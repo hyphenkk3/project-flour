@@ -1,0 +1,185 @@
+---
+description: Permanent development standards for Project Flour (Whitebird Operating System)
+alwaysApply: true
+---
+
+# Project Flour Global Rule
+
+## 1. Technology Stack
+
+Project Flour is a production-grade web platform.
+
+Technology stack:
+
+- Next.js (App Router)
+- React
+- TypeScript (strict mode)
+- Tailwind CSS
+- Supabase
+- PostgreSQL
+- GitHub
+- Vercel
+- Mobile-first responsive design
+
+Do not introduce additional frameworks or libraries unless explicitly approved.
+
+---
+
+## 2. Coding Standards
+
+- TypeScript strict mode.
+- Reusable components.
+- Clean architecture.
+- Small focused files.
+- Strong typing.
+- Meaningful naming.
+- Avoid duplicated logic.
+- Prefer composition over large monolithic components.
+- Prefer server-side validation for business logic.
+- Never hardcode configurable business rules.
+- Code should be production-ready rather than prototype quality.
+
+---
+
+## 3. Terminology
+
+Official product name:
+
+Whitebird Operating System (WOS)
+
+Internal codename:
+
+Project Flour
+
+Official workspace names:
+
+- Home
+- Customer Operations
+- Bakery
+- Collection
+- Management
+- Owner
+
+Never replace these names with generic software terminology.
+
+Use "Bakery", never "Kitchen".
+
+---
+
+## 4. Architecture Philosophy
+
+Project Flour follows a layered architecture.
+
+Foundation Layer
+
+- Authentication
+- Users
+- Roles
+- Audit
+- Timeline
+
+Core Engine Layer
+
+- Business Rules Engine
+- Business Calendar Engine
+- Menu Engine
+- Capacity Engine
+- Order Validation Engine
+- Task Engine
+- Responsibility Engine
+- Suggestion Engine
+
+Workspace Layer
+
+- Home
+- Customer Operations
+- Bakery
+- Collection
+- Management
+- Owner
+
+Future modules must extend this architecture instead of replacing it.
+
+---
+
+## 5. Implementation Principles
+
+Implement one milestone at a time.
+
+Every milestone must:
+
+- compile successfully
+- be deployable
+- be independently testable
+
+Never redesign previous milestones unless explicitly requested.
+
+Prefer incremental implementation.
+
+Do not generate speculative features.
+
+If requirements are unclear, ask.
+
+---
+
+## 6. Business Rules Philosophy
+
+Business rules belong to the Business Rules Engine.
+
+Business rules must not be duplicated throughout the application.
+
+Whenever practical, business rules should be configurable instead of hardcoded.
+
+Examples:
+
+- pickup windows
+- operating hours
+- business calendar
+- capacity
+- seasonal availability
+- order cutoff
+
+Operational decisions remain human decisions.
+
+The system may recommend actions but must never automatically perform business decisions unless explicitly requested.
+
+---
+
+## 7. Do's
+
+- Build maintainable code.
+- Use reusable components.
+- Respect existing architecture.
+- Keep business logic separate from UI.
+- Keep database migrations reversible.
+- Use meaningful commit structure.
+- Ask questions instead of inventing requirements.
+
+---
+
+## 8. Don'ts
+
+Do not:
+
+- redesign architecture
+- rename agreed terminology
+- introduce unnecessary dependencies
+- hardcode business rules
+- create generic dashboard templates
+- generate fake placeholder business logic
+- silently change database schema
+- implement automatic business decisions
+
+If unsure, stop and ask.
+
+---
+
+## Project Philosophy
+
+Project Flour is not a generic bakery POS.
+
+It is a long-term operational platform for Whitebird Cake House.
+
+The objective is to mirror real business operations rather than generic software patterns.
+
+Architecture decisions always take precedence over implementation convenience.
