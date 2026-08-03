@@ -1,8 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseEnv } from "@/lib/supabase/env";
+import {
+  AUTH_FETCH_TIMEOUT_MS,
+  fetchWithTimeout,
+} from "@/lib/supabase/fetch-timeout";
 
-export async function updateSession(request: NextRequest) {
+export async function updateSession(
+  request: NextRequest,
+  timeoutMs: number = AUTH_FETCH_TIMEOUT_MS,
+) {
   let supabaseResponse = NextResponse.next({ request });
   const { url, anonKey } = getSupabaseEnv();
 
@@ -20,6 +27,11 @@ export async function updateSession(request: NextRequest) {
           supabaseResponse.cookies.set(name, value, options);
         });
       },
+    },
+    global: {
+      // Hard abort — Promise.race alone leaves getUser() running and can
+      // exhaust the process until even public routes stop responding.
+      fetch: fetchWithTimeout(timeoutMs),
     },
   });
 

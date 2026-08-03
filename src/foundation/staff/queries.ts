@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { AUTH_FETCH_TIMEOUT_MS } from "@/lib/supabase/fetch-timeout";
 import type { Role, RoleCode, StaffProfile } from "@/types/staff";
 
 type RoleRow = {
@@ -81,7 +82,7 @@ export async function findStaffByUsername(username: string) {
 }
 
 export async function getStaffByAuthUserId(authUserId: string) {
-  const supabase = await createClient();
+  const supabase = await createClient({ timeoutMs: AUTH_FETCH_TIMEOUT_MS });
 
   const { data, error } = await supabase
     .from("staff_profiles")

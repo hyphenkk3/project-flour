@@ -37,6 +37,12 @@
 - Date helpers + status design tokens
 - No Orders; Customers left unchanged
 
+## V0.3 Preview 1 — Order Foundation (Sprint 1.1)
+
+- Orders entity + Customer Operations Orders routes
+- Create / list / search / detail / confirm / payment status
+- No products, Bakery, Collection, or Timeline
+
 ## Sprint 3+ — Later
 
 - Core engines

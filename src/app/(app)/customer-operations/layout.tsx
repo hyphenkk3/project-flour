@@ -1,6 +1,7 @@
-import { redirect } from "next/navigation";
+import { CustomerOperationsNav } from "@/workspaces/customer-operations/CustomerOperationsNav";
 import { requireStaff } from "@/foundation/auth/session";
 import { canAccessWorkspace } from "@/foundation/navigation/access";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -15,5 +16,10 @@ export default async function CustomerOperationsLayout({
     redirect("/home");
   }
 
-  return children;
+  return (
+    <div>
+      <CustomerOperationsNav />
+      {children}
+    </div>
+  );
 }

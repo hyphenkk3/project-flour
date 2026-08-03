@@ -1,2 +1,2 @@
 /** Customer Operations workspace. */
-export {};
+export { CustomerOperationsNav } from "@/workspaces/customer-operations/CustomerOperationsNav";

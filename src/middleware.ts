@@ -1,29 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
+import { AUTH_FETCH_TIMEOUT_MS } from "@/lib/supabase/fetch-timeout";
 
 const PUBLIC_PATHS = new Set(["/", "/login"]);
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.has(pathname);
-}
-
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        timer = setTimeout(() => {
-          reject(new Error("Supabase session validation timed out."));
-        }, ms);
-      }),
-    ]);
-  } finally {
-    if (timer) {
-      clearTimeout(timer);
-    }
-  }
 }
 
 export async function middleware(request: NextRequest) {
@@ -35,9 +17,9 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    const { user, supabaseResponse } = await withTimeout(
-      updateSession(request),
-      3000,
+    const { user, supabaseResponse } = await updateSession(
+      request,
+      AUTH_FETCH_TIMEOUT_MS,
     );
 
     if (!user) {
@@ -48,7 +30,7 @@ export async function middleware(request: NextRequest) {
 
     return supabaseResponse;
   } catch {
-    // Fail safe: never hang protected routes if Supabase is unavailable.
+    // Timeout / network failure: fail closed to login, never hang.
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
     return NextResponse.redirect(loginUrl);

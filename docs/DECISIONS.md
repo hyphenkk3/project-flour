@@ -2,6 +2,25 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-03 — Auth fetch timeouts must abort
+
+- Middleware and server Supabase clients use `AbortSignal.timeout` on fetch.
+- `Promise.race` timeouts alone are insufficient: abandoned `getUser()` calls can exhaust the process until public routes hang.
+- Public paths (`/`, `/login`) still skip Supabase entirely.
+- `getSessionStaff` is React `cache()`-scoped per request to avoid duplicate auth work in nested layouts.
+
+## 2026-08-03 — V0.3 Preview 1 Order Foundation (Sprint 1.1)
+
+- Orders live under Customer Operations (`/customer-operations/orders`).
+- Order numbers: `ORD-YYYYMMDD-####` allocated in Asia/Singapore via `allocate_order_number()`.
+- No products/line items yet (Sprint 2).
+- Status includes Completed as a placeholder value; UI does not set it in this sprint.
+- Payment Refunded is a placeholder value; UI does not set it in this sprint.
+- Soft cancel only (status = cancelled); no hard deletes.
+- CO section tabs: Customers | Orders (shell navigation unchanged).
+- Fulfilment methods: Pickup, Delivery, Drive-through.
+- Payment may be recorded only after Confirm (or Awaiting Payment).
+
 ## 2026-08-03 — Foundation Pack 1 shared UI
 
 - Reusable UI primitives live under `src/components/ui/` for future modules.
