@@ -1,23 +1,26 @@
 "use client";
 
 import { useActionState } from "react";
-import {
-  loginAction,
-  type LoginState,
-} from "@/foundation/auth/actions";
+import { loginAction, type LoginState } from "@/foundation/auth/actions";
 
 const initialState: LoginState = { error: null };
 
 export function LoginForm() {
-  const [state, formAction, pending] = useActionState(loginAction, initialState);
+  const [state, formAction, pending] = useActionState(
+    loginAction,
+    initialState,
+  );
 
   return (
-    <form action={formAction} className="mt-10 flex w-full max-w-sm flex-col gap-5">
-      <label className="flex flex-col gap-2 text-sm text-skyline">
+    <form
+      action={formAction}
+      className="mt-10 flex w-full max-w-sm flex-col gap-5"
+    >
+      <label className="text-skyline flex flex-col gap-2 text-sm">
         Username
         <input
           autoComplete="username"
-          className="rounded-md border border-fog bg-white px-3 py-2.5 text-base text-ink outline-none focus:border-signal"
+          className="border-fog text-ink focus:border-signal rounded-md border bg-white px-3 py-2.5 text-base outline-none"
           name="username"
           required
           spellCheck={false}
@@ -25,11 +28,11 @@ export function LoginForm() {
         />
       </label>
 
-      <label className="flex flex-col gap-2 text-sm text-skyline">
+      <label className="text-skyline flex flex-col gap-2 text-sm">
         Password
         <input
           autoComplete="current-password"
-          className="rounded-md border border-fog bg-white px-3 py-2.5 text-base text-ink outline-none focus:border-signal"
+          className="border-fog text-ink focus:border-signal rounded-md border bg-white px-3 py-2.5 text-base outline-none"
           name="password"
           required
           type="password"
@@ -43,7 +46,7 @@ export function LoginForm() {
       ) : null}
 
       <button
-        className="mt-2 rounded-md bg-ink px-4 py-3 text-sm font-medium text-mist transition hover:bg-skyline disabled:opacity-60"
+        className="bg-ink text-mist hover:bg-skyline mt-2 rounded-md px-4 py-3 text-sm font-medium transition disabled:opacity-60"
         disabled={pending}
         type="submit"
       >

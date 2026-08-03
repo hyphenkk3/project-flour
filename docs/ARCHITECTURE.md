@@ -31,4 +31,7 @@ src/
 
 Future modules extend this architecture; they do not replace it.
 
+Shared UI primitives for workspaces live under `src/components/ui/`
+(Foundation Pack 1). Shell chrome remains under `src/components/shell/`.
+
 > Sprint 1 establishes application structure only. Supabase and authentication arrive in later sprints.

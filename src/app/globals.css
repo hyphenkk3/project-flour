@@ -6,6 +6,16 @@
   --color-fog: #d7e0e8;
   --color-skyline: #3d5a73;
   --color-signal: #2f6f6a;
+
+  /* Status tones — Foundation Pack 1 */
+  --color-status-info: #2f5f8a;
+  --color-status-info-soft: #e8f0f7;
+  --color-status-success: #2f6b4f;
+  --color-status-success-soft: #e7f3ec;
+  --color-status-warning: #8a6a2f;
+  --color-status-warning-soft: #f7f1e4;
+  --color-status-danger: #8a3a3a;
+  --color-status-danger-soft: #f7e8e8;
 }
 
 @theme inline {
@@ -16,6 +26,14 @@
   --color-fog: var(--color-fog);
   --color-skyline: var(--color-skyline);
   --color-signal: var(--color-signal);
+  --color-status-info: var(--color-status-info);
+  --color-status-info-soft: var(--color-status-info-soft);
+  --color-status-success: var(--color-status-success);
+  --color-status-success-soft: var(--color-status-success-soft);
+  --color-status-warning: var(--color-status-warning);
+  --color-status-warning-soft: var(--color-status-warning-soft);
+  --color-status-danger: var(--color-status-danger);
+  --color-status-danger-soft: var(--color-status-danger-soft);
 }
 
 body {
@@ -36,7 +54,7 @@ body {
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(1.25rem);
+    transform: translateY(1rem);
   }
   to {
     opacity: 1;
@@ -50,18 +68,47 @@ body {
     transform: translate(0, 0);
   }
   50% {
-    transform: translate(-1.5rem, 1rem);
+    transform: translate(-1rem, 0.75rem);
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
 @utility animate-fade-in {
-  animation: fade-in 1.1s ease-out both;
+  animation: fade-in 1s ease-out both;
 }
 
 @utility animate-rise {
-  animation: rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+  animation: rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
 }
 
 @utility animate-drift {
-  animation: drift 14s ease-in-out infinite;
+  animation: drift 16s ease-in-out infinite;
+}
+
+@utility animate-skeleton {
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+@utility animate-toast-in {
+  animation: toast-in 0.25s ease-out both;
 }

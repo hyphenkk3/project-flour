@@ -2,6 +2,33 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-03 — Foundation Pack 1 shared UI
+
+- Reusable UI primitives live under `src/components/ui/` for future modules.
+- Toast provider mounts in authenticated `AppShellFrame` only.
+- Shell `EmptyState` re-exports the shared UI empty state (same API, additive props).
+- Date helpers default to Asia/Singapore (`en-SG`) in `src/lib/dates.ts`.
+- Status/toast tones are design tokens in `globals.css` + `src/lib/design-tokens.ts`.
+- Customer Operations pages are not migrated onto these primitives in this pack.
+
+## 2026-08-03 — WhatsApp preferred contact identifiers
+
+- Preferred Contact = WhatsApp is valid when a phone number **or** a WhatsApp username is present.
+- Staff may contact the customer on WhatsApp using either identifier; a username is not required when a phone number exists.
+
+## 2026-08-02 — V0.2 Preview 1 customer foundation
+
+- Customer Operations workspace: list, profile, add/edit customer, addresses, search.
+- Tables: `customers`, `customer_addresses` with RLS for authenticated staff.
+- Orders and Timeline shown as Coming in V0.3 placeholders only.
+
+## 2026-08-02 — V0.1.1 application shell
+
+- Authenticated routes use a reusable AppShell (sidebar, mobile bottom nav, header).
+- Workspace navigation visibility is centralized in `foundation/navigation/workspaces.ts` by role.
+- Only Home is implemented; other visible workspaces show as “Coming later”.
+- No fake business metrics or operational modules.
+
 ## 2026-08-02 — Task 002 staff login
 
 - App login identifier is always **username** (never email).

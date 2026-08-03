@@ -19,6 +19,24 @@
 - Minimal authenticated Home
 - Dev Owner seed (`npm run seed:dev`)
 
+## V0.1.1 — Application shell
+
+- Reusable authenticated AppShell
+- Role-aware workspace navigation (Home only active)
+- Mobile bottom navigation + desktop sidebar
+
+## V0.2 Preview 1 — Customer Foundation
+
+- Customer Operations: customers, addresses, search
+- Orders / Timeline placeholders for V0.3
+
+## Foundation Pack 1 — Shared UI infrastructure
+
+- Breadcrumb, toast, confirm dialog, status badge
+- Shared empty state, skeletons, form controls, page section
+- Date helpers + status design tokens
+- No Orders; Customers left unchanged
+
 ## Sprint 3+ — Later
 
 - Core engines

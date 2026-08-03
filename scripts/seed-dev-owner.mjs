@@ -71,7 +71,9 @@ async function main() {
     .single();
 
   if (roleError || !ownerRole) {
-    throw roleError ?? new Error("Owner role not found. Apply migrations first.");
+    throw (
+      roleError ?? new Error("Owner role not found. Apply migrations first.")
+    );
   }
 
   const { data: existingProfile } = await admin

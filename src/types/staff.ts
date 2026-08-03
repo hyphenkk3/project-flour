@@ -1,9 +1,5 @@
 export type RoleCode =
-  | "owner"
-  | "manager"
-  | "customer_operations"
-  | "bakery"
-  | "collection";
+  "owner" | "manager" | "customer_operations" | "bakery" | "collection";
 
 export type Role = {
   id: string;
