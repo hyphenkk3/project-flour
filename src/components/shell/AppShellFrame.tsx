@@ -15,8 +15,14 @@ type AppShellFrameProps = {
 };
 
 function titleForPath(pathname: string): string {
+  if (pathname.startsWith("/owner")) {
+    return "Operations";
+  }
   if (pathname.startsWith("/customer-operations")) {
     return "Customer Operations";
+  }
+  if (pathname.startsWith("/library")) {
+    return "Library";
   }
   return "Home";
 }

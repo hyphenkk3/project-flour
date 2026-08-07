@@ -13,7 +13,9 @@ export function isWorkspaceNavActive(
   }
 
   return (
-    item.id === "customer_operations" &&
-    currentPath.startsWith("/customer-operations")
+    (item.id === "customer_operations" &&
+      currentPath.startsWith("/customer-operations")) ||
+    (item.id === "library" && currentPath.startsWith("/library")) ||
+    (item.id === "owner" && currentPath.startsWith("/owner"))
   );
 }

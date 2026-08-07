@@ -5,9 +5,21 @@ import type {
   TextareaHTMLAttributes,
 } from "react";
 
+/**
+ * Shared control chrome for primary form fields (input + select).
+ * Fixed height so native selects match text/date inputs visually.
+ */
+const controlBase =
+  "box-border h-12 w-full rounded-lg border border-fog bg-white px-3 text-base font-normal leading-none text-ink outline-none transition-colors focus:border-signal disabled:cursor-not-allowed disabled:opacity-60";
+
+const selectChevron =
+  "appearance-none bg-[length:1rem_1rem] bg-[right_0.75rem_center] bg-no-repeat pr-10 [background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E\")]";
+
 export const formStyles = {
-  fieldClass:
-    "w-full rounded-lg border border-fog bg-white px-3 py-3 text-base text-ink outline-none focus:border-signal min-h-12",
+  fieldClass: controlBase,
+  selectClass: `${controlBase} ${selectChevron}`,
+  textareaClass:
+    "box-border min-h-28 w-full resize-y rounded-lg border border-fog bg-white px-3 py-3 text-base font-normal leading-normal text-ink outline-none transition-colors focus:border-signal disabled:cursor-not-allowed disabled:opacity-60",
   labelClass: "flex flex-col gap-1.5 text-sm font-medium text-ink",
   helpClass: "text-skyline text-xs font-normal",
   errorClass:
@@ -57,7 +69,7 @@ type FormTextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement>;
 export function FormTextarea({ className = "", ...props }: FormTextareaProps) {
   return (
     <textarea
-      className={`${formStyles.fieldClass} min-h-28 resize-y ${className}`.trim()}
+      className={`${formStyles.textareaClass} ${className}`.trim()}
       {...props}
     />
   );
@@ -72,7 +84,7 @@ export function FormSelect({
 }: FormSelectProps) {
   return (
     <select
-      className={`${formStyles.fieldClass} ${className}`.trim()}
+      className={`${formStyles.selectClass} ${className}`.trim()}
       {...props}
     >
       {children}

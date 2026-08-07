@@ -2,10 +2,22 @@ import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 import { AUTH_FETCH_TIMEOUT_MS } from "@/lib/supabase/fetch-timeout";
 
-const PUBLIC_PATHS = new Set(["/", "/login"]);
+const PUBLIC_PATHS = new Set([
+  "/",
+  "/login",
+  "/browse",
+  "/order",
+  "/order/success",
+]);
 
 function isPublicPath(pathname: string) {
-  return PUBLIC_PATHS.has(pathname);
+  return (
+    PUBLIC_PATHS.has(pathname) ||
+    pathname.startsWith("/browse/") ||
+    pathname.startsWith("/cakes/") ||
+    pathname.startsWith("/order/") ||
+    pathname.startsWith("/preview")
+  );
 }
 
 export async function middleware(request: NextRequest) {

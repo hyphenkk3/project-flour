@@ -24,12 +24,16 @@ export async function loginAction(
     return { error: genericLoginError };
   }
 
+  let roleCode: string | null = null;
+
   try {
     const staff = await findStaffByUsername(username);
 
     if (!staff || !staff.isActive) {
       return { error: genericLoginError };
     }
+
+    roleCode = staff.role.code;
 
     const authEmail = await getAuthEmailForUserId(staff.authUserId);
 
@@ -50,7 +54,7 @@ export async function loginAction(
     return { error: genericLoginError };
   }
 
-  redirect("/home");
+  redirect(roleCode === "owner" ? "/owner" : "/home");
 }
 
 export async function logoutAction() {

@@ -14,7 +14,7 @@ export type FulfilmentMethod = "pickup" | "delivery" | "drive_through";
 export type Order = {
   id: string;
   orderNumber: string;
-  customerId: string;
+  customerId: string | null;
   fulfilmentMethod: FulfilmentMethod;
   pickupDate: string;
   pickupTime: string;
@@ -22,6 +22,9 @@ export type Order = {
   paymentStatus: PaymentStatus;
   internalNotes: string | null;
   customerNotes: string | null;
+  guestName: string | null;
+  guestPhone: string | null;
+  guestEmail: string | null;
   createdBy: string | null;
   updatedBy: string | null;
   createdAt: string;

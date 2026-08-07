@@ -22,7 +22,7 @@ type StaffEmbed = {
 type OrderRow = {
   id: string;
   order_number: string;
-  customer_id: string;
+  customer_id: string | null;
   fulfilment_method: FulfilmentMethod;
   pickup_date: string;
   pickup_time: string;
@@ -30,6 +30,9 @@ type OrderRow = {
   payment_status: PaymentStatus;
   internal_notes: string | null;
   customer_notes: string | null;
+  guest_name: string | null;
+  guest_phone: string | null;
+  guest_email: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -58,6 +61,9 @@ function mapOrder(row: OrderRow): Order {
     paymentStatus: row.payment_status,
     internalNotes: row.internal_notes,
     customerNotes: row.customer_notes,
+    guestName: row.guest_name,
+    guestPhone: row.guest_phone,
+    guestEmail: row.guest_email,
     createdBy: row.created_by,
     updatedBy: row.updated_by,
     createdAt: row.created_at,
@@ -103,6 +109,9 @@ const listSelect = `
   payment_status,
   internal_notes,
   customer_notes,
+  guest_name,
+  guest_phone,
+  guest_email,
   created_by,
   updated_by,
   created_at,

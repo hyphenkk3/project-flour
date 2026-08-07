@@ -1,7 +1,13 @@
 import type { RoleCode } from "@/types/staff";
 
 export type WorkspaceId =
-  "home" | "customer_operations" | "bakery" | "collection" | "management";
+  | "home"
+  | "owner"
+  | "customer_operations"
+  | "bakery"
+  | "collection"
+  | "library"
+  | "management";
 
 export type WorkspaceNavItem = {
   id: WorkspaceId;
@@ -23,6 +29,12 @@ export const WORKSPACE_CATALOG: Record<WorkspaceId, WorkspaceNavItem> = {
     href: "/home",
     available: true,
   },
+  owner: {
+    id: "owner",
+    label: "Operations",
+    href: "/owner",
+    available: true,
+  },
   customer_operations: {
     id: "customer_operations",
     label: "Customer Operations",
@@ -41,6 +53,12 @@ export const WORKSPACE_CATALOG: Record<WorkspaceId, WorkspaceNavItem> = {
     href: null,
     available: false,
   },
+  library: {
+    id: "library",
+    label: "Library",
+    href: "/library/cakes",
+    available: true,
+  },
   management: {
     id: "management",
     label: "Management",
@@ -54,12 +72,13 @@ export const WORKSPACE_CATALOG: Record<WorkspaceId, WorkspaceNavItem> = {
  * Components must consume this via getNavigationForRole — do not duplicate.
  */
 export const ROLE_NAVIGATION: Record<RoleCode, readonly WorkspaceId[]> = {
-  owner: ["home", "customer_operations", "bakery", "collection", "management"],
+  owner: ["owner", "customer_operations", "library"],
   manager: [
     "home",
     "customer_operations",
     "bakery",
     "collection",
+    "library",
     "management",
   ],
   customer_operations: ["home", "customer_operations", "collection"],
@@ -68,5 +87,7 @@ export const ROLE_NAVIGATION: Record<RoleCode, readonly WorkspaceId[]> = {
 };
 
 export function getNavigationForRole(role: RoleCode): WorkspaceNavItem[] {
-  return ROLE_NAVIGATION[role].map((id) => WORKSPACE_CATALOG[id]);
+  return ROLE_NAVIGATION[role]
+    .map((id) => WORKSPACE_CATALOG[id])
+    .filter((item) => item.available && Boolean(item.href));
 }

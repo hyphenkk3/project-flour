@@ -15,8 +15,12 @@ const display = Newsreader({
 });
 
 export const metadata: Metadata = {
-  title: "Whitebird Operating System",
-  description: "Operational platform for Whitebird Cake House",
+  title: {
+    default: "Whitebird",
+    template: "%s · Whitebird",
+  },
+  description:
+    "Whitebird Cake House — celebrations, cakes, and the Whitebird order experience.",
 };
 
 export default function RootLayout({

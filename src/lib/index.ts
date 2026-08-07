@@ -2,6 +2,10 @@
 export {
   formatDate,
   formatDateTime,
+  formatDdMmYyyy,
+  formatLongBusinessDate,
+  formatShortBusinessDate,
+  parseBusinessDate,
   formatLongDate,
   formatTime,
   toBusinessDateKey,
