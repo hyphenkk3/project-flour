@@ -2,9 +2,46 @@
 
 Record of durable project decisions. Newest first.
 
-## 2026-08-07 — Milestone 3 Preview 2 · Final closed behaviour
+## 2026-08-07 — Milestone 3 Preview 2 · Final closed behaviour (Product-tested)
 
 Milestone 3 Preview 2 is closed. Preview 3 has not started.
+
+Final lifecycle corrections after checkpoint `9068d2fb` were Product-browser-tested
+and committed separately. These principles supersede earlier Preview 2 notes that
+said orders/discounts freeze after payment or that Payment Request always asks for
+the full Amount Due.
+
+### Lifecycle principles
+
+1. **Payment does not freeze an order.** Active preorders remain editable through
+   `submitted`, `pending_confirmation`, `awaiting_payment`, and `paid`.
+   Verified payment records themselves remain immutable.
+
+2. **Verified payments are historical facts.** Never rewrite/delete verified
+   payments or allocations because the order or discount changes later.
+   Settlement recalculates around money already received.
+
+3. **Discounts do not freeze after payment.** Staff may Change/Remove discounts
+   after payment via compensating adjustments; preserve the audit trail.
+
+4. **Settlement determines current financial position** after order/discount amendment:
+   - `netReceived < amountDue` → Awaiting Payment
+   - `netReceived = amountDue` → Paid · Preorder Secured
+   - `netReceived > amountDue` → Paid · Preorder Secured + Overpaid (no auto-refund)
+
+5. **Outstanding-balance Payment Request.** With no prior payment, request full
+   Amount Due. When prior verified payment exists and balance remains, request
+   only `remainingBalance` (message shows Cake Total / effective discount /
+   Amount Due / Payment Received / Balance to Pay). No normal Payment Request
+   when Balance = RM0 or Overpaid.
+
+6. **Overpayment.** Show Overpaid clearly. Do not automatically refund or alter
+   Received. Refund/payment-correction workflow is future work.
+
+7. **Discount eligibility after amendment.** Do not automatically remove an
+   already-granted discount when the amended order no longer meets normal rules.
+   Staff controls Change/Remove. Soft eligibility warnings may inform staff
+   without mutating financial history.
 
 ### Payments & settlement
 
@@ -23,8 +60,13 @@ Milestone 3 Preview 2 is closed. Preview 3 has not started.
 - August Promo 2026 (`august_promo_2026`) is a temporary rule, not the architecture.
 - RM10 physical Discount Cards use structured voucher registry + redemptions (not Library catalog vouchers).
 - No stacking August Promo + RM10 on the same order.
-- Change/Remove blocked after verified payment received or Paid.
+- Change/Remove remains available after verified payment or Paid (compensating adjustments only).
 - Customer Payment Request shows effective discounts only; staff retains full audit.
+
+### Catalog / Collection
+
+- Master Library Active ≠ automatically customer-facing.
+- Customer-facing cakes require explicit Collection membership (`collection_cakes`).
 
 ### Customer contact
 
@@ -57,22 +99,24 @@ Milestone 3 Preview 2 is closed. Preview 3 has not started.
 
 ### Deferred (not Preview 2)
 
-- Submission receipt email provider/delivery
-- WhatsApp usernames
+- Refund / payment-correction workflow (including handling of Overpaid)
+- Actual submission receipt email delivery / provider
+- WhatsApp username support
 - Persistent NEW/unread Operations tracking
-- Refunds / payment corrections / overpayment / multi-order allocation UI
 - POS checkout / pickup completion / Bakery workspace
+- EXTRA Hold for Walk-in / Walk-in EXTRA recording
 - Generic Promotions admin / Business Settings
 - Voucher photo storage / OCR
+- Studio / Collection Builder
+- Multi-order payment allocation UI
 - Automatic last-minute 15-minute classification
-- **EXTRA Hold for Walk-in:** when EXTRA stock is listed publicly and a walk-in wants that stock, staff need to temporarily PAUSE/HOLD that EXTRA on the public link while serving the walk-in so another online customer cannot take the same stock; then a **Walk-in** sale/order path must record the EXTRA as sold (audit), not silently disappear. Future milestone — not Preview 2/3 scope until Product schedules it.
 
 ## 2026-08-07 — Milestone 3 Preview 2 · Discount lifecycle (change/remove)
 
 - Discounts are changed/removed via compensating adjustments — never delete or mutate amounts.
 - Original rows keep amounts; lifecycle `status` becomes `reversed`; reversal row links via `reverses_adjustment_id`.
 - Customer Payment Request shows effective discounts only; staff timeline retains full audit.
-- Change/Remove blocked when verified payments exist or order is Paid.
+- Superseded: earlier note that Change/Remove was blocked after payment — final Product decision keeps discounts mutable after payment (see Final closed behaviour).
 - Atomic RPC replaces August Promo with RM10 voucher redemption.
 
 ## 2026-08-07 — Milestone 3 Preview 2 · Discounts & adjustments
@@ -81,8 +125,8 @@ Milestone 3 Preview 2 is closed. Preview 3 has not started.
 - August Promo 2026 is a temporary rule implementation (`august_promo_2026`), not the architecture.
 - RM10 physical discount cards use a structured voucher registry + redemption records (not Library catalog vouchers).
 - No stacking August Promo + RM10 on the same order in Preview 2.
-- Adjustments blocked after verified payments or Paid (corrections/refunds deferred).
-- Applied adjustments are immutable (no silent delete); reversal UX deferred.
+- Superseded: earlier note that adjustments were blocked after payment — final Product decision keeps discount Change/Remove available after payment via compensating rows.
+- Applied adjustment amounts are never silently deleted or rewritten.
 - RM10 card issuance suppression retains reason codes for later Counter/Bakery.
 - Not in Preview 2: refunds UI, payment corrections, multi-order allocation, POS, Bakery, EXTRA Hold for Walk-in.
 

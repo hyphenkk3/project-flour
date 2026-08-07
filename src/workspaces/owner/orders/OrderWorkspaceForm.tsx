@@ -44,6 +44,7 @@ import {
   formatTimelineDateTime,
   guestOrderStatusLabel,
   guestOrderStatusTone,
+  isGuestOrderEditable,
 } from "@/workspaces/owner/orders/labels";
 
 const initialSaveState: OrderWorkspaceSaveState = {
@@ -112,8 +113,7 @@ export function OrderWorkspaceForm({
     EditableComplimentary[]
   >([]);
 
-  const canEdit =
-    order.status === "submitted" || order.status === "pending_confirmation";
+  const canEdit = isGuestOrderEditable(order.status);
 
   useEffect(() => {
     if (!state.success) return;

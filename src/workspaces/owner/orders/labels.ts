@@ -16,6 +16,17 @@ export function guestOrderStatusLabel(
   }
 }
 
+/** Active preorder statuses that Owner may still amend. Payment does not freeze the order. */
+export const GUEST_ORDER_EDITABLE_STATUSES: ReadonlyArray<
+  StorefrontOrder["status"]
+> = ["submitted", "pending_confirmation", "awaiting_payment", "paid"];
+
+export function isGuestOrderEditable(
+  status: StorefrontOrder["status"],
+): boolean {
+  return (GUEST_ORDER_EDITABLE_STATUSES as readonly string[]).includes(status);
+}
+
 /**
  * Semantic Operations status colors (text remains the primary signal).
  * Submitted → amber · pending confirmation → blue · awaiting payment → purple · paid → green.

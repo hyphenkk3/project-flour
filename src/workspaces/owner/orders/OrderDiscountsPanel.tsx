@@ -15,6 +15,8 @@ import {
   AUGUST_PROMO_CODE,
   AUGUST_PROMO_LABEL,
   evaluateAugustPromoEligibility,
+  evaluateAugustPromoRuleFit,
+  evaluateRm10CardRuleFit,
   getEffectiveAdjustments,
   hasActiveAdjustmentCode,
   RM10_CARD_AMOUNT,
@@ -25,6 +27,7 @@ import {
 } from "@/engines/orders/promotions";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type { StorefrontOrder } from "@/types/storefront";
+import { isGuestOrderEditable } from "@/workspaces/owner/orders/labels";
 import {
   applyAugustPromoAction,
   changeAugustPromoToRm10Action,
@@ -65,9 +68,7 @@ export function OrderDiscountsPanel({ order }: OrderDiscountsPanelProps) {
   );
   const hasAugust = hasActiveAdjustmentCode(order.adjustments, AUGUST_PROMO_CODE);
   const hasRm10 = hasActiveAdjustmentCode(order.adjustments, RM10_CARD_CODE);
-  const hasVerifiedPayments = order.settlement.netReceived > 0;
-  const canMutateDiscounts =
-    order.status !== "paid" && !hasVerifiedPayments;
+  const canMutateDiscounts = isGuestOrderEditable(order.status);
   const orderDate = singaporeDateFromIso(order.createdAt);
 
   const activePromo = effective.find((row) => row.code === AUGUST_PROMO_CODE);
@@ -80,12 +81,36 @@ export function OrderDiscountsPanel({ order }: OrderDiscountsPanelProps) {
     subtotal: order.settlement.subtotal,
     hasAugustPromo: hasAugust,
     hasRm10Card: hasRm10,
-    hasVerifiedPayments,
+    hasVerifiedPayments: order.settlement.netReceived > 0,
     orderStatus: order.status,
   });
 
-  const canOfferRm10Form =
-    canMutateDiscounts && !hasAugust && !hasRm10;
+  const augustRuleFit = evaluateAugustPromoRuleFit({
+    orderSource: order.orderSource,
+    orderDate,
+    pickupDate: order.pickupDate,
+    subtotal: order.settlement.subtotal,
+  });
+
+  const rm10Expiry =
+    typeof activeRm10?.metadata.expiry_date === "string"
+      ? activeRm10.metadata.expiry_date
+      : null;
+  const rm10RuleFit = rm10Expiry
+    ? evaluateRm10CardRuleFit({
+        items: order.items,
+        orderDate,
+        pickupDate: order.pickupDate,
+        expiryDate: rm10Expiry,
+      })
+    : evaluateRm10CardRuleFit({
+        items: order.items,
+        orderDate,
+        pickupDate: order.pickupDate,
+        expiryDate: "9999-12-31",
+      });
+
+  const canOfferRm10Form = canMutateDiscounts && !hasAugust && !hasRm10;
 
   const boundRedeem = redeemRm10VoucherAction.bind(null, order.id);
   const [redeemState, redeemAction, redeemPending] = useActionState(
@@ -181,10 +206,19 @@ export function OrderDiscountsPanel({ order }: OrderDiscountsPanelProps) {
         </p>
       ) : null}
 
-      {hasVerifiedPayments && (hasAugust || hasRm10) ? (
-        <p className="text-skyline text-xs">
-          Payment has already been received. Discount changes require a payment
-          correction/refund workflow.
+      {hasAugust && !augustRuleFit.eligible ? (
+        <p className="text-status-warning text-xs">
+          {AUGUST_PROMO_LABEL} no longer meets its normal eligibility rules
+          {augustRuleFit.reason ? ` (${augustRuleFit.reason})` : ""}. Staff may
+          still keep, change, or remove it.
+        </p>
+      ) : null}
+
+      {hasRm10 && !rm10RuleFit.eligible ? (
+        <p className="text-status-warning text-xs">
+          {RM10_CARD_LABEL} no longer meets its normal eligibility rules
+          {rm10RuleFit.reason ? ` (${rm10RuleFit.reason})` : ""}. Staff may still
+          keep or remove it.
         </p>
       ) : null}
 

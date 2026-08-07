@@ -39,10 +39,12 @@ export function PaymentSection({ order }: PaymentSectionProps) {
     order.status,
     order.paymentDeadlineAt,
   );
-  const canRecord = order.status === "awaiting_payment";
-  const canRequest = order.status === "awaiting_payment";
+  const canRecord =
+    order.status === "awaiting_payment" && settlement.remainingBalance > 0;
+  const canRequest =
+    order.status === "awaiting_payment" && settlement.remainingBalance > 0;
   const canExtendFollowUp =
-    canRecord && Boolean(order.paymentDeadlineAt);
+    order.status === "awaiting_payment" && Boolean(order.paymentDeadlineAt);
 
   const cakeBreakdown = buildCakePriceBreakdown(
     order.items.map((item) => ({
@@ -106,7 +108,9 @@ export function PaymentSection({ order }: PaymentSectionProps) {
 
       <OrderDiscountsPanel order={order} />
 
-      <dl className="grid gap-2 text-sm sm:grid-cols-3">
+      <dl
+        className={`grid gap-2 text-sm ${settlement.overpayment > 0 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}
+      >
         <div>
           <dt className="text-skyline">Amount due</dt>
           <dd className="text-ink font-semibold">
@@ -125,7 +129,21 @@ export function PaymentSection({ order }: PaymentSectionProps) {
             {formatRm(settlement.remainingBalance)}
           </dd>
         </div>
+        {settlement.overpayment > 0 ? (
+          <div>
+            <dt className="text-skyline">Overpaid</dt>
+            <dd className="text-status-warning font-semibold">
+              {formatRm(settlement.overpayment)}
+            </dd>
+          </div>
+        ) : null}
       </dl>
+      {settlement.overpayment > 0 ? (
+        <p className="text-skyline text-sm">
+          Customer has paid more than the current amount due. Do not change
+          Payment History here — refund/correction is a separate workflow.
+        </p>
+      ) : null}
 
       {!isPaid && order.paymentDeadlineAt ? (
         <div className="space-y-1">

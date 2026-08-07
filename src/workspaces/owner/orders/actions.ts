@@ -7,12 +7,17 @@ import {
   generateConfirmationMessage,
 } from "@/engines/orders/confirmation-message";
 import { orderMateriallyAffectsConfirmation } from "@/engines/orders/confirmation-validity";
+import { reconcilePaymentLifecycleStatus } from "@/engines/orders/payment-status";
 import { isValidPickupSlot } from "@/engines/business-calendar/pickup-slots";
 import { requireStaff } from "@/foundation/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import type { StorefrontOrderListItem } from "@/types/storefront";
+import type {
+  StorefrontOrder,
+  StorefrontOrderListItem,
+} from "@/types/storefront";
 import {
   fromDatetimeLocalValue,
+  isGuestOrderEditable,
 } from "@/workspaces/owner/orders/labels";
 import {
   getGuestOrderById,
@@ -54,6 +59,45 @@ async function insertTimelineEvent(input: {
   if (error) {
     throw new Error(error.message);
   }
+}
+
+/**
+ * After amendment/discount mutation: Paid ↔ Awaiting Payment from settlement.
+ * Does not touch payment rows.
+ */
+async function reconcileOrderStatusAfterFinancialChange(input: {
+  orderId: string;
+  before: StorefrontOrder;
+  staffId: string;
+}): Promise<{ error: string | null }> {
+  const after = await getGuestOrderById(input.orderId);
+  if (!after) {
+    return { error: "Order not found after update." };
+  }
+
+  const reconciled = reconcilePaymentLifecycleStatus({
+    previousStatus: input.before.status,
+    previousNetReceived: input.before.settlement.netReceived,
+    settlement: after.settlement,
+  });
+
+  if (reconciled.statusChanged) {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        status: reconciled.newStatus,
+        payment_status: reconciled.newStatus === "paid" ? "paid" : "unpaid",
+        updated_by: input.staffId,
+      })
+      .eq("id", input.orderId)
+      .is("customer_id", null);
+    if (error) {
+      return { error: error.message };
+    }
+  }
+
+  return { error: null };
 }
 
 function parseItemsFromForm(formData: FormData): Array<{
@@ -163,10 +207,7 @@ export async function saveOrderWorkspaceAction(
   if (!before) {
     return { error: "Order not found.", success: false };
   }
-  if (
-    before.status !== "submitted" &&
-    before.status !== "pending_confirmation"
-  ) {
+  if (!isGuestOrderEditable(before.status)) {
     return {
       error: "This order can no longer be edited.",
       success: false,
@@ -312,12 +353,57 @@ export async function saveOrderWorkspaceAction(
   });
 
   const hadSentConfirmation = before.status === "pending_confirmation";
+  const previousAmountDue = before.settlement.amountDue;
+  const previousStatus = before.status;
 
-  if (materialChange) {
+  const reconcile = await reconcileOrderStatusAfterFinancialChange({
+    orderId,
+    before,
+    staffId: staff.id,
+  });
+  if (reconcile.error) {
+    return { error: reconcile.error, success: false };
+  }
+
+  const after = await getGuestOrderById(orderId);
+  if (!after) {
+    return { error: "Order not found after save.", success: false };
+  }
+
+  const newAmountDue = after.settlement.amountDue;
+  const netReceived = after.settlement.netReceived;
+  const newStatus = after.status;
+
+  const shouldAuditUpdate =
+    materialChange ||
+    previousStatus === "awaiting_payment" ||
+    previousStatus === "paid" ||
+    newStatus !== previousStatus ||
+    previousAmountDue !== newAmountDue;
+
+  if (shouldAuditUpdate) {
+    const metadata: Record<string, unknown> = {
+      previous_amount_due: previousAmountDue,
+      new_amount_due: newAmountDue,
+      net_received: netReceived,
+      previous_status: previousStatus,
+      new_status: newStatus,
+      remaining_balance: after.settlement.remainingBalance,
+      overpayment: after.settlement.overpayment,
+    };
+    if (
+      previousStatus === "awaiting_payment" ||
+      previousStatus === "paid" ||
+      newStatus !== previousStatus
+    ) {
+      metadata.amended_during_payment_lifecycle = true;
+    }
+
     await insertTimelineEvent({
       orderId,
       eventType: "order_updated",
       actorStaffId: staff.id,
+      metadata,
     });
   }
 
@@ -358,6 +444,7 @@ export async function saveOrderWorkspaceAction(
   revalidatePath("/owner");
   revalidatePath(`/owner/orders/${orderId}`);
   revalidatePath(`/owner/orders/${orderId}/confirmation`);
+  revalidatePath(`/owner/orders/${orderId}/payment`);
 
   return { error: null, success: true };
 }
@@ -584,11 +671,21 @@ export async function markPaymentRequestSentAction(
   if (order.status !== "awaiting_payment") {
     return { error: "Payment request can only be sent while awaiting payment." };
   }
+  if (order.settlement.remainingBalance <= 0) {
+    return {
+      error: "No outstanding balance — a Payment Request is not needed.",
+    };
+  }
 
   // Deadline belongs to the follow-up process, not the instruction method.
   // Re-sending alternative instructions (e.g. Online Transfer after WB QR)
-  // must not reset an existing payment hold.
-  const deadlineIso = order.paymentDeadlineAt ?? input.deadlineAtIso;
+  // must not reset an existing payment hold — unless this is a new outstanding
+  // balance request after prior verified payment (e.g. Paid amended upward).
+  const isOutstandingBalanceFollowUp =
+    order.settlement.netReceived > 0 && order.settlement.remainingBalance > 0;
+  const deadlineIso = isOutstandingBalanceFollowUp
+    ? input.deadlineAtIso
+    : (order.paymentDeadlineAt ?? input.deadlineAtIso);
   const deadline = new Date(deadlineIso);
   if (Number.isNaN(deadline.getTime())) {
     return { error: "Invalid payment deadline." };
@@ -751,6 +848,15 @@ export async function applyAugustPromoAction(
     return { error: error.message };
   }
 
+  const reconcile = await reconcileOrderStatusAfterFinancialChange({
+    orderId,
+    before: order,
+    staffId: staff.id,
+  });
+  if (reconcile.error) {
+    return { error: reconcile.error };
+  }
+
   revalidatePath("/owner");
   revalidatePath(`/owner/orders/${orderId}`);
   revalidatePath(`/owner/orders/${orderId}/payment`);
@@ -808,6 +914,15 @@ export async function redeemRm10VoucherAction(
     return { error: error.message, success: false };
   }
 
+  const reconcile = await reconcileOrderStatusAfterFinancialChange({
+    orderId,
+    before: order,
+    staffId: staff.id,
+  });
+  if (reconcile.error) {
+    return { error: reconcile.error, success: false };
+  }
+
   revalidatePath("/owner");
   revalidatePath(`/owner/orders/${orderId}`);
   revalidatePath(`/owner/orders/${orderId}/payment`);
@@ -836,6 +951,15 @@ export async function removeOrderDiscountAction(
 
   if (error) {
     return { error: error.message };
+  }
+
+  const reconcile = await reconcileOrderStatusAfterFinancialChange({
+    orderId,
+    before: order,
+    staffId: staff.id,
+  });
+  if (reconcile.error) {
+    return { error: reconcile.error };
   }
 
   revalidatePath("/owner");
@@ -888,6 +1012,15 @@ export async function changeAugustPromoToRm10Action(
 
   if (error) {
     return { error: error.message, success: false };
+  }
+
+  const reconcile = await reconcileOrderStatusAfterFinancialChange({
+    orderId,
+    before: order,
+    staffId: staff.id,
+  });
+  if (reconcile.error) {
+    return { error: reconcile.error, success: false };
   }
 
   revalidatePath("/owner");

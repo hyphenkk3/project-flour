@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -11,9 +11,12 @@ import {
 import {
   buildPaymentRequestPayload,
   generatePaymentRequestMessage,
+  hasPriorVerifiedPayment,
+  paymentRequestCollectAmount,
 } from "@/engines/orders/payment-message";
 import { getEffectiveAdjustments } from "@/engines/orders/promotions";
 import { buildWhatsAppDeepLink } from "@/engines/orders/whatsapp";
+import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type { StorefrontOrder } from "@/types/storefront";
 import {
   markPaymentRequestSentAction,
@@ -39,12 +42,25 @@ export function PaymentRequestPreview({ order }: PaymentRequestPreviewProps) {
   const [copied, setCopied] = useState(false);
   const [preparedLogged, setPreparedLogged] = useState(false);
   const [method, setMethod] = useState<PaymentRequestMethod>("wb_qr");
-  const deadlineAlreadySet = Boolean(order.paymentDeadlineAt);
+
+  const settlement = order.settlement;
+  const isOutstandingBalanceRequest =
+    hasPriorVerifiedPayment(settlement.netReceived) &&
+    settlement.remainingBalance > 0;
+
+  // Follow-up after prior payment (e.g. Paid → amended → Awaiting Payment):
+  // allow Mark as Sent again and set a fresh follow-up deadline.
+  const canMarkSent =
+    settlement.remainingBalance > 0 &&
+    (!order.paymentDeadlineAt || isOutstandingBalanceRequest);
+
   const [deadlineLocal, setDeadlineLocal] = useState(() =>
     toDatetimeLocalValue(
-      order.paymentDeadlineAt
-        ? new Date(order.paymentDeadlineAt)
-        : defaultPaymentDeadlineAt(),
+      isOutstandingBalanceRequest
+        ? defaultPaymentDeadlineAt()
+        : order.paymentDeadlineAt
+          ? new Date(order.paymentDeadlineAt)
+          : defaultPaymentDeadlineAt(),
     ),
   );
   const [adjustDeadline, setAdjustDeadline] = useState(false);
@@ -54,10 +70,16 @@ export function PaymentRequestPreview({ order }: PaymentRequestPreviewProps) {
     ? formatPaymentDueRelative(deadlineIso)
     : "—";
 
-  const effectiveAdjustments = getEffectiveAdjustments(order.adjustments);
+  const effectiveAdjustments = useMemo(
+    () => getEffectiveAdjustments(order.adjustments),
+    [order.adjustments],
+  );
+
   const payload = buildPaymentRequestPayload({
-    cakeSubtotal: order.settlement.subtotal,
-    amountDue: order.settlement.amountDue,
+    cakeSubtotal: settlement.subtotal,
+    amountDue: settlement.amountDue,
+    netReceived: settlement.netReceived,
+    remainingBalance: settlement.remainingBalance,
     adjustments: effectiveAdjustments.map((row) => ({
       label: row.label,
       amount: row.amount,
@@ -69,11 +91,12 @@ export function PaymentRequestPreview({ order }: PaymentRequestPreviewProps) {
     })),
     method,
   });
+  const collectAmount = paymentRequestCollectAmount(payload);
   const message = generatePaymentRequestMessage(payload);
   const whatsappUrl = buildWhatsAppDeepLink(order.phone, message);
 
   useEffect(() => {
-    const key = `wb-pay-prepared:${order.id}`;
+    const key = `wb-pay-prepared:${order.id}:${settlement.remainingBalance}`;
     try {
       if (window.sessionStorage.getItem(key) === "1") {
         setPreparedLogged(true);
@@ -86,7 +109,7 @@ export function PaymentRequestPreview({ order }: PaymentRequestPreviewProps) {
     if (preparedLogged) return;
     setPreparedLogged(true);
     void recordPaymentRequestPreparedAction(order.id);
-  }, [order.id, preparedLogged]);
+  }, [order.id, preparedLogged, settlement.remainingBalance]);
 
   function handleCopy() {
     void navigator.clipboard.writeText(message).then(() => {
@@ -126,6 +149,22 @@ export function PaymentRequestPreview({ order }: PaymentRequestPreviewProps) {
     });
   }
 
+  if (settlement.remainingBalance <= 0) {
+    return (
+      <div className="space-y-4">
+        <Link
+          className="text-skyline hover:text-ink text-sm font-medium"
+          href={`/owner/orders/${order.id}`}
+        >
+          ← Order Workspace
+        </Link>
+        <p className="text-ink text-sm">
+          No outstanding balance — a Payment Request is not needed.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -139,12 +178,31 @@ export function PaymentRequestPreview({ order }: PaymentRequestPreviewProps) {
           Payment Request
         </h1>
         <p className="text-skyline mt-1 text-sm">
-          Choose the payment instructions to send. WB QR is the normal default.
+          {isOutstandingBalanceRequest
+            ? "Ask only for the outstanding balance. Money already received stays credited."
+            : "Choose the payment instructions to send. WB QR is the normal default."}{" "}
           Opening WhatsApp does not record payment or change the hold.
         </p>
       </div>
 
       <section className="border-fog space-y-5 rounded-xl border bg-white p-5">
+        <div className="space-y-1">
+          <p className="text-skyline text-xs tracking-wide uppercase">
+            {isOutstandingBalanceRequest
+              ? "Balance to pay"
+              : "Amount to request"}
+          </p>
+          <p className="text-ink text-2xl font-semibold tracking-tight">
+            {formatRm(collectAmount)}
+          </p>
+          {isOutstandingBalanceRequest ? (
+            <p className="text-skyline text-sm">
+              Amount due {formatRm(settlement.amountDue)} · Received{" "}
+              {formatRm(settlement.netReceived)}
+            </p>
+          ) : null}
+        </div>
+
         <fieldset className="space-y-3">
           <legend className="text-ink text-sm font-medium">
             Payment instructions
@@ -187,11 +245,13 @@ export function PaymentRequestPreview({ order }: PaymentRequestPreviewProps) {
             {deadlineLabel}
           </p>
           <p className="text-skyline text-sm">
-            {deadlineAlreadySet
-              ? "Existing payment hold — unchanged when sending alternative instructions"
-              : "24-hour payment window"}
+            {isOutstandingBalanceRequest
+              ? "Follow-up window for the outstanding balance"
+              : order.paymentDeadlineAt && !isOutstandingBalanceRequest
+                ? "Existing payment hold — unchanged when sending alternative instructions"
+                : "24-hour payment window"}
           </p>
-          {deadlineAlreadySet ? (
+          {order.paymentDeadlineAt && !isOutstandingBalanceRequest ? (
             <p className="text-skyline text-xs">
               To change the hold, use Extend follow-up in Order Workspace.
             </p>
@@ -253,20 +313,26 @@ export function PaymentRequestPreview({ order }: PaymentRequestPreviewProps) {
         >
           {copied ? "Copied" : "Copy Message"}
         </button>
-        {!deadlineAlreadySet ? (
+        {canMarkSent ? (
           <button
             className="border-fog text-ink hover:bg-mist inline-flex min-h-12 items-center justify-center rounded-lg border px-5 text-sm font-medium disabled:opacity-60"
             disabled={pending}
             onClick={handleMarkSent}
             type="button"
           >
-            {pending ? "Saving…" : "Mark Payment Request as Sent"}
+            {pending
+              ? "Saving…"
+              : isOutstandingBalanceRequest
+                ? "Mark Outstanding Balance Request as Sent"
+                : "Mark Payment Request as Sent"}
           </button>
         ) : null}
         <p className="text-skyline text-xs">
-          {deadlineAlreadySet
-            ? "Open WhatsApp or Copy to send alternative instructions (e.g. Online Transfer). This does not create a payment, mark Paid, or reset the payment hold."
-            : "Open WhatsApp and Copy never change order status. Only Mark as Sent records that the request was sent and starts the payment hold."}
+          {canMarkSent
+            ? isOutstandingBalanceRequest
+              ? "Open WhatsApp and Copy never change order status. Mark as Sent records this outstanding-balance follow-up and sets/updates the payment hold."
+              : "Open WhatsApp and Copy never change order status. Only Mark as Sent records that the request was sent and starts the payment hold."
+            : "Open WhatsApp or Copy to send alternative instructions (e.g. Online Transfer). This does not create a payment, mark Paid, or reset the payment hold."}
         </p>
         <Link
           className="text-skyline hover:text-ink inline-flex min-h-10 items-center justify-center text-sm font-medium"

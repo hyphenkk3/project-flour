@@ -43,16 +43,6 @@ export type EligibilityResult = {
 export function evaluateAugustPromoEligibility(
   input: AugustPromoEligibilityInput,
 ): EligibilityResult {
-  if (input.orderStatus === "paid") {
-    return { eligible: false, reason: "Order is already paid." };
-  }
-  if (input.hasVerifiedPayments) {
-    return {
-      eligible: false,
-      reason:
-        "Verified payments already exist. Adjustment changes are blocked in this Preview.",
-    };
-  }
   if (input.hasAugustPromo) {
     return { eligible: false, reason: "August Promo is already applied." };
   }
@@ -62,6 +52,19 @@ export function evaluateAugustPromoEligibility(
       reason: "Cannot stack with an RM10 Discount Card on the same order.",
     };
   }
+  return evaluateAugustPromoRuleFit(input);
+}
+
+/**
+ * Rule fit only (dates / source / subtotal). Used to warn when an already-applied
+ * promo no longer meets normal eligibility after an amendment — does not auto-remove.
+ */
+export function evaluateAugustPromoRuleFit(
+  input: Pick<
+    AugustPromoEligibilityInput,
+    "orderSource" | "orderDate" | "pickupDate" | "subtotal"
+  >,
+): EligibilityResult {
   if (input.orderSource !== "customer_website") {
     return {
       eligible: false,
@@ -81,7 +84,6 @@ export function evaluateAugustPromoEligibility(
       reason: "Pickup date must be within August 2026.",
     };
   }
-  // Strictly greater than RM100
   if (moneyCompare(input.subtotal, 100) <= 0) {
     return {
       eligible: false,
@@ -119,16 +121,6 @@ export type Rm10EligibilityInput = {
 export function evaluateRm10CardEligibility(
   input: Rm10EligibilityInput,
 ): EligibilityResult {
-  if (input.orderStatus === "paid") {
-    return { eligible: false, reason: "Order is already paid." };
-  }
-  if (input.hasVerifiedPayments) {
-    return {
-      eligible: false,
-      reason:
-        "Verified payments already exist. Adjustment changes are blocked in this Preview.",
-    };
-  }
   if (input.hasRm10Card) {
     return {
       eligible: false,
@@ -141,10 +133,20 @@ export function evaluateRm10CardEligibility(
       reason: "Cannot stack with August Promo on the same order.",
     };
   }
+  return evaluateRm10CardRuleFit(input);
+}
+
+/** Size / date rule fit for an already-applied RM10 card (warning only). */
+export function evaluateRm10CardRuleFit(
+  input: Pick<
+    Rm10EligibilityInput,
+    "items" | "orderDate" | "pickupDate" | "expiryDate"
+  >,
+): EligibilityResult {
   if (!input.items.some((item) => isRm10EligibleSizeLabel(item.sizeLabel))) {
     return {
       eligible: false,
-      reason: 'RM10 Discount Card requires a 6" or 8" cake.',
+      reason: 'RM10 Discount Card requires a 6" or 8" cake on the order.',
     };
   }
   if (input.orderDate > input.expiryDate) {

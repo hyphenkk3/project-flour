@@ -24,6 +24,9 @@ export default async function PaymentRequestPage({ params }: PageProps) {
   if (order.status !== "awaiting_payment") {
     notFound();
   }
+  if (order.settlement.remainingBalance <= 0) {
+    notFound();
+  }
 
   return (
     <PaymentRequestPreview order={order} />
