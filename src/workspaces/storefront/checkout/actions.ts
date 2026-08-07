@@ -56,6 +56,11 @@ function consolidateItems(items: SubmitItem[]): SubmitItem[] {
   return Array.from(map.values());
 }
 
+function isPlausibleEmail(value: string): boolean {
+  // Lightweight client/server guard — not a full RFC validator.
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
 export async function submitGuestPreorderAction(
   _prev: CheckoutState,
   formData: FormData,
@@ -63,13 +68,25 @@ export async function submitGuestPreorderAction(
   const customerName = String(formData.get("customer_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
+  const receiptRequested =
+    String(formData.get("email_submission_receipt_requested") ?? "") === "on" ||
+    String(formData.get("email_submission_receipt_requested") ?? "") === "true";
   const pickupDate = String(formData.get("pickup_date") ?? "").trim();
   const pickupTime = String(formData.get("pickup_time") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
   const items = consolidateItems(parseItems(formData));
 
-  if (!customerName || !phone || !email) {
-    return { error: "Please fill in your name, phone, and email." };
+  if (!customerName || !phone) {
+    return { error: "Please fill in your name and WhatsApp phone number." };
+  }
+  if (receiptRequested && !email) {
+    return {
+      error:
+        "Please enter your email to receive a copy of your preorder submission.",
+    };
+  }
+  if (email && !isPlausibleEmail(email)) {
+    return { error: "Please enter a valid email address." };
   }
   if (!pickupDate || !pickupTime) {
     return { error: "Please choose a pickup date and time." };
@@ -87,11 +104,12 @@ export async function submitGuestPreorderAction(
   const { data, error } = await supabase.rpc("submit_guest_preorder", {
     p_customer_name: customerName,
     p_phone: phone,
-    p_email: email,
+    p_email: email || null,
     p_pickup_date: pickupDate,
     p_pickup_time: pickupTime,
     p_notes: notes || null,
     p_items: items,
+    p_email_submission_receipt_requested: receiptRequested,
   });
 
   if (error) {

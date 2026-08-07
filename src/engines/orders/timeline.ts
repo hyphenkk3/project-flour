@@ -9,6 +9,16 @@ export const TIMELINE_EVENT_LABELS: Record<string, string> = {
   updated_confirmation_prepared: "Updated confirmation prepared",
   updated_confirmation_marked_sent: "Updated confirmation marked as sent",
   customer_confirmed: "Customer confirmed",
+  payment_request_prepared: "Payment request prepared",
+  payment_request_marked_sent: "Payment request marked as sent",
+  payment_deadline_extended: "Payment follow-up deadline extended",
+  payment_recorded: "Payment recorded",
+  payment_secured: "Paid · Preorder secured",
+  august_promo_applied: "August Promo applied",
+  rm10_voucher_redeemed: "RM10 Discount Card redeemed",
+  rm10_voucher_owner_override: "RM10 Discount Card redeemed (Owner override)",
+  discount_removed: "Discount removed",
+  discount_changed: "Discount changed",
 };
 
 export function timelineEventLabel(eventType: string): string {

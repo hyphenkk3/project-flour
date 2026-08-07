@@ -12,6 +12,9 @@ import { requireStaff } from "@/foundation/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type { StorefrontOrderListItem } from "@/types/storefront";
 import {
+  fromDatetimeLocalValue,
+} from "@/workspaces/owner/orders/labels";
+import {
   getGuestOrderById,
   getGuestOrderListItem,
   listGuestOrders,
@@ -131,9 +134,15 @@ export async function saveOrderWorkspaceAction(
   const draftItems = parseItemsFromForm(formData);
   const draftComplimentary = parseComplimentaryFromForm(formData);
 
-  if (!guestName || !guestPhone || !guestEmail) {
+  if (!guestName || !guestPhone) {
     return {
-      error: "Please fill in the customer name, phone, and email.",
+      error: "Please fill in the customer name and WhatsApp phone.",
+      success: false,
+    };
+  }
+  if (guestEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail)) {
+    return {
+      error: "Please enter a valid email address, or leave email blank.",
       success: false,
     };
   }
@@ -230,7 +239,7 @@ export async function saveOrderWorkspaceAction(
     .update({
       guest_name: guestName,
       guest_phone: guestPhone,
-      guest_email: guestEmail,
+      guest_email: guestEmail || null,
       pickup_date: pickupDate,
       pickup_time: pickupTime,
       customer_notes: customerNotes || null,
@@ -533,4 +542,356 @@ export async function confirmGuestOrderAction(orderId: string): Promise<void> {
     throw new Error(result.error);
   }
   redirect("/owner");
+}
+
+// ---------------------------------------------------------------------------
+// Milestone 3 Preview 1 — Payment
+// ---------------------------------------------------------------------------
+
+export type RecordPaymentState = {
+  error: string | null;
+  success: boolean;
+};
+
+export async function recordPaymentRequestPreparedAction(
+  orderId: string,
+): Promise<void> {
+  const staff = await requireOwner();
+  const order = await getGuestOrderById(orderId);
+  if (!order || order.status !== "awaiting_payment") return;
+
+  await insertTimelineEvent({
+    orderId,
+    eventType: "payment_request_prepared",
+    actorStaffId: staff.id,
+  });
+  revalidatePath(`/owner/orders/${orderId}`);
+}
+
+export async function markPaymentRequestSentAction(
+  orderId: string,
+  input: {
+    method: "wb_qr" | "online_transfer";
+    messageBody: string;
+    deadlineAtIso: string;
+  },
+): Promise<{ error: string | null }> {
+  const staff = await requireOwner();
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found." };
+  }
+  if (order.status !== "awaiting_payment") {
+    return { error: "Payment request can only be sent while awaiting payment." };
+  }
+
+  // Deadline belongs to the follow-up process, not the instruction method.
+  // Re-sending alternative instructions (e.g. Online Transfer after WB QR)
+  // must not reset an existing payment hold.
+  const deadlineIso = order.paymentDeadlineAt ?? input.deadlineAtIso;
+  const deadline = new Date(deadlineIso);
+  if (Number.isNaN(deadline.getTime())) {
+    return { error: "Invalid payment deadline." };
+  }
+  if (input.method !== "wb_qr" && input.method !== "online_transfer") {
+    return { error: "Choose WB QR or Online Transfer." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("mark_guest_payment_request_sent", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+    p_method: input.method,
+    p_message_body: input.messageBody,
+    p_deadline_at: deadline.toISOString(),
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/payment`);
+  return { error: null };
+}
+
+export async function extendPaymentDeadlineAction(
+  orderId: string,
+  _prev: { error: string | null; success: boolean },
+  formData: FormData,
+): Promise<{ error: string | null; success: boolean }> {
+  const staff = await requireOwner();
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found.", success: false };
+  }
+  if (order.status !== "awaiting_payment") {
+    return {
+      error: "Deadline can only be updated while awaiting payment.",
+      success: false,
+    };
+  }
+
+  const raw = String(formData.get("deadline_at") ?? "").trim();
+  const iso = fromDatetimeLocalValue(raw);
+  if (!iso) {
+    return { error: "Enter a valid follow-up deadline.", success: false };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("extend_guest_payment_deadline", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+    p_deadline_at: iso,
+  });
+
+  if (error) {
+    return { error: error.message, success: false };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${orderId}`);
+  return { error: null, success: true };
+}
+
+export async function recordAndVerifyPaymentAction(
+  orderId: string,
+  _prev: RecordPaymentState,
+  formData: FormData,
+): Promise<RecordPaymentState> {
+  const staff = await requireOwner();
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found.", success: false };
+  }
+  if (order.status !== "awaiting_payment") {
+    return {
+      error: "Payments can only be recorded while awaiting payment.",
+      success: false,
+    };
+  }
+
+  const amountRaw = String(formData.get("amount") ?? "").trim();
+  const amount = Number(amountRaw);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { error: "Enter a valid amount received.", success: false };
+  }
+
+  const method = String(formData.get("method") ?? "").trim();
+  if (
+    method !== "wb_qr" &&
+    method !== "online_transfer" &&
+    method !== "others"
+  ) {
+    return { error: "Choose a payment method.", success: false };
+  }
+
+  const methodDescription = String(
+    formData.get("method_description") ?? "",
+  ).trim();
+  if (method === "others" && !methodDescription) {
+    return {
+      error: "Description is required when payment method is Others.",
+      success: false,
+    };
+  }
+
+  const paidAtRaw = String(formData.get("paid_at") ?? "").trim();
+  const paidAtIso = fromDatetimeLocalValue(paidAtRaw);
+  if (!paidAtIso) {
+    return { error: "Enter a valid payment date/time.", success: false };
+  }
+
+  const referenceNote = String(formData.get("reference_note") ?? "").trim();
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "record_and_verify_guest_order_payment",
+    {
+      p_order_id: orderId,
+      p_amount: amount,
+      p_method: method,
+      p_method_description: method === "others" ? methodDescription : null,
+      p_paid_at: paidAtIso,
+      p_reference_note: referenceNote || null,
+      p_verifier_staff_id: staff.id,
+    },
+  );
+
+  if (error) {
+    return { error: error.message, success: false };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${orderId}`);
+  return { error: null, success: true };
+}
+
+// ---------------------------------------------------------------------------
+// Milestone 3 Preview 2 — Discounts & adjustments
+// ---------------------------------------------------------------------------
+
+export async function applyAugustPromoAction(
+  orderId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireOwner();
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("apply_august_promo_to_guest_order", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/payment`);
+  return { error: null };
+}
+
+export type RedeemRm10State = {
+  error: string | null;
+  success: boolean;
+};
+
+export async function redeemRm10VoucherAction(
+  orderId: string,
+  _prev: RedeemRm10State,
+  formData: FormData,
+): Promise<RedeemRm10State> {
+  const staff = await requireOwner();
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found.", success: false };
+  }
+
+  const voucherNumber = String(formData.get("voucher_number") ?? "").trim();
+  const expiryDate = String(formData.get("expiry_date") ?? "").trim();
+  const ownerOverride = String(formData.get("owner_override") ?? "") === "1";
+  const overrideReason = String(formData.get("override_reason") ?? "").trim();
+
+  if (!voucherNumber) {
+    return { error: "Voucher number is required.", success: false };
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) {
+    return { error: "Enter a valid expiry date.", success: false };
+  }
+  if (ownerOverride && !overrideReason) {
+    return {
+      error: "Owner override requires a reason.",
+      success: false,
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "redeem_rm10_physical_voucher_for_guest_order",
+    {
+      p_order_id: orderId,
+      p_actor_staff_id: staff.id,
+      p_voucher_number: voucherNumber,
+      p_expiry_date: expiryDate,
+      p_owner_override: ownerOverride,
+      p_override_reason: ownerOverride ? overrideReason : null,
+    },
+  );
+
+  if (error) {
+    return { error: error.message, success: false };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/payment`);
+  return { error: null, success: true };
+}
+
+export async function removeOrderDiscountAction(
+  orderId: string,
+  adjustmentId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireOwner();
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "reverse_active_guest_order_adjustment",
+    {
+      p_order_id: orderId,
+      p_actor_staff_id: staff.id,
+      p_adjustment_id: adjustmentId,
+    },
+  );
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/payment`);
+  return { error: null };
+}
+
+export async function changeAugustPromoToRm10Action(
+  orderId: string,
+  _prev: RedeemRm10State,
+  formData: FormData,
+): Promise<RedeemRm10State> {
+  const staff = await requireOwner();
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found.", success: false };
+  }
+
+  const voucherNumber = String(formData.get("voucher_number") ?? "").trim();
+  const expiryDate = String(formData.get("expiry_date") ?? "").trim();
+  const ownerOverride = String(formData.get("owner_override") ?? "") === "1";
+  const overrideReason = String(formData.get("override_reason") ?? "").trim();
+
+  if (!voucherNumber) {
+    return { error: "Voucher number is required.", success: false };
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) {
+    return { error: "Enter a valid expiry date.", success: false };
+  }
+  if (ownerOverride && !overrideReason) {
+    return {
+      error: "Owner override requires a reason.",
+      success: false,
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "change_august_promo_to_rm10_physical_voucher",
+    {
+      p_order_id: orderId,
+      p_actor_staff_id: staff.id,
+      p_voucher_number: voucherNumber,
+      p_expiry_date: expiryDate,
+      p_owner_override: ownerOverride,
+      p_override_reason: ownerOverride ? overrideReason : null,
+    },
+  );
+
+  if (error) {
+    return { error: error.message, success: false };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/payment`);
+  return { error: null, success: true };
 }

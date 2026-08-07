@@ -3,6 +3,7 @@ import { formatDdMmYyyy } from "@/lib/dates";
 import {
   formatPickupTime,
   guestOrderStatusLabel,
+  guestOrderStatusTone,
 } from "@/workspaces/owner/orders/labels";
 import type { StorefrontOrderListItem } from "@/types/storefront";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -48,13 +49,7 @@ export function OwnerOrderCard({
         </div>
         <StatusBadge
           label={guestOrderStatusLabel(order.status)}
-          tone={
-            order.status === "submitted"
-              ? "warning"
-              : order.status === "awaiting_payment"
-                ? "success"
-                : "info"
-          }
+          tone={guestOrderStatusTone(order.status)}
         />
       </div>
     </Link>

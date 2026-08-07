@@ -2,6 +2,100 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-07 — Milestone 3 Preview 2 · Final closed behaviour
+
+Milestone 3 Preview 2 is closed. Preview 3 has not started.
+
+### Payments & settlement
+
+- Additive financial model: `order_adjustments`, `payments`, `payment_allocations`, `refunds`.
+- Amount due = immutable order-item price snapshots + signed adjustments.
+- Never mutate historical `order_items.unit_price` for discounts or Library price edits.
+- Payment request (WB QR / Online Transfer / Others+description) → deadline/hold → staff verifies slip → Record & Verify Payment.
+- Partial / split payments via multiple verified payment + allocation rows.
+- Paid when net received ≥ amount due. Label: **Paid · Preorder Secured** — not POS checkout, not picked up, not completed.
+- Verified payments immutable in Preview 2 (no edit/delete UX). Corrections/refunds deferred.
+
+### Discounts
+
+- Generic `order_adjustments` are the only financial discount mechanism.
+- Lifecycle: never delete/mutate adjustment amounts; reverse via compensating rows (`status`, `reverses_adjustment_id`).
+- August Promo 2026 (`august_promo_2026`) is a temporary rule, not the architecture.
+- RM10 physical Discount Cards use structured voucher registry + redemptions (not Library catalog vouchers).
+- No stacking August Promo + RM10 on the same order.
+- Change/Remove blocked after verified payment received or Paid.
+- Customer Payment Request shows effective discounts only; staff retains full audit.
+
+### Customer contact
+
+- Guest email is optional; WhatsApp phone remains required/primary.
+- Checkbox preference `email_submission_receipt_requested` — when checked, email becomes required.
+- Outbound **Preorder Submission Receipt** delivery deferred until an email provider is deliberately chosen.
+- Do not call the submission email a confirmation. Lifecycle: Submitted → optional receipt → Whitebird review → confirmation → payment → Paid.
+- WhatsApp deep links remain phone-number based. WhatsApp usernames deferred.
+
+### Operations
+
+- Default board order: Pickup Date ASC → Pickup Time ASC → Created ASC.
+- Staff may select **Latest Orders — Newest First** (`created_at` desc) deliberately; Realtime does not force-sort.
+- Search: order number, name, full phone, last 4 digits. Pickup filters (All/Today/Tomorrow/This Week/Choose Date). Status filters. Clear resets defaults.
+- Paid orders remain on Operations (future pickup still operational).
+- No persistent NEW/unread tracking yet — Submitted status + Latest Orders is sufficient for now.
+- Shared semantic status colours (Operations + Order Workspace):
+  - Submitted → amber / warm orange (`warning`)
+  - Waiting Customer Confirmation → blue (`info`)
+  - Awaiting Payment → soft purple (`progress`)
+  - Paid · Preorder Secured → green (`success`)
+  - Red (`danger`) reserved for genuine exception copy (e.g. overdue), not a new order status
+
+### Library cake-size identity / price history
+
+- Edit Cake reconciles `library_cake_sizes` by stable ID: update in place, insert new, delete only unreferenced removed sizes.
+- Never delete+recreate referenced size rows (FK `order_items_cake_size_id_fkey` / `ON DELETE RESTRICT` is correct).
+- Library current price may change; historical order-item snapshots remain unchanged.
+- Removing a size still referenced by `order_items` is blocked with a clear error (no size-level archive column yet; cake Active/inactive remains the storefront gate).
+
+### Deferred (not Preview 2)
+
+- Submission receipt email provider/delivery
+- WhatsApp usernames
+- Persistent NEW/unread Operations tracking
+- Refunds / payment corrections / overpayment / multi-order allocation UI
+- POS checkout / pickup completion / Bakery workspace
+- Generic Promotions admin / Business Settings
+- Voucher photo storage / OCR
+- Automatic last-minute 15-minute classification
+- **EXTRA Hold for Walk-in:** when EXTRA stock is listed publicly and a walk-in wants that stock, staff need to temporarily PAUSE/HOLD that EXTRA on the public link while serving the walk-in so another online customer cannot take the same stock; then a **Walk-in** sale/order path must record the EXTRA as sold (audit), not silently disappear. Future milestone — not Preview 2/3 scope until Product schedules it.
+
+## 2026-08-07 — Milestone 3 Preview 2 · Discount lifecycle (change/remove)
+
+- Discounts are changed/removed via compensating adjustments — never delete or mutate amounts.
+- Original rows keep amounts; lifecycle `status` becomes `reversed`; reversal row links via `reverses_adjustment_id`.
+- Customer Payment Request shows effective discounts only; staff timeline retains full audit.
+- Change/Remove blocked when verified payments exist or order is Paid.
+- Atomic RPC replaces August Promo with RM10 voucher redemption.
+
+## 2026-08-07 — Milestone 3 Preview 2 · Discounts & adjustments
+
+- Generic `order_adjustments` remain the financial mechanism (signed amounts; never mutate item price snapshots).
+- August Promo 2026 is a temporary rule implementation (`august_promo_2026`), not the architecture.
+- RM10 physical discount cards use a structured voucher registry + redemption records (not Library catalog vouchers).
+- No stacking August Promo + RM10 on the same order in Preview 2.
+- Adjustments blocked after verified payments or Paid (corrections/refunds deferred).
+- Applied adjustments are immutable (no silent delete); reversal UX deferred.
+- RM10 card issuance suppression retains reason codes for later Counter/Bakery.
+- Not in Preview 2: refunds UI, payment corrections, multi-order allocation, POS, Bakery, EXTRA Hold for Walk-in.
+
+## 2026-08-07 — Milestone 3 Preview 1 · Payment foundation
+
+- Additive financial model: `order_adjustments`, `payments`, `payment_allocations`, `refunds`.
+- Amount due = item price snapshots + adjustments; never mutate historical item prices for discounts.
+- Payment request (WB QR / Online Transfer) → deadline → staff verifies slip → Record & Verify Payment.
+- Partial / split payments via multiple payment + allocation rows; Paid when net received ≥ amount due.
+- `paid` means preorder financially secured — not POS checkout / picked up / completed.
+- Verified payments immutable in Preview 1 (no edit/delete UX).
+- Not in Preview 1: August Promo UI, vouchers, refunds UI, corrections UI, multi-order allocation UI, POS.
+
 ## 2026-08-07 — Milestone 2 · Customer Confirmation
 
 - Multi-cake preorder on unified `orders` / `order_items` (shared pickup).

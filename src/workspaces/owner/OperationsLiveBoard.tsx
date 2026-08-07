@@ -1,9 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { useToast } from "@/components/ui/Toast";
+import {
+  DEFAULT_OPERATIONS_QUERY,
+  filterAndSortOperationsOrders,
+  type OperationsBoardQuery,
+} from "@/engines/operations/order-board";
 import { formatShortBusinessDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 import type { StorefrontOrderListItem } from "@/types/storefront";
@@ -12,6 +17,7 @@ import {
   listGuestOrdersAction,
 } from "@/workspaces/owner/orders/actions";
 import { OwnerOrderCard } from "@/workspaces/owner/orders/OwnerOrderCard";
+import { OperationsBoardToolbar } from "@/workspaces/owner/OperationsBoardToolbar";
 
 const POLL_INTERVAL_MS = 30_000;
 const HIGHLIGHT_MS = 4500;
@@ -26,18 +32,14 @@ type OrderRowPayload = {
   status?: string;
 };
 
-function sortOrders(orders: StorefrontOrderListItem[]): StorefrontOrderListItem[] {
-  return [...orders].sort(
-    (a, b) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
-}
-
 export function OperationsLiveBoard({
   initialOrders,
 }: OperationsLiveBoardProps) {
   const { toast } = useToast();
   const [orders, setOrders] = useState(initialOrders);
+  const [query, setQuery] = useState<OperationsBoardQuery>(
+    DEFAULT_OPERATIONS_QUERY,
+  );
   const [highlightedIds, setHighlightedIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -49,7 +51,7 @@ export function OperationsLiveBoard({
     knownIdsRef.current.add(item.id);
     setOrders((current) => {
       const without = current.filter((order) => order.id !== item.id);
-      return sortOrders([item, ...without]);
+      return [item, ...without];
     });
   }, []);
 
@@ -177,8 +179,6 @@ export function OperationsLiveBoard({
       )
       .subscribe();
 
-    // Polling fallback (~30s) keeps the board current if Realtime is delayed
-    // or unavailable. notifiedIdsRef prevents duplicate toasts.
     const pollId = window.setInterval(() => {
       void reconcileFromServer();
     }, POLL_INTERVAL_MS);
@@ -189,8 +189,15 @@ export function OperationsLiveBoard({
     };
   }, [handleIncomingInsert, handleIncomingUpdate, reconcileFromServer]);
 
-  const newOrders = orders.filter((order) => order.status === "submitted");
-  const otherOrders = orders.filter((order) => order.status !== "submitted");
+  const visibleOrders = useMemo(
+    () => filterAndSortOperationsOrders(orders, query),
+    [orders, query],
+  );
+
+  const newCount = useMemo(
+    () => visibleOrders.filter((order) => order.status === "submitted").length,
+    [visibleOrders],
+  );
 
   return (
     <div className="space-y-8">
@@ -199,19 +206,28 @@ export function OperationsLiveBoard({
         title="Operations"
       />
 
+      <OperationsBoardToolbar
+        matchCount={visibleOrders.length}
+        newCount={newCount}
+        onChange={setQuery}
+        query={query}
+      />
+
       <section className="space-y-4">
-        <h2 className="text-ink text-sm font-semibold tracking-[0.14em] uppercase">
-          New orders
-          {newOrders.length > 0 ? ` · ${newOrders.length}` : ""}
-        </h2>
-        {newOrders.length === 0 ? (
+        {visibleOrders.length === 0 ? (
           <EmptyState
-            description="New customer preorders will appear here automatically."
-            title="You’re all caught up."
+            description={
+              orders.length === 0
+                ? "New customer preorders will appear here automatically."
+                : "Try clearing search or filters to see more orders."
+            }
+            title={
+              orders.length === 0 ? "You’re all caught up." : "No matching orders."
+            }
           />
         ) : (
           <ul className="grid gap-3">
-            {newOrders.map((order) => (
+            {visibleOrders.map((order) => (
               <li key={order.id}>
                 <OwnerOrderCard
                   highlight={highlightedIds.has(order.id)}
@@ -222,24 +238,6 @@ export function OperationsLiveBoard({
           </ul>
         )}
       </section>
-
-      {otherOrders.length > 0 ? (
-        <section className="space-y-4">
-          <h2 className="text-skyline text-sm font-semibold tracking-[0.14em] uppercase">
-            In progress
-          </h2>
-          <ul className="grid gap-3">
-            {otherOrders.map((order) => (
-              <li key={order.id}>
-                <OwnerOrderCard
-                  highlight={highlightedIds.has(order.id)}
-                  order={order}
-                />
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
     </div>
   );
 }

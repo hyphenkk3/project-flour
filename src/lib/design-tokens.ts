@@ -8,6 +8,8 @@ export const statusTone = {
   info: "info",
   success: "success",
   warning: "warning",
+  /** Soft purple — outstanding work in progress (e.g. awaiting payment). */
+  progress: "progress",
   danger: "danger",
 } as const;
 

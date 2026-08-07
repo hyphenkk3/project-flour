@@ -36,6 +36,7 @@ function parseLines(value: FormDataEntryValue | null): string[] {
 }
 
 function parseSizes(formData: FormData): LibraryCakeSizeInput[] | string {
+  const ids = formData.getAll("size_id").map((value) => String(value).trim());
   const labels = formData
     .getAll("size_label")
     .map((value) => String(value).trim());
@@ -46,6 +47,7 @@ function parseSizes(formData: FormData): LibraryCakeSizeInput[] | string {
   for (let index = 0; index < labels.length; index += 1) {
     const label = labels[index] ?? "";
     const priceRaw = String(prices[index] ?? "").trim();
+    const id = ids[index] ? ids[index] : null;
 
     if (!label && !priceRaw) {
       continue;
@@ -59,6 +61,7 @@ function parseSizes(formData: FormData): LibraryCakeSizeInput[] | string {
 
     const price = parseNonNegativeNumber(priceRaw);
     sizes.push({
+      id,
       label,
       price,
       sortOrder: sizes.length,
@@ -123,20 +126,103 @@ function parseCakeInput(formData: FormData): LibraryCakeInput | string {
   };
 }
 
-async function replaceCakeChildren(
+/**
+ * Identity-preserving size reconciliation.
+ * Existing size IDs are updated in place so order_items FKs stay valid.
+ * Unreferenced removed sizes may be deleted; referenced sizes are blocked.
+ */
+async function reconcileCakeSizes(
   cakeId: string,
   sizes: LibraryCakeSizeInput[],
-  photos: LibraryCakePhotoInput[],
 ) {
   const supabase = await createClient();
 
-  const { error: deleteSizesError } = await supabase
+  const { data: existingRows, error: existingError } = await supabase
+    .from("library_cake_sizes")
+    .select("id")
+    .eq("cake_id", cakeId);
+  if (existingError) {
+    throw new Error(existingError.message);
+  }
+
+  const existingIds = new Set(
+    (existingRows ?? []).map((row) => String(row.id)),
+  );
+  const keptIds = new Set<string>();
+
+  for (const size of sizes) {
+    const sizeId = size.id?.trim() || null;
+    if (sizeId) {
+      if (!existingIds.has(sizeId)) {
+        throw new Error(
+          "One of the cake sizes no longer belongs to this cake. Reload and try again.",
+        );
+      }
+      const { error } = await supabase
+        .from("library_cake_sizes")
+        .update({
+          label: size.label,
+          price: size.price,
+          sort_order: size.sortOrder,
+        })
+        .eq("id", sizeId)
+        .eq("cake_id", cakeId);
+      if (error) {
+        throw new Error(error.message);
+      }
+      keptIds.add(sizeId);
+      continue;
+    }
+
+    const { error } = await supabase.from("library_cake_sizes").insert({
+      cake_id: cakeId,
+      label: size.label,
+      serves: null,
+      price: size.price,
+      sort_order: size.sortOrder,
+    });
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  const removedIds = [...existingIds].filter((id) => !keptIds.has(id));
+  if (removedIds.length === 0) {
+    return;
+  }
+
+  const { data: referencedRows, error: referencedError } = await supabase
+    .from("order_items")
+    .select("cake_size_id")
+    .in("cake_size_id", removedIds);
+  if (referencedError) {
+    throw new Error(referencedError.message);
+  }
+
+  const referencedIds = new Set(
+    (referencedRows ?? []).map((row) => String(row.cake_size_id)),
+  );
+  if (referencedIds.size > 0) {
+    throw new Error(
+      "A size you removed is used on existing orders, so it cannot be deleted. Keep that size on the cake (you may still change its current Library price), or set the cake inactive if it should leave the storefront.",
+    );
+  }
+
+  const { error: deleteError } = await supabase
     .from("library_cake_sizes")
     .delete()
-    .eq("cake_id", cakeId);
-  if (deleteSizesError) {
-    throw new Error(deleteSizesError.message);
+    .eq("cake_id", cakeId)
+    .in("id", removedIds);
+  if (deleteError) {
+    throw new Error(deleteError.message);
   }
+}
+
+async function replaceCakePhotos(
+  cakeId: string,
+  photos: LibraryCakePhotoInput[],
+) {
+  const supabase = await createClient();
 
   const { error: deletePhotosError } = await supabase
     .from("library_cake_photos")
@@ -144,21 +230,6 @@ async function replaceCakeChildren(
     .eq("cake_id", cakeId);
   if (deletePhotosError) {
     throw new Error(deletePhotosError.message);
-  }
-
-  if (sizes.length > 0) {
-    const { error } = await supabase.from("library_cake_sizes").insert(
-      sizes.map((size) => ({
-        cake_id: cakeId,
-        label: size.label,
-        serves: null,
-        price: size.price,
-        sort_order: size.sortOrder,
-      })),
-    );
-    if (error) {
-      throw new Error(error.message);
-    }
   }
 
   if (photos.length > 0) {
@@ -175,6 +246,15 @@ async function replaceCakeChildren(
       throw new Error(error.message);
     }
   }
+}
+
+async function saveCakeChildren(
+  cakeId: string,
+  sizes: LibraryCakeSizeInput[],
+  photos: LibraryCakePhotoInput[],
+) {
+  await reconcileCakeSizes(cakeId, sizes);
+  await replaceCakePhotos(cakeId, photos);
 }
 
 export async function createCakeAction(
@@ -209,7 +289,7 @@ export async function createCakeAction(
   }
 
   try {
-    await replaceCakeChildren(data.id, parsed.sizes, parsed.photos);
+    await saveCakeChildren(data.id, parsed.sizes, parsed.photos);
   } catch (childError) {
     return {
       error:
@@ -254,7 +334,7 @@ export async function updateCakeAction(
   }
 
   try {
-    await replaceCakeChildren(id, parsed.sizes, parsed.photos);
+    await saveCakeChildren(id, parsed.sizes, parsed.photos);
   } catch (childError) {
     return {
       error:

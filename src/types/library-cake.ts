@@ -40,6 +40,8 @@ export type LibraryCakeDetail = LibraryCake & {
 };
 
 export type LibraryCakeSizeInput = {
+  /** Existing size id when editing; omit/null for newly added sizes. */
+  id?: string | null;
   label: string;
   price: number;
   sortOrder: number;

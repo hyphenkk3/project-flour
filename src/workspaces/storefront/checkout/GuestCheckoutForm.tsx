@@ -4,6 +4,7 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   FormActions,
+  FormCheckbox,
   FormError,
   FormField,
   FormInput,
@@ -52,7 +53,9 @@ export function GuestCheckoutForm({ cakes }: GuestCheckoutFormProps) {
   );
 
   const [items, setItems] = useState<PreorderDraftItem[]>([]);
-  const [fields, setFields] = useState<PreorderDraftFields>(emptyPreorderFields);
+  const [fields, setFields] = useState<PreorderDraftFields>(() =>
+    emptyPreorderFields(),
+  );
   const [hydrated, setHydrated] = useState(false);
   const [itemError, setItemError] = useState<string | null>(null);
 
@@ -63,6 +66,8 @@ export function GuestCheckoutForm({ cakes }: GuestCheckoutFormProps) {
       customerName: draft?.customerName ?? "",
       phone: draft?.phone ?? "",
       email: draft?.email ?? "",
+      emailSubmissionReceiptRequested:
+        draft?.emailSubmissionReceiptRequested ?? false,
       pickupDate: draft?.pickupDate ?? "",
       pickupTime: draft?.pickupTime ?? "",
       notes: draft?.notes ?? "",
@@ -272,7 +277,11 @@ export function GuestCheckoutForm({ cakes }: GuestCheckoutFormProps) {
           />
         </FormField>
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormField htmlFor="phone" label="Phone">
+          <FormField
+            help="Primary contact for WhatsApp updates"
+            htmlFor="phone"
+            label="WhatsApp phone"
+          >
             <FormInput
               id="phone"
               name="phone"
@@ -282,17 +291,31 @@ export function GuestCheckoutForm({ cakes }: GuestCheckoutFormProps) {
               value={fields.phone}
             />
           </FormField>
-          <FormField htmlFor="email" label="Email">
+          <FormField
+            help="For a copy of your preorder submission"
+            htmlFor="email"
+            label="Email (optional)"
+          >
             <FormInput
               id="email"
               name="email"
               onChange={(event) => patchFields({ email: event.target.value })}
-              required
+              required={fields.emailSubmissionReceiptRequested}
               type="email"
               value={fields.email}
             />
           </FormField>
         </div>
+        <FormCheckbox
+          checked={fields.emailSubmissionReceiptRequested}
+          label="Email me a copy of my preorder submission"
+          name="email_submission_receipt_requested"
+          onChange={(event) =>
+            patchFields({
+              emailSubmissionReceiptRequested: event.target.checked,
+            })
+          }
+        />
       </section>
 
       <section className="space-y-3">

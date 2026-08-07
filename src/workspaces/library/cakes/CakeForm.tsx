@@ -100,6 +100,7 @@ export function CakeForm({ mode, cake, cancelHref }: CakeFormProps) {
 
       <CakeSizeFields
         initialSizes={cake?.sizes.map((size) => ({
+          id: size.id,
           label: size.label,
           price: size.price,
         }))}

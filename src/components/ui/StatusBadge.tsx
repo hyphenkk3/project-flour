@@ -11,6 +11,8 @@ const toneClass: Record<StatusTone, string> = {
   info: "bg-status-info-soft text-status-info ring-status-info/20",
   success: "bg-status-success-soft text-status-success ring-status-success/20",
   warning: "bg-status-warning-soft text-status-warning ring-status-warning/20",
+  progress:
+    "bg-status-progress-soft text-status-progress ring-status-progress/20",
   danger: "bg-status-danger-soft text-status-danger ring-status-danger/20",
 };
 

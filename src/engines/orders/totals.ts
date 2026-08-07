@@ -1,12 +1,16 @@
+import { fromCents, toCents } from "@/engines/orders/money";
 import type { StorefrontOrderItem } from "@/types/storefront";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 
 export function calculateOrderTotal(
   items: Array<Pick<StorefrontOrderItem, "unitPrice" | "quantity">>,
 ): number {
-  return items.reduce(
-    (sum, item) => sum + Number(item.unitPrice) * Number(item.quantity),
-    0,
+  return fromCents(
+    items.reduce(
+      (sum, item) =>
+        sum + toCents(Number(item.unitPrice)) * Number(item.quantity),
+      0,
+    ),
   );
 }
 

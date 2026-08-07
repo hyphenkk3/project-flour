@@ -12,8 +12,10 @@
   --color-status-info-soft: #e8f0f7;
   --color-status-success: #2f6b4f;
   --color-status-success-soft: #e7f3ec;
-  --color-status-warning: #8a6a2f;
-  --color-status-warning-soft: #f7f1e4;
+  --color-status-warning: #9a5b24;
+  --color-status-warning-soft: #f8efe4;
+  --color-status-progress: #5c4a7a;
+  --color-status-progress-soft: #efeaf5;
   --color-status-danger: #8a3a3a;
   --color-status-danger-soft: #f7e8e8;
 }
@@ -32,6 +34,8 @@
   --color-status-success-soft: var(--color-status-success-soft);
   --color-status-warning: var(--color-status-warning);
   --color-status-warning-soft: var(--color-status-warning-soft);
+  --color-status-progress: var(--color-status-progress);
+  --color-status-progress-soft: var(--color-status-progress-soft);
   --color-status-danger: var(--color-status-danger);
   --color-status-danger-soft: var(--color-status-danger-soft);
 }

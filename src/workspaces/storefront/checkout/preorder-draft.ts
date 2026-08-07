@@ -13,6 +13,7 @@ export type PreorderDraftFields = {
   customerName: string;
   phone: string;
   email: string;
+  emailSubmissionReceiptRequested: boolean;
   pickupDate: string;
   pickupTime: string;
   notes: string;
@@ -28,6 +29,7 @@ export const emptyPreorderFields = (): PreorderDraftFields => ({
   customerName: "",
   phone: "",
   email: "",
+  emailSubmissionReceiptRequested: false,
   pickupDate: "",
   pickupTime: "",
   notes: "",
@@ -54,6 +56,9 @@ export function readPreorderDraft(): PreorderDraft | null {
       customerName: String(parsed.customerName ?? ""),
       phone: String(parsed.phone ?? ""),
       email: String(parsed.email ?? ""),
+      emailSubmissionReceiptRequested: Boolean(
+        parsed.emailSubmissionReceiptRequested,
+      ),
       pickupDate: String(parsed.pickupDate ?? ""),
       pickupTime: String(parsed.pickupTime ?? ""),
       notes: String(parsed.notes ?? ""),

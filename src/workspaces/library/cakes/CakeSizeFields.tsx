@@ -5,17 +5,19 @@ import { FormField, FormInput } from "@/components/ui/form";
 
 type SizeDraft = {
   key: string;
+  id: string | null;
   label: string;
   price: string;
 };
 
 type CakeSizeFieldsProps = {
-  initialSizes?: Array<{ label: string; price: number }>;
+  initialSizes?: Array<{ id?: string; label: string; price: number }>;
 };
 
 function createEmptySize(): SizeDraft {
   return {
     key: crypto.randomUUID(),
+    id: null,
     label: "",
     price: "",
   };
@@ -25,7 +27,8 @@ export function CakeSizeFields({ initialSizes }: CakeSizeFieldsProps) {
   const [sizes, setSizes] = useState<SizeDraft[]>(() => {
     if (initialSizes && initialSizes.length > 0) {
       return initialSizes.map((size) => ({
-        key: crypto.randomUUID(),
+        key: size.id ?? crypto.randomUUID(),
+        id: size.id ?? null,
         label: size.label,
         price: String(size.price),
       }));
@@ -42,7 +45,7 @@ export function CakeSizeFields({ initialSizes }: CakeSizeFieldsProps) {
           </h2>
           <p className="text-skyline mt-1 text-sm">
             Each size has its own label and price. This is the only cake pricing
-            model.
+            model. Existing size identities are kept when you edit a cake.
           </p>
         </div>
         <button
@@ -60,6 +63,7 @@ export function CakeSizeFields({ initialSizes }: CakeSizeFieldsProps) {
             className="border-fog grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_8rem_auto]"
             key={size.key}
           >
+            <input name="size_id" type="hidden" value={size.id ?? ""} />
             <FormField htmlFor={`size_label_${size.key}`} label="Size">
               <FormInput
                 id={`size_label_${size.key}`}

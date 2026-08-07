@@ -38,10 +38,12 @@ import {
   type OrderWorkspaceSaveState,
 } from "@/workspaces/owner/orders/actions";
 import { CustomerConfirmedButton } from "@/workspaces/owner/orders/CustomerConfirmedButton";
+import { PaymentSection } from "@/workspaces/owner/orders/PaymentSection";
 import {
   formatPickupTime,
   formatTimelineDateTime,
   guestOrderStatusLabel,
+  guestOrderStatusTone,
 } from "@/workspaces/owner/orders/labels";
 
 const initialSaveState: OrderWorkspaceSaveState = {
@@ -219,13 +221,7 @@ export function OrderWorkspaceForm({
         <div className="flex flex-wrap items-center gap-3">
           <StatusBadge
             label={guestOrderStatusLabel(order.status)}
-            tone={
-              order.status === "submitted"
-                ? "warning"
-                : order.status === "awaiting_payment"
-                  ? "success"
-                  : "info"
-            }
+            tone={guestOrderStatusTone(order.status)}
           />
           <p className="text-skyline text-sm">{order.orderNumber}</p>
         </div>
@@ -266,6 +262,10 @@ export function OrderWorkspaceForm({
             Total · {formatRm(order.total)}
           </p>
         </ViewBlock>
+
+        {order.status === "awaiting_payment" || order.status === "paid" ? (
+          <PaymentSection order={order} />
+        ) : null}
 
         <ViewBlock title="Pickup">
           <div className="space-y-1">
@@ -398,7 +398,7 @@ export function OrderWorkspaceForm({
       <div className="flex flex-wrap items-center gap-3">
         <StatusBadge
           label={guestOrderStatusLabel(order.status)}
-          tone={order.status === "submitted" ? "warning" : "info"}
+          tone={guestOrderStatusTone(order.status)}
         />
         <p className="text-skyline text-sm">{order.orderNumber}</p>
       </div>
@@ -416,7 +416,7 @@ export function OrderWorkspaceForm({
           />
         </FormField>
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField htmlFor="guest_phone" label="Phone">
+          <FormField htmlFor="guest_phone" label="WhatsApp phone">
             <FormInput
               defaultValue={order.phone}
               id="guest_phone"
@@ -425,12 +425,15 @@ export function OrderWorkspaceForm({
               type="tel"
             />
           </FormField>
-          <FormField htmlFor="guest_email" label="Email">
+          <FormField
+            help="Optional. Used only if the customer shared an email."
+            htmlFor="guest_email"
+            label="Email (optional)"
+          >
             <FormInput
               defaultValue={order.email}
               id="guest_email"
               name="guest_email"
-              required
               type="email"
             />
           </FormField>
