@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CakeDetailPurchasePanel } from "@/workspaces/storefront/catalog/CakeDetailPurchasePanel";
+import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
 import {
   getAvailableCakeById,
   getCurrentCollection,
@@ -24,6 +25,8 @@ export async function StorefrontCakeDetail({ cakeId }: CakeDetailProps) {
 
   return (
     <main className="bg-mist mx-auto min-h-screen max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
+      <PreorderInProgressBar />
+
       <Link
         className="text-skyline hover:text-ink text-sm font-medium"
         href="/"

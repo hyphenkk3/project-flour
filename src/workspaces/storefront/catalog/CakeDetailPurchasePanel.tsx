@@ -1,17 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { StorefrontCake, StorefrontCollection } from "@/types/storefront";
 import {
   formatCollectionAvailabilityLabel,
   formatRm,
 } from "@/workspaces/storefront/catalog/pricing";
+import {
+  draftHasItems,
+  emptyPreorderDraft,
+  mergeDraftItem,
+  readPreorderDraft,
+  writePreorderDraft,
+  type PreorderDraftItem,
+} from "@/workspaces/storefront/checkout/preorder-draft";
 
 type CakeDetailPurchasePanelProps = {
   cake: StorefrontCake;
   collection: StorefrontCollection | null;
 };
+
+function existingQuantityForSize(
+  items: PreorderDraftItem[],
+  cakeId: string,
+  sizeId: string,
+): number {
+  return items
+    .filter((item) => item.cakeId === cakeId && item.sizeId === sizeId)
+    .reduce((sum, item) => sum + item.quantity, 0);
+}
 
 export function CakeDetailPurchasePanel({
   cake,
@@ -20,16 +38,49 @@ export function CakeDetailPurchasePanel({
   const router = useRouter();
   const [selectedSizeId, setSelectedSizeId] = useState(cake.sizes[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
+  const [draftItems, setDraftItems] = useState<PreorderDraftItem[]>([]);
+  const [hasActivePreorder, setHasActivePreorder] = useState(false);
 
   const selectedSize = cake.sizes.find((size) => size.id === selectedSizeId);
 
-  function handlePreorder() {
-    if (!selectedSizeId) {
+  useEffect(() => {
+    const draft = readPreorderDraft();
+    setHasActivePreorder(draftHasItems(draft));
+    setDraftItems(draft?.items ?? []);
+  }, []);
+
+  const existingQuantity = useMemo(
+    () =>
+      selectedSizeId
+        ? existingQuantityForSize(draftItems, cake.id, selectedSizeId)
+        : 0,
+    [draftItems, cake.id, selectedSizeId],
+  );
+
+  const primaryLabel = !hasActivePreorder
+    ? "Preorder This Cake"
+    : existingQuantity > 0
+      ? `Add Another · Already ${existingQuantity} in Preorder`
+      : "Add to Preorder";
+
+  function handlePrimaryAction() {
+    if (!selectedSize) {
       setError("Please choose a size.");
       return;
     }
     setError(null);
-    router.push(`/order?cake=${cake.id}&size=${selectedSizeId}`);
+    const draft = readPreorderDraft() ?? emptyPreorderDraft();
+    writePreorderDraft(
+      mergeDraftItem(draft, {
+        cakeId: cake.id,
+        sizeId: selectedSize.id,
+        quantity: 1,
+        cakeName: cake.name,
+        sizeLabel: selectedSize.size,
+        unitPrice: selectedSize.price,
+      }),
+    );
+    router.push("/order");
   }
 
   return (
@@ -125,10 +176,10 @@ export function CakeDetailPurchasePanel({
       <button
         className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full items-center justify-center rounded-xl px-5 text-sm font-medium disabled:opacity-50"
         disabled={cake.sizes.length === 0}
-        onClick={handlePreorder}
+        onClick={handlePrimaryAction}
         type="button"
       >
-        Preorder This Cake
+        {primaryLabel}
       </button>
     </div>
   );

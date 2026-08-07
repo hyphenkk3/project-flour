@@ -12,7 +12,15 @@ type OwnerOrderCardProps = {
   highlight?: boolean;
 };
 
-export function OwnerOrderCard({ order, highlight = false }: OwnerOrderCardProps) {
+export function OwnerOrderCard({
+  order,
+  highlight = false,
+}: OwnerOrderCardProps) {
+  const cakeLine =
+    order.additionalItemCount > 0
+      ? `${order.cakeName} · ${order.sizeLabel} + ${order.additionalItemCount} more`
+      : `${order.cakeName} · ${order.sizeLabel}`;
+
   return (
     <Link
       className={
@@ -27,17 +35,26 @@ export function OwnerOrderCard({ order, highlight = false }: OwnerOrderCardProps
           <p className="text-ink truncate text-base font-semibold">
             {order.customerName}
           </p>
-          <p className="text-ink text-sm">
-            {order.cakeName} · {order.sizeLabel}
-          </p>
+          <p className="text-ink text-sm">{cakeLine}</p>
           <p className="text-skyline text-sm">
             {formatDdMmYyyy(order.pickupDate)} ·{" "}
             {formatPickupTime(order.pickupTime)}
           </p>
+          {order.confirmationNeedsResend ? (
+            <p className="text-status-warning text-xs font-medium">
+              Confirmation needs to be resent
+            </p>
+          ) : null}
         </div>
         <StatusBadge
           label={guestOrderStatusLabel(order.status)}
-          tone={order.status === "submitted" ? "warning" : "info"}
+          tone={
+            order.status === "submitted"
+              ? "warning"
+              : order.status === "awaiting_payment"
+                ? "success"
+                : "info"
+          }
         />
       </div>
     </Link>

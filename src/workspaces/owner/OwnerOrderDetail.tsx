@@ -2,7 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { OrderWorkspaceForm } from "@/workspaces/owner/orders/OrderWorkspaceForm";
-import { getGuestOrderById } from "@/workspaces/owner/orders/queries";
+import {
+  getGuestOrderById,
+  listCollectionComplimentaryOptions,
+  listConfirmationSnapshots,
+  listOrderTimeline,
+} from "@/workspaces/owner/orders/queries";
 import type { StorefrontCake } from "@/types/storefront";
 import {
   getAvailableCakeById,
@@ -27,13 +32,22 @@ export async function OwnerOrderDetail({ orderId }: OwnerOrderDetailProps) {
     ? await listAvailableCakes(collection.id)
     : [];
 
-  const orderedCakeId = order.items[0]?.cakeId;
-  if (orderedCakeId && !cakes.some((cake) => cake.id === orderedCakeId)) {
-    const orderedCake = await getAvailableCakeById(orderedCakeId);
-    if (orderedCake) {
-      cakes.unshift(orderedCake);
+  for (const item of order.items) {
+    if (!cakes.some((cake) => cake.id === item.cakeId)) {
+      const orderedCake = await getAvailableCakeById(item.cakeId);
+      if (orderedCake) {
+        cakes.unshift(orderedCake);
+      }
     }
   }
+
+  const complimentaryCollectionId = order.collectionId ?? collection?.id;
+  const complimentaryOptions = complimentaryCollectionId
+    ? await listCollectionComplimentaryOptions(complimentaryCollectionId)
+    : [];
+
+  const timeline = await listOrderTimeline(orderId);
+  const confirmations = await listConfirmationSnapshots(orderId);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -48,7 +62,13 @@ export async function OwnerOrderDetail({ orderId }: OwnerOrderDetailProps) {
         <p className="text-skyline -mt-2 text-sm">{order.customerName}</p>
       </div>
 
-      <OrderWorkspaceForm cakes={cakes} order={order} />
+      <OrderWorkspaceForm
+        cakes={cakes}
+        complimentaryOptions={complimentaryOptions}
+        confirmations={confirmations}
+        order={order}
+        timeline={timeline}
+      />
     </div>
   );
 }

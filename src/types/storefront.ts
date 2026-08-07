@@ -1,3 +1,8 @@
+export type GuestOrderStatus =
+  | "submitted"
+  | "pending_confirmation"
+  | "awaiting_payment";
+
 export type StorefrontCollection = {
   id: string;
   name: string;
@@ -22,7 +27,6 @@ export type StorefrontCake = {
   sizes: StorefrontCakeSize[];
 };
 
-/** Owner-facing guest preorder (orders.customer_id is null). */
 export type StorefrontOrderItem = {
   id: string;
   orderId: string;
@@ -32,6 +36,14 @@ export type StorefrontOrderItem = {
   unitPrice: number;
   cakeName: string;
   sizeLabel: string;
+};
+
+export type StorefrontComplimentaryItem = {
+  id: string;
+  name: string;
+  quantity: number;
+  sortOrder: number;
+  complimentaryItemTypeId: string | null;
 };
 
 export type StorefrontOrder = {
@@ -44,9 +56,13 @@ export type StorefrontOrder = {
   pickupTime: string;
   notes: string | null;
   internalNotes: string | null;
-  status: "submitted" | "pending_confirmation";
+  status: GuestOrderStatus;
   createdAt: string;
+  confirmationNeedsResend: boolean;
+  collectionId: string | null;
   items: StorefrontOrderItem[];
+  complimentaryItems: StorefrontComplimentaryItem[];
+  total: number;
 };
 
 export type StorefrontOrderListItem = {
@@ -55,8 +71,64 @@ export type StorefrontOrderListItem = {
   customerName: string;
   cakeName: string;
   sizeLabel: string;
+  additionalItemCount: number;
   pickupDate: string;
   pickupTime: string;
-  status: "submitted" | "pending_confirmation";
+  status: GuestOrderStatus;
   createdAt: string;
+  confirmationNeedsResend: boolean;
+};
+
+export type OrderTimelineEventType =
+  | "preorder_submitted"
+  | "order_updated"
+  | "confirmation_prepared"
+  | "confirmation_marked_sent"
+  | "confirmation_outdated"
+  | "updated_confirmation_prepared"
+  | "updated_confirmation_marked_sent"
+  | "customer_confirmed";
+
+export type OrderTimelineEvent = {
+  id: string;
+  orderId: string;
+  eventType: OrderTimelineEventType | string;
+  actorStaffId: string | null;
+  actorName: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type ConfirmationSnapshot = {
+  id: string;
+  orderId: string;
+  version: number;
+  lifecycleStatus: "sent" | "outdated";
+  messageBody: string;
+  snapshotPayload: ConfirmationPayload;
+  preparedBy: string | null;
+  preparedAt: string | null;
+  sentBy: string | null;
+  sentAt: string | null;
+  outdatedAt: string | null;
+  createdAt: string;
+};
+
+export type ConfirmationPayload = {
+  staffCustomerFacingName: string;
+  customerName: string;
+  customerPhone: string;
+  pickupDate: string;
+  pickupTime: string;
+  items: Array<{
+    cakeName: string;
+    sizeLabel: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
+  complimentaryItems: Array<{
+    name: string;
+    quantity: number;
+  }>;
+  total: number;
 };

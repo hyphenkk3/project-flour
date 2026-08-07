@@ -8,6 +8,54 @@ export type CheckoutState = {
   error: string | null;
 };
 
+type SubmitItem = {
+  cake_id: string;
+  cake_size_id: string;
+  quantity: number;
+};
+
+function parseItems(formData: FormData): SubmitItem[] {
+  const raw = String(formData.get("items_json") ?? "").trim();
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as Array<{
+      cakeId?: string;
+      sizeId?: string;
+      quantity?: number;
+    }>;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => ({
+        cake_id: String(item.cakeId ?? "").trim(),
+        cake_size_id: String(item.sizeId ?? "").trim(),
+        quantity: Number(item.quantity ?? 0),
+      }))
+      .filter(
+        (item) =>
+          item.cake_id &&
+          item.cake_size_id &&
+          Number.isInteger(item.quantity) &&
+          item.quantity >= 1,
+      );
+  } catch {
+    return [];
+  }
+}
+
+function consolidateItems(items: SubmitItem[]): SubmitItem[] {
+  const map = new Map<string, SubmitItem>();
+  for (const item of items) {
+    const key = `${item.cake_id}::${item.cake_size_id}`;
+    const existing = map.get(key);
+    if (existing) {
+      existing.quantity += item.quantity;
+    } else {
+      map.set(key, { ...item });
+    }
+  }
+  return Array.from(map.values());
+}
+
 export async function submitGuestPreorderAction(
   _prev: CheckoutState,
   formData: FormData,
@@ -18,10 +66,7 @@ export async function submitGuestPreorderAction(
   const pickupDate = String(formData.get("pickup_date") ?? "").trim();
   const pickupTime = String(formData.get("pickup_time") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim();
-  const cakeId = String(formData.get("cake_id") ?? "").trim();
-  const cakeSizeId = String(formData.get("cake_size_id") ?? "").trim();
-  const quantityRaw = String(formData.get("quantity") ?? "1").trim();
-  const quantity = Number(quantityRaw);
+  const items = consolidateItems(parseItems(formData));
 
   if (!customerName || !phone || !email) {
     return { error: "Please fill in your name, phone, and email." };
@@ -34,11 +79,8 @@ export async function submitGuestPreorderAction(
       error: "Please choose a valid pickup time for that date.",
     };
   }
-  if (!cakeId || !cakeSizeId) {
-    return { error: "Please choose a cake size." };
-  }
-  if (!Number.isInteger(quantity) || quantity < 1) {
-    return { error: "Quantity must be at least 1." };
+  if (items.length === 0) {
+    return { error: "Please add at least one cake to your preorder." };
   }
 
   const supabase = await createClient();
@@ -49,9 +91,7 @@ export async function submitGuestPreorderAction(
     p_pickup_date: pickupDate,
     p_pickup_time: pickupTime,
     p_notes: notes || null,
-    p_cake_id: cakeId,
-    p_cake_size_id: cakeSizeId,
-    p_quantity: quantity,
+    p_items: items,
   });
 
   if (error) {

@@ -8,6 +8,8 @@ export function guestOrderStatusLabel(
       return "Submitted";
     case "pending_confirmation":
       return "Waiting Customer Confirmation";
+    case "awaiting_payment":
+      return "Awaiting Payment";
   }
 }
 
@@ -27,5 +29,25 @@ export function formatSubmittedAt(iso: string): string {
     timeZone: "Asia/Singapore",
     dateStyle: "medium",
     timeStyle: "short",
+  }).format(new Date(iso));
+}
+
+export function formatTimelineTime(iso: string): string {
+  return new Intl.DateTimeFormat("en-SG", {
+    timeZone: "Asia/Singapore",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(iso));
+}
+
+export function formatTimelineDateTime(iso: string): string {
+  return new Intl.DateTimeFormat("en-SG", {
+    timeZone: "Asia/Singapore",
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
   }).format(new Date(iso));
 }

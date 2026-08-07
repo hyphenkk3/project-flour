@@ -1,6 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useActionState,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   FormActions,
@@ -14,15 +21,26 @@ import {
 import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatLongBusinessDate } from "@/lib/dates";
-import type { StorefrontCake, StorefrontOrder } from "@/types/storefront";
+import {
+  describeTimelineActor,
+  timelineEventLabel,
+} from "@/engines/orders/timeline";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
+import type {
+  ConfirmationSnapshot,
+  OrderTimelineEvent,
+  StorefrontCake,
+  StorefrontOrder,
+} from "@/types/storefront";
+import type { CollectionComplimentaryOption } from "@/workspaces/owner/orders/queries";
 import {
   saveOrderWorkspaceAction,
   type OrderWorkspaceSaveState,
 } from "@/workspaces/owner/orders/actions";
-import { ConfirmOrderButton } from "@/workspaces/owner/orders/ConfirmOrderButton";
+import { CustomerConfirmedButton } from "@/workspaces/owner/orders/CustomerConfirmedButton";
 import {
   formatPickupTime,
+  formatTimelineDateTime,
   guestOrderStatusLabel,
 } from "@/workspaces/owner/orders/labels";
 
@@ -31,9 +49,26 @@ const initialSaveState: OrderWorkspaceSaveState = {
   success: false,
 };
 
+type EditableItem = {
+  key: string;
+  cakeId: string;
+  cakeSizeId: string;
+  quantity: number;
+};
+
+type EditableComplimentary = {
+  typeId: string | null;
+  name: string;
+  quantity: number;
+  sortOrder: number;
+};
+
 type OrderWorkspaceFormProps = {
   order: StorefrontOrder;
   cakes: StorefrontCake[];
+  complimentaryOptions: CollectionComplimentaryOption[];
+  timeline: OrderTimelineEvent[];
+  confirmations: ConfirmationSnapshot[];
 };
 
 function ViewBlock({
@@ -53,9 +88,14 @@ function ViewBlock({
   );
 }
 
-export function OrderWorkspaceForm({ order, cakes }: OrderWorkspaceFormProps) {
+export function OrderWorkspaceForm({
+  order,
+  cakes,
+  complimentaryOptions,
+  timeline,
+  confirmations,
+}: OrderWorkspaceFormProps) {
   const router = useRouter();
-  const item = order.items[0];
   const boundSave = saveOrderWorkspaceAction.bind(null, order.id);
   const [state, formAction, pending] = useActionState(
     boundSave,
@@ -65,26 +105,13 @@ export function OrderWorkspaceForm({ order, cakes }: OrderWorkspaceFormProps) {
   const [mode, setMode] = useState<"view" | "edit">("view");
   const [formKey, setFormKey] = useState(0);
   const [showSaved, setShowSaved] = useState(false);
+  const [editItems, setEditItems] = useState<EditableItem[]>([]);
+  const [editComplimentary, setEditComplimentary] = useState<
+    EditableComplimentary[]
+  >([]);
 
-  const initialCakeId = item?.cakeId ?? cakes[0]?.id ?? "";
-  const [cakeId, setCakeId] = useState(initialCakeId);
-
-  const selectedCake = useMemo(
-    () => cakes.find((cake) => cake.id === cakeId) ?? null,
-    [cakes, cakeId],
-  );
-
-  const [sizeId, setSizeId] = useState(
-    item?.cakeSizeId ?? selectedCake?.sizes[0]?.id ?? "",
-  );
-
-  useEffect(() => {
-    if (!selectedCake) return;
-    const stillValid = selectedCake.sizes.some((size) => size.id === sizeId);
-    if (!stillValid) {
-      setSizeId(selectedCake.sizes[0]?.id ?? "");
-    }
-  }, [selectedCake, sizeId]);
+  const canEdit =
+    order.status === "submitted" || order.status === "pending_confirmation";
 
   useEffect(() => {
     if (!state.success) return;
@@ -93,18 +120,42 @@ export function OrderWorkspaceForm({ order, cakes }: OrderWorkspaceFormProps) {
     router.refresh();
   }, [state, router]);
 
-  useEffect(() => {
-    setCakeId(item?.cakeId ?? cakes[0]?.id ?? "");
-    setSizeId(item?.cakeSizeId ?? "");
-  }, [order, item?.cakeId, item?.cakeSizeId, cakes]);
+  function seedEditState() {
+    setEditItems(
+      order.items.map((item, index) => ({
+        key: item.id || `item-${index}`,
+        cakeId: item.cakeId,
+        cakeSizeId: item.cakeSizeId,
+        quantity: item.quantity,
+      })),
+    );
 
-  const canEdit =
-    order.status === "submitted" || order.status === "pending_confirmation";
+    if (order.complimentaryItems.length > 0) {
+      setEditComplimentary(
+        order.complimentaryItems.map((item) => ({
+          typeId: item.complimentaryItemTypeId,
+          name: item.name,
+          quantity: item.quantity,
+          sortOrder: item.sortOrder,
+        })),
+      );
+    } else {
+      setEditComplimentary(
+        complimentaryOptions
+          .filter((option) => option.isAvailable)
+          .map((option) => ({
+            typeId: option.typeId,
+            name: option.name,
+            quantity: option.isDefault ? option.defaultQuantity : 0,
+            sortOrder: option.sortOrder,
+          })),
+      );
+    }
+  }
 
   function enterEditMode() {
     setShowSaved(false);
-    setCakeId(item?.cakeId ?? cakes[0]?.id ?? "");
-    setSizeId(item?.cakeSizeId ?? selectedCake?.sizes[0]?.id ?? "");
+    seedEditState();
     setFormKey((value) => value + 1);
     setMode("edit");
   }
@@ -114,13 +165,67 @@ export function OrderWorkspaceForm({ order, cakes }: OrderWorkspaceFormProps) {
     setFormKey((value) => value + 1);
   }
 
+  function addCakeLine() {
+    const cake = cakes[0];
+    if (!cake) return;
+    setEditItems((current) => [
+      ...current,
+      {
+        key: `new-${Date.now()}`,
+        cakeId: cake.id,
+        cakeSizeId: cake.sizes[0]?.id ?? "",
+        quantity: 1,
+      },
+    ]);
+  }
+
+  function updateCakeLine(key: string, patch: Partial<EditableItem>) {
+    setEditItems((current) =>
+      current.map((item) => (item.key === key ? { ...item, ...patch } : item)),
+    );
+  }
+
+  function removeCakeLine(key: string) {
+    setEditItems((current) => {
+      if (current.length <= 1) return current;
+      return current.filter((item) => item.key !== key);
+    });
+  }
+
+  const itemsJson = useMemo(
+    () =>
+      JSON.stringify(
+        editItems.map((item) => ({
+          cakeId: item.cakeId,
+          cakeSizeId: item.cakeSizeId,
+          quantity: item.quantity,
+        })),
+      ),
+    [editItems],
+  );
+
+  const complimentaryJson = useMemo(
+    () => JSON.stringify(editComplimentary),
+    [editComplimentary],
+  );
+
+  const activeComplimentary = order.complimentaryItems.filter(
+    (item) => item.quantity > 0,
+  );
+
   if (mode === "view") {
     return (
       <div className="space-y-6">
         <div className="flex flex-wrap items-center gap-3">
           <StatusBadge
             label={guestOrderStatusLabel(order.status)}
-            tone={order.status === "submitted" ? "warning" : "info"}
+            tone={
+              order.status === "submitted"
+                ? "warning"
+                : order.status === "awaiting_payment"
+                  ? "success"
+                  : "info"
+            }
           />
           <p className="text-skyline text-sm">{order.orderNumber}</p>
         </div>
@@ -128,6 +233,12 @@ export function OrderWorkspaceForm({ order, cakes }: OrderWorkspaceFormProps) {
         {showSaved ? (
           <p className="border-status-success/30 bg-status-success-soft text-status-success rounded-lg border px-4 py-3 text-sm">
             Changes saved
+          </p>
+        ) : null}
+
+        {order.confirmationNeedsResend ? (
+          <p className="border-status-warning/30 bg-status-warning-soft text-status-warning rounded-lg border px-4 py-3 text-sm">
+            Confirmation needs to be resent
           </p>
         ) : null}
 
@@ -140,19 +251,20 @@ export function OrderWorkspaceForm({ order, cakes }: OrderWorkspaceFormProps) {
         </ViewBlock>
 
         <ViewBlock title="Order">
-          <div className="space-y-1">
-            <p className="text-ink text-base font-semibold">
-              {item?.cakeName ?? "—"}
-            </p>
-            <p className="text-ink text-sm">
-              {item
-                ? `${item.sizeLabel} · ${formatRm(item.unitPrice)}`
-                : "—"}
-            </p>
-            <p className="text-skyline text-sm">
-              Quantity {item?.quantity ?? 1}
-            </p>
-          </div>
+          <ul className="space-y-2">
+            {order.items.map((item) => (
+              <li key={item.id}>
+                <p className="text-ink font-medium">{item.cakeName}</p>
+                <p className="text-skyline text-sm">
+                  {item.sizeLabel} × {item.quantity} ·{" "}
+                  {formatRm(item.unitPrice * item.quantity)}
+                </p>
+              </li>
+            ))}
+          </ul>
+          <p className="text-ink mt-3 text-sm font-semibold">
+            Total · {formatRm(order.total)}
+          </p>
         </ViewBlock>
 
         <ViewBlock title="Pickup">
@@ -164,6 +276,20 @@ export function OrderWorkspaceForm({ order, cakes }: OrderWorkspaceFormProps) {
               {formatPickupTime(order.pickupTime)}
             </p>
           </div>
+        </ViewBlock>
+
+        <ViewBlock title="Complimentary items">
+          {activeComplimentary.length === 0 ? (
+            <p className="text-skyline text-sm">None</p>
+          ) : (
+            <ul className="text-ink space-y-1 text-sm">
+              {activeComplimentary.map((item) => (
+                <li key={item.id}>
+                  {item.name} × {item.quantity}
+                </li>
+              ))}
+            </ul>
+          )}
         </ViewBlock>
 
         <ViewBlock title="Customer notes">
@@ -190,16 +316,85 @@ export function OrderWorkspaceForm({ order, cakes }: OrderWorkspaceFormProps) {
               Edit Order
             </button>
           ) : null}
+
           {order.status === "submitted" ? (
-            <ConfirmOrderButton orderId={order.id} />
+            <Link
+              className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium"
+              href={`/owner/orders/${order.id}/confirmation`}
+            >
+              Prepare Confirmation
+            </Link>
+          ) : null}
+
+          {order.status === "pending_confirmation" &&
+          order.confirmationNeedsResend ? (
+            <Link
+              className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium"
+              href={`/owner/orders/${order.id}/confirmation?updated=1`}
+            >
+              Prepare Updated Confirmation
+            </Link>
+          ) : null}
+
+          {order.status === "pending_confirmation" &&
+          !order.confirmationNeedsResend ? (
+            <CustomerConfirmedButton orderId={order.id} />
           ) : null}
         </div>
+
+        <ViewBlock title="Timeline">
+          {timeline.length === 0 ? (
+            <p className="text-skyline text-sm">No events yet.</p>
+          ) : (
+            <ol className="space-y-3">
+              {timeline.map((event) => (
+                <li className="text-sm" key={event.id}>
+                  <p className="text-ink font-medium">
+                    {timelineEventLabel(event.eventType)}
+                  </p>
+                  <p className="text-skyline">
+                    {formatTimelineDateTime(event.createdAt)}
+                    {" · "}
+                    {describeTimelineActor(event.eventType, event.actorName)}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          )}
+        </ViewBlock>
+
+        {confirmations.length > 0 ? (
+          <ViewBlock title="Confirmation history">
+            <ul className="space-y-4">
+              {[...confirmations].reverse().map((snapshot) => (
+                <li key={snapshot.id}>
+                  <p className="text-ink text-sm font-medium">
+                    Version {snapshot.version}
+                    {" · "}
+                    {snapshot.lifecycleStatus === "sent"
+                      ? "Sent"
+                      : "Outdated"}
+                    {snapshot.sentAt
+                      ? ` · ${formatTimelineDateTime(snapshot.sentAt)}`
+                      : null}
+                  </p>
+                  <pre className="border-fog text-skyline mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg border bg-mist/40 p-3 text-xs leading-relaxed">
+                    {snapshot.messageBody}
+                  </pre>
+                </li>
+              ))}
+            </ul>
+          </ViewBlock>
+        ) : null}
       </div>
     );
   }
 
   return (
     <form action={formAction} className="space-y-6" key={formKey}>
+      <input name="items_json" type="hidden" value={itemsJson} />
+      <input name="complimentary_json" type="hidden" value={complimentaryJson} />
+
       <div className="flex flex-wrap items-center gap-3">
         <StatusBadge
           label={guestOrderStatusLabel(order.status)}
@@ -243,53 +438,94 @@ export function OrderWorkspaceForm({ order, cakes }: OrderWorkspaceFormProps) {
       </section>
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
-        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-          Order
-        </h2>
-        <FormField htmlFor="cake_id" label="Cake">
-          <FormSelect
-            id="cake_id"
-            name="cake_id"
-            onChange={(event) => setCakeId(event.target.value)}
-            required
-            value={cakeId}
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
+            Order
+          </h2>
+          <button
+            className="text-signal text-sm font-medium"
+            onClick={addCakeLine}
+            type="button"
           >
-            {cakes.map((cake) => (
-              <option key={cake.id} value={cake.id}>
-                {cake.name}
-              </option>
-            ))}
-          </FormSelect>
-        </FormField>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FormField htmlFor="cake_size_id" label="Size">
-            <FormSelect
-              disabled={!selectedCake}
-              id="cake_size_id"
-              name="cake_size_id"
-              onChange={(event) => setSizeId(event.target.value)}
-              required
-              value={sizeId}
-            >
-              {(selectedCake?.sizes ?? []).map((size) => (
-                <option key={size.id} value={size.id}>
-                  {size.size} — {formatRm(size.price)}
-                </option>
-              ))}
-            </FormSelect>
-          </FormField>
-          <FormField htmlFor="quantity" label="Quantity">
-            <FormInput
-              defaultValue={item?.quantity ?? 1}
-              id="quantity"
-              min={1}
-              name="quantity"
-              required
-              step={1}
-              type="number"
-            />
-          </FormField>
+            + Add cake
+          </button>
         </div>
+        <ul className="space-y-4">
+          {editItems.map((item) => {
+            const cake =
+              cakes.find((entry) => entry.id === item.cakeId) ?? cakes[0];
+            return (
+              <li
+                className="border-fog space-y-3 rounded-lg border p-3"
+                key={item.key}
+              >
+                <FormField label="Cake">
+                  <FormSelect
+                    onChange={(event) => {
+                      const nextCake = cakes.find(
+                        (entry) => entry.id === event.target.value,
+                      );
+                      updateCakeLine(item.key, {
+                        cakeId: event.target.value,
+                        cakeSizeId: nextCake?.sizes[0]?.id ?? "",
+                      });
+                    }}
+                    value={item.cakeId}
+                  >
+                    {cakes.map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.name}
+                      </option>
+                    ))}
+                  </FormSelect>
+                </FormField>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <FormField label="Size">
+                    <FormSelect
+                      onChange={(event) =>
+                        updateCakeLine(item.key, {
+                          cakeSizeId: event.target.value,
+                        })
+                      }
+                      value={item.cakeSizeId}
+                    >
+                      {(cake?.sizes ?? []).map((size) => (
+                        <option key={size.id} value={size.id}>
+                          {size.size} — {formatRm(size.price)}
+                        </option>
+                      ))}
+                    </FormSelect>
+                  </FormField>
+                  <FormField label="Quantity">
+                    <FormInput
+                      min={1}
+                      onChange={(event) =>
+                        updateCakeLine(item.key, {
+                          quantity: Math.max(
+                            1,
+                            Number(event.target.value) || 1,
+                          ),
+                        })
+                      }
+                      step={1}
+                      type="number"
+                      value={item.quantity}
+                    />
+                  </FormField>
+                </div>
+                {editItems.length > 1 ? (
+                  <button
+                    className="text-skyline hover:text-ink text-xs font-medium"
+                    onClick={() => removeCakeLine(item.key)}
+                    type="button"
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
       </section>
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
@@ -300,6 +536,38 @@ export function OrderWorkspaceForm({ order, cakes }: OrderWorkspaceFormProps) {
           defaultDate={order.pickupDate}
           defaultTime={order.pickupTime}
         />
+      </section>
+
+      <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
+        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
+          Complimentary items
+        </h2>
+        <ul className="space-y-3">
+          {editComplimentary.map((item, index) => (
+            <li
+              className="flex items-center justify-between gap-3"
+              key={`${item.name}-${index}`}
+            >
+              <span className="text-ink text-sm">{item.name}</span>
+              <FormInput
+                aria-label={`${item.name} quantity`}
+                className="w-24"
+                min={0}
+                onChange={(event) => {
+                  const quantity = Math.max(0, Number(event.target.value) || 0);
+                  setEditComplimentary((current) =>
+                    current.map((entry, i) =>
+                      i === index ? { ...entry, quantity } : entry,
+                    ),
+                  );
+                }}
+                step={1}
+                type="number"
+                value={item.quantity}
+              />
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">

@@ -16,6 +16,8 @@ type PickupSlotFieldsProps = {
   defaultDate?: string;
   defaultTime?: string;
   required?: boolean;
+  onDateChange?: (date: string) => void;
+  onTimeChange?: (time: string) => void;
 };
 
 export function PickupSlotFields({
@@ -26,6 +28,8 @@ export function PickupSlotFields({
   defaultDate,
   defaultTime,
   required = true,
+  onDateChange,
+  onTimeChange,
 }: PickupSlotFieldsProps) {
   const minDate = earliestPickupDateYmd();
   const [date, setDate] = useState(defaultDate ?? "");
@@ -42,8 +46,9 @@ export function PickupSlotFields({
     );
     if (!stillValid) {
       setTime("");
+      onTimeChange?.("");
     }
-  }, [date, time]);
+  }, [date, time, onTimeChange]);
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -52,7 +57,11 @@ export function PickupSlotFields({
           id={dateId}
           min={minDate}
           name={dateName}
-          onChange={(event) => setDate(event.target.value)}
+          onChange={(event) => {
+            const next = event.target.value;
+            setDate(next);
+            onDateChange?.(next);
+          }}
           required={required}
           type="date"
           value={date}
@@ -63,7 +72,11 @@ export function PickupSlotFields({
           disabled={!date || slots.length === 0}
           id={timeId}
           name={timeName}
-          onChange={(event) => setTime(event.target.value)}
+          onChange={(event) => {
+            const next = event.target.value;
+            setTime(next);
+            onTimeChange?.(next);
+          }}
           required={required}
           value={time}
         >

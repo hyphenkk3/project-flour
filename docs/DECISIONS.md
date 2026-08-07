@@ -2,6 +2,17 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-07 — Milestone 2 · Customer Confirmation
+
+- Multi-cake preorder on unified `orders` / `order_items` (shared pickup).
+- Item commercial snapshots (`cake_name`, `size_label`, `unit_price`).
+- Collection-aware complimentary items with per-order snapshots.
+- Prepare Confirmation → WhatsApp handoff → Mark as Sent → Waiting Customer Confirmation.
+- Customer Confirmed event → Awaiting Payment (no payment collection).
+- Immutable confirmation snapshots + outdated-on-edit behaviour.
+- Order timeline / audit foundation for meaningful business events.
+- No Milestone 3 / payment / Bakery.
+
 ## 2026-08-07 — Milestone 1.1 · Product Review refinement
 
 - Cake detail: contained hero, compact info column, boutique composition (real data only).

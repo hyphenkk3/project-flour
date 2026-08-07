@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatDdMmYyyy } from "@/lib/dates";
+import { ClearPreorderDraftOnSuccess } from "@/workspaces/storefront/checkout/ClearPreorderDraft";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import { getGuestPreorderReceipt } from "@/workspaces/storefront/checkout/receipt";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
@@ -15,6 +16,7 @@ export async function StorefrontSuccessPage({
 
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-16 sm:px-6">
+      <ClearPreorderDraftOnSuccess />
       <div className="text-center">
         <h1 className="font-display text-ink text-3xl tracking-tight">
           Thank you.
@@ -31,20 +33,21 @@ export async function StorefrontSuccessPage({
           <p className="text-skyline text-[11px] font-semibold tracking-[0.14em] uppercase">
             Order recap
           </p>
-          <dl className="mt-3 space-y-2 text-sm">
-            <div className="flex justify-between gap-4">
-              <dt className="text-skyline">Cake</dt>
-              <dd className="text-ink text-right font-medium">{receipt.cakeName}</dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-skyline">Size</dt>
-              <dd className="text-ink text-right font-medium">
-                {receipt.sizeLabel}
-                {receipt.unitPrice != null
-                  ? ` · ${formatRm(receipt.unitPrice)}`
-                  : ""}
-              </dd>
-            </div>
+          <ul className="mt-3 space-y-2">
+            {receipt.items.map((item) => (
+              <li className="text-ink text-sm" key={item.key}>
+                <span className="font-medium">{item.cakeName}</span>
+                <span className="text-skyline">
+                  {" "}
+                  · {item.sizeLabel} × {item.quantity}
+                  {item.unitPrice != null
+                    ? ` · ${formatRm(item.unitPrice * item.quantity)}`
+                    : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <dl className="mt-4 space-y-2 border-t border-fog pt-3 text-sm">
             <div className="flex justify-between gap-4">
               <dt className="text-skyline">Pickup date</dt>
               <dd className="text-ink text-right font-medium">
@@ -55,6 +58,12 @@ export async function StorefrontSuccessPage({
               <dt className="text-skyline">Pickup time</dt>
               <dd className="text-ink text-right font-medium">
                 {formatPickupTime(receipt.pickupTime)}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-skyline">Total</dt>
+              <dd className="text-ink text-right font-semibold">
+                {formatRm(receipt.total)}
               </dd>
             </div>
           </dl>
@@ -75,10 +84,7 @@ export async function StorefrontSuccessPage({
       </section>
 
       <div className="mt-10 text-center">
-        <Link
-          className="text-signal text-sm font-medium underline"
-          href="/"
-        >
+        <Link className="text-signal text-sm font-medium underline" href="/">
           Back to collection
         </Link>
       </div>

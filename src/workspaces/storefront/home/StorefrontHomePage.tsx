@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { StorefrontCakeCard } from "@/workspaces/storefront/catalog/StorefrontCakeCard";
+import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
 import {
   getCurrentCollection,
   listAvailableCakes,
@@ -13,6 +14,8 @@ export async function StorefrontHomePage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-4 py-10 sm:px-6">
+      <PreorderInProgressBar />
+
       <header className="mb-10 space-y-3">
         <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
           Whitebird Cake House
