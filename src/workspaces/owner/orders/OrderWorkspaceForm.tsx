@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   FormActions,
+  FormCheckbox,
   FormError,
   FormField,
   FormInput,
@@ -18,6 +19,7 @@ import {
   FormSubmitButton,
   FormTextarea,
 } from "@/components/ui/form";
+import { OwnerPickupFields } from "@/components/ui/OwnerPickupFields";
 import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatLongBusinessDate } from "@/lib/dates";
@@ -42,9 +44,12 @@ import { PaymentSection } from "@/workspaces/owner/orders/PaymentSection";
 import {
   formatPickupTime,
   formatTimelineDateTime,
+  guestOrderRequiresPhone,
   guestOrderStatusLabel,
   guestOrderStatusTone,
   isGuestOrderEditable,
+  orderSourceLabel,
+  STAFF_GUEST_ORDER_SOURCES,
 } from "@/workspaces/owner/orders/labels";
 
 const initialSaveState: OrderWorkspaceSaveState = {
@@ -114,6 +119,16 @@ export function OrderWorkspaceForm({
   >([]);
 
   const canEdit = isGuestOrderEditable(order.status);
+  const phoneRequired = guestOrderRequiresPhone(order.orderSource);
+  const sourceLocked = order.orderSource === "customer_website";
+  const [needsAttention, setNeedsAttention] = useState(
+    order.needsBakeryAttention,
+  );
+
+  useEffect(() => {
+    if (mode !== "edit") return;
+    setNeedsAttention(order.needsBakeryAttention);
+  }, [mode, order.needsBakeryAttention, formKey]);
 
   useEffect(() => {
     if (!state.success) return;
@@ -241,8 +256,16 @@ export function OrderWorkspaceForm({
         <ViewBlock title="Customer">
           <div className="space-y-1">
             <p className="text-ink text-base font-semibold">{order.customerName}</p>
-            <p className="text-ink text-sm">{order.phone}</p>
-            <p className="text-skyline text-sm">{order.email}</p>
+            <p className="text-ink text-sm">
+              {order.phone.trim() ? order.phone : "No WhatsApp phone"}
+            </p>
+            <p className="text-skyline text-sm">
+              {order.email.trim() ? order.email : "No email"}
+            </p>
+            <p className="text-skyline text-sm">
+              Source · {orderSourceLabel(order.orderSource)}
+              {order.crewOrder ? " · Crew order" : ""}
+            </p>
           </div>
         </ViewBlock>
 
@@ -275,6 +298,11 @@ export function OrderWorkspaceForm({
             <p className="text-ink text-sm">
               {formatPickupTime(order.pickupTime)}
             </p>
+            {order.pickupInstruction?.trim() ? (
+              <p className="text-skyline text-sm">
+                Instruction · {order.pickupInstruction}
+              </p>
+            ) : null}
           </div>
         </ViewBlock>
 
@@ -289,6 +317,24 @@ export function OrderWorkspaceForm({
                 </li>
               ))}
             </ul>
+          )}
+          <p className="text-skyline mt-3 text-sm">
+            Include receipt · {order.includeReceipt ? "Yes" : "No"}
+          </p>
+        </ViewBlock>
+
+        <ViewBlock title="Bakery attention">
+          {order.needsBakeryAttention ? (
+            <div className="space-y-1">
+              <p className="text-ink text-sm font-medium">Needs attention</p>
+              <p className="text-skyline text-sm leading-relaxed whitespace-pre-wrap">
+                {order.bakeryAttentionNote?.trim()
+                  ? order.bakeryAttentionNote
+                  : "No attention note."}
+              </p>
+            </div>
+          ) : (
+            <p className="text-skyline text-sm">No bakery attention flag.</p>
           )}
         </ViewBlock>
 
@@ -416,12 +462,22 @@ export function OrderWorkspaceForm({
           />
         </FormField>
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField htmlFor="guest_phone" label="WhatsApp phone">
+          <FormField
+            help={
+              phoneRequired
+                ? "Required for website storefront orders."
+                : "Optional for staff-created orders."
+            }
+            htmlFor="guest_phone"
+            label={
+              phoneRequired ? "WhatsApp phone" : "WhatsApp phone (optional)"
+            }
+          >
             <FormInput
               defaultValue={order.phone}
               id="guest_phone"
               name="guest_phone"
-              required
+              required={phoneRequired}
               type="tel"
             />
           </FormField>
@@ -438,6 +494,39 @@ export function OrderWorkspaceForm({
             />
           </FormField>
         </div>
+        {sourceLocked ? (
+          <p className="text-skyline text-sm">
+            Source · Customer website (locked — storefront origin)
+          </p>
+        ) : (
+          <FormField htmlFor="order_source" label="Order source">
+            <FormSelect
+              defaultValue={order.orderSource}
+              id="order_source"
+              name="order_source"
+              required
+            >
+              {STAFF_GUEST_ORDER_SOURCES.map((source) => (
+                <option key={source.value} value={source.value}>
+                  {source.label}
+                </option>
+              ))}
+              {order.orderSource === "walk_in" ||
+              order.orderSource === "last_minute" ? (
+                <option value={order.orderSource}>
+                  {orderSourceLabel(order.orderSource)}
+                </option>
+              ) : null}
+            </FormSelect>
+          </FormField>
+        )}
+        <FormCheckbox
+          defaultChecked={order.crewOrder}
+          help="Shows as (crew) later. Does not change payment or discounts."
+          label="Crew order"
+          name="crew_order"
+          value="1"
+        />
       </section>
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
@@ -535,10 +624,18 @@ export function OrderWorkspaceForm({
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
           Pickup
         </h2>
-        <PickupSlotFields
-          defaultDate={order.pickupDate}
-          defaultTime={order.pickupTime}
-        />
+        {sourceLocked ? (
+          <PickupSlotFields
+            defaultDate={order.pickupDate}
+            defaultTime={order.pickupTime}
+          />
+        ) : (
+          <OwnerPickupFields
+            defaultDate={order.pickupDate}
+            defaultInstruction={order.pickupInstruction}
+            defaultTime={order.pickupTime}
+          />
+        )}
       </section>
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
@@ -571,6 +668,39 @@ export function OrderWorkspaceForm({
             </li>
           ))}
         </ul>
+        <FormCheckbox
+          defaultChecked={order.includeReceipt}
+          help="Physical purchase receipt with the cake at pickup."
+          label="Include receipt"
+          name="include_receipt"
+          value="1"
+        />
+      </section>
+
+      <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
+        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
+          Bakery attention
+        </h2>
+        <FormCheckbox
+          checked={needsAttention}
+          label="Needs bakery attention"
+          name="needs_bakery_attention"
+          onChange={(event) => setNeedsAttention(event.target.checked)}
+          value="1"
+        />
+        {needsAttention ? (
+          <FormField
+            htmlFor="bakery_attention_note"
+            label="Attention note"
+          >
+            <FormInput
+              defaultValue={order.bakeryAttentionNote ?? ""}
+              id="bakery_attention_note"
+              name="bakery_attention_note"
+              placeholder="Early pickup, less sweet, special handling…"
+            />
+          </FormField>
+        ) : null}
       </section>
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">

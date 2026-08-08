@@ -22,7 +22,11 @@ export type OrderAdjustment = {
 
 export type OrderSource =
   | "customer_website"
+  | "jotform"
   | "whatsapp"
+  | "whitebird_instagram"
+  | "wee"
+  | "lex"
   | "walk_in"
   | "last_minute"
   | "other";
@@ -118,10 +122,13 @@ export type StorefrontOrder = {
   id: string;
   orderNumber: string;
   customerName: string;
+  /** WhatsApp phone. May be blank for Owner-created guest orders; website submit still requires it. */
   phone: string;
   email: string;
   pickupDate: string;
   pickupTime: string;
+  /** Optional human-facing pickup wording; pickupTime remains the sortable clock time. */
+  pickupInstruction: string | null;
   notes: string | null;
   internalNotes: string | null;
   status: GuestOrderStatus;
@@ -129,6 +136,16 @@ export type StorefrontOrder = {
   confirmationNeedsResend: boolean;
   collectionId: string | null;
   orderSource: OrderSource;
+  /** Crew Order flag — not an order source. Display precedence later: (crew) over source suffix. */
+  crewOrder: boolean;
+  /** Physical purchase receipt with cake at pickup. Independent of email submission preference. */
+  includeReceipt: boolean;
+  needsBakeryAttention: boolean;
+  bakeryAttentionNote: string | null;
+  readyAt: string | null;
+  readyBy: string | null;
+  pickedUpAt: string | null;
+  pickedUpBy: string | null;
   paymentDeadlineAt: string | null;
   paymentRequestSentAt: string | null;
   rm10CardIssuanceSuppressed: boolean;
@@ -176,7 +193,12 @@ export type OrderTimelineEventType =
   | "rm10_voucher_redeemed"
   | "rm10_voucher_owner_override"
   | "discount_removed"
-  | "discount_changed";
+  | "discount_changed"
+  | "order_marked_ready"
+  | "order_ready_undone"
+  | "order_picked_up"
+  | "order_picked_up_undone"
+  | "staff_preorder_created";
 
 export type OrderTimelineEvent = {
   id: string;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { useToast } from "@/components/ui/Toast";
@@ -201,10 +202,18 @@ export function OperationsLiveBoard({
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        description="Customer preorders requiring attention."
-        title="Operations"
-      />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <PageHeader
+          description="Customer preorders requiring attention."
+          title="Operations"
+        />
+        <Link
+          className="bg-ink text-mist hover:bg-skyline inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg px-4 text-sm font-medium"
+          href="/owner/orders/new"
+        >
+          + New Order
+        </Link>
+      </div>
 
       <OperationsBoardToolbar
         matchCount={visibleOrders.length}

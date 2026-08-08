@@ -122,6 +122,95 @@ export function formatPaymentDueRelative(
   return `${dayLabel}, ${timeLabel}`;
 }
 
+/**
+ * Calendar / operational name suffix for later Preview 3A UI.
+ * Crew Order takes precedence over source suffix.
+ * customer_website → no suffix. walk_in / last_minute / other → no suffix yet.
+ */
+export function guestOrderOperationalSuffix(input: {
+  orderSource: StorefrontOrder["orderSource"];
+  crewOrder: boolean;
+}): string | null {
+  if (input.crewOrder) return "(crew)";
+  switch (input.orderSource) {
+    case "jotform":
+      return "(jw)";
+    case "whatsapp":
+      return "(w)";
+    case "whitebird_instagram":
+      return "(Iw)";
+    case "wee":
+      return "(wee)";
+    case "lex":
+      return "(lex)";
+    case "customer_website":
+    case "walk_in":
+    case "last_minute":
+    case "other":
+      return null;
+  }
+}
+
+export function guestOrderDisplayName(input: {
+  customerName: string;
+  orderSource: StorefrontOrder["orderSource"];
+  crewOrder: boolean;
+}): string {
+  const suffix = guestOrderOperationalSuffix(input);
+  return suffix ? `${input.customerName} ${suffix}` : input.customerName;
+}
+
+/** Staff-created preorder sources — excludes customer_website. */
+export const STAFF_GUEST_ORDER_SOURCES = [
+  { value: "jotform", label: "Jotform" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "whitebird_instagram", label: "Whitebird Instagram" },
+  { value: "wee", label: "Wee" },
+  { value: "lex", label: "Lex" },
+  { value: "other", label: "Other" },
+] as const;
+
+export type StaffGuestOrderSource =
+  (typeof STAFF_GUEST_ORDER_SOURCES)[number]["value"];
+
+export function isStaffGuestOrderSource(
+  value: string,
+): value is StaffGuestOrderSource {
+  return STAFF_GUEST_ORDER_SOURCES.some((entry) => entry.value === value);
+}
+
+export function orderSourceLabel(
+  source: StorefrontOrder["orderSource"],
+): string {
+  switch (source) {
+    case "customer_website":
+      return "Customer website";
+    case "jotform":
+      return "Jotform";
+    case "whatsapp":
+      return "WhatsApp";
+    case "whitebird_instagram":
+      return "Whitebird Instagram";
+    case "wee":
+      return "Wee";
+    case "lex":
+      return "Lex";
+    case "walk_in":
+      return "Walk-in";
+    case "last_minute":
+      return "Last-minute";
+    case "other":
+      return "Other";
+  }
+}
+
+/** Website storefront orders keep required WhatsApp phone on edit. */
+export function guestOrderRequiresPhone(
+  orderSource: StorefrontOrder["orderSource"],
+): boolean {
+  return orderSource === "customer_website";
+}
+
 function singaporeYmd(date: Date): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Singapore",

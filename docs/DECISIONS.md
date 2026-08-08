@@ -2,9 +2,94 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-08 — Milestone 3 Preview 3A-1/2 · Closed checkpoint (Product-tested)
+
+Preview 3A-1 (operational foundation) and 3A-2 (Owner staff-created guest orders)
+are closed. Preview 3A-3 (Whole Cake Calendar) has **not** started.
+
+Applied migrations (do not amend):
+- `20260808090000_preview3a1_operational_foundation.sql`
+- `20260808093000_preview3a2_staff_guest_preorder.sql`
+
+### Access
+
+- Preview 3 remains **Owner-only** for now (`requireOwner`).
+- Bakery workspace / routes / Counter access not enabled.
+- Actor FKs retained for future authorised staff.
+
+### Catalog / cake selection
+
+- Collection controls **customer storefront** merchandising (`collection_cakes`).
+- Owner **+ New Order** / Order Workspace may select Master Library cakes with
+  status `active` or `seasonal` via `listOfferableLibraryCakes()`, independent of
+  Collection membership. Does not auto-add to Collection or mutate `collection_cakes`.
+
+### Sources / crew / phone
+
+- Staff create sources: jotform, whatsapp, whitebird_instagram, wee, lex, other
+  (`customer_website` not offered). Website-origin source stays locked on edit.
+- `crew_order` is not a source; later display `(crew)` takes precedence.
+- Staff-created / non-website guest phone may be blank; customer website
+  submission still requires WhatsApp phone.
+- Manual sources do **not** automatically receive August Promo
+  (`customer_website`-only eligibility unchanged).
+
+### Pickup
+
+- One order = one pickup date.
+- `pickup_time` remains a sortable Postgres `time`.
+- Optional `pickup_instruction` is separate human-facing wording (e.g. “Before 3pm”).
+- Owner may use any valid clock time; customer storefront remains public-slot-only.
+- Custom pickup does not auto-set Bakery Attention.
+
+### Operational fields
+
+- `include_receipt` = physical receipt with cake — independent of
+  `email_submission_receipt_requested`.
+- `needs_bakery_attention` + `bakery_attention_note` are explicit structured data;
+  never inferred from free-text notes or pickup instruction.
+- Ready / Picked Up (`ready_at`/`ready_by`, `picked_up_at`/`picked_up_by`) are
+  operational state, **not** financial `order_status`. Owner-gated RPC/actions
+  exist; Calendar/Ready UI deferred to later slices.
+
+### Operations board
+
+- Default sort: **Latest Orders — Newest First** (`created_at` desc).
+- Clear Filters restores that default.
+- Realtime does not change the selected sort.
+
+### Storefront cart
+
+- Customer may temporarily have zero cakes while editing (including remove last cake).
+- Empty cart: Total RM0; intentional empty state; submission blocked until ≥1 cake.
+- Server/RPC still rejects empty submitted orders.
+
+## 2026-08-08 — Milestone 3 Preview 3A-2 · Owner staff-created guest orders
+
+- Owner Operations: **+ New Order** → `/owner/orders/new`.
+- Atomic RPC `create_staff_guest_preorder` creates normal guest orders
+  (`customer_id` null, status `submitted`). Source cannot be `customer_website`.
+- Phone optional for staff-created / non-website orders; website checkout and
+  website-origin edit still require phone.
+- Source edit rule: `customer_website` locked; staff sources editable among
+  staff allowlist; never convert to/from website casually.
+- Owner cake picker: Master Library `active` + `seasonal` via
+  `listOfferableLibraryCakes()` — **not** Collection membership. Storefront
+  Collection filtering unchanged; `collection_cakes` not mutated.
+- Owner pickup: any valid clock `pickup_time` (sortable); optional
+  `pickup_instruction` for wording like “Before 3pm”. Website checkout remains
+  public-slot-only. Does not auto-set Bakery Attention.
+- No automatic August Promo / payment / confirmation on create.
+
+## 2026-08-08 — Milestone 3 Preview 3A-1 · Operational foundation
+
+Schema/domain foundation for later Calendar / Ready UI. Product-tested as part of
+the 3A-1/2 closed checkpoint above.
+
 ## 2026-08-07 — Milestone 3 Preview 2 · Final closed behaviour (Product-tested)
 
-Milestone 3 Preview 2 is closed. Preview 3 has not started.
+Milestone 3 Preview 2 is closed. Preview 3A-1 foundation may proceed; Calendar UI
+and later Preview 3 slices are not started from this decision alone.
 
 Final lifecycle corrections after checkpoint `9068d2fb` were Product-browser-tested
 and committed separately. These principles supersede earlier Preview 2 notes that
@@ -78,8 +163,9 @@ the full Amount Due.
 
 ### Operations
 
-- Default board order: Pickup Date ASC → Pickup Time ASC → Created ASC.
-- Staff may select **Latest Orders — Newest First** (`created_at` desc) deliberately; Realtime does not force-sort.
+- Default board order: **Latest Orders — Newest First** (`created_at` desc).
+  Pickup Date — Earliest First remains available as a sort option.
+- Staff may select other sorts deliberately; Realtime does not force-sort or reset the selected sort.
 - Search: order number, name, full phone, last 4 digits. Pickup filters (All/Today/Tomorrow/This Week/Choose Date). Status filters. Clear resets defaults.
 - Paid orders remain on Operations (future pickup still operational).
 - No persistent NEW/unread tracking yet — Submitted status + Latest Orders is sufficient for now.

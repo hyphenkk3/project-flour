@@ -80,6 +80,12 @@ export function GuestCheckoutForm({ cakes }: GuestCheckoutFormProps) {
     persistDraft(items, fields);
   }, [items, fields, hydrated]);
 
+  useEffect(() => {
+    if (items.length > 0) {
+      setItemError(null);
+    }
+  }, [items.length]);
+
   const total = useMemo(() => calculateOrderTotal(items), [items]);
   const itemsJson = useMemo(
     () =>
@@ -133,10 +139,6 @@ export function GuestCheckoutForm({ cakes }: GuestCheckoutFormProps) {
   }
 
   function removeItem(index: number) {
-    if (items.length <= 1) {
-      setItemError("Your preorder needs at least one cake.");
-      return;
-    }
     setItemError(null);
     setItems((current) => current.filter((_, i) => i !== index));
   }
@@ -172,13 +174,16 @@ export function GuestCheckoutForm({ cakes }: GuestCheckoutFormProps) {
           Your cakes
         </h2>
         {items.length === 0 ? (
-          <p className="text-skyline text-sm">
-            No cakes yet.{" "}
-            <Link className="text-signal font-medium" href="/">
-              Choose a cake
-            </Link>{" "}
-            to continue.
-          </p>
+          <div className="space-y-3">
+            <p className="text-skyline text-sm">No cakes added yet.</p>
+            <Link
+              className="text-signal inline-flex text-sm font-medium"
+              href="/"
+              onClick={handleAddAnotherCake}
+            >
+              + Add Cake
+            </Link>
+          </div>
         ) : (
           <ul className="space-y-3">
             {items.map((item, index) => {
@@ -245,19 +250,25 @@ export function GuestCheckoutForm({ cakes }: GuestCheckoutFormProps) {
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-          <Link
-            className="text-signal text-sm font-medium"
-            href="/"
-            onClick={handleAddAnotherCake}
-          >
-            + Add Another Cake
-          </Link>
+          {items.length > 0 ? (
+            <Link
+              className="text-signal text-sm font-medium"
+              href="/"
+              onClick={handleAddAnotherCake}
+            >
+              + Add Another Cake
+            </Link>
+          ) : (
+            <span />
+          )}
           <p className="text-ink text-sm font-semibold">
             Total · {formatRm(total)}
           </p>
         </div>
         {itemError ? (
-          <p className="text-status-danger text-sm">{itemError}</p>
+          <p className="text-status-danger text-sm" role="alert">
+            {itemError}
+          </p>
         ) : null}
       </section>
 

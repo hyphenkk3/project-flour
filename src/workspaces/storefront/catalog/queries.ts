@@ -213,3 +213,46 @@ export async function getAvailableCakeById(
 
   return mapCake(cake);
 }
+
+/**
+ * Owner staff order entry / workspace: Master Library cakes independent of
+ * Collection membership. Statuses: active | seasonal.
+ * Does not read or write collection_cakes.
+ */
+export async function listOfferableLibraryCakes(): Promise<StorefrontCake[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("library_cakes")
+    .select(
+      `
+      id,
+      name,
+      description,
+      status,
+      sharing_guide,
+      allergens,
+      library_cake_sizes (
+        id,
+        cake_id,
+        label,
+        price,
+        sort_order
+      ),
+      library_cake_photos (
+        image_url,
+        sort_order
+      )
+    `,
+    )
+    .in("status", ["active", "seasonal"])
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data as unknown as LibraryCakeEmbed[])
+    .filter((cake) => isOfferableStatus(cake.status))
+    .map(mapCake)
+    .filter((cake) => cake.sizes.length > 0);
+}

@@ -119,6 +119,10 @@ export function PaymentRequestPreview({ order }: PaymentRequestPreviewProps) {
   }
 
   function handleOpenWhatsApp() {
+    if (!order.phone.trim()) {
+      setError("No WhatsApp phone on this order.");
+      return;
+    }
     if (!whatsappUrl) {
       setError("Could not build a WhatsApp link from this phone number.");
       return;

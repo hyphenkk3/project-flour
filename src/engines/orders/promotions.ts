@@ -15,7 +15,11 @@ export const RM10_CARD_AMOUNT = -10;
 
 export type OrderSource =
   | "customer_website"
+  | "jotform"
   | "whatsapp"
+  | "whitebird_instagram"
+  | "wee"
+  | "lex"
   | "walk_in"
   | "last_minute"
   | "other";

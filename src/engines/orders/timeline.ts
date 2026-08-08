@@ -19,6 +19,11 @@ export const TIMELINE_EVENT_LABELS: Record<string, string> = {
   rm10_voucher_owner_override: "RM10 Discount Card redeemed (Owner override)",
   discount_removed: "Discount removed",
   discount_changed: "Discount changed",
+  order_marked_ready: "Marked ready",
+  order_ready_undone: "Ready undone",
+  order_picked_up: "Marked picked up",
+  order_picked_up_undone: "Picked up undone",
+  staff_preorder_created: "Staff preorder created",
 };
 
 export function timelineEventLabel(eventType: string): string {

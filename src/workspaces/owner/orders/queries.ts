@@ -25,6 +25,7 @@ type OrderRow = {
   guest_email: string | null;
   pickup_date: string;
   pickup_time: string;
+  pickup_instruction: string | null;
   customer_notes: string | null;
   internal_notes: string | null;
   status: GuestOrderStatus;
@@ -32,6 +33,14 @@ type OrderRow = {
   confirmation_needs_resend: boolean | null;
   collection_id: string | null;
   order_source: OrderSource | null;
+  crew_order: boolean | null;
+  include_receipt: boolean | null;
+  needs_bakery_attention: boolean | null;
+  bakery_attention_note: string | null;
+  ready_at: string | null;
+  ready_by: string | null;
+  picked_up_at: string | null;
+  picked_up_by: string | null;
   payment_deadline_at: string | null;
   payment_request_sent_at: string | null;
   rm10_card_issuance_suppressed: boolean | null;
@@ -122,6 +131,7 @@ function mapOrder(
     email: row.guest_email ?? "",
     pickupDate: row.pickup_date,
     pickupTime: row.pickup_time,
+    pickupInstruction: row.pickup_instruction,
     notes: row.customer_notes,
     internalNotes: row.internal_notes,
     status: row.status,
@@ -129,6 +139,14 @@ function mapOrder(
     confirmationNeedsResend: Boolean(row.confirmation_needs_resend),
     collectionId: row.collection_id,
     orderSource: row.order_source ?? "customer_website",
+    crewOrder: Boolean(row.crew_order),
+    includeReceipt: Boolean(row.include_receipt),
+    needsBakeryAttention: Boolean(row.needs_bakery_attention),
+    bakeryAttentionNote: row.bakery_attention_note,
+    readyAt: row.ready_at,
+    readyBy: row.ready_by,
+    pickedUpAt: row.picked_up_at,
+    pickedUpBy: row.picked_up_by,
     paymentDeadlineAt: row.payment_deadline_at,
     paymentRequestSentAt: row.payment_request_sent_at,
     rm10CardIssuanceSuppressed: Boolean(row.rm10_card_issuance_suppressed),
@@ -152,6 +170,7 @@ const orderSelect = `
   guest_email,
   pickup_date,
   pickup_time,
+  pickup_instruction,
   customer_notes,
   internal_notes,
   status,
@@ -159,6 +178,14 @@ const orderSelect = `
   confirmation_needs_resend,
   collection_id,
   order_source,
+  crew_order,
+  include_receipt,
+  needs_bakery_attention,
+  bakery_attention_note,
+  ready_at,
+  ready_by,
+  picked_up_at,
+  picked_up_by,
   payment_deadline_at,
   payment_request_sent_at,
   rm10_card_issuance_suppressed,

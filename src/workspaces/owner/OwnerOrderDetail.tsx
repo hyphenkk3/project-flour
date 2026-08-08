@@ -8,11 +8,10 @@ import {
   listConfirmationSnapshots,
   listOrderTimeline,
 } from "@/workspaces/owner/orders/queries";
-import type { StorefrontCake } from "@/types/storefront";
 import {
   getAvailableCakeById,
   getCurrentCollection,
-  listAvailableCakes,
+  listOfferableLibraryCakes,
 } from "@/workspaces/storefront/catalog/queries";
 
 export const dynamic = "force-dynamic";
@@ -28,9 +27,7 @@ export async function OwnerOrderDetail({ orderId }: OwnerOrderDetailProps) {
   }
 
   const collection = await getCurrentCollection();
-  const cakes: StorefrontCake[] = collection
-    ? await listAvailableCakes(collection.id)
-    : [];
+  const cakes = await listOfferableLibraryCakes();
 
   for (const item of order.items) {
     if (!cakes.some((cake) => cake.id === item.cakeId)) {

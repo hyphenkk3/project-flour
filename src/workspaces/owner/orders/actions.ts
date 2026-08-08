@@ -8,7 +8,7 @@ import {
 } from "@/engines/orders/confirmation-message";
 import { orderMateriallyAffectsConfirmation } from "@/engines/orders/confirmation-validity";
 import { reconcilePaymentLifecycleStatus } from "@/engines/orders/payment-status";
-import { isValidPickupSlot } from "@/engines/business-calendar/pickup-slots";
+import { isValidClockPickupTime, isValidPickupSlot } from "@/engines/business-calendar/pickup-slots";
 import { requireStaff } from "@/foundation/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -17,7 +17,9 @@ import type {
 } from "@/types/storefront";
 import {
   fromDatetimeLocalValue,
+  guestOrderRequiresPhone,
   isGuestOrderEditable,
+  isStaffGuestOrderSource,
 } from "@/workspaces/owner/orders/labels";
 import {
   getGuestOrderById,
@@ -26,13 +28,16 @@ import {
 } from "@/workspaces/owner/orders/queries";
 import {
   getAvailableCakeById,
-  getCurrentCollection,
-  listAvailableCakes,
+  listOfferableLibraryCakes,
 } from "@/workspaces/storefront/catalog/queries";
 
 export type OrderWorkspaceSaveState = {
   error: string | null;
   success: boolean;
+};
+
+export type CreateStaffGuestOrderState = {
+  error: string | null;
 };
 
 async function requireOwner() {
@@ -161,6 +166,119 @@ function parseComplimentaryFromForm(formData: FormData): Array<{
   }
 }
 
+export async function createStaffGuestOrderAction(
+  _prev: CreateStaffGuestOrderState,
+  formData: FormData,
+): Promise<CreateStaffGuestOrderState> {
+  const staff = await requireOwner();
+
+  const guestName = String(formData.get("guest_name") ?? "").trim();
+  const guestPhone = String(formData.get("guest_phone") ?? "").trim();
+  const guestEmail = String(formData.get("guest_email") ?? "").trim();
+  const orderSource = String(formData.get("order_source") ?? "").trim();
+  const crewOrder = String(formData.get("crew_order") ?? "") === "1";
+  const pickupDate = String(formData.get("pickup_date") ?? "").trim();
+  const pickupTime = String(formData.get("pickup_time") ?? "").trim();
+  const pickupInstruction = String(
+    formData.get("pickup_instruction") ?? "",
+  ).trim();
+  const includeReceipt = String(formData.get("include_receipt") ?? "") === "1";
+  const needsAttention =
+    String(formData.get("needs_bakery_attention") ?? "") === "1";
+  const attentionNote = String(
+    formData.get("bakery_attention_note") ?? "",
+  ).trim();
+  const customerNotes = String(formData.get("customer_notes") ?? "").trim();
+  const internalNotes = String(formData.get("internal_notes") ?? "").trim();
+  const draftItems = parseItemsFromForm(formData);
+  const draftComplimentary = parseComplimentaryFromForm(formData);
+
+  if (!guestName) {
+    return { error: "Please enter the customer name." };
+  }
+  if (!isStaffGuestOrderSource(orderSource)) {
+    return { error: "Please choose a valid order source." };
+  }
+  if (guestEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail)) {
+    return {
+      error: "Please enter a valid email address, or leave email blank.",
+    };
+  }
+  if (!pickupDate || !pickupTime) {
+    return { error: "Please choose a pickup date and time." };
+  }
+  if (!isValidClockPickupTime(pickupTime)) {
+    return { error: "Please enter a valid pickup clock time." };
+  }
+  if (draftItems.length === 0) {
+    return { error: "Please add at least one cake." };
+  }
+
+  const cakes = await listOfferableLibraryCakes();
+
+  for (const draft of draftItems) {
+    const cake = cakes.find((entry) => entry.id === draft.cakeId);
+    if (!cake) {
+      return {
+        error: "One of the cakes is not available in the Library.",
+      };
+    }
+    const size = cake.sizes.find((entry) => entry.id === draft.cakeSizeId);
+    if (!size) {
+      return {
+        error: `Please choose a valid size for ${cake.name}.`,
+      };
+    }
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("create_staff_guest_preorder", {
+    p_actor_staff_id: staff.id,
+    p_customer_name: guestName,
+    p_phone: guestPhone || null,
+    p_email: guestEmail || null,
+    p_order_source: orderSource,
+    p_crew_order: crewOrder,
+    p_pickup_date: pickupDate,
+    p_pickup_time: pickupTime,
+    p_pickup_instruction: pickupInstruction || null,
+    p_items: draftItems.map((item) => ({
+      cake_id: item.cakeId,
+      cake_size_id: item.cakeSizeId,
+      quantity: item.quantity,
+    })),
+    p_complimentary: draftComplimentary
+      .filter((item) => item.quantity > 0)
+      .map((item) => ({
+        type_id: item.typeId,
+        name: item.name,
+        quantity: item.quantity,
+        sort_order: item.sortOrder,
+      })),
+    p_include_receipt: includeReceipt,
+    p_needs_bakery_attention: needsAttention,
+    p_bakery_attention_note: needsAttention ? attentionNote || null : null,
+    p_customer_notes: customerNotes || null,
+    p_internal_notes: internalNotes || null,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  const orderId =
+    data && typeof data === "object" && "id" in data
+      ? String((data as { id: string }).id)
+      : null;
+  if (!orderId) {
+    return { error: "Order was created but could not be opened." };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${orderId}`);
+  redirect(`/owner/orders/${orderId}`);
+}
+
 export async function saveOrderWorkspaceAction(
   orderId: string,
   _prev: OrderWorkspaceSaveState,
@@ -171,37 +289,23 @@ export async function saveOrderWorkspaceAction(
   const guestName = String(formData.get("guest_name") ?? "").trim();
   const guestPhone = String(formData.get("guest_phone") ?? "").trim();
   const guestEmail = String(formData.get("guest_email") ?? "").trim();
+  const requestedSource = String(formData.get("order_source") ?? "").trim();
+  const crewOrder = String(formData.get("crew_order") ?? "") === "1";
+  const includeReceipt = String(formData.get("include_receipt") ?? "") === "1";
+  const needsAttention =
+    String(formData.get("needs_bakery_attention") ?? "") === "1";
+  const attentionNote = String(
+    formData.get("bakery_attention_note") ?? "",
+  ).trim();
   const pickupDate = String(formData.get("pickup_date") ?? "").trim();
   const pickupTime = String(formData.get("pickup_time") ?? "").trim();
+  const pickupInstruction = String(
+    formData.get("pickup_instruction") ?? "",
+  ).trim();
   const customerNotes = String(formData.get("customer_notes") ?? "").trim();
   const internalNotes = String(formData.get("internal_notes") ?? "").trim();
   const draftItems = parseItemsFromForm(formData);
   const draftComplimentary = parseComplimentaryFromForm(formData);
-
-  if (!guestName || !guestPhone) {
-    return {
-      error: "Please fill in the customer name and WhatsApp phone.",
-      success: false,
-    };
-  }
-  if (guestEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail)) {
-    return {
-      error: "Please enter a valid email address, or leave email blank.",
-      success: false,
-    };
-  }
-  if (!pickupDate || !pickupTime) {
-    return { error: "Please choose a pickup date and time.", success: false };
-  }
-  if (!isValidPickupSlot(pickupDate, pickupTime)) {
-    return {
-      error: "Please choose a valid pickup time for that date.",
-      success: false,
-    };
-  }
-  if (draftItems.length === 0) {
-    return { error: "Please keep at least one cake on the order.", success: false };
-  }
 
   const before = await getGuestOrderById(orderId);
   if (!before) {
@@ -214,10 +318,66 @@ export async function saveOrderWorkspaceAction(
     };
   }
 
-  const collection = await getCurrentCollection();
-  const cakes = collection
-    ? await listAvailableCakes(collection.id)
-    : [];
+  let nextSource = before.orderSource;
+  if (before.orderSource === "customer_website") {
+    // Website-origin source stays locked — never convert to a manual channel.
+    nextSource = "customer_website";
+  } else {
+    if (!requestedSource) {
+      return { error: "Please choose an order source.", success: false };
+    }
+    if (requestedSource === "customer_website") {
+      return {
+        error: "Cannot convert a staff-created order to customer website.",
+        success: false,
+      };
+    }
+    if (
+      !isStaffGuestOrderSource(requestedSource) &&
+      requestedSource !== "walk_in" &&
+      requestedSource !== "last_minute"
+    ) {
+      return { error: "Please choose a valid order source.", success: false };
+    }
+    nextSource = requestedSource as typeof before.orderSource;
+  }
+
+  const phoneRequired = guestOrderRequiresPhone(nextSource);
+  if (!guestName || (phoneRequired && !guestPhone)) {
+    return {
+      error: phoneRequired
+        ? "Please fill in the customer name and WhatsApp phone."
+        : "Please fill in the customer name.",
+      success: false,
+    };
+  }
+  if (guestEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail)) {
+    return {
+      error: "Please enter a valid email address, or leave email blank.",
+      success: false,
+    };
+  }
+  if (!pickupDate || !pickupTime) {
+    return { error: "Please choose a pickup date and time.", success: false };
+  }
+  if (nextSource === "customer_website") {
+    if (!isValidPickupSlot(pickupDate, pickupTime)) {
+      return {
+        error: "Please choose a valid pickup time for that date.",
+        success: false,
+      };
+    }
+  } else if (!isValidClockPickupTime(pickupTime)) {
+    return {
+      error: "Please enter a valid pickup clock time.",
+      success: false,
+    };
+  }
+  if (draftItems.length === 0) {
+    return { error: "Please keep at least one cake on the order.", success: false };
+  }
+
+  const cakes = await listOfferableLibraryCakes();
 
   const resolvedItems: Array<{
     cakeId: string;
@@ -235,7 +395,7 @@ export async function saveOrderWorkspaceAction(
     }
     if (!cake) {
       return {
-        error: "One of the cakes is not available in the current collection.",
+        error: "One of the cakes is not available in the Library.",
         success: false,
       };
     }
@@ -279,10 +439,19 @@ export async function saveOrderWorkspaceAction(
     .from("orders")
     .update({
       guest_name: guestName,
-      guest_phone: guestPhone,
+      guest_phone: guestPhone || null,
       guest_email: guestEmail || null,
+      order_source: nextSource,
+      crew_order: crewOrder,
+      include_receipt: includeReceipt,
+      needs_bakery_attention: needsAttention,
+      bakery_attention_note: needsAttention ? attentionNote || null : null,
       pickup_date: pickupDate,
       pickup_time: pickupTime,
+      pickup_instruction:
+        nextSource === "customer_website"
+          ? before.pickupInstruction
+          : pickupInstruction || null,
       customer_notes: customerNotes || null,
       internal_notes: internalNotes || null,
       updated_by: staff.id,
@@ -1027,4 +1196,105 @@ export async function changeAugustPromoToRm10Action(
   revalidatePath(`/owner/orders/${orderId}`);
   revalidatePath(`/owner/orders/${orderId}/payment`);
   return { error: null, success: true };
+}
+
+// ---------------------------------------------------------------------------
+// Milestone 3 Preview 3A-1 — Ready / Picked Up (Owner-only foundation; no UI yet)
+// Narrow RPCs only. Does not mutate items, adjustments, payments, or financial status.
+// ---------------------------------------------------------------------------
+
+export async function markOrderReadyAction(
+  orderId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireOwner();
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("mark_guest_order_ready", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${orderId}`);
+  return { error: null };
+}
+
+export async function undoOrderReadyAction(
+  orderId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireOwner();
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("undo_guest_order_ready", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${orderId}`);
+  return { error: null };
+}
+
+export async function markOrderPickedUpAction(
+  orderId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireOwner();
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("mark_guest_order_picked_up", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${orderId}`);
+  return { error: null };
+}
+
+export async function undoOrderPickedUpAction(
+  orderId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireOwner();
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("undo_guest_order_picked_up", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${orderId}`);
+  return { error: null };
 }

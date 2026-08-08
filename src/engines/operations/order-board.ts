@@ -34,7 +34,7 @@ export type OperationsSortOption =
   | "customer_asc"
   | "customer_desc";
 
-export const DEFAULT_OPERATIONS_SORT: OperationsSortOption = "pickup_asc";
+export const DEFAULT_OPERATIONS_SORT: OperationsSortOption = "created_desc";
 
 export const OPERATIONS_SORT_OPTIONS: Array<{
   value: OperationsSortOption;

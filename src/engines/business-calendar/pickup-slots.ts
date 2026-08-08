@@ -115,6 +115,15 @@ export function isValidPickupSlot(dateYmd: string, timeValue: string): boolean {
   );
 }
 
+/**
+ * Owner-only: any valid 24h clock time (HH:MM). Does not require a public
+ * customer pickup slot. Used for staff-created / exceptional manual orders.
+ */
+export function isValidClockPickupTime(timeValue: string): boolean {
+  const normalized = normalizePickupTimeValue(timeValue);
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(normalized);
+}
+
 export function earliestPickupDateYmd(from = new Date()): string {
   const next = new Date(from);
   next.setDate(next.getDate() + 1);
