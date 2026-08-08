@@ -3,6 +3,7 @@ import type { RoleCode } from "@/types/staff";
 export type WorkspaceId =
   | "home"
   | "owner"
+  | "owner_calendar"
   | "customer_operations"
   | "bakery"
   | "collection"
@@ -33,6 +34,12 @@ export const WORKSPACE_CATALOG: Record<WorkspaceId, WorkspaceNavItem> = {
     id: "owner",
     label: "Operations",
     href: "/owner",
+    available: true,
+  },
+  owner_calendar: {
+    id: "owner_calendar",
+    label: "Whole Cake Calendar",
+    href: "/owner/calendar",
     available: true,
   },
   customer_operations: {
@@ -72,7 +79,7 @@ export const WORKSPACE_CATALOG: Record<WorkspaceId, WorkspaceNavItem> = {
  * Components must consume this via getNavigationForRole — do not duplicate.
  */
 export const ROLE_NAVIGATION: Record<RoleCode, readonly WorkspaceId[]> = {
-  owner: ["owner", "customer_operations", "library"],
+  owner: ["owner", "owner_calendar", "customer_operations", "library"],
   manager: [
     "home",
     "customer_operations",

@@ -51,6 +51,7 @@ export function WorkspaceLink({
             }`
       }
       href={item.href}
+      scroll={item.href.startsWith("/owner/calendar") ? false : undefined}
     >
       <span className={compact ? "line-clamp-2" : undefined}>{item.label}</span>
     </Link>

@@ -15,6 +15,7 @@ type OwnerPickupFieldsProps = {
   defaultDate?: string;
   defaultTime?: string;
   defaultInstruction?: string | null;
+  onDateChange?: (date: string) => void;
 };
 
 /**
@@ -25,6 +26,7 @@ export function OwnerPickupFields({
   defaultDate,
   defaultTime,
   defaultInstruction,
+  onDateChange,
 }: OwnerPickupFieldsProps) {
   const minDate = earliestPickupDateYmd();
   const initialTime = defaultTime
@@ -64,6 +66,7 @@ export function OwnerPickupFields({
             onChange={(event) => {
               const next = event.target.value;
               setDate(next);
+              onDateChange?.(next);
               if (mode === "slot" && slotTime) {
                 const stillValid = getPickupSlotsForDate(next).some(
                   (slot) => slot.value === slotTime,

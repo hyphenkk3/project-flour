@@ -24,12 +24,17 @@ import {
 } from "@/workspaces/owner/orders/labels";
 import { OrderDiscountsPanel } from "@/workspaces/owner/orders/OrderDiscountsPanel";
 import { RecordPaymentForm } from "@/workspaces/owner/orders/RecordPaymentForm";
+import { withOwnerReturnTo } from "@/workspaces/owner/navigation/return-to";
 
 type PaymentSectionProps = {
   order: StorefrontOrder;
+  returnTo?: string | null;
 };
 
-export function PaymentSection({ order }: PaymentSectionProps) {
+export function PaymentSection({
+  order,
+  returnTo = null,
+}: PaymentSectionProps) {
   const router = useRouter();
   const [showRecord, setShowRecord] = useState(false);
   const [showExtend, setShowExtend] = useState(false);
@@ -197,7 +202,10 @@ export function PaymentSection({ order }: PaymentSectionProps) {
           {canRequest ? (
             <Link
               className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium"
-              href={`/owner/orders/${order.id}/payment`}
+              href={withOwnerReturnTo(
+                `/owner/orders/${order.id}/payment`,
+                returnTo,
+              )}
             >
               Prepare Payment Request
             </Link>

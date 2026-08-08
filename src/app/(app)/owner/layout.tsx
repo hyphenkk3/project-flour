@@ -13,5 +13,7 @@ export default async function OwnerLayout({
     redirect("/home");
   }
 
-  return <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">{children}</div>;
+  return (
+    <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">{children}</div>
+  );
 }

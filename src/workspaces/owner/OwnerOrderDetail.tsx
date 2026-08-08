@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { withCalendarReturnPositionFlag } from "@/workspaces/owner/calendar/calendar-return-position";
+import { resolveOwnerReturnTo } from "@/workspaces/owner/navigation/return-to";
 import { OrderWorkspaceForm } from "@/workspaces/owner/orders/OrderWorkspaceForm";
 import {
   getGuestOrderById,
@@ -18,9 +20,13 @@ export const dynamic = "force-dynamic";
 
 type OwnerOrderDetailProps = {
   orderId: string;
+  returnTo?: string;
 };
 
-export async function OwnerOrderDetail({ orderId }: OwnerOrderDetailProps) {
+export async function OwnerOrderDetail({
+  orderId,
+  returnTo,
+}: OwnerOrderDetailProps) {
   const order = await getGuestOrderById(orderId);
   if (!order) {
     notFound();
@@ -45,15 +51,23 @@ export async function OwnerOrderDetail({ orderId }: OwnerOrderDetailProps) {
 
   const timeline = await listOrderTimeline(orderId);
   const confirmations = await listConfirmationSnapshots(orderId);
+  const back = resolveOwnerReturnTo(returnTo);
+  const safeReturnTo =
+    back.label === "Whole Cake Calendar" ? back.href : null;
+  const backHref =
+    back.label === "Whole Cake Calendar"
+      ? withCalendarReturnPositionFlag(back.href)
+      : back.href;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <Link
           className="text-skyline hover:text-ink text-sm font-medium"
-          href="/owner"
+          href={backHref}
+          scroll={back.label === "Whole Cake Calendar" ? false : undefined}
         >
-          ← Operations
+          ← {back.label}
         </Link>
         <PageHeader title="Order Workspace" />
         <p className="text-skyline -mt-2 text-sm">{order.customerName}</p>
@@ -64,6 +78,7 @@ export async function OwnerOrderDetail({ orderId }: OwnerOrderDetailProps) {
         complimentaryOptions={complimentaryOptions}
         confirmations={confirmations}
         order={order}
+        returnTo={safeReturnTo}
         timeline={timeline}
       />
     </div>

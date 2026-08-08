@@ -22,7 +22,7 @@ import {
 import { OwnerPickupFields } from "@/components/ui/OwnerPickupFields";
 import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { formatLongBusinessDate } from "@/lib/dates";
+import { formatLongBusinessDate, formatBusinessMonthYear, isDifferentBusinessMonth } from "@/lib/dates";
 import {
   describeTimelineActor,
   timelineEventLabel,
@@ -51,6 +51,7 @@ import {
   orderSourceLabel,
   STAFF_GUEST_ORDER_SOURCES,
 } from "@/workspaces/owner/orders/labels";
+import { withOwnerReturnTo } from "@/workspaces/owner/navigation/return-to";
 
 const initialSaveState: OrderWorkspaceSaveState = {
   error: null,
@@ -77,6 +78,8 @@ type OrderWorkspaceFormProps = {
   complimentaryOptions: CollectionComplimentaryOption[];
   timeline: OrderTimelineEvent[];
   confirmations: ConfirmationSnapshot[];
+  /** Validated Calendar return path, or null for Operations default. */
+  returnTo?: string | null;
 };
 
 function ViewBlock({
@@ -102,6 +105,7 @@ export function OrderWorkspaceForm({
   complimentaryOptions,
   timeline,
   confirmations,
+  returnTo = null,
 }: OrderWorkspaceFormProps) {
   const router = useRouter();
   const boundSave = saveOrderWorkspaceAction.bind(null, order.id);
@@ -124,11 +128,26 @@ export function OrderWorkspaceForm({
   const [needsAttention, setNeedsAttention] = useState(
     order.needsBakeryAttention,
   );
+  const [editPickupDate, setEditPickupDate] = useState(order.pickupDate);
+  const [pickupMonthOverride, setPickupMonthOverride] = useState(false);
+
+  const pickupMonthChanging = isDifferentBusinessMonth(
+    order.pickupDate,
+    editPickupDate,
+  );
 
   useEffect(() => {
     if (mode !== "edit") return;
     setNeedsAttention(order.needsBakeryAttention);
-  }, [mode, order.needsBakeryAttention, formKey]);
+    setEditPickupDate(order.pickupDate);
+    setPickupMonthOverride(false);
+  }, [mode, order.needsBakeryAttention, order.pickupDate, formKey]);
+
+  useEffect(() => {
+    if (!pickupMonthChanging) {
+      setPickupMonthOverride(false);
+    }
+  }, [pickupMonthChanging]);
 
   useEffect(() => {
     if (!state.success) return;
@@ -287,7 +306,7 @@ export function OrderWorkspaceForm({
         </ViewBlock>
 
         {order.status === "awaiting_payment" || order.status === "paid" ? (
-          <PaymentSection order={order} />
+          <PaymentSection order={order} returnTo={returnTo} />
         ) : null}
 
         <ViewBlock title="Pickup">
@@ -366,7 +385,10 @@ export function OrderWorkspaceForm({
           {order.status === "submitted" ? (
             <Link
               className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium"
-              href={`/owner/orders/${order.id}/confirmation`}
+              href={withOwnerReturnTo(
+                `/owner/orders/${order.id}/confirmation`,
+                returnTo,
+              )}
             >
               Prepare Confirmation
             </Link>
@@ -376,7 +398,10 @@ export function OrderWorkspaceForm({
           order.confirmationNeedsResend ? (
             <Link
               className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium"
-              href={`/owner/orders/${order.id}/confirmation?updated=1`}
+              href={withOwnerReturnTo(
+                `/owner/orders/${order.id}/confirmation?updated=1`,
+                returnTo,
+              )}
             >
               Prepare Updated Confirmation
             </Link>
@@ -628,13 +653,42 @@ export function OrderWorkspaceForm({
           <PickupSlotFields
             defaultDate={order.pickupDate}
             defaultTime={order.pickupTime}
+            onDateChange={setEditPickupDate}
           />
         ) : (
           <OwnerPickupFields
             defaultDate={order.pickupDate}
             defaultInstruction={order.pickupInstruction}
             defaultTime={order.pickupTime}
+            onDateChange={setEditPickupDate}
           />
+        )}
+        {pickupMonthChanging ? (
+          <div className="border-status-warning/30 bg-status-warning-soft space-y-3 rounded-lg border px-4 py-3">
+            <p className="text-status-warning text-sm">
+              This changes the pickup month from{" "}
+              {formatBusinessMonthYear(order.pickupDate)} to{" "}
+              {formatBusinessMonthYear(editPickupDate)}.
+            </p>
+            <label className="text-ink flex items-start gap-2 text-sm">
+              <input
+                checked={pickupMonthOverride}
+                className="mt-0.5"
+                name="pickup_month_override"
+                onChange={(event) =>
+                  setPickupMonthOverride(event.target.checked)
+                }
+                required
+                type="checkbox"
+                value="1"
+              />
+              <span>
+                Owner override — allow pickup month change
+              </span>
+            </label>
+          </div>
+        ) : (
+          <input name="pickup_month_override" type="hidden" value="0" />
         )}
       </section>
 

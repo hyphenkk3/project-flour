@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ updated?: string }>;
+  searchParams: Promise<{ updated?: string; returnTo?: string }>;
 };
 
 export default async function ConfirmationPage({
@@ -42,6 +42,7 @@ export default async function ConfirmationPage({
     <ConfirmationPreview
       isUpdated={isUpdated}
       order={order}
+      returnTo={query.returnTo}
       staffDisplayName={staff.displayName}
     />
   );

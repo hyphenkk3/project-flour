@@ -103,3 +103,31 @@ export function toBusinessDateKey(
     timeZone: TIME_ZONE,
   }).format(toDate(value));
 }
+
+/** YYYY-MM from a business date YYYY-MM-DD. */
+export function businessYearMonth(ymd: string): string | null {
+  const match = /^(\d{4})-(\d{2})-\d{2}$/.exec(ymd.trim());
+  if (!match) return null;
+  return `${match[1]}-${match[2]}`;
+}
+
+/** Month label from YYYY-MM-DD, e.g. August 2026. */
+export function formatBusinessMonthYear(ymd: string): string {
+  const date = parseBusinessDate(ymd);
+  if (!date) return ymd;
+  return new Intl.DateTimeFormat(LOCALE, {
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
+/** True when two business dates fall in different calendar months. */
+export function isDifferentBusinessMonth(
+  fromYmd: string,
+  toYmd: string,
+): boolean {
+  const from = businessYearMonth(fromYmd);
+  const to = businessYearMonth(toYmd);
+  if (!from || !to) return false;
+  return from !== to;
+}

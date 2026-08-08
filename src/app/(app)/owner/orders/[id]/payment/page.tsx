@@ -7,15 +7,20 @@ export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ returnTo?: string }>;
 };
 
-export default async function PaymentRequestPage({ params }: PageProps) {
+export default async function PaymentRequestPage({
+  params,
+  searchParams,
+}: PageProps) {
   const staff = await requireStaff();
   if (staff.role.code !== "owner") {
     notFound();
   }
 
   const { id } = await params;
+  const query = await searchParams;
   const order = await getGuestOrderById(id);
   if (!order) {
     notFound();
@@ -28,7 +33,5 @@ export default async function PaymentRequestPage({ params }: PageProps) {
     notFound();
   }
 
-  return (
-    <PaymentRequestPreview order={order} />
-  );
+  return <PaymentRequestPreview order={order} returnTo={query.returnTo} />;
 }

@@ -47,6 +47,26 @@ export function guestOrderStatusTone(
   }
 }
 
+/** Text colour classes matching guestOrderStatusTone / Operations semantics. */
+export function guestOrderStatusTextClass(
+  status: StorefrontOrder["status"],
+): string {
+  switch (guestOrderStatusTone(status)) {
+    case "warning":
+      return "text-status-warning";
+    case "info":
+      return "text-status-info";
+    case "progress":
+      return "text-status-progress";
+    case "success":
+      return "text-status-success";
+    case "danger":
+      return "text-status-danger";
+    case "neutral":
+      return "text-zinc-700";
+  }
+}
+
 export function isPaymentOverdue(
   status: StorefrontOrder["status"],
   paymentDeadlineAt: string | null,

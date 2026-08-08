@@ -2,10 +2,72 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-08 — Milestone 3 Preview 3A-3 · Whole Cake Calendar (Product-tested)
+
+Preview 3A-3 is closed. Owner-only Whole Cake Calendar at `/owner/calendar`.
+Preview 3A-4 has **not** started.
+
+Applied migration (do not amend):
+- `20260808100000_preview3a3_calendar_item_sync_realtime.sql`
+  (`sync_guest_order_items` touches `orders.updated_at` so item-only sync emits
+  orders Realtime for Calendar Cake/Matrix refresh)
+
+### Views / defaults
+
+- Views: **Matrix | Cakes | Orders**
+- Default: **Matrix** + **Customers** (`?view=matrix&matrix=customers`)
+- Missing/invalid view → matrix; Matrix mode URL: `matrix=customers|totals`
+- Cakes: cake snapshot lines (`cake_name` / `size_label` / `×qty` + customer)
+- Orders: compact customer list (status / source / crew / attention / RM10)
+- Read model: active guest orders (`customer_id` null; submitted /
+  pending_confirmation / awaiting_payment / paid); order-item snapshots only —
+  not Collection membership
+
+### Matrix
+
+- Columns: Cake/Size sticky + one column per day of selected month
+- Rows: unique ordered cake+size snapshots for the month
+- Customers mode: customer links with Operations status colour, source/(crew),
+  bakery-attention bold, effective RM10 strikethrough; qty>1 as `Name ×N`
+- Totals mode: aggregate quantity only (`×N`) per cake/size/date
+- Horizontal + vertical scroll; sticky date header + Cake/Size column
+- Fresh current-month Matrix entry horizontally focuses **Today**
+
+### Navigation / scroll (working position)
+
+- Calendar internal Links use `scroll={false}` (Customers↔Totals, view switches,
+  Prev/Next, sidebar/Ops Calendar links) so document does not jump to top
+- Customers ↔ Totals: preserve `window.scrollY` and Matrix `scrollLeft`
+- Matrix ↔ Cakes ↔ Orders: preserve document scrollY (clamp if shorter)
+- Calendar → Operations → Calendar (SPA): restore useful Calendar vertical
+  working position; Matrix horizontal = **Today** for current month — do **not**
+  resurrect pre-Operations Matrix `scrollLeft`
+- Calendar → Order Workspace → ← Whole Cake Calendar (`rp=1`): restore exact
+  document Y + Matrix X (one-shot); ordinary Calendar entry does not
+- **Today**: horizontal Today focus; document Y unchanged
+- Hard reload / fresh browser entry: no stale vertical or Matrix horizontal restore
+
+### Pickup amendment
+
+- Same-month pickup amendments save normally
+- Cross-month pickup requires explicit **Owner override** checkbox in Order
+  Workspace; otherwise blocked with clear error
+
+### Realtime / polling
+
+- Subscribe to `orders` changes; reconcile month entries (including item
+  snapshots after frozen item-sync touch)
+- 30s full-month poll fallback for all three views
+
+### Out of scope (deferred)
+
+- Ready / Picked Up UI, Quick View, EXTRA, Collection categories, Bakery
+  workspace activation, Crew WhatsApp, POS, permissions/RLS redesign
+
 ## 2026-08-08 — Milestone 3 Preview 3A-1/2 · Closed checkpoint (Product-tested)
 
 Preview 3A-1 (operational foundation) and 3A-2 (Owner staff-created guest orders)
-are closed. Preview 3A-3 (Whole Cake Calendar) has **not** started.
+are closed. Preview 3A-3 Whole Cake Calendar closed separately (see above).
 
 Applied migrations (do not amend):
 - `20260808090000_preview3a1_operational_foundation.sql`

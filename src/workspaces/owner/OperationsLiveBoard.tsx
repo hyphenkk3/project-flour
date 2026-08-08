@@ -207,12 +207,21 @@ export function OperationsLiveBoard({
           description="Customer preorders requiring attention."
           title="Operations"
         />
-        <Link
-          className="bg-ink text-mist hover:bg-skyline inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg px-4 text-sm font-medium"
-          href="/owner/orders/new"
-        >
-          + New Order
-        </Link>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Link
+            className="border-line text-ink hover:bg-mist inline-flex min-h-10 items-center justify-center rounded-lg border px-4 text-sm font-medium"
+            href="/owner/calendar"
+            scroll={false}
+          >
+            Whole Cake Calendar
+          </Link>
+          <Link
+            className="bg-ink text-mist hover:bg-skyline inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-medium"
+            href="/owner/orders/new"
+          >
+            + New Order
+          </Link>
+        </div>
       </div>
 
       <OperationsBoardToolbar

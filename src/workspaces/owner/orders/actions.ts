@@ -10,6 +10,10 @@ import { orderMateriallyAffectsConfirmation } from "@/engines/orders/confirmatio
 import { reconcilePaymentLifecycleStatus } from "@/engines/orders/payment-status";
 import { isValidClockPickupTime, isValidPickupSlot } from "@/engines/business-calendar/pickup-slots";
 import { requireStaff } from "@/foundation/auth/session";
+import {
+  formatBusinessMonthYear,
+  isDifferentBusinessMonth,
+} from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import type {
   StorefrontOrder,
@@ -360,6 +364,20 @@ export async function saveOrderWorkspaceAction(
   if (!pickupDate || !pickupTime) {
     return { error: "Please choose a pickup date and time.", success: false };
   }
+
+  // Normal amendment: pickup month stays put. Cross-month requires explicit Owner override.
+  const pickupMonthOverride =
+    String(formData.get("pickup_month_override") ?? "") === "1";
+  if (isDifferentBusinessMonth(before.pickupDate, pickupDate)) {
+    if (!pickupMonthOverride) {
+      return {
+        error: `Pickup date must stay within ${formatBusinessMonthYear(before.pickupDate)}. Enable Owner override to change the pickup month.`,
+        success: false,
+      };
+    }
+    // requireOwner() already gated this action; override checkbox is the explicit intent.
+  }
+
   if (nextSource === "customer_website") {
     if (!isValidPickupSlot(pickupDate, pickupTime)) {
       return {

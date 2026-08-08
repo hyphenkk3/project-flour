@@ -13,23 +13,34 @@ import {
   markConfirmationSentAction,
   recordConfirmationPreparedAction,
 } from "@/workspaces/owner/orders/actions";
+import {
+  ownerOrderWorkspaceHref,
+  resolveOwnerReturnTo,
+} from "@/workspaces/owner/navigation/return-to";
 
 type ConfirmationPreviewProps = {
   order: StorefrontOrder;
   staffDisplayName: string;
   isUpdated: boolean;
+  returnTo?: string;
 };
 
 export function ConfirmationPreview({
   order,
   staffDisplayName,
   isUpdated,
+  returnTo,
 }: ConfirmationPreviewProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [preparedLogged, setPreparedLogged] = useState(false);
+  const back = resolveOwnerReturnTo(returnTo);
+  const workspaceHref = ownerOrderWorkspaceHref(
+    order.id,
+    back.label === "Whole Cake Calendar" ? back.href : null,
+  );
 
   const payload = buildConfirmationPayload({
     staffCustomerFacingName: staffDisplayName,
@@ -95,7 +106,7 @@ export function ConfirmationPreview({
         setError(result.error);
         return;
       }
-      router.push(`/owner/orders/${order.id}`);
+      router.push(workspaceHref);
       router.refresh();
     });
   }
@@ -105,7 +116,7 @@ export function ConfirmationPreview({
       <div>
         <Link
           className="text-skyline hover:text-ink text-sm font-medium"
-          href={`/owner/orders/${order.id}`}
+          href={workspaceHref}
         >
           ← Order Workspace
         </Link>
@@ -153,7 +164,7 @@ export function ConfirmationPreview({
         </button>
         <Link
           className="text-skyline hover:text-ink inline-flex min-h-12 items-center justify-center px-2 text-sm font-medium"
-          href={`/owner/orders/${order.id}`}
+          href={workspaceHref}
         >
           Back
         </Link>

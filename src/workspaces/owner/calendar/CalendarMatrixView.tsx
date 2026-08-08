@@ -1,0 +1,380 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useLayoutEffect, useMemo, useRef } from "react";
+import { CalendarGuide } from "@/workspaces/owner/calendar/CalendarGuide";
+import { captureCalendarReturnPosition } from "@/workspaces/owner/calendar/calendar-return-position";
+import { buildCalendarMatrix } from "@/workspaces/owner/calendar/matrix";
+import type { CalendarDayCell } from "@/workspaces/owner/calendar/month-grid";
+import { singaporeTodayParts } from "@/workspaces/owner/calendar/month-grid";
+import type {
+  CalendarEntry,
+  CalendarMatrixMode,
+} from "@/workspaces/owner/calendar/types";
+import { ownerOrderWorkspaceHref } from "@/workspaces/owner/navigation/return-to";
+import { guestOrderStatusTextClass } from "@/workspaces/owner/orders/labels";
+
+type CalendarMatrixViewProps = {
+  columns: CalendarDayCell[];
+  entries: CalendarEntry[];
+  mode: CalendarMatrixMode;
+  year: number;
+  month: number;
+  /** When true, force horizontal position to Today (e.g. Today button). */
+  focusToday: boolean;
+  matrixHref: (mode: CalendarMatrixMode) => string;
+  /** Calendar URL for Order Workspace return navigation. */
+  returnTo: string;
+  /**
+   * One-shot Order Workspace return horizontal restore.
+   * Wins over automatic Today for this mount only.
+   */
+  orderReturnMatrixScrollLeft?: number | null;
+  onOrderReturnMatrixApplied?: () => void;
+};
+
+const LABEL_COL_WIDTH = "11rem";
+const DATE_COL_WIDTH = "6.5rem";
+
+/**
+ * In-memory scroll retention for Customers ↔ Totals remounts.
+ * Cleared on full page reload so current-month entry re-applies Today positioning.
+ * Must NOT use sessionStorage for initial position (that overrode Today).
+ */
+let matrixScrollMemory: {
+  year: number;
+  month: number;
+  scrollLeft: number;
+} | null = null;
+
+/**
+ * Scroll so Today's date column is the first visible date after the sticky
+ * Cake / Size column. Uses viewport geometry — not offsetLeft − labelWidth.
+ */
+function scrollMatrixToInitialPosition(
+  container: HTMLElement,
+  year: number,
+  month: number,
+) {
+  const today = singaporeTodayParts();
+  const isCurrentMonth = year === today.year && month === today.month;
+
+  if (!isCurrentMonth) {
+    container.scrollLeft = 0;
+    return;
+  }
+
+  const todayCol = container.querySelector<HTMLElement>(
+    `thead [data-matrix-date="${today.ymd}"]`,
+  );
+  const labelCol = container.querySelector<HTMLElement>(
+    "thead [data-matrix-label]",
+  );
+  if (!todayCol || !labelCol) {
+    container.scrollLeft = 0;
+    return;
+  }
+
+  // Align Today's left edge with the sticky label's right edge in the viewport.
+  const labelRight = labelCol.getBoundingClientRect().right;
+  const todayLeft = todayCol.getBoundingClientRect().left;
+  const nextScrollLeft = container.scrollLeft + (todayLeft - labelRight);
+  const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
+  container.scrollLeft = Math.max(0, Math.min(nextScrollLeft, maxScroll));
+}
+
+function rememberScroll(year: number, month: number, scrollLeft: number) {
+  matrixScrollMemory = { year, month, scrollLeft };
+}
+
+/** Seed Matrix horizontal place before first paint (Order Workspace return). */
+export function seedMatrixScrollMemory(
+  year: number,
+  month: number,
+  scrollLeft: number,
+) {
+  rememberScroll(year, month, scrollLeft);
+}
+
+/**
+ * Clear live Matrix horizontal memory when leaving the Calendar route.
+ * Must NOT survive Operations / sidebar / fresh Calendar entry.
+ * Customers ↔ Totals within the same Calendar visit still share memory
+ * because WholeCakeCalendar stays mounted.
+ */
+export function clearMatrixScrollMemory() {
+  matrixScrollMemory = null;
+}
+
+/**
+ * Horizontally focus Today inside the Matrix scroll container only.
+ * Does not change document scroll. Used by Today when already on current month.
+ */
+export function focusMatrixTodayColumn() {
+  const container = document.querySelector<HTMLElement>(
+    "[data-matrix-scroll]",
+  );
+  if (!container) return;
+  const today = singaporeTodayParts();
+  scrollMatrixToInitialPosition(container, today.year, today.month);
+  rememberScroll(today.year, today.month, container.scrollLeft);
+}
+
+export function CalendarMatrixView({
+  columns,
+  entries,
+  mode,
+  year,
+  month,
+  focusToday,
+  matrixHref,
+  returnTo,
+  orderReturnMatrixScrollLeft = null,
+  onOrderReturnMatrixApplied,
+}: CalendarMatrixViewProps) {
+  const router = useRouter();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const dateYmids = useMemo(() => columns.map((col) => col.ymd), [columns]);
+  const rows = useMemo(
+    () => buildCalendarMatrix(entries, dateYmids),
+    [entries, dateYmids],
+  );
+
+  // Persist manual scroll in memory (same-month remount only).
+  useLayoutEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const onScroll = () => {
+      rememberScroll(year, month, container.scrollLeft);
+    };
+
+    container.addEventListener("scroll", onScroll, { passive: true });
+    return () => container.removeEventListener("scroll", onScroll);
+  }, [year, month]);
+
+  // Auto-position on month entry / Today focus / order return — never on entries.
+  // mode is intentionally omitted so Customers ↔ Totals can restore memory.
+  useLayoutEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    if (orderReturnMatrixScrollLeft != null) {
+      const maxScroll = Math.max(
+        0,
+        container.scrollWidth - container.clientWidth,
+      );
+      container.scrollLeft = Math.max(
+        0,
+        Math.min(orderReturnMatrixScrollLeft, maxScroll),
+      );
+      rememberScroll(year, month, container.scrollLeft);
+      onOrderReturnMatrixApplied?.();
+      return;
+    }
+
+    const memory = matrixScrollMemory;
+    const sameMonthMemory =
+      memory != null && memory.year === year && memory.month === month;
+
+    if (focusToday || !sameMonthMemory) {
+      // First entry into this month, or explicit Today — Today/day-1 wins.
+      scrollMatrixToInitialPosition(container, year, month);
+      rememberScroll(year, month, container.scrollLeft);
+    } else {
+      // Same-month remount / seeded memory: keep the saved horizontal place.
+      container.scrollLeft = memory.scrollLeft;
+    }
+
+    if (!focusToday) return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("focus")) return;
+    params.delete("focus");
+    const query = params.toString();
+    router.replace(query ? `/owner/calendar?${query}` : "/owner/calendar", {
+      scroll: false,
+    });
+  }, [
+    year,
+    month,
+    focusToday,
+    orderReturnMatrixScrollLeft,
+    onOrderReturnMatrixApplied,
+    router,
+  ]);
+
+  function handleOrderNavigate() {
+    captureCalendarReturnPosition(returnTo);
+  }
+  return (
+    <div className="space-y-4">
+      <div
+        aria-label="Matrix cell mode"
+        className="flex flex-wrap items-center gap-2 text-sm"
+        role="group"
+      >
+        <span className="text-skyline text-xs font-medium tracking-wide uppercase">
+          Matrix
+        </span>
+        <div className="border-line inline-flex rounded-lg border p-0.5">
+          <Link
+            aria-current={mode === "customers" ? "page" : undefined}
+            className={[
+              "inline-flex min-h-9 items-center justify-center rounded-md px-3 text-sm font-medium",
+              mode === "customers"
+                ? "bg-ink text-mist"
+                : "text-ink hover:bg-mist",
+            ].join(" ")}
+            href={matrixHref("customers")}
+            scroll={false}
+          >
+            Customers
+          </Link>
+          <Link
+            aria-current={mode === "totals" ? "page" : undefined}
+            className={[
+              "inline-flex min-h-9 items-center justify-center rounded-md px-3 text-sm font-medium",
+              mode === "totals"
+                ? "bg-ink text-mist"
+                : "text-ink hover:bg-mist",
+            ].join(" ")}
+            href={matrixHref("totals")}
+            scroll={false}
+          >
+            Totals
+          </Link>
+        </div>
+      </div>
+
+      <div
+        className="border-line/80 max-h-[min(70vh,44rem)] overflow-auto rounded-xl border bg-white"
+        data-matrix-scroll
+        ref={scrollRef}
+      >
+        <table className="border-separate border-spacing-0 text-left text-[11px] sm:text-xs">
+          <thead>
+            <tr>
+              <th
+                className="border-line/60 bg-mist text-ink sticky top-0 left-0 z-30 border-b border-r px-2 py-2 text-left text-[10px] font-semibold tracking-wide uppercase"
+                data-matrix-label
+                style={{ minWidth: LABEL_COL_WIDTH, width: LABEL_COL_WIDTH }}
+              >
+                Cake / Size
+              </th>
+              {columns.map((col) => (
+                <th
+                  className={[
+                    "border-line/60 sticky top-0 z-20 border-b px-1.5 py-1.5 text-center font-semibold",
+                    col.isToday
+                      ? "bg-status-info-soft text-ink"
+                      : "bg-mist text-skyline",
+                  ].join(" ")}
+                  data-matrix-date={col.ymd}
+                  key={col.ymd}
+                  style={{ minWidth: DATE_COL_WIDTH, width: DATE_COL_WIDTH }}
+                >
+                  <div className="text-sm leading-tight">{col.dayOfMonth}</div>
+                  <div className="text-[10px] font-medium tracking-wide uppercase opacity-80">
+                    {col.weekdayShort}
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td
+                  className="text-skyline px-3 py-6"
+                  colSpan={columns.length + 1}
+                >
+                  No whole-cake pickups in this month yet.
+                </td>
+              </tr>
+            ) : (
+              rows.map((row) => (
+                <tr key={row.key}>
+                  <th
+                    className="border-line/50 bg-white text-ink sticky left-0 z-10 border-r border-b px-2 py-1.5 text-left font-medium"
+                    scope="row"
+                    style={{
+                      minWidth: LABEL_COL_WIDTH,
+                      width: LABEL_COL_WIDTH,
+                    }}
+                    title={row.label}
+                  >
+                    <span className="block leading-snug">{row.cakeName}</span>
+                    <span className="text-skyline block text-[10px] font-normal">
+                      {row.sizeLabel}
+                    </span>
+                  </th>
+                  {columns.map((col) => {
+                    const cell = row.cellsByDate[col.ymd];
+                    return (
+                      <td
+                        className={[
+                          "border-line/40 align-top border-b px-1.5 py-1",
+                          col.isToday ? "bg-status-info-soft/30" : "bg-white",
+                        ].join(" ")}
+                        key={`${row.key}:${col.ymd}`}
+                        style={{
+                          minWidth: DATE_COL_WIDTH,
+                          width: DATE_COL_WIDTH,
+                        }}
+                      >
+                        {!cell || cell.totalQuantity === 0 ? (
+                          <span className="text-zinc-300">—</span>
+                        ) : mode === "totals" ? (
+                          <span className="text-ink font-medium">
+                            ×{cell.totalQuantity}
+                          </span>
+                        ) : (
+                          <ul className="space-y-0.5">
+                            {cell.customers.map((customer) => {
+                              const label =
+                                customer.quantity > 1
+                                  ? `${customer.displayName} ×${customer.quantity}`
+                                  : customer.displayName;
+                              return (
+                                <li key={customer.orderId}>
+                                  <Link
+                                    className={[
+                                      guestOrderStatusTextClass(customer.status),
+                                      customer.needsBakeryAttention
+                                        ? "font-bold"
+                                        : "",
+                                      customer.hasEffectiveRm10
+                                        ? "line-through"
+                                        : "",
+                                      "block leading-snug hover:underline",
+                                    ].join(" ")}
+                                    href={ownerOrderWorkspaceHref(
+                                      customer.orderId,
+                                      returnTo,
+                                    )}
+                                    onClick={handleOrderNavigate}
+                                    title={label}
+                                  >
+                                    {label}
+                                  </Link>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <CalendarGuide />
+    </div>
+  );
+}

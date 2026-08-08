@@ -1,0 +1,59 @@
+import Link from "next/link";
+import { PageHeader } from "@/components/shell/PageHeader";
+import { resolveCalendarMonthParams } from "@/workspaces/owner/calendar/calendar-url";
+import { WholeCakeCalendar } from "@/workspaces/owner/calendar/WholeCakeCalendar";
+import { listCalendarEntriesForMonth } from "@/workspaces/owner/calendar/queries";
+import type {
+  CalendarMatrixMode,
+  CalendarViewMode,
+} from "@/workspaces/owner/calendar/types";
+
+export { resolveCalendarMonthParams };
+
+export const dynamic = "force-dynamic";
+
+type WholeCakeCalendarPageProps = {
+  year: number;
+  month: number;
+  view: CalendarViewMode;
+  matrixMode: CalendarMatrixMode;
+  focusToday: boolean;
+  restorePosition: boolean;
+};
+
+export async function WholeCakeCalendarPage({
+  year,
+  month,
+  view,
+  matrixMode,
+  focusToday,
+  restorePosition,
+}: WholeCakeCalendarPageProps) {
+  const entries = await listCalendarEntriesForMonth(year, month);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <PageHeader
+          description="Production scan by pickup date. Matrix is cake×date density; Cakes and Orders remain available."
+          title="Whole Cake Calendar"
+        />
+        <Link
+          className="border-line text-ink hover:bg-mist inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg border px-4 text-sm font-medium"
+          href="/owner"
+        >
+          Operations
+        </Link>
+      </div>
+      <WholeCakeCalendar
+        focusToday={focusToday}
+        initialEntries={entries}
+        matrixMode={matrixMode}
+        month={month}
+        restorePosition={restorePosition}
+        view={view}
+        year={year}
+      />
+    </div>
+  );
+}

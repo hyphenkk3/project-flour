@@ -28,20 +28,33 @@ import {
   toDatetimeLocalValue,
 } from "@/workspaces/owner/orders/labels";
 import { FormField, FormInput } from "@/components/ui/form";
+import {
+  ownerOrderWorkspaceHref,
+  resolveOwnerReturnTo,
+} from "@/workspaces/owner/navigation/return-to";
 
 type PaymentRequestPreviewProps = {
   order: StorefrontOrder;
+  returnTo?: string;
 };
 
 const REQUEST_METHODS: PaymentRequestMethod[] = ["wb_qr", "online_transfer"];
 
-export function PaymentRequestPreview({ order }: PaymentRequestPreviewProps) {
+export function PaymentRequestPreview({
+  order,
+  returnTo,
+}: PaymentRequestPreviewProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [preparedLogged, setPreparedLogged] = useState(false);
   const [method, setMethod] = useState<PaymentRequestMethod>("wb_qr");
+  const back = resolveOwnerReturnTo(returnTo);
+  const workspaceHref = ownerOrderWorkspaceHref(
+    order.id,
+    back.label === "Whole Cake Calendar" ? back.href : null,
+  );
 
   const settlement = order.settlement;
   const isOutstandingBalanceRequest =
@@ -148,7 +161,7 @@ export function PaymentRequestPreview({ order }: PaymentRequestPreviewProps) {
         setError(result.error);
         return;
       }
-      router.push(`/owner/orders/${order.id}`);
+      router.push(workspaceHref);
       router.refresh();
     });
   }
@@ -158,7 +171,7 @@ export function PaymentRequestPreview({ order }: PaymentRequestPreviewProps) {
       <div className="space-y-4">
         <Link
           className="text-skyline hover:text-ink text-sm font-medium"
-          href={`/owner/orders/${order.id}`}
+          href={workspaceHref}
         >
           ← Order Workspace
         </Link>
@@ -174,7 +187,7 @@ export function PaymentRequestPreview({ order }: PaymentRequestPreviewProps) {
       <div>
         <Link
           className="text-skyline hover:text-ink text-sm font-medium"
-          href={`/owner/orders/${order.id}`}
+          href={workspaceHref}
         >
           ← Order Workspace
         </Link>
@@ -340,7 +353,7 @@ export function PaymentRequestPreview({ order }: PaymentRequestPreviewProps) {
         </p>
         <Link
           className="text-skyline hover:text-ink inline-flex min-h-10 items-center justify-center text-sm font-medium"
-          href={`/owner/orders/${order.id}`}
+          href={workspaceHref}
         >
           Back
         </Link>
