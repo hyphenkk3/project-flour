@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { requireStaff } from "@/foundation/auth/session";
 import { resolveCalendarMonthParams } from "@/workspaces/owner/calendar/calendar-url";
 import { WholeCakeCalendar } from "@/workspaces/owner/calendar/WholeCakeCalendar";
 import { listCalendarEntriesForMonth } from "@/workspaces/owner/calendar/queries";
@@ -7,6 +8,7 @@ import type {
   CalendarMatrixMode,
   CalendarViewMode,
 } from "@/workspaces/owner/calendar/types";
+import { notFound } from "next/navigation";
 
 export { resolveCalendarMonthParams };
 
@@ -29,6 +31,11 @@ export async function WholeCakeCalendarPage({
   focusToday,
   restorePosition,
 }: WholeCakeCalendarPageProps) {
+  const staff = await requireStaff();
+  if (staff.role.code !== "owner") {
+    notFound();
+  }
+
   const entries = await listCalendarEntriesForMonth(year, month);
 
   return (
@@ -51,6 +58,7 @@ export async function WholeCakeCalendarPage({
         matrixMode={matrixMode}
         month={month}
         restorePosition={restorePosition}
+        staffDisplayName={staff.displayName}
         view={view}
         year={year}
       />

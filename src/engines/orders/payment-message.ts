@@ -3,6 +3,7 @@ import {
   type PaymentRequestMethod,
 } from "@/engines/orders/payment-details";
 import { moneyCompare } from "@/engines/orders/money";
+import { physicalVoucherNumberFromMetadata } from "@/engines/orders/promotions";
 import { formatOrderTotal } from "@/engines/orders/totals";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 
@@ -43,10 +44,7 @@ export function formatSignedRm(amount: number): string {
 export function customerFacingAdjustmentLabel(
   adjustment: PaymentRequestAdjustmentLine,
 ): string {
-  const fromMeta =
-    typeof adjustment.metadata?.voucher_number === "string"
-      ? adjustment.metadata.voucher_number.trim()
-      : "";
+  const fromMeta = physicalVoucherNumberFromMetadata(adjustment.metadata) ?? "";
   const reference = (adjustment.referenceNumber ?? fromMeta).trim();
   if (!reference) {
     return adjustment.label;

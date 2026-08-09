@@ -40,8 +40,10 @@ import {
   type OrderWorkspaceSaveState,
 } from "@/workspaces/owner/orders/actions";
 import { CustomerConfirmedButton } from "@/workspaces/owner/orders/CustomerConfirmedButton";
+import { OrderMessagesSection } from "@/workspaces/owner/orders/OrderMessagesSection";
 import { OrderOperationalControls } from "@/workspaces/owner/orders/OrderOperationalControls";
 import { PaymentSection } from "@/workspaces/owner/orders/PaymentSection";
+import { OrderTotalAdjustmentsSection } from "@/workspaces/owner/orders/OrderTotalAdjustmentsSection";
 import {
   formatPickupTime,
   formatTimelineDateTime,
@@ -82,6 +84,8 @@ type OrderWorkspaceFormProps = {
   confirmations: ConfirmationSnapshot[];
   /** Validated Calendar return path, or null for Operations default. */
   returnTo?: string | null;
+  /** Default sender for Customer Ready Message. */
+  staffDisplayName: string;
 };
 
 function ViewBlock({
@@ -101,6 +105,24 @@ function ViewBlock({
   );
 }
 
+/** Permanent staff guidance — not order-specific notes. */
+function OrderGuideCallout() {
+  return (
+    <aside
+      aria-label="Order guide"
+      className="border-fog bg-mist/50 mt-4 rounded-lg border px-3 py-2.5"
+    >
+      <p className="text-skyline text-[0.65rem] font-semibold tracking-[0.14em] uppercase">
+        Order guide
+      </p>
+      <ul className="text-ink mt-1.5 space-y-0.5 text-sm leading-snug">
+        <li>No wording on cakes or cake boards.</li>
+        <li>Customised cake decoration is not available.</li>
+      </ul>
+    </aside>
+  );
+}
+
 export function OrderWorkspaceForm({
   order,
   cakes,
@@ -108,6 +130,7 @@ export function OrderWorkspaceForm({
   timeline,
   confirmations,
   returnTo = null,
+  staffDisplayName,
 }: OrderWorkspaceFormProps) {
   const router = useRouter();
   const boundSave = saveOrderWorkspaceAction.bind(null, order.id);
@@ -291,6 +314,17 @@ export function OrderWorkspaceForm({
           </div>
         </ViewBlock>
 
+        <ViewBlock title="Pickup">
+          <div className="space-y-1">
+            <p className="text-ink text-base font-semibold">
+              {formatLongBusinessDate(order.pickupDate)}
+            </p>
+            <p className="text-ink text-sm">
+              {formatPickupTime(order.pickupTime)}
+            </p>
+          </div>
+        </ViewBlock>
+
         <ViewBlock title="Order">
           <ul className="space-y-2">
             {order.items.map((item) => (
@@ -306,38 +340,7 @@ export function OrderWorkspaceForm({
           <p className="text-ink mt-3 text-sm font-semibold">
             Total · {formatRm(order.total)}
           </p>
-        </ViewBlock>
-
-        {order.status === "awaiting_payment" || order.status === "paid" ? (
-          <PaymentSection order={order} returnTo={returnTo} />
-        ) : null}
-
-        <ViewBlock title="Pickup">
-          <div className="space-y-1">
-            <p className="text-ink text-base font-semibold">
-              {formatLongBusinessDate(order.pickupDate)}
-            </p>
-            <p className="text-ink text-sm">
-              {formatPickupTime(order.pickupTime)}
-            </p>
-            {order.pickupInstruction?.trim() ? (
-              <p className="text-skyline text-sm">
-                Instruction · {order.pickupInstruction}
-              </p>
-            ) : null}
-          </div>
-        </ViewBlock>
-
-        <ViewBlock title="Collection">
-          <OrderOperationalControls
-            compact
-            onSuccess={() => {
-              router.refresh();
-            }}
-            orderId={order.id}
-            pickedUpAt={order.pickedUpAt}
-            readyAt={order.readyAt}
-          />
+          <OrderGuideCallout />
         </ViewBlock>
 
         <ViewBlock title="Complimentary items">
@@ -357,6 +360,43 @@ export function OrderWorkspaceForm({
           </p>
         </ViewBlock>
 
+        {order.status === "submitted" ||
+        order.status === "pending_confirmation" ? (
+          <OrderTotalAdjustmentsSection order={order} />
+        ) : null}
+
+        {order.status === "awaiting_payment" || order.status === "paid" ? (
+          <PaymentSection order={order} returnTo={returnTo} />
+        ) : null}
+
+        <ViewBlock title="Collection">
+          <OrderOperationalControls
+            compact
+            onSuccess={() => {
+              router.refresh();
+            }}
+            orderId={order.id}
+            pickedUpAt={order.pickedUpAt}
+            readyAt={order.readyAt}
+          />
+        </ViewBlock>
+
+        <ViewBlock title="Messages">
+          <OrderMessagesSection
+            compact
+            order={order}
+            staffDisplayName={staffDisplayName}
+          />
+        </ViewBlock>
+
+        <ViewBlock title="Internal notes">
+          <p className="text-skyline text-sm leading-relaxed whitespace-pre-wrap">
+            {order.internalNotes?.trim()
+              ? order.internalNotes
+              : "No internal notes."}
+          </p>
+        </ViewBlock>
+
         <ViewBlock title="Bakery attention">
           {order.needsBakeryAttention ? (
             <div className="space-y-1">
@@ -370,20 +410,6 @@ export function OrderWorkspaceForm({
           ) : (
             <p className="text-skyline text-sm">No bakery attention flag.</p>
           )}
-        </ViewBlock>
-
-        <ViewBlock title="Customer notes">
-          <p className="text-skyline text-sm leading-relaxed whitespace-pre-wrap">
-            {order.notes?.trim() ? order.notes : "No notes provided."}
-          </p>
-        </ViewBlock>
-
-        <ViewBlock title="Internal notes">
-          <p className="text-skyline text-sm leading-relaxed whitespace-pre-wrap">
-            {order.internalNotes?.trim()
-              ? order.internalNotes
-              : "No internal notes."}
-          </p>
         </ViewBlock>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -571,6 +597,52 @@ export function OrderWorkspaceForm({
       </section>
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
+        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
+          Pickup
+        </h2>
+        {sourceLocked ? (
+          <PickupSlotFields
+            defaultDate={order.pickupDate}
+            defaultTime={order.pickupTime}
+            onDateChange={setEditPickupDate}
+          />
+        ) : (
+          <OwnerPickupFields
+            defaultDate={order.pickupDate}
+            defaultTime={order.pickupTime}
+            onDateChange={setEditPickupDate}
+          />
+        )}
+        {pickupMonthChanging ? (
+          <div className="border-status-warning/30 bg-status-warning-soft space-y-3 rounded-lg border px-4 py-3">
+            <p className="text-status-warning text-sm">
+              This changes the pickup month from{" "}
+              {formatBusinessMonthYear(order.pickupDate)} to{" "}
+              {formatBusinessMonthYear(editPickupDate)}.
+            </p>
+            <label className="text-ink flex items-start gap-2 text-sm">
+              <input
+                checked={pickupMonthOverride}
+                className="mt-0.5"
+                name="pickup_month_override"
+                onChange={(event) =>
+                  setPickupMonthOverride(event.target.checked)
+                }
+                required
+                type="checkbox"
+                value="1"
+              />
+              <span>
+                Owner override — allow pickup month change
+              </span>
+            </label>
+          </div>
+        ) : (
+          <input name="pickup_month_override" type="hidden" value="0" />
+        )}
+      </section>
+
+      <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
             Order
@@ -659,68 +731,7 @@ export function OrderWorkspaceForm({
             );
           })}
         </ul>
-      </section>
-
-      <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
-        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-          Pickup
-        </h2>
-        {sourceLocked ? (
-          <PickupSlotFields
-            defaultDate={order.pickupDate}
-            defaultTime={order.pickupTime}
-            onDateChange={setEditPickupDate}
-          />
-        ) : (
-          <OwnerPickupFields
-            defaultDate={order.pickupDate}
-            defaultInstruction={order.pickupInstruction}
-            defaultTime={order.pickupTime}
-            onDateChange={setEditPickupDate}
-          />
-        )}
-        {pickupMonthChanging ? (
-          <div className="border-status-warning/30 bg-status-warning-soft space-y-3 rounded-lg border px-4 py-3">
-            <p className="text-status-warning text-sm">
-              This changes the pickup month from{" "}
-              {formatBusinessMonthYear(order.pickupDate)} to{" "}
-              {formatBusinessMonthYear(editPickupDate)}.
-            </p>
-            <label className="text-ink flex items-start gap-2 text-sm">
-              <input
-                checked={pickupMonthOverride}
-                className="mt-0.5"
-                name="pickup_month_override"
-                onChange={(event) =>
-                  setPickupMonthOverride(event.target.checked)
-                }
-                required
-                type="checkbox"
-                value="1"
-              />
-              <span>
-                Owner override — allow pickup month change
-              </span>
-            </label>
-          </div>
-        ) : (
-          <input name="pickup_month_override" type="hidden" value="0" />
-        )}
-      </section>
-
-      <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
-        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-          Collection
-        </h2>
-        <OrderOperationalControls
-          compact
-          onSuccess={() => {
-            router.refresh();
-          }}
-          orderId={order.id}
-          pickedUpAt={order.pickedUpAt}
-          readyAt={order.readyAt}
-        />
+        <OrderGuideCallout />
       </section>
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
@@ -764,6 +775,52 @@ export function OrderWorkspaceForm({
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
+          Collection
+        </h2>
+        <OrderOperationalControls
+          compact
+          onSuccess={() => {
+            router.refresh();
+          }}
+          orderId={order.id}
+          pickedUpAt={order.pickedUpAt}
+          readyAt={order.readyAt}
+        />
+      </section>
+
+      <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
+        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
+          Messages
+        </h2>
+        <OrderMessagesSection
+          compact
+          order={order}
+          staffDisplayName={staffDisplayName}
+        />
+      </section>
+
+      <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
+        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
+          Internal notes
+        </h2>
+        {/* Preserve existing customer_notes on save — field hidden from UI. */}
+        <input
+          name="customer_notes"
+          type="hidden"
+          value={order.notes ?? ""}
+        />
+        <FormField htmlFor="internal_notes" label="Internal notes">
+          <FormTextarea
+            defaultValue={order.internalNotes ?? ""}
+            id="internal_notes"
+            name="internal_notes"
+            rows={3}
+          />
+        </FormField>
+      </section>
+
+      <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
+        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
           Bakery attention
         </h2>
         <FormCheckbox
@@ -786,28 +843,6 @@ export function OrderWorkspaceForm({
             />
           </FormField>
         ) : null}
-      </section>
-
-      <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
-        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-          Notes
-        </h2>
-        <FormField htmlFor="customer_notes" label="Customer notes">
-          <FormTextarea
-            defaultValue={order.notes ?? ""}
-            id="customer_notes"
-            name="customer_notes"
-            rows={3}
-          />
-        </FormField>
-        <FormField htmlFor="internal_notes" label="Internal notes">
-          <FormTextarea
-            defaultValue={order.internalNotes ?? ""}
-            id="internal_notes"
-            name="internal_notes"
-            rows={3}
-          />
-        </FormField>
       </section>
 
       <FormError message={state.error} />

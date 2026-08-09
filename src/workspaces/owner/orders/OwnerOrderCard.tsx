@@ -6,6 +6,7 @@ import {
   guestOrderStatusBadgeClassName,
   guestOrderStatusBadgeTone,
   guestOrderStatusLabel,
+  orderSourceLabel,
 } from "@/workspaces/owner/orders/labels";
 import type { StorefrontOrderListItem } from "@/types/storefront";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -42,6 +43,9 @@ export function OwnerOrderCard({
           <p className="text-ink truncate text-base font-semibold">
             {marker ? `${marker} ` : ""}
             {order.customerName}
+          </p>
+          <p className="text-skyline truncate text-sm">
+            {orderSourceLabel(order.orderSource)}
           </p>
           <p className="text-ink text-sm">{cakeLine}</p>
           <p className="text-skyline text-sm">

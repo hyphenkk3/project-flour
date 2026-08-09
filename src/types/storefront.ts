@@ -173,6 +173,7 @@ export type StorefrontOrderListItem = {
   status: GuestOrderStatus;
   createdAt: string;
   confirmationNeedsResend: boolean;
+  orderSource: OrderSource;
   readyAt: string | null;
   pickedUpAt: string | null;
 };
@@ -243,5 +244,23 @@ export type ConfirmationPayload = {
     name: string;
     quantity: number;
   }>;
+  /**
+   * Payable total stored on snapshots.
+   * After pre-confirmation pricing correction this equals amountDue.
+   * Historical snapshots may equal item subtotal only.
+   */
   total: number;
+  /** Item subtotal before adjustments (when present). */
+  subtotal?: number;
+  /** Effective customer-facing adjustments (when present). */
+  adjustments?: Array<{
+    label: string;
+    amount: number;
+    /** Structured adjustment code (e.g. august_promo_2026, rm10_physical_card). */
+    code?: string | null;
+    /** Structured adjustment metadata (e.g. RM10 voucher_number). */
+    metadata?: Record<string, unknown>;
+  }>;
+  /** Authoritative settlement amount due (when present). */
+  amountDue?: number;
 };

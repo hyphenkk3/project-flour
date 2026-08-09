@@ -1,6 +1,11 @@
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
-import { formatOrderTotal } from "@/engines/orders/totals";
-import type { ConfirmationPayload } from "@/types/storefront";
+import { formatOrderFinancialEquation } from "@/engines/orders/financial-equation";
+import { getEffectiveAdjustments } from "@/engines/orders/promotions";
+import type {
+  ConfirmationPayload,
+  OrderAdjustment,
+  StorefrontOrder,
+} from "@/types/storefront";
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
@@ -34,6 +39,31 @@ export function formatComplimentaryLine(
 }
 
 /**
+ * Customer-facing financial block for confirmation.
+ * Full item + adjustment equation (shared with Crew amount head).
+ * No payment / NYP / c/o notation.
+ */
+export function formatConfirmationFinancialBlock(
+  payload: Pick<
+    ConfirmationPayload,
+    "items" | "subtotal" | "amountDue" | "adjustments" | "total"
+  >,
+): string {
+  const amountDue = payload.amountDue ?? payload.total;
+  const adjustments = payload.adjustments ?? [];
+  return formatOrderFinancialEquation({
+    items: payload.items,
+    effective: adjustments.map((row) => ({
+      label: row.label,
+      amount: row.amount,
+      code: row.code ?? "",
+      metadata: row.metadata ?? {},
+    })),
+    amountDue,
+  });
+}
+
+/**
  * Generates the Whitebird WhatsApp confirmation message body.
  * Preserve tone — do not rewrite into generic e-commerce language.
  */
@@ -43,7 +73,7 @@ export function generateConfirmationMessage(
   const weekday = formatPickupWeekdayShort(payload.pickupDate);
   const dateShort = formatPickupDateShort(payload.pickupDate);
   const timeLabel = formatPickupTime(payload.pickupTime);
-  const totalLabel = formatOrderTotal(payload.total);
+  const financialBlock = formatConfirmationFinancialBlock(payload);
 
   const cakeLines = payload.items
     .map(
@@ -67,7 +97,7 @@ export function generateConfirmationMessage(
     `Time: ${timeLabel}\n\n` +
     `Whole Cake;\n` +
     `${cakeLines}\n\n` +
-    `${totalLabel}\n` +
+    `${financialBlock}\n` +
     complimentaryBlock +
     `\n` +
     `Kindly review ALL the details in this confirmation carefully, as your order will be prepared based on the information provided above.\n\n` +
@@ -85,7 +115,12 @@ export function buildConfirmationPayload(input: {
   pickupTime: string;
   items: ConfirmationPayload["items"];
   complimentaryItems: ConfirmationPayload["complimentaryItems"];
-  total: number;
+  /** Item subtotal (price snapshots). */
+  subtotal: number;
+  /** Effective adjustments only. */
+  adjustments: ConfirmationPayload["adjustments"];
+  /** Authoritative settlement amount due. */
+  amountDue: number;
 }): ConfirmationPayload {
   return {
     staffCustomerFacingName: input.staffCustomerFacingName.trim() || "Whitebird",
@@ -97,6 +132,44 @@ export function buildConfirmationPayload(input: {
     complimentaryItems: input.complimentaryItems.filter(
       (item) => item.quantity > 0,
     ),
-    total: input.total,
+    subtotal: input.subtotal,
+    adjustments: input.adjustments,
+    amountDue: input.amountDue,
+    /** Snapshot compatibility: total = payable amount due. */
+    total: input.amountDue,
   };
+}
+
+/** Build confirmation payload from live StorefrontOrder + staff name. */
+export function buildConfirmationPayloadFromOrder(input: {
+  order: StorefrontOrder;
+  staffCustomerFacingName: string;
+}): ConfirmationPayload {
+  const { order } = input;
+  const effective = getEffectiveAdjustments(order.adjustments);
+  return buildConfirmationPayload({
+    staffCustomerFacingName: input.staffCustomerFacingName,
+    customerName: order.customerName,
+    customerPhone: order.phone,
+    pickupDate: order.pickupDate,
+    pickupTime: order.pickupTime,
+    items: order.items.map((item) => ({
+      cakeName: item.cakeName,
+      sizeLabel: item.sizeLabel,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+    })),
+    complimentaryItems: order.complimentaryItems.map((item) => ({
+      name: item.name,
+      quantity: item.quantity,
+    })),
+    subtotal: order.settlement.subtotal,
+    adjustments: effective.map((row: OrderAdjustment) => ({
+      label: row.label,
+      amount: row.amount,
+      code: row.code,
+      metadata: row.metadata,
+    })),
+    amountDue: order.settlement.amountDue,
+  });
 }

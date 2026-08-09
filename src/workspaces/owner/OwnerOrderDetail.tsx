@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { requireStaff } from "@/foundation/auth/session";
 import { withCalendarReturnPositionFlag } from "@/workspaces/owner/calendar/calendar-return-position";
 import { resolveOwnerReturnTo } from "@/workspaces/owner/navigation/return-to";
 import { OrderWorkspaceForm } from "@/workspaces/owner/orders/OrderWorkspaceForm";
@@ -27,6 +28,11 @@ export async function OwnerOrderDetail({
   orderId,
   returnTo,
 }: OwnerOrderDetailProps) {
+  const staff = await requireStaff();
+  if (staff.role.code !== "owner") {
+    notFound();
+  }
+
   const order = await getGuestOrderById(orderId);
   if (!order) {
     notFound();
@@ -79,6 +85,7 @@ export async function OwnerOrderDetail({
         confirmations={confirmations}
         order={order}
         returnTo={safeReturnTo}
+        staffDisplayName={staff.displayName}
         timeline={timeline}
       />
     </div>

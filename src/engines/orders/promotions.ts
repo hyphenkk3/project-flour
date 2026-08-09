@@ -13,6 +13,29 @@ export const RM10_CARD_CODE = "rm10_physical_card" as const;
 export const RM10_CARD_LABEL = "RM10 Discount Card";
 export const RM10_CARD_AMOUNT = -10;
 
+/**
+ * Redeemed RM10 physical card number from adjustment metadata.
+ * Written by redeem / change-to-RM10 RPCs as metadata.voucher_number.
+ */
+export function physicalVoucherNumberFromMetadata(
+  metadata: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!metadata || typeof metadata.voucher_number !== "string") return null;
+  const trimmed = metadata.voucher_number.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * Crew Order Message shorthand inside -RM10(...).
+ * Product: Voucher No.<actual card number> — never literal "xxx" or "RM10".
+ */
+export function crewRm10VoucherShorthand(
+  metadata: Record<string, unknown> | null | undefined,
+): string {
+  const number = physicalVoucherNumberFromMetadata(metadata);
+  return number ? `Voucher No.${number}` : "Voucher No.";
+}
+
 export type OrderSource =
   | "customer_website"
   | "jotform"

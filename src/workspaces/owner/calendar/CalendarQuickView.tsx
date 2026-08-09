@@ -26,12 +26,15 @@ import {
   guestOrderStatusLabel,
 } from "@/workspaces/owner/orders/labels";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
+import { OrderMessagesSection } from "@/workspaces/owner/orders/OrderMessagesSection";
 import { OrderOperationalControls } from "@/workspaces/owner/orders/OrderOperationalControls";
 
 type CalendarQuickViewProps = {
   orderId: string | null;
   /** Calendar path for View Order returnTo / rp=1 capture. */
   returnTo: string;
+  /** Default sender for Customer Ready Message. */
+  staffDisplayName: string;
   /**
    * Bumped when Calendar realtime/poll updates the open order so Quick View
    * can quietly refetch without an elaborate sync system.
@@ -43,6 +46,7 @@ type CalendarQuickViewProps = {
 export function CalendarQuickView({
   orderId,
   returnTo,
+  staffDisplayName,
   refreshKey = 0,
   onClose,
 }: CalendarQuickViewProps) {
@@ -109,7 +113,7 @@ export function CalendarQuickView({
     <dialog
       aria-labelledby={open ? titleId : undefined}
       aria-modal="true"
-      className="text-ink open:fixed open:inset-0 open:m-0 open:flex open:h-dvh open:max-h-dvh open:w-full open:max-w-none open:translate-x-0 open:translate-y-0 open:items-stretch open:justify-end open:border-0 open:bg-transparent open:p-0 open:shadow-none backdrop:bg-ink/40 z-50"
+      className="text-ink open:fixed open:inset-0 open:z-50 open:m-0 open:flex open:h-dvh open:max-h-dvh open:w-full open:max-w-none open:translate-x-0 open:translate-y-0 open:items-stretch open:justify-end open:overflow-hidden open:border-0 open:bg-transparent open:p-0 open:shadow-none backdrop:bg-ink/40"
       onCancel={(event) => {
         event.preventDefault();
         handleClose();
@@ -132,7 +136,7 @@ export function CalendarQuickView({
     >
       {open ? (
         <div
-          className="border-line flex h-full w-full max-w-full flex-col border-y-0 border-r-0 border-l bg-white shadow-xl sm:max-w-md"
+          className="border-line flex h-dvh max-h-dvh w-full max-w-full flex-col overflow-hidden border-y-0 border-r-0 border-l bg-white shadow-xl sm:ml-auto sm:w-full sm:max-w-md"
           // Keep sheet interactions from bubbling as dialog self-clicks.
           onClick={(event) => event.stopPropagation()}
         >
@@ -193,6 +197,7 @@ export function CalendarQuickView({
                   if (orderId) return load(orderId);
                 }}
                 order={order}
+                staffDisplayName={staffDisplayName}
               />
             ) : null}
           </div>
@@ -218,10 +223,12 @@ function CalendarQuickViewBody({
   order,
   loading,
   onRefresh,
+  staffDisplayName,
 }: {
   order: StorefrontOrder;
   loading: boolean;
   onRefresh: () => void | Promise<void>;
+  staffDisplayName: string;
 }) {
   const settlement = order.settlement;
   const effectiveAdjustments = getEffectiveAdjustments(order.adjustments);
@@ -248,9 +255,6 @@ function CalendarQuickViewBody({
             {" · "}
             {formatPickupTime(order.pickupTime)}
           </p>
-          {order.pickupInstruction ? (
-            <p className="text-ink pt-1 text-sm">{order.pickupInstruction}</p>
-          ) : null}
         </div>
       </section>
 
@@ -260,6 +264,8 @@ function CalendarQuickViewBody({
         pickedUpAt={order.pickedUpAt}
         readyAt={order.readyAt}
       />
+
+      <OrderMessagesSection order={order} staffDisplayName={staffDisplayName} />
 
       <section className="space-y-1">
         <h3 className="text-skyline text-[11px] font-semibold tracking-wide uppercase">

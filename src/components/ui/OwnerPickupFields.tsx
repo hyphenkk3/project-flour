@@ -14,18 +14,17 @@ const CUSTOM_VALUE = "__custom__";
 type OwnerPickupFieldsProps = {
   defaultDate?: string;
   defaultTime?: string;
-  defaultInstruction?: string | null;
   onDateChange?: (date: string) => void;
 };
 
 /**
  * Owner staff entry / edit: public slots plus any valid clock time.
  * Customer storefront continues to use PickupSlotFields (slots only).
+ * Free-text pickupInstruction is retired from Owner UI (legacy values remain in DB).
  */
 export function OwnerPickupFields({
   defaultDate,
   defaultTime,
-  defaultInstruction,
   onDateChange,
 }: OwnerPickupFieldsProps) {
   const minDate = earliestPickupDateYmd();
@@ -130,19 +129,6 @@ export function OwnerPickupFields({
       ) : null}
 
       <input name="pickup_time" type="hidden" value={effectiveTime} />
-
-      <FormField
-        help='Optional wording such as "Before 3pm". Does not replace pickup time.'
-        htmlFor="pickup_instruction"
-        label="Pickup instruction (optional)"
-      >
-        <FormInput
-          defaultValue={defaultInstruction ?? ""}
-          id="pickup_instruction"
-          name="pickup_instruction"
-          placeholder="Before 3pm, early collection…"
-        />
-      </FormField>
     </div>
   );
 }

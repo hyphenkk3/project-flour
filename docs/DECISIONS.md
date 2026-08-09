@@ -2,6 +2,124 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-09 — Pickup instruction retired from Owner UI (structured time only)
+
+Free-text `pickup_instruction` conventions such as “Before 3pm” are retired from
+Owner create/edit, Order Workspace Pickup display, and Calendar Quick View.
+
+Crew Order Message and Customer Confirmation use structured `pickupTime` only.
+
+**Historical:** `orders.pickup_instruction` column and existing values remain.
+Workspace Save preserves the stored value (field is not editable). New Owner
+orders create with `pickup_instruction = null`.
+
+Customer website does not expose this field. Ready Message GrabExpress
+“before 3:00pm” guidance is unrelated and unchanged.
+
+## 2026-08-09 — Milestone 3 Preview 3B · Messages + pre-confirmation finance (Product-tested)
+
+Preview 3B Product Tests **1–18: PASS.** Closed pending commit authorization.
+
+### Messages (pickup-only; copy for WhatsApp — no API / send tracking)
+
+- **Crew Order Message** — INTERNAL · CREW; temporarily editable; structured
+  `pickupTime`; shared financial equation + Crew-only payment suffix
+  (NYP / allocations / c/o). No Bakery Attention in Crew body.
+- **Customer Ready Message** — CUSTOMER; primary when Ready ●; secondary after
+  Picked Up ✓; sender defaults to authenticated staff `displayName` (temporary
+  override). GrabExpress “before 3:00pm” + day last-pickup times preserved.
+- **Customer Thank You Message** — CUSTOMER; primary when Picked Up ✓; exact
+  constant body (not editable).
+- Shared availability/priority + Message Preview (portaled); Quick View +
+  Order Workspace.
+
+### Pre-confirmation finance
+
+- Order Total / Adjustments on Submitted + Pending Confirmation.
+- Payment collection/history remains Awaiting Payment / Paid.
+- Customer Confirmation uses the same shared financial-equation calculator as
+  Crew (no Crew payment suffixes). RM10 shows `Voucher No.` from
+  `order_adjustments.metadata.voucher_number`.
+- Amount-due changes while Pending Confirmation keep existing stale /
+  needs-resend path.
+
+### Workspace / Ops refinements during 3B testing
+
+- Locked Workspace section hierarchy + Order Guide; Customer Notes hidden (DB
+  preserved); pickupInstruction UI retired; Operations order cards show source;
+  Delivery deferred (Option C — separate decision above).
+
+No migration for Preview 3B.
+
+## 2026-08-09 — Order Workspace hierarchy · Order Guide · Customer Notes hidden
+
+Owner Order Workspace section sequence locked to Whitebird processing flow:
+
+1. Customer → 2. Pickup → 3. Order → 4. Complimentary items →
+5. Order Total / Adjustments (Submitted / Pending Confirmation) **or**
+   Payment (Awaiting Payment / Paid) → 6. Collection → 7. Messages →
+8. Internal notes → 9. Bakery attention
+
+**Customer Notes** (`orders.customer_notes`) is hidden from the Owner Order
+Workspace UI only. Column and existing values remain intact; not migrated into
+Internal Notes. May be reconsidered if a real operational use case appears.
+
+**Order Guide** (permanent staff guidance on the Order section — not notes):
+
+- No wording on cakes or cake boards.
+- Customised cake decoration is not available.
+
+### Future consideration
+
+These ordering restrictions are frequently asked and may also need to surface
+on the **Customer website** preorder experience. Not implemented in this
+refinement — Owner Workspace only for now.
+
+## 2026-08-09 — Milestone 3 Preview 3B · Delivery deferred (Option C)
+
+Preview 3B Crew Message generators remain **pickup-only**.
+
+Delivery was audited against historical Whitebird Crew messages and current
+schema/DTO/settlement architecture. Product decision: **Option C** — Delivery
+requires a **separate future preview/foundation**, not inclusion inside 3B.
+
+### Why not 3B
+
+Truthful Delivery Crew messages need order-level data that guest/Owner
+Calendar flows do not yet expose or persist (recipient modes, address,
+notification preference, delivery/processing fees in settlement, Birthday Card
+as a paid add-on with written message, and Delivery lifecycle wording).
+
+`fulfilment_method` already includes `delivery` in the DB enum, but guest create
+paths hardcode `pickup` and Owner `StorefrontOrder` does not expose fulfilment.
+
+### Preserved Product requirements (future Delivery preview)
+
+- Header: `🟢🚗 Delivery Order: D/M (Day)`; unpaid `🔺🟢🚗…`
+  (`🟢` decorative; `🚗` delivery indicator; `🔺` payment incomplete only)
+- Modes: customer = recipient; customer ≠ recipient
+- Explicit recipient name + phone; delivery address; delivery time
+- Explicit `*DO NOT INFORM RECIPIENT (It’s A Surprise!)` vs
+  `*Inform Recipient before delivery` (never inferred)
+- Crew manually checks GrabExpress and **enters** delivery fee
+- Processing fee is part of Delivery financial truth
+- Fees must feed authoritative settlement (e.g. positive adjustments), not
+  message-only math; equation may include pf / df / promotions
+- Birthday Card = paid add-on/order concept, not Crew-message-owned data
+- Birthday Card written message = canonical order data (not notes dump)
+- Pickup-specific Customer Ready Message must **not** be used for Delivery
+- Generic Customer Thank You wording may be reusable
+- Operational lifecycle needs future Product design — “Picked Up” is
+  semantically wrong for completed Delivery (possible Ready /
+  Out for Delivery / Delivered — undecided)
+
+### Explicit non-goals for 3B
+
+No Delivery schema, UI, formatter branches, GrabExpress automation, or
+Birthday Card product work in Preview 3B.
+
+See also `docs/ROADMAP.md` (Milestone 3 — Delivery foundation deferred).
+
 ## 2026-08-09 — Milestone 3 Preview 3A-5 · Ready / Picked Up operations (Product-tested)
 
 Preview 3A-5 is closed. **16 / 16 Product tests PASS.**
@@ -88,10 +206,12 @@ No new migration for 3A-4. Frozen 3A-3 migration remains:
 ### Content (accepted)
 
 Customer display name + source/(crew), order number, status, pickup
-date/time/instruction, phone (or quiet “No phone number”), cake snapshots
-(name / size / qty), complimentary/prep when present, physical Include RECEIPT,
-Bakery Attention + note, payment summary (amount due / received / balance),
-effective RM10 (reversed not shown as active).
+date/time (structured `pickupTime` only — free-text instruction retired from
+Quick View UI; see 2026-08-09 pickup instruction retirement), phone (or quiet
+“No phone number”), cake snapshots (name / size / qty), complimentary/prep when
+present, physical Include RECEIPT, Bakery Attention + note, payment summary
+(amount due / received / balance), effective RM10 (reversed not shown as active).
+Preview 3B adds Messages (Crew / Ready / Thank You) via shared Order Messages UI.
 
 ### Dismissal
 
@@ -215,7 +335,10 @@ Applied migrations (do not amend):
 
 - One order = one pickup date.
 - `pickup_time` remains a sortable Postgres `time`.
-- Optional `pickup_instruction` is separate human-facing wording (e.g. “Before 3pm”).
+- Optional `pickup_instruction` column may still hold historical free-text
+  (e.g. older “Before 3pm” values). **Owner UI no longer creates or displays it**
+  (see 2026-08-09 pickup instruction retirement). Crew/Confirmation Time use
+  structured `pickupTime` only.
 - Owner may use any valid clock time; customer storefront remains public-slot-only.
 - Custom pickup does not auto-set Bakery Attention.
 
@@ -253,9 +376,10 @@ Applied migrations (do not amend):
 - Owner cake picker: Master Library `active` + `seasonal` via
   `listOfferableLibraryCakes()` — **not** Collection membership. Storefront
   Collection filtering unchanged; `collection_cakes` not mutated.
-- Owner pickup: any valid clock `pickup_time` (sortable); optional
-  `pickup_instruction` for wording like “Before 3pm”. Website checkout remains
-  public-slot-only. Does not auto-set Bakery Attention.
+- Owner pickup: any valid clock `pickup_time` (sortable). Optional
+  `pickup_instruction` may exist historically; Owner UI no longer exposes it
+  (see 2026-08-09 retirement). Website checkout remains public-slot-only. Does
+  not auto-set Bakery Attention.
 - No automatic August Promo / payment / confirmation on create.
 
 ## 2026-08-08 — Milestone 3 Preview 3A-1 · Operational foundation

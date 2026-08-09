@@ -1,3 +1,4 @@
+import { moneyCompare } from "@/engines/orders/money";
 import type { StorefrontOrder } from "@/types/storefront";
 
 /** Fields that appear in the customer-facing confirmation message. */
@@ -35,6 +36,14 @@ export function orderMateriallyAffectsConfirmation(
   if (beforeComp !== afterComp) return true;
 
   return false;
+}
+
+/** Amount due change that customers would have confirmed. */
+export function financialMateriallyAffectsConfirmation(
+  beforeAmountDue: number,
+  afterAmountDue: number,
+): boolean {
+  return moneyCompare(beforeAmountDue, afterAmountDue) !== 0;
 }
 
 function normalizeTime(value: string): string {

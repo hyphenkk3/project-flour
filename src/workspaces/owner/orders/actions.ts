@@ -3,10 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
-  buildConfirmationPayload,
+  buildConfirmationPayloadFromOrder,
   generateConfirmationMessage,
 } from "@/engines/orders/confirmation-message";
-import { orderMateriallyAffectsConfirmation } from "@/engines/orders/confirmation-validity";
+import {
+  financialMateriallyAffectsConfirmation,
+  orderMateriallyAffectsConfirmation,
+} from "@/engines/orders/confirmation-validity";
 import { reconcilePaymentLifecycleStatus } from "@/engines/orders/payment-status";
 import { isValidClockPickupTime, isValidPickupSlot } from "@/engines/business-calendar/pickup-slots";
 import { requireStaff } from "@/foundation/auth/session";
@@ -109,6 +112,85 @@ async function reconcileOrderStatusAfterFinancialChange(input: {
   return { error: null };
 }
 
+/**
+ * When amount due changes after Mark as Sent, outdate the sent confirmation
+ * and require resend — same pattern as material order edits.
+ */
+async function markPendingConfirmationStaleIfAmountChanged(input: {
+  orderId: string;
+  before: StorefrontOrder;
+  staffId: string;
+}): Promise<{ error: string | null }> {
+  if (input.before.status !== "pending_confirmation") {
+    return { error: null };
+  }
+
+  const after = await getGuestOrderById(input.orderId);
+  if (!after) {
+    return { error: "Order not found after update." };
+  }
+
+  if (
+    !financialMateriallyAffectsConfirmation(
+      input.before.settlement.amountDue,
+      after.settlement.amountDue,
+    )
+  ) {
+    return { error: null };
+  }
+
+  const supabase = await createClient();
+  const { data: latestSent } = await supabase
+    .from("order_confirmation_snapshots")
+    .select("id")
+    .eq("order_id", input.orderId)
+    .eq("lifecycle_status", "sent")
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestSent?.id) {
+    await supabase
+      .from("order_confirmation_snapshots")
+      .update({
+        lifecycle_status: "outdated",
+        outdated_at: new Date().toISOString(),
+      })
+      .eq("id", latestSent.id)
+      .eq("lifecycle_status", "sent");
+
+    await insertTimelineEvent({
+      orderId: input.orderId,
+      eventType: "confirmation_outdated",
+      actorStaffId: input.staffId,
+      metadata: {
+        reason: "financial_adjustment",
+        previous_amount_due: input.before.settlement.amountDue,
+        new_amount_due: after.settlement.amountDue,
+      },
+    });
+  }
+
+  await supabase
+    .from("orders")
+    .update({ confirmation_needs_resend: true })
+    .eq("id", input.orderId)
+    .is("customer_id", null);
+
+  revalidatePath(`/owner/orders/${input.orderId}/confirmation`);
+  return { error: null };
+}
+
+async function afterDiscountMutation(input: {
+  orderId: string;
+  before: StorefrontOrder;
+  staffId: string;
+}): Promise<{ error: string | null }> {
+  const reconcile = await reconcileOrderStatusAfterFinancialChange(input);
+  if (reconcile.error) return reconcile;
+  return markPendingConfirmationStaleIfAmountChanged(input);
+}
+
 function parseItemsFromForm(formData: FormData): Array<{
   cakeId: string;
   cakeSizeId: string;
@@ -183,9 +265,6 @@ export async function createStaffGuestOrderAction(
   const crewOrder = String(formData.get("crew_order") ?? "") === "1";
   const pickupDate = String(formData.get("pickup_date") ?? "").trim();
   const pickupTime = String(formData.get("pickup_time") ?? "").trim();
-  const pickupInstruction = String(
-    formData.get("pickup_instruction") ?? "",
-  ).trim();
   const includeReceipt = String(formData.get("include_receipt") ?? "") === "1";
   const needsAttention =
     String(formData.get("needs_bakery_attention") ?? "") === "1";
@@ -245,7 +324,8 @@ export async function createStaffGuestOrderAction(
     p_crew_order: crewOrder,
     p_pickup_date: pickupDate,
     p_pickup_time: pickupTime,
-    p_pickup_instruction: pickupInstruction || null,
+    /** Free-text pickup instruction retired from Owner UI — new orders leave null. */
+    p_pickup_instruction: null,
     p_items: draftItems.map((item) => ({
       cake_id: item.cakeId,
       cake_size_id: item.cakeSizeId,
@@ -303,9 +383,6 @@ export async function saveOrderWorkspaceAction(
   ).trim();
   const pickupDate = String(formData.get("pickup_date") ?? "").trim();
   const pickupTime = String(formData.get("pickup_time") ?? "").trim();
-  const pickupInstruction = String(
-    formData.get("pickup_instruction") ?? "",
-  ).trim();
   const customerNotes = String(formData.get("customer_notes") ?? "").trim();
   const internalNotes = String(formData.get("internal_notes") ?? "").trim();
   const draftItems = parseItemsFromForm(formData);
@@ -466,10 +543,8 @@ export async function saveOrderWorkspaceAction(
       bakery_attention_note: needsAttention ? attentionNote || null : null,
       pickup_date: pickupDate,
       pickup_time: pickupTime,
-      pickup_instruction:
-        nextSource === "customer_website"
-          ? before.pickupInstruction
-          : pickupInstruction || null,
+      /** Preserve historical free-text; Owner UI no longer edits this field. */
+      pickup_instruction: before.pickupInstruction,
       customer_notes: customerNotes || null,
       internal_notes: internalNotes || null,
       updated_by: staff.id,
@@ -648,23 +723,9 @@ export async function markConfirmationSentAction(
     return { error: "This order cannot receive a confirmation send right now." };
   }
 
-  const payload = buildConfirmationPayload({
+  const payload = buildConfirmationPayloadFromOrder({
+    order,
     staffCustomerFacingName: staff.displayName,
-    customerName: order.customerName,
-    customerPhone: order.phone,
-    pickupDate: order.pickupDate,
-    pickupTime: order.pickupTime,
-    items: order.items.map((item) => ({
-      cakeName: item.cakeName,
-      sizeLabel: item.sizeLabel,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-    })),
-    complimentaryItems: order.complimentaryItems.map((item) => ({
-      name: item.name,
-      quantity: item.quantity,
-    })),
-    total: order.total,
   });
   const messageBody = generateConfirmationMessage(payload);
   const isUpdated = order.status === "pending_confirmation";
@@ -1035,7 +1096,7 @@ export async function applyAugustPromoAction(
     return { error: error.message };
   }
 
-  const reconcile = await reconcileOrderStatusAfterFinancialChange({
+  const reconcile = await afterDiscountMutation({
     orderId,
     before: order,
     staffId: staff.id,
@@ -1101,7 +1162,7 @@ export async function redeemRm10VoucherAction(
     return { error: error.message, success: false };
   }
 
-  const reconcile = await reconcileOrderStatusAfterFinancialChange({
+  const reconcile = await afterDiscountMutation({
     orderId,
     before: order,
     staffId: staff.id,
@@ -1140,7 +1201,7 @@ export async function removeOrderDiscountAction(
     return { error: error.message };
   }
 
-  const reconcile = await reconcileOrderStatusAfterFinancialChange({
+  const reconcile = await afterDiscountMutation({
     orderId,
     before: order,
     staffId: staff.id,
@@ -1201,7 +1262,7 @@ export async function changeAugustPromoToRm10Action(
     return { error: error.message, success: false };
   }
 
-  const reconcile = await reconcileOrderStatusAfterFinancialChange({
+  const reconcile = await afterDiscountMutation({
     orderId,
     before: order,
     staffId: staff.id,

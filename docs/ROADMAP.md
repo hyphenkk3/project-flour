@@ -123,8 +123,26 @@
 - Statuses: Submitted → Waiting Customer Confirmation.
 - Production workflow only; no payment, membership, or other workspaces.
 
+## Milestone 3 — Delivery foundation (deferred; after Preview 3B)
+
+**Not in Preview 3B.** Product decision 2026-08-09 (Option C): Delivery needs a
+dedicated future preview/foundation. Recorded requirements live in
+`docs/DECISIONS.md` (Preview 3B · Delivery deferred).
+
+Preview 3B Crew / Ready / Thank You messages remain **pickup-focused**.
+
+Do not start Delivery schema/UI until that preview is authorised.
+
+## Later — Customer website Order Guide (consideration)
+
+Whitebird ordering restrictions (no wording on cakes/boards; no customised
+decoration) are shown as permanent Order Guide on Owner Order Workspace.
+Consider surfacing the same guidance on the customer preorder experience when
+Product authorises that work. See `docs/DECISIONS.md`.
+
 ## Sprint 3+ — Later
 
 - Core engines
 - Workspace implementations
 - Business rules as configurable engine-owned logic
+- Delivery foundation (see above) when scheduled

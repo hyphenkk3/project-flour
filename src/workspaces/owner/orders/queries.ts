@@ -273,6 +273,7 @@ function mapListItem(row: OrderRow): StorefrontOrderListItem {
     status: order.status,
     createdAt: order.createdAt,
     confirmationNeedsResend: order.confirmationNeedsResend,
+    orderSource: order.orderSource,
     readyAt: order.readyAt,
     pickedUpAt: order.pickedUpAt,
   };

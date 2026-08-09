@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  buildConfirmationPayload,
+  buildConfirmationPayloadFromOrder,
   generateConfirmationMessage,
 } from "@/engines/orders/confirmation-message";
 import { buildWhatsAppDeepLink } from "@/engines/orders/whatsapp";
@@ -42,23 +42,9 @@ export function ConfirmationPreview({
     back.label === "Whole Cake Calendar" ? back.href : null,
   );
 
-  const payload = buildConfirmationPayload({
+  const payload = buildConfirmationPayloadFromOrder({
+    order,
     staffCustomerFacingName: staffDisplayName,
-    customerName: order.customerName,
-    customerPhone: order.phone,
-    pickupDate: order.pickupDate,
-    pickupTime: order.pickupTime,
-    items: order.items.map((item) => ({
-      cakeName: item.cakeName,
-      sizeLabel: item.sizeLabel,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-    })),
-    complimentaryItems: order.complimentaryItems.map((item) => ({
-      name: item.name,
-      quantity: item.quantity,
-    })),
-    total: order.total,
   });
   const message = generateConfirmationMessage(payload);
   const whatsappUrl = buildWhatsAppDeepLink(order.phone, message);

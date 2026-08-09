@@ -48,6 +48,8 @@ type WholeCakeCalendarProps = {
   /** True only for Order Workspace ← Whole Cake Calendar (rp=1). */
   restorePosition: boolean;
   initialEntries: CalendarEntry[];
+  /** Default sender for Customer Ready Message. */
+  staffDisplayName: string;
 };
 
 type OrderRowPayload = {
@@ -79,6 +81,7 @@ export function WholeCakeCalendar({
   focusToday,
   restorePosition,
   initialEntries,
+  staffDisplayName,
 }: WholeCakeCalendarProps) {
   const [entries, setEntries] = useState(initialEntries);
   const [quickViewOrderId, setQuickViewOrderId] = useState<string | null>(null);
@@ -334,6 +337,7 @@ export function WholeCakeCalendar({
         orderId={quickViewOrderId}
         refreshKey={quickViewRefreshKey}
         returnTo={calendarReturnTo}
+        staffDisplayName={staffDisplayName}
       />
     </div>
   );
