@@ -24,6 +24,7 @@ import {
 } from "@/workspaces/owner/calendar/CalendarMatrixView";
 import { CalendarMonthGrid } from "@/workspaces/owner/calendar/CalendarMonthGrid";
 import { CalendarMonthHeader } from "@/workspaces/owner/calendar/CalendarMonthHeader";
+import { CalendarQuickView } from "@/workspaces/owner/calendar/CalendarQuickView";
 import {
   buildMonthDateColumns,
   buildMonthGrid,
@@ -80,6 +81,10 @@ export function WholeCakeCalendar({
   initialEntries,
 }: WholeCakeCalendarProps) {
   const [entries, setEntries] = useState(initialEntries);
+  const [quickViewOrderId, setQuickViewOrderId] = useState<string | null>(null);
+  const [quickViewRefreshKey, setQuickViewRefreshKey] = useState(0);
+  const quickViewOrderIdRef = useRef<string | null>(null);
+  quickViewOrderIdRef.current = quickViewOrderId;
   const todayYmd = singaporeTodayParts().ymd;
   const cells = useMemo(
     () => buildMonthGrid(year, month, todayYmd),
@@ -129,6 +134,9 @@ export function WholeCakeCalendar({
         return;
       }
       upsertEntry(entry);
+      if (quickViewOrderIdRef.current === id) {
+        setQuickViewRefreshKey((key) => key + 1);
+      }
     },
     [loadEntry, removeEntry, upsertEntry],
   );
@@ -308,19 +316,25 @@ export function WholeCakeCalendar({
           matrixHref={matrixHref}
           mode={matrixMode}
           month={month}
+          onOpenQuickView={setQuickViewOrderId}
           onOrderReturnMatrixApplied={clearOrderReturnMatrix}
           orderReturnMatrixScrollLeft={orderReturnMatrixScrollLeft}
-          returnTo={calendarReturnTo}
           year={year}
         />
       ) : (
         <CalendarMonthGrid
           cells={cells}
           entries={entries}
-          returnTo={calendarReturnTo}
+          onOpenQuickView={setQuickViewOrderId}
           view={view}
         />
       )}
+      <CalendarQuickView
+        onClose={() => setQuickViewOrderId(null)}
+        orderId={quickViewOrderId}
+        refreshKey={quickViewRefreshKey}
+        returnTo={calendarReturnTo}
+      />
     </div>
   );
 }

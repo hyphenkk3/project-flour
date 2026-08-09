@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { CalendarGuide } from "@/workspaces/owner/calendar/CalendarGuide";
-import { captureCalendarReturnPosition } from "@/workspaces/owner/calendar/calendar-return-position";
 import { buildCalendarMatrix } from "@/workspaces/owner/calendar/matrix";
 import type { CalendarDayCell } from "@/workspaces/owner/calendar/month-grid";
 import { singaporeTodayParts } from "@/workspaces/owner/calendar/month-grid";
@@ -12,7 +11,6 @@ import type {
   CalendarEntry,
   CalendarMatrixMode,
 } from "@/workspaces/owner/calendar/types";
-import { ownerOrderWorkspaceHref } from "@/workspaces/owner/navigation/return-to";
 import { guestOrderStatusTextClass } from "@/workspaces/owner/orders/labels";
 
 type CalendarMatrixViewProps = {
@@ -24,8 +22,8 @@ type CalendarMatrixViewProps = {
   /** When true, force horizontal position to Today (e.g. Today button). */
   focusToday: boolean;
   matrixHref: (mode: CalendarMatrixMode) => string;
-  /** Calendar URL for Order Workspace return navigation. */
-  returnTo: string;
+  /** Open Calendar Quick View for this order (Matrix Customers only). */
+  onOpenQuickView: (orderId: string) => void;
   /**
    * One-shot Order Workspace return horizontal restore.
    * Wins over automatic Today for this mount only.
@@ -129,7 +127,7 @@ export function CalendarMatrixView({
   month,
   focusToday,
   matrixHref,
-  returnTo,
+  onOpenQuickView,
   orderReturnMatrixScrollLeft = null,
   onOrderReturnMatrixApplied,
 }: CalendarMatrixViewProps) {
@@ -205,9 +203,6 @@ export function CalendarMatrixView({
     router,
   ]);
 
-  function handleOrderNavigate() {
-    captureCalendarReturnPosition(returnTo);
-  }
   return (
     <div className="space-y-4">
       <div
@@ -339,7 +334,7 @@ export function CalendarMatrixView({
                                   : customer.displayName;
                               return (
                                 <li key={customer.orderId}>
-                                  <Link
+                                  <button
                                     className={[
                                       guestOrderStatusTextClass(customer.status),
                                       customer.needsBakeryAttention
@@ -348,17 +343,16 @@ export function CalendarMatrixView({
                                       customer.hasEffectiveRm10
                                         ? "line-through"
                                         : "",
-                                      "block leading-snug hover:underline",
+                                      "block w-full cursor-pointer text-left leading-snug hover:underline",
                                     ].join(" ")}
-                                    href={ownerOrderWorkspaceHref(
-                                      customer.orderId,
-                                      returnTo,
-                                    )}
-                                    onClick={handleOrderNavigate}
+                                    onClick={() =>
+                                      onOpenQuickView(customer.orderId)
+                                    }
                                     title={label}
+                                    type="button"
                                   >
                                     {label}
-                                  </Link>
+                                  </button>
                                 </li>
                               );
                             })}

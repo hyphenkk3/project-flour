@@ -2,10 +2,70 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-09 — Milestone 3 Preview 3A-4 · Calendar Quick View (Product-tested)
+
+Preview 3A-4 is closed. Owner Calendar Quick View is Product-approved.
+Preview 3A-5 (Ready / Picked Up UI) has **not** started.
+
+No new migration for 3A-4. Frozen 3A-3 migration remains:
+- `20260808100000_preview3a3_calendar_item_sync_realtime.sql` (do not amend)
+
+### Purpose / boundary
+
+- Read-only operational overlay so Owner can inspect an order from Calendar
+  without leaving the month board.
+- Deeper work uses **View Order** → existing Owner Order Workspace.
+- No payment / discount mutation controls in Quick View.
+
+### Entry points
+
+- Matrix **Customers**, **Cakes**, and **Orders** open Quick View.
+- Matrix **Totals** stays aggregate-only (no single-order click).
+
+### Architecture
+
+- Calendar stays mounted; Quick View is a right-side sheet (`<dialog>`).
+- On open: `getCalendarQuickViewOrderAction` → existing `getGuestOrderById`
+  (one targeted fetch). Month Calendar read model stays slim.
+- Reuses settlement truth, effective adjustments, complimentary rows,
+  source/crew helpers, StatusBadge / guest-order status helpers.
+
+### Content (accepted)
+
+Customer display name + source/(crew), order number, status, pickup
+date/time/instruction, phone (or quiet “No phone number”), cake snapshots
+(name / size / qty), complimentary/prep when present, physical Include RECEIPT,
+Bakery Attention + note, payment summary (amount due / received / balance),
+effective RM10 (reversed not shown as active).
+
+### Dismissal
+
+- ×, Escape, and dimmed-backdrop click close Quick View.
+- Clicks inside the white sheet do not close it.
+- Closing does not navigate or remount Calendar; document Y, Matrix X,
+  month, view, and Matrix Customers/Totals mode are preserved.
+
+### View Order / return
+
+Calendar → Quick View → View Order → Order Workspace → ← Whole Cake Calendar
+uses existing `returnTo` / `rp=1` exact Y + Matrix X restoration (3A-3).
+
+### Status colours (visual only; revisitable)
+
+During 3A-4, shared status-token contrast was strengthened for scanning.
+**Current implemented colours are retained for now** and may be revised in a
+future Product visual pass. This is not a lifecycle/domain change — status
+enums, meanings, and payment logic stay as in 3A-3.
+
+### Out of scope (deferred)
+
+- Ready / Picked Up UI (3A-5), EXTRA, Collection categories, Bakery workspace
+  activation, Crew WhatsApp generation, POS, permissions/RLS redesign
+
 ## 2026-08-08 — Milestone 3 Preview 3A-3 · Whole Cake Calendar (Product-tested)
 
 Preview 3A-3 is closed. Owner-only Whole Cake Calendar at `/owner/calendar`.
-Preview 3A-4 has **not** started.
+Preview 3A-4 Quick View closed separately (see above).
 
 Applied migration (do not amend):
 - `20260808100000_preview3a3_calendar_item_sync_realtime.sql`
@@ -61,7 +121,7 @@ Applied migration (do not amend):
 
 ### Out of scope (deferred)
 
-- Ready / Picked Up UI, Quick View, EXTRA, Collection categories, Bakery
+- Ready / Picked Up UI, EXTRA, Collection categories, Bakery
   workspace activation, Crew WhatsApp, POS, permissions/RLS redesign
 
 ## 2026-08-08 — Milestone 3 Preview 3A-1/2 · Closed checkpoint (Product-tested)

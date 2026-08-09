@@ -45,8 +45,9 @@ import {
   formatPickupTime,
   formatTimelineDateTime,
   guestOrderRequiresPhone,
+  guestOrderStatusBadgeClassName,
+  guestOrderStatusBadgeTone,
   guestOrderStatusLabel,
-  guestOrderStatusTone,
   isGuestOrderEditable,
   orderSourceLabel,
   STAFF_GUEST_ORDER_SOURCES,
@@ -254,8 +255,9 @@ export function OrderWorkspaceForm({
       <div className="space-y-6">
         <div className="flex flex-wrap items-center gap-3">
           <StatusBadge
+            className={guestOrderStatusBadgeClassName(order.status)}
             label={guestOrderStatusLabel(order.status)}
-            tone={guestOrderStatusTone(order.status)}
+            tone={guestOrderStatusBadgeTone(order.status)}
           />
           <p className="text-skyline text-sm">{order.orderNumber}</p>
         </div>
@@ -468,8 +470,9 @@ export function OrderWorkspaceForm({
 
       <div className="flex flex-wrap items-center gap-3">
         <StatusBadge
+          className={guestOrderStatusBadgeClassName(order.status)}
           label={guestOrderStatusLabel(order.status)}
-          tone={guestOrderStatusTone(order.status)}
+          tone={guestOrderStatusBadgeTone(order.status)}
         />
         <p className="text-skyline text-sm">{order.orderNumber}</p>
       </div>

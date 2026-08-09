@@ -7,15 +7,21 @@
   --color-skyline: #3d5a73;
   --color-signal: #2f6f6a;
 
-  /* Status tones — Foundation Pack 1 */
-  --color-status-info: #2f5f8a;
-  --color-status-info-soft: #e8f0f7;
-  --color-status-success: #2f6b4f;
-  --color-status-success-soft: #e7f3ec;
-  --color-status-warning: #9a5b24;
-  --color-status-warning-soft: #f8efe4;
-  --color-status-progress: #5c4a7a;
-  --color-status-progress-soft: #efeaf5;
+  /* Status tones — Whitebird operational readability.
+     Guest-order lifecycle (via guestOrderStatusTone):
+       warning = Submitted (amber) · info = Pending Confirmation (blue) ·
+       progress = Awaiting Payment (operational red) · success remains green for
+       generic positive UI; Paid renders black via guest-order-specific classes.
+     Danger = errors/exceptions only — distinct from Awaiting Payment red. */
+  --color-status-info: #1a6bb5;
+  --color-status-info-soft: #e0effc;
+  --color-status-success: #1a7a45;
+  --color-status-success-soft: #def5e8;
+  --color-status-warning: #c45c0a;
+  --color-status-warning-soft: #ffefd9;
+  /* Operational Awaiting Payment red — brighter than danger/error. */
+  --color-status-progress: #d32f2f;
+  --color-status-progress-soft: #fdecea;
   --color-status-danger: #8a3a3a;
   --color-status-danger-soft: #f7e8e8;
 }

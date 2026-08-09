@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { CalendarDayCell } from "@/workspaces/owner/calendar/month-grid";
 import { WEEKDAY_HEADERS } from "@/workspaces/owner/calendar/month-grid";
@@ -13,8 +12,6 @@ import type {
   CalendarEntry,
   CalendarViewMode,
 } from "@/workspaces/owner/calendar/types";
-import { captureCalendarReturnPosition } from "@/workspaces/owner/calendar/calendar-return-position";
-import { ownerOrderWorkspaceHref } from "@/workspaces/owner/navigation/return-to";
 
 const ORDERS_COLLAPSED_VISIBLE = 4;
 const CAKES_COLLAPSED_VISIBLE = 5;
@@ -23,8 +20,7 @@ type CalendarMonthGridProps = {
   cells: CalendarDayCell[];
   entries: CalendarEntry[];
   view: Exclude<CalendarViewMode, "matrix">;
-  /** Calendar URL for Order Workspace return navigation. */
-  returnTo: string;
+  onOpenQuickView: (orderId: string) => void;
 };
 
 type CakeLine = {
@@ -37,7 +33,7 @@ export function CalendarMonthGrid({
   cells,
   entries,
   view,
-  returnTo,
+  onOpenQuickView,
 }: CalendarMonthGridProps) {
   const byDate = useMemo(() => {
     const map = new Map<string, CalendarEntry[]>();
@@ -66,7 +62,7 @@ export function CalendarMonthGrid({
                 cell={cell}
                 entries={byDate.get(cell.ymd) ?? []}
                 key={cell.ymd}
-                returnTo={returnTo}
+                onOpenQuickView={onOpenQuickView}
                 view={view}
               />
             ))}
@@ -101,12 +97,12 @@ function CalendarDayCellView({
   cell,
   entries,
   view,
-  returnTo,
+  onOpenQuickView,
 }: {
   cell: CalendarDayCell;
   entries: CalendarEntry[];
   view: CalendarViewMode;
-  returnTo: string;
+  onOpenQuickView: (orderId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const cakeLines = useMemo(() => cakeLinesForEntries(entries), [entries]);
@@ -150,18 +146,18 @@ function CalendarDayCellView({
         <ul className="space-y-0.5">
           {visibleOrders.map((entry) => (
             <li key={entry.id}>
-              <Link
+              <button
                 className={[
                   calendarCustomerSignalClass(entry),
-                  "block w-full truncate text-left text-[11px] leading-snug hover:underline sm:text-xs",
+                  "block w-full cursor-pointer truncate text-left text-[11px] leading-snug hover:underline sm:text-xs",
                   cell.inMonth ? "" : "opacity-50",
                 ].join(" ")}
-                href={ownerOrderWorkspaceHref(entry.id, returnTo)}
-                onClick={() => captureCalendarReturnPosition(returnTo)}
+                onClick={() => onOpenQuickView(entry.id)}
                 title={entry.displayName}
+                type="button"
               >
                 {entry.displayName}
-              </Link>
+              </button>
             </li>
           ))}
         </ul>
@@ -172,21 +168,21 @@ function CalendarDayCellView({
             const title = `${cakeLabel} — ${line.entry.displayName}`;
             return (
               <li key={line.key}>
-                <Link
+                <button
                   className={[
-                    "block w-full text-left text-[10px] leading-snug hover:underline sm:text-[11px]",
+                    "block w-full cursor-pointer text-left text-[10px] leading-snug hover:underline sm:text-[11px]",
                     cell.inMonth ? "" : "opacity-50",
                   ].join(" ")}
-                  href={ownerOrderWorkspaceHref(line.entry.id, returnTo)}
-                  onClick={() => captureCalendarReturnPosition(returnTo)}
+                  onClick={() => onOpenQuickView(line.entry.id)}
                   title={title}
+                  type="button"
                 >
                   <span className="text-ink">{cakeLabel}</span>
                   <span className="text-zinc-500"> — </span>
                   <span className={calendarCustomerSignalClass(line.entry)}>
                     {line.entry.displayName}
                   </span>
-                </Link>
+                </button>
               </li>
             );
           })}

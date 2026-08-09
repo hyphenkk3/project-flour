@@ -79,7 +79,7 @@ export function PaymentSection({
           Payment
         </h2>
         {isPaid ? (
-          <p className="text-status-success text-xs font-semibold tracking-wide uppercase">
+          <p className="text-ink text-xs font-semibold tracking-wide uppercase">
             Paid · Preorder Secured
           </p>
         ) : overdue ? (

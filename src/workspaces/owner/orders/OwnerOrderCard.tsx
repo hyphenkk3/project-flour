@@ -2,8 +2,9 @@ import Link from "next/link";
 import { formatDdMmYyyy } from "@/lib/dates";
 import {
   formatPickupTime,
+  guestOrderStatusBadgeClassName,
+  guestOrderStatusBadgeTone,
   guestOrderStatusLabel,
-  guestOrderStatusTone,
 } from "@/workspaces/owner/orders/labels";
 import type { StorefrontOrderListItem } from "@/types/storefront";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -48,8 +49,9 @@ export function OwnerOrderCard({
           ) : null}
         </div>
         <StatusBadge
+          className={guestOrderStatusBadgeClassName(order.status)}
           label={guestOrderStatusLabel(order.status)}
-          tone={guestOrderStatusTone(order.status)}
+          tone={guestOrderStatusBadgeTone(order.status)}
         />
       </div>
     </Link>

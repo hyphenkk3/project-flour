@@ -28,9 +28,13 @@ export function isGuestOrderEditable(
 }
 
 /**
- * Semantic Operations status colors (text remains the primary signal).
- * Submitted → amber · pending confirmation → blue · awaiting payment → purple · paid → green.
- * Reserve danger/red for genuine exceptions (e.g. overdue payment copy), not a new status.
+ * Semantic guest-order status → shared StatusTone keys (architecture unchanged).
+ * Visual Whitebird scheme:
+ *   Submitted → amber (warning)
+ *   Pending Confirmation → blue (info)
+ *   Awaiting Payment → operational red (progress) — not danger/error
+ *   Paid → black/ink (success key kept; badge/text use guest-order overrides)
+ * Reserve danger/red-muted for genuine exceptions, not awaiting_payment.
  */
 export function guestOrderStatusTone(
   status: StorefrontOrder["status"],
@@ -47,23 +51,43 @@ export function guestOrderStatusTone(
   }
 }
 
-/** Text colour classes matching guestOrderStatusTone / Operations semantics. */
+/**
+ * StatusBadge display tone. Paid uses neutral + ink classes so global
+ * success green (Library / Toast / storefront) is not forced black.
+ */
+export function guestOrderStatusBadgeTone(
+  status: StorefrontOrder["status"],
+): StatusTone {
+  if (status === "paid") return "neutral";
+  return guestOrderStatusTone(status);
+}
+
+/** Extra StatusBadge classes for Whitebird Paid = black treatment. */
+export function guestOrderStatusBadgeClassName(
+  status: StorefrontOrder["status"],
+): string {
+  if (status === "paid") {
+    return "bg-zinc-100 text-ink ring-ink/20";
+  }
+  return "";
+}
+
+/**
+ * Calendar / Guide customer-name colours — Whitebird operational scheme.
+ * Paid uses ink (black); Awaiting Payment uses progress (operational red).
+ */
 export function guestOrderStatusTextClass(
   status: StorefrontOrder["status"],
 ): string {
-  switch (guestOrderStatusTone(status)) {
-    case "warning":
+  switch (status) {
+    case "submitted":
       return "text-status-warning";
-    case "info":
+    case "pending_confirmation":
       return "text-status-info";
-    case "progress":
+    case "awaiting_payment":
       return "text-status-progress";
-    case "success":
-      return "text-status-success";
-    case "danger":
-      return "text-status-danger";
-    case "neutral":
-      return "text-zinc-700";
+    case "paid":
+      return "text-ink";
   }
 }
 
