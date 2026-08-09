@@ -40,6 +40,7 @@ import {
   type OrderWorkspaceSaveState,
 } from "@/workspaces/owner/orders/actions";
 import { CustomerConfirmedButton } from "@/workspaces/owner/orders/CustomerConfirmedButton";
+import { OrderOperationalControls } from "@/workspaces/owner/orders/OrderOperationalControls";
 import { PaymentSection } from "@/workspaces/owner/orders/PaymentSection";
 import {
   formatPickupTime,
@@ -325,6 +326,18 @@ export function OrderWorkspaceForm({
               </p>
             ) : null}
           </div>
+        </ViewBlock>
+
+        <ViewBlock title="Collection">
+          <OrderOperationalControls
+            compact
+            onSuccess={() => {
+              router.refresh();
+            }}
+            orderId={order.id}
+            pickedUpAt={order.pickedUpAt}
+            readyAt={order.readyAt}
+          />
         </ViewBlock>
 
         <ViewBlock title="Complimentary items">
@@ -693,6 +706,21 @@ export function OrderWorkspaceForm({
         ) : (
           <input name="pickup_month_override" type="hidden" value="0" />
         )}
+      </section>
+
+      <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
+        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
+          Collection
+        </h2>
+        <OrderOperationalControls
+          compact
+          onSuccess={() => {
+            router.refresh();
+          }}
+          orderId={order.id}
+          pickedUpAt={order.pickedUpAt}
+          readyAt={order.readyAt}
+        />
       </section>
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">

@@ -12,6 +12,7 @@ import type {
   CalendarMatrixMode,
 } from "@/workspaces/owner/calendar/types";
 import { guestOrderStatusTextClass } from "@/workspaces/owner/orders/labels";
+import { withOperationalMarker } from "@/engines/orders/operational-state";
 
 type CalendarMatrixViewProps = {
   columns: CalendarDayCell[];
@@ -328,10 +329,17 @@ export function CalendarMatrixView({
                         ) : (
                           <ul className="space-y-0.5">
                             {cell.customers.map((customer) => {
+                              const nameWithMarker = withOperationalMarker(
+                                customer.displayName,
+                                {
+                                  readyAt: customer.readyAt,
+                                  pickedUpAt: customer.pickedUpAt,
+                                },
+                              );
                               const label =
                                 customer.quantity > 1
-                                  ? `${customer.displayName} ×${customer.quantity}`
-                                  : customer.displayName;
+                                  ? `${nameWithMarker} ×${customer.quantity}`
+                                  : nameWithMarker;
                               return (
                                 <li key={customer.orderId}>
                                   <button

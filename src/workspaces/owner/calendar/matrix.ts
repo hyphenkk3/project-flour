@@ -9,6 +9,8 @@ export type MatrixCustomerEntry = {
   status: CalendarEntry["status"];
   needsBakeryAttention: boolean;
   hasEffectiveRm10: boolean;
+  readyAt: string | null;
+  pickedUpAt: string | null;
 };
 
 export type MatrixCell = {
@@ -117,6 +119,8 @@ export function buildCalendarMatrix(
           status: entry.status,
           needsBakeryAttention: entry.needsBakeryAttention,
           hasEffectiveRm10: entry.hasEffectiveRm10,
+          readyAt: entry.readyAt,
+          pickedUpAt: entry.pickedUpAt,
         });
       }
     }

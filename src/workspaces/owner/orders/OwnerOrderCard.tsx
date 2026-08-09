@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatDdMmYyyy } from "@/lib/dates";
+import { operationalMarkerFromTimestamps } from "@/engines/orders/operational-state";
 import {
   formatPickupTime,
   guestOrderStatusBadgeClassName,
@@ -22,6 +23,10 @@ export function OwnerOrderCard({
     order.additionalItemCount > 0
       ? `${order.cakeName} · ${order.sizeLabel} + ${order.additionalItemCount} more`
       : `${order.cakeName} · ${order.sizeLabel}`;
+  const marker = operationalMarkerFromTimestamps({
+    readyAt: order.readyAt,
+    pickedUpAt: order.pickedUpAt,
+  });
 
   return (
     <Link
@@ -35,6 +40,7 @@ export function OwnerOrderCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <p className="text-ink truncate text-base font-semibold">
+            {marker ? `${marker} ` : ""}
             {order.customerName}
           </p>
           <p className="text-ink text-sm">{cakeLine}</p>

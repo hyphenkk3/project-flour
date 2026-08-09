@@ -2,10 +2,64 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-09 — Milestone 3 Preview 3A-5 · Ready / Picked Up operations (Product-tested)
+
+Preview 3A-5 is closed. **16 / 16 Product tests PASS.**
+
+Owner-only collection lifecycle UI on top of the 3A-1 foundation
+(`ready_at` / `ready_by` / `picked_up_at` / `picked_up_by` + existing RPCs /
+Owner actions / timeline events). No new migration for 3A-5.
+
+Frozen migrations remain unamended (including
+`20260808100000_preview3a3_calendar_item_sync_realtime.sql`).
+
+### Domain rule
+
+Ready / Picked Up is **operational collection state**, independent of
+financial `order_status`. Valid combinations include Awaiting Payment + Ready,
+Awaiting Payment + Picked Up, Paid + Not Ready, Paid + Ready, Paid + Picked Up.
+Mutations do **not** change payment, confirmation, discounts, or order_status.
+
+### Operational rules (Product-approved)
+
+- States: **Not Ready** → **Ready** → **Picked Up** (with direct Not Ready →
+  Picked Up allowed).
+- **Ready is NOT required** before Mark Picked Up.
+- **Undo Ready** is unavailable in UI and blocked by RPC while Picked Up.
+- **Undo Picked Up** preserves prior `ready_at` / `ready_by`:
+  - Ready → Picked Up → Undo → Ready
+  - Not Ready → Picked Up → Undo → Not Ready
+- Timeline retains staff actor (`order_marked_ready`, `order_ready_undone`,
+  `order_picked_up`, `order_picked_up_undone`).
+
+### Surfaces
+
+- **Primary mutations:** Calendar Quick View Collection controls + Order
+  Workspace Collection controls (shared `OrderOperationalControls` +
+  `operational-state` helper).
+- **Calendar markers:** ● = Ready · ✓ = Picked Up · Picked Up wins (never both)
+  on Matrix Customers, Cakes, Orders. Matrix **Totals** stays quantity-only.
+- **Calendar Guide** documents ● / ✓ with existing status / bold / RM10 notes.
+- **Operations cards:** read-only ● / ✓ only — no Ready/Picked Up mutations.
+- Quick View mutations keep Calendar mounted and preserve document Y / Matrix X;
+  Calendar markers refresh via existing orders Realtime (+ poll fallback).
+
+### Access
+
+- All Ready / Picked Up mutations remain **Owner-only** for this preview
+  (`requireOwner` + guest-order RPCs).
+- Bakery / Counter workspace activation and role permissions are **not**
+  enabled in 3A-5.
+
+### Out of scope (deferred)
+
+- Bakery / Counter activation, EXTRA, Crew WhatsApp automation, POS,
+  permissions/RLS redesign, status-colour redesign
+
 ## 2026-08-09 — Milestone 3 Preview 3A-4 · Calendar Quick View (Product-tested)
 
 Preview 3A-4 is closed. Owner Calendar Quick View is Product-approved.
-Preview 3A-5 (Ready / Picked Up UI) has **not** started.
+Preview 3A-5 Ready / Picked Up closed separately (see above).
 
 No new migration for 3A-4. Frozen 3A-3 migration remains:
 - `20260808100000_preview3a3_calendar_item_sync_realtime.sql` (do not amend)
@@ -15,7 +69,8 @@ No new migration for 3A-4. Frozen 3A-3 migration remains:
 - Read-only operational overlay so Owner can inspect an order from Calendar
   without leaving the month board.
 - Deeper work uses **View Order** → existing Owner Order Workspace.
-- No payment / discount mutation controls in Quick View.
+- No payment / discount mutation controls in Quick View (3A-5 adds collection
+  Ready/Picked Up mutations only).
 
 ### Entry points
 
@@ -59,8 +114,8 @@ enums, meanings, and payment logic stay as in 3A-3.
 
 ### Out of scope (deferred)
 
-- Ready / Picked Up UI (3A-5), EXTRA, Collection categories, Bakery workspace
-  activation, Crew WhatsApp generation, POS, permissions/RLS redesign
+- EXTRA, Collection categories, Bakery workspace activation, Crew WhatsApp
+  generation, POS, permissions/RLS redesign
 
 ## 2026-08-08 — Milestone 3 Preview 3A-3 · Whole Cake Calendar (Product-tested)
 

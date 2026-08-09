@@ -38,6 +38,14 @@ export function CalendarGuide() {
           <p className="text-ink/80 font-medium">Notation</p>
           <ul className="space-y-0.5">
             <li>
+              <span className="text-ink">●</span>
+              {" = Ready"}
+            </li>
+            <li>
+              <span className="text-ink">✓</span>
+              {" = Picked Up"}
+            </li>
+            <li>
               <span className="text-ink font-bold">Bold</span>
               {" = Needs attention"}
             </li>
@@ -49,7 +57,7 @@ export function CalendarGuide() {
         </div>
       </div>
       <p className="mt-2 text-[11px] text-zinc-500">
-        Same status colours as Operations. Tap a line to open Order Workspace.
+        Same status colours as Operations. Tap a line to open Quick View.
       </p>
     </aside>
   );

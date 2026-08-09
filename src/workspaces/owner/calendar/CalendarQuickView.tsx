@@ -26,6 +26,7 @@ import {
   guestOrderStatusLabel,
 } from "@/workspaces/owner/orders/labels";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
+import { OrderOperationalControls } from "@/workspaces/owner/orders/OrderOperationalControls";
 
 type CalendarQuickViewProps = {
   orderId: string | null;
@@ -186,7 +187,13 @@ export function CalendarQuickView({
             ) : null}
 
             {order ? (
-              <CalendarQuickViewBody loading={loading} order={order} />
+              <CalendarQuickViewBody
+                loading={loading}
+                onRefresh={() => {
+                  if (orderId) return load(orderId);
+                }}
+                order={order}
+              />
             ) : null}
           </div>
 
@@ -210,9 +217,11 @@ export function CalendarQuickView({
 function CalendarQuickViewBody({
   order,
   loading,
+  onRefresh,
 }: {
   order: StorefrontOrder;
   loading: boolean;
+  onRefresh: () => void | Promise<void>;
 }) {
   const settlement = order.settlement;
   const effectiveAdjustments = getEffectiveAdjustments(order.adjustments);
@@ -244,6 +253,13 @@ function CalendarQuickViewBody({
           ) : null}
         </div>
       </section>
+
+      <OrderOperationalControls
+        onSuccess={onRefresh}
+        orderId={order.id}
+        pickedUpAt={order.pickedUpAt}
+        readyAt={order.readyAt}
+      />
 
       <section className="space-y-1">
         <h3 className="text-skyline text-[11px] font-semibold tracking-wide uppercase">

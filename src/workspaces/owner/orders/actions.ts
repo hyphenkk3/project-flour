@@ -1217,7 +1217,7 @@ export async function changeAugustPromoToRm10Action(
 }
 
 // ---------------------------------------------------------------------------
-// Milestone 3 Preview 3A-1 — Ready / Picked Up (Owner-only foundation; no UI yet)
+// Milestone 3 Preview 3A-5 — Ready / Picked Up (Owner operational UI)
 // Narrow RPCs only. Does not mutate items, adjustments, payments, or financial status.
 // ---------------------------------------------------------------------------
 
@@ -1241,6 +1241,7 @@ export async function markOrderReadyAction(
   }
 
   revalidatePath("/owner");
+  revalidatePath("/owner/calendar");
   revalidatePath(`/owner/orders/${orderId}`);
   return { error: null };
 }
@@ -1265,6 +1266,7 @@ export async function undoOrderReadyAction(
   }
 
   revalidatePath("/owner");
+  revalidatePath("/owner/calendar");
   revalidatePath(`/owner/orders/${orderId}`);
   return { error: null };
 }
@@ -1289,6 +1291,7 @@ export async function markOrderPickedUpAction(
   }
 
   revalidatePath("/owner");
+  revalidatePath("/owner/calendar");
   revalidatePath(`/owner/orders/${orderId}`);
   return { error: null };
 }
@@ -1313,6 +1316,7 @@ export async function undoOrderPickedUpAction(
   }
 
   revalidatePath("/owner");
+  revalidatePath("/owner/calendar");
   revalidatePath(`/owner/orders/${orderId}`);
   return { error: null };
 }

@@ -173,6 +173,8 @@ export type StorefrontOrderListItem = {
   status: GuestOrderStatus;
   createdAt: string;
   confirmationNeedsResend: boolean;
+  readyAt: string | null;
+  pickedUpAt: string | null;
 };
 
 export type OrderTimelineEventType =

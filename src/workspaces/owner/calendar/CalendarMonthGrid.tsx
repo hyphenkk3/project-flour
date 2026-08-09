@@ -12,6 +12,7 @@ import type {
   CalendarEntry,
   CalendarViewMode,
 } from "@/workspaces/owner/calendar/types";
+import { withOperationalMarker } from "@/engines/orders/operational-state";
 
 const ORDERS_COLLAPSED_VISIBLE = 4;
 const CAKES_COLLAPSED_VISIBLE = 5;
@@ -144,28 +145,38 @@ function CalendarDayCellView({
 
       {view === "orders" ? (
         <ul className="space-y-0.5">
-          {visibleOrders.map((entry) => (
-            <li key={entry.id}>
-              <button
-                className={[
-                  calendarCustomerSignalClass(entry),
-                  "block w-full cursor-pointer truncate text-left text-[11px] leading-snug hover:underline sm:text-xs",
-                  cell.inMonth ? "" : "opacity-50",
-                ].join(" ")}
-                onClick={() => onOpenQuickView(entry.id)}
-                title={entry.displayName}
-                type="button"
-              >
-                {entry.displayName}
-              </button>
-            </li>
-          ))}
+          {visibleOrders.map((entry) => {
+            const label = withOperationalMarker(entry.displayName, {
+              readyAt: entry.readyAt,
+              pickedUpAt: entry.pickedUpAt,
+            });
+            return (
+              <li key={entry.id}>
+                <button
+                  className={[
+                    calendarCustomerSignalClass(entry),
+                    "block w-full cursor-pointer truncate text-left text-[11px] leading-snug hover:underline sm:text-xs",
+                    cell.inMonth ? "" : "opacity-50",
+                  ].join(" ")}
+                  onClick={() => onOpenQuickView(entry.id)}
+                  title={label}
+                  type="button"
+                >
+                  {label}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <ul className="space-y-1">
           {visibleCakes.map((line) => {
             const cakeLabel = formatCakeLabel(line.item);
-            const title = `${cakeLabel} — ${line.entry.displayName}`;
+            const customerLabel = withOperationalMarker(line.entry.displayName, {
+              readyAt: line.entry.readyAt,
+              pickedUpAt: line.entry.pickedUpAt,
+            });
+            const title = `${cakeLabel} — ${customerLabel}`;
             return (
               <li key={line.key}>
                 <button
@@ -180,7 +191,7 @@ function CalendarDayCellView({
                   <span className="text-ink">{cakeLabel}</span>
                   <span className="text-zinc-500"> — </span>
                   <span className={calendarCustomerSignalClass(line.entry)}>
-                    {line.entry.displayName}
+                    {customerLabel}
                   </span>
                 </button>
               </li>
