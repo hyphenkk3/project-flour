@@ -2,6 +2,50 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-09 — Milestone 3 CLOSED · Milestone 4 NEXT (roadmap lock)
+
+Product-approved roadmap reconciliation after Preview 3B.
+
+### Milestone 3 — Owner Pickup Operations
+
+**STATUS: COMPLETE**
+
+- Checkpoint: `ab55cfac1413b5f683dca9e6f4450922e033d279`
+- Preview 3B Product Tests **1–18: PASS**
+- Owner **pickup** operational loop is closed (submit → review → pre-confirmation
+  discounts → confirmation → payment → calendar → Ready → Crew/Ready messages →
+  Picked Up → Thank You). Staff guest create, edit-through-payment, complimentary,
+  source on Ops cards, Internal Notes, Bakery Attention, confirmation invalidation,
+  and timeline are in scope for this completion.
+- Delivery, EXTRA, real Bakery/Counter activation, WhatsApp automation, refunds UI,
+  and POS remain **future** — they do not keep Milestone 3 open.
+- Preview 3B required **no** migration.
+
+### Milestone 4 — Delivery & Order Fulfilment Foundation
+
+**STATUS: NEXT** · Implementation not started.
+
+Locked Product-testable preview sequence (do not reorder without Product approval):
+
+1. **M4-P1 — Paid Order Add-ons** — reusable paid non-cake add-ons; first concrete
+   Product implementation is **Birthday Card** (e.g. RM3(BC)) with structured written
+   message. Not Delivery-only; not complimentary; not a speculative full add-on catalog.
+2. **M4-P2 — Fulfilment & Delivery Order Model** — Pickup vs Delivery on Owner/guest
+   path; recipient modes; address; Inform vs DO NOT INFORM / surprise (structured).
+3. **M4-P3 — Delivery Fees & Settlement** — processing fee + crew-entered delivery fee
+   after GrabExpress check; authoritative settlement/equations.
+4. **M4-P4 — Delivery Crew Message** — copy-ready Delivery Crew messages from P1–P3 truth.
+5. **M4-P5 — Delivery Lifecycle & Customer Messaging** — Delivery ops + customer messaging.
+
+**Dependency:** Paid add-ons (P1) before core Delivery model (P2+).
+
+**Not locked yet:** Delivery lifecycle terminology (e.g. Out for Delivery / Delivered).
+Decide during M4-P5 Product design/review. Pickup “Picked Up” and Pickup Ready copy
+must not be reused for Delivery without Product review.
+
+Planning overview: `docs/ROADMAP.md`. Detailed Delivery requirements remain in the
+earlier Preview 3B Delivery deferred (Option C) decision.
+
 ## 2026-08-09 — Pickup instruction retired from Owner UI (structured time only)
 
 Free-text `pickup_instruction` conventions such as “Before 3pm” are retired from
@@ -18,7 +62,9 @@ Customer website does not expose this field. Ready Message GrabExpress
 
 ## 2026-08-09 — Milestone 3 Preview 3B · Messages + pre-confirmation finance (Product-tested)
 
-Preview 3B Product Tests **1–18: PASS.** Closed pending commit authorization.
+Preview 3B Product Tests **1–18: PASS.** Committed at checkpoint
+`ab55cfac1413b5f683dca9e6f4450922e033d279` (Milestone 3 closed — see
+roadmap lock decision above).
 
 ### Messages (pickup-only; copy for WhatsApp — no API / send tracking)
 

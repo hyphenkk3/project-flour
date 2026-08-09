@@ -1,148 +1,151 @@
-# Roadmap
+# Project Flour Roadmap
 
-## Sprint 1 — Application foundation (current)
+Authoritative planning view for **where we are**, **what is complete**, **what is next**, and **what comes later**.
 
-- Next.js (App Router)
-- TypeScript (strict)
-- Tailwind CSS
-- Project folder structure under `src/`
-- Basic homepage
-- ESLint + Prettier
-- Local build
-- Vercel deployment
+Detailed business rules, message formats, financial/lifecycle rationale, and historical Product decisions live in [`docs/DECISIONS.md`](./DECISIONS.md).
 
-## Sprint 2 / Task 002 — Staff login
+---
 
-- Supabase Auth + PostgreSQL schema (`roles`, `staff_profiles`)
-- Username + password login
-- Session via `@supabase/ssr`
-- Minimal authenticated Home
-- Dev Owner seed (`npm run seed:dev`)
+## Where We Are
 
-## V0.1.1 — Application shell
+- **Product checkpoint:** `ab55cfac1413b5f683dca9e6f4450922e033d279`
+- **Milestone 3 — Owner Pickup Operations:** **COMPLETE**
+- **Preview 3B Product Tests 1–18:** PASS
+- **Next:** Milestone 4 — Delivery & Order Fulfilment Foundation (not started)
+- Local `main` may be ahead of `origin/main`; do not assume this checkpoint is pushed.
 
-- Reusable authenticated AppShell
-- Role-aware workspace navigation (Home only active)
-- Mobile bottom navigation + desktop sidebar
+---
 
-## V0.2 Preview 1 — Customer Foundation
+## Completed
 
-- Customer Operations: customers, addresses, search
-- Orders / Timeline placeholders for V0.3
+### Platform Foundations
 
-## Foundation Pack 1 — Shared UI infrastructure
+- Sprint 1 — Application foundation (Next.js App Router, TypeScript, Tailwind, `src/` layout)
+- Staff login (Supabase Auth, roles, staff profiles)
+- Authenticated application shell (role-aware navigation)
+- Foundation Pack 1 — Shared UI primitives
+- Foundation Sprint A — Master Library (`/library` cakes, promotions, vouchers, assets)
 
-- Breadcrumb, toast, confirm dialog, status badge
-- Shared empty state, skeletons, form controls, page section
-- Date helpers + status design tokens
-- No Orders; Customers left unchanged
+### Early Product / Mock Era
 
-## V0.3 Preview 1 — Order Foundation (Sprint 1.1)
+Mock/preview prototypes only — **not** live Bakery or Collection workspace activation:
 
-- Orders entity + Customer Operations Orders routes
-- Create / list / search / detail / confirm / payment status
-- No products, Bakery, Collection, or Timeline
+- V0.2 — Customer Operations customers/addresses foundation
+- V0.3 — Customer Operations order foundation (member orders)
+- ENG-002A / V0.4 — Customer website homepage, browse, detail, mock order journey
+- V0.5-P5→P11 — Connected mock journey (Customer Operations → Bakery → Collection prototypes)
 
-## ENG-002A — Customer website homepage (Sprint 2.1)
+### Milestone 1 — First Order
 
-- Public `/` is the Whitebird customer homepage (order experience entry).
-- Not an ecommerce shop; Browse / Order Journey / Fresh Picks pages deferred.
-- Fresh Picks card uses mock `FRESH_PICKS_DEMO` for four UI states.
-- Staff login remains at `/login`.
+- Live guest preorder on customer website → Owner Operations
+- Statuses through Submitted → Waiting Customer Confirmation (production path)
 
-## V0.4-P2 — Browse Cakes
+### Milestone 2 — Customer Confirmation
 
-- Public `/browse` inspiration gallery (Available Now + Whitebird Classics).
-- Mock cake data only; no search, filters, or backend.
-- View Details links to Cake Detail (`/browse/[id]`).
+- Multi-cake guest preorders, complimentary items, confirmation snapshots
+- Prepare Confirmation → WhatsApp handoff → Waiting Customer Confirmation → Customer Confirmed → Awaiting Payment
 
-## V0.4-P3 — Cake Detail
+### Milestone 3 — Owner Pickup Operations
 
-- Public `/browse/[id]` decision page (story, flavour, sizes, price, availability).
-- Mock detail data; Start This Celebration → `/order`.
-- No payment, WhatsApp, or backend.
+**STATUS: COMPLETE** · Checkpoint: `ab55cfac`
 
-## V0.4-P4 — Basic Order Journey
+Completed Owner **pickup** operational loop:
 
-- Public `/order` preorder form + `/order/thank-you` (mock only).
-- Customer details, collection method, date/time, summary.
-- No payment, Supabase, WhatsApp, or customer accounts.
+Customer submission → Owner review → pre-confirmation pricing/discounts → Customer Confirmation → Awaiting Payment → payment verification → Paid / Preorder Secured → Whole Cake Calendar → Quick View → Ready → Crew Order Message → Customer Ready Message → Picked Up → Customer Thank You Message
 
-## V0.5-P5 — Customer Operations Preview 1
+Also includes staff-created guest orders, order editing through the payment lifecycle, complimentary items, Ops source visibility, Internal Notes, Bakery Attention, confirmation invalidation, and timeline/history.
 
-- Public product prototype at `/preview/customer-operations`.
-- One click-through workflow: Needs Review → Order Workspace → Send Confirmation → Waiting for Customer.
-- Mock data only; no backend, persistence, payment, Bakery, or Management.
+| Preview | Focus |
+|---|---|
+| Preview 1 | Payment foundation |
+| Preview 2 | Discounts + Operations usability / post-payment amendment lifecycle |
+| Preview 3A-1/2 | Operational foundation + staff-created guest orders |
+| Preview 3A-3 | Whole Cake Calendar |
+| Preview 3A-4 | Calendar Quick View |
+| Preview 3A-5 | Ready / Picked Up UI |
+| Preview 3B | Crew / Ready / Thank You messages (copy-only) + pre-confirmation finance |
 
-## V0.5-P5a — Customer Operations Polish
+**Explicitly not part of Milestone 3 completion:** Delivery, EXTRA, real Bakery/Counter activation, WhatsApp automation, refunds UI, POS.
 
-- Same preview workflow; experience-only refinement.
-- Official work statuses, dual collection language, Order Health, warmer RNA + relationship card.
-- No Payment, Bakery, backend, or persistence.
+See `docs/DECISIONS.md` (Milestone 3 Preview entries, including Preview 3B).
 
-## V0.5-P6 — Payment Request Workflow
+---
 
-- Preview only: Waiting for Customer → Confirmed → Awaiting Payment → payment message preview → Mark as Sent.
-- Read-only payment summary (RM). No receipt upload, verification, refunds, or Bakery.
+## Current / Next
 
-## V0.5-P7 — Payment Verification Workflow
+### Milestone 4 — Delivery & Order Fulfilment Foundation
 
-- Preview only: Awaiting Payment → receipt submitted → review receipt → Verify Payment → Ready for Bakery.
-- Mock receipt review. No gateway, QR, persistence, Bakery, or Counter.
+**STATUS: NEXT** · Implementation **not started**.
 
-## V0.5-P8 — Bakery Workspace Preview 1
+Not one giant Delivery drop. Five Product-testable previews, in locked order:
 
-- Public prototype at `/preview/bakery`.
-- Today’s Production board → order workspace → Start Production → Mark Ready → Ready for Counter.
-- Visual packing checklist before Mark Ready. Mock data only.
+#### M4-P1 — Paid Order Add-ons
 
-## V0.5-P9 — Counter Workspace Preview 1
+- Reusable paid **non-cake** add-on capability.
+- **First Product implementation:** Birthday Card (e.g. `Birthday Card x1` / `RM3(BC)`).
+- Architecture reusable for future paid add-ons — **not** a speculative full add-on catalog in P1.
+- Birthday Card is **not** Delivery-only (Pickup orders can purchase it).
+- Birthday Card is **not** complimentary; complimentary items remain separate.
+- Written Birthday Card message = **structured order data** (not Customer/Internal/Bakery/Delivery notes).
+- **Dependency lock:** M4-P1 before core Delivery model (P2+).
 
-- Public prototype at `/preview/collection` (workspace name: Collection).
-- Desk board → arrive → verify order → mark collected → completed.
-- Mock data only. No Management, backend, or persistence.
+#### M4-P2 — Fulfilment & Delivery Order Model
 
-## V0.5-P10 — Connected Order Journey
+- Pickup vs Delivery on the real Owner/guest preorder path.
+- Structured fulfilment truth; customer = recipient **or** ≠ recipient.
+- Recipient name/phone; structured delivery address.
+- Explicit recipient communication preference: Inform Recipient vs DO NOT INFORM RECIPIENT / surprise (never inferred from notes).
+- Establishes structured order truth — **not** Delivery Crew Message formatting (that is P4).
 
-- Public hub at `/preview` connects Website → Customer Operations → Bakery → Collection.
-- One mock preorder (Amy · Chocolate D’Amour). URL `step` only. No Management.
+#### M4-P3 — Delivery Fees & Settlement
 
-## V0.5-P11 — Experience Polish
+- Processing fee + delivery fee in authoritative settlement and financial equations.
+- Crew checks GrabExpress, then **enters** the delivery fee (no scraping / auto-fetch).
+- Promotions/discounts continue to reconcile correctly.
+- Positive `order_adjustments` remain an engineering recommendation until P3 design confirms — not ROADMAP-locked architecture.
 
-- Same connected journey. No new features, no Management, no Whitebird Studio.
-- Stay on Amy’s celebration after actions. Clearer handoffs and hierarchy.
+#### M4-P4 — Delivery Crew Message
 
-## Foundation Sprint A — Master Library
+- Copy-ready Delivery Crew Order Messages from structured truth (P1–P3).
+- Supports Delivery Order header, orderer/recipient/phones/address/time, cakes, paid Birthday Card + written message, fees, discounts, payment/NYP/c/o truth, complimentary, Include RECEIPT, Inform / DO NOT INFORM footers.
+- Exact formatter rules and examples: `docs/DECISIONS.md`.
 
-- Staff `/library` CRUD for cakes, promotions, vouchers, and assets.
-- Reusable business objects for future Studio. No Collection Builder.
+#### M4-P5 — Delivery Lifecycle & Customer Messaging
 
-## Milestone 1 — First Order
+- Delivery operational journey + Delivery-appropriate customer messaging.
+- Pickup “Picked Up” terminology is inappropriate for Delivery.
+- Pickup Customer Ready Message must not be reused without Product review.
+- **Lifecycle names (e.g. Out for Delivery / Delivered) are NOT locked** — decided during P5 Product design/review.
 
-- Guest preorder on customer website → Owner dashboard → Confirm Order.
-- Statuses: Submitted → Waiting Customer Confirmation.
-- Production workflow only; no payment, membership, or other workspaces.
+**Locked sequence:** M4-P1 → M4-P2 → M4-P3 → M4-P4 → M4-P5.
 
-## Milestone 3 — Delivery foundation (deferred; after Preview 3B)
+---
 
-**Not in Preview 3B.** Product decision 2026-08-09 (Option C): Delivery needs a
-dedicated future preview/foundation. Recorded requirements live in
-`docs/DECISIONS.md` (Preview 3B · Delivery deferred).
+## Future
 
-Preview 3B Crew / Ready / Thank You messages remain **pickup-focused**.
+Product-approved deferred domains (not next unless Product reorders):
 
-Do not start Delivery schema/UI until that preview is authorised.
+- EXTRA / walk-in Hold and recording workflow
+- Real Bakery workspace activation (beyond V0.5 mocks)
+- Real Counter / Collection workspace activation (beyond V0.5 mocks)
+- Refunds / overpayment / payment-correction workflows
+- WhatsApp automation (send API / tracking) — messages remain copy-only until then
+- Email / preorder submission-receipt provider
+- Promotions administration / Business Settings (beyond temporary August Promo rules)
+- POS checkout / completion
 
-## Later — Customer website Order Guide (consideration)
+Details and rationale: `docs/DECISIONS.md`.
 
-Whitebird ordering restrictions (no wording on cakes/boards; no customised
-decoration) are shown as permanent Order Guide on Owner Order Workspace.
-Consider surfacing the same guidance on the customer preorder experience when
-Product authorises that work. See `docs/DECISIONS.md`.
+---
 
-## Sprint 3+ — Later
+## Ideas / Considerations
 
-- Core engines
-- Workspace implementations
-- Business rules as configurable engine-owned logic
-- Delivery foundation (see above) when scheduled
+- **Customer website Order Guide** — surface Owner Order Guide rules on the customer preorder experience (“No wording on cakes or cake boards.” / “Customised cake decoration is not available.”). **Not required before M4.**
+
+---
+
+## Technical Debt
+
+- ESLint reports approximately **20** `react-hooks/set-state-in-effect` findings (pre-existing and some dialog/preview patterns).
+- Build and Product-tested Milestone 3 flows are green.
+- Maintenance debt only — **does not block Milestone 4**; not a Product milestone.
