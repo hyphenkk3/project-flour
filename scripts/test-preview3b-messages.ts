@@ -120,6 +120,7 @@ function baseOrder(overrides: Partial<StorefrontOrder> = {}): StorefrontOrder {
         complimentaryItemTypeId: null,
       },
     ],
+    paidAddons: [],
     total: 135,
     adjustments: [],
     paymentAllocations: [

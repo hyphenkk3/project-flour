@@ -16,7 +16,8 @@ export type PaymentRequestAdjustmentLine = {
 };
 
 export type PaymentRequestPayload = {
-  cakeSubtotal: number;
+  /** Commercial subtotal (cakes + paid add-ons) before adjustments. */
+  commercialSubtotal: number;
   amountDue: number;
   /** Verified net received for this order (allocations − refunds). */
   netReceived: number;
@@ -79,7 +80,7 @@ export function paymentRequestCollectAmount(payload: {
  * Financial block only — no order recap.
  *
  * First request (nothing received), with adjustments:
- *   Cake Total: RM135
+ *   Order Total: RM135
  *   August Promo: -RM20
  *   Amount: RM115
  *
@@ -87,19 +88,19 @@ export function paymentRequestCollectAmount(payload: {
  *   Amount: RM135
  *
  * Outstanding balance (prior payment), with adjustments:
- *   Cake Total / adjustments / Amount Due / Payment Received / Balance to Pay
+ *   Order Total / adjustments / Amount Due / Payment Received / Balance to Pay
  *
  * Outstanding balance, no adjustments:
- *   Cake Total / Payment Received / Balance to Pay
+ *   Order Total / Payment Received / Balance to Pay
  */
 export function formatPaymentRequestAmountBlock(payload: {
-  cakeSubtotal: number;
+  commercialSubtotal: number;
   amountDue: number;
   netReceived: number;
   remainingBalance: number;
   adjustments: PaymentRequestAdjustmentLine[];
 }): string {
-  const cakeTotalLabel = formatOrderTotal(payload.cakeSubtotal);
+  const orderTotalLabel = formatOrderTotal(payload.commercialSubtotal);
   const amountDueLabel = formatOrderTotal(payload.amountDue);
   const receivedLabel = formatOrderTotal(payload.netReceived);
   const balanceLabel = formatOrderTotal(
@@ -116,14 +117,14 @@ export function formatPaymentRequestAmountBlock(payload: {
 
     if (payload.adjustments.length === 0) {
       return (
-        `Cake Total: ${cakeTotalLabel}\n` +
+        `Order Total: ${orderTotalLabel}\n` +
         `Payment Received: ${receivedLabel}\n` +
         `Balance to Pay: ${balanceLabel}`
       );
     }
 
     return (
-      `Cake Total: ${cakeTotalLabel}\n` +
+      `Order Total: ${orderTotalLabel}\n` +
       `${adjustmentLines}\n` +
       `Amount Due: ${amountDueLabel}\n` +
       `Payment Received: ${receivedLabel}\n` +
@@ -143,7 +144,7 @@ export function formatPaymentRequestAmountBlock(payload: {
     .join("\n");
 
   return (
-    `Cake Total: ${cakeTotalLabel}\n` +
+    `Order Total: ${orderTotalLabel}\n` +
     `${adjustmentLines}\n` +
     `Amount: ${amountDueLabel}`
   );
@@ -195,7 +196,7 @@ export function generatePaymentRequestMessage(
 }
 
 export function buildPaymentRequestPayload(input: {
-  cakeSubtotal: number;
+  commercialSubtotal: number;
   amountDue: number;
   netReceived: number;
   remainingBalance: number;
@@ -203,7 +204,7 @@ export function buildPaymentRequestPayload(input: {
   method: PaymentRequestMethod;
 }): PaymentRequestPayload {
   return {
-    cakeSubtotal: input.cakeSubtotal,
+    commercialSubtotal: input.commercialSubtotal,
     amountDue: input.amountDue,
     netReceived: input.netReceived,
     remainingBalance: input.remainingBalance,

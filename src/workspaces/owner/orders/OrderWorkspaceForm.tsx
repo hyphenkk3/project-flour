@@ -27,10 +27,17 @@ import {
   describeTimelineActor,
   timelineEventLabel,
 } from "@/engines/orders/timeline";
+import { shouldOfferUpdatedConfirmationAction } from "@/engines/orders/confirmation-validity";
+import {
+  buildEditablePaidAddonDrafts,
+  paidAddonDraftsToMutationPayload,
+  type EditablePaidAddonDraft,
+} from "@/engines/orders/paid-addons";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type {
   ConfirmationSnapshot,
   OrderTimelineEvent,
+  PaidAddonType,
   StorefrontCake,
   StorefrontOrder,
 } from "@/types/storefront";
@@ -42,6 +49,7 @@ import {
 import { CustomerConfirmedButton } from "@/workspaces/owner/orders/CustomerConfirmedButton";
 import { OrderMessagesSection } from "@/workspaces/owner/orders/OrderMessagesSection";
 import { OrderOperationalControls } from "@/workspaces/owner/orders/OrderOperationalControls";
+import { OrderPaidAddonsEditor } from "@/workspaces/owner/orders/OrderPaidAddonsEditor";
 import { PaymentSection } from "@/workspaces/owner/orders/PaymentSection";
 import { OrderTotalAdjustmentsSection } from "@/workspaces/owner/orders/OrderTotalAdjustmentsSection";
 import {
@@ -80,6 +88,7 @@ type OrderWorkspaceFormProps = {
   order: StorefrontOrder;
   cakes: StorefrontCake[];
   complimentaryOptions: CollectionComplimentaryOption[];
+  paidAddonCatalog: PaidAddonType[];
   timeline: OrderTimelineEvent[];
   confirmations: ConfirmationSnapshot[];
   /** Validated Calendar return path, or null for Operations default. */
@@ -127,6 +136,7 @@ export function OrderWorkspaceForm({
   order,
   cakes,
   complimentaryOptions,
+  paidAddonCatalog,
   timeline,
   confirmations,
   returnTo = null,
@@ -145,6 +155,9 @@ export function OrderWorkspaceForm({
   const [editItems, setEditItems] = useState<EditableItem[]>([]);
   const [editComplimentary, setEditComplimentary] = useState<
     EditableComplimentary[]
+  >([]);
+  const [editPaidAddons, setEditPaidAddons] = useState<
+    EditablePaidAddonDraft[]
   >([]);
 
   const canEdit = isGuestOrderEditable(order.status);
@@ -212,6 +225,13 @@ export function OrderWorkspaceForm({
           })),
       );
     }
+
+    setEditPaidAddons(
+      buildEditablePaidAddonDrafts({
+        catalog: paidAddonCatalog,
+        existing: order.paidAddons ?? [],
+      }),
+    );
   }
 
   function enterEditMode() {
@@ -270,9 +290,15 @@ export function OrderWorkspaceForm({
     [editComplimentary],
   );
 
+  const paidAddonsJson = useMemo(
+    () => JSON.stringify(paidAddonDraftsToMutationPayload(editPaidAddons)),
+    [editPaidAddons],
+  );
+
   const activeComplimentary = order.complimentaryItems.filter(
     (item) => item.quantity > 0,
   );
+  const orderPaidAddons = order.paidAddons ?? [];
 
   if (mode === "view") {
     return (
@@ -294,7 +320,7 @@ export function OrderWorkspaceForm({
 
         {order.confirmationNeedsResend ? (
           <p className="border-status-warning/30 bg-status-warning-soft text-status-warning rounded-lg border px-4 py-3 text-sm">
-            Confirmation needs to be resent
+            Previous confirmation is outdated — customer reconfirmation required
           </p>
         ) : null}
 
@@ -341,6 +367,49 @@ export function OrderWorkspaceForm({
             Total · {formatRm(order.total)}
           </p>
           <OrderGuideCallout />
+        </ViewBlock>
+
+        <ViewBlock title="Add-ons">
+          {orderPaidAddons.length === 0 ? (
+            <p className="text-skyline text-sm">No add-ons.</p>
+          ) : (
+            <ul className="space-y-3">
+              {orderPaidAddons.map((addon) => {
+                const visibleMessages = (addon.messages ?? [])
+                  .filter((m) => Boolean(m.writtenMessage?.trim()))
+                  .sort((a, b) => a.cardIndex - b.cardIndex);
+                // Legacy single-message fallback before child rows exist.
+                if (
+                  visibleMessages.length === 0 &&
+                  addon.writtenMessage?.trim()
+                ) {
+                  visibleMessages.push({
+                    cardIndex: 1,
+                    writtenMessage: addon.writtenMessage.trim(),
+                  });
+                }
+                return (
+                  <li key={addon.id}>
+                    <p className="text-ink font-medium">
+                      {addon.name} ×{addon.quantity}
+                    </p>
+                    <p className="text-skyline text-sm">
+                      {formatRm(addon.unitPrice)}/pc
+                    </p>
+                    {visibleMessages.length > 0 ? (
+                      <ul className="text-ink mt-1 space-y-0.5 text-sm">
+                        {visibleMessages.map((m) => (
+                          <li key={`${addon.id}-${m.cardIndex}`}>
+                            Card {m.cardIndex}: {m.writtenMessage?.trim()}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </ViewBlock>
 
         <ViewBlock title="Complimentary items">
@@ -435,8 +504,10 @@ export function OrderWorkspaceForm({
             </Link>
           ) : null}
 
-          {order.status === "pending_confirmation" &&
-          order.confirmationNeedsResend ? (
+          {shouldOfferUpdatedConfirmationAction({
+            status: order.status,
+            confirmationNeedsResend: order.confirmationNeedsResend,
+          }) ? (
             <Link
               className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium"
               href={withOwnerReturnTo(
@@ -506,6 +577,7 @@ export function OrderWorkspaceForm({
     <form action={formAction} className="space-y-6" key={formKey}>
       <input name="items_json" type="hidden" value={itemsJson} />
       <input name="complimentary_json" type="hidden" value={complimentaryJson} />
+      <input name="paid_addons_json" type="hidden" value={paidAddonsJson} />
 
       <div className="flex flex-wrap items-center gap-3">
         <StatusBadge
@@ -732,6 +804,17 @@ export function OrderWorkspaceForm({
           })}
         </ul>
         <OrderGuideCallout />
+      </section>
+
+      <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
+        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
+          Add-ons
+        </h2>
+        <OrderPaidAddonsEditor
+          drafts={editPaidAddons}
+          onChange={setEditPaidAddons}
+          preferSnapshotPrice
+        />
       </section>
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">

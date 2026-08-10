@@ -53,8 +53,11 @@ export type AugustPromoEligibilityInput = {
   orderDate: string;
   /** Pickup date YYYY-MM-DD */
   pickupDate: string;
-  /** Cake item subtotal before adjustments */
-  subtotal: number;
+  /**
+   * Whole-cake subtotal only (order_items snapshots).
+   * Must NOT include paid add-ons. Threshold: strictly greater than RM100.
+   */
+  cakeSubtotal: number;
   hasAugustPromo: boolean;
   hasRm10Card: boolean;
   hasVerifiedPayments: boolean;
@@ -89,7 +92,7 @@ export function evaluateAugustPromoEligibility(
 export function evaluateAugustPromoRuleFit(
   input: Pick<
     AugustPromoEligibilityInput,
-    "orderSource" | "orderDate" | "pickupDate" | "subtotal"
+    "orderSource" | "orderDate" | "pickupDate" | "cakeSubtotal"
   >,
 ): EligibilityResult {
   if (input.orderSource !== "customer_website") {
@@ -111,7 +114,7 @@ export function evaluateAugustPromoRuleFit(
       reason: "Pickup date must be within August 2026.",
     };
   }
-  if (moneyCompare(input.subtotal, 100) <= 0) {
+  if (moneyCompare(input.cakeSubtotal, 100) <= 0) {
     return {
       eligible: false,
       reason: "Whole-cake subtotal must be above RM100.",

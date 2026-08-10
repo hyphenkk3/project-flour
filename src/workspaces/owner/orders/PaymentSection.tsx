@@ -105,8 +105,36 @@ export function PaymentSection({
               )}
             </li>
           ))}
+          {[...(order.paidAddons ?? [])]
+            .sort(
+              (a, b) =>
+                a.sortOrder - b.sortOrder ||
+                a.code.localeCompare(b.code, "en"),
+            )
+            .map((addon) => {
+              const lineTotal = addon.unitPrice * addon.quantity;
+              const title = `${addon.name} x${addon.quantity}`;
+              return (
+                <li key={`${addon.code}-${addon.id}`}>
+                  {addon.quantity > 1 ? (
+                    <>
+                      <p className="text-ink text-sm font-medium">{title}</p>
+                      <p className="text-skyline text-sm">
+                        {formatRm(addon.unitPrice)} × {addon.quantity} ={" "}
+                        {formatRm(lineTotal)}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-ink text-sm font-medium">
+                      {title} — {formatRm(lineTotal)}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
         </ul>
-        {cakeBreakdown.sumExpression ? (
+        {cakeBreakdown.sumExpression &&
+        (order.paidAddons ?? []).length === 0 ? (
           <p className="text-skyline text-sm">{cakeBreakdown.sumExpression}</p>
         ) : null}
       </div>

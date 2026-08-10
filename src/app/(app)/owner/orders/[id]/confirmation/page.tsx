@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { canAccessCustomerConfirmation } from "@/engines/orders/confirmation-validity";
 import { requireStaff } from "@/foundation/auth/session";
 import { ConfirmationPreview } from "@/workspaces/owner/orders/ConfirmationPreview";
 import { getGuestOrderById } from "@/workspaces/owner/orders/queries";
@@ -27,15 +28,17 @@ export default async function ConfirmationPage({
   }
 
   if (
-    order.status !== "submitted" &&
-    order.status !== "pending_confirmation"
+    !canAccessCustomerConfirmation({
+      status: order.status,
+      confirmationNeedsResend: order.confirmationNeedsResend,
+    })
   ) {
     notFound();
   }
 
   const isUpdated =
-    order.status === "pending_confirmation" ||
     order.confirmationNeedsResend ||
+    order.status === "pending_confirmation" ||
     query.updated === "1";
 
   return (

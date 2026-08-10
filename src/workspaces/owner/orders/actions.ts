@@ -7,9 +7,19 @@ import {
   generateConfirmationMessage,
 } from "@/engines/orders/confirmation-message";
 import {
+  canAccessCustomerConfirmation,
   financialMateriallyAffectsConfirmation,
+  nextStatusAfterConfirmationMarkedSent,
   orderMateriallyAffectsConfirmation,
+  orderStatusAllowsConfirmationInvalidation,
+  shouldOfferUpdatedConfirmationAction,
+  shouldOutdateSentConfirmation,
 } from "@/engines/orders/confirmation-validity";
+import {
+  paidAddonsMateriallyDiffer,
+  paidAddonsTimelineSummary,
+  type PaidAddonMutationPayload,
+} from "@/engines/orders/paid-addons";
 import { reconcilePaymentLifecycleStatus } from "@/engines/orders/payment-status";
 import { isValidClockPickupTime, isValidPickupSlot } from "@/engines/business-calendar/pickup-slots";
 import { requireStaff } from "@/foundation/auth/session";
@@ -121,7 +131,7 @@ async function markPendingConfirmationStaleIfAmountChanged(input: {
   before: StorefrontOrder;
   staffId: string;
 }): Promise<{ error: string | null }> {
-  if (input.before.status !== "pending_confirmation") {
+  if (!orderStatusAllowsConfirmationInvalidation(input.before.status)) {
     return { error: null };
   }
 
@@ -252,6 +262,50 @@ function parseComplimentaryFromForm(formData: FormData): Array<{
   }
 }
 
+/** Mutation-only paid-add-on payload (code / qty / per-card messages). */
+function parsePaidAddonsMutationFromForm(
+  formData: FormData,
+): PaidAddonMutationPayload[] {
+  const raw = String(formData.get("paid_addons_json") ?? "").trim();
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as Array<{
+      code?: string;
+      quantity?: number;
+      messages?: Array<string | null>;
+      written_message?: string | null;
+    }>;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => {
+        const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+        let messages: Array<string | null>;
+        if (Array.isArray(item.messages)) {
+          messages = item.messages
+            .slice(0, quantity)
+            .map((m) =>
+              m == null ? null : String(m).trim() || null,
+            );
+          while (messages.length < quantity) messages.push(null);
+        } else if (item.written_message != null) {
+          messages = Array.from({ length: quantity }, (_, i) =>
+            i === 0 ? String(item.written_message).trim() || null : null,
+          );
+        } else {
+          messages = Array.from({ length: quantity }, () => null);
+        }
+        return {
+          code: String(item.code ?? "").trim(),
+          quantity,
+          messages,
+        };
+      })
+      .filter((item) => item.code.length > 0 && item.quantity >= 1);
+  } catch {
+    return [];
+  }
+}
+
 export async function createStaffGuestOrderAction(
   _prev: CreateStaffGuestOrderState,
   formData: FormData,
@@ -275,6 +329,7 @@ export async function createStaffGuestOrderAction(
   const internalNotes = String(formData.get("internal_notes") ?? "").trim();
   const draftItems = parseItemsFromForm(formData);
   const draftComplimentary = parseComplimentaryFromForm(formData);
+  const draftPaidAddons = parsePaidAddonsMutationFromForm(formData);
 
   if (!guestName) {
     return { error: "Please enter the customer name." };
@@ -339,6 +394,7 @@ export async function createStaffGuestOrderAction(
         quantity: item.quantity,
         sort_order: item.sortOrder,
       })),
+    p_paid_addons: draftPaidAddons,
     p_include_receipt: includeReceipt,
     p_needs_bakery_attention: needsAttention,
     p_bakery_attention_note: needsAttention ? attentionNote || null : null,
@@ -387,6 +443,7 @@ export async function saveOrderWorkspaceAction(
   const internalNotes = String(formData.get("internal_notes") ?? "").trim();
   const draftItems = parseItemsFromForm(formData);
   const draftComplimentary = parseComplimentaryFromForm(formData);
+  const draftPaidAddons = parsePaidAddonsMutationFromForm(formData);
 
   const before = await getGuestOrderById(orderId);
   if (!before) {
@@ -602,6 +659,24 @@ export async function saveOrderWorkspaceAction(
     }
   }
 
+  // Full-membership sync — server retains snapshots for kept codes.
+  const { error: syncPaidAddonsError } = await supabase.rpc(
+    "sync_guest_order_paid_addons",
+    {
+      p_order_id: orderId,
+      p_paid_addons: draftPaidAddons,
+    },
+  );
+
+  if (syncPaidAddonsError) {
+    return { error: syncPaidAddonsError.message, success: false };
+  }
+
+  const afterPaidAddons = await getGuestOrderById(orderId);
+  if (!afterPaidAddons) {
+    return { error: "Order not found after add-on sync.", success: false };
+  }
+
   const materialChange = orderMateriallyAffectsConfirmation(before, {
     customerName: guestName,
     phone: guestPhone,
@@ -612,9 +687,18 @@ export async function saveOrderWorkspaceAction(
       name: item.name,
       quantity: item.quantity,
     })),
+    paidAddons: afterPaidAddons.paidAddons,
   });
 
-  const hadSentConfirmation = before.status === "pending_confirmation";
+  const paidAddonsChanged = paidAddonsMateriallyDiffer(
+    before.paidAddons ?? [],
+    afterPaidAddons.paidAddons ?? [],
+  );
+
+  const shouldInvalidateConfirmation = shouldOutdateSentConfirmation({
+    materialChange,
+    orderStatus: before.status,
+  });
   const previousAmountDue = before.settlement.amountDue;
   const previousStatus = before.status;
 
@@ -638,6 +722,7 @@ export async function saveOrderWorkspaceAction(
 
   const shouldAuditUpdate =
     materialChange ||
+    paidAddonsChanged ||
     previousStatus === "awaiting_payment" ||
     previousStatus === "paid" ||
     newStatus !== previousStatus ||
@@ -660,6 +745,14 @@ export async function saveOrderWorkspaceAction(
     ) {
       metadata.amended_during_payment_lifecycle = true;
     }
+    if (paidAddonsChanged) {
+      metadata.paid_addons_before = paidAddonsTimelineSummary(
+        before.paidAddons ?? [],
+      );
+      metadata.paid_addons_after = paidAddonsTimelineSummary(
+        after.paidAddons ?? [],
+      );
+    }
 
     await insertTimelineEvent({
       orderId,
@@ -669,7 +762,7 @@ export async function saveOrderWorkspaceAction(
     });
   }
 
-  if (materialChange && hadSentConfirmation) {
+  if (shouldInvalidateConfirmation) {
     const { data: latestSent } = await supabase
       .from("order_confirmation_snapshots")
       .select("id")
@@ -719,7 +812,12 @@ export async function markConfirmationSentAction(
   if (!order) {
     return { error: "Order not found." };
   }
-  if (order.status !== "submitted" && order.status !== "pending_confirmation") {
+  if (
+    !canAccessCustomerConfirmation({
+      status: order.status,
+      confirmationNeedsResend: order.confirmationNeedsResend,
+    })
+  ) {
     return { error: "This order cannot receive a confirmation send right now." };
   }
 
@@ -728,7 +826,11 @@ export async function markConfirmationSentAction(
     staffCustomerFacingName: staff.displayName,
   });
   const messageBody = generateConfirmationMessage(payload);
-  const isUpdated = order.status === "pending_confirmation";
+  const isUpdated = shouldOfferUpdatedConfirmationAction({
+    status: order.status,
+    confirmationNeedsResend: order.confirmationNeedsResend,
+  }) || order.status === "pending_confirmation";
+  const nextStatus = nextStatusAfterConfirmationMarkedSent(order.status);
 
   const supabase = await createClient();
 
@@ -774,7 +876,7 @@ export async function markConfirmationSentAction(
   const { error: statusError } = await supabase
     .from("orders")
     .update({
-      status: "pending_confirmation",
+      status: nextStatus,
       confirmation_needs_resend: false,
       updated_by: staff.id,
     })

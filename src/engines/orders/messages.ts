@@ -6,10 +6,19 @@ import {
 import {
   formatItemPriceComponent,
   formatOrderFinancialEquation,
+  commercialEquationItems,
+  type FinancialEquationItem,
 } from "@/engines/orders/financial-equation";
 import { paymentMethodLabel } from "@/engines/orders/payment-details";
+import {
+  messagesForQuantity,
+  normalizeWrittenMessage,
+} from "@/engines/orders/paid-addons";
 import { getEffectiveAdjustments } from "@/engines/orders/promotions";
-import { formatOrderTotal } from "@/engines/orders/totals";
+import {
+  formatOrderTotal,
+  normalizePaidAddonLines,
+} from "@/engines/orders/totals";
 import { normalizePickupTimeValue } from "@/engines/business-calendar/pickup-slots";
 import type {
   OrderAdjustment,
@@ -17,6 +26,7 @@ import type {
   OrderSettlement,
   StorefrontOrder,
   StorefrontOrderItem,
+  StorefrontPaidAddon,
 } from "@/types/storefront";
 import { guestOrderDisplayName } from "@/workspaces/owner/orders/labels";
 
@@ -58,6 +68,81 @@ export function formatCrewCakeLine(input: {
   const size = input.sizeLabel.trim() || "Size";
   const qty = Math.max(1, Number(input.quantity) || 1);
   return `~ ${name} ${size}x${qty}`;
+}
+
+/** Paid-add-on commercial line for Crew (space before x — not size-attached). */
+export function formatCrewPaidAddonLine(input: {
+  name: string;
+  quantity: number;
+}): string {
+  const name = input.name.trim() || "Add-on";
+  const qty = Math.max(1, Number(input.quantity) || 1);
+  return `~ ${name} x${qty}`;
+}
+
+/**
+ * Compact Crew per-card message lines under one commercial add-on line.
+ * qty 1 → "Message: …"; qty >1 → "Card N: …". Blank slots omitted.
+ */
+export function formatCrewPaidAddonMessageLines(input: {
+  quantity: number;
+  writtenMessage?: string | null;
+  messages?: Array<{
+    cardIndex: number;
+    writtenMessage: string | null;
+  }> | null;
+}): string[] {
+  const quantity = Math.max(1, Math.floor(Number(input.quantity) || 1));
+  const slots = messagesForQuantity(
+    input.messages ?? undefined,
+    quantity,
+    input.writtenMessage,
+  );
+  const lines: string[] = [];
+  for (let i = 0; i < quantity; i += 1) {
+    const message = normalizeWrittenMessage(slots[i]);
+    if (!message) continue;
+    if (quantity <= 1) {
+      lines.push(`Message: ${message}`);
+    } else {
+      lines.push(`Card ${i + 1}: ${message}`);
+    }
+  }
+  return lines;
+}
+
+/**
+ * Full Crew Add-ons; block (heading + lines + messages), or null when empty.
+ * Omitted entirely when there are no paid add-ons.
+ */
+export function formatCrewAddonsBlock(
+  paidAddons: StorefrontPaidAddon[] | null | undefined,
+): string | null {
+  const addons = [...normalizePaidAddonLines(paidAddons)].sort(
+    (a, b) =>
+      (a.sortOrder ?? 0) - (b.sortOrder ?? 0) ||
+      String(a.code ?? "").localeCompare(String(b.code ?? ""), "en"),
+  );
+  if (addons.length === 0) return null;
+
+  const bodyLines: string[] = [];
+  for (const addon of addons) {
+    bodyLines.push(
+      formatCrewPaidAddonLine({
+        name: addon.name,
+        quantity: addon.quantity,
+      }),
+    );
+    bodyLines.push(
+      ...formatCrewPaidAddonMessageLines({
+        quantity: addon.quantity,
+        writtenMessage: addon.writtenMessage,
+        messages: addon.messages,
+      }),
+    );
+  }
+
+  return ["Add-ons;", ...bodyLines].join("\n");
 }
 
 function formatPaymentDateShort(iso: string): string {
@@ -123,6 +208,9 @@ export function formatCrewPaymentLine(input: {
   allocations: OrderPaymentAllocationView[];
   pickupDate: string;
   items: Array<Pick<StorefrontOrderItem, "unitPrice" | "quantity">>;
+  paidAddons?: Array<
+    Pick<StorefrontPaidAddon, "unitPrice" | "quantity" | "financialShorthand">
+  > | null;
 }): string {
   const { settlement, pickupDate } = input;
   const verified = input.allocations.filter(
@@ -130,7 +218,10 @@ export function formatCrewPaymentLine(input: {
   );
   const effective = getEffectiveAdjustments(input.adjustments);
   const amountHead = formatCrewAmountHead({
-    items: input.items,
+    items: commercialEquationItems({
+      cakes: input.items,
+      paidAddons: normalizePaidAddonLines(input.paidAddons),
+    }),
     effective,
     amountDue: settlement.amountDue,
   });
@@ -177,7 +268,7 @@ export function formatCrewItemPriceComponent(input: {
  * Shared calculator with Customer Confirmation — do not diverge.
  */
 export function formatCrewAmountHead(input: {
-  items: Array<Pick<StorefrontOrderItem, "unitPrice" | "quantity">>;
+  items: FinancialEquationItem[];
   effective: Array<
     Pick<OrderAdjustment, "amount" | "label" | "code" | "metadata">
   >;
@@ -212,12 +303,15 @@ export function generateCrewOrderMessage(order: StorefrontOrder): string {
     )
     .join("\n");
 
+  const addonsBlock = formatCrewAddonsBlock(order.paidAddons);
+
   const paymentLine = formatCrewPaymentLine({
     settlement: order.settlement,
     adjustments: order.adjustments,
     allocations: order.paymentAllocations,
     pickupDate: order.pickupDate,
     items: order.items,
+    paidAddons: normalizePaidAddonLines(order.paidAddons),
   });
 
   const complimentary = formatComplimentaryLine(
@@ -241,9 +335,15 @@ export function generateCrewOrderMessage(order: StorefrontOrder): string {
     "",
     "Whole Cake;",
     cakeLines,
-    "",
-    paymentLine,
   ];
+
+  if (addonsBlock) {
+    lines.push("");
+    lines.push(addonsBlock);
+  }
+
+  lines.push("");
+  lines.push(paymentLine);
 
   if (complimentary) {
     lines.push("");

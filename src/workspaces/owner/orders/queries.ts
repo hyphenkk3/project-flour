@@ -1,6 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { calculateOrderSettlement } from "@/engines/orders/settlement";
-import { calculateOrderTotal } from "@/engines/orders/totals";
+import {
+  calculateCommercialSubtotal,
+  commercialLinesForSettlement,
+  normalizePaidAddonLines,
+} from "@/engines/orders/totals";
 import type {
   ConfirmationSnapshot,
   GuestOrderStatus,
@@ -15,6 +19,8 @@ import type {
   StorefrontOrder,
   StorefrontOrderItem,
   StorefrontOrderListItem,
+  StorefrontPaidAddon,
+  PaidAddonType,
 } from "@/types/storefront";
 
 type OrderRow = {
@@ -57,6 +63,23 @@ type OrderRow = {
     library_cakes?: { name: string } | { name: string }[] | null;
     library_cake_sizes?: { label: string } | { label: string }[] | null;
   }> | null;
+  order_paid_addons?: Array<{
+    id: string;
+    order_id: string;
+    paid_addon_type_id: string | null;
+    code: string;
+    name: string;
+    unit_price: number | string;
+    financial_shorthand: string;
+    quantity: number;
+    written_message: string | null;
+    sort_order: number;
+    order_paid_addon_messages?: Array<{
+      id: string;
+      card_index: number;
+      written_message: string | null;
+    }> | null;
+  }> | null;
   order_complimentary_items?: Array<{
     id: string;
     name: string;
@@ -88,6 +111,41 @@ function mapItem(
   };
 }
 
+function mapPaidAddon(
+  row: NonNullable<OrderRow["order_paid_addons"]>[number],
+): StorefrontPaidAddon {
+  const quantity = Number(row.quantity);
+  const childMessages = [...(row.order_paid_addon_messages ?? [])].sort(
+    (a, b) => a.card_index - b.card_index,
+  );
+  const messages =
+    childMessages.length > 0
+      ? childMessages.map((m) => ({
+          cardIndex: Number(m.card_index),
+          writtenMessage: m.written_message,
+        }))
+      : row.written_message
+        ? [{ cardIndex: 1, writtenMessage: row.written_message }]
+        : Array.from({ length: Math.max(1, quantity) }, (_, i) => ({
+            cardIndex: i + 1,
+            writtenMessage: null as string | null,
+          }));
+
+  return {
+    id: row.id,
+    orderId: row.order_id,
+    paidAddonTypeId: row.paid_addon_type_id,
+    code: row.code,
+    name: row.name,
+    unitPrice: Number(row.unit_price),
+    financialShorthand: row.financial_shorthand,
+    quantity,
+    writtenMessage: row.written_message,
+    messages,
+    sortOrder: row.sort_order,
+  };
+}
+
 function mapComplimentary(
   row: NonNullable<OrderRow["order_complimentary_items"]>[number],
 ): StorefrontComplimentaryItem {
@@ -109,6 +167,12 @@ function mapOrder(
   },
 ): StorefrontOrder {
   const items = (row.order_items ?? []).map(mapItem);
+  const paidAddons = normalizePaidAddonLines(row.order_paid_addons)
+    .map(mapPaidAddon)
+    .sort(
+      (a, b) =>
+        a.sortOrder - b.sortOrder || a.code.localeCompare(b.code, "en"),
+    );
   const complimentaryItems = [...(row.order_complimentary_items ?? [])]
     .map(mapComplimentary)
     .sort((a, b) => a.sortOrder - b.sortOrder);
@@ -117,7 +181,7 @@ function mapOrder(
   const paymentAllocations = financial?.paymentAllocations ?? [];
   const refunds = financial?.refunds ?? [];
   const settlement = calculateOrderSettlement({
-    items,
+    items: commercialLinesForSettlement({ items, paidAddons }),
     adjustments,
     allocations: paymentAllocations,
     refunds,
@@ -153,8 +217,9 @@ function mapOrder(
     rm10CardIssuanceSuppressionCode:
       row.rm10_card_issuance_suppression_code ?? null,
     items,
+    paidAddons,
     complimentaryItems,
-    total: calculateOrderTotal(items),
+    total: calculateCommercialSubtotal({ items, paidAddons }),
     adjustments,
     paymentAllocations,
     refunds,
@@ -201,6 +266,23 @@ const orderSelect = `
     size_label,
     library_cakes ( name ),
     library_cake_sizes ( label )
+  ),
+  order_paid_addons (
+    id,
+    order_id,
+    paid_addon_type_id,
+    code,
+    name,
+    unit_price,
+    financial_shorthand,
+    quantity,
+    written_message,
+    sort_order,
+    order_paid_addon_messages (
+      id,
+      card_index,
+      written_message
+    )
   ),
   order_complimentary_items (
     id,
@@ -615,4 +697,34 @@ export async function listCollectionComplimentaryOptions(
       sortOrder: Number(row.sort_order ?? 0),
     };
   });
+}
+
+/** Active paid-add-on catalog for Owner create/edit (no admin UI). */
+export async function listActivePaidAddonTypes(): Promise<PaidAddonType[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("paid_addon_types")
+    .select(
+      "id, code, name, unit_price, financial_shorthand, is_active, sort_order, max_quantity",
+    )
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+    .order("code", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    code: row.code as string,
+    name: row.name as string,
+    unitPrice: Number(row.unit_price),
+    financialShorthand: row.financial_shorthand as string,
+    isActive: Boolean(row.is_active),
+    sortOrder: Number(row.sort_order ?? 0),
+    maxQuantity: Number(
+      (row as { max_quantity?: number }).max_quantity ?? 3,
+    ),
+  }));
 }

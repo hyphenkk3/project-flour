@@ -17,6 +17,7 @@ import { formatLongBusinessDate } from "@/lib/dates";
 import type { StorefrontOrder } from "@/types/storefront";
 import { getCalendarQuickViewOrderAction } from "@/workspaces/owner/calendar/actions";
 import { captureCalendarReturnPosition } from "@/workspaces/owner/calendar/calendar-return-position";
+import { buildQuickViewPaidAddonBlocks } from "@/workspaces/owner/calendar/quick-view-paid-addons";
 import { ownerOrderWorkspaceHref } from "@/workspaces/owner/navigation/return-to";
 import {
   formatPickupTime,
@@ -236,6 +237,7 @@ function CalendarQuickViewBody({
   const complimentary = [...order.complimentaryItems].sort(
     (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
   );
+  const paidAddonBlocks = buildQuickViewPaidAddonBlocks(order.paidAddons);
 
   return (
     <div className={["space-y-5", loading ? "opacity-70" : ""].join(" ")}>
@@ -293,6 +295,26 @@ function CalendarQuickViewBody({
           ))}
         </ul>
       </section>
+
+      {paidAddonBlocks.length > 0 ? (
+        <section className="space-y-2">
+          <h3 className="text-skyline text-[11px] font-semibold tracking-wide uppercase">
+            Add-ons
+          </h3>
+          <ul className="space-y-2">
+            {paidAddonBlocks.map((block) => (
+              <li className="text-ink text-sm" key={block.code}>
+                <p className="font-medium">{block.title}</p>
+                {block.messageLines.map((line) => (
+                  <p className="text-skyline" key={line}>
+                    {line}
+                  </p>
+                ))}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {complimentary.length > 0 ? (
         <section className="space-y-2">

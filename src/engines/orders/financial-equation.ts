@@ -1,5 +1,5 @@
 /**
- * Shared order financial equation from item price snapshots + effective adjustments.
+ * Shared order financial equation from commercial line snapshots + effective adjustments.
  * Used by Crew Order Message (amount head) and Customer Confirmation (financial block).
  * Does not include payment / NYP / c/o notation.
  */
@@ -16,6 +16,8 @@ import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 export type FinancialEquationItem = {
   unitPrice: number;
   quantity: number;
+  /** Present for paid add-ons (BC / WC). Omit for cake lines. */
+  financialShorthand?: string | null;
 };
 
 export type FinancialEquationAdjustment = Pick<
@@ -23,20 +25,50 @@ export type FinancialEquationAdjustment = Pick<
   "amount" | "label" | "code" | "metadata"
 >;
 
-/** One item: RM125 or RM165*2 (qty > 1). */
+/**
+ * One commercial component:
+ * - Cake qty 1: RM125
+ * - Cake qty 2: RM125*2
+ * - Add-on qty 1: RM3(BC)
+ * - Add-on qty 2: RM3*2(BC)
+ */
 export function formatItemPriceComponent(input: {
   unitPrice: number;
   quantity: number;
+  financialShorthand?: string | null;
 }): string {
   const qty = Math.max(1, Number(input.quantity) || 1);
   const price = formatRm(Number(input.unitPrice));
-  if (qty === 1) return price;
-  return `${price}*${qty}`;
+  const shorthand = input.financialShorthand?.trim() ?? "";
+  const base = qty === 1 ? price : `${price}*${qty}`;
+  if (!shorthand) return base;
+  return `${base}(${shorthand})`;
+}
+
+/** Cake lines first, then paid add-ons (caller supplies already-sorted add-ons). */
+export function commercialEquationItems(input: {
+  cakes: Array<{ unitPrice: number; quantity: number }>;
+  paidAddons?: Array<{
+    unitPrice: number;
+    quantity: number;
+    financialShorthand: string;
+  }> | null;
+}): FinancialEquationItem[] {
+  const cakes = input.cakes.map((item) => ({
+    unitPrice: Number(item.unitPrice),
+    quantity: Number(item.quantity),
+  }));
+  const addons = (input.paidAddons ?? []).map((item) => ({
+    unitPrice: Number(item.unitPrice),
+    quantity: Number(item.quantity),
+    financialShorthand: item.financialShorthand,
+  }));
+  return [...cakes, ...addons];
 }
 
 /**
  * Authoritative equation reconciling to amountDue.
- * Single ×1 with no adjustments → concise RMamountDue only.
+ * Single ×1 cake with no shorthand and no adjustments → concise RMamountDue only.
  */
 export function formatOrderFinancialEquation(input: {
   items: FinancialEquationItem[];
@@ -56,14 +88,21 @@ export function formatOrderFinancialEquation(input: {
     formatItemPriceComponent({
       unitPrice: item.unitPrice,
       quantity: item.quantity,
+      financialShorthand: item.financialShorthand,
     }),
   );
   const itemExpression = itemParts.join("+");
   const hasQtyMultiplier = items.some(
     (item) => Math.max(1, Number(item.quantity) || 1) > 1,
   );
+  const hasShorthand = items.some(
+    (item) => (item.financialShorthand?.trim() ?? "").length > 0,
+  );
   const needsEquation =
-    items.length > 1 || hasQtyMultiplier || effective.length > 0;
+    items.length > 1 ||
+    hasQtyMultiplier ||
+    hasShorthand ||
+    effective.length > 0;
 
   if (!needsEquation) {
     return amountDueLabel;

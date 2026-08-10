@@ -89,7 +89,7 @@ export function PaymentRequestPreview({
   );
 
   const payload = buildPaymentRequestPayload({
-    cakeSubtotal: settlement.subtotal,
+    commercialSubtotal: settlement.subtotal,
     amountDue: settlement.amountDue,
     netReceived: settlement.netReceived,
     remainingBalance: settlement.remainingBalance,

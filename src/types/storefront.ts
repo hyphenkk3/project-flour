@@ -118,6 +118,45 @@ export type StorefrontComplimentaryItem = {
   complimentaryItemTypeId: string | null;
 };
 
+/** Catalog definition for a paid non-cake add-on (live price for NEW lines only). */
+export type PaidAddonType = {
+  id: string;
+  code: string;
+  name: string;
+  unitPrice: number;
+  financialShorthand: string;
+  isActive: boolean;
+  sortOrder: number;
+  /** Maximum selectable quantity per order line (P1 cards = 3). */
+  maxQuantity: number;
+};
+
+/** Optional written message for one physical card within a commercial line. */
+export type StorefrontPaidAddonMessage = {
+  cardIndex: number;
+  writtenMessage: string | null;
+};
+
+/** Snapshotted paid-add-on commercial line on an order. */
+export type StorefrontPaidAddon = {
+  id: string;
+  orderId: string;
+  paidAddonTypeId: string | null;
+  code: string;
+  name: string;
+  unitPrice: number;
+  financialShorthand: string;
+  quantity: number;
+  /**
+   * @deprecated Prefer `messages` (per physical card). Legacy single-message
+   * field may appear on historical reads before backfill; treat as Card 1.
+   */
+  writtenMessage: string | null;
+  /** Per-physical-card messages; length conceptually = quantity (nulls allowed). */
+  messages: StorefrontPaidAddonMessage[];
+  sortOrder: number;
+};
+
 export type StorefrontOrder = {
   id: string;
   orderNumber: string;
@@ -151,8 +190,13 @@ export type StorefrontOrder = {
   rm10CardIssuanceSuppressed: boolean;
   rm10CardIssuanceSuppressionCode: Rm10IssuanceSuppressionCode | null;
   items: StorefrontOrderItem[];
+  /** Snapshotted paid add-ons; normalize missing/legacy to []. */
+  paidAddons: StorefrontPaidAddon[];
   complimentaryItems: StorefrontComplimentaryItem[];
-  /** Item subtotal (price snapshots). Prefer settlement.amountDue for payable. */
+  /**
+   * Commercial subtotal (cake snapshots + paid-add-on snapshots) before adjustments.
+   * Prefer settlement.amountDue for payable.
+   */
   total: number;
   adjustments: OrderAdjustment[];
   paymentAllocations: OrderPaymentAllocationView[];
@@ -245,12 +289,30 @@ export type ConfirmationPayload = {
     quantity: number;
   }>;
   /**
+   * Snapshotted paid add-ons for equation + Whole Cake commercial lines +
+   * per-card Special Request messages. Optional for historical snapshots;
+   * readers treat missing as []. Uses order snapshots — never live catalog.
+   */
+  paidAddons?: Array<{
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    financialShorthand: string;
+    /** @deprecated Prefer messages[]. Legacy single message → Card 1. */
+    writtenMessage?: string | null;
+    /** Per-physical-card optional messages. */
+    messages?: Array<{
+      cardIndex: number;
+      writtenMessage: string | null;
+    }>;
+  }>;
+  /**
    * Payable total stored on snapshots.
    * After pre-confirmation pricing correction this equals amountDue.
    * Historical snapshots may equal item subtotal only.
    */
   total: number;
-  /** Item subtotal before adjustments (when present). */
+  /** Commercial subtotal before adjustments (cakes + paid add-ons when present). */
   subtotal?: number;
   /** Effective customer-facing adjustments (when present). */
   adjustments?: Array<{

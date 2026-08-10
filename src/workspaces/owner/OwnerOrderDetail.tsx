@@ -7,6 +7,7 @@ import { resolveOwnerReturnTo } from "@/workspaces/owner/navigation/return-to";
 import { OrderWorkspaceForm } from "@/workspaces/owner/orders/OrderWorkspaceForm";
 import {
   getGuestOrderById,
+  listActivePaidAddonTypes,
   listCollectionComplimentaryOptions,
   listConfirmationSnapshots,
   listOrderTimeline,
@@ -55,6 +56,14 @@ export async function OwnerOrderDetail({
     ? await listCollectionComplimentaryOptions(complimentaryCollectionId)
     : [];
 
+  let paidAddonCatalog: Awaited<ReturnType<typeof listActivePaidAddonTypes>> =
+    [];
+  try {
+    paidAddonCatalog = await listActivePaidAddonTypes();
+  } catch {
+    paidAddonCatalog = [];
+  }
+
   const timeline = await listOrderTimeline(orderId);
   const confirmations = await listConfirmationSnapshots(orderId);
   const back = resolveOwnerReturnTo(returnTo);
@@ -84,6 +93,7 @@ export async function OwnerOrderDetail({
         complimentaryOptions={complimentaryOptions}
         confirmations={confirmations}
         order={order}
+        paidAddonCatalog={paidAddonCatalog}
         returnTo={safeReturnTo}
         staffDisplayName={staff.displayName}
         timeline={timeline}

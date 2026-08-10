@@ -13,14 +13,20 @@ import {
   FormTextarea,
 } from "@/components/ui/form";
 import { OwnerPickupFields } from "@/components/ui/OwnerPickupFields";
+import {
+  buildEditablePaidAddonDrafts,
+  paidAddonDraftsToMutationPayload,
+  type EditablePaidAddonDraft,
+} from "@/engines/orders/paid-addons";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
-import type { StorefrontCake } from "@/types/storefront";
+import type { PaidAddonType, StorefrontCake } from "@/types/storefront";
 import type { CollectionComplimentaryOption } from "@/workspaces/owner/orders/queries";
 import {
   createStaffGuestOrderAction,
   type CreateStaffGuestOrderState,
 } from "@/workspaces/owner/orders/actions";
 import { STAFF_GUEST_ORDER_SOURCES } from "@/workspaces/owner/orders/labels";
+import { OrderPaidAddonsEditor } from "@/workspaces/owner/orders/OrderPaidAddonsEditor";
 
 type EditableItem = {
   key: string;
@@ -39,6 +45,7 @@ type EditableComplimentary = {
 type StaffGuestOrderFormProps = {
   cakes: StorefrontCake[];
   complimentaryOptions: CollectionComplimentaryOption[];
+  paidAddonCatalog: PaidAddonType[];
 };
 
 const initialState: CreateStaffGuestOrderState = {
@@ -48,6 +55,7 @@ const initialState: CreateStaffGuestOrderState = {
 export function StaffGuestOrderForm({
   cakes,
   complimentaryOptions,
+  paidAddonCatalog,
 }: StaffGuestOrderFormProps) {
   const [state, formAction, pending] = useActionState(
     createStaffGuestOrderAction,
@@ -76,12 +84,20 @@ export function StaffGuestOrderForm({
       })),
   );
 
+  const [paidAddonDrafts, setPaidAddonDrafts] = useState<
+    EditablePaidAddonDraft[]
+  >(() => buildEditablePaidAddonDrafts({ catalog: paidAddonCatalog }));
+
   const [needsAttention, setNeedsAttention] = useState(false);
 
   const itemsJson = useMemo(() => JSON.stringify(items), [items]);
   const complimentaryJson = useMemo(
     () => JSON.stringify(complimentary),
     [complimentary],
+  );
+  const paidAddonsJson = useMemo(
+    () => JSON.stringify(paidAddonDraftsToMutationPayload(paidAddonDrafts)),
+    [paidAddonDrafts],
   );
 
   function updateCakeLine(key: string, patch: Partial<EditableItem>) {
@@ -127,6 +143,7 @@ export function StaffGuestOrderForm({
     <form action={formAction} className="space-y-6">
       <input name="items_json" type="hidden" value={itemsJson} />
       <input name="complimentary_json" type="hidden" value={complimentaryJson} />
+      <input name="paid_addons_json" type="hidden" value={paidAddonsJson} />
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
@@ -260,6 +277,16 @@ export function StaffGuestOrderForm({
             );
           })}
         </ul>
+      </section>
+
+      <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
+        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
+          Add-ons
+        </h2>
+        <OrderPaidAddonsEditor
+          drafts={paidAddonDrafts}
+          onChange={setPaidAddonDrafts}
+        />
       </section>
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">

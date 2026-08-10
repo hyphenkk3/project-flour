@@ -14,6 +14,7 @@ import type {
 } from "@/types/storefront";
 
 export type SettlementInput = {
+  /** Commercial lines: cakes and/or paid add-ons (unit price snapshots × qty). */
   items: Array<{ unitPrice: number; quantity: number }>;
   adjustments: Array<Pick<OrderAdjustment, "amount">>;
   allocations: Array<Pick<OrderPaymentAllocationView, "amount" | "paymentStatus">>;
@@ -22,6 +23,7 @@ export type SettlementInput = {
 
 /**
  * Single source of truth for order financial settlement.
+ * subtotal = commercial (cakes + paid add-ons); amountDue = subtotal + adjustments.
  * Do not re-implement these rules in UI components.
  */
 export function calculateOrderSettlement(input: SettlementInput): OrderSettlement {

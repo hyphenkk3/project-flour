@@ -3,11 +3,15 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { requireStaff } from "@/foundation/auth/session";
 import { StaffGuestOrderForm } from "@/workspaces/owner/orders/StaffGuestOrderForm";
-import { listCollectionComplimentaryOptions } from "@/workspaces/owner/orders/queries";
+import {
+  listActivePaidAddonTypes,
+  listCollectionComplimentaryOptions,
+} from "@/workspaces/owner/orders/queries";
 import {
   getCurrentCollection,
   listOfferableLibraryCakes,
 } from "@/workspaces/storefront/catalog/queries";
+import type { PaidAddonType } from "@/types/storefront";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +26,12 @@ export default async function OwnerNewOrderPage() {
   const complimentaryOptions = collection
     ? await listCollectionComplimentaryOptions(collection.id)
     : [];
+  let paidAddonCatalog: PaidAddonType[] = [];
+  try {
+    paidAddonCatalog = await listActivePaidAddonTypes();
+  } catch {
+    paidAddonCatalog = [];
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -43,6 +53,7 @@ export default async function OwnerNewOrderPage() {
       <StaffGuestOrderForm
         cakes={cakes}
         complimentaryOptions={complimentaryOptions}
+        paidAddonCatalog={paidAddonCatalog}
       />
     </div>
   );

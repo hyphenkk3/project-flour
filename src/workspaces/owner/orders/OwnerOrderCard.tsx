@@ -54,7 +54,7 @@ export function OwnerOrderCard({
           </p>
           {order.confirmationNeedsResend ? (
             <p className="text-status-warning text-xs font-medium">
-              Confirmation needs to be resent
+              Previous confirmation outdated — reconfirmation required
             </p>
           ) : null}
         </div>

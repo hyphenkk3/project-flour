@@ -25,6 +25,7 @@ import {
   rm10IssuanceSuppressionLabel,
   singaporeDateFromIso,
 } from "@/engines/orders/promotions";
+import { calculateCakeSubtotal } from "@/engines/orders/totals";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type { StorefrontOrder } from "@/types/storefront";
 import { isGuestOrderEditable } from "@/workspaces/owner/orders/labels";
@@ -74,11 +75,13 @@ export function OrderDiscountsPanel({ order }: OrderDiscountsPanelProps) {
   const activePromo = effective.find((row) => row.code === AUGUST_PROMO_CODE);
   const activeRm10 = effective.find((row) => row.code === RM10_CARD_CODE);
 
+  const cakeSubtotal = calculateCakeSubtotal(order.items);
+
   const august = evaluateAugustPromoEligibility({
     orderSource: order.orderSource,
     orderDate,
     pickupDate: order.pickupDate,
-    subtotal: order.settlement.subtotal,
+    cakeSubtotal,
     hasAugustPromo: hasAugust,
     hasRm10Card: hasRm10,
     hasVerifiedPayments: order.settlement.netReceived > 0,
@@ -89,7 +92,7 @@ export function OrderDiscountsPanel({ order }: OrderDiscountsPanelProps) {
     orderSource: order.orderSource,
     orderDate,
     pickupDate: order.pickupDate,
-    subtotal: order.settlement.subtotal,
+    cakeSubtotal,
   });
 
   const rm10Expiry =

@@ -1,6 +1,14 @@
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
-import { formatOrderFinancialEquation } from "@/engines/orders/financial-equation";
+import {
+  commercialEquationItems,
+  formatOrderFinancialEquation,
+} from "@/engines/orders/financial-equation";
+import {
+  messagesForQuantity,
+  normalizeWrittenMessage,
+} from "@/engines/orders/paid-addons";
 import { getEffectiveAdjustments } from "@/engines/orders/promotions";
+import { normalizePaidAddonLines } from "@/engines/orders/totals";
 import type {
   ConfirmationPayload,
   OrderAdjustment,
@@ -8,6 +16,7 @@ import type {
 } from "@/types/storefront";
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const MESSAGE_SEPARATOR = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~";
 
 function parseYmd(ymd: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim());
@@ -38,6 +47,113 @@ export function formatComplimentaryLine(
     .join(", ");
 }
 
+/** Cake + paid-add-on commercial lines under Whole Cake; (no separate Add-ons heading). */
+export function formatConfirmationCommercialLines(input: {
+  items: ConfirmationPayload["items"];
+  paidAddons?: ConfirmationPayload["paidAddons"];
+}): string {
+  const cakeLines = input.items.map(
+    (item) => `~ ${item.cakeName} ${item.sizeLabel} x${item.quantity}`,
+  );
+  const addonLines = normalizePaidAddonLines(input.paidAddons).map(
+    (addon) => `~ ${addon.name} x${addon.quantity}`,
+  );
+  return [...cakeLines, ...addonLines].join("\n");
+}
+
+/**
+ * Label for one physical card's written-message Special Request entry.
+ * qty 1 → no index suffix; qty >1 → " Card {n}".
+ */
+export function formatWrittenMessageOnCardLabel(input: {
+  addonName: string;
+  quantity: number;
+  cardIndex: number;
+}): string {
+  const qty = Math.max(1, Math.floor(Number(input.quantity) || 1));
+  if (qty <= 1) {
+    return `~Written message on ${input.addonName}:`;
+  }
+  return `~Written message on ${input.addonName} ${input.cardIndex}:`;
+}
+
+export function formatWrittenMessageEntry(input: {
+  addonName: string;
+  quantity: number;
+  cardIndex: number;
+  message: string;
+}): string {
+  return (
+    `${formatWrittenMessageOnCardLabel(input)}\n\n` +
+    `${MESSAGE_SEPARATOR}\n\n` +
+    `${input.message}\n\n` +
+    `${MESSAGE_SEPARATOR}`
+  );
+}
+
+type ConfirmationAddonForMessages = {
+  name: string;
+  quantity: number;
+  writtenMessage?: string | null;
+  messages?: Array<{
+    cardIndex: number;
+    writtenMessage: string | null;
+  }>;
+};
+
+/** Collect non-empty per-card messages in commercial-line / card_index order. */
+export function collectConfirmationCardMessages(
+  paidAddons: ConfirmationAddonForMessages[] | null | undefined,
+): Array<{
+  addonName: string;
+  quantity: number;
+  cardIndex: number;
+  message: string;
+}> {
+  const rows: Array<{
+    addonName: string;
+    quantity: number;
+    cardIndex: number;
+    message: string;
+  }> = [];
+
+  for (const addon of normalizePaidAddonLines(paidAddons)) {
+    const quantity = Math.max(1, Math.floor(Number(addon.quantity) || 1));
+    const slots = messagesForQuantity(
+      addon.messages,
+      quantity,
+      addon.writtenMessage,
+    );
+    for (let i = 0; i < quantity; i += 1) {
+      const message = normalizeWrittenMessage(slots[i]);
+      if (!message) continue;
+      rows.push({
+        addonName: addon.name,
+        quantity,
+        cardIndex: i + 1,
+        message,
+      });
+    }
+  }
+
+  return rows;
+}
+
+/**
+ * Special Request block for non-empty card messages only.
+ * Returns null when no messages → omit entirely.
+ */
+export function formatConfirmationSpecialRequestBlock(
+  paidAddons: ConfirmationPayload["paidAddons"],
+): string | null {
+  const entries = collectConfirmationCardMessages(paidAddons);
+  if (entries.length === 0) return null;
+  const body = entries
+    .map((entry) => formatWrittenMessageEntry(entry))
+    .join("\n\n");
+  return `⭐️Special Request:⭐️\n${body}`;
+}
+
 /**
  * Customer-facing financial block for confirmation.
  * Full item + adjustment equation (shared with Crew amount head).
@@ -46,13 +162,21 @@ export function formatComplimentaryLine(
 export function formatConfirmationFinancialBlock(
   payload: Pick<
     ConfirmationPayload,
-    "items" | "subtotal" | "amountDue" | "adjustments" | "total"
+    "items" | "paidAddons" | "subtotal" | "amountDue" | "adjustments" | "total"
   >,
 ): string {
   const amountDue = payload.amountDue ?? payload.total;
   const adjustments = payload.adjustments ?? [];
+  const paidAddons = normalizePaidAddonLines(payload.paidAddons);
   return formatOrderFinancialEquation({
-    items: payload.items,
+    items: commercialEquationItems({
+      cakes: payload.items,
+      paidAddons: paidAddons.map((row) => ({
+        unitPrice: row.unitPrice,
+        quantity: row.quantity,
+        financialShorthand: row.financialShorthand,
+      })),
+    }),
     effective: adjustments.map((row) => ({
       label: row.label,
       amount: row.amount,
@@ -74,13 +198,14 @@ export function generateConfirmationMessage(
   const dateShort = formatPickupDateShort(payload.pickupDate);
   const timeLabel = formatPickupTime(payload.pickupTime);
   const financialBlock = formatConfirmationFinancialBlock(payload);
-
-  const cakeLines = payload.items
-    .map(
-      (item) =>
-        `~ ${item.cakeName} ${item.sizeLabel} x${item.quantity}`,
-    )
-    .join("\n");
+  const commercialLines = formatConfirmationCommercialLines({
+    items: payload.items,
+    paidAddons: payload.paidAddons,
+  });
+  const specialRequest = formatConfirmationSpecialRequestBlock(
+    payload.paidAddons,
+  );
+  const specialRequestBlock = specialRequest ? `\n${specialRequest}\n` : "\n";
 
   const complimentary = formatComplimentaryLine(payload.complimentaryItems);
   const complimentaryBlock = complimentary
@@ -96,7 +221,8 @@ export function generateConfirmationMessage(
     `Phone No: ${payload.customerPhone}\n` +
     `Time: ${timeLabel}\n\n` +
     `Whole Cake;\n` +
-    `${cakeLines}\n\n` +
+    `${commercialLines}\n` +
+    specialRequestBlock +
     `${financialBlock}\n` +
     complimentaryBlock +
     `\n` +
@@ -115,7 +241,8 @@ export function buildConfirmationPayload(input: {
   pickupTime: string;
   items: ConfirmationPayload["items"];
   complimentaryItems: ConfirmationPayload["complimentaryItems"];
-  /** Item subtotal (price snapshots). */
+  paidAddons?: ConfirmationPayload["paidAddons"];
+  /** Commercial subtotal (cakes + paid add-ons). */
   subtotal: number;
   /** Effective adjustments only. */
   adjustments: ConfirmationPayload["adjustments"];
@@ -132,6 +259,7 @@ export function buildConfirmationPayload(input: {
     complimentaryItems: input.complimentaryItems.filter(
       (item) => item.quantity > 0,
     ),
+    paidAddons: normalizePaidAddonLines(input.paidAddons),
     subtotal: input.subtotal,
     adjustments: input.adjustments,
     amountDue: input.amountDue,
@@ -162,6 +290,17 @@ export function buildConfirmationPayloadFromOrder(input: {
     complimentaryItems: order.complimentaryItems.map((item) => ({
       name: item.name,
       quantity: item.quantity,
+    })),
+    paidAddons: normalizePaidAddonLines(order.paidAddons).map((item) => ({
+      name: item.name,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      financialShorthand: item.financialShorthand,
+      writtenMessage: item.writtenMessage,
+      messages: (item.messages ?? []).map((m) => ({
+        cardIndex: m.cardIndex,
+        writtenMessage: m.writtenMessage,
+      })),
     })),
     subtotal: order.settlement.subtotal,
     adjustments: effective.map((row: OrderAdjustment) => ({
