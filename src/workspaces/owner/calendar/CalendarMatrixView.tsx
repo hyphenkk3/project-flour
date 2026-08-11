@@ -11,6 +11,7 @@ import type {
   CalendarEntry,
   CalendarMatrixMode,
 } from "@/workspaces/owner/calendar/types";
+import { calendarFulfilmentBackgroundClass } from "@/workspaces/owner/calendar/calendar-fulfilment-presentation";
 import { guestOrderStatusTextClass } from "@/workspaces/owner/orders/labels";
 import { withOperationalMarker } from "@/engines/orders/operational-state";
 
@@ -286,7 +287,7 @@ export function CalendarMatrixView({
                   className="text-skyline px-3 py-6"
                   colSpan={columns.length + 1}
                 >
-                  No whole-cake pickups in this month yet.
+                  No whole-cake orders in this month yet.
                 </td>
               </tr>
             ) : (
@@ -351,6 +352,9 @@ export function CalendarMatrixView({
                                       customer.hasEffectiveRm10
                                         ? "line-through"
                                         : "",
+                                      calendarFulfilmentBackgroundClass(
+                                        customer.fulfilmentMethod,
+                                      ),
                                       "block w-full cursor-pointer text-left leading-snug hover:underline",
                                     ].join(" ")}
                                     onClick={() =>

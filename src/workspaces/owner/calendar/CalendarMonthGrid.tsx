@@ -7,6 +7,7 @@ import {
   CalendarGuide,
   calendarCustomerSignalClass,
 } from "@/workspaces/owner/calendar/CalendarGuide";
+import { calendarFulfilmentBackgroundClass } from "@/workspaces/owner/calendar/calendar-fulfilment-presentation";
 import type {
   CalendarCakeItem,
   CalendarEntry,
@@ -155,6 +156,7 @@ function CalendarDayCellView({
                 <button
                   className={[
                     calendarCustomerSignalClass(entry),
+                    calendarFulfilmentBackgroundClass(entry.fulfilmentMethod),
                     "block w-full cursor-pointer truncate text-left text-[11px] leading-snug hover:underline sm:text-xs",
                     cell.inMonth ? "" : "opacity-50",
                   ].join(" ")}
@@ -190,7 +192,14 @@ function CalendarDayCellView({
                 >
                   <span className="text-ink">{cakeLabel}</span>
                   <span className="text-zinc-500"> — </span>
-                  <span className={calendarCustomerSignalClass(line.entry)}>
+                  <span
+                    className={[
+                      calendarCustomerSignalClass(line.entry),
+                      calendarFulfilmentBackgroundClass(
+                        line.entry.fulfilmentMethod,
+                      ),
+                    ].join(" ")}
+                  >
                     {customerLabel}
                   </span>
                 </button>

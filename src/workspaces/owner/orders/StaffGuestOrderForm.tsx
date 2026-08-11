@@ -12,12 +12,17 @@ import {
   FormSubmitButton,
   FormTextarea,
 } from "@/components/ui/form";
-import { OwnerPickupFields } from "@/components/ui/OwnerPickupFields";
 import {
   buildEditablePaidAddonDrafts,
   paidAddonDraftsToMutationPayload,
   type EditablePaidAddonDraft,
 } from "@/engines/orders/paid-addons";
+import {
+  defaultDeliveryCreateDraft,
+  defaultOwnerCreateFulfilmentMethod,
+  type DeliveryCreateDraft,
+  type OwnerCreateFulfilmentMethod,
+} from "@/engines/orders/fulfilment";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type { PaidAddonType, StorefrontCake } from "@/types/storefront";
 import type { CollectionComplimentaryOption } from "@/workspaces/owner/orders/queries";
@@ -27,6 +32,7 @@ import {
 } from "@/workspaces/owner/orders/actions";
 import { STAFF_GUEST_ORDER_SOURCES } from "@/workspaces/owner/orders/labels";
 import { OrderPaidAddonsEditor } from "@/workspaces/owner/orders/OrderPaidAddonsEditor";
+import { OrderFulfilmentCreateFields } from "@/workspaces/owner/orders/OrderFulfilmentCreateFields";
 
 type EditableItem = {
   key: string;
@@ -60,6 +66,14 @@ export function StaffGuestOrderForm({
   const [state, formAction, pending] = useActionState(
     createStaffGuestOrderAction,
     initialState,
+  );
+
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [fulfilmentMethod, setFulfilmentMethod] =
+    useState<OwnerCreateFulfilmentMethod>(defaultOwnerCreateFulfilmentMethod);
+  const [deliveryDraft, setDeliveryDraft] = useState<DeliveryCreateDraft>(
+    defaultDeliveryCreateDraft,
   );
 
   const [items, setItems] = useState<EditableItem[]>(() => {
@@ -98,6 +112,10 @@ export function StaffGuestOrderForm({
   const paidAddonsJson = useMemo(
     () => JSON.stringify(paidAddonDraftsToMutationPayload(paidAddonDrafts)),
     [paidAddonDrafts],
+  );
+  const deliveryJson = useMemo(
+    () => JSON.stringify(deliveryDraft),
+    [deliveryDraft],
   );
 
   function updateCakeLine(key: string, patch: Partial<EditableItem>) {
@@ -144,13 +162,21 @@ export function StaffGuestOrderForm({
       <input name="items_json" type="hidden" value={itemsJson} />
       <input name="complimentary_json" type="hidden" value={complimentaryJson} />
       <input name="paid_addons_json" type="hidden" value={paidAddonsJson} />
+      <input name="fulfilment_method" type="hidden" value={fulfilmentMethod} />
+      <input name="delivery_json" type="hidden" value={deliveryJson} />
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
           Customer
         </h2>
         <FormField htmlFor="guest_name" label="Customer name">
-          <FormInput id="guest_name" name="guest_name" required />
+          <FormInput
+            id="guest_name"
+            name="guest_name"
+            onChange={(event) => setGuestName(event.target.value)}
+            required
+            value={guestName}
+          />
         </FormField>
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField
@@ -158,14 +184,25 @@ export function StaffGuestOrderForm({
             htmlFor="guest_phone"
             label="WhatsApp phone (optional)"
           >
-            <FormInput id="guest_phone" name="guest_phone" type="tel" />
+            <FormInput
+              id="guest_phone"
+              name="guest_phone"
+              onChange={(event) => setGuestPhone(event.target.value)}
+              type="tel"
+              value={guestPhone}
+            />
           </FormField>
           <FormField htmlFor="guest_email" label="Email (optional)">
             <FormInput id="guest_email" name="guest_email" type="email" />
           </FormField>
         </div>
         <FormField htmlFor="order_source" label="Order source">
-          <FormSelect defaultValue="jotform" id="order_source" name="order_source" required>
+          <FormSelect
+            defaultValue="jotform"
+            id="order_source"
+            name="order_source"
+            required
+          >
             {STAFF_GUEST_ORDER_SOURCES.map((source) => (
               <option key={source.value} value={source.value}>
                 {source.label}
@@ -181,12 +218,14 @@ export function StaffGuestOrderForm({
         />
       </section>
 
-      <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
-        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-          Pickup
-        </h2>
-        <OwnerPickupFields />
-      </section>
+      <OrderFulfilmentCreateFields
+        customerName={guestName}
+        customerPhone={guestPhone}
+        delivery={deliveryDraft}
+        method={fulfilmentMethod}
+        onDeliveryChange={setDeliveryDraft}
+        onMethodChange={setFulfilmentMethod}
+      />
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
         <div className="flex items-center justify-between gap-3">

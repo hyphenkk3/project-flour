@@ -1,6 +1,12 @@
 import { moneyCompare } from "@/engines/orders/money";
 import { paidAddonsMateriallyDiffer } from "@/engines/orders/paid-addons";
-import type { GuestOrderStatus, StorefrontOrder } from "@/types/storefront";
+import { fulfilmentMateriallyDiffer } from "@/engines/orders/fulfilment";
+import type {
+  GuestOrderStatus,
+  StorefrontOrder,
+  StorefrontOrderDelivery,
+  StorefrontOrderFulfilmentMethod,
+} from "@/types/storefront";
 
 /** Fields that appear in the customer-facing confirmation message. */
 export function orderMateriallyAffectsConfirmation(
@@ -31,6 +37,8 @@ export function orderMateriallyAffectsConfirmation(
         writtenMessage: string | null;
       }> | Array<string | null>;
     }>;
+    fulfilmentMethod?: StorefrontOrderFulfilmentMethod;
+    delivery?: StorefrontOrderDelivery | null;
   },
 ): boolean {
   if (before.customerName.trim() !== after.customerName.trim()) return true;
@@ -50,6 +58,26 @@ export function orderMateriallyAffectsConfirmation(
 
   if (
     paidAddonsMateriallyDiffer(before.paidAddons ?? [], after.paidAddons ?? [])
+  ) {
+    return true;
+  }
+
+  if (
+    fulfilmentMateriallyDiffer(
+      {
+        method: before.fulfilmentMethod,
+        pickupDate: before.pickupDate,
+        pickupTime: before.pickupTime,
+        delivery: before.delivery,
+      },
+      {
+        method: after.fulfilmentMethod ?? before.fulfilmentMethod,
+        pickupDate: after.pickupDate,
+        pickupTime: after.pickupTime,
+        delivery:
+          after.delivery !== undefined ? after.delivery : before.delivery,
+      },
+    )
   ) {
     return true;
   }

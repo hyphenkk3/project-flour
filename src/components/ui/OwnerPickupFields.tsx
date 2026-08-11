@@ -15,6 +15,9 @@ type OwnerPickupFieldsProps = {
   defaultDate?: string;
   defaultTime?: string;
   onDateChange?: (date: string) => void;
+  /** Contextual schedule labels (Delivery reuses pickup_date / pickup_time). */
+  dateLabel?: string;
+  timeLabel?: string;
 };
 
 /**
@@ -26,6 +29,8 @@ export function OwnerPickupFields({
   defaultDate,
   defaultTime,
   onDateChange,
+  dateLabel = "Pickup date",
+  timeLabel = "Pickup time",
 }: OwnerPickupFieldsProps) {
   const minDate = earliestPickupDateYmd();
   const initialTime = defaultTime
@@ -57,7 +62,7 @@ export function OwnerPickupFields({
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField htmlFor="pickup_date" label="Pickup date">
+        <FormField htmlFor="pickup_date" label={dateLabel}>
           <FormInput
             id="pickup_date"
             min={minDate}
@@ -82,7 +87,7 @@ export function OwnerPickupFields({
         <FormField
           help="Choose a public slot, or Custom time for special arrangements."
           htmlFor="pickup_time_mode"
-          label="Pickup time"
+          label={timeLabel}
         >
           <FormSelect
             disabled={!date}

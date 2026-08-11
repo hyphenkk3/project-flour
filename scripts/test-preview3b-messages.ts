@@ -121,6 +121,8 @@ function baseOrder(overrides: Partial<StorefrontOrder> = {}): StorefrontOrder {
       },
     ],
     paidAddons: [],
+    fulfilmentMethod: "pickup",
+    delivery: null,
     total: 135,
     adjustments: [],
     paymentAllocations: [

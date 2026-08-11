@@ -4,6 +4,10 @@ import {
   formatComplimentaryLine,
 } from "@/engines/orders/confirmation-message";
 import {
+  isPickupCrewMessageAvailable,
+  pickupCrewUnavailableReason,
+} from "@/engines/orders/fulfilment";
+import {
   formatItemPriceComponent,
   formatOrderFinancialEquation,
   commercialEquationItems,
@@ -278,6 +282,13 @@ export function formatCrewAmountHead(input: {
 }
 
 export function generateCrewOrderMessage(order: StorefrontOrder): string {
+  if (!isPickupCrewMessageAvailable(order.fulfilmentMethod)) {
+    throw new Error(
+      pickupCrewUnavailableReason(order.fulfilmentMethod) ??
+        "Delivery Crew message is not available yet.",
+    );
+  }
+
   const unpaid = order.settlement.remainingBalance > 0;
   const headerPrefix = unpaid ? "🔺🟢" : "🟢";
   const dateShort = formatPickupDateShort(order.pickupDate);

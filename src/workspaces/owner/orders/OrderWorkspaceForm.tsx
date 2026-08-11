@@ -19,8 +19,6 @@ import {
   FormSubmitButton,
   FormTextarea,
 } from "@/components/ui/form";
-import { OwnerPickupFields } from "@/components/ui/OwnerPickupFields";
-import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatLongBusinessDate, formatBusinessMonthYear, isDifferentBusinessMonth } from "@/lib/dates";
 import {
@@ -33,6 +31,13 @@ import {
   paidAddonDraftsToMutationPayload,
   type EditablePaidAddonDraft,
 } from "@/engines/orders/paid-addons";
+import {
+  buildWorkspaceFulfilmentViewModel,
+  deliveryDraftFromPersistedOrder,
+  normalizeOwnerCreateFulfilmentMethod,
+  type DeliveryCreateDraft,
+  type OwnerCreateFulfilmentMethod,
+} from "@/engines/orders/fulfilment";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type {
   ConfirmationSnapshot,
@@ -47,6 +52,7 @@ import {
   type OrderWorkspaceSaveState,
 } from "@/workspaces/owner/orders/actions";
 import { CustomerConfirmedButton } from "@/workspaces/owner/orders/CustomerConfirmedButton";
+import { OrderFulfilmentCreateFields } from "@/workspaces/owner/orders/OrderFulfilmentCreateFields";
 import { OrderMessagesSection } from "@/workspaces/owner/orders/OrderMessagesSection";
 import { OrderOperationalControls } from "@/workspaces/owner/orders/OrderOperationalControls";
 import { OrderPaidAddonsEditor } from "@/workspaces/owner/orders/OrderPaidAddonsEditor";
@@ -159,10 +165,26 @@ export function OrderWorkspaceForm({
   const [editPaidAddons, setEditPaidAddons] = useState<
     EditablePaidAddonDraft[]
   >([]);
+  const [editGuestName, setEditGuestName] = useState(order.customerName);
+  const [editGuestPhone, setEditGuestPhone] = useState(order.phone);
+  const [editFulfilmentMethod, setEditFulfilmentMethod] =
+    useState<OwnerCreateFulfilmentMethod>(() =>
+      normalizeOwnerCreateFulfilmentMethod(order.fulfilmentMethod),
+    );
+  const [editDeliveryDraft, setEditDeliveryDraft] = useState<DeliveryCreateDraft>(
+    () =>
+      deliveryDraftFromPersistedOrder({
+        customerName: order.customerName,
+        customerPhone: order.phone,
+        fulfilmentMethod: order.fulfilmentMethod,
+        delivery: order.delivery,
+      }),
+  );
 
   const canEdit = isGuestOrderEditable(order.status);
   const phoneRequired = guestOrderRequiresPhone(order.orderSource);
   const sourceLocked = order.orderSource === "customer_website";
+  const fulfilmentView = buildWorkspaceFulfilmentViewModel(order);
   const [needsAttention, setNeedsAttention] = useState(
     order.needsBakeryAttention,
   );
@@ -173,13 +195,39 @@ export function OrderWorkspaceForm({
     order.pickupDate,
     editPickupDate,
   );
+  const deliveryJson = useMemo(
+    () => JSON.stringify(editDeliveryDraft),
+    [editDeliveryDraft],
+  );
 
   useEffect(() => {
     if (mode !== "edit") return;
     setNeedsAttention(order.needsBakeryAttention);
     setEditPickupDate(order.pickupDate);
     setPickupMonthOverride(false);
-  }, [mode, order.needsBakeryAttention, order.pickupDate, formKey]);
+    setEditGuestName(order.customerName);
+    setEditGuestPhone(order.phone);
+    setEditFulfilmentMethod(
+      normalizeOwnerCreateFulfilmentMethod(order.fulfilmentMethod),
+    );
+    setEditDeliveryDraft(
+      deliveryDraftFromPersistedOrder({
+        customerName: order.customerName,
+        customerPhone: order.phone,
+        fulfilmentMethod: order.fulfilmentMethod,
+        delivery: order.delivery,
+      }),
+    );
+  }, [
+    mode,
+    order.needsBakeryAttention,
+    order.pickupDate,
+    order.customerName,
+    order.phone,
+    order.fulfilmentMethod,
+    order.delivery,
+    formKey,
+  ]);
 
   useEffect(() => {
     if (!pickupMonthChanging) {
@@ -230,6 +278,19 @@ export function OrderWorkspaceForm({
       buildEditablePaidAddonDrafts({
         catalog: paidAddonCatalog,
         existing: order.paidAddons ?? [],
+      }),
+    );
+    setEditGuestName(order.customerName);
+    setEditGuestPhone(order.phone);
+    setEditFulfilmentMethod(
+      normalizeOwnerCreateFulfilmentMethod(order.fulfilmentMethod),
+    );
+    setEditDeliveryDraft(
+      deliveryDraftFromPersistedOrder({
+        customerName: order.customerName,
+        customerPhone: order.phone,
+        fulfilmentMethod: order.fulfilmentMethod,
+        delivery: order.delivery,
       }),
     );
   }
@@ -340,15 +401,65 @@ export function OrderWorkspaceForm({
           </div>
         </ViewBlock>
 
-        <ViewBlock title="Pickup">
-          <div className="space-y-1">
-            <p className="text-ink text-base font-semibold">
-              {formatLongBusinessDate(order.pickupDate)}
-            </p>
-            <p className="text-ink text-sm">
-              {formatPickupTime(order.pickupTime)}
-            </p>
-          </div>
+        <ViewBlock title={fulfilmentView.sectionTitle}>
+          {fulfilmentView.isDelivery ? (
+            <div className="space-y-1">
+              <p className="text-skyline text-xs font-medium tracking-wide uppercase">
+                {fulfilmentView.dateLabel}
+              </p>
+              <p className="text-ink text-base font-semibold">
+                {formatLongBusinessDate(order.pickupDate)}
+              </p>
+              <p className="text-skyline mt-2 text-xs font-medium tracking-wide uppercase">
+                {fulfilmentView.timeLabel}
+              </p>
+              <p className="text-ink text-sm">
+                {formatPickupTime(order.pickupTime)}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <p className="text-ink text-base font-semibold">
+                {formatLongBusinessDate(order.pickupDate)}
+              </p>
+              <p className="text-ink text-sm">
+                {formatPickupTime(order.pickupTime)}
+              </p>
+            </div>
+          )}
+          {fulfilmentView.isDelivery && fulfilmentView.delivery ? (
+            <div className="border-fog mt-4 space-y-2 border-t pt-4">
+              <p className="text-ink text-sm">
+                <span className="text-skyline">Recipient · </span>
+                {fulfilmentView.delivery.recipientName}
+              </p>
+              <p className="text-ink text-sm">
+                <span className="text-skyline">Phone · </span>
+                {fulfilmentView.delivery.recipientPhone}
+              </p>
+              <p className="text-ink text-sm">
+                {fulfilmentView.delivery.addressLine1}
+              </p>
+              {fulfilmentView.delivery.addressLine2 ? (
+                <p className="text-ink text-sm">
+                  {fulfilmentView.delivery.addressLine2}
+                </p>
+              ) : null}
+              <p className="text-ink text-sm">
+                {fulfilmentView.delivery.postcode}{" "}
+                {fulfilmentView.delivery.city}
+              </p>
+              <p className="text-ink text-sm">
+                {fulfilmentView.delivery.state}
+              </p>
+              {fulfilmentView.notifyLabel ? (
+                <p className="text-ink text-sm">
+                  <span className="text-skyline">Notify · </span>
+                  {fulfilmentView.notifyLabel}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </ViewBlock>
 
         <ViewBlock title="Order">
@@ -578,6 +689,8 @@ export function OrderWorkspaceForm({
       <input name="items_json" type="hidden" value={itemsJson} />
       <input name="complimentary_json" type="hidden" value={complimentaryJson} />
       <input name="paid_addons_json" type="hidden" value={paidAddonsJson} />
+      <input name="fulfilment_method" type="hidden" value={editFulfilmentMethod} />
+      <input name="delivery_json" type="hidden" value={deliveryJson} />
 
       <div className="flex flex-wrap items-center gap-3">
         <StatusBadge
@@ -594,10 +707,11 @@ export function OrderWorkspaceForm({
         </h2>
         <FormField htmlFor="guest_name" label="Name">
           <FormInput
-            defaultValue={order.customerName}
             id="guest_name"
             name="guest_name"
+            onChange={(event) => setEditGuestName(event.target.value)}
             required
+            value={editGuestName}
           />
         </FormField>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -613,11 +727,12 @@ export function OrderWorkspaceForm({
             }
           >
             <FormInput
-              defaultValue={order.phone}
               id="guest_phone"
               name="guest_phone"
+              onChange={(event) => setEditGuestPhone(event.target.value)}
               required={phoneRequired}
               type="tel"
+              value={editGuestPhone}
             />
           </FormField>
           <FormField
@@ -668,28 +783,25 @@ export function OrderWorkspaceForm({
         />
       </section>
 
-      <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
-        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-          Pickup
-        </h2>
-        {sourceLocked ? (
-          <PickupSlotFields
-            defaultDate={order.pickupDate}
-            defaultTime={order.pickupTime}
-            onDateChange={setEditPickupDate}
-          />
-        ) : (
-          <OwnerPickupFields
-            defaultDate={order.pickupDate}
-            defaultTime={order.pickupTime}
-            onDateChange={setEditPickupDate}
-          />
-        )}
+      <div className="space-y-4">
+        <OrderFulfilmentCreateFields
+          customerName={editGuestName}
+          customerPhone={editGuestPhone}
+          defaultDate={order.pickupDate}
+          defaultTime={order.pickupTime}
+          delivery={editDeliveryDraft}
+          method={editFulfilmentMethod}
+          onDateChange={setEditPickupDate}
+          onDeliveryChange={setEditDeliveryDraft}
+          onMethodChange={setEditFulfilmentMethod}
+          scheduleMode={sourceLocked ? "slots" : "owner"}
+        />
         {pickupMonthChanging ? (
           <div className="border-status-warning/30 bg-status-warning-soft space-y-3 rounded-lg border px-4 py-3">
             <p className="text-status-warning text-sm">
-              This changes the pickup month from{" "}
-              {formatBusinessMonthYear(order.pickupDate)} to{" "}
+              This changes the{" "}
+              {editFulfilmentMethod === "delivery" ? "delivery" : "pickup"}{" "}
+              month from {formatBusinessMonthYear(order.pickupDate)} to{" "}
               {formatBusinessMonthYear(editPickupDate)}.
             </p>
             <label className="text-ink flex items-start gap-2 text-sm">
@@ -705,14 +817,16 @@ export function OrderWorkspaceForm({
                 value="1"
               />
               <span>
-                Owner override — allow pickup month change
+                Owner override — allow{" "}
+                {editFulfilmentMethod === "delivery" ? "delivery" : "pickup"}{" "}
+                month change
               </span>
             </label>
           </div>
         ) : (
           <input name="pickup_month_override" type="hidden" value="0" />
         )}
-      </section>
+      </div>
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
         <div className="flex items-center justify-between gap-3">

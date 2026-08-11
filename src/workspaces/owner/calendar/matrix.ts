@@ -6,6 +6,7 @@ export type MatrixCustomerEntry = {
   customerName: string;
   quantity: number;
   pickupTime: string;
+  fulfilmentMethod: CalendarEntry["fulfilmentMethod"];
   status: CalendarEntry["status"];
   needsBakeryAttention: boolean;
   hasEffectiveRm10: boolean;
@@ -116,6 +117,7 @@ export function buildCalendarMatrix(
           customerName: entry.customerName,
           quantity: qty,
           pickupTime: entry.pickupTime,
+          fulfilmentMethod: entry.fulfilmentMethod,
           status: entry.status,
           needsBakeryAttention: entry.needsBakeryAttention,
           hasEffectiveRm10: entry.hasEffectiveRm10,

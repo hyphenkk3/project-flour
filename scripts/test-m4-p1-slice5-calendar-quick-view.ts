@@ -96,6 +96,7 @@ function calendarEntry(
     id: "order-1",
     pickupDate: "2026-08-15",
     pickupTime: "15:00:00",
+    fulfilmentMethod: "pickup",
     customerName: "Amy",
     displayName: "Amy",
     status: "paid",

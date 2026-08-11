@@ -1,4 +1,8 @@
 import type { CalendarEntry } from "@/workspaces/owner/calendar/types";
+import {
+  CALENDAR_FULFILMENT_DELIVERY_BG_CLASS,
+  calendarFulfilmentBackgroundClass,
+} from "@/workspaces/owner/calendar/calendar-fulfilment-presentation";
 import { guestOrderStatusTextClass } from "@/workspaces/owner/orders/labels";
 
 export function CalendarGuide() {
@@ -35,6 +39,25 @@ export function CalendarGuide() {
           </ul>
         </div>
         <div className="space-y-1">
+          <p className="text-ink/80 font-medium">Fulfilment background</p>
+          <ul className="space-y-0.5">
+            <li className="flex items-center gap-2">
+              <span
+                aria-hidden
+                className={[
+                  CALENDAR_FULFILMENT_DELIVERY_BG_CLASS,
+                  "border-line/40 inline-block h-3 w-5 shrink-0 rounded-sm border",
+                ].join(" ")}
+              />
+              <span>Delivery</span>
+            </li>
+            <li>
+              <span className="text-ink/70">Pickup</span>
+              {" = default (no fill)"}
+            </li>
+          </ul>
+        </div>
+        <div className="space-y-1">
           <p className="text-ink/80 font-medium">Notation</p>
           <ul className="space-y-0.5">
             <li>
@@ -57,6 +80,7 @@ export function CalendarGuide() {
         </div>
       </div>
       <p className="mt-2 text-[11px] text-zinc-500">
+        Status colour = order/payment state. Soft background = fulfilment method.
         Same status colours as Operations. Tap a line to open Quick View.
       </p>
     </aside>
@@ -73,4 +97,14 @@ export function calendarCustomerSignalClass(entry: CalendarEntry): string {
     parts.push("line-through");
   }
   return parts.join(" ");
+}
+
+/** Status signals + fulfilment background for Calendar identity lines. */
+export function calendarCustomerLineClass(entry: CalendarEntry): string {
+  return [
+    calendarCustomerSignalClass(entry),
+    calendarFulfilmentBackgroundClass(entry.fulfilmentMethod),
+  ]
+    .filter(Boolean)
+    .join(" ");
 }

@@ -2,6 +2,118 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-11 — M4-P2 Slice 5 CLOSED · Calendar fulfilment background ACCEPTED
+
+**STATUS: CLOSED** for authorized Slice 5 scope (Calendar fulfilment awareness /
+background colour). Implementation remains uncommitted on working tree at HEAD
+`b95f5da4934296e0865c1b76f5dbd3bdd4568c10` until Product authorizes commit.
+
+Visual Trial 1 (`#e4f0ee`, tight `px-0.5`) was rejected as too subtle.
+**Visual Trial 2 is Product-accepted.**
+
+### Accepted Calendar fulfilment presentation (locked Slice 5 Product truth)
+
+- Calendar month list carries lightweight `fulfilmentMethod` from
+  `orders.fulfilment_method` (no Delivery details query; **no migration**).
+- Presentation derives from stored/normalized **fulfilment_method only** —
+  never from customer/order name text (e.g. a name containing “pickup”).
+- Fulfilment distinction uses **BACKGROUND COLOUR** on the customer/order
+  identity line (not emoji; not status text colour).
+- **Pickup** = existing/default baseline (no fulfilment fill).
+- **Delivery** = soft identity background:
+  - class: `bg-signal-soft`
+  - token: `--color-signal-soft: #b8d4cf`
+  - chrome: `inline-block rounded-sm px-1 py-0.5`
+- Status text colours remain authoritative for order/payment state and must
+  coexist with Delivery background.
+- Ready `●` / Picked Up `✓` / bakery-attention bold / RM10 strikethrough /
+  source·crew suffixes remain unchanged and coexist.
+- Today chrome (`status-info-soft`) remains independent of Delivery identity fill.
+- Guide documents Delivery swatch + Pickup default; no Dine-In Guide row; no emoji.
+- Copy: “Production scan by fulfilment date…”; “No whole-cake orders…”.
+- null / unknown / `drive_through` → Pickup baseline (never invent Delivery).
+- Future Dine-In may extend the presentation map later — **not** implemented in
+  M4-P2 Owner controls.
+
+Matrix/Cakes production counts remain cake-only (`order_items`); fulfilment is
+presentation metadata only. Quick View was not visually redesigned by Slice 5
+(Slice 4 Delivery-aware QV preserved).
+
+### Carry-forward (unchanged; do not pull into closed Slice 5)
+
+- Delivery RM5 processing fee + variable Delivery fee → **M4-P3**
+- Delivery Crew message → **M4-P4**
+- Fulfilment-aware Delivery completion / lifecycle terminology → **M4-P5**
+- Operations non-default fulfilment indicator / emoji → **Owner Operations backlog**
+- Order Workspace → View in Calendar → **Owner workflow backlog**
+- EXTRA untouched · Dine-In outside M4-P2 Owner controls
+
+## 2026-08-11 — M4-P2 Slice 4 CLOSED · Product Tests 1–14 PASS
+
+**STATUS: CLOSED** for authorized Slice 4 scope (Confirmation + Crew gate +
+Quick View). Implementation remains uncommitted on working tree at HEAD
+`b95f5da4934296e0865c1b76f5dbd3bdd4568c10` until Product authorizes commit.
+
+M4-P2 Slice 5 is CLOSED (see above). M4-P3 / M4-P4 / M4-P5 are **not started**.
+
+### Accepted Confirmation presentation (locked Slice 4 Product truth)
+
+Shared opening/closing separator (Pickup + Delivery; identical rails):
+
+`____________________________________________________________` (exactly 60 `_`)
+
+Delivery different-recipient identity + notify rules, Same-as-Customer compact
+identity, KK/Sabah omitted from customer-facing Address, complimentary↔notify
+adjacency, Time→Whole Cake blank line, and frozen historical `message_body`
+behaviour are Product-accepted. Do not redesign unless Product reopens.
+
+Delivery Crew remains gated: “Delivery Crew message is not available yet.”
+(Pickup Crew unchanged.) Delivery Quick View / Pickup Quick View accepted.
+
+**Financial boundary at Slice 4:** Delivery still contributes **RM0** to
+settlement. Product Test 13 PASS only proves non-regression of existing
+payment/discount/paid-add-on behaviour — **not** acceptance of final Delivery
+totals once fees exist.
+
+### Carry-forward Product truths (NOT implemented; do not pull into Slice 4/5)
+
+| Observation | Classification (existing plan) |
+| --- | --- |
+| RM5 processing fee + variable Delivery fee (historically often rounded RM5/10/15/20 + RM5 pf; architecture not locked to those values) | **M4-P3 — Delivery Fees & Settlement** |
+| Delivery Crew message body | **M4-P4 — Delivery Crew Message** |
+| Fulfilment-aware Delivery completion (Collection / Mark Picked Up is wrong for Delivery; labels e.g. Ready / Out for Delivery / Delivered **not locked**) | **M4-P5 — Delivery Lifecycle & Customer Messaging** |
+| Calendar fulfilment colours / Delivery Calendar awareness | **M4-P2 Slice 5** — **CLOSED / Product-accepted** |
+| Operations list non-default fulfilment indicator (subtle scan cue; emoji 🚗/🍽️ suggested only) | **Owner Operations backlog** — not an M4-P2 Slice 5 item; not M4-P3/P4/P5 |
+| Order Workspace → “View in Calendar” (navigate to fulfilment date; preferably surface/open originating order via existing Calendar/Quick View; **navigation only / zero mutation**) | **Owner workflow backlog** — reuse existing Calendar architecture; not Slice 5 colours; not M4-P3/P4/P5 |
+| Dine-In fulfilment controls / product path | **Outside M4-P2** (see below). Ops indicator may eventually mention Dine-In without bringing Dine-In into M4-P2. |
+| EXTRA workflow | **Out of M4-P2** (unchanged) |
+
+## 2026-08-11 — M4-P2 Product truths recorded (Slice 5 accepted)
+
+### Calendar fulfilment colour (M4-P2 Slice 5 — CLOSED)
+
+Fulfilment type is operationally represented by background colour on Calendar
+identity lines. Accepted Product mapping:
+
+- normal Pickup — baseline / default background
+- Delivery — `bg-signal-soft` (`#b8d4cf`) + `inline-block rounded-sm px-1 py-0.5`
+- Dine-in — future different background; **not** implemented in M4-P2 Owner controls
+
+Dine-in must **not** be introduced into Owner M4-P2 fulfilment controls.
+
+### EXTRA workflow (out of M4-P2)
+
+Future EXTRA:
+
+- Owner may input/propose EXTRA.
+- Bakery may input/propose EXTRA.
+- Bakery has final authority.
+- Proposed EXTRA is **not** sellable.
+- Only Bakery-confirmed EXTRA becomes sellable/available stock.
+- Bakery may delete/reject an EXTRA proposed by Owner.
+
+Do not implement EXTRA in M4-P2.
+
 ## 2026-08-09 — Milestone 3 CLOSED · Milestone 4 NEXT (roadmap lock)
 
 Product-approved roadmap reconciliation after Preview 3B.
@@ -23,7 +135,14 @@ Product-approved roadmap reconciliation after Preview 3B.
 
 ### Milestone 4 — Delivery & Order Fulfilment Foundation
 
-**STATUS: NEXT** · Implementation not started.
+**STATUS: IN PROGRESS**
+
+- **M4-P1 — Paid Order Add-ons:** CLOSED (committed at
+  `b95f5da4934296e0865c1b76f5dbd3bdd4568c10`).
+- **M4-P2 — Fulfilment & Delivery Order Model:** CLOSED for Product (Slices 1–5
+  accepted; working tree uncommitted). Website remains Pickup-only for this
+  milestone only.
+- **M4-P3 / M4-P4 / M4-P5:** not started.
 
 Locked Product-testable preview sequence (do not reorder without Product approval):
 

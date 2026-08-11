@@ -2,7 +2,11 @@ import {
   deriveOperationalState,
   type OperationalTimestamps,
 } from "@/engines/orders/operational-state";
+import {
+  isPickupCrewMessageAvailable,
+} from "@/engines/orders/fulfilment";
 import type { MessageType } from "@/engines/orders/messages";
+import type { StorefrontOrderFulfilmentMethod } from "@/types/storefront";
 
 export type MessageAction = {
   type: MessageType;
@@ -15,33 +19,49 @@ export type MessageAction = {
   primary: boolean;
 };
 
+export type MessageAvailabilityInput = OperationalTimestamps & {
+  /**
+   * Delivery orders suppress Pickup Crew (M4-P4 owns Delivery Crew body).
+   * Missing/unknown → treat as Pickup-available (historical safety).
+   */
+  fulfilmentMethod?: StorefrontOrderFulfilmentMethod | null;
+};
+
 /**
  * Message availability by Collection operational state (Preview 3B).
  * Display groups: INTERNAL · CREW, then CUSTOMER.
  * Within CUSTOMER, primary action first (Ready when ready; Thank You when picked up).
  * Membership only changes by state; unavailable types are omitted.
+ * Delivery: Pickup Crew action omitted (shared gate — see generateCrewOrderMessage).
  */
 export function messageActionsForOperationalState(
-  input: OperationalTimestamps,
+  input: MessageAvailabilityInput,
 ): MessageAction[] {
   const state = deriveOperationalState(input);
+  const crewAvailable = isPickupCrewMessageAvailable(input.fulfilmentMethod);
 
   switch (state) {
     case "not_ready":
-      return [
-        {
-          type: "crew",
-          title: "Crew Order Message",
-          primary: true,
-        },
-      ];
+      return crewAvailable
+        ? [
+            {
+              type: "crew",
+              title: "Crew Order Message",
+              primary: true,
+            },
+          ]
+        : [];
     case "ready":
       return [
-        {
-          type: "crew",
-          title: "Crew Order Message",
-          primary: false,
-        },
+        ...(crewAvailable
+          ? [
+              {
+                type: "crew" as const,
+                title: "Crew Order Message",
+                primary: false,
+              },
+            ]
+          : []),
         {
           type: "customer_ready",
           title: "Customer Ready Message",
@@ -50,11 +70,15 @@ export function messageActionsForOperationalState(
       ];
     case "picked_up":
       return [
-        {
-          type: "crew",
-          title: "Crew Order Message",
-          primary: false,
-        },
+        ...(crewAvailable
+          ? [
+              {
+                type: "crew" as const,
+                title: "Crew Order Message",
+                primary: false,
+              },
+            ]
+          : []),
         {
           type: "customer_thank_you",
           title: "Customer Thank You Message",

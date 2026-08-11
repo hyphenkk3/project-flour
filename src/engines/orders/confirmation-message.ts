@@ -4,6 +4,9 @@ import {
   formatOrderFinancialEquation,
 } from "@/engines/orders/financial-equation";
 import {
+  isDeliveryRecipientSameAsOrderingCustomer,
+} from "@/engines/orders/fulfilment";
+import {
   messagesForQuantity,
   normalizeWrittenMessage,
 } from "@/engines/orders/paid-addons";
@@ -12,11 +15,21 @@ import { normalizePaidAddonLines } from "@/engines/orders/totals";
 import type {
   ConfirmationPayload,
   OrderAdjustment,
+  RecipientNotifyPreference,
   StorefrontOrder,
+  StorefrontOrderDelivery,
+  StorefrontOrderFulfilmentMethod,
 } from "@/types/storefront";
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const MESSAGE_SEPARATOR = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~";
+
+/**
+ * Shared Confirmation section rails — opening and closing MUST be identical.
+ * Product-approved long underscore separator (60 characters).
+ */
+export const CONFIRMATION_SECTION_SEPARATOR =
+  "____________________________________________________________";
 
 function parseYmd(ymd: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim());
@@ -190,6 +203,7 @@ export function formatConfirmationFinancialBlock(
 /**
  * Generates the Whitebird WhatsApp confirmation message body.
  * Preserve tone — do not rewrite into generic e-commerce language.
+ * Pickup + Delivery share identical section separators and spacing rhythm.
  */
 export function generateConfirmationMessage(
   payload: ConfirmationPayload,
@@ -205,32 +219,162 @@ export function generateConfirmationMessage(
   const specialRequest = formatConfirmationSpecialRequestBlock(
     payload.paidAddons,
   );
-  const specialRequestBlock = specialRequest ? `\n${specialRequest}\n` : "\n";
+
+  const isDelivery = payload.fulfilmentMethod === "delivery";
+  const samePerson =
+    isDelivery &&
+    isDeliveryRecipientSameAsOrderingCustomer({
+      customerName: payload.customerName,
+      customerPhone: payload.customerPhone,
+      delivery: payload.delivery,
+    });
+  const showDeliveryNotify = Boolean(
+    isDelivery && payload.delivery && !samePerson,
+  );
 
   const complimentary = formatComplimentaryLine(payload.complimentaryItems);
-  const complimentaryBlock = complimentary
-    ? `\n*Complimentary ${complimentary}\n`
-    : "\n";
+  const notifyInstruction = showDeliveryNotify
+    ? formatConfirmationRecipientNotifyInstruction(
+        payload.delivery!.recipientNotifyPreference,
+      )
+    : null;
+
+  // Complimentary + Delivery notify are adjacent (no blank line between).
+  const postAmountLines: string[] = [];
+  if (complimentary) {
+    postAmountLines.push(`*Complimentary ${complimentary}`);
+  }
+  if (notifyInstruction) {
+    postAmountLines.push(notifyInstruction);
+  }
+  const postAmountBlock =
+    postAmountLines.length > 0 ? postAmountLines.join("\n") : null;
+
+  const fulfilmentBlock = formatConfirmationFulfilmentBlock({
+    fulfilmentMethod: payload.fulfilmentMethod,
+    delivery: payload.delivery,
+    customerName: payload.customerName,
+    customerPhone: payload.customerPhone,
+    pickupDate: payload.pickupDate,
+    pickupTime: payload.pickupTime,
+    dateShort,
+    weekday,
+    timeLabel,
+  });
+
+  // Order section (between identical separators).
+  let orderSection =
+    `${fulfilmentBlock}\n\n` +
+    `Whole Cake;\n` +
+    `${commercialLines}`;
+  if (specialRequest) {
+    orderSection += `\n\n${specialRequest}`;
+  }
+  orderSection += `\n\n${financialBlock}`;
+  if (postAmountBlock) {
+    orderSection += `\n\n${postAmountBlock}`;
+  }
 
   return (
     `Hello ${payload.staffCustomerFacingName} here,\n\n` +
     `We've received your cakes preorder submission via online system. ;)\n\n` +
     `Here's the order confirmation.\n\n` +
-    `🟠Pick-up order: ${dateShort} (${weekday})\n\n` +
-    `Ordered by: ${payload.customerName}\n` +
-    `Phone No: ${payload.customerPhone}\n` +
-    `Time: ${timeLabel}\n\n` +
-    `Whole Cake;\n` +
-    `${commercialLines}\n` +
-    specialRequestBlock +
-    `${financialBlock}\n` +
-    complimentaryBlock +
-    `\n` +
+    `${CONFIRMATION_SECTION_SEPARATOR}\n\n` +
+    `${orderSection}\n\n` +
+    `${CONFIRMATION_SECTION_SEPARATOR}\n\n` +
     `Kindly review ALL the details in this confirmation carefully, as your order will be prepared based on the information provided above.\n\n` +
     `Once confirmed, any amendments or errors will not be our responsibility.\n` +
     `Important: Voucher orders are final and cannot be amended under any circumstances.\n\n` +
     `We will proceed with payment once everything is confirmed 😊`
   );
+}
+
+/**
+ * Customer-facing Confirmation address — entered lines + postcode only.
+ * Omits persisted KK/Sabah (internal normalization remains in DB / Workspace).
+ */
+export function formatConfirmationDeliveryAddress(
+  delivery: StorefrontOrderDelivery,
+): string {
+  const parts: string[] = [];
+  const line1 = String(delivery.addressLine1 ?? "").trim();
+  const line2 = String(delivery.addressLine2 ?? "").trim();
+  const postcode = String(delivery.postcode ?? "").trim();
+  if (line1) parts.push(line1);
+  if (line2) parts.push(line2);
+  if (postcode) parts.push(postcode);
+  return parts.join(", ");
+}
+
+/** Product-approved different-recipient notify lines (customer Confirmation). */
+export function formatConfirmationRecipientNotifyInstruction(
+  preference: RecipientNotifyPreference,
+): string {
+  if (preference === "do_not_inform_recipient") {
+    return "*DO NOT inform Recipient (It's a Surprise!)";
+  }
+  return "*Inform Recipient before delivery.";
+}
+
+/**
+ * Fulfilment header + identity/address block.
+ * Missing fulfilmentMethod → Pickup (historical snapshots).
+ * Explicit delivery method never falsifies to Pickup.
+ *
+ * Delivery identity rows are consecutive (no blank lines between).
+ * Exactly one blank line after Time is provided by the caller before Whole Cake.
+ */
+export function formatConfirmationFulfilmentBlock(input: {
+  fulfilmentMethod?: StorefrontOrderFulfilmentMethod | null;
+  delivery?: StorefrontOrderDelivery | null;
+  customerName: string;
+  customerPhone: string;
+  pickupDate: string;
+  pickupTime: string;
+  dateShort: string;
+  weekday: string;
+  timeLabel: string;
+}): string {
+  const isDelivery = input.fulfilmentMethod === "delivery";
+  if (!isDelivery) {
+    return (
+      `🟠Pick-up order: ${input.dateShort} (${input.weekday})\n\n` +
+      `Ordered by: ${input.customerName}\n` +
+      `Phone No: ${input.customerPhone}\n` +
+      `Time: ${input.timeLabel}`
+    );
+  }
+
+  const header = `🟠🚗 Delivery order: ${input.dateShort} (${input.weekday})`;
+  const delivery = input.delivery ?? null;
+  const samePerson = isDeliveryRecipientSameAsOrderingCustomer({
+    customerName: input.customerName,
+    customerPhone: input.customerPhone,
+    delivery,
+  });
+
+  const lines: string[] = [header, ""];
+
+  if (samePerson && delivery) {
+    lines.push(`Ordered by/ Recipient: ${input.customerName}`);
+    lines.push(`Phone No: ${input.customerPhone}`);
+    lines.push(`Address: ${formatConfirmationDeliveryAddress(delivery)}`);
+    lines.push(`Time: ${input.timeLabel}`);
+  } else if (delivery) {
+    lines.push(`Ordered by: ${input.customerName}`);
+    lines.push(`Phone No: ${input.customerPhone}`);
+    lines.push(`Recipient: ${delivery.recipientName}`);
+    lines.push(`Recipient Phone No: ${delivery.recipientPhone}`);
+    lines.push(`Address: ${formatConfirmationDeliveryAddress(delivery)}`);
+    lines.push(`Time: ${input.timeLabel}`);
+  } else {
+    // Explicit Delivery without details — still never say Pick-up.
+    lines.push(`Ordered by: ${input.customerName}`);
+    lines.push(`Phone No: ${input.customerPhone}`);
+    lines.push(`Time: ${input.timeLabel}`);
+  }
+
+  return lines.join("\n");
 }
 
 export function buildConfirmationPayload(input: {
@@ -248,6 +392,8 @@ export function buildConfirmationPayload(input: {
   adjustments: ConfirmationPayload["adjustments"];
   /** Authoritative settlement amount due. */
   amountDue: number;
+  fulfilmentMethod?: StorefrontOrderFulfilmentMethod;
+  delivery?: StorefrontOrderDelivery | null;
 }): ConfirmationPayload {
   return {
     staffCustomerFacingName: input.staffCustomerFacingName.trim() || "Whitebird",
@@ -255,6 +401,8 @@ export function buildConfirmationPayload(input: {
     customerPhone: input.customerPhone,
     pickupDate: input.pickupDate,
     pickupTime: input.pickupTime,
+    fulfilmentMethod: input.fulfilmentMethod,
+    delivery: input.delivery ?? null,
     items: input.items,
     complimentaryItems: input.complimentaryItems.filter(
       (item) => item.quantity > 0,
@@ -281,6 +429,8 @@ export function buildConfirmationPayloadFromOrder(input: {
     customerPhone: order.phone,
     pickupDate: order.pickupDate,
     pickupTime: order.pickupTime,
+    fulfilmentMethod: order.fulfilmentMethod,
+    delivery: order.delivery,
     items: order.items.map((item) => ({
       cakeName: item.cakeName,
       sizeLabel: item.sizeLabel,

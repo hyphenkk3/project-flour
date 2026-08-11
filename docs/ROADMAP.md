@@ -75,7 +75,12 @@ See `docs/DECISIONS.md` (Milestone 3 Preview entries, including Preview 3B).
 
 ### Milestone 4 — Delivery & Order Fulfilment Foundation
 
-**STATUS: NEXT** · Implementation **not started**.
+**STATUS: IN PROGRESS**
+
+- M4-P1 CLOSED (committed).
+- **M4-P2 CLOSED for Product** (Slices 1–5 accepted; working tree may still be
+  uncommitted). Website remains Pickup-only for this milestone only.
+- M4-P3 / M4-P4 / M4-P5 **not started**.
 
 Not one giant Delivery drop. Five Product-testable previews, in locked order:
 

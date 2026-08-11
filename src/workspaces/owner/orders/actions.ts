@@ -20,6 +20,15 @@ import {
   paidAddonsTimelineSummary,
   type PaidAddonMutationPayload,
 } from "@/engines/orders/paid-addons";
+import {
+  buildCreateStaffFulfilmentRpcParams,
+  defaultDeliveryCreateDraft,
+  fulfilmentMateriallyDiffer,
+  fulfilmentTimelineSummary,
+  normalizeOwnerCreateFulfilmentMethod,
+  validateOwnerCreateFulfilment,
+  type DeliveryCreateDraft,
+} from "@/engines/orders/fulfilment";
 import { reconcilePaymentLifecycleStatus } from "@/engines/orders/payment-status";
 import { isValidClockPickupTime, isValidPickupSlot } from "@/engines/business-calendar/pickup-slots";
 import { requireStaff } from "@/foundation/auth/session";
@@ -306,6 +315,31 @@ function parsePaidAddonsMutationFromForm(
   }
 }
 
+function parseDeliveryDraftFromForm(formData: FormData): DeliveryCreateDraft {
+  const raw = String(formData.get("delivery_json") ?? "").trim();
+  if (!raw) return defaultDeliveryCreateDraft();
+  try {
+    const parsed = JSON.parse(raw) as Partial<DeliveryCreateDraft>;
+    return {
+      recipientName: String(parsed.recipientName ?? ""),
+      recipientPhone: String(parsed.recipientPhone ?? ""),
+      addressLine1: String(parsed.addressLine1 ?? ""),
+      addressLine2: String(parsed.addressLine2 ?? ""),
+      postcode: String(parsed.postcode ?? ""),
+      city: String(parsed.city ?? ""),
+      state: String(parsed.state ?? ""),
+      recipientNotifyPreference:
+        parsed.recipientNotifyPreference === "inform_recipient" ||
+        parsed.recipientNotifyPreference === "do_not_inform_recipient"
+          ? parsed.recipientNotifyPreference
+          : null,
+      sameAsCustomer: Boolean(parsed.sameAsCustomer),
+    };
+  } catch {
+    return defaultDeliveryCreateDraft();
+  }
+}
+
 export async function createStaffGuestOrderAction(
   _prev: CreateStaffGuestOrderState,
   formData: FormData,
@@ -330,6 +364,10 @@ export async function createStaffGuestOrderAction(
   const draftItems = parseItemsFromForm(formData);
   const draftComplimentary = parseComplimentaryFromForm(formData);
   const draftPaidAddons = parsePaidAddonsMutationFromForm(formData);
+  const fulfilmentMethod = normalizeOwnerCreateFulfilmentMethod(
+    String(formData.get("fulfilment_method") ?? ""),
+  );
+  const deliveryDraft = parseDeliveryDraftFromForm(formData);
 
   if (!guestName) {
     return { error: "Please enter the customer name." };
@@ -342,11 +380,23 @@ export async function createStaffGuestOrderAction(
       error: "Please enter a valid email address, or leave email blank.",
     };
   }
-  if (!pickupDate || !pickupTime) {
-    return { error: "Please choose a pickup date and time." };
+
+  const fulfilmentError = validateOwnerCreateFulfilment({
+    method: fulfilmentMethod,
+    pickupDate,
+    pickupTime,
+    delivery: deliveryDraft,
+  });
+  if (fulfilmentError) {
+    return { error: fulfilmentError };
   }
   if (!isValidClockPickupTime(pickupTime)) {
-    return { error: "Please enter a valid pickup clock time." };
+    return {
+      error:
+        fulfilmentMethod === "delivery"
+          ? "Please enter a valid delivery clock time."
+          : "Please enter a valid pickup clock time.",
+    };
   }
   if (draftItems.length === 0) {
     return { error: "Please add at least one cake." };
@@ -368,6 +418,11 @@ export async function createStaffGuestOrderAction(
       };
     }
   }
+
+  const fulfilmentRpc = buildCreateStaffFulfilmentRpcParams({
+    method: fulfilmentMethod,
+    delivery: deliveryDraft,
+  });
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("create_staff_guest_preorder", {
@@ -400,6 +455,8 @@ export async function createStaffGuestOrderAction(
     p_bakery_attention_note: needsAttention ? attentionNote || null : null,
     p_customer_notes: customerNotes || null,
     p_internal_notes: internalNotes || null,
+    p_fulfilment_method: fulfilmentRpc.p_fulfilment_method,
+    p_delivery: fulfilmentRpc.p_delivery,
   });
 
   if (error) {
@@ -444,6 +501,10 @@ export async function saveOrderWorkspaceAction(
   const draftItems = parseItemsFromForm(formData);
   const draftComplimentary = parseComplimentaryFromForm(formData);
   const draftPaidAddons = parsePaidAddonsMutationFromForm(formData);
+  const fulfilmentMethod = normalizeOwnerCreateFulfilmentMethod(
+    String(formData.get("fulfilment_method") ?? ""),
+  );
+  const deliveryDraft = parseDeliveryDraftFromForm(formData);
 
   const before = await getGuestOrderById(orderId);
   if (!before) {
@@ -495,8 +556,15 @@ export async function saveOrderWorkspaceAction(
       success: false,
     };
   }
-  if (!pickupDate || !pickupTime) {
-    return { error: "Please choose a pickup date and time.", success: false };
+
+  const fulfilmentError = validateOwnerCreateFulfilment({
+    method: fulfilmentMethod,
+    pickupDate,
+    pickupTime,
+    delivery: deliveryDraft,
+  });
+  if (fulfilmentError) {
+    return { error: fulfilmentError, success: false };
   }
 
   // Normal amendment: pickup month stays put. Cross-month requires explicit Owner override.
@@ -515,18 +583,40 @@ export async function saveOrderWorkspaceAction(
   if (nextSource === "customer_website") {
     if (!isValidPickupSlot(pickupDate, pickupTime)) {
       return {
-        error: "Please choose a valid pickup time for that date.",
+        error:
+          fulfilmentMethod === "delivery"
+            ? "Please choose a valid delivery time for that date."
+            : "Please choose a valid pickup time for that date.",
         success: false,
       };
     }
   } else if (!isValidClockPickupTime(pickupTime)) {
     return {
-      error: "Please enter a valid pickup clock time.",
+      error:
+        fulfilmentMethod === "delivery"
+          ? "Please enter a valid delivery clock time."
+          : "Please enter a valid pickup clock time.",
       success: false,
     };
   }
   if (draftItems.length === 0) {
     return { error: "Please keep at least one cake on the order.", success: false };
+  }
+
+  let fulfilmentRpc: ReturnType<typeof buildCreateStaffFulfilmentRpcParams>;
+  try {
+    fulfilmentRpc = buildCreateStaffFulfilmentRpcParams({
+      method: fulfilmentMethod,
+      delivery: deliveryDraft,
+    });
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Please complete Delivery details before saving.",
+      success: false,
+    };
   }
 
   const cakes = await listOfferableLibraryCakes();
@@ -672,9 +762,23 @@ export async function saveOrderWorkspaceAction(
     return { error: syncPaidAddonsError.message, success: false };
   }
 
+  // Atomic method + delivery-details sync (Pickup clears sibling row).
+  const { error: syncFulfilmentError } = await supabase.rpc(
+    "sync_guest_order_fulfilment",
+    {
+      p_order_id: orderId,
+      p_fulfilment_method: fulfilmentRpc.p_fulfilment_method,
+      p_delivery: fulfilmentRpc.p_delivery,
+    },
+  );
+
+  if (syncFulfilmentError) {
+    return { error: syncFulfilmentError.message, success: false };
+  }
+
   const afterPaidAddons = await getGuestOrderById(orderId);
   if (!afterPaidAddons) {
-    return { error: "Order not found after add-on sync.", success: false };
+    return { error: "Order not found after fulfilment sync.", success: false };
   }
 
   const materialChange = orderMateriallyAffectsConfirmation(before, {
@@ -688,11 +792,28 @@ export async function saveOrderWorkspaceAction(
       quantity: item.quantity,
     })),
     paidAddons: afterPaidAddons.paidAddons,
+    fulfilmentMethod: afterPaidAddons.fulfilmentMethod,
+    delivery: afterPaidAddons.delivery,
   });
 
   const paidAddonsChanged = paidAddonsMateriallyDiffer(
     before.paidAddons ?? [],
     afterPaidAddons.paidAddons ?? [],
+  );
+
+  const fulfilmentChanged = fulfilmentMateriallyDiffer(
+    {
+      method: before.fulfilmentMethod,
+      pickupDate: before.pickupDate,
+      pickupTime: before.pickupTime,
+      delivery: before.delivery,
+    },
+    {
+      method: afterPaidAddons.fulfilmentMethod,
+      pickupDate: afterPaidAddons.pickupDate,
+      pickupTime: afterPaidAddons.pickupTime,
+      delivery: afterPaidAddons.delivery,
+    },
   );
 
   const shouldInvalidateConfirmation = shouldOutdateSentConfirmation({
@@ -723,6 +844,7 @@ export async function saveOrderWorkspaceAction(
   const shouldAuditUpdate =
     materialChange ||
     paidAddonsChanged ||
+    fulfilmentChanged ||
     previousStatus === "awaiting_payment" ||
     previousStatus === "paid" ||
     newStatus !== previousStatus ||
@@ -752,6 +874,20 @@ export async function saveOrderWorkspaceAction(
       metadata.paid_addons_after = paidAddonsTimelineSummary(
         after.paidAddons ?? [],
       );
+    }
+    if (fulfilmentChanged) {
+      metadata.fulfilment_before = fulfilmentTimelineSummary({
+        method: before.fulfilmentMethod,
+        pickupDate: before.pickupDate,
+        pickupTime: before.pickupTime,
+        delivery: before.delivery,
+      });
+      metadata.fulfilment_after = fulfilmentTimelineSummary({
+        method: after.fulfilmentMethod,
+        pickupDate: after.pickupDate,
+        pickupTime: after.pickupTime,
+        delivery: after.delivery,
+      });
     }
 
     await insertTimelineEvent({

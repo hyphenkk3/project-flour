@@ -1,4 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
+import {
+  mapOrderDeliveryDetails,
+  normalizeFulfilmentMethod,
+} from "@/engines/orders/fulfilment";
 import { calculateOrderSettlement } from "@/engines/orders/settlement";
 import {
   calculateCommercialSubtotal,
@@ -17,6 +21,8 @@ import type {
   Rm10IssuanceSuppressionCode,
   StorefrontComplimentaryItem,
   StorefrontOrder,
+  StorefrontOrderDelivery,
+  StorefrontOrderFulfilmentMethod,
   StorefrontOrderItem,
   StorefrontOrderListItem,
   StorefrontPaidAddon,
@@ -32,6 +38,7 @@ type OrderRow = {
   pickup_date: string;
   pickup_time: string;
   pickup_instruction: string | null;
+  fulfilment_method?: string | null;
   customer_notes: string | null;
   internal_notes: string | null;
   status: GuestOrderStatus;
@@ -51,6 +58,30 @@ type OrderRow = {
   payment_request_sent_at: string | null;
   rm10_card_issuance_suppressed: boolean | null;
   rm10_card_issuance_suppression_code: Rm10IssuanceSuppressionCode | null;
+  order_delivery_details?:
+    | {
+        order_id: string;
+        recipient_name: string;
+        recipient_phone: string;
+        address_line_1: string;
+        address_line_2: string | null;
+        postcode: string;
+        city: string;
+        state: string;
+        recipient_notify_preference: string;
+      }
+    | {
+        order_id: string;
+        recipient_name: string;
+        recipient_phone: string;
+        address_line_1: string;
+        address_line_2: string | null;
+        postcode: string;
+        city: string;
+        state: string;
+        recipient_notify_preference: string;
+      }[]
+    | null;
   order_items?: Array<{
     id: string;
     order_id: string;
@@ -177,6 +208,14 @@ function mapOrder(
     .map(mapComplimentary)
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
+  const fulfilmentMethod: StorefrontOrderFulfilmentMethod =
+    normalizeFulfilmentMethod(row.fulfilment_method);
+  const deliveryRow = relationOne(row.order_delivery_details);
+  const delivery: StorefrontOrderDelivery | null =
+    fulfilmentMethod === "delivery"
+      ? mapOrderDeliveryDetails(deliveryRow)
+      : null;
+
   const adjustments = financial?.adjustments ?? [];
   const paymentAllocations = financial?.paymentAllocations ?? [];
   const refunds = financial?.refunds ?? [];
@@ -196,6 +235,8 @@ function mapOrder(
     pickupDate: row.pickup_date,
     pickupTime: row.pickup_time,
     pickupInstruction: row.pickup_instruction,
+    fulfilmentMethod,
+    delivery,
     notes: row.customer_notes,
     internalNotes: row.internal_notes,
     status: row.status,
@@ -236,6 +277,7 @@ const orderSelect = `
   pickup_date,
   pickup_time,
   pickup_instruction,
+  fulfilment_method,
   customer_notes,
   internal_notes,
   status,
@@ -255,6 +297,17 @@ const orderSelect = `
   payment_request_sent_at,
   rm10_card_issuance_suppressed,
   rm10_card_issuance_suppression_code,
+  order_delivery_details (
+    order_id,
+    recipient_name,
+    recipient_phone,
+    address_line_1,
+    address_line_2,
+    postcode,
+    city,
+    state,
+    recipient_notify_preference
+  ),
   order_items (
     id,
     order_id,

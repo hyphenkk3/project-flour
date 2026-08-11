@@ -4,6 +4,29 @@ export type GuestOrderStatus =
   | "awaiting_payment"
   | "paid";
 
+/** Guest Owner fulfilment methods (DB also has drive_through). */
+export type StorefrontOrderFulfilmentMethod =
+  | "pickup"
+  | "delivery"
+  | "drive_through";
+
+/** Explicit Delivery recipient-notify preference (not customer messaging consent). */
+export type RecipientNotifyPreference =
+  | "inform_recipient"
+  | "do_not_inform_recipient";
+
+/** Snapshotted Delivery details on a guest order (null when Pickup). */
+export type StorefrontOrderDelivery = {
+  recipientName: string;
+  recipientPhone: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  postcode: string;
+  city: string;
+  state: string;
+  recipientNotifyPreference: RecipientNotifyPreference;
+};
+
 export type PaymentMethodCode = "wb_qr" | "online_transfer" | "others";
 
 export type OrderAdjustment = {
@@ -164,10 +187,22 @@ export type StorefrontOrder = {
   /** WhatsApp phone. May be blank for Owner-created guest orders; website submit still requires it. */
   phone: string;
   email: string;
+  /**
+   * Fulfilment schedule date (DB column pickup_date).
+   * Used for both Pickup and Delivery — contextual UI labels in later slices.
+   */
   pickupDate: string;
+  /**
+   * Fulfilment schedule time (DB column pickup_time).
+   * Used for both Pickup and Delivery — contextual UI labels in later slices.
+   */
   pickupTime: string;
   /** Optional human-facing pickup wording; pickupTime remains the sortable clock time. */
   pickupInstruction: string | null;
+  /** DB fulfilment_method. Historical / missing maps to pickup in readers. */
+  fulfilmentMethod: StorefrontOrderFulfilmentMethod;
+  /** Snapshotted Delivery details; null for Pickup (and when no details row). */
+  delivery: StorefrontOrderDelivery | null;
   notes: string | null;
   internalNotes: string | null;
   status: GuestOrderStatus;
@@ -278,6 +313,18 @@ export type ConfirmationPayload = {
   customerPhone: string;
   pickupDate: string;
   pickupTime: string;
+  /**
+   * Optional for historical Pickup snapshots (missing → render as Pickup).
+   * Explicit `delivery` must not be falsified to Pickup merely because
+   * optional Delivery detail fields are incomplete.
+   */
+  fulfilmentMethod?: StorefrontOrderFulfilmentMethod;
+  /**
+   * Snapshotted Delivery sibling truth (M4-P2). Optional for historical
+   * Pickup snapshots. Present on Delivery confirmations so sent bodies
+   * remain reproducible from payload without live-order drift.
+   */
+  delivery?: StorefrontOrderDelivery | null;
   items: Array<{
     cakeName: string;
     sizeLabel: string;

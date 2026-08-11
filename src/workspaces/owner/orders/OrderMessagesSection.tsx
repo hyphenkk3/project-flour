@@ -78,12 +78,15 @@ export function OrderMessagesSection({
       messageActionsForOperationalState({
         readyAt: order.readyAt,
         pickedUpAt: order.pickedUpAt,
+        fulfilmentMethod: order.fulfilmentMethod,
       }),
-    [order.readyAt, order.pickedUpAt],
+    [order.readyAt, order.pickedUpAt, order.fulfilmentMethod],
   );
 
   const crewActions = actions.filter((action) => action.type === "crew");
   const customerActions = actions.filter((action) => action.type !== "crew");
+  const deliveryCrewBlocked =
+    order.fulfilmentMethod === "delivery" && crewActions.length === 0;
 
   const generatedText = useMemo(() => {
     if (!preview) return "";
@@ -134,6 +137,15 @@ export function OrderMessagesSection({
                   />
                 ))}
               </div>
+            </div>
+          ) : deliveryCrewBlocked ? (
+            <div className="space-y-1.5">
+              <p className="text-ink text-[10px] font-semibold tracking-[0.14em] uppercase">
+                Internal · Crew
+              </p>
+              <p className="text-skyline text-sm">
+                Delivery Crew message is not available yet.
+              </p>
             </div>
           ) : null}
 

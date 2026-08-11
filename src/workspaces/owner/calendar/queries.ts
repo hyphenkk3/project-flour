@@ -3,7 +3,11 @@ import {
   RM10_CARD_CODE,
 } from "@/engines/orders/promotions";
 import { createClient } from "@/lib/supabase/server";
-import type { GuestOrderStatus, OrderSource } from "@/types/storefront";
+import type {
+  GuestOrderStatus,
+  OrderSource,
+  StorefrontOrderFulfilmentMethod,
+} from "@/types/storefront";
 import { guestOrderDisplayName } from "@/workspaces/owner/orders/labels";
 import type {
   CalendarCakeItem,
@@ -23,6 +27,7 @@ const CALENDAR_ORDER_SELECT = `
   guest_name,
   pickup_date,
   pickup_time,
+  fulfilment_method,
   status,
   order_source,
   crew_order,
@@ -51,6 +56,7 @@ type CalendarOrderRow = {
   guest_name: string | null;
   pickup_date: string;
   pickup_time: string;
+  fulfilment_method: string | null;
   status: string;
   order_source: string;
   crew_order: boolean | null;
@@ -71,6 +77,23 @@ function normalizePickupTime(value: string): string {
   const match = /^(\d{2}):(\d{2})(?::(\d{2}))?/.exec(value.trim());
   if (!match) return value;
   return `${match[1]}:${match[2]}:${match[3] ?? "00"}`;
+}
+
+/**
+ * Calendar list normalisation — never invent Delivery.
+ * Known enum values preserved; null/unknown → pickup (baseline presentation).
+ */
+export function normalizeCalendarFulfilmentMethod(
+  value: string | null | undefined,
+): StorefrontOrderFulfilmentMethod {
+  if (
+    value === "pickup" ||
+    value === "delivery" ||
+    value === "drive_through"
+  ) {
+    return value;
+  }
+  return "pickup";
 }
 
 function compareCalendarEntries(a: CalendarEntry, b: CalendarEntry): number {
@@ -114,6 +137,7 @@ function mapEntry(
     id: row.id,
     pickupDate: row.pickup_date,
     pickupTime: normalizePickupTime(row.pickup_time),
+    fulfilmentMethod: normalizeCalendarFulfilmentMethod(row.fulfilment_method),
     customerName,
     displayName: guestOrderDisplayName({
       customerName,

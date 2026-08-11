@@ -13,6 +13,7 @@ import {
   getEffectiveAdjustments,
   RM10_CARD_CODE,
 } from "@/engines/orders/promotions";
+import { buildQuickViewFulfilmentSummary } from "@/engines/orders/fulfilment";
 import { formatLongBusinessDate } from "@/lib/dates";
 import type { StorefrontOrder } from "@/types/storefront";
 import { getCalendarQuickViewOrderAction } from "@/workspaces/owner/calendar/actions";
@@ -238,6 +239,7 @@ function CalendarQuickViewBody({
     (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
   );
   const paidAddonBlocks = buildQuickViewPaidAddonBlocks(order.paidAddons);
+  const fulfilment = buildQuickViewFulfilmentSummary(order);
 
   return (
     <div className={["space-y-5", loading ? "opacity-70" : ""].join(" ")}>
@@ -250,13 +252,43 @@ function CalendarQuickViewBody({
           />
           <span className="text-skyline text-sm">{order.orderNumber}</span>
         </div>
-        <div className="text-ink space-y-0.5 text-sm">
+        <div className="text-ink space-y-1 text-sm">
           <p>
-            <span className="text-skyline">Pickup </span>
+            <span className="text-skyline">{fulfilment.methodLabel} </span>
             {formatLongBusinessDate(order.pickupDate)}
             {" · "}
             {formatPickupTime(order.pickupTime)}
           </p>
+          {fulfilment.isDelivery ? (
+            <div className="space-y-0.5">
+              {fulfilment.recipientName ? (
+                <p>
+                  <span className="text-skyline">Recipient </span>
+                  {fulfilment.recipientName}
+                </p>
+              ) : null}
+              {fulfilment.recipientPhone ? (
+                <p>
+                  <span className="text-skyline">Phone </span>
+                  {fulfilment.recipientPhone}
+                </p>
+              ) : null}
+              {fulfilment.addressLines.length > 0 ? (
+                <div>
+                  <p className="text-skyline">Address</p>
+                  {fulfilment.addressLines.map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
+                </div>
+              ) : null}
+              {fulfilment.notifyLabel ? (
+                <p>
+                  <span className="text-skyline">Notify </span>
+                  {fulfilment.notifyLabel}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </section>
 

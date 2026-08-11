@@ -1,4 +1,7 @@
-import type { GuestOrderStatus } from "@/types/storefront";
+import type {
+  GuestOrderStatus,
+  StorefrontOrderFulfilmentMethod,
+} from "@/types/storefront";
 
 /**
  * Slim Whole Cake Calendar read model.
@@ -22,6 +25,12 @@ export type CalendarEntry = {
   pickupDate: string;
   /** Sortable HH:MM:SS (or HH:MM) from orders.pickup_time. */
   pickupTime: string;
+  /**
+   * Lightweight fulfilment truth for Calendar presentation only.
+   * Shared schedule remains pickup_date / pickup_time.
+   * Missing/unknown normalize to pickup at map time.
+   */
+  fulfilmentMethod: StorefrontOrderFulfilmentMethod;
   /** Raw customer name for deterministic tie-break sorting. */
   customerName: string;
   /** Display name including source/crew suffix. */
