@@ -150,6 +150,9 @@ function CalendarDayCellView({
             const label = withOperationalMarker(entry.displayName, {
               readyAt: entry.readyAt,
               pickedUpAt: entry.pickedUpAt,
+              outForDeliveryAt: entry.outForDeliveryAt,
+              deliveredAt: entry.deliveredAt,
+              fulfilmentMethod: entry.fulfilmentMethod,
             });
             return (
               <li key={entry.id}>
@@ -177,6 +180,9 @@ function CalendarDayCellView({
             const customerLabel = withOperationalMarker(line.entry.displayName, {
               readyAt: line.entry.readyAt,
               pickedUpAt: line.entry.pickedUpAt,
+              outForDeliveryAt: line.entry.outForDeliveryAt,
+              deliveredAt: line.entry.deliveredAt,
+              fulfilmentMethod: line.entry.fulfilmentMethod,
             });
             const title = `${cakeLabel} — ${customerLabel}`;
             return (

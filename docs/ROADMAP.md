@@ -11,7 +11,11 @@ Detailed business rules, message formats, financial/lifecycle rationale, and his
 - **Product checkpoint:** `ab55cfac1413b5f683dca9e6f4450922e033d279`
 - **Milestone 3 — Owner Pickup Operations:** **COMPLETE**
 - **Preview 3B Product Tests 1–18:** PASS
-- **Next:** Milestone 4 — Delivery & Order Fulfilment Foundation (not started)
+- **Milestone 4 — Delivery & Order Fulfilment Foundation:** Product-accepted
+  through **M4-P5** (P1–P5 CLOSED for Product; working tree may still be
+  uncommitted). No M4-P6 defined.
+- **Next:** Product review of deferred Future backlog / commit posture —
+  do **not** invent M4-P6 without Product lock.
 - Local `main` may be ahead of `origin/main`; do not assume this checkpoint is pushed.
 
 ---
@@ -75,12 +79,19 @@ See `docs/DECISIONS.md` (Milestone 3 Preview entries, including Preview 3B).
 
 ### Milestone 4 — Delivery & Order Fulfilment Foundation
 
-**STATUS: IN PROGRESS**
+**STATUS: PRODUCT-ACCEPTED THROUGH M4-P5** (working tree may still be
+uncommitted; commit/push only when Product authorizes).
 
 - M4-P1 CLOSED (committed).
 - **M4-P2 CLOSED for Product** (Slices 1–5 accepted; working tree may still be
   uncommitted). Website remains Pickup-only for this milestone only.
-- M4-P3 / M4-P4 / M4-P5 **not started**.
+- **M4-P3 CLOSED / PRODUCT ACCEPTED** (Slices 1–3; working tree may still be
+  uncommitted).
+- **M4-P4 CLOSED / PRODUCT ACCEPTED** (working tree may still be
+  uncommitted).
+- **M4-P5 CLOSED / PRODUCT ACCEPTED (2026-08-12)** — Delivery lifecycle +
+  customer messaging; Calendar Delivery fill `#ffefd9`; photo/media and
+  other deferred non-goals unchanged.
 
 Not one giant Delivery drop. Five Product-testable previews, in locked order:
 
@@ -117,12 +128,22 @@ Not one giant Delivery drop. Five Product-testable previews, in locked order:
 
 #### M4-P5 — Delivery Lifecycle & Customer Messaging
 
-- Delivery operational journey + Delivery-appropriate customer messaging.
-- Pickup “Picked Up” terminology is inappropriate for Delivery.
-- Pickup Customer Ready Message must not be reused without Product review.
-- **Lifecycle names (e.g. Out for Delivery / Delivered) are NOT locked** — decided during P5 Product design/review.
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-12).**
 
-**Locked sequence:** M4-P1 → M4-P2 → M4-P3 → M4-P4 → M4-P5.
+- Delivery operational journey + Delivery-appropriate customer messaging.
+- Four states: Not Ready → Ready → Out for Delivery → Delivered (Pickup
+  remains Not Ready → Ready → Picked Up). Calendar: ● Ready · ○ Out for
+  Delivery · ✓ Delivered (Pickup ✓ = Picked Up).
+- Pickup Customer Ready Message must not be reused for Delivery.
+- Copy-ready Delivery Ready + Out for Delivery customer messages; existing
+  Thank You unchanged. Photo upload/send is **not** P5 (future TBD).
+- Product-accepted Calendar Delivery fill: pale warm yellow/beige
+  (`bg-status-warning-soft` / `#ffefd9`); Pickup no-fill; Today chrome
+  remains light blue.
+
+**Locked sequence:** M4-P1 → M4-P2 → M4-P3 → M4-P4 → M4-P5 (complete for Product).
+No M4-P6 in this roadmap — next work requires Product lock from Future /
+Owner backlog.
 
 ---
 

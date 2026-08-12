@@ -1,3 +1,4 @@
+import { deliveryFinanceFactsFromDelivery } from "@/engines/orders/delivery-finance";
 import { moneyCompare } from "@/engines/orders/money";
 import { paidAddonsMateriallyDiffer } from "@/engines/orders/paid-addons";
 import { fulfilmentMateriallyDiffer } from "@/engines/orders/fulfilment";
@@ -140,6 +141,33 @@ export function canAccessCustomerConfirmation(input: {
     return true;
   }
   return false;
+}
+
+export const MISSING_DELIVERY_FEE_BEFORE_CONFIRMATION_TITLE =
+  "Delivery fee not set";
+
+export const MISSING_DELIVERY_FEE_BEFORE_CONFIRMATION_BODY =
+  "The delivery fee has not been added yet. Add the delivery fee before confirming with the customer, or continue without it if this is intentional.";
+
+export const MISSING_DELIVERY_FEE_ADD_ACTION = "Add Delivery Fee";
+
+export const MISSING_DELIVERY_FEE_CONTINUE_ACTION =
+  "Continue Without Delivery Fee";
+
+/**
+ * Slice 3 safety acknowledgement — not a hard block.
+ * Delivery + finance enabled + Delivery Fee still NOT SET.
+ * Waived (`quoted_waived`) is resolved, not NOT SET.
+ * Pickup / finance-disabled Delivery never warn.
+ */
+export function shouldWarnMissingDeliveryFeeBeforeConfirmation(order: {
+  fulfilmentMethod?: StorefrontOrderFulfilmentMethod | string | null;
+  delivery?: StorefrontOrderDelivery | null;
+}): boolean {
+  if (order.fulfilmentMethod !== "delivery") return false;
+  const facts = deliveryFinanceFactsFromDelivery(order.delivery);
+  if (!facts?.financeEnabled) return false;
+  return facts.deliveryFeeStatus === "not_set";
 }
 
 /** Show "Prepare Updated Confirmation" (vs first Prepare Confirmation). */

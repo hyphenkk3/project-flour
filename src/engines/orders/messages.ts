@@ -3,9 +3,9 @@ import {
   formatPickupWeekdayShort,
   formatComplimentaryLine,
 } from "@/engines/orders/confirmation-message";
+import { formatDeliveryFinanceWaiverLines } from "@/engines/orders/delivery-finance";
 import {
-  isPickupCrewMessageAvailable,
-  pickupCrewUnavailableReason,
+  isDeliveryRecipientSameAsOrderingCustomer,
 } from "@/engines/orders/fulfilment";
 import {
   formatItemPriceComponent,
@@ -28,19 +28,39 @@ import type {
   OrderAdjustment,
   OrderPaymentAllocationView,
   OrderSettlement,
+  RecipientNotifyPreference,
   StorefrontOrder,
+  StorefrontOrderDelivery,
   StorefrontOrderItem,
   StorefrontPaidAddon,
 } from "@/types/storefront";
 import { guestOrderDisplayName } from "@/workspaces/owner/orders/labels";
 
-export type MessageType = "crew" | "customer_ready" | "customer_thank_you";
+export type MessageType =
+  | "crew"
+  | "customer_ready"
+  | "customer_delivery_ready"
+  | "customer_out_for_delivery"
+  | "customer_thank_you";
+
+export type OutForDeliveryAudience = "orderer" | "recipient";
+
+export type DeliveryCustomerReadyVariant = "schedule" | "contact_recipient";
+
+/** Preview 3B Option C — Delivery Crew notify footers (internal; not Confirmation copy). */
+export const CREW_NOTIFY_DO_NOT_INFORM =
+  "*DO NOT INFORM RECIPIENT (It's A Surprise!)";
+export const CREW_NOTIFY_INFORM = "*Inform Recipient before delivery";
 
 /** Product-approved Thank You body — do not alter. */
 export const CUSTOMER_THANK_YOU_MESSAGE =
   "Thank you for the order and hope you enjoy ya ;)\n\n" +
   "If there’s anything please do not hesitate to let us know so we can improve and serve you better !\n\n" +
   "Thank you once again and have a nice day ahead!";
+
+/** Product-approved Out for Delivery body — do not alter. */
+export const CUSTOMER_OUT_FOR_DELIVERY_MESSAGE =
+  "Rider has picked up the order and is on his way ya!";
 
 /**
  * Crew "Time:" — always structured pickupTime (compact Whitebird clock).
@@ -269,7 +289,7 @@ export function formatCrewItemPriceComponent(input: {
 /**
  * Left-side financial composition from item snapshots + effective adjustments.
  * Simple single ×1 with no adjustments → RMamountDue only (no redundant equation).
- * Shared calculator with Customer Confirmation — do not diverge.
+ * Shared calculator with Customer Confirmation; Crew uses pf/df shorthands.
  */
 export function formatCrewAmountHead(input: {
   items: FinancialEquationItem[];
@@ -278,32 +298,101 @@ export function formatCrewAmountHead(input: {
   >;
   amountDue: number;
 }): string {
-  return formatOrderFinancialEquation(input);
+  return formatOrderFinancialEquation({ ...input, audience: "crew" });
 }
 
-export function generateCrewOrderMessage(order: StorefrontOrder): string {
-  if (!isPickupCrewMessageAvailable(order.fulfilmentMethod)) {
-    throw new Error(
-      pickupCrewUnavailableReason(order.fulfilmentMethod) ??
-        "Delivery Crew message is not available yet.",
-    );
-  }
+export function formatCrewDeliveryOrderHeader(input: {
+  pickupDate: string;
+  unpaid: boolean;
+}): string {
+  const prefix = input.unpaid ? "🔺🟢🚗" : "🟢🚗";
+  const dateShort = formatPickupDateShort(input.pickupDate);
+  const weekday = formatPickupWeekdayShort(input.pickupDate);
+  return `${prefix} Delivery Order: ${dateShort} (${weekday})`;
+}
 
-  const unpaid = order.settlement.remainingBalance > 0;
-  const headerPrefix = unpaid ? "🔺🟢" : "🟢";
-  const dateShort = formatPickupDateShort(order.pickupDate);
-  const weekday = formatPickupWeekdayShort(order.pickupDate);
-  const displayName = guestOrderDisplayName({
+/** Internal Crew address — includes city/state (not Confirmation’s KK/Sabah omission). */
+export function formatCrewDeliveryAddress(
+  delivery: StorefrontOrderDelivery,
+): string {
+  const line1 = delivery.addressLine1.trim();
+  const line2 = delivery.addressLine2?.trim() ?? "";
+  const locality =
+    `${delivery.postcode.trim()} ${delivery.city.trim()}`.trim();
+  const state = delivery.state.trim();
+  return [line1, line2, locality, state].filter((part) => part.length > 0).join(
+    ", ",
+  );
+}
+
+export function formatCrewRecipientNotifyFooter(
+  preference: RecipientNotifyPreference | null | undefined,
+): string | null {
+  if (preference === "do_not_inform_recipient") {
+    return CREW_NOTIFY_DO_NOT_INFORM;
+  }
+  if (preference === "inform_recipient") {
+    return CREW_NOTIFY_INFORM;
+  }
+  return null;
+}
+
+function crewDisplayName(order: StorefrontOrder): string {
+  return guestOrderDisplayName({
     customerName: order.customerName,
     orderSource: order.orderSource,
     crewOrder: order.crewOrder,
   });
-  const phone = order.phone.trim();
-  const time = formatCrewPickupTime({
+}
+
+function crewTimeLabel(order: StorefrontOrder): string {
+  return formatCrewPickupTime({
     pickupTime: order.pickupTime,
     pickupInstruction: order.pickupInstruction,
   });
+}
 
+function formatCrewDeliveryIdentityLines(order: StorefrontOrder): string[] {
+  const displayName = crewDisplayName(order);
+  const phone = order.phone.trim();
+  const time = crewTimeLabel(order);
+  const delivery = order.delivery ?? null;
+
+  if (!delivery) {
+    return [`Ordered by: ${displayName}`, `Phone No: ${phone}`, `Time: ${time}`];
+  }
+
+  const samePerson = isDeliveryRecipientSameAsOrderingCustomer({
+    customerName: order.customerName,
+    customerPhone: order.phone,
+    delivery,
+  });
+  const address = formatCrewDeliveryAddress(delivery);
+
+  if (samePerson) {
+    return [
+      `Ordered by/ Recipient: ${displayName}`,
+      `Phone No: ${phone}`,
+      `Address: ${address}`,
+      `Time: ${time}`,
+    ];
+  }
+
+  return [
+    `Ordered by: ${displayName}`,
+    `Phone No: ${phone}`,
+    `Recipient: ${delivery.recipientName.trim()}`,
+    `Recipient Phone No: ${delivery.recipientPhone.trim()}`,
+    `Address: ${address}`,
+    `Time: ${time}`,
+  ];
+}
+
+function appendCrewCommercialSettlementAndFooters(
+  order: StorefrontOrder,
+  lines: string[],
+  notifyFooter?: string | null,
+): void {
   const cakeLines = order.items
     .map((item) =>
       formatCrewCakeLine({
@@ -315,7 +404,6 @@ export function generateCrewOrderMessage(order: StorefrontOrder): string {
     .join("\n");
 
   const addonsBlock = formatCrewAddonsBlock(order.paidAddons);
-
   const paymentLine = formatCrewPaymentLine({
     settlement: order.settlement,
     adjustments: order.adjustments,
@@ -324,7 +412,6 @@ export function generateCrewOrderMessage(order: StorefrontOrder): string {
     items: order.items,
     paidAddons: normalizePaidAddonLines(order.paidAddons),
   });
-
   const complimentary = formatComplimentaryLine(
     [...order.complimentaryItems]
       .sort(
@@ -337,35 +424,83 @@ export function generateCrewOrderMessage(order: StorefrontOrder): string {
       })),
   );
 
-  const lines: string[] = [
-    `${headerPrefix}Pick-up order: ${dateShort} (${weekday})`,
-    "",
-    `Ordered by: ${displayName}`,
-    `Phone No: ${phone}`,
-    `Time: ${time}`,
-    "",
-    "Whole Cake;",
-    cakeLines,
-  ];
-
+  lines.push("Whole Cake;");
+  lines.push(cakeLines);
   if (addonsBlock) {
     lines.push("");
     lines.push(addonsBlock);
   }
-
   lines.push("");
   lines.push(paymentLine);
-
+  if (order.fulfilmentMethod === "delivery") {
+    const waivers = formatDeliveryFinanceWaiverLines({
+      fulfilmentMethod: order.fulfilmentMethod,
+      delivery: order.delivery,
+    });
+    if (waivers) {
+      lines.push(waivers);
+    }
+  }
   if (complimentary) {
     lines.push("");
     lines.push(`*Complimentary ${complimentary}`);
   }
-
   if (order.includeReceipt) {
     lines.push("*Include RECEIPT");
   }
+  if (notifyFooter) {
+    lines.push(notifyFooter);
+  }
+}
 
+function generatePickupCrewOrderMessage(order: StorefrontOrder): string {
+  const unpaid = order.settlement.remainingBalance > 0;
+  const headerPrefix = unpaid ? "🔺🟢" : "🟢";
+  const dateShort = formatPickupDateShort(order.pickupDate);
+  const weekday = formatPickupWeekdayShort(order.pickupDate);
+  const lines: string[] = [
+    `${headerPrefix}Pick-up order: ${dateShort} (${weekday})`,
+    "",
+    `Ordered by: ${crewDisplayName(order)}`,
+    `Phone No: ${order.phone.trim()}`,
+    `Time: ${crewTimeLabel(order)}`,
+    "",
+  ];
+  appendCrewCommercialSettlementAndFooters(order, lines);
   return lines.join("\n");
+}
+
+function generateDeliveryCrewOrderMessage(order: StorefrontOrder): string {
+  const unpaid = order.settlement.remainingBalance > 0;
+  const delivery = order.delivery ?? null;
+  const samePerson = isDeliveryRecipientSameAsOrderingCustomer({
+    customerName: order.customerName,
+    customerPhone: order.phone,
+    delivery,
+  });
+  const notifyFooter =
+    delivery && !samePerson
+      ? formatCrewRecipientNotifyFooter(delivery.recipientNotifyPreference)
+      : null;
+
+  const lines: string[] = [
+    formatCrewDeliveryOrderHeader({
+      pickupDate: order.pickupDate,
+      unpaid,
+    }),
+    "",
+    ...formatCrewDeliveryIdentityLines(order),
+    "",
+  ];
+  appendCrewCommercialSettlementAndFooters(order, lines, notifyFooter);
+  return lines.join("\n");
+}
+
+export function generateCrewOrderMessage(order: StorefrontOrder): string {
+  if (order.fulfilmentMethod === "delivery") {
+    return generateDeliveryCrewOrderMessage(order);
+  }
+  return generatePickupCrewOrderMessage(order);
 }
 
 export function generateCustomerReadyMessage(senderName: string): string {
@@ -385,6 +520,85 @@ export function generateCustomerReadyMessage(senderName: string): string {
   );
 }
 
+export function deliveryCustomerReadyVariant(
+  order: Pick<StorefrontOrder, "customerName" | "phone" | "fulfilmentMethod" | "delivery">,
+): DeliveryCustomerReadyVariant {
+  const delivery = order.delivery;
+  if (!delivery || order.fulfilmentMethod !== "delivery") {
+    return "schedule";
+  }
+  const samePerson = isDeliveryRecipientSameAsOrderingCustomer({
+    customerName: order.customerName,
+    customerPhone: order.phone,
+    delivery,
+  });
+  if (samePerson) return "schedule";
+  if (delivery.recipientNotifyPreference === "inform_recipient") {
+    return "contact_recipient";
+  }
+  return "schedule";
+}
+
+export function generateCustomerDeliveryReadyMessage(input: {
+  senderName: string;
+  scheduledTime: string;
+  variant: DeliveryCustomerReadyVariant;
+}): string {
+  const sender = input.senderName.trim() || "Whitebird";
+  if (input.variant === "contact_recipient") {
+    return (
+      `Good morning, ${sender} here.\n` +
+      `Just to inform you that your order is ready for delivery anytime now.\n` +
+      `We will contact the recipient for arranging the delivery ya ;)`
+    );
+  }
+  const time = formatCrewPickupTime({ pickupTime: input.scheduledTime });
+  return (
+    `Good morning, ${sender} here.\n` +
+    `Just to inform you that your order is ready for delivery anytime now, we will arrange delivery base on your schedule at ${time}.\n` +
+    `Do let us know if you like to deliver earlier ya ;)`
+  );
+}
+
+export function outForDeliveryMessageAudiences(
+  order: Pick<StorefrontOrder, "customerName" | "phone" | "fulfilmentMethod" | "delivery">,
+): OutForDeliveryAudience[] {
+  const delivery = order.delivery;
+  if (!delivery || order.fulfilmentMethod !== "delivery") {
+    return ["orderer"];
+  }
+  const samePerson = isDeliveryRecipientSameAsOrderingCustomer({
+    customerName: order.customerName,
+    customerPhone: order.phone,
+    delivery,
+  });
+  if (samePerson) return ["orderer"];
+  if (delivery.recipientNotifyPreference === "inform_recipient") {
+    return ["orderer", "recipient"];
+  }
+  return ["orderer"];
+}
+
+export function outForDeliveryContactForAudience(
+  order: Pick<StorefrontOrder, "customerName" | "phone" | "delivery">,
+  audience: OutForDeliveryAudience,
+): { name: string; phone: string } {
+  if (audience === "recipient" && order.delivery) {
+    return {
+      name: order.delivery.recipientName.trim(),
+      phone: order.delivery.recipientPhone.trim(),
+    };
+  }
+  return {
+    name: order.customerName.trim(),
+    phone: order.phone.trim(),
+  };
+}
+
+export function generateCustomerOutForDeliveryMessage(): string {
+  return CUSTOMER_OUT_FOR_DELIVERY_MESSAGE;
+}
+
 export function generateCustomerThankYouMessage(): string {
   return CUSTOMER_THANK_YOU_MESSAGE;
 }
@@ -397,7 +611,23 @@ export function generateOrderMessage(
     case "crew":
       return generateCrewOrderMessage(input.order);
     case "customer_ready":
+      if (input.order.fulfilmentMethod === "delivery") {
+        throw new Error(
+          "Pickup Customer Ready Message is not used for Delivery.",
+        );
+      }
       return generateCustomerReadyMessage(input.senderName ?? "");
+    case "customer_delivery_ready":
+      if (input.order.fulfilmentMethod !== "delivery") {
+        throw new Error("Delivery Customer Ready is only for Delivery orders.");
+      }
+      return generateCustomerDeliveryReadyMessage({
+        senderName: input.senderName ?? "",
+        scheduledTime: input.order.pickupTime,
+        variant: deliveryCustomerReadyVariant(input.order),
+      });
+    case "customer_out_for_delivery":
+      return generateCustomerOutForDeliveryMessage();
     case "customer_thank_you":
       return generateCustomerThankYouMessage();
   }

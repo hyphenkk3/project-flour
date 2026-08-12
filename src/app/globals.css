@@ -6,10 +6,6 @@
   --color-fog: #d7e0e8;
   --color-skyline: #3d5a73;
   --color-signal: #2f6f6a;
-  /* Soft wash of signal — Calendar Delivery fulfilment (M4-P2 Slice 5 Product-accepted).
-     Visual Trial 2 `#b8d4cf` (Trial 1 `#e4f0ee` rejected as too subtle).
-     Distinct from status-info-soft (Today) and status soft tones. Still soft, not saturated. */
-  --color-signal-soft: #b8d4cf;
 
   /* Status tones — Whitebird operational readability.
      Guest-order lifecycle (via guestOrderStatusTone):
@@ -38,7 +34,6 @@
   --color-fog: var(--color-fog);
   --color-skyline: var(--color-skyline);
   --color-signal: var(--color-signal);
-  --color-signal-soft: var(--color-signal-soft);
   --color-status-info: var(--color-status-info);
   --color-status-info-soft: var(--color-status-info-soft);
   --color-status-success: var(--color-status-success);

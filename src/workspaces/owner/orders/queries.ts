@@ -1,4 +1,6 @@
+import { createServiceClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { applyDeliveryFeeRequestStaffNames } from "@/engines/orders/delivery-fee-request-attribution";
 import {
   mapOrderDeliveryDetails,
   normalizeFulfilmentMethod,
@@ -54,6 +56,10 @@ type OrderRow = {
   ready_by: string | null;
   picked_up_at: string | null;
   picked_up_by: string | null;
+  out_for_delivery_at?: string | null;
+  out_for_delivery_by?: string | null;
+  delivered_at?: string | null;
+  delivered_by?: string | null;
   payment_deadline_at: string | null;
   payment_request_sent_at: string | null;
   rm10_card_issuance_suppressed: boolean | null;
@@ -252,6 +258,10 @@ function mapOrder(
     readyBy: row.ready_by,
     pickedUpAt: row.picked_up_at,
     pickedUpBy: row.picked_up_by,
+    outForDeliveryAt: row.out_for_delivery_at ?? null,
+    outForDeliveryBy: row.out_for_delivery_by ?? null,
+    deliveredAt: row.delivered_at ?? null,
+    deliveredBy: row.delivered_by ?? null,
     paymentDeadlineAt: row.payment_deadline_at,
     paymentRequestSentAt: row.payment_request_sent_at,
     rm10CardIssuanceSuppressed: Boolean(row.rm10_card_issuance_suppressed),
@@ -293,6 +303,10 @@ const orderSelect = `
   ready_by,
   picked_up_at,
   picked_up_by,
+  out_for_delivery_at,
+  out_for_delivery_by,
+  delivered_at,
+  delivered_by,
   payment_deadline_at,
   payment_request_sent_at,
   rm10_card_issuance_suppressed,
@@ -306,7 +320,40 @@ const orderSelect = `
     postcode,
     city,
     state,
-    recipient_notify_preference
+    recipient_notify_preference,
+    delivery_finance_enabled,
+    processing_fee_applicable_amount,
+    processing_fee_override_amount,
+    processing_fee_waived,
+    delivery_fee_status,
+    delivery_fee_quoted_amount,
+    delivery_fee_waived,
+    delivery_fee_request_status,
+    delivery_fee_request_reason,
+    delivery_fee_request_quoted_amount,
+    delivery_fee_requested_by,
+    delivery_fee_requested_at,
+    delivery_fee_request_resolved_by,
+    delivery_fee_request_resolved_at,
+    delivery_fee_request_resolution_note,
+    processing_fee_request_kind,
+    processing_fee_request_status,
+    processing_fee_request_proposed_amount,
+    processing_fee_request_reason,
+    processing_fee_requested_by,
+    processing_fee_requested_at,
+    processing_fee_request_resolved_by,
+    processing_fee_request_resolved_at,
+    processing_fee_request_resolution_note,
+    fee_request_kind,
+    fee_request_status,
+    fee_request_proposed_amount,
+    fee_request_reason,
+    fee_requested_by,
+    fee_requested_at,
+    fee_resolved_by,
+    fee_resolved_at,
+    fee_resolution_note
   ),
   order_items (
     id,
@@ -409,8 +456,11 @@ function mapListItem(row: OrderRow): StorefrontOrderListItem {
     createdAt: order.createdAt,
     confirmationNeedsResend: order.confirmationNeedsResend,
     orderSource: order.orderSource,
+    fulfilmentMethod: order.fulfilmentMethod,
     readyAt: order.readyAt,
     pickedUpAt: order.pickedUpAt,
+    outForDeliveryAt: order.outForDeliveryAt,
+    deliveredAt: order.deliveredAt,
   };
 }
 
@@ -612,7 +662,46 @@ export async function getGuestOrderById(
   if (!data) return null;
 
   const financial = await loadOrderFinancials(id);
-  return mapOrder(data as unknown as OrderRow, financial);
+  const order = mapOrder(data as unknown as OrderRow, financial);
+  // Attribution names must resolve for any authorized viewer. Session RLS on
+  // staff_profiles is own-row-only ("Staff can read own profile"), so Vivian
+  // would see her name while Peter would fall back to "Staff". Use service
+  // role for this presentation lookup only — same pattern as findStaffByUsername.
+  return hydrateDeliveryFeeRequestAttribution(order);
+}
+
+async function hydrateDeliveryFeeRequestAttribution(
+  order: StorefrontOrder,
+): Promise<StorefrontOrder> {
+  const delivery = order.delivery;
+  if (!delivery) return order;
+
+  const ids = [
+    delivery.deliveryFeeRequest.requestedBy,
+    delivery.deliveryFeeRequest.resolvedBy,
+    delivery.processingFeeRequest.requestedBy,
+    delivery.processingFeeRequest.resolvedBy,
+  ].filter((value): value is string => Boolean(value));
+
+  if (ids.length === 0) return order;
+
+  const unique = [...new Set(ids)];
+  const admin = createServiceClient();
+  const { data, error } = await admin
+    .from("staff_profiles")
+    .select("id, display_name")
+    .in("id", unique);
+  if (error) {
+    // Attribution is presentation-only; do not fail the order load.
+    return order;
+  }
+
+  const names = new Map<string, string>();
+  for (const row of data ?? []) {
+    names.set(row.id as string, row.display_name as string);
+  }
+
+  return applyDeliveryFeeRequestStaffNames(order, names);
 }
 
 export async function listOrderTimeline(

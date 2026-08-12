@@ -25,7 +25,10 @@ import {
   describeTimelineActor,
   timelineEventLabel,
 } from "@/engines/orders/timeline";
-import { shouldOfferUpdatedConfirmationAction } from "@/engines/orders/confirmation-validity";
+import {
+  shouldOfferUpdatedConfirmationAction,
+  shouldWarnMissingDeliveryFeeBeforeConfirmation,
+} from "@/engines/orders/confirmation-validity";
 import {
   buildEditablePaidAddonDrafts,
   paidAddonDraftsToMutationPayload,
@@ -51,9 +54,23 @@ import {
   saveOrderWorkspaceAction,
   type OrderWorkspaceSaveState,
 } from "@/workspaces/owner/orders/actions";
+import {
+  deliveryChargesRemovalWarning,
+  deliveryFinanceFactsFromDelivery,
+} from "@/engines/orders/delivery-finance";
+import { pendingFeeRequestAttentionCopy } from "@/engines/orders/delivery-fee-request-attribution";
+import type { GuestOrderWorkspaceCapabilities } from "@/engines/orders/delivery-finance-capabilities";
 import { CustomerConfirmedButton } from "@/workspaces/owner/orders/CustomerConfirmedButton";
+import { DeliveryChargesSection } from "@/workspaces/owner/orders/DeliveryChargesSection";
+import { MissingDeliveryFeeConfirmationDialog } from "@/workspaces/owner/orders/MissingDeliveryFeeConfirmationDialog";
+import {
+  acknowledgeMissingDeliveryFeeBeforeConfirmation,
+  focusDeliveryChargesSection,
+} from "@/workspaces/owner/orders/missing-delivery-fee-confirmation";
+import { EnableDeliveryChargesControl } from "@/workspaces/owner/orders/EnableDeliveryChargesControl";
 import { OrderFulfilmentCreateFields } from "@/workspaces/owner/orders/OrderFulfilmentCreateFields";
 import { OrderMessagesSection } from "@/workspaces/owner/orders/OrderMessagesSection";
+import { operationalSectionTitle } from "@/engines/orders/operational-state";
 import { OrderOperationalControls } from "@/workspaces/owner/orders/OrderOperationalControls";
 import { OrderPaidAddonsEditor } from "@/workspaces/owner/orders/OrderPaidAddonsEditor";
 import { PaymentSection } from "@/workspaces/owner/orders/PaymentSection";
@@ -101,6 +118,8 @@ type OrderWorkspaceFormProps = {
   returnTo?: string | null;
   /** Default sender for Customer Ready Message. */
   staffDisplayName: string;
+  /** Role-aware gates for shared guest Order Workspace (2B-1). */
+  capabilities: GuestOrderWorkspaceCapabilities;
 };
 
 function ViewBlock({
@@ -147,6 +166,7 @@ export function OrderWorkspaceForm({
   confirmations,
   returnTo = null,
   staffDisplayName,
+  capabilities,
 }: OrderWorkspaceFormProps) {
   const router = useRouter();
   const boundSave = saveOrderWorkspaceAction.bind(null, order.id);
@@ -181,7 +201,8 @@ export function OrderWorkspaceForm({
       }),
   );
 
-  const canEdit = isGuestOrderEditable(order.status);
+  const canEdit =
+    capabilities.canEditOrderWorkspace && isGuestOrderEditable(order.status);
   const phoneRequired = guestOrderRequiresPhone(order.orderSource);
   const sourceLocked = order.orderSource === "customer_website";
   const fulfilmentView = buildWorkspaceFulfilmentViewModel(order);
@@ -195,6 +216,62 @@ export function OrderWorkspaceForm({
     order.pickupDate,
     editPickupDate,
   );
+  const deliveryToPickupWarning = (() => {
+    if (editFulfilmentMethod !== "pickup") return null;
+    if (order.fulfilmentMethod !== "delivery") return null;
+    const warning = deliveryChargesRemovalWarning(
+      deliveryFinanceFactsFromDelivery(order.delivery),
+    );
+    if (!warning.hasRemovableCharges) return null;
+    return warning;
+  })();
+  const hasVerifiedPayment = order.settlement.netReceived > 0;
+  const feeAttentionCopy =
+    capabilities.canResolveFeeRequests && order.delivery
+      ? pendingFeeRequestAttentionCopy({
+          deliveryPending:
+            order.delivery.deliveryFeeRequest.status === "pending",
+          processingPending:
+            order.delivery.processingFeeRequest.status === "pending",
+          processingKind: order.delivery.processingFeeRequest.kind,
+        })
+      : null;
+  const [missingFeeConfirmationHref, setMissingFeeConfirmationHref] = useState<
+    string | null
+  >(null);
+
+  function confirmationHref(updated: boolean): string {
+    return withOwnerReturnTo(
+      updated
+        ? `/owner/orders/${order.id}/confirmation?updated=1`
+        : `/owner/orders/${order.id}/confirmation`,
+      returnTo,
+    );
+  }
+
+  function handlePrepareConfirmation(updated: boolean) {
+    const href = confirmationHref(updated);
+    if (shouldWarnMissingDeliveryFeeBeforeConfirmation(order)) {
+      setMissingFeeConfirmationHref(href);
+      return;
+    }
+    router.push(href);
+  }
+
+  function handleAddDeliveryFeeFromConfirmationWarning() {
+    setMissingFeeConfirmationHref(null);
+    requestAnimationFrame(() => {
+      focusDeliveryChargesSection();
+    });
+  }
+
+  function handleContinueWithoutDeliveryFeeFromWorkspace() {
+    const href = missingFeeConfirmationHref;
+    setMissingFeeConfirmationHref(null);
+    if (!href) return;
+    acknowledgeMissingDeliveryFeeBeforeConfirmation(order.id);
+    router.push(href);
+  }
   const deliveryJson = useMemo(
     () => JSON.stringify(editDeliveryDraft),
     [editDeliveryDraft],
@@ -385,6 +462,12 @@ export function OrderWorkspaceForm({
           </p>
         ) : null}
 
+        {feeAttentionCopy ? (
+          <p className="border-status-warning/30 bg-status-warning-soft text-ink rounded-lg border px-4 py-3 text-sm">
+            {feeAttentionCopy}
+          </p>
+        ) : null}
+
         <ViewBlock title="Customer">
           <div className="space-y-1">
             <p className="text-ink text-base font-semibold">{order.customerName}</p>
@@ -458,9 +541,19 @@ export function OrderWorkspaceForm({
                   {fulfilmentView.notifyLabel}
                 </p>
               ) : null}
+              <div className="mt-3">
+                {capabilities.canEnableDeliveryFinance ? (
+                  <EnableDeliveryChargesControl order={order} />
+                ) : null}
+              </div>
             </div>
           ) : null}
         </ViewBlock>
+
+        <DeliveryChargesSection
+          capabilities={capabilities}
+          order={order}
+        />
 
         <ViewBlock title="Order">
           <ul className="space-y-2">
@@ -540,34 +633,40 @@ export function OrderWorkspaceForm({
           </p>
         </ViewBlock>
 
-        {order.status === "submitted" ||
-        order.status === "pending_confirmation" ? (
+        {capabilities.canManageDiscounts &&
+        (order.status === "submitted" ||
+          order.status === "pending_confirmation") ? (
           <OrderTotalAdjustmentsSection order={order} />
         ) : null}
 
-        {order.status === "awaiting_payment" || order.status === "paid" ? (
+        {capabilities.canManagePayments &&
+        (order.status === "awaiting_payment" || order.status === "paid") ? (
           <PaymentSection order={order} returnTo={returnTo} />
         ) : null}
 
-        <ViewBlock title="Collection">
-          <OrderOperationalControls
-            compact
-            onSuccess={() => {
-              router.refresh();
-            }}
-            orderId={order.id}
-            pickedUpAt={order.pickedUpAt}
-            readyAt={order.readyAt}
-          />
-        </ViewBlock>
+        {capabilities.canOperateCollectionControls ? (
+          <ViewBlock title={operationalSectionTitle(order.fulfilmentMethod)}>
+            <OrderOperationalControls
+              compact
+              fulfilmentMethod={order.fulfilmentMethod}
+              deliveredAt={order.deliveredAt}
+              orderId={order.id}
+              outForDeliveryAt={order.outForDeliveryAt}
+              pickedUpAt={order.pickedUpAt}
+              readyAt={order.readyAt}
+            />
+          </ViewBlock>
+        ) : null}
 
-        <ViewBlock title="Messages">
-          <OrderMessagesSection
-            compact
-            order={order}
-            staffDisplayName={staffDisplayName}
-          />
-        </ViewBlock>
+        {capabilities.canEditOrderWorkspace ? (
+          <ViewBlock title="Messages">
+            <OrderMessagesSection
+              compact
+              order={order}
+              staffDisplayName={staffDisplayName}
+            />
+          </ViewBlock>
+        ) : null}
 
         <ViewBlock title="Internal notes">
           <p className="text-skyline text-sm leading-relaxed whitespace-pre-wrap">
@@ -603,38 +702,43 @@ export function OrderWorkspaceForm({
             </button>
           ) : null}
 
-          {order.status === "submitted" ? (
-            <Link
+          {capabilities.canPrepareConfirmation &&
+          order.status === "submitted" ? (
+            <button
               className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium"
-              href={withOwnerReturnTo(
-                `/owner/orders/${order.id}/confirmation`,
-                returnTo,
-              )}
+              onClick={() => handlePrepareConfirmation(false)}
+              type="button"
             >
               Prepare Confirmation
-            </Link>
+            </button>
           ) : null}
 
-          {shouldOfferUpdatedConfirmationAction({
+          {capabilities.canPrepareConfirmation &&
+          shouldOfferUpdatedConfirmationAction({
             status: order.status,
             confirmationNeedsResend: order.confirmationNeedsResend,
           }) ? (
-            <Link
+            <button
               className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium"
-              href={withOwnerReturnTo(
-                `/owner/orders/${order.id}/confirmation?updated=1`,
-                returnTo,
-              )}
+              onClick={() => handlePrepareConfirmation(true)}
+              type="button"
             >
               Prepare Updated Confirmation
-            </Link>
+            </button>
           ) : null}
 
-          {order.status === "pending_confirmation" &&
+          {capabilities.canPrepareConfirmation &&
+          order.status === "pending_confirmation" &&
           !order.confirmationNeedsResend ? (
             <CustomerConfirmedButton orderId={order.id} />
           ) : null}
         </div>
+
+        <MissingDeliveryFeeConfirmationDialog
+          onAddDeliveryFee={handleAddDeliveryFeeFromConfirmationWarning}
+          onContinueWithout={handleContinueWithoutDeliveryFeeFromWorkspace}
+          open={missingFeeConfirmationHref != null}
+        />
 
         <ViewBlock title="Timeline">
           {timeline.length === 0 ? (
@@ -826,6 +930,30 @@ export function OrderWorkspaceForm({
         ) : (
           <input name="pickup_month_override" type="hidden" value="0" />
         )}
+        {deliveryToPickupWarning ? (
+          <div className="border-status-warning/30 bg-status-warning-soft space-y-2 rounded-lg border px-4 py-3">
+            <p className="text-status-warning text-sm">
+              Changing this order to Pickup will remove its Delivery charges:
+            </p>
+            <ul className="text-status-warning list-inside list-disc text-sm">
+              {deliveryToPickupWarning.lines.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+            {deliveryToPickupWarning.removableAmount > 0 ? (
+              <p className="text-status-warning text-sm">
+                Amount due will decrease accordingly.
+              </p>
+            ) : null}
+            {hasVerifiedPayment &&
+            deliveryToPickupWarning.removableAmount > 0 ? (
+              <p className="text-status-warning text-sm font-medium">
+                This order already has payment recorded. Removing Delivery
+                charges may create an overpayment.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
@@ -972,14 +1100,14 @@ export function OrderWorkspaceForm({
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-          Collection
+          {operationalSectionTitle(order.fulfilmentMethod)}
         </h2>
         <OrderOperationalControls
           compact
-          onSuccess={() => {
-            router.refresh();
-          }}
+          fulfilmentMethod={order.fulfilmentMethod}
+          deliveredAt={order.deliveredAt}
           orderId={order.id}
+          outForDeliveryAt={order.outForDeliveryAt}
           pickedUpAt={order.pickedUpAt}
           readyAt={order.readyAt}
         />

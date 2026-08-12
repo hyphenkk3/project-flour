@@ -2,6 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { requireStaff } from "@/foundation/auth/session";
+import {
+  buildGuestOrderWorkspaceCapabilities,
+  canAccessGuestOrderWorkspace,
+} from "@/engines/orders/delivery-finance-capabilities";
 import { withCalendarReturnPositionFlag } from "@/workspaces/owner/calendar/calendar-return-position";
 import { resolveOwnerReturnTo } from "@/workspaces/owner/navigation/return-to";
 import { OrderWorkspaceForm } from "@/workspaces/owner/orders/OrderWorkspaceForm";
@@ -30,9 +34,14 @@ export async function OwnerOrderDetail({
   returnTo,
 }: OwnerOrderDetailProps) {
   const staff = await requireStaff();
-  if (staff.role.code !== "owner") {
+  if (!canAccessGuestOrderWorkspace(staff.role.code)) {
     notFound();
   }
+
+  const capabilities = buildGuestOrderWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
 
   const order = await getGuestOrderById(orderId);
   if (!order) {
@@ -72,7 +81,14 @@ export async function OwnerOrderDetail({
   const backHref =
     back.label === "Whole Cake Calendar"
       ? withCalendarReturnPositionFlag(back.href)
-      : back.href;
+      : capabilities.canEditOrderWorkspace
+        ? back.href
+        : staff.role.code === "manager"
+          ? "/customer-operations/orders"
+          : "/customer-operations/orders";
+  const backLabel = capabilities.canEditOrderWorkspace
+    ? back.label
+    : "Customer Operations";
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -82,7 +98,7 @@ export async function OwnerOrderDetail({
           href={backHref}
           scroll={back.label === "Whole Cake Calendar" ? false : undefined}
         >
-          ← {back.label}
+          ← {backLabel}
         </Link>
         <PageHeader title="Order Workspace" />
         <p className="text-skyline -mt-2 text-sm">{order.customerName}</p>
@@ -90,6 +106,7 @@ export async function OwnerOrderDetail({
 
       <OrderWorkspaceForm
         cakes={cakes}
+        capabilities={capabilities}
         complimentaryOptions={complimentaryOptions}
         confirmations={confirmations}
         order={order}

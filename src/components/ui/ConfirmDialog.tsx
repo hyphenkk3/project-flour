@@ -18,6 +18,11 @@ type ConfirmDialogProps = {
   /** Destructive styling for irreversible actions. */
   tone?: "default" | "danger";
   pending?: boolean;
+  /**
+   * When false, Escape / backdrop do not dismiss. The cancel button still works.
+   * Use for safety acknowledgements that must be an explicit choice.
+   */
+  allowDismiss?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
   children?: ReactNode;
@@ -31,6 +36,7 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   tone = "default",
   pending = false,
+  allowDismiss = true,
   onConfirm,
   onCancel,
   children,
@@ -64,6 +70,13 @@ export function ConfirmDialog({
     onCancel();
   }, [onCancel, pending]);
 
+  const handleDismiss = useCallback(() => {
+    if (!allowDismiss) {
+      return;
+    }
+    handleCancel();
+  }, [allowDismiss, handleCancel]);
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (pending) {
@@ -79,14 +92,14 @@ export function ConfirmDialog({
       className="border-fog text-ink backdrop:bg-ink/40 fixed top-1/2 left-1/2 z-50 w-[min(100%-2rem,24rem)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border bg-white p-0 shadow-lg open:flex open:flex-col"
       onCancel={(event) => {
         event.preventDefault();
-        handleCancel();
+        handleDismiss();
       }}
       onClose={() => {
         if (closingFromParentRef.current) {
           closingFromParentRef.current = false;
           return;
         }
-        handleCancel();
+        handleDismiss();
       }}
       ref={dialogRef}
     >

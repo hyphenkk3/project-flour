@@ -39,10 +39,14 @@ export type CalendarEntry = {
   needsBakeryAttention: boolean;
   /** Effective rm10_physical_card only (reversed rows do not count). */
   hasEffectiveRm10: boolean;
-  /** Collection Ready timestamp — independent of financial status. */
+  /** Operational Ready timestamp — independent of financial status. */
   readyAt: string | null;
-  /** Collection Picked Up timestamp — independent of financial status. */
+  /** Pickup Picked Up timestamp — independent of financial status. Ignored for Delivery markers. */
   pickedUpAt: string | null;
+  /** Delivery Out for Delivery timestamp — independent of financial status. */
+  outForDeliveryAt: string | null;
+  /** Delivery Delivered timestamp — independent of financial status. */
+  deliveredAt: string | null;
   /** Snapshot items in deterministic display order for Cake View. */
   items: CalendarCakeItem[];
 };

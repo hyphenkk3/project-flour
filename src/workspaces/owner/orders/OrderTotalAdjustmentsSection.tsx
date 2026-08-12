@@ -2,6 +2,7 @@
 
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type { StorefrontOrder } from "@/types/storefront";
+import { DeliveryFinanceBreakdown } from "@/workspaces/owner/orders/DeliveryFinanceBreakdown";
 import { OrderDiscountsPanel } from "@/workspaces/owner/orders/OrderDiscountsPanel";
 
 type OrderTotalAdjustmentsSectionProps = {
@@ -39,6 +40,7 @@ export function OrderTotalAdjustmentsSection({
           </dd>
         </div>
       </dl>
+      <DeliveryFinanceBreakdown order={order} />
       <OrderDiscountsPanel order={order} />
     </section>
   );

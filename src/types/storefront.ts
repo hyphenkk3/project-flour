@@ -15,6 +15,43 @@ export type RecipientNotifyPreference =
   | "inform_recipient"
   | "do_not_inform_recipient";
 
+/** M4-P3 fee exception request lifecycle (independent per charge category). */
+export type DeliveryFeeRequestStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "cancelled";
+
+/** Pending/resolved Delivery Fee waiver request (independent of Processing). */
+export type StorefrontDeliveryFeeRequest = {
+  status: DeliveryFeeRequestStatus | null;
+  reason: string | null;
+  /** Quote amount snapshotted when the waiver was requested. */
+  quotedAmount: number | null;
+  requestedBy: string | null;
+  requestedByName: string | null;
+  requestedAt: string | null;
+  resolvedBy: string | null;
+  resolvedByName: string | null;
+  resolvedAt: string | null;
+  resolutionNote: string | null;
+};
+
+/** Pending/resolved Processing Fee waive/change request. */
+export type StorefrontProcessingFeeRequest = {
+  kind: "processing_override" | "processing_waiver" | null;
+  status: DeliveryFeeRequestStatus | null;
+  proposedAmount: number | null;
+  reason: string | null;
+  requestedBy: string | null;
+  requestedByName: string | null;
+  requestedAt: string | null;
+  resolvedBy: string | null;
+  resolvedByName: string | null;
+  resolvedAt: string | null;
+  resolutionNote: string | null;
+};
+
 /** Snapshotted Delivery details on a guest order (null when Pickup). */
 export type StorefrontOrderDelivery = {
   recipientName: string;
@@ -25,6 +62,18 @@ export type StorefrontOrderDelivery = {
   city: string;
   state: string;
   recipientNotifyPreference: RecipientNotifyPreference;
+  /** M4-P3: false for historical M4-P2 Delivery (no auto charges). */
+  financeEnabled: boolean;
+  processingFeeApplicableAmount: number | null;
+  processingFeeOverrideAmount: number | null;
+  processingFeeWaived: boolean;
+  deliveryFeeStatus: "not_set" | "quoted" | "quoted_waived";
+  deliveryFeeQuotedAmount: number | null;
+  deliveryFeeWaived: boolean;
+  /** Independent Delivery Fee waiver request slot (2B-1). */
+  deliveryFeeRequest: StorefrontDeliveryFeeRequest;
+  /** Independent Processing Fee request slot (2B-1). */
+  processingFeeRequest: StorefrontProcessingFeeRequest;
 };
 
 export type PaymentMethodCode = "wb_qr" | "online_transfer" | "others";
@@ -220,6 +269,10 @@ export type StorefrontOrder = {
   readyBy: string | null;
   pickedUpAt: string | null;
   pickedUpBy: string | null;
+  outForDeliveryAt: string | null;
+  outForDeliveryBy: string | null;
+  deliveredAt: string | null;
+  deliveredBy: string | null;
   paymentDeadlineAt: string | null;
   paymentRequestSentAt: string | null;
   rm10CardIssuanceSuppressed: boolean;
@@ -253,8 +306,11 @@ export type StorefrontOrderListItem = {
   createdAt: string;
   confirmationNeedsResend: boolean;
   orderSource: OrderSource;
+  fulfilmentMethod: StorefrontOrderFulfilmentMethod;
   readyAt: string | null;
   pickedUpAt: string | null;
+  outForDeliveryAt: string | null;
+  deliveredAt: string | null;
 };
 
 export type OrderTimelineEventType =
@@ -280,6 +336,10 @@ export type OrderTimelineEventType =
   | "order_ready_undone"
   | "order_picked_up"
   | "order_picked_up_undone"
+  | "order_out_for_delivery"
+  | "order_out_for_delivery_undone"
+  | "order_delivered"
+  | "order_delivered_undone"
   | "staff_preorder_created";
 
 export type OrderTimelineEvent = {

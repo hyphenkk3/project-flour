@@ -4,9 +4,12 @@
  */
 
 import type {
+  DeliveryFeeRequestStatus,
   RecipientNotifyPreference,
+  StorefrontDeliveryFeeRequest,
   StorefrontOrderDelivery,
   StorefrontOrderFulfilmentMethod,
+  StorefrontProcessingFeeRequest,
 } from "@/types/storefront";
 
 const NOTIFY_VALUES = new Set<RecipientNotifyPreference>([
@@ -355,6 +358,60 @@ function trimOptionalNull(value: string | null | undefined): string | null {
  * Returns null when no row (Pickup / missing).
  * Does not coerce Delivery method to Pickup when details are missing.
  */
+function toNullableAmount(
+  value: number | string | null | undefined,
+): number | null {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeFeeRequestStatus(
+  value: string | null | undefined,
+): DeliveryFeeRequestStatus | null {
+  const raw = String(value ?? "").trim();
+  if (
+    raw === "pending" ||
+    raw === "approved" ||
+    raw === "rejected" ||
+    raw === "cancelled"
+  ) {
+    return raw;
+  }
+  return null;
+}
+
+function emptyDeliveryFeeRequest(): StorefrontDeliveryFeeRequest {
+  return {
+    status: null,
+    reason: null,
+    quotedAmount: null,
+    requestedBy: null,
+    requestedByName: null,
+    requestedAt: null,
+    resolvedBy: null,
+    resolvedByName: null,
+    resolvedAt: null,
+    resolutionNote: null,
+  };
+}
+
+function emptyProcessingFeeRequest(): StorefrontProcessingFeeRequest {
+  return {
+    kind: null,
+    status: null,
+    proposedAmount: null,
+    reason: null,
+    requestedBy: null,
+    requestedByName: null,
+    requestedAt: null,
+    resolvedBy: null,
+    resolvedByName: null,
+    resolvedAt: null,
+    resolutionNote: null,
+  };
+}
+
 export function mapOrderDeliveryDetails(
   row:
     | {
@@ -366,6 +423,40 @@ export function mapOrderDeliveryDetails(
         city?: string | null;
         state?: string | null;
         recipient_notify_preference?: string | null;
+        delivery_finance_enabled?: boolean | null;
+        processing_fee_applicable_amount?: number | string | null;
+        processing_fee_override_amount?: number | string | null;
+        processing_fee_waived?: boolean | null;
+        delivery_fee_status?: string | null;
+        delivery_fee_quoted_amount?: number | string | null;
+        delivery_fee_waived?: boolean | null;
+        delivery_fee_request_status?: string | null;
+        delivery_fee_request_reason?: string | null;
+        delivery_fee_request_quoted_amount?: number | string | null;
+        delivery_fee_requested_by?: string | null;
+        delivery_fee_requested_at?: string | null;
+        delivery_fee_request_resolved_by?: string | null;
+        delivery_fee_request_resolved_at?: string | null;
+        delivery_fee_request_resolution_note?: string | null;
+        processing_fee_request_kind?: string | null;
+        processing_fee_request_status?: string | null;
+        processing_fee_request_proposed_amount?: number | string | null;
+        processing_fee_request_reason?: string | null;
+        processing_fee_requested_by?: string | null;
+        processing_fee_requested_at?: string | null;
+        processing_fee_request_resolved_by?: string | null;
+        processing_fee_request_resolved_at?: string | null;
+        processing_fee_request_resolution_note?: string | null;
+        /** Legacy Slice 1 single-slot fields (fallback only). */
+        fee_request_kind?: string | null;
+        fee_request_status?: string | null;
+        fee_request_proposed_amount?: number | string | null;
+        fee_request_reason?: string | null;
+        fee_requested_by?: string | null;
+        fee_requested_at?: string | null;
+        fee_resolved_by?: string | null;
+        fee_resolved_at?: string | null;
+        fee_resolution_note?: string | null;
       }
     | null
     | undefined,
@@ -395,6 +486,99 @@ export function mapOrderDeliveryDetails(
     return null;
   }
 
+  const feeStatusRaw = String(row.delivery_fee_status ?? "not_set").trim();
+  const deliveryFeeStatus =
+    feeStatusRaw === "quoted" || feeStatusRaw === "quoted_waived"
+      ? feeStatusRaw
+      : "not_set";
+
+  let deliveryFeeRequest = emptyDeliveryFeeRequest();
+  const deliveryStatus = normalizeFeeRequestStatus(
+    row.delivery_fee_request_status,
+  );
+  if (deliveryStatus) {
+    deliveryFeeRequest = {
+      status: deliveryStatus,
+      reason: trimOptionalNull(row.delivery_fee_request_reason),
+      quotedAmount: toNullableAmount(row.delivery_fee_request_quoted_amount),
+      requestedBy: trimOptionalNull(row.delivery_fee_requested_by),
+      requestedByName: null,
+      requestedAt: trimOptionalNull(row.delivery_fee_requested_at),
+      resolvedBy: trimOptionalNull(row.delivery_fee_request_resolved_by),
+      resolvedByName: null,
+      resolvedAt: trimOptionalNull(row.delivery_fee_request_resolved_at),
+      resolutionNote: trimOptionalNull(row.delivery_fee_request_resolution_note),
+    };
+  } else if (
+    String(row.fee_request_kind ?? "").trim() === "delivery_waiver" &&
+    normalizeFeeRequestStatus(row.fee_request_status)
+  ) {
+    // Slice 1 fallback before 2B-1 backfill is visible to this reader.
+    deliveryFeeRequest = {
+      status: normalizeFeeRequestStatus(row.fee_request_status),
+      reason: trimOptionalNull(row.fee_request_reason),
+      quotedAmount: toNullableAmount(row.delivery_fee_quoted_amount),
+      requestedBy: trimOptionalNull(row.fee_requested_by),
+      requestedByName: null,
+      requestedAt: trimOptionalNull(row.fee_requested_at),
+      resolvedBy: trimOptionalNull(row.fee_resolved_by),
+      resolvedByName: null,
+      resolvedAt: trimOptionalNull(row.fee_resolved_at),
+      resolutionNote: trimOptionalNull(row.fee_resolution_note),
+    };
+  }
+
+  let processingFeeRequest = emptyProcessingFeeRequest();
+  const processingStatus = normalizeFeeRequestStatus(
+    row.processing_fee_request_status,
+  );
+  const processingKindRaw = String(row.processing_fee_request_kind ?? "").trim();
+  const processingKind =
+    processingKindRaw === "processing_override" ||
+    processingKindRaw === "processing_waiver"
+      ? processingKindRaw
+      : null;
+  if (processingStatus) {
+    processingFeeRequest = {
+      kind: processingKind,
+      status: processingStatus,
+      proposedAmount: toNullableAmount(
+        row.processing_fee_request_proposed_amount,
+      ),
+      reason: trimOptionalNull(row.processing_fee_request_reason),
+      requestedBy: trimOptionalNull(row.processing_fee_requested_by),
+      requestedByName: null,
+      requestedAt: trimOptionalNull(row.processing_fee_requested_at),
+      resolvedBy: trimOptionalNull(row.processing_fee_request_resolved_by),
+      resolvedByName: null,
+      resolvedAt: trimOptionalNull(row.processing_fee_request_resolved_at),
+      resolutionNote: trimOptionalNull(
+        row.processing_fee_request_resolution_note,
+      ),
+    };
+  } else {
+    const legacyKind = String(row.fee_request_kind ?? "").trim();
+    if (
+      (legacyKind === "processing_override" ||
+        legacyKind === "processing_waiver") &&
+      normalizeFeeRequestStatus(row.fee_request_status)
+    ) {
+      processingFeeRequest = {
+        kind: legacyKind,
+        status: normalizeFeeRequestStatus(row.fee_request_status),
+        proposedAmount: toNullableAmount(row.fee_request_proposed_amount),
+        reason: trimOptionalNull(row.fee_request_reason),
+        requestedBy: trimOptionalNull(row.fee_requested_by),
+        requestedByName: null,
+        requestedAt: trimOptionalNull(row.fee_requested_at),
+        resolvedBy: trimOptionalNull(row.fee_resolved_by),
+        resolvedByName: null,
+        resolvedAt: trimOptionalNull(row.fee_resolved_at),
+        resolutionNote: trimOptionalNull(row.fee_resolution_note),
+      };
+    }
+  }
+
   return {
     recipientName,
     recipientPhone,
@@ -404,6 +588,19 @@ export function mapOrderDeliveryDetails(
     city,
     state,
     recipientNotifyPreference: notify,
+    financeEnabled: Boolean(row.delivery_finance_enabled),
+    processingFeeApplicableAmount: toNullableAmount(
+      row.processing_fee_applicable_amount,
+    ),
+    processingFeeOverrideAmount: toNullableAmount(
+      row.processing_fee_override_amount,
+    ),
+    processingFeeWaived: Boolean(row.processing_fee_waived),
+    deliveryFeeStatus,
+    deliveryFeeQuotedAmount: toNullableAmount(row.delivery_fee_quoted_amount),
+    deliveryFeeWaived: Boolean(row.delivery_fee_waived),
+    deliveryFeeRequest,
+    processingFeeRequest,
   };
 }
 
@@ -414,10 +611,37 @@ function normalizeTimeForCompare(value: string | null | undefined): string {
   return `${parts[0]!.padStart(2, "0")}:${parts[1]!.padStart(2, "0")}`;
 }
 
+/** Historical / non-governed Delivery finance defaults on DTO. */
+export function defaultDeliveryFinanceDtoFields(): Pick<
+  StorefrontOrderDelivery,
+  | "financeEnabled"
+  | "processingFeeApplicableAmount"
+  | "processingFeeOverrideAmount"
+  | "processingFeeWaived"
+  | "deliveryFeeStatus"
+  | "deliveryFeeQuotedAmount"
+  | "deliveryFeeWaived"
+  | "deliveryFeeRequest"
+  | "processingFeeRequest"
+> {
+  return {
+    financeEnabled: false,
+    processingFeeApplicableAmount: null,
+    processingFeeOverrideAmount: null,
+    processingFeeWaived: false,
+    deliveryFeeStatus: "not_set",
+    deliveryFeeQuotedAmount: null,
+    deliveryFeeWaived: false,
+    deliveryFeeRequest: emptyDeliveryFeeRequest(),
+    processingFeeRequest: emptyProcessingFeeRequest(),
+  };
+}
+
 function serializeDeliveryForConfirmation(
   delivery: StorefrontOrderDelivery | null | undefined,
 ): string {
   if (!delivery) return "";
+  // Fee request queue fields are not Confirmation-material until approved.
   return [
     trimRequired(delivery.recipientName),
     trimRequired(delivery.recipientPhone),
@@ -427,6 +651,13 @@ function serializeDeliveryForConfirmation(
     trimRequired(delivery.city),
     trimRequired(delivery.state),
     delivery.recipientNotifyPreference,
+    delivery.financeEnabled ? "1" : "0",
+    String(delivery.processingFeeApplicableAmount ?? ""),
+    String(delivery.processingFeeOverrideAmount ?? ""),
+    delivery.processingFeeWaived ? "1" : "0",
+    delivery.deliveryFeeStatus ?? "not_set",
+    String(delivery.deliveryFeeQuotedAmount ?? ""),
+    delivery.deliveryFeeWaived ? "1" : "0",
   ].join("|");
 }
 
@@ -592,18 +823,29 @@ export function buildQuickViewFulfilmentSummary(order: {
   };
 }
 
-/** Pickup Crew only — Delivery Crew body belongs to M4-P4. */
+/**
+ * Pickup Crew formatter path (not Delivery).
+ * Delivery uses the Delivery Crew formatter (M4-P4).
+ */
 export function isPickupCrewMessageAvailable(
   fulfilmentMethod: StorefrontOrderFulfilmentMethod | null | undefined,
 ): boolean {
   return fulfilmentMethod !== "delivery";
 }
 
+/**
+ * Crew Order Message is available for Pickup and Delivery.
+ * null / unknown / drive_through keep historical Pickup formatter availability.
+ */
+export function isCrewOrderMessageAvailable(
+  _fulfilmentMethod?: StorefrontOrderFulfilmentMethod | null,
+): boolean {
+  return true;
+}
+
+/** @deprecated M4-P4 ungated Delivery Crew — always available. */
 export function pickupCrewUnavailableReason(
-  fulfilmentMethod: StorefrontOrderFulfilmentMethod | null | undefined,
+  _fulfilmentMethod?: StorefrontOrderFulfilmentMethod | null,
 ): string | null {
-  if (fulfilmentMethod === "delivery") {
-    return "Delivery Crew message is not available yet.";
-  }
   return null;
 }

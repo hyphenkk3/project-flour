@@ -4,6 +4,11 @@ import {
   formatOrderFinancialEquation,
 } from "@/engines/orders/financial-equation";
 import {
+  DELIVERY_FEE_WAIVED_LINE,
+  formatDeliveryFinanceWaiverLines,
+  PROCESSING_FEE_WAIVED_LINE,
+} from "@/engines/orders/delivery-finance";
+import {
   isDeliveryRecipientSameAsOrderingCustomer,
 } from "@/engines/orders/fulfilment";
 import {
@@ -167,10 +172,47 @@ export function formatConfirmationSpecialRequestBlock(
   return `⭐️Special Request:⭐️\n${body}`;
 }
 
+export const PROCESSING_FEE_WAIVED_CONFIRMATION_LINE =
+  PROCESSING_FEE_WAIVED_LINE;
+export const DELIVERY_FEE_WAIVED_CONFIRMATION_LINE = DELIVERY_FEE_WAIVED_LINE;
+
+/**
+ * Customer-facing waiver traceability after the equation.
+ * Only canonical deliberate waivers — never NOT SET / RM0 inference.
+ * Processing first, then Delivery. Returns null when none apply.
+ */
+export function formatConfirmationDeliveryFinanceWaiverLines(input: {
+  fulfilmentMethod?: StorefrontOrderFulfilmentMethod | string | null;
+  delivery?: StorefrontOrderDelivery | null;
+}): string | null {
+  return formatDeliveryFinanceWaiverLines(input);
+}
+
+/**
+ * Equation plus optional waiver lines (immediately after, no blank line).
+ */
+export function formatConfirmationAmountSection(
+  payload: Pick<
+    ConfirmationPayload,
+    | "items"
+    | "paidAddons"
+    | "subtotal"
+    | "amountDue"
+    | "adjustments"
+    | "total"
+    | "fulfilmentMethod"
+    | "delivery"
+  >,
+): string {
+  const equation = formatConfirmationFinancialBlock(payload);
+  const waivers = formatConfirmationDeliveryFinanceWaiverLines(payload);
+  return waivers ? `${equation}\n${waivers}` : equation;
+}
+
 /**
  * Customer-facing financial block for confirmation.
  * Full item + adjustment equation (shared with Crew amount head).
- * No payment / NYP / c/o notation.
+ * No payment / NYP / c/o notation. Waiver lines are not part of the equation.
  */
 export function formatConfirmationFinancialBlock(
   payload: Pick<
@@ -211,7 +253,7 @@ export function generateConfirmationMessage(
   const weekday = formatPickupWeekdayShort(payload.pickupDate);
   const dateShort = formatPickupDateShort(payload.pickupDate);
   const timeLabel = formatPickupTime(payload.pickupTime);
-  const financialBlock = formatConfirmationFinancialBlock(payload);
+  const amountSection = formatConfirmationAmountSection(payload);
   const commercialLines = formatConfirmationCommercialLines({
     items: payload.items,
     paidAddons: payload.paidAddons,
@@ -270,7 +312,7 @@ export function generateConfirmationMessage(
   if (specialRequest) {
     orderSection += `\n\n${specialRequest}`;
   }
-  orderSection += `\n\n${financialBlock}`;
+  orderSection += `\n\n${amountSection}`;
   if (postAmountBlock) {
     orderSection += `\n\n${postAmountBlock}`;
   }

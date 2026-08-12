@@ -7,12 +7,19 @@ import {
   buildConfirmationPayloadFromOrder,
   generateConfirmationMessage,
 } from "@/engines/orders/confirmation-message";
+import { shouldWarnMissingDeliveryFeeBeforeConfirmation } from "@/engines/orders/confirmation-validity";
 import { buildWhatsAppDeepLink } from "@/engines/orders/whatsapp";
 import type { StorefrontOrder } from "@/types/storefront";
 import {
   markConfirmationSentAction,
   recordConfirmationPreparedAction,
 } from "@/workspaces/owner/orders/actions";
+import { MissingDeliveryFeeConfirmationDialog } from "@/workspaces/owner/orders/MissingDeliveryFeeConfirmationDialog";
+import {
+  acknowledgeMissingDeliveryFeeBeforeConfirmation,
+  deliveryChargesSectionHref,
+  hasAcknowledgedMissingDeliveryFeeBeforeConfirmation,
+} from "@/workspaces/owner/orders/missing-delivery-fee-confirmation";
 import {
   ownerOrderWorkspaceHref,
   resolveOwnerReturnTo,
@@ -36,11 +43,20 @@ export function ConfirmationPreview({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [preparedLogged, setPreparedLogged] = useState(false);
+  const needsMissingFeeAck =
+    shouldWarnMissingDeliveryFeeBeforeConfirmation(order);
+  const [acknowledgedMissingFee, setAcknowledgedMissingFee] = useState(
+    () =>
+      !needsMissingFeeAck ||
+      hasAcknowledgedMissingDeliveryFeeBeforeConfirmation(order.id),
+  );
+  const confirmationLocked = needsMissingFeeAck && !acknowledgedMissingFee;
   const back = resolveOwnerReturnTo(returnTo);
   const workspaceHref = ownerOrderWorkspaceHref(
     order.id,
     back.label === "Whole Cake Calendar" ? back.href : null,
   );
+  const deliveryChargesHref = deliveryChargesSectionHref(workspaceHref);
 
   const payload = buildConfirmationPayloadFromOrder({
     order,
@@ -50,6 +66,7 @@ export function ConfirmationPreview({
   const whatsappUrl = buildWhatsAppDeepLink(order.phone, message);
 
   useEffect(() => {
+    if (confirmationLocked) return;
     const key = `wb-conf-prepared:${order.id}:${isUpdated ? "updated" : "first"}`;
     try {
       if (window.sessionStorage.getItem(key) === "1") {
@@ -63,9 +80,10 @@ export function ConfirmationPreview({
     if (preparedLogged) return;
     setPreparedLogged(true);
     void recordConfirmationPreparedAction(order.id, isUpdated);
-  }, [order.id, isUpdated, preparedLogged]);
+  }, [order.id, isUpdated, preparedLogged, confirmationLocked]);
 
   function handleCopy() {
+    if (confirmationLocked) return;
     void navigator.clipboard.writeText(message).then(() => {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
@@ -73,6 +91,7 @@ export function ConfirmationPreview({
   }
 
   function handleOpenWhatsApp() {
+    if (confirmationLocked) return;
     if (!order.phone.trim()) {
       setError("No WhatsApp phone on this order.");
       return;
@@ -85,6 +104,7 @@ export function ConfirmationPreview({
   }
 
   function handleMarkSent() {
+    if (confirmationLocked) return;
     setError(null);
     startTransition(async () => {
       const result = await markConfirmationSentAction(order.id);
@@ -95,6 +115,29 @@ export function ConfirmationPreview({
       router.push(workspaceHref);
       router.refresh();
     });
+  }
+
+  function handleContinueWithoutDeliveryFee() {
+    acknowledgeMissingDeliveryFeeBeforeConfirmation(order.id);
+    setAcknowledgedMissingFee(true);
+  }
+
+  if (confirmationLocked) {
+    return (
+      <div className="space-y-6">
+        <Link
+          className="text-skyline hover:text-ink text-sm font-medium"
+          href={workspaceHref}
+        >
+          ← Order Workspace
+        </Link>
+        <MissingDeliveryFeeConfirmationDialog
+          onAddDeliveryFee={() => router.push(deliveryChargesHref)}
+          onContinueWithout={handleContinueWithoutDeliveryFee}
+          open
+        />
+      </div>
+    );
   }
 
   return (

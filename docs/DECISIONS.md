@@ -2,6 +2,465 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-12 — M4-P5 · Delivery Lifecycle & Customer Messaging
+
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-12).** Live migration verified
+against approved SQL. Four-state Delivery TS/UI replaced the superseded
+3-state `picked_up_at` relabel. Photo upload/send is **not** P5. Accepted
+behaviour is frozen for later work unless Product reopens.
+
+Migration (Product-applied live; TS/UI implemented):
+`supabase/migrations/20260812140000_m4_p5_delivery_operational_lifecycle.sql`
+
+SHA-256: `b3c2228294f1d1a59f113d3a13b412dbb64e5c63ec7cc86d59162b274ab60931`
+
+### Product acceptance (2026-08-12)
+
+Product closed M4-P5 after Owner Product tests on `ORD-20260812-0100`
+(`fed10d26-…`), including happy-path lifecycle + undos + re-run, Ready →
+Delivered **skip-Out**, Delivery Ready / Out routing (incl. different
+purchaser/recipient where applicable), locked Out copy
+(`Rider has picked up the order and is on his way ya!`), Thank You +
+state-dependent resend availability, anti-hang operational actions,
+deterministic AM/PM timeline rendering, Calendar Delivery fill
+`bg-status-warning-soft` (`#ffefd9`) with Pickup no-fill / Today light-blue
+chrome / matching Guide, and ● / ○ / ✓ Delivery notation
+(automation-covered). Remaining skip/undo/routing guards accepted via
+automated + live-fixture coverage. No further M4-P5 Product testing
+required.
+
+### Persistence (locked — SQL already matches; do not change)
+
+Pickup: `ready_at` / `picked_up_at` only.
+Delivery: `ready_at` + `out_for_delivery_at` + `delivered_at`.
+Do not overload `picked_up_at`. No fabricated/backfilled skip timestamps.
+Owner-only mutations.
+
+Intended path: Not Ready → Ready → Out for Delivery → Delivered.
+Staff **may** mark Delivered without Out for Delivery (forgot Out).
+Ready is **not** required before Out. Out is **not** required before
+Delivered. Do not auto-set `out_for_delivery_at` when marking Delivered.
+
+Undo: Ready blocked while Out or Delivered (and while Pickup Picked Up).
+Out blocked while Delivered. Undo Delivered preserves Out + Ready.
+
+Pickup RPCs unchanged except mark Picked Up refuses Delivery.
+
+### Workspace / Calendar (locked; TS after apply)
+
+- Section: Pickup **Collection** · Delivery **Delivery**.
+- Pickup: ● = Ready · ✓ = Picked Up.
+- Delivery: ● = Ready · **○ = Out for Delivery** · ✓ = Delivered.
+- Guide updated accordingly. No View in Calendar feature. Pickup Customer
+  Ready must not be reused for Delivery.
+- **Product-accepted Delivery Calendar fill (2026-08-12):**
+  `bg-status-warning-soft` / `--color-status-warning-soft: #ffefd9`
+  (pale warm yellow/beige). Pickup = no fulfilment fill. Today chrome
+  remains light blue (`status-info-soft`). Guide Delivery swatch matches.
+  Earlier M4-P2 Visual Trial 2 teal (`#b8d4cf` / `signal-soft`) is
+  superseded for Delivery fill and was removed when unused.
+
+### Delivery Ready (primary at Ready; to person who ordered)
+
+Canonical inform / same-person state only. `{time}` from structured
+scheduled delivery time. `{sender}` = staff display name.
+
+- **A** same person, or different + DO NOT INFORM:
+  `Good morning, {sender} here.` /
+  `Just to inform you that your order is ready for delivery anytime now, we will arrange delivery base on your schedule at {time}.` /
+  `Do let us know if you like to deliver earlier ya ;)`
+- **B** different + INFORM RECIPIENT:
+  `Good morning, {sender} here.` /
+  `Just to inform you that your order is ready for delivery anytime now.` /
+  `We will contact the recipient for arranging the delivery ya ;)`
+
+### Out for Delivery message (primary at Out for Delivery)
+
+Exact body: `Rider has picked up the order and is on his way ya!`
+
+Copy-ready text only. Routing (canonical stored inform state; never infer):
+
+- **Same person:** orderer receives the text. Future photos: handoff + cake.
+- **Different + INFORM:** text goes to **both** orderer and recipient.
+  Future photos: orderer = handoff + cake; recipient = **handoff only,
+  never cake**. Inform ≠ cake-photo permission.
+- **Different + DO NOT INFORM / surprise:** orderer receives text (+ future
+  both photos). Recipient: **no text, no photos, no communication**.
+
+UI must truthfully show dual addressees when INFORM; must not offer
+recipient contact when DO NOT INFORM. No automatic WhatsApp send.
+
+### Thank You — do not edit
+
+Existing `CUSTOMER_THANK_YOU_MESSAGE` remains authoritative. Product
+accepts the current constant. Do not replace from later examples.
+
+### Message availability (locked)
+
+- **Ready:** Delivery Ready primary; Crew also available.
+- **Out for Delivery:** rider-on-the-way primary; also Thank You, Delivery
+  Ready (resend), Crew.
+- **Delivered:** operational completion; no new Delivered customer message.
+  Resend: Thank You, Delivery Ready, Crew, and Out for Delivery if the
+  existing copy-ready architecture can resend truthfully.
+
+### Photo workflow (locked future; not P5; roadmap placement TBD)
+
+No upload / storage / attachment / gallery / WhatsApp send API in P5.
+Do not invent a new milestone number. Placement left for Product (not a
+clear fit for existing Future “WhatsApp automation / send API” alone).
+
+Handoff photo vs cake photo routing is locked above for when Product
+schedules that work.
+
+### Explicit non-goals
+
+Photo/media · WhatsApp automation · Operations indicator · View in
+Calendar · notifications · EXTRA · Dine-in / Invoice fulfilment · Thank You
+wording · Pickup Ready / Wednesday Ready copy · GrabExpress automation.
+
+## 2026-08-12 — M4-P4 · Delivery Crew Message
+
+**STATUS: PRODUCT ACCEPTED** (manual restoration test + waiver
+traceability). No migration. Accepted Crew behaviour is frozen for P5+.
+
+Final restoration test PASS (`testdelivery (w)`, Chocolate D'Amour 6",
+quoted RM15+RM5, complimentary, one-line KK/Sabah address, compact Time,
+`RM125+RM15(df)+RM5(pf)= RM145 (NYP)`). Adjustment row order remains
+authoritative — do **not** sort `pf`/`df`. Waiver / both-waived /
+restore / NOT SET≠waived accepted. Same-person omits notify. Crew notify
+copy stays Preview 3B wording. Missing delivery details stay a Delivery
+header (defensive; no extra P4 validation UX).
+
+Delivery Crew Message is an **INTERNAL operational** copy-ready WhatsApp
+message (Preview 3B Option C + ROADMAP M4-P4). It is not a customer
+financial message. Confirmation, Payment Request, Quick View, Calendar,
+Operations, and finance UI are unchanged.
+
+### Contract (locked before implementation)
+
+- **Ungate** Delivery Crew: `messageActionsForOperationalState` includes
+  Crew for Delivery; Order Workspace / Calendar Quick View Messages show
+  Crew Order Message. Pickup Crew body is bit-compatible.
+- **Header:** paid `🟢🚗 Delivery Order: D/M (Day)`; unpaid/partial
+  `🔺🟢🚗 Delivery Order: D/M (Day)`. `🔺` = payment incomplete only.
+  Pickup header `🟢Pick-up order:` / `🔺🟢Pick-up order:` unchanged.
+- **Identity:** same-person → `Ordered by/ Recipient` + `Phone No` +
+  `Address` + `Time`. Different recipient → `Ordered by` + `Phone No` +
+  `Recipient` + `Recipient Phone No` + `Address` + `Time`. Ordered-by
+  uses `guestOrderDisplayName` (internal). Recipient name/phone are
+  canonical delivery fields.
+- **Address:** internal — include city/state (KK/Sabah). Do **not** use
+  Confirmation’s customer-facing omission.
+- **Time:** structured `pickupTime` via existing Crew compact clock
+  (`3pm` / `3:30pm`), not Confirmation `3:00 PM`.
+- **Notify footer (different recipient only, never inferred):**
+  `*DO NOT INFORM RECIPIENT (It's A Surprise!)` vs
+  `*Inform Recipient before delivery`. Same-person omits notify (Product
+  accepted). Do not normalize Crew notify copy to Confirmation. Missing
+  delivery details: Delivery header + ordered-by/phone/time only; no fake
+  Pickup (defensive; no extra validation UX in P4).
+- **Cakes / paid add-ons / written BC message / complimentary /
+  Include RECEIPT / NYP / allocations / c/o:** reuse Pickup Crew
+  commercial + settlement suffix. No Bakery Attention in Crew body.
+- **Equation:** shared calculator; Crew shorthands `pf` / `df`
+  (Confirmation keeps `Processing` / `Delivery`). Adjustment **row
+  order** is authoritative — no artificial fee-term sorting. Waived /
+  NOT SET have no active adj → no `pf`/`df` term. Do **not** infer
+  waiver or NOT SET from RM0.
+- **Waiver traceability (internal, required):** same canonical state as
+  Confirmation. Immediately after the Crew payment line (no blank line;
+  outside the equation): `Processing Fee: Waived` / `Delivery Fee: Waived`.
+  Processing first, then Delivery. NOT SET / RM0 / missing adj / finance
+  disabled never emit a waiver line. Quoted / restored / override use
+  `pf`/`df` and omit waiver lines. No missing-fee acknowledgement, no
+  Confirmation separators/shorthands, no Payment Request formatting, no
+  requester/approver/reason/timestamp.
+- **Not in Crew:** Confirmation underscore/`~~~~` separators; Payment
+  Request `Order Total` / `Delivery Fee` / `Amount` labels; customer
+  Ready/Thank You copy.
+- **Authority:** no new capability. Crew remains copy-only (temporarily
+  editable preview; not frozen `message_body`). Confirmation stays
+  Owner-only. Manager Delivery Charges authority unchanged. Customer
+  Ready / Thank You availability for Delivery is **M4-P5** — not changed
+  here.
+- **Gating helpers:** `isPickupCrewMessageAvailable` = Pickup formatter
+  path (`!== "delivery"`). `isCrewOrderMessageAvailable` = Pickup +
+  Delivery (null/unknown/`drive_through` keep Pickup formatter).
+
+### Explicit non-goals
+
+M4-P5 lifecycle / customer messaging · Operations indicator · View in
+Calendar · notifications · EXTRA · Confirmation/Payment Request redesign
+· fee-term reordering · Crew snapshot persistence · GrabExpress fetch.
+
+## 2026-08-12 — M4-P3 Slice 3 · Confirmation equation
+
+**STATUS: Slice 3 PRODUCT ACCEPTED** (manual Product tests + refinements).
+No migration. Accepted behaviour is frozen for M4-P4+.
+
+Customer Confirmation financial equation uses Delivery finance shorthands
+from live settlement adjustments:
+
+- `delivery_processing_fee` → `Processing`
+- `delivery_fee` → `Delivery`
+
+Examples (both accepted; **no sorting**):
+
+- `RM125+RM5(Processing)+RM15(Delivery)= RM145`
+- `RM125+RM15(Delivery)+RM5(Processing)= RM145`
+
+Fee-term order follows `order_adjustments` row order. Do **not** add
+sorting merely to force Processing before Delivery. Payment Request
+Delivery-before-Processing presentation is also accepted.
+
+Waived / NOT SET fees have no active adjustment (Slice 1 sync) and therefore
+do not appear. Pickup Confirmation remains unchanged. Sent `message_body`
+stays frozen. Quick View was not redesigned — `amountDue` already includes
+fees.
+
+Payment Request lines use customer labels **Processing Fee** / **Delivery Fee**.
+
+### Waiver traceability (Product Test 2 second refinement)
+
+Equation stays amountDue-only (no RM0 fee terms). Immediately after the
+equation, Confirmation adds customer-facing outcome lines from canonical
+state only:
+
+- Processing: `financeEnabled && processingFeeWaived` → `Processing Fee: Waived`
+- Delivery: `financeEnabled && deliveryFeeStatus === "quoted_waived"` →
+  `Delivery Fee: Waived`
+
+NOT SET / quoted / override / RM0 absence never emit a waiver line.
+Processing first, then Delivery. Payment Request is unchanged. Sent
+`message_body` remains frozen; a later restore does not rewrite history.
+
+### Missing Delivery Fee acknowledgement (Product Test 2 refinement)
+
+Not an unconditional hard block. When fulfilment is Delivery, finance is
+enabled, and Delivery Fee status is still `not_set` (waived `quoted_waived`
+does **not** warn), Owner sees a safety dialog before entering / sending
+Customer Confirmation:
+
+- Title: Delivery fee not set
+- Add Delivery Fee → stay out of Confirmation; focus Delivery Charges
+- Continue Without Delivery Fee → existing Confirmation flow; equation
+  unchanged (no fake RM0 / waiver / request / persist)
+
+Guard covers Prepare Confirmation, Prepare Updated Confirmation, direct
+`/confirmation` URL, and Mark as Sent / Copy / WhatsApp. Acknowledgement is
+ephemeral UI (React state + sessionStorage for the current attempt).
+Confirmation remains Owner-only. Manager authority unchanged.
+
+## 2026-08-12 — M4-P3 Slice 2B-2 · Manager exception authority + Approve/Reject
+
+**STATUS: Slice 2B-2 CLOSED / PRODUCT ACCEPTED.** Slice 3 Confirmation
+equation is PRODUCT ACCEPTED. M4-P4 Delivery Crew Message is PRODUCT
+ACCEPTED. M4-P5 awaits Product design lock. Operations indicator /
+View in Calendar / notifications / EXTRA remain out of scope.
+
+### Migration (applied)
+
+`supabase/migrations/20260812080000_m4_p3_manager_delivery_charges_authority.sql`
+
+SHA-256: `f25ce8644eec5dcd98e20a845d776cb578b76d903dafcfc206141bc0038c4088`
+
+Manager gains Delivery Charges **exception + resolve** authority only — not
+global Owner. Direct waive/override refuses while the same-category Counter
+request is pending (Approve/Reject required). `init_guest_order_delivery_finance`
+remains Owner-only. Quote RPC unchanged (Owner | CO | Manager).
+
+### Capability matrix (shared guest Order Workspace)
+
+| Capability | Owner | Manager | Counter |
+|---|---|---|---|
+| Quote / change Delivery Fee | yes | yes | yes |
+| Direct waive / restore / Processing override | yes | yes | no |
+| Request Delivery waiver / Processing change | no (direct) | no (direct) | yes |
+| Approve / Reject pending requests | yes | yes | no |
+| Cancel / dismiss pending requests | any | any | own only |
+| Enable Delivery Charges (historical) | yes | no | no |
+| Edit Order / Confirmation / Payment / Discounts / Collection ops | yes | no | no |
+
+### UX
+
+Owner + Manager: pending Delivery/Processing cards show requester name,
+timestamp, reason, current → requested amounts, **Approve** / **Reject**
+(optional note). Same-category direct Waive/Edit suppressed while pending.
+Unrelated category keeps normal direct controls. Compact top-of-order
+attention banner when requests are pending. Slice 2A hang rule unchanged:
+no `router.refresh()` inside fee `useTransition`.
+
+### Attribution
+
+2B-1 service-role requester hydration preserved. Resolver labels:
+Approved/Rejected/Cancelled by actual staff display name.
+
+## 2026-08-11 — M4-P3 Slice 2B-1 · Counter Delivery Charges + dual requests
+
+**STATUS: Slice 2B-1 IMPLEMENTED.** Manager Counter-like fee authority was
+**superseded by 2B-2**. Slice 3 / M4-P4 / M4-P5 remain out of scope.
+
+### Migration (applied)
+
+`supabase/migrations/20260811200000_m4_p3_independent_fee_requests.sql`
+
+SHA-256: `cc6b778d1ea69422273fed9756685b4d6bb9fcb312e5b0946e20cbfb69cde0ed`
+
+Independent pending slots for Delivery Fee waiver and Processing Fee
+waive/change; cancel RPCs; Delivery re-quote auto-cancels **only** the
+pending Delivery waiver with audited `superseded_by_delivery_fee_change`.
+
+### Capability audit (shared guest Order Workspace)
+
+Counter (`customer_operations`) and Manager may open `/owner/orders/[id]`.
+Shared route does **not** grant Owner-only controls:
+
+| Capability | Owner | CO / Manager |
+|---|---|---|
+| Quote Delivery Fee | yes | yes |
+| Request Delivery waiver / Processing change | no (direct) | yes |
+| Cancel own pending request | yes (any) | own only |
+| Direct waive / restore / Processing override | yes | no |
+| Enable Delivery Charges | yes | no |
+| Edit Order / Confirmation / Payment / Discounts / Collection ops on this page | yes | no |
+
+Manager follows **Counter-like** fee authority (not Owner exception authority).
+
+### UX / hang rule
+
+Counter Delivery Charges: quote presets + Request Waiver / Request Change;
+dual pending cards with requester attribution; Cancel Request only for
+requester (or Owner dismiss). No `router.refresh()` inside fee
+`useTransition` (Slice 2A restore lesson).
+
+### Not in 2B-1
+
+Final Owner Approve/Reject UI; Slice 3; Operations indicator; View in
+Calendar; notifications; EXTRA.
+
+## 2026-08-11 — M4-P3 Slice 2A · Owner Delivery Charges UX
+
+**STATUS: Slice 2A CLOSED / PRODUCT ACCEPTED.** M4-P3 as a whole is **not**
+complete — Slice 2B-1/2B-2 are PRODUCT-accepted; Slice 3 Confirmation equation
+refinements are PRODUCT-accepted (quoted RM15 / Payment Request / freeze gate
+remains before M4-P4).
+
+### Product acceptance
+
+Product accepted Slice 2A after clean post-fix browser retest:
+fresh Delivery → Processing RM5 + Delivery NOT SET; quote RM15; waive →
+RM0 / RM15 waived; Restore Delivery Fee settles (no Working/Rendering hang);
+Processing waive → restore RM5; amountDue moves correctly on waive/restore.
+
+### Restore runtime defect (closed)
+
+Product previously saw Restore Delivery Fee ConfirmDialog stuck on
+**Working…** / Next **Rendering…** with waived UI frozen. First Product
+click did not commit authority (`quoted_waived`, no restore timeline event)
+when the Next process was wedged; reproduction then showed the server action
+(RPC + reconcile + `revalidatePath`) could complete while the client
+`useTransition` stayed pending because `router.refresh()` ran inside the
+same transition as actions that already revalidate. Fix: fee ConfirmDialog
+actions settle via action `revalidatePath` only; `try/catch` surfaces
+errors; no `router.refresh()` in that transition
+(`DeliveryChargesSection` / `EnableDeliveryChargesControl`). Product
+re-verified Restore (Delivery + Processing) settles.
+
+### Locked Product decisions (from Slice 2 recon + 2A prompt)
+
+1. **Counter request cancellation (Slice 2B-1):** Counter may cancel **their own**
+   pending fee request only. No edit of pending requests — cancel then re-submit.
+   Owner may also cancel/dismiss. Resolved requests cannot be cancelled.
+   **Implemented in 2B-1** (Approve/Reject UI is 2B-2).
+2. **Historical M4-P2 opt-in:** Owner action wording **Enable Delivery Charges**,
+   gated by ConfirmDialog (adds current Processing Fee; Delivery Fee remains
+   NOT SET). Viewing alone never enables finance.
+3. **Owner rejection reason (Slice 2B):** optional. **Not implemented in 2A.**
+4. **Counter normal Delivery fee quote (Slice 2B):** Counter may quote/change
+   normal Delivery fee (>0 presets/custom). Counter may **not** directly waive
+   Delivery or Processing. **Not implemented in 2A.**
+5. **Delivery → Pickup warning:** yes — edit-mode warning when active Delivery
+   charges will be removed; if verified payment exists, also warn about possible
+   overpayment.
+
+### Slice 2A Owner UX implemented
+
+- Dedicated **Delivery Charges** ViewBlock (VIEW mode only) between Fulfilment
+  and Order for finance-enabled Delivery.
+- Processing: normal / override / waive (ConfirmDialog); waived shows
+  `RM0` + suspended amount waived (applicable or override).
+- **Restore Processing Fee** / **Restore Delivery Fee**: explicit audited Owner
+  RPCs (`restore_guest_order_*`). Restores suspended authoritative amount;
+  does **not** erase the waiver timeline event; does **not** use set-quote /
+  override as fake undo.
+- Delivery: NOT SET (warning colour), presets RM5/RM10/RM15 + More
+  RM20/RM25/RM30/Custom; quote via Slice 1 server actions; Owner waive via
+  ConfirmDialog; waived shows `RM0` + quoted amount waived.
+- Historical Enable Delivery Charges control on Delivery fulfilment area.
+- Payment + pre-payment breakdown lines from Delivery finance facts; managed
+  fee adjustment codes filtered from discount panel to avoid double presentation.
+  Settlement arithmetic unchanged (adjustments only).
+
+### Waiver restoration (locked Product truth)
+
+- Restoration is an **explicit audited Owner financial action**.
+- Processing restore respects persisted override if present, else applicable.
+- Delivery restore respects persisted quoted amount (`quoted_waived` → `quoted`).
+- Original waiver events remain intact in the timeline.
+
+### Authority migrations (unchanged hashes)
+
+- Slice 1: `20260811160000_m4_p3_delivery_finance_authority.sql`
+  SHA-256 `dad21d80e539822482f87c38202ad23d5eedd252f1a8df1296779b3d65802ff3`
+- Restore: `20260811170000_m4_p3_delivery_fee_waiver_restore.sql`
+  SHA-256 `2b0a75379bf8973e9381302c802d967f2c26524959a09f63496c70ee71cfc380`
+## 2026-08-11 — M4-P3 Slice 1 · Delivery financial authority (schema + settlement)
+
+**STATUS: Slice 1 CLOSED / VERIFIED.** Slice 2A / 2B-1 / 2B-2 are CLOSED /
+PRODUCT ACCEPTED. Slice 3 Confirmation equation refinements are PRODUCT
+ACCEPTED (remaining quoted-fee / Payment Request / freeze gate before M4-P4).
+
+Locked Product financial truth implemented in authority/schema:
+
+### Processing fee
+- Current business default **RM5** via `current_delivery_processing_fee_default()`
+  (SQL) and `CURRENT_DELIVERY_PROCESSING_FEE_DEFAULT` (TS). Default may change
+  later; **order-level** `processing_fee_applicable_amount` is historical truth.
+- Owner may **override** (`processing_fee_override_amount`) or **waive**
+  (`processing_fee_waived`) directly.
+- Counter may **request** override/waiver; cannot authorize. Pending request does
+  not change payable amount until Owner approve/reject.
+
+### Delivery fee
+- States: `not_set` | `quoted` | `quoted_waived`.
+- Quote amount must be **> 0**. Payable RM0 is **waiver**, not a preset.
+- Quoted amount remains auditable after waiver; effective payable Delivery = RM0.
+- NOT SET ≠ WAIVED.
+- Future UX presets (Slice 2): visible RM5/RM10/RM15; More = RM20/RM25/RM30/Custom;
+  **no RM0 preset**.
+- Owner: quote then separately waive. Counter: quote then request waiver → Owner
+  approve/reject.
+
+### Cutover / history
+- Gate: `delivery_finance_enabled` (default **false** on migrate).
+- New Delivery detail INSERT after this migration → finance enabled + processing
+  default + Delivery fee NOT SET.
+- Existing M4-P2 Delivery rows keep finance disabled — **no retroactive charges**.
+- Explicit Owner `init_guest_order_delivery_finance` opts a historical Delivery
+  into M4-P3 finance.
+- Delivery→Pickup clears fee adjustments + details; Pickup→Delivery / round-trip
+  starts fresh (no quote/waiver resurrection).
+
+### Settlement authority
+- Facts on `order_delivery_details` → `_sync_delivery_finance_adjustments` →
+  managed `order_adjustments` codes `delivery_processing_fee` / `delivery_fee` →
+  SQL `order_amount_due` / TS settlement.
+- Clients must not independently edit generated fee adjustments.
+
+August cake-only and RM10 flat −RM10 remain unchanged. Fees do not help August
+eligibility. No new refund system.
+
 ## 2026-08-11 — M4-P2 Slice 5 CLOSED · Calendar fulfilment background ACCEPTED
 
 **STATUS: CLOSED** for authorized Slice 5 scope (Calendar fulfilment awareness /
@@ -54,7 +513,10 @@ presentation metadata only. Quick View was not visually redesigned by Slice 5
 Quick View). Implementation remains uncommitted on working tree at HEAD
 `b95f5da4934296e0865c1b76f5dbd3bdd4568c10` until Product authorizes commit.
 
-M4-P2 Slice 5 is CLOSED (see above). M4-P3 / M4-P4 / M4-P5 are **not started**.
+M4-P2 Slice 5 is CLOSED (see above). M4-P3 Slice 1 + 2A + 2B-1 + 2B-2 are
+CLOSED / PRODUCT-accepted; Slice 3 Confirmation equation refinements are
+PRODUCT-accepted (quoted RM15 / Payment Request / freeze gate before M4-P4).
+M4-P4 / M4-P5 are **not started**.
 
 ### Accepted Confirmation presentation (locked Slice 4 Product truth)
 
@@ -142,7 +604,10 @@ Product-approved roadmap reconciliation after Preview 3B.
 - **M4-P2 — Fulfilment & Delivery Order Model:** CLOSED for Product (Slices 1–5
   accepted; working tree uncommitted). Website remains Pickup-only for this
   milestone only.
-- **M4-P3 / M4-P4 / M4-P5:** not started.
+- **M4-P3 — Delivery Fees & Settlement:** Slice 1 CLOSED / VERIFIED; Slice 2A /
+  2B-1 / 2B-2 CLOSED / PRODUCT ACCEPTED. Slice 3 Confirmation equation
+  refinements PRODUCT ACCEPTED (quoted RM15 / Payment Request / freeze gate
+  before M4-P4). M4-P4 / M4-P5 not started.
 
 Locked Product-testable preview sequence (do not reorder without Product approval):
 

@@ -34,6 +34,8 @@ const CALENDAR_ORDER_SELECT = `
   needs_bakery_attention,
   ready_at,
   picked_up_at,
+  out_for_delivery_at,
+  delivered_at,
   order_items (
     id,
     cake_name,
@@ -63,6 +65,8 @@ type CalendarOrderRow = {
   needs_bakery_attention: boolean | null;
   ready_at: string | null;
   picked_up_at: string | null;
+  out_for_delivery_at?: string | null;
+  delivered_at?: string | null;
   order_items?: CalendarItemRow[] | null;
 };
 
@@ -149,6 +153,8 @@ function mapEntry(
     hasEffectiveRm10,
     readyAt: row.ready_at,
     pickedUpAt: row.picked_up_at,
+    outForDeliveryAt: row.out_for_delivery_at ?? null,
+    deliveredAt: row.delivered_at ?? null,
     items: mapItems(row.order_items),
   };
 }

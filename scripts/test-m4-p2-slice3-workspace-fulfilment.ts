@@ -20,6 +20,7 @@ import {
   buildCreateStaffFulfilmentRpcParams,
   copyCustomerToRecipientDraft,
   defaultDeliveryCreateDraft,
+  defaultDeliveryFinanceDtoFields,
   deliveryDraftFromPersistedOrder,
   fulfilmentMateriallyDiffer,
   fulfilmentTimelineSummary,
@@ -89,6 +90,7 @@ function deliveryFromDraft(draft: DeliveryCreateDraft): StorefrontOrderDelivery 
     city: d.city,
     state: d.state,
     recipientNotifyPreference: d.recipient_notify_preference,
+    ...defaultDeliveryFinanceDtoFields(),
   };
 }
 
@@ -867,11 +869,30 @@ async function runLiveDb() {
         "S. complimentary unchanged",
       );
       check(
-        JSON.stringify(before.payments) === JSON.stringify(after.payments) &&
+        JSON.stringify(before.payments) === JSON.stringify(after.payments),
+        "T. payments unchanged",
+      );
+      const { error: financeProbeErr } = await admin.rpc(
+        "current_delivery_processing_fee_default",
+      );
+      const m4p3FinanceLive = !financeProbeErr;
+      if (m4p3FinanceLive) {
+        const feeAdj = (after.adjustments ?? []).filter(
+          (a) => Number(a.amount) === 5,
+        );
+        check(
+          feeAdj.length >= 1 &&
+            after.delivery?.delivery_finance_enabled === true &&
+            after.delivery?.delivery_fee_status === "not_set",
+          "U. M4-P3 Pickup→Delivery initializes processing (+ Delivery NOT SET)",
+        );
+      } else {
+        check(
           JSON.stringify(before.adjustments) ===
             JSON.stringify(after.adjustments),
-        "T/U. payments + adjustments unchanged",
-      );
+          "U. adjustments unchanged (pre-M4-P3)",
+        );
+      }
     }
 
     // D. Pickup → Delivery Same as Customer

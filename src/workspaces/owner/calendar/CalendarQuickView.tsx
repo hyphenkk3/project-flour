@@ -293,8 +293,11 @@ function CalendarQuickViewBody({
       </section>
 
       <OrderOperationalControls
+        deliveredAt={order.deliveredAt}
+        fulfilmentMethod={order.fulfilmentMethod}
         onSuccess={onRefresh}
         orderId={order.id}
+        outForDeliveryAt={order.outForDeliveryAt}
         pickedUpAt={order.pickedUpAt}
         readyAt={order.readyAt}
       />

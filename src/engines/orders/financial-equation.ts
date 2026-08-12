@@ -5,6 +5,10 @@
  */
 
 import {
+  DELIVERY_FEE_CODE,
+  DELIVERY_PROCESSING_FEE_CODE,
+} from "@/engines/orders/delivery-finance";
+import {
   AUGUST_PROMO_CODE,
   crewRm10VoucherShorthand,
   RM10_CARD_CODE,
@@ -24,6 +28,9 @@ export type FinancialEquationAdjustment = Pick<
   OrderAdjustment,
   "amount" | "label" | "code" | "metadata"
 >;
+
+/** Confirmation uses Processing/Delivery; Crew uses pf/df (Preview 3B Option C). */
+export type FinancialEquationAudience = "confirmation" | "crew";
 
 /**
  * One commercial component:
@@ -74,14 +81,16 @@ export function formatOrderFinancialEquation(input: {
   items: FinancialEquationItem[];
   effective: FinancialEquationAdjustment[];
   amountDue: number;
+  audience?: FinancialEquationAudience;
 }): string {
   const items = input.items;
   const effective = input.effective;
+  const audience = input.audience ?? "confirmation";
   const amountDueLabel = formatOrderTotal(input.amountDue);
 
   if (items.length === 0) {
     if (effective.length === 0) return amountDueLabel;
-    return appendAdjustmentsEquation("", effective, input.amountDue);
+    return appendAdjustmentsEquation("", effective, input.amountDue, audience);
   }
 
   const itemParts = items.map((item) =>
@@ -108,18 +117,30 @@ export function formatOrderFinancialEquation(input: {
     return amountDueLabel;
   }
 
-  return appendAdjustmentsEquation(itemExpression, effective, input.amountDue);
+  return appendAdjustmentsEquation(
+    itemExpression,
+    effective,
+    input.amountDue,
+    audience,
+  );
 }
 
 function appendAdjustmentsEquation(
   itemExpression: string,
   effective: FinancialEquationAdjustment[],
   amountDue: number,
+  audience: FinancialEquationAudience,
 ): string {
   let equation = itemExpression;
   for (const adj of effective) {
+    if (
+      isDeliveryFinanceEquationCode(adj.code) &&
+      Number(adj.amount) === 0
+    ) {
+      continue;
+    }
     const abs = Math.abs(adj.amount);
-    const label = equationAdjustmentShorthand(adj);
+    const label = equationAdjustmentShorthand(adj, audience);
     if (adj.amount < 0) {
       equation += `-${formatRm(abs)}(${label})`;
     } else {
@@ -130,11 +151,25 @@ function appendAdjustmentsEquation(
   return equation;
 }
 
+function isDeliveryFinanceEquationCode(code: string | null | undefined): boolean {
+  const trimmed = code?.trim() ?? "";
+  return (
+    trimmed === DELIVERY_PROCESSING_FEE_CODE || trimmed === DELIVERY_FEE_CODE
+  );
+}
+
 export function equationAdjustmentShorthand(
   adj: Pick<OrderAdjustment, "label" | "code" | "metadata">,
+  audience: FinancialEquationAudience = "confirmation",
 ): string {
   const label = adj.label.trim();
   const code = adj.code?.trim() ?? "";
+  if (code === DELIVERY_PROCESSING_FEE_CODE) {
+    return audience === "crew" ? "pf" : "Processing";
+  }
+  if (code === DELIVERY_FEE_CODE) {
+    return audience === "crew" ? "df" : "Delivery";
+  }
   if (code === AUGUST_PROMO_CODE) return "AugPromo";
   if (code === RM10_CARD_CODE) {
     return crewRm10VoucherShorthand(adj.metadata);

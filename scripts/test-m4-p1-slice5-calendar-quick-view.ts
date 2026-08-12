@@ -104,6 +104,8 @@ function calendarEntry(
     hasEffectiveRm10: false,
     readyAt: null,
     pickedUpAt: null,
+    outForDeliveryAt: null,
+    deliveredAt: null,
     ...overrides,
   };
 }
@@ -439,6 +441,10 @@ assert.equal(
     readyBy: null,
     pickedUpAt: null,
     pickedUpBy: null,
+    outForDeliveryAt: null,
+    outForDeliveryBy: null,
+    deliveredAt: null,
+    deliveredBy: null,
     paymentDeadlineAt: null,
     paymentRequestSentAt: null,
     rm10CardIssuanceSuppressed: false,

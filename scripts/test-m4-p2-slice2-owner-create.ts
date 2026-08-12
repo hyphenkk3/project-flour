@@ -14,6 +14,7 @@ import {
   buildWorkspaceFulfilmentViewModel,
   copyCustomerToRecipientDraft,
   defaultDeliveryCreateDraft,
+  defaultDeliveryFinanceDtoFields,
   defaultOwnerCreateFulfilmentMethod,
   isDeliveryRecipientSameAsOrderingCustomer,
   markRecipientDivergedFromCustomer,
@@ -469,6 +470,7 @@ assert.equal(
     city: OWNER_DELIVERY_CITY,
     state: OWNER_DELIVERY_STATE,
     recipientNotifyPreference: "inform_recipient" as const,
+    ...defaultDeliveryFinanceDtoFields(),
   };
   const deliveryVm = buildWorkspaceFulfilmentViewModel({
     fulfilmentMethod: "delivery",
@@ -815,10 +817,26 @@ async function runLiveDb() {
         "LIVE DO NOT INFORM RECIPIENT",
       );
       check(Number(addonSub) === 6, "LIVE paid-add-on subtotal RM6");
-      check(
-        Number(amountDue) === Number(cakeSub) + Number(addonSub),
-        "LIVE Delivery contributes RM0 to amountDue",
+      const { data: processingDefault, error: financeProbeErr } = await admin.rpc(
+        "current_delivery_processing_fee_default",
       );
+      const m4p3FinanceLive = !financeProbeErr && processingDefault != null;
+      if (m4p3FinanceLive) {
+        check(
+          Number(amountDue) ===
+            Number(cakeSub) + Number(addonSub) + Number(processingDefault),
+          "LIVE Delivery includes default processing fee (M4-P3)",
+        );
+        check(
+          Boolean(rows[0]?.delivery_finance_enabled),
+          "LIVE new Delivery finance enabled (M4-P3)",
+        );
+      } else {
+        check(
+          Number(amountDue) === Number(cakeSub) + Number(addonSub),
+          "LIVE Delivery contributes RM0 to amountDue (pre-M4-P3)",
+        );
+      }
     }
   } finally {
     for (const id of cleanup) {

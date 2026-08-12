@@ -1,4 +1,8 @@
 import {
+  DELIVERY_FEE_CODE,
+  DELIVERY_PROCESSING_FEE_CODE,
+} from "@/engines/orders/delivery-finance";
+import {
   getPaymentRequestDetails,
   type PaymentRequestMethod,
 } from "@/engines/orders/payment-details";
@@ -10,6 +14,7 @@ import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 export type PaymentRequestAdjustmentLine = {
   label: string;
   amount: number;
+  code?: string | null;
   /** Optional voucher/reference number from adjustment metadata */
   referenceNumber?: string | null;
   metadata?: Record<string, unknown> | null;
@@ -45,15 +50,22 @@ export function formatSignedRm(amount: number): string {
 export function customerFacingAdjustmentLabel(
   adjustment: PaymentRequestAdjustmentLine,
 ): string {
+  const code = adjustment.code?.trim() ?? "";
+  const baseLabel =
+    code === DELIVERY_PROCESSING_FEE_CODE
+      ? "Processing Fee"
+      : code === DELIVERY_FEE_CODE
+        ? "Delivery Fee"
+        : adjustment.label;
   const fromMeta = physicalVoucherNumberFromMetadata(adjustment.metadata) ?? "";
   const reference = (adjustment.referenceNumber ?? fromMeta).trim();
   if (!reference) {
-    return adjustment.label;
+    return baseLabel;
   }
-  if (adjustment.label.includes(`#${reference}`)) {
-    return adjustment.label;
+  if (baseLabel.includes(`#${reference}`)) {
+    return baseLabel;
   }
-  return `${adjustment.label} #${reference}`;
+  return `${baseLabel} #${reference}`;
 }
 
 /** True when the customer already has verified money credited on this order. */

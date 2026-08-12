@@ -3,7 +3,8 @@
  * Run: npx tsx scripts/test-m4-p2-slice4-confirmation-crew-quick-view.ts
  *
  * Snapshot/helper suite only (no live DB fixtures).
- * Does NOT implement Delivery Crew body (M4-P4) or Calendar colours (Slice 5).
+ * M4-P4 ungated Delivery Crew; this file keeps Pickup Crew + Confirmation + QV
+ * regressions. Delivery Crew body coverage: test-m4-p4-delivery-crew-message.ts.
  */
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
@@ -21,6 +22,8 @@ import {
 } from "@/engines/orders/confirmation-validity";
 import {
   buildQuickViewFulfilmentSummary,
+  defaultDeliveryFinanceDtoFields,
+  isCrewOrderMessageAvailable,
   isDeliveryRecipientSameAsOrderingCustomer,
   isPickupCrewMessageAvailable,
   pickupCrewUnavailableReason,
@@ -61,6 +64,7 @@ function deliveryDetails(
     city: "Kota Kinabalu",
     state: "Sabah",
     recipientNotifyPreference: "inform_recipient",
+    ...defaultDeliveryFinanceDtoFields(),
     ...overrides,
   };
 }
@@ -133,6 +137,8 @@ function storefrontOrder(
     delivery: null,
     readyAt: null,
     pickedUpAt: null,
+    outForDeliveryAt: null,
+    deliveredAt: null,
     items: [
       {
         id: "i1",
@@ -692,17 +698,15 @@ function storefrontOrder(
     delivery: deliveryDetails(),
   });
   assert.equal(isPickupCrewMessageAvailable("delivery"), false);
-  assert.match(
-    pickupCrewUnavailableReason("delivery") ?? "",
-    /Delivery Crew message is not available yet/i,
-  );
-  assert.throws(
-    () => generateCrewOrderMessage(deliveryOrder),
-    /Delivery Crew message is not available yet/,
-  );
-  assert.throws(
-    () => generateOrderMessage("crew", { order: deliveryOrder }),
-    /Delivery Crew message is not available yet/,
+  assert.equal(isCrewOrderMessageAvailable("delivery"), true);
+  assert.equal(pickupCrewUnavailableReason("delivery"), null);
+  const deliveryCrew = generateCrewOrderMessage(deliveryOrder);
+  assert.ok(deliveryCrew.includes("Delivery Order:"));
+  assert.ok(!deliveryCrew.includes("Pick-up order:"));
+  assert.ok(
+    generateOrderMessage("crew", { order: deliveryOrder }).includes(
+      "Delivery Order:",
+    ),
   );
 
   const actions = messageActionsForOperationalState({
@@ -710,7 +714,7 @@ function storefrontOrder(
     pickedUpAt: null,
     fulfilmentMethod: "delivery",
   });
-  assert.equal(actions.some((a) => a.type === "crew"), false);
+  assert.equal(actions.some((a) => a.type === "crew"), true);
 
   const pickupActions = messageActionsForOperationalState({
     readyAt: null,

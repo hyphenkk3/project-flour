@@ -9,6 +9,7 @@ import {
 import {
   generateOrderMessage,
   type MessageType,
+  type OutForDeliveryAudience,
 } from "@/engines/orders/messages";
 import type { StorefrontOrder } from "@/types/storefront";
 import { OrderMessagePreview } from "@/workspaces/owner/orders/OrderMessagePreview";
@@ -24,6 +25,9 @@ type OrderMessagesSectionProps = {
 type PreviewState = {
   type: MessageType;
   title: string;
+  audience?: OutForDeliveryAudience;
+  contactName?: string;
+  contactPhone?: string;
 };
 
 const crewButtonClass =
@@ -78,15 +82,23 @@ export function OrderMessagesSection({
       messageActionsForOperationalState({
         readyAt: order.readyAt,
         pickedUpAt: order.pickedUpAt,
+        outForDeliveryAt: order.outForDeliveryAt,
+        deliveredAt: order.deliveredAt,
         fulfilmentMethod: order.fulfilmentMethod,
+        order,
       }),
-    [order.readyAt, order.pickedUpAt, order.fulfilmentMethod],
+    [
+      order,
+      order.readyAt,
+      order.pickedUpAt,
+      order.outForDeliveryAt,
+      order.deliveredAt,
+      order.fulfilmentMethod,
+    ],
   );
 
   const crewActions = actions.filter((action) => action.type === "crew");
   const customerActions = actions.filter((action) => action.type !== "crew");
-  const deliveryCrewBlocked =
-    order.fulfilmentMethod === "delivery" && crewActions.length === 0;
 
   const generatedText = useMemo(() => {
     if (!preview) return "";
@@ -97,10 +109,19 @@ export function OrderMessagesSection({
   }, [preview, order, senderName]);
 
   function openAction(action: MessageAction) {
-    if (action.type === "customer_ready") {
+    if (
+      action.type === "customer_ready" ||
+      action.type === "customer_delivery_ready"
+    ) {
       setSenderName(staffDisplayName.trim() || "Whitebird");
     }
-    setPreview({ type: action.type, title: action.title });
+    setPreview({
+      type: action.type,
+      title: action.title,
+      audience: action.audience,
+      contactName: action.contactName,
+      contactPhone: action.contactPhone,
+    });
   }
 
   return (
@@ -138,15 +159,6 @@ export function OrderMessagesSection({
                 ))}
               </div>
             </div>
-          ) : deliveryCrewBlocked ? (
-            <div className="space-y-1.5">
-              <p className="text-ink text-[10px] font-semibold tracking-[0.14em] uppercase">
-                Internal · Crew
-              </p>
-              <p className="text-skyline text-sm">
-                Delivery Crew message is not available yet.
-              </p>
-            </div>
           ) : null}
 
           {customerActions.length > 0 ? (
@@ -163,7 +175,7 @@ export function OrderMessagesSection({
                         ? customerPrimaryButtonClass
                         : customerSecondaryButtonClass
                     }
-                    key={action.type}
+                    key={`${action.type}:${action.audience ?? "default"}`}
                     onOpen={openAction}
                   />
                 ))}
@@ -175,13 +187,18 @@ export function OrderMessagesSection({
 
       {preview ? (
         <OrderMessagePreview
+          contactName={preview.contactName}
+          contactPhone={preview.contactPhone}
           editable={preview.type === "crew"}
           generatedText={generatedText}
           onClose={() => setPreview(null)}
           onSenderNameChange={
-            preview.type === "customer_ready" ? setSenderName : undefined
+            preview.type === "customer_ready" ||
+            preview.type === "customer_delivery_ready"
+              ? setSenderName
+              : undefined
           }
-          recipientLabel={messageRecipientLabel(preview.type)}
+          recipientLabel={messageRecipientLabel(preview.type, preview.audience)}
           senderName={senderName}
           title={preview.title}
           type={preview.type}

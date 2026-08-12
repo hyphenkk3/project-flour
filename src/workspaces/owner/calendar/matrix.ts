@@ -12,6 +12,8 @@ export type MatrixCustomerEntry = {
   hasEffectiveRm10: boolean;
   readyAt: string | null;
   pickedUpAt: string | null;
+  outForDeliveryAt: string | null;
+  deliveredAt: string | null;
 };
 
 export type MatrixCell = {
@@ -123,6 +125,8 @@ export function buildCalendarMatrix(
           hasEffectiveRm10: entry.hasEffectiveRm10,
           readyAt: entry.readyAt,
           pickedUpAt: entry.pickedUpAt,
+          outForDeliveryAt: entry.outForDeliveryAt,
+          deliveredAt: entry.deliveredAt,
         });
       }
     }

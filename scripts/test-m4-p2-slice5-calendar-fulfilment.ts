@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   buildQuickViewFulfilmentSummary,
+  defaultDeliveryFinanceDtoFields,
   isPickupCrewMessageAvailable,
 } from "@/engines/orders/fulfilment";
 import { withOperationalMarker } from "@/engines/orders/operational-state";
@@ -52,6 +53,8 @@ function entry(
     hasEffectiveRm10: false,
     readyAt: null,
     pickedUpAt: null,
+    outForDeliveryAt: null,
+    deliveredAt: null,
     items: [
       {
         id: "item-1",
@@ -176,18 +179,56 @@ const cakeItem = {
     withOperationalMarker("Amy", {
       readyAt: attentive.readyAt,
       pickedUpAt: attentive.pickedUpAt,
+      outForDeliveryAt: attentive.outForDeliveryAt,
+      deliveredAt: attentive.deliveredAt,
+      fulfilmentMethod: "delivery",
     }).startsWith("●"),
   );
 
-  const picked = entry({
+  const stalePickedUp = entry({
     fulfilmentMethod: "delivery",
     readyAt: "2026-08-14T01:00:00Z",
     pickedUpAt: "2026-08-15T02:00:00Z",
   });
   assert.ok(
     withOperationalMarker("Amy", {
-      readyAt: picked.readyAt,
-      pickedUpAt: picked.pickedUpAt,
+      readyAt: stalePickedUp.readyAt,
+      pickedUpAt: stalePickedUp.pickedUpAt,
+      outForDeliveryAt: stalePickedUp.outForDeliveryAt,
+      deliveredAt: stalePickedUp.deliveredAt,
+      fulfilmentMethod: "delivery",
+    }).startsWith("●"),
+    "Delivery must ignore stale picked_up_at",
+  );
+
+  const out = entry({
+    fulfilmentMethod: "delivery",
+    readyAt: "2026-08-14T01:00:00Z",
+    outForDeliveryAt: "2026-08-15T03:00:00Z",
+  });
+  assert.ok(
+    withOperationalMarker("Amy", {
+      readyAt: out.readyAt,
+      pickedUpAt: out.pickedUpAt,
+      outForDeliveryAt: out.outForDeliveryAt,
+      deliveredAt: out.deliveredAt,
+      fulfilmentMethod: "delivery",
+    }).startsWith("○"),
+  );
+
+  const delivered = entry({
+    fulfilmentMethod: "delivery",
+    readyAt: "2026-08-14T01:00:00Z",
+    outForDeliveryAt: "2026-08-15T03:00:00Z",
+    deliveredAt: "2026-08-15T06:00:00Z",
+  });
+  assert.ok(
+    withOperationalMarker("Amy", {
+      readyAt: delivered.readyAt,
+      pickedUpAt: delivered.pickedUpAt,
+      outForDeliveryAt: delivered.outForDeliveryAt,
+      deliveredAt: delivered.deliveredAt,
+      fulfilmentMethod: "delivery",
     }).startsWith("✓"),
   );
 }
@@ -275,6 +316,7 @@ const cakeItem = {
       city: "Kota Kinabalu",
       state: "Sabah",
       recipientNotifyPreference: "inform_recipient",
+      ...defaultDeliveryFinanceDtoFields(),
     },
   } as StorefrontOrder;
 
@@ -387,7 +429,7 @@ const cakeItem = {
 }
 
 // ---------------------------------------------------------------------------
-// AC Today chrome remains status-info (Delivery uses signal-soft)
+// AC Today chrome remains status-info (Delivery uses warning-soft pale yellow)
 // ---------------------------------------------------------------------------
 {
   assert.notEqual(CALENDAR_FULFILMENT_DELIVERY_BG_CLASS, "bg-status-info-soft");
@@ -395,13 +437,15 @@ const cakeItem = {
     CALENDAR_FULFILMENT_DELIVERY_BG_CLASS,
     "bg-status-info-soft/40",
   );
-  assert.equal(CALENDAR_FULFILMENT_DELIVERY_BG_CLASS, "bg-signal-soft");
+  assert.equal(CALENDAR_FULFILMENT_DELIVERY_BG_CLASS, "bg-status-warning-soft");
+  assert.notEqual(CALENDAR_FULFILMENT_DELIVERY_BG_CLASS, "bg-signal-soft");
 
   const globals = readFileSync(resolve("src/app/globals.css"), "utf8");
-  assert.ok(globals.includes("--color-signal-soft"));
-  assert.ok(globals.includes("#b8d4cf"));
-  assert.ok(!globals.includes("--color-signal-soft: #e4f0ee"));
+  assert.ok(globals.includes("--color-status-warning-soft"));
+  assert.ok(globals.includes("#ffefd9"));
   assert.ok(globals.includes("--color-status-info-soft"));
+  assert.ok(!globals.includes("--color-signal-soft"));
+  assert.ok(!globals.includes("#b8d4cf"));
 }
 
 // ---------------------------------------------------------------------------

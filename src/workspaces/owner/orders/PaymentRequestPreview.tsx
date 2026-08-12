@@ -96,6 +96,7 @@ export function PaymentRequestPreview({
     adjustments: effectiveAdjustments.map((row) => ({
       label: row.label,
       amount: row.amount,
+      code: row.code,
       metadata: row.metadata,
       referenceNumber:
         typeof row.metadata.voucher_number === "string"

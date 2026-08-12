@@ -101,51 +101,73 @@ export function isPaymentOverdue(
   return new Date(paymentDeadlineAt).getTime() < now.getTime();
 }
 
+const SINGAPORE_TIME_ZONE = "Asia/Singapore";
+
+/** 12-hour clock with uppercase AM/PM — matches formatPickupTime, ICU-stable. */
+function formatHourMinute12h(hours24: number, minutes: string): string {
+  const normalized = hours24 === 24 ? 0 : hours24;
+  const suffix = normalized >= 12 ? "PM" : "AM";
+  const hour12 = normalized % 12 === 0 ? 12 : normalized % 12;
+  return `${hour12}:${minutes} ${suffix}`;
+}
+
+/**
+ * Wall-clock hour/minute in Asia/Singapore via hour12:false parts.
+ * Avoids en-SG vs browser dayPeriod casing (`am` vs `AM`) hydration mismatches.
+ */
+function singaporeHourMinute(iso: string): { hours24: number; minutes: string } {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: SINGAPORE_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const hours24 = Number(parts.find((part) => part.type === "hour")?.value ?? NaN);
+  const minutes = parts.find((part) => part.type === "minute")?.value ?? "00";
+  return { hours24, minutes };
+}
+
+function singaporeDayMonth(iso: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: SINGAPORE_TIME_ZONE,
+    day: "numeric",
+    month: "short",
+  }).format(new Date(iso));
+}
+
 export function formatPickupTime(time: string): string {
   const parts = time.split(":");
   if (parts.length < 2) return time;
   const hours = Number(parts[0]);
   const minutes = parts[1];
   if (!Number.isFinite(hours)) return time;
-  const suffix = hours >= 12 ? "PM" : "AM";
-  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
-  return `${hour12}:${minutes} ${suffix}`;
+  return formatHourMinute12h(hours, minutes);
 }
 
 export function formatSubmittedAt(iso: string): string {
-  return new Intl.DateTimeFormat("en-SG", {
-    timeZone: "Asia/Singapore",
+  const dateLabel = new Intl.DateTimeFormat("en-SG", {
+    timeZone: SINGAPORE_TIME_ZONE,
     dateStyle: "medium",
-    timeStyle: "short",
   }).format(new Date(iso));
+  const { hours24, minutes } = singaporeHourMinute(iso);
+  if (!Number.isFinite(hours24)) return dateLabel;
+  return `${dateLabel}, ${formatHourMinute12h(hours24, minutes)}`;
 }
 
 export function formatTimelineTime(iso: string): string {
-  return new Intl.DateTimeFormat("en-SG", {
-    timeZone: "Asia/Singapore",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(new Date(iso));
+  const { hours24, minutes } = singaporeHourMinute(iso);
+  if (!Number.isFinite(hours24)) return iso;
+  return formatHourMinute12h(hours24, minutes);
 }
 
 export function formatTimelineDateTime(iso: string): string {
-  return new Intl.DateTimeFormat("en-SG", {
-    timeZone: "Asia/Singapore",
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(new Date(iso));
+  const { hours24, minutes } = singaporeHourMinute(iso);
+  if (!Number.isFinite(hours24)) return singaporeDayMonth(iso);
+  return `${singaporeDayMonth(iso)}, ${formatHourMinute12h(hours24, minutes)}`;
 }
 
 export function formatPaymentHistoryDate(iso: string): string {
-  return new Intl.DateTimeFormat("en-SG", {
-    timeZone: "Asia/Singapore",
-    day: "numeric",
-    month: "short",
-  }).format(new Date(iso));
+  return singaporeDayMonth(iso);
 }
 
 /**
@@ -155,13 +177,7 @@ export function formatPaymentDueRelative(
   iso: string,
   now: Date = new Date(),
 ): string {
-  const timeLabel = new Intl.DateTimeFormat("en-SG", {
-    timeZone: "Asia/Singapore",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(new Date(iso));
-
+  const timeLabel = formatTimelineTime(iso);
   const dayLabel = relativeBusinessDayLabel(iso, now);
   return `${dayLabel}, ${timeLabel}`;
 }

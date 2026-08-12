@@ -16,6 +16,9 @@ type OrderMessagePreviewProps = {
   /** Ready only: sender name control. */
   senderName?: string;
   onSenderNameChange?: (value: string) => void;
+  /** Out for Delivery: intended copy target (manual WhatsApp). */
+  contactName?: string;
+  contactPhone?: string;
   onClose: () => void;
 };
 
@@ -32,6 +35,8 @@ export function OrderMessagePreview({
   editable,
   senderName,
   onSenderNameChange,
+  contactName,
+  contactPhone,
   onClose,
 }: OrderMessagePreviewProps) {
   const titleId = useId();
@@ -79,7 +84,13 @@ export function OrderMessagePreview({
     onClose();
   }
 
-  const showSender = type === "customer_ready" && onSenderNameChange != null;
+  const showSender =
+    (type === "customer_ready" || type === "customer_delivery_ready") &&
+    onSenderNameChange != null;
+  const contactHint =
+    contactName || contactPhone
+      ? [contactName?.trim(), contactPhone?.trim()].filter(Boolean).join(" · ")
+      : null;
 
   if (!mounted) return null;
 
@@ -136,6 +147,13 @@ export function OrderMessagePreview({
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 py-4 sm:px-5">
+          {contactHint ? (
+            <p className="text-skyline shrink-0 text-xs">
+              Intended for {contactHint}. Copy for WhatsApp — nothing is sent
+              automatically.
+            </p>
+          ) : null}
+
           {showSender ? (
             <div className="shrink-0 space-y-1.5">
               <label

@@ -27,6 +27,9 @@ export function OwnerOrderCard({
   const marker = operationalMarkerFromTimestamps({
     readyAt: order.readyAt,
     pickedUpAt: order.pickedUpAt,
+    outForDeliveryAt: order.outForDeliveryAt,
+    deliveredAt: order.deliveredAt,
+    fulfilmentMethod: order.fulfilmentMethod,
   });
 
   return (

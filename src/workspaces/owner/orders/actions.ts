@@ -74,6 +74,15 @@ async function requireOwner() {
   return staff;
 }
 
+/** Owner or Manager — Delivery Charges exception / resolve only. */
+async function requireOwnerOrManager() {
+  const staff = await requireStaff();
+  if (staff.role.code !== "owner" && staff.role.code !== "manager") {
+    return { error: "Not authorized." as const, staff: null };
+  }
+  return { error: null, staff };
+}
+
 async function insertTimelineEvent(input: {
   orderId: string;
   eventType: string;
@@ -1578,6 +1587,11 @@ export async function markOrderPickedUpAction(
   if (!order) {
     return { error: "Order not found." };
   }
+  if (order.fulfilmentMethod === "delivery") {
+    return {
+      error: "Delivery orders use Out for Delivery / Delivered, not Picked Up.",
+    };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("mark_guest_order_picked_up", {
@@ -1617,5 +1631,591 @@ export async function undoOrderPickedUpAction(
   revalidatePath("/owner");
   revalidatePath("/owner/calendar");
   revalidatePath(`/owner/orders/${orderId}`);
+  return { error: null };
+}
+
+export async function markOrderOutForDeliveryAction(
+  orderId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireOwner();
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found." };
+  }
+  if (order.fulfilmentMethod !== "delivery") {
+    return { error: "Out for Delivery is only for Delivery orders." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("mark_guest_order_out_for_delivery", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath("/owner/calendar");
+  revalidatePath(`/owner/orders/${orderId}`);
+  return { error: null };
+}
+
+export async function undoOrderOutForDeliveryAction(
+  orderId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireOwner();
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found." };
+  }
+  if (order.fulfilmentMethod !== "delivery") {
+    return { error: "Out for Delivery is only for Delivery orders." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("undo_guest_order_out_for_delivery", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath("/owner/calendar");
+  revalidatePath(`/owner/orders/${orderId}`);
+  return { error: null };
+}
+
+export async function markOrderDeliveredAction(
+  orderId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireOwner();
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found." };
+  }
+  if (order.fulfilmentMethod !== "delivery") {
+    return { error: "Delivered is only for Delivery orders." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("mark_guest_order_delivered", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath("/owner/calendar");
+  revalidatePath(`/owner/orders/${orderId}`);
+  return { error: null };
+}
+
+export async function undoOrderDeliveredAction(
+  orderId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireOwner();
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found." };
+  }
+  if (order.fulfilmentMethod !== "delivery") {
+    return { error: "Delivered is only for Delivery orders." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("undo_guest_order_delivered", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath("/owner/calendar");
+  revalidatePath(`/owner/orders/${orderId}`);
+  return { error: null };
+}
+
+async function afterDeliveryFinanceMutation(input: {
+  orderId: string;
+  before: StorefrontOrder;
+  staffId: string;
+}): Promise<{ error: string | null }> {
+  return afterDiscountMutation(input);
+}
+
+/** Owner: enable M4-P3 finance on an existing Delivery order (explicit opt-in). */
+export async function initGuestOrderDeliveryFinanceAction(
+  orderId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireOwner();
+  const before = await getGuestOrderById(orderId);
+  if (!before) return { error: "Order not found." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("init_guest_order_delivery_finance", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+  });
+  if (error) return { error: error.message };
+
+  const reconcile = await afterDeliveryFinanceMutation({
+    orderId,
+    before,
+    staffId: staff.id,
+  });
+  if (reconcile.error) return reconcile;
+
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/confirmation`);
+  revalidatePath("/owner");
+  return { error: null };
+}
+
+/** Staff (Owner/Counter): set Delivery fee quote (>0). */
+export async function setGuestOrderDeliveryFeeQuoteAction(
+  orderId: string,
+  amount: number,
+): Promise<{ error: string | null }> {
+  const staff = await requireStaff();
+  if (
+    staff.role.code !== "owner" &&
+    staff.role.code !== "customer_operations" &&
+    staff.role.code !== "manager"
+  ) {
+    return { error: "Not authorized to set Delivery fee quote." };
+  }
+  const before = await getGuestOrderById(orderId);
+  if (!before) return { error: "Order not found." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_guest_order_delivery_fee_quote", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+    p_amount: amount,
+  });
+  if (error) return { error: error.message };
+
+  const reconcile = await afterDeliveryFinanceMutation({
+    orderId,
+    before,
+    staffId: staff.id,
+  });
+  if (reconcile.error) return reconcile;
+
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/confirmation`);
+  revalidatePath("/owner");
+  return { error: null };
+}
+
+/** Owner or Manager: waive quoted Delivery fee (effective payable RM0; quote preserved). */
+export async function waiveGuestOrderDeliveryFeeAction(
+  orderId: string,
+  reason?: string | null,
+): Promise<{ error: string | null }> {
+  const auth = await requireOwnerOrManager();
+  if (auth.error || !auth.staff) return { error: auth.error ?? "Not authorized." };
+  const staff = auth.staff;
+  const before = await getGuestOrderById(orderId);
+  if (!before) return { error: "Order not found." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("waive_guest_order_delivery_fee", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+    p_reason: reason ?? null,
+  });
+  if (error) return { error: error.message };
+
+  const reconcile = await afterDeliveryFinanceMutation({
+    orderId,
+    before,
+    staffId: staff.id,
+  });
+  if (reconcile.error) return reconcile;
+
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/confirmation`);
+  revalidatePath("/owner");
+  return { error: null };
+}
+
+/** Owner or Manager: override processing fee amount (non-negative). */
+export async function overrideGuestOrderProcessingFeeAction(
+  orderId: string,
+  amount: number,
+  reason?: string | null,
+): Promise<{ error: string | null }> {
+  const auth = await requireOwnerOrManager();
+  if (auth.error || !auth.staff) return { error: auth.error ?? "Not authorized." };
+  const staff = auth.staff;
+  const before = await getGuestOrderById(orderId);
+  if (!before) return { error: "Order not found." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("override_guest_order_processing_fee", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+    p_amount: amount,
+    p_reason: reason ?? null,
+  });
+  if (error) return { error: error.message };
+
+  const reconcile = await afterDeliveryFinanceMutation({
+    orderId,
+    before,
+    staffId: staff.id,
+  });
+  if (reconcile.error) return reconcile;
+
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/confirmation`);
+  revalidatePath("/owner");
+  return { error: null };
+}
+
+/** Owner or Manager: waive processing fee (applicable amount preserved). */
+export async function waiveGuestOrderProcessingFeeAction(
+  orderId: string,
+  reason?: string | null,
+): Promise<{ error: string | null }> {
+  const auth = await requireOwnerOrManager();
+  if (auth.error || !auth.staff) return { error: auth.error ?? "Not authorized." };
+  const staff = auth.staff;
+  const before = await getGuestOrderById(orderId);
+  if (!before) return { error: "Order not found." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("waive_guest_order_processing_fee", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+    p_reason: reason ?? null,
+  });
+  if (error) return { error: error.message };
+
+  const reconcile = await afterDeliveryFinanceMutation({
+    orderId,
+    before,
+    staffId: staff.id,
+  });
+  if (reconcile.error) return reconcile;
+
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/confirmation`);
+  revalidatePath("/owner");
+  return { error: null };
+}
+
+/** Owner or Manager: restore waived Processing fee to persisted applicable/override amount. */
+export async function restoreGuestOrderProcessingFeeAction(
+  orderId: string,
+  reason?: string | null,
+): Promise<{ error: string | null }> {
+  const auth = await requireOwnerOrManager();
+  if (auth.error || !auth.staff) return { error: auth.error ?? "Not authorized." };
+  const staff = auth.staff;
+  const before = await getGuestOrderById(orderId);
+  if (!before) return { error: "Order not found." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("restore_guest_order_processing_fee", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+    p_reason: reason ?? null,
+  });
+  if (error) return { error: error.message };
+
+  const reconcile = await afterDeliveryFinanceMutation({
+    orderId,
+    before,
+    staffId: staff.id,
+  });
+  if (reconcile.error) return reconcile;
+
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/confirmation`);
+  revalidatePath("/owner");
+  return { error: null };
+}
+
+/** Owner or Manager: restore waived Delivery fee to persisted quoted amount (not a new quote). */
+export async function restoreGuestOrderDeliveryFeeAction(
+  orderId: string,
+  reason?: string | null,
+): Promise<{ error: string | null }> {
+  const auth = await requireOwnerOrManager();
+  if (auth.error || !auth.staff) return { error: auth.error ?? "Not authorized." };
+  const staff = auth.staff;
+  const before = await getGuestOrderById(orderId);
+  if (!before) return { error: "Order not found." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("restore_guest_order_delivery_fee", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+    p_reason: reason ?? null,
+  });
+  if (error) return { error: error.message };
+
+  const reconcile = await afterDeliveryFinanceMutation({
+    orderId,
+    before,
+    staffId: staff.id,
+  });
+  if (reconcile.error) return reconcile;
+
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/confirmation`);
+  revalidatePath("/owner");
+  return { error: null };
+}
+
+/**
+ * Counter (customer_operations): request Delivery fee waiver.
+ * Does not change payable amount until Owner/Manager resolves.
+ */
+export async function requestGuestOrderDeliveryFeeWaiverAction(
+  orderId: string,
+  reason: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireStaff();
+  if (staff.role.code === "owner") {
+    return {
+      error: "Owner should waive Delivery fee directly.",
+    };
+  }
+  if (staff.role.code === "manager") {
+    return {
+      error: "Manager should waive Delivery fee directly.",
+    };
+  }
+  if (staff.role.code !== "customer_operations") {
+    return { error: "Not authorized to request Delivery fee waiver." };
+  }
+  if (!reason.trim()) {
+    return { error: "Waiver request reason is required." };
+  }
+  const before = await getGuestOrderById(orderId);
+  if (!before) return { error: "Order not found." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "request_guest_order_delivery_fee_waiver",
+    {
+      p_order_id: orderId,
+      p_actor_staff_id: staff.id,
+      p_reason: reason,
+    },
+  );
+  if (error) return { error: error.message };
+
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath("/owner");
+  return { error: null };
+}
+
+/**
+ * Counter: request processing fee override (>RM0) or waiver.
+ * Does not change payable amount until Owner/Manager resolves.
+ */
+export async function requestGuestOrderProcessingFeeChangeAction(
+  orderId: string,
+  kind: "processing_override" | "processing_waiver",
+  reason: string,
+  proposedAmount?: number | null,
+): Promise<{ error: string | null }> {
+  const staff = await requireStaff();
+  if (staff.role.code === "owner") {
+    return {
+      error: "Owner should override/waive processing fee directly.",
+    };
+  }
+  if (staff.role.code === "manager") {
+    return {
+      error: "Manager should override/waive processing fee directly.",
+    };
+  }
+  if (staff.role.code !== "customer_operations") {
+    return { error: "Not authorized to request processing fee change." };
+  }
+  if (!reason.trim()) {
+    return { error: "Request reason is required." };
+  }
+  if (kind === "processing_override") {
+    const amount = Number(proposedAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return {
+        error:
+          "Processing fee change amount must be greater than RM0 (use waive for RM0).",
+      };
+    }
+  }
+  const before = await getGuestOrderById(orderId);
+  if (!before) return { error: "Order not found." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "request_guest_order_processing_fee_change",
+    {
+      p_order_id: orderId,
+      p_actor_staff_id: staff.id,
+      p_kind: kind,
+      p_proposed_amount: proposedAmount ?? null,
+      p_reason: reason,
+    },
+  );
+  if (error) return { error: error.message };
+
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath("/owner");
+  return { error: null };
+}
+
+/** Requester-own or Owner: cancel/dismiss pending Delivery fee waiver request. */
+export async function cancelGuestOrderDeliveryFeeRequestAction(
+  orderId: string,
+  note?: string | null,
+): Promise<{ error: string | null }> {
+  const staff = await requireStaff();
+  if (
+    staff.role.code !== "owner" &&
+    staff.role.code !== "customer_operations" &&
+    staff.role.code !== "manager"
+  ) {
+    return { error: "Not authorized to cancel Delivery fee requests." };
+  }
+  const before = await getGuestOrderById(orderId);
+  if (!before) return { error: "Order not found." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "cancel_guest_order_delivery_fee_request",
+    {
+      p_order_id: orderId,
+      p_actor_staff_id: staff.id,
+      p_note: note ?? null,
+    },
+  );
+  if (error) return { error: error.message };
+
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath("/owner");
+  return { error: null };
+}
+
+/** Requester-own or Owner: cancel/dismiss pending Processing fee request. */
+export async function cancelGuestOrderProcessingFeeRequestAction(
+  orderId: string,
+  note?: string | null,
+): Promise<{ error: string | null }> {
+  const staff = await requireStaff();
+  if (
+    staff.role.code !== "owner" &&
+    staff.role.code !== "customer_operations" &&
+    staff.role.code !== "manager"
+  ) {
+    return { error: "Not authorized to cancel processing fee requests." };
+  }
+  const before = await getGuestOrderById(orderId);
+  if (!before) return { error: "Order not found." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "cancel_guest_order_processing_fee_request",
+    {
+      p_order_id: orderId,
+      p_actor_staff_id: staff.id,
+      p_note: note ?? null,
+    },
+  );
+  if (error) return { error: error.message };
+
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath("/owner");
+  return { error: null };
+}
+
+/** Owner or Manager: approve or reject pending Delivery fee waiver request. */
+export async function resolveGuestOrderDeliveryFeeRequestAction(
+  orderId: string,
+  approve: boolean,
+  note?: string | null,
+): Promise<{ error: string | null }> {
+  const auth = await requireOwnerOrManager();
+  if (auth.error || !auth.staff) return { error: auth.error ?? "Not authorized." };
+  const staff = auth.staff;
+  const before = await getGuestOrderById(orderId);
+  if (!before) return { error: "Order not found." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "resolve_guest_order_delivery_fee_request",
+    {
+      p_order_id: orderId,
+      p_actor_staff_id: staff.id,
+      p_approve: approve,
+      p_note: note ?? null,
+    },
+  );
+  if (error) return { error: error.message };
+
+  const reconcile = await afterDeliveryFinanceMutation({
+    orderId,
+    before,
+    staffId: staff.id,
+  });
+  if (reconcile.error) return reconcile;
+
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/confirmation`);
+  revalidatePath("/owner");
+  return { error: null };
+}
+
+/** Owner or Manager: approve or reject pending processing fee override/waiver request. */
+export async function resolveGuestOrderProcessingFeeRequestAction(
+  orderId: string,
+  approve: boolean,
+  note?: string | null,
+): Promise<{ error: string | null }> {
+  const auth = await requireOwnerOrManager();
+  if (auth.error || !auth.staff) return { error: auth.error ?? "Not authorized." };
+  const staff = auth.staff;
+  const before = await getGuestOrderById(orderId);
+  if (!before) return { error: "Order not found." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "resolve_guest_order_processing_fee_request",
+    {
+      p_order_id: orderId,
+      p_actor_staff_id: staff.id,
+      p_approve: approve,
+      p_note: note ?? null,
+    },
+  );
+  if (error) return { error: error.message };
+
+  const reconcile = await afterDeliveryFinanceMutation({
+    orderId,
+    before,
+    staffId: staff.id,
+  });
+  if (reconcile.error) return reconcile;
+
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/confirmation`);
+  revalidatePath("/owner");
   return { error: null };
 }

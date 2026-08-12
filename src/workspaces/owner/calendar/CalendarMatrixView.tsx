@@ -335,6 +335,9 @@ export function CalendarMatrixView({
                                 {
                                   readyAt: customer.readyAt,
                                   pickedUpAt: customer.pickedUpAt,
+                                  outForDeliveryAt: customer.outForDeliveryAt,
+                                  deliveredAt: customer.deliveredAt,
+                                  fulfilmentMethod: customer.fulfilmentMethod,
                                 },
                               );
                               const label =

@@ -23,7 +23,27 @@ export const TIMELINE_EVENT_LABELS: Record<string, string> = {
   order_ready_undone: "Ready undone",
   order_picked_up: "Marked picked up",
   order_picked_up_undone: "Picked up undone",
+  order_out_for_delivery: "Marked out for delivery",
+  order_out_for_delivery_undone: "Out for delivery undone",
+  order_delivered: "Marked delivered",
+  order_delivered_undone: "Delivered undone",
   staff_preorder_created: "Staff preorder created",
+  delivery_finance_initialized: "Delivery charges enabled",
+  delivery_fee_quoted: "Delivery fee quoted",
+  delivery_fee_waived: "Delivery fee waived",
+  delivery_fee_restored: "Delivery fee restored",
+  delivery_fee_waiver_requested: "Delivery fee waiver requested",
+  delivery_fee_waiver_approved: "Delivery fee waiver approved",
+  delivery_fee_waiver_rejected: "Delivery fee waiver rejected",
+  delivery_fee_waiver_request_cancelled: "Delivery fee waiver request cancelled",
+  delivery_processing_fee_overridden: "Processing fee overridden",
+  delivery_processing_fee_waived: "Processing fee waived",
+  delivery_processing_fee_restored: "Processing fee restored",
+  delivery_processing_fee_change_requested: "Processing fee change requested",
+  delivery_processing_fee_request_approved: "Processing fee request approved",
+  delivery_processing_fee_request_rejected: "Processing fee request rejected",
+  delivery_processing_fee_request_cancelled:
+    "Processing fee request cancelled",
 };
 
 export function timelineEventLabel(eventType: string): string {

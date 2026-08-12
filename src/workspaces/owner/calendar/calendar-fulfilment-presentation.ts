@@ -7,11 +7,11 @@
  */
 
 /**
- * Soft teal wash from brand `--color-signal` (`bg-signal-soft` in globals).
- * Product-accepted Visual Trial 2 (`#b8d4cf`).
- * Distinct from status-info (Today) / status-warning / status-progress.
+ * Pale warm yellow / beige — Whitebird operational Delivery convention.
+ * Reuses `--color-status-warning-soft` (`#ffefd9`); presentation only.
+ * Distinct from status-info (Today chrome).
  */
-export const CALENDAR_FULFILMENT_DELIVERY_BG_CLASS = "bg-signal-soft";
+export const CALENDAR_FULFILMENT_DELIVERY_BG_CLASS = "bg-status-warning-soft";
 
 /**
  * Identity-line chrome: intentional small highlighted block (not a tight text wash).

@@ -23,6 +23,7 @@ import {
   toDatetimeLocalValue,
 } from "@/workspaces/owner/orders/labels";
 import { OrderDiscountsPanel } from "@/workspaces/owner/orders/OrderDiscountsPanel";
+import { DeliveryFinanceBreakdown } from "@/workspaces/owner/orders/DeliveryFinanceBreakdown";
 import { RecordPaymentForm } from "@/workspaces/owner/orders/RecordPaymentForm";
 import { withOwnerReturnTo } from "@/workspaces/owner/navigation/return-to";
 
@@ -138,6 +139,8 @@ export function PaymentSection({
           <p className="text-skyline text-sm">{cakeBreakdown.sumExpression}</p>
         ) : null}
       </div>
+
+      <DeliveryFinanceBreakdown order={order} />
 
       <OrderDiscountsPanel order={order} />
 

@@ -25,6 +25,7 @@ import {
   rm10IssuanceSuppressionLabel,
   singaporeDateFromIso,
 } from "@/engines/orders/promotions";
+import { isDeliveryFinanceAdjustmentCode } from "@/engines/orders/delivery-finance";
 import { calculateCakeSubtotal } from "@/engines/orders/totals";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type { StorefrontOrder } from "@/types/storefront";
@@ -64,7 +65,10 @@ export function OrderDiscountsPanel({ order }: OrderDiscountsPanelProps) {
   const [changeOverride, setChangeOverride] = useState(false);
 
   const effective = useMemo(
-    () => getEffectiveAdjustments(order.adjustments),
+    () =>
+      getEffectiveAdjustments(order.adjustments).filter(
+        (row) => !isDeliveryFinanceAdjustmentCode(row.code),
+      ),
     [order.adjustments],
   );
   const hasAugust = hasActiveAdjustmentCode(order.adjustments, AUGUST_PROMO_CODE);

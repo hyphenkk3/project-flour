@@ -61,12 +61,22 @@ export function CalendarGuide() {
           <p className="text-ink/80 font-medium">Notation</p>
           <ul className="space-y-0.5">
             <li>
+              <span className="text-ink/80 font-medium">Pickup:</span>
+              {" "}
               <span className="text-ink">●</span>
-              {" = Ready"}
-            </li>
-            <li>
+              {" = Ready · "}
               <span className="text-ink">✓</span>
               {" = Picked Up"}
+            </li>
+            <li>
+              <span className="text-ink/80 font-medium">Delivery:</span>
+              {" "}
+              <span className="text-ink">●</span>
+              {" = Ready · "}
+              <span className="text-ink">○</span>
+              {" = Out for Delivery · "}
+              <span className="text-ink">✓</span>
+              {" = Delivered"}
             </li>
             <li>
               <span className="text-ink font-bold">Bold</span>
