@@ -1,0 +1,32 @@
+import { redirect } from "next/navigation";
+import { requireStaff } from "@/foundation/auth/session";
+import { canAccessBakeryWorkspace } from "@/engines/bakery/capabilities";
+
+export const dynamic = "force-dynamic";
+
+export default async function BakeryLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  const staff = await requireStaff();
+
+  if (!canAccessBakeryWorkspace(staff.role.code)) {
+    redirect("/home");
+  }
+
+  return (
+    <div>
+      <div className="mb-2 px-5 pt-4 sm:px-8">
+        <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
+          Bakery
+        </p>
+        <p className="text-skyline mt-1 text-sm">
+          Production board for guest preorders. Prepare cakes — Owner handles
+          payment and handoff lifecycle.
+        </p>
+      </div>
+      {children}
+    </div>
+  );
+}

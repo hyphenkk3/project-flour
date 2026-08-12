@@ -51,8 +51,8 @@ export const WORKSPACE_CATALOG: Record<WorkspaceId, WorkspaceNavItem> = {
   bakery: {
     id: "bakery",
     label: "Bakery",
-    href: null,
-    available: false,
+    href: "/bakery",
+    available: true,
   },
   collection: {
     id: "collection",
@@ -79,7 +79,7 @@ export const WORKSPACE_CATALOG: Record<WorkspaceId, WorkspaceNavItem> = {
  * Components must consume this via getNavigationForRole — do not duplicate.
  */
 export const ROLE_NAVIGATION: Record<RoleCode, readonly WorkspaceId[]> = {
-  owner: ["owner", "owner_calendar", "customer_operations", "library"],
+  owner: ["owner", "owner_calendar", "bakery", "customer_operations", "library"],
   manager: [
     "home",
     "customer_operations",

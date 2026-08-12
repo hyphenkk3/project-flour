@@ -8,15 +8,18 @@ Detailed business rules, message formats, financial/lifecycle rationale, and his
 
 ## Where We Are
 
-- **Product checkpoint:** `ab55cfac1413b5f683dca9e6f4450922e033d279`
+- **Product checkpoint:** `18092cfb07314944f0e8bd6ee5d948fd7b2cf554`
+  (`feat: complete Milestone 4 owner operations through M4-P5`) · on
+  `origin/main`
 - **Milestone 3 — Owner Pickup Operations:** **COMPLETE**
-- **Preview 3B Product Tests 1–18:** PASS
-- **Milestone 4 — Delivery & Order Fulfilment Foundation:** Product-accepted
-  through **M4-P5** (P1–P5 CLOSED for Product; working tree may still be
-  uncommitted). No M4-P6 defined.
-- **Next:** Product review of deferred Future backlog / commit posture —
-  do **not** invent M4-P6 without Product lock.
-- Local `main` may be ahead of `origin/main`; do not assume this checkpoint is pushed.
+- **Milestone 4 — Delivery & Order Fulfilment Foundation:** **COMPLETE**
+  through **M4-P5** (PRODUCT ACCEPTED / CLOSED 2026-08-12). No M4-P6.
+- **Milestone 5 — Bakery Activation:** **IN PROGRESS**
+- **M5-P1 — Live Bakery Board:** **PRODUCT ACCEPTED / CLOSED (2026-08-12)**
+- **Next implementation slice:** **M5-P2 — Start Production** (NOT STARTED)
+- **M5-P3** remains NOT STARTED
+- Working tree may include untracked `tmp/` Product-review assets only —
+  do not stage.
 
 ---
 
@@ -73,77 +76,90 @@ Also includes staff-created guest orders, order editing through the payment life
 
 See `docs/DECISIONS.md` (Milestone 3 Preview entries, including Preview 3B).
 
+### Milestone 4 — Delivery & Order Fulfilment Foundation
+
+**STATUS: COMPLETE** · Checkpoint: `18092cf` · Product-accepted through
+**M4-P5** (2026-08-12).
+
+| Preview | Focus |
+|---|---|
+| M4-P1 | Paid Order Add-ons (Birthday Card first) |
+| M4-P2 | Fulfilment & Delivery Order Model |
+| M4-P3 | Delivery Fees & Settlement |
+| M4-P4 | Delivery Crew Message |
+| M4-P5 | Delivery Lifecycle & Customer Messaging |
+
+**Locked sequence completed:** M4-P1 → M4-P2 → M4-P3 → M4-P4 → M4-P5.
+No M4-P6.
+
+Website remained Pickup-only for Milestone 4 only. Details:
+`docs/DECISIONS.md` (M4-P1–P5 entries).
+
 ---
 
 ## Current / Next
 
-### Milestone 4 — Delivery & Order Fulfilment Foundation
+### Milestone 5 — Bakery Activation
 
-**STATUS: PRODUCT-ACCEPTED THROUGH M4-P5** (working tree may still be
-uncommitted; commit/push only when Product authorizes).
+**STATUS: IN PROGRESS** · Product-approved 2026-08-12.
+**M5-P1:** PRODUCT ACCEPTED / CLOSED (2026-08-12).
+**M5-P2:** next slice · NOT STARTED.
+**M5-P3:** NOT STARTED.
 
-- M4-P1 CLOSED (committed).
-- **M4-P2 CLOSED for Product** (Slices 1–5 accepted; working tree may still be
-  uncommitted). Website remains Pickup-only for this milestone only.
-- **M4-P3 CLOSED / PRODUCT ACCEPTED** (Slices 1–3; working tree may still be
-  uncommitted).
-- **M4-P4 CLOSED / PRODUCT ACCEPTED** (working tree may still be
-  uncommitted).
-- **M4-P5 CLOSED / PRODUCT ACCEPTED (2026-08-12)** — Delivery lifecycle +
-  customer messaging; Calendar Delivery fill `#ffefd9`; photo/media and
-  other deferred non-goals unchanged.
+**Mission:** Replace the V0.5 Bakery preview with a live, authenticated
+Bakery workspace on the existing **guest-order** spine, allowing Bakery —
+with Manager/Owner coverage — to plan and operate production from Start
+Production through canonical Ready.
 
-Not one giant Delivery drop. Five Product-testable previews, in locked order:
+**Locked sequence (do not reorder without Product approval):**
 
-#### M4-P1 — Paid Order Add-ons
+#### M5-P1 — Live Bakery Board — PRODUCT ACCEPTED / CLOSED (2026-08-12)
 
-- Reusable paid **non-cake** add-on capability.
-- **First Product implementation:** Birthday Card (e.g. `Birthday Card x1` / `RM3(BC)`).
-- Architecture reusable for future paid add-ons — **not** a speculative full add-on catalog in P1.
-- Birthday Card is **not** Delivery-only (Pickup orders can purchase it).
-- Birthday Card is **not** complimentary; complimentary items remain separate.
-- Written Birthday Card message = **structured order data** (not Customer/Internal/Bakery/Delivery notes).
-- **Dependency lock:** M4-P1 before core Delivery model (P2+).
+- Authenticated `/bakery` workspace + nav for Bakery, Manager, Owner.
+- Live guest-order board by fulfilment `pickup_date` (default Today;
+  Today / Tomorrow / +2 shortcuts; pick any other date).
+- **Final P1 visibility:** **all active guest preorders** for the selected
+  fulfilment date regardless of payment stage (Submitted / Pending
+  Confirmation / Awaiting Payment / Paid); terminal exclusions;
+  Realtime/poll; production-first cards/detail; packing reminder;
+  attentions.
+- Unsecured visibility is for Bakery **planning** and does **not** itself
+  authorize production. Secured vs unsecured is presented via canonical
+  order status (Start rules reconciled in M5-P2).
+- Production presentation in P1: **Not started | Ready only** (no In
+  Production). Labels describe production state only — not authorization.
+  **No** Start schema in P1 (`production_started_at` /
+  `production_started_by` deferred to M5-P2).
+- **No** Start/Ready mutations from Bakery in P1.
+- Packing checklist remains reminder-only/local state, including Check all
+  / Clear all (accepted refinement).
 
-#### M4-P2 — Fulfilment & Delivery Order Model
+#### M5-P2 — Start Production
 
-- Pickup vs Delivery on the real Owner/guest preorder path.
-- Structured fulfilment truth; customer = recipient **or** ≠ recipient.
-- Recipient name/phone; structured delivery address.
-- Explicit recipient communication preference: Inform Recipient vs DO NOT INFORM RECIPIENT / surprise (never inferred from notes).
-- Establishes structured order truth — **not** Delivery Crew Message formatting (that is P4).
+- Introduces `production_started_at` / `production_started_by` with Start /
+  Undo Start RPC + timeline (whole-order).
+- Server-side authorization for Bakery production capability
+  (Bakery / Manager / Owner).
+- Start / Undo Start on **Bakery workspace only** (not Owner Order
+  Workspace / Calendar Quick View).
+- Expands board eligibility with Start; adds **In Production** column.
 
-#### M4-P3 — Delivery Fees & Settlement
+#### M5-P3 — Bakery Ready Authority + Exception Polish
 
-- Processing fee + delivery fee in authoritative settlement and financial equations.
-- Crew checks GrabExpress, then **enters** the delivery fee (no scraping / auto-fetch).
-- Promotions/discounts continue to reconcile correctly.
-- Positive `order_adjustments` remain an engineering recommendation until P3 design confirms — not ROADMAP-locked architecture.
+- Bakery / Manager / Owner Mark Ready / Undo Ready from Bakery on
+  canonical `ready_at` / `ready_by`.
+- **Server/RPC authority required** (UI capability and server must agree).
+- Owner Ready controls remain on existing Owner surfaces (override).
+- Payment Attention (derived) + demotion retention rules; terminal board
+  exit verified.
+- Does **not** remove Owner Ready; does **not** give Bakery
+  Picked Up / Out / Delivered.
 
-#### M4-P4 — Delivery Crew Message
+**Authority / board equation / non-goals / EXTRA compatibility:**
+`docs/DECISIONS.md` (Milestone 5 lock entry).
 
-- Copy-ready Delivery Crew Order Messages from structured truth (P1–P3).
-- Supports Delivery Order header, orderer/recipient/phones/address/time, cakes, paid Birthday Card + written message, fees, discounts, payment/NYP/c/o truth, complimentary, Include RECEIPT, Inform / DO NOT INFORM footers.
-- Exact formatter rules and examples: `docs/DECISIONS.md`.
-
-#### M4-P5 — Delivery Lifecycle & Customer Messaging
-
-**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-12).**
-
-- Delivery operational journey + Delivery-appropriate customer messaging.
-- Four states: Not Ready → Ready → Out for Delivery → Delivered (Pickup
-  remains Not Ready → Ready → Picked Up). Calendar: ● Ready · ○ Out for
-  Delivery · ✓ Delivered (Pickup ✓ = Picked Up).
-- Pickup Customer Ready Message must not be reused for Delivery.
-- Copy-ready Delivery Ready + Out for Delivery customer messages; existing
-  Thank You unchanged. Photo upload/send is **not** P5 (future TBD).
-- Product-accepted Calendar Delivery fill: pale warm yellow/beige
-  (`bg-status-warning-soft` / `#ffefd9`); Pickup no-fill; Today chrome
-  remains light blue.
-
-**Locked sequence:** M4-P1 → M4-P2 → M4-P3 → M4-P4 → M4-P5 (complete for Product).
-No M4-P6 in this roadmap — next work requires Product lock from Future /
-Owner backlog.
+**Next implementation slice:** **M5-P2 — Start Production** (NOT STARTED).
+Do not start until Product authorizes.
 
 ---
 
@@ -151,8 +167,8 @@ Owner backlog.
 
 Product-approved deferred domains (not next unless Product reorders):
 
-- EXTRA / walk-in Hold and recording workflow
-- Real Bakery workspace activation (beyond V0.5 mocks)
+- EXTRA / walk-in Hold and recording workflow (separate physical-stock
+  domain — **not** part of Milestone 5)
 - Real Counter / Collection workspace activation (beyond V0.5 mocks)
 - Refunds / overpayment / payment-correction workflows
 - WhatsApp automation (send API / tracking) — messages remain copy-only until then
@@ -166,12 +182,13 @@ Details and rationale: `docs/DECISIONS.md`.
 
 ## Ideas / Considerations
 
-- **Customer website Order Guide** — surface Owner Order Guide rules on the customer preorder experience (“No wording on cakes or cake boards.” / “Customised cake decoration is not available.”). **Not required before M4.**
+- **Customer website Order Guide** — surface Owner Order Guide rules on the customer preorder experience (“No wording on cakes or cake boards.” / “Customised cake decoration is not available.”). **Not required before M4/M5.**
+- **Customer Notes accommodation copy** — clarify what customer requests Bakery can honour. Not an M5 blocker; not Customer Portal work in M5.
 
 ---
 
 ## Technical Debt
 
 - ESLint reports approximately **20** `react-hooks/set-state-in-effect` findings (pre-existing and some dialog/preview patterns).
-- Build and Product-tested Milestone 3 flows are green.
-- Maintenance debt only — **does not block Milestone 4**; not a Product milestone.
+- Build and Product-tested Milestone 3–4 flows are green.
+- Maintenance debt only — **does not block Milestone 5**; not a Product milestone.

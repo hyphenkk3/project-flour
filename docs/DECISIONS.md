@@ -2,6 +2,213 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-12 — M5-P1 · Live Bakery Board
+
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-12).** Milestone 5 remains
+**IN PROGRESS.** Next slice is **M5-P2 — Start Production** (NOT STARTED).
+M5-P3 remains NOT STARTED. No schema/migration in P1.
+
+Product closed M5-P1 after the final reconciliation report and Product
+manual testing, including the amended unsecured-preorder visibility
+behaviour and Packing Checklist Check all / Clear all refinement.
+
+### Accepted P1 surface (frozen unless Product reopens)
+
+Authenticated `/bakery` for Bakery / Manager / Owner (Owner nav includes
+Bakery). Customer Operations / Collection cannot access. Guest preorders
+only. Board by fulfilment `pickup_date` (default Today; Today / Tomorrow /
++2; arbitrary date). Realtime + 30s poll. No new-order toast. Preview
+Bakery remains intact.
+
+**Final P1 visibility:** all active guest preorders for the selected
+fulfilment date are visible regardless of payment stage:
+
+- Submitted
+- Pending Confirmation (`pending_confirmation`)
+- Awaiting Payment
+- Paid
+
+Unsecured visibility is for Bakery **planning** and does **not** itself
+authorize production. Canonical order/payment state is shown (including
+“Not secured” when unpaid). Terminal board exits unchanged: Pickup hides
+after Picked Up; Delivery hides after Out for Delivery.
+
+**P1 production states:** **Not started | Ready only** (canonical
+`ready_at`). No fabricated In Production. No Bakery Start / Undo Start /
+Mark Ready / Undo Ready. Owner Ready on Owner surfaces unchanged.
+
+`production_started_at` / `production_started_by` remain deferred to
+**M5-P2**.
+
+Bakery Attention remains Owner-controlled and read-only to Bakery.
+Payment Attention remains distinct (P1: Ready and not Paid). Customer
+notes available; Internal Notes not exposed. Delivery shows fulfilment
+cue/date/time only. Packing checklist is structured, reminder-only, local
+state (including Check all / Clear all); no packing persistence.
+
+M5 non-goals and EXTRA separation are unchanged — see Milestone 5 lock
+entry below.
+
+## 2026-08-12 — Milestone 5 · Bakery Activation (LOCKED)
+
+**STATUS: IN PROGRESS.** Product formalized Milestone 5 after post-M4
+Bakery design recon (Batches 1–4). Implementation sequence locked. EXTRA
+and Collection remain Future — not scheduled by this lock.
+
+**M5-P1:** PRODUCT ACCEPTED / CLOSED (2026-08-12) — see entry above.
+**M5-P2 — Start Production:** authoritative next slice · NOT STARTED.
+**M5-P3:** NOT STARTED.
+
+**M5-P1 schema boundary (approved):** Do **not** add
+`production_started_at` / `production_started_by` in P1. Those columns and
+Start RPCs ship in **M5-P2** when Start mutations exist. P1 production
+presentation is **Not started | Ready** only (production state wording —
+does not imply authorization to produce).
+
+**M5-P1 visibility amendment (Product testing):** Bakery shows **all active
+guest preorders** for the selected fulfilment date (Submitted, Waiting
+Customer Confirmation, Awaiting Payment, Paid · Preorder Secured). Do **not**
+require Paid for board visibility. Visibility ≠ permission to produce —
+M5-P2 must explicitly reconcile whether unsecured orders may Start.
+
+**Mission:** Replace the V0.5 Bakery preview with a live authenticated
+Bakery workspace on the M1–M4 **guest-order** spine so Bakery (with
+Manager/Owner coverage) can run production from Start through canonical
+Ready.
+
+**Locked sequence:** M5-P1 → M5-P2 → M5-P3.
+
+| Phase | Focus |
+|---|---|
+| **M5-P1** | Live Bakery Board (read) — nav, board, date UX, detail, packing reminder, attentions read, Realtime/poll; **no Start schema** |
+| **M5-P2** | Start Production — introduce `production_started_*` + Start/Undo Start RPC/timeline; server-side Bakery production capability |
+| **M5-P3** | Bakery Ready Authority + Exception Polish — Bakery Mark/Undo Ready on canonical Ready; **server/RPC enforced**; Payment Attention; terminal exit |
+
+### Authority (locked)
+
+**Bakery workspace access:** Bakery · Manager · Owner.
+
+**Start / Undo Start:** Bakery · Manager · Owner · **Bakery workspace only** ·
+**server-side enforced**. Do **not** add Start to Owner Order Workspace or
+Calendar Quick View.
+
+**Mark / Undo Ready from Bakery:** Bakery · Manager · Owner · **server/RPC
+enforced** · same `ready_at` / `ready_by`. UI capability and server authority
+must agree. Do not weaken or accidentally widen unrelated Owner Ops
+authority. Customer Operations and other unauthorized roles must not mutate
+Bakery production state.
+
+**Owner Ready on existing Owner surfaces:** retained (override/exception).
+Owner may also Mark/Undo Ready from Bakery when covering.
+
+**Downstream lifecycle** (Picked Up / Out for Delivery / Delivered):
+Owner-controlled only. No Bakery controls.
+
+**Bakery Attention:** Owner set/edit/clear · Bakery/Manager read-only.
+No acknowledge persistence in M5.
+
+**Payment Attention:** derived only · no Bakery financial actions.
+Distinct from Bakery Attention.
+
+Use capability-based checks; avoid scattered raw role-name gates in UI.
+
+### Production model (locked)
+
+Whole-order only (no per-line / per-unit state).
+
+Not Started → In Production → Ready.
+
+Persist Start: `production_started_at` / `production_started_by`.
+Ready remains: `ready_at` / `ready_by`.
+
+- Ready may skip Start (no fabricated Start timestamp).
+- Undo Start only while Not Ready; clears Start; may Start again.
+- Mark Ready preserves Start when present.
+- Undo Ready preserves Start (Started→Ready→Undo → In Production;
+  Ready-without-Start→Undo → Not Started).
+- Existing Ready undo guards unchanged (Pickup Picked Up; Delivery Out;
+  Delivery Delivered).
+
+### Active board equation (locked — Product-amended)
+
+Guest (`customer_id IS NULL`)
+AND selected `pickup_date`
+AND status ∈ active preorder
+  (`submitted` | `pending_confirmation` | `awaiting_payment` | `paid`)
+AND NOT (Pickup AND `picked_up_at IS NOT NULL`)
+AND NOT (Delivery AND `out_for_delivery_at IS NOT NULL`)
+
+Do **not** gate normal visibility on Paid / Ready / Start. Unsecured
+preorders remain visible for planning with canonical status presentation
+(+ “Not secured” cue when `status != paid`).
+
+**Payment Attention** (derived; not a visibility gate):
+(`production_started_at IS NOT NULL` OR `ready_at IS NOT NULL`)
+AND `order_status != 'paid'`
+(M5-P1: Start absent → `ready_at` only).
+
+**M5-P2 recon note (do not implement in P1):** board visibility of
+unsecured orders does **not** automatically authorize Start Production.
+Start rules for non-Paid orders must be Product-locked before P2.
+
+**Board exit:** Pickup leaves at Picked Up; Delivery leaves at **Out for
+Delivery** (do not wait for Delivered). Ready stays visible until handoff.
+No completed/history lane in M5.
+
+### Date UX (locked)
+
+Default Today. Quick: Today / Tomorrow / +2. Also pick any fulfilment date.
+No `production_date` in M5. Shortcuts are not an underlying query limit.
+
+### Information surface (locked)
+
+Production-first cards: time · primary cake · size · guest secondary ·
+Pickup/Delivery cue · canonical order status (+ Not secured when unpaid)
+· short `customer_notes` excerpt · Bakery Attention badge · production
+meta · multi-cake `+N more`.
+
+Detail: all cake lines (name/size/qty) · structured packing
+(complimentary, paid add-ons, Birthday Card written message, Include
+RECEIPT) · `customer_notes` · Bakery Attention note.
+
+Packing checklist = local reminder only; does **not** gate Ready.
+
+**Do not expose on Bakery:** Owner Internal Notes · full Delivery address ·
+recipient notify preference · fees/payment controls · customer WhatsApp
+controls.
+
+### Order universe (locked)
+
+Guest orders only. Do not widen Start/Ready to member/`customer_id` orders
+in M5. No special member inclusion flag. Do not overload Bakery Attention
+as unpaid inclusion.
+
+### V0.5 disposition (locked)
+
+Bring V0.5 Bakery board/detail/packing/mobile patterns forward into live
+`/bakery`. Retire mock data / URL hero state / journey handoffs from the
+live path. Adapt “Ready for Counter” to canonical Ready.
+
+### Explicit M5 non-goals
+
+EXTRA · Collection/Counter activation · POS · member Bakery orders ·
+per-line production · `production_date` · packing persistence · Bakery
+CRM/payment/WhatsApp · Delivery logistics details · refund/payment-correction
+workflow · Ops fulfilment indicator · View in Calendar · Customer Portal
+redesign · removal of Owner Ready controls · new-order toast/banner ·
+Bakery completed-history lane.
+
+### EXTRA compatibility (architectural constraint only)
+
+Future EXTRA is a **separate** physical-stock domain (Bakery final
+authority; origin/prepared date; Bakery-controlled pickup-through
+datetime; customer eligibility by selected pickup datetime; carry-forward
+provenance; previous-day acknowledgement; automatic expiry; holds/release;
+sold/sliced). Do **not** implement EXTRA in M5. Do **not** model EXTRA
+with `order_status`, `production_started_*`, `ready_*`, Bakery Attention,
+or Payment Attention. M5 may reuse Bakery workspace/capability/date
+foundations later.
+
 ## 2026-08-12 — M4-P5 · Delivery Lifecycle & Customer Messaging
 
 **STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-12).** Live migration verified
