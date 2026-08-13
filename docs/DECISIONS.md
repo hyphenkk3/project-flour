@@ -2,6 +2,40 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-13 — EXTRA Activation v1
+
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-13).** M5 Bakery and Collection
+Activation v1 remain PRODUCT ACCEPTED / CLOSED. No Milestone 6 invented.
+
+Product closed EXTRA Activation v1 after manual Owner propose, Confirm →
+Available, Reject (mandatory reason / Past reason / Undo Reject same-row)
+tests, live suite 43/43, fixture cleanup, regressions, and scope audit.
+
+### Accepted EXTRA v1 surface (frozen unless Product reopens)
+
+- Separate physical-stock domain — not guest `orders` lifecycle fields.
+- Lifecycle only: `proposed` → `confirmed` | `rejected`.
+- Availability is **derived**: confirmed && now ≤ `pickup_through_at`.
+- No `available` lifecycle status; no auto-mutate to `expired`.
+- One row = one whole cake. Snapshots for cake name + size label.
+- `prepared_on` (date) + `pickup_through_at` (timestamptz) required to
+  confirm / direct-create. Pickup-through = internal Bakery cutoff.
+- Authority on Bakery EXTRA surface: bakery | manager | owner (M5 coverage
+  model). Owner propose from Bakery EXTRA (Ops link). CO / Collection: no
+  EXTRA mutations.
+- Bakery may create confirmed EXTRA in one step.
+- Owner proposals require Bakery confirm/reject.
+- Reject requires a non-empty trimmed reason (RPC-enforced) and a
+  confirmation dialog. Undo Reject restores the same row to `proposed`
+  without making it Available.
+- Bakery EXTRA area is separate from Bakery Production columns.
+
+### Explicitly deferred (not this accepted slice)
+
+Hold/Release · walk-in sale/recording · public EXTRA listing · previous-day
+customer acknowledgement · Calendar-assisted EXTRA proposal · Collection
+EXTRA · POS · Slice · origin enum · packing persistence.
+
 ## 2026-08-13 — Live Collection workspace activation (v1)
 
 **STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-13).** M5-P1/P2/P3 remain

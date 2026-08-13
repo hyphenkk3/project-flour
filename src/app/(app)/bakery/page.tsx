@@ -1,4 +1,5 @@
 import { BakeryLiveBoard } from "@/workspaces/bakery/BakeryLiveBoard";
+import { BakeryWorkspaceNav } from "@/workspaces/bakery/BakeryWorkspaceNav";
 import { resolveBakeryBoardDate } from "@/workspaces/bakery/date";
 import { listBakeryBoardOrders } from "@/workspaces/bakery/queries";
 
@@ -13,5 +14,12 @@ export default async function BakeryPage({ searchParams }: BakeryPageProps) {
   const boardDate = resolveBakeryBoardDate(params.date);
   const orders = await listBakeryBoardOrders(boardDate);
 
-  return <BakeryLiveBoard boardDate={boardDate} initialOrders={orders} />;
+  return (
+    <>
+      <div className="px-5 sm:px-8">
+        <BakeryWorkspaceNav active="production" />
+      </div>
+      <BakeryLiveBoard boardDate={boardDate} initialOrders={orders} />
+    </>
+  );
 }

@@ -22,9 +22,9 @@ Detailed business rules, message formats, financial/lifecycle rationale, and his
   (2026-08-13)**
 - **Live Collection workspace activation (v1):** **PRODUCT ACCEPTED /
   CLOSED (2026-08-13)**
-- **Next implementation slice:** **NOT STARTED** (Product must direct;
-  EXTRA / packing persistence / Business Calendar Admin / Delivery
-  Collection remain Future)
+- **EXTRA Activation v1:** **PRODUCT ACCEPTED / CLOSED (2026-08-13)**
+  (Propose / Confirm / Reject+Undo / Available; no Hold/sale/public /
+  Calendar-assisted EXTRA)
 - Working tree may include untracked `tmp/` Product-review assets only —
   do not stage.
 
@@ -184,9 +184,23 @@ Production through canonical Ready.
 **Authority / board equation / non-goals / EXTRA compatibility:**
 `docs/DECISIONS.md` (Milestone 5 lock entry + M5-P3 accepted freeze).
 
-**Next implementation slice:** **NOT STARTED** — Product must direct.
-EXTRA / packing persistence / Business Calendar Admin / Delivery Collection
-remain Future.
+### EXTRA Activation v1 — PRODUCT ACCEPTED / CLOSED (2026-08-13)
+
+- Separate physical-stock domain under Bakery (`/bakery/extra`).
+- Propose → Confirm / Reject (required trimmed reason + Undo Reject same
+  row → proposed); Bakery may create confirmed stock directly.
+- Available = confirmed && now ≤ pickup_through_at (derived; no `available`
+  status).
+- Prepared/origin date + Bakery pickup-through required for confirmed.
+- Authority: bakery | manager | owner on Bakery EXTRA; CO / Collection
+  denied at RPC. Owner propose entry from Ops → Bakery EXTRA.
+- Explicitly deferred (not this slice): Hold/Release, walk-in sale,
+  public EXTRA listing, previous-day customer acknowledgement,
+  Calendar-assisted EXTRA proposal, Collection EXTRA, POS, Slice,
+  origin enum.
+
+**Authority / exclusions:** `docs/DECISIONS.md` (EXTRA Activation v1
+accepted freeze).
 
 ### Live Collection workspace activation (v1) — PRODUCT ACCEPTED / CLOSED (2026-08-13)
 
@@ -211,8 +225,10 @@ freeze).
 
 Product-approved deferred domains (not next unless Product reorders):
 
-- EXTRA / walk-in Hold and recording workflow (separate physical-stock
-  domain — **not** part of Milestone 5)
+- EXTRA Hold / Release, walk-in sale recording, public EXTRA listing
+- Calendar-assisted EXTRA proposal (likely follow-on; not started)
+- Previous-day customer acknowledgement for EXTRA / walk-in context
+- Collection EXTRA desk · EXTRA Slice · EXTRA origin enum
 - Refunds / overpayment / payment-correction workflows
 - WhatsApp automation (send API / tracking) — messages remain copy-only until then
 - Email / preorder submission-receipt provider

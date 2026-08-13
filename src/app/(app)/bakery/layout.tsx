@@ -22,8 +22,8 @@ export default async function BakeryLayout({
           Bakery
         </p>
         <p className="text-skyline mt-1 text-sm">
-          Production board for guest preorders. Prepare cakes — Owner handles
-          payment and handoff lifecycle.
+          Preorder production and Bakery-confirmed EXTRA stock. Owner still
+          handles payment and preorder handoff lifecycle.
         </p>
       </div>
       {children}

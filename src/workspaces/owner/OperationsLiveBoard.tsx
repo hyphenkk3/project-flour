@@ -216,6 +216,12 @@ export function OperationsLiveBoard({
             Whole Cake Calendar
           </Link>
           <Link
+            className="border-line text-ink hover:bg-mist inline-flex min-h-10 items-center justify-center rounded-lg border px-4 text-sm font-medium"
+            href="/bakery/extra?mode=propose"
+          >
+            Propose EXTRA
+          </Link>
+          <Link
             className="bg-ink text-mist hover:bg-skyline inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-medium"
             href="/owner/orders/new"
           >
