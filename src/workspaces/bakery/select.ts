@@ -12,6 +12,8 @@ export const BAKERY_ORDER_SELECT = `
   customer_notes,
   needs_bakery_attention,
   bakery_attention_note,
+  production_started_at,
+  production_started_by,
   ready_at,
   picked_up_at,
   out_for_delivery_at,

@@ -10,6 +10,7 @@ import {
 } from "@/workspaces/bakery/actions";
 import { BakeryDateNav } from "@/workspaces/bakery/BakeryDateNav";
 import { BakeryOrderCard } from "@/workspaces/bakery/BakeryOrderCard";
+import { bakeryProductionPresentation } from "@/workspaces/bakery/eligibility";
 import type { BakeryBoardOrder } from "@/workspaces/bakery/types";
 
 const POLL_INTERVAL_MS = 30_000;
@@ -91,8 +92,27 @@ export function BakeryLiveBoard({
     };
   }, [boardDate, handleIncoming, reconcileList]);
 
-  const readyCount = orders.filter((order) => order.readyAt).length;
-  const startCount = orders.length - readyCount;
+  const notStarted = orders.filter(
+    (order) =>
+      bakeryProductionPresentation({
+        productionStartedAt: order.productionStartedAt,
+        readyAt: order.readyAt,
+      }) === "not_started",
+  );
+  const inProduction = orders.filter(
+    (order) =>
+      bakeryProductionPresentation({
+        productionStartedAt: order.productionStartedAt,
+        readyAt: order.readyAt,
+      }) === "in_production",
+  );
+  const ready = orders.filter(
+    (order) =>
+      bakeryProductionPresentation({
+        productionStartedAt: order.productionStartedAt,
+        readyAt: order.readyAt,
+      }) === "ready",
+  );
 
   return (
     <main className="mx-auto w-full max-w-6xl px-5 py-7 pb-16 sm:px-8 sm:py-10">
@@ -120,25 +140,43 @@ export function BakeryLiveBoard({
           />
         </div>
       ) : (
-        <div className="mt-8 grid gap-8 lg:grid-cols-2">
+        <div className="mt-8 grid gap-8 lg:grid-cols-3">
           <section>
             <h2 className="text-ink text-sm font-semibold tracking-wide uppercase">
               Not started
               <span className="text-skyline ml-2 font-normal normal-case">
-                {startCount}
+                {notStarted.length}
               </span>
             </h2>
             <div className="mt-4 space-y-3">
-              {orders
-                .filter((order) => !order.readyAt)
-                .map((order) => (
-                  <BakeryOrderCard
-                    key={order.id}
-                    boardDate={boardDate}
-                    order={order}
-                  />
-                ))}
-              {startCount === 0 ? (
+              {notStarted.map((order) => (
+                <BakeryOrderCard
+                  key={order.id}
+                  boardDate={boardDate}
+                  order={order}
+                />
+              ))}
+              {notStarted.length === 0 ? (
+                <p className="text-skyline text-sm">None right now.</p>
+              ) : null}
+            </div>
+          </section>
+          <section>
+            <h2 className="text-ink text-sm font-semibold tracking-wide uppercase">
+              In Production
+              <span className="text-skyline ml-2 font-normal normal-case">
+                {inProduction.length}
+              </span>
+            </h2>
+            <div className="mt-4 space-y-3">
+              {inProduction.map((order) => (
+                <BakeryOrderCard
+                  key={order.id}
+                  boardDate={boardDate}
+                  order={order}
+                />
+              ))}
+              {inProduction.length === 0 ? (
                 <p className="text-skyline text-sm">None right now.</p>
               ) : null}
             </div>
@@ -147,20 +185,18 @@ export function BakeryLiveBoard({
             <h2 className="text-ink text-sm font-semibold tracking-wide uppercase">
               Ready
               <span className="text-skyline ml-2 font-normal normal-case">
-                {readyCount}
+                {ready.length}
               </span>
             </h2>
             <div className="mt-4 space-y-3">
-              {orders
-                .filter((order) => Boolean(order.readyAt))
-                .map((order) => (
-                  <BakeryOrderCard
-                    key={order.id}
-                    boardDate={boardDate}
-                    order={order}
-                  />
-                ))}
-              {readyCount === 0 ? (
+              {ready.map((order) => (
+                <BakeryOrderCard
+                  key={order.id}
+                  boardDate={boardDate}
+                  order={order}
+                />
+              ))}
+              {ready.length === 0 ? (
                 <p className="text-skyline text-sm">None right now.</p>
               ) : null}
             </div>

@@ -1,7 +1,7 @@
 /**
  * M5 — Bakery workspace capability matrix.
  * Workspace access is separate from Owner Ops / Delivery finance capabilities.
- * P1: read-only (production mutations false until P2/P3).
+ * P2: Start / Undo Start for Bakery · Manager · Owner. Ready mutations remain P3.
  */
 
 import type { RoleCode } from "@/types/staff";
@@ -25,18 +25,23 @@ export function canAccessBakeryWorkspace(role: RoleCode): boolean {
   return role === "bakery" || role === "manager" || role === "owner";
 }
 
+export function canMutateBakeryProduction(role: RoleCode): boolean {
+  return canAccessBakeryWorkspace(role);
+}
+
 export function buildBakeryWorkspaceCapabilities(input: {
   role: RoleCode;
   staffId: string;
 }): BakeryWorkspaceCapabilities {
   const canAccess = canAccessBakeryWorkspace(input.role);
+  const canProduce = canMutateBakeryProduction(input.role);
   return {
     role: input.role,
     staffId: input.staffId,
     canAccessBakeryWorkspace: canAccess,
-    // M5-P1: no production mutations from Bakery.
-    canStartProduction: false,
-    canUndoStart: false,
+    canStartProduction: canProduce,
+    canUndoStart: canProduce,
+    // M5-P3: no Bakery Ready mutations yet.
     canMarkReady: false,
     canUndoReady: false,
   };

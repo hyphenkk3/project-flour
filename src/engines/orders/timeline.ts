@@ -19,6 +19,8 @@ export const TIMELINE_EVENT_LABELS: Record<string, string> = {
   rm10_voucher_owner_override: "RM10 Discount Card redeemed (Owner override)",
   discount_removed: "Discount removed",
   discount_changed: "Discount changed",
+  order_production_started: "Production started",
+  order_production_start_undone: "Production start undone",
   order_marked_ready: "Marked ready",
   order_ready_undone: "Ready undone",
   order_picked_up: "Marked picked up",

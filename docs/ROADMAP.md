@@ -16,7 +16,7 @@ Detailed business rules, message formats, financial/lifecycle rationale, and his
   through **M4-P5** (PRODUCT ACCEPTED / CLOSED 2026-08-12). No M4-P6.
 - **Milestone 5 — Bakery Activation:** **IN PROGRESS**
 - **M5-P1 — Live Bakery Board:** **PRODUCT ACCEPTED / CLOSED (2026-08-12)**
-- **Next implementation slice:** **M5-P2 — Start Production** (NOT STARTED)
+- **M5-P2 — Start Production:** **PRODUCT ACCEPTED / CLOSED (2026-08-13)**
 - **M5-P3** remains NOT STARTED
 - Working tree may include untracked `tmp/` Product-review assets only —
   do not stage.
@@ -103,7 +103,7 @@ Website remained Pickup-only for Milestone 4 only. Details:
 
 **STATUS: IN PROGRESS** · Product-approved 2026-08-12.
 **M5-P1:** PRODUCT ACCEPTED / CLOSED (2026-08-12).
-**M5-P2:** next slice · NOT STARTED.
+**M5-P2:** PRODUCT ACCEPTED / CLOSED (2026-08-13).
 **M5-P3:** NOT STARTED.
 
 **Mission:** Replace the V0.5 Bakery preview with a live, authenticated
@@ -134,15 +134,29 @@ Production through canonical Ready.
 - Packing checklist remains reminder-only/local state, including Check all
   / Clear all (accepted refinement).
 
-#### M5-P2 — Start Production
+#### M5-P2 — Start Production — PRODUCT ACCEPTED / CLOSED (2026-08-13)
 
 - Introduces `production_started_at` / `production_started_by` with Start /
   Undo Start RPC + timeline (whole-order).
 - Server-side authorization for Bakery production capability
   (Bakery / Manager / Owner).
 - Start / Undo Start on **Bakery workspace only** (not Owner Order
-  Workspace / Calendar Quick View).
-- Expands board eligibility with Start; adds **In Production** column.
+  Workspace / Calendar Quick View). Owner Collection controls retained.
+- Board columns: **Not started | In Production | Ready**.
+- **Visibility** remains Submitted → Paid. **Start** is allowed only for
+  Awaiting Payment and Paid (not Submitted / Pending Confirmation —
+  **Waiting for confirmation** UX).
+- Unsecured Awaiting Payment Start requires staff confirmation (Cancel
+  leaves Not started). Paid Start does not. No Owner production-authorization
+  field.
+- Payment Attention derived; Q13 demotion retention accepted via automated
+  coverage (no Owner demote control).
+- Owner Ready without Start / Start then Owner Ready remain the P2 Ready
+  boundary (Bakery Mark Ready deferred to P3).
+- **Accepted P2 refinement:** authoritative effective pickup schedule
+  resolver + Early Pickup Bakery Attention (derived; coexists with manual
+  Attention) + Owner outside-hours warning/continue. Code-config date
+  overrides only — no Business Calendar Admin UI / DB persistence.
 
 #### M5-P3 — Bakery Ready Authority + Exception Polish
 
@@ -158,8 +172,8 @@ Production through canonical Ready.
 **Authority / board equation / non-goals / EXTRA compatibility:**
 `docs/DECISIONS.md` (Milestone 5 lock entry).
 
-**Next implementation slice:** **M5-P2 — Start Production** (NOT STARTED).
-Do not start until Product authorizes.
+**Next implementation slice:** **M5-P3 — Bakery Ready Authority + Exception
+Polish** (NOT STARTED).
 
 ---
 

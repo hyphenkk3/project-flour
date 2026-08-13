@@ -8,9 +8,11 @@ import {
 } from "@/workspaces/owner/orders/labels";
 import { bakeryOrderHref } from "@/workspaces/bakery/date";
 import {
+  bakeryAttentionBadgeLabel,
   bakeryCustomerNotesExcerpt,
   bakeryFulfilmentCue,
   bakeryPrimaryCakeSummary,
+  bakeryProductionBadgeTone,
   bakeryProductionLabel,
   bakeryProductionPresentation,
   hasPaymentAttention,
@@ -24,16 +26,25 @@ type BakeryOrderCardProps = {
 };
 
 export function BakeryOrderCard({ order, boardDate }: BakeryOrderCardProps) {
-  const presentation = bakeryProductionPresentation({ readyAt: order.readyAt });
+  const presentation = bakeryProductionPresentation({
+    productionStartedAt: order.productionStartedAt,
+    readyAt: order.readyAt,
+  });
   const { cakeName, sizeLabel, additionalCakeCount } =
     bakeryPrimaryCakeSummary(order);
   const notesExcerpt = bakeryCustomerNotesExcerpt(order.customerNotes);
   const paymentAttention = hasPaymentAttention({
+    productionStartedAt: order.productionStartedAt,
     readyAt: order.readyAt,
     status: order.status,
   });
   const fulfilment = bakeryFulfilmentCue(order.fulfilmentMethod);
   const secured = isBakeryOrderSecured(order.status);
+  const attentionBadge = bakeryAttentionBadgeLabel({
+    needsBakeryAttention: order.needsBakeryAttention,
+    pickupDate: order.pickupDate,
+    pickupTime: order.pickupTime,
+  });
 
   return (
     <article className="border-fog rounded-2xl border bg-white p-4">
@@ -43,7 +54,7 @@ export function BakeryOrderCard({ order, boardDate }: BakeryOrderCardProps) {
         </p>
         <StatusBadge
           label={bakeryProductionLabel(presentation)}
-          tone={presentation === "ready" ? "success" : "info"}
+          tone={bakeryProductionBadgeTone(presentation)}
         />
       </div>
       <h3 className="font-display text-ink mt-1 text-xl leading-tight tracking-tight">
@@ -70,8 +81,8 @@ export function BakeryOrderCard({ order, boardDate }: BakeryOrderCardProps) {
         {!secured ? (
           <StatusBadge label="Not secured" tone="warning" />
         ) : null}
-        {order.needsBakeryAttention ? (
-          <StatusBadge label="Bakery Attention" tone="warning" />
+        {attentionBadge ? (
+          <StatusBadge label={attentionBadge} tone="warning" />
         ) : null}
         {paymentAttention ? (
           <StatusBadge label="Payment Attention" tone="danger" />

@@ -1,7 +1,12 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/foundation/auth/session";
-import { canAccessBakeryWorkspace } from "@/engines/bakery/capabilities";
+import {
+  buildBakeryWorkspaceCapabilities,
+  canAccessBakeryWorkspace,
+} from "@/engines/bakery/capabilities";
+import { createClient } from "@/lib/supabase/server";
 import {
   getBakeryBoardOrderById,
   listBakeryBoardOrders,
@@ -29,4 +34,56 @@ export async function getBakeryBoardOrderAction(
 ): Promise<BakeryBoardOrder | null> {
   await requireBakeryStaff();
   return getBakeryBoardOrderById(orderId, selectedPickupDate);
+}
+
+export async function startBakeryProductionAction(
+  orderId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireBakeryStaff();
+  const caps = buildBakeryWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canStartProduction) {
+    return { error: "Not authorized to start production." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("mark_guest_order_production_started", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+  revalidatePath("/bakery");
+  revalidatePath(`/bakery/orders/${orderId}`);
+  return { error: null };
+}
+
+export async function undoBakeryProductionStartAction(
+  orderId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireBakeryStaff();
+  const caps = buildBakeryWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canUndoStart) {
+    return { error: "Not authorized to undo start production." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("undo_guest_order_production_started", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+  revalidatePath("/bakery");
+  revalidatePath(`/bakery/orders/${orderId}`);
+  return { error: null };
 }

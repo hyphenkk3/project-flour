@@ -23,6 +23,8 @@ export type BakeryOrderRow = {
   customer_notes: string | null;
   needs_bakery_attention: boolean | null;
   bakery_attention_note: string | null;
+  production_started_at: string | null;
+  production_started_by: string | null;
   ready_at: string | null;
   picked_up_at: string | null;
   out_for_delivery_at: string | null;
@@ -122,6 +124,8 @@ export function mapBakeryBoardOrder(row: BakeryOrderRow): BakeryBoardOrder {
     customerNotes: row.customer_notes,
     needsBakeryAttention: Boolean(row.needs_bakery_attention),
     bakeryAttentionNote: row.bakery_attention_note,
+    productionStartedAt: row.production_started_at ?? null,
+    productionStartedBy: row.production_started_by ?? null,
     readyAt: row.ready_at,
     pickedUpAt: row.picked_up_at,
     outForDeliveryAt: row.out_for_delivery_at,

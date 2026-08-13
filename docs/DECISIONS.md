@@ -2,11 +2,81 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-13 — M5-P2 · Start Production
+
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-13).** Milestone 5 remains
+**IN PROGRESS.** M5-P3 remains NOT STARTED.
+
+Product closed M5-P2 after completed Product acceptance and automated
+verification (including Start lifecycle, Waiting for confirmation UX,
+Payment Attention, Owner surface separation, and the effective pickup
+schedule / Early Pickup refinement).
+
+### Accepted P2 surface (frozen unless Product reopens)
+
+**Board:** Not started | In Production | Ready.
+
+**Start / Undo Start:** Bakery workspace detail only (Bakery / Manager /
+Owner; server/RPC enforced; guest-only). Not on Owner Order Workspace or
+Whole Cake Calendar Quick View. Existing Owner Collection controls
+(including Mark Ready / Mark Picked Up) remain intact.
+
+**Visibility (unchanged from P1):** Submitted → Pending Confirmation →
+Awaiting Payment → Paid.
+
+**Start eligibility:** Awaiting Payment and Paid only. Not payment-gated.
+Submitted / Pending Confirmation remain visible for planning; Start is not
+executable — **Waiting for confirmation** UX (muted, non-clickable).
+No Owner production-authorization field. Do not overload Bakery Attention.
+
+**Awaiting Payment Start:** enabled with staff confirmation
+(“Payment is still pending for this preorder. Start production anyway?”);
+Cancel leaves Not started.
+**Paid Start:** enabled with no extra payment confirm.
+
+Schema: `production_started_at` / `production_started_by`. RPCs
+`mark_guest_order_production_started` /
+`undo_guest_order_production_started` with server-side Bakery / Manager /
+Owner role checks. Guest only. Undo Start is not payment-gated.
+
+**Ready (P2 boundary):** Ready may skip Start and must not fabricate Start.
+Ready preserves Start. Owner Ready without Start and Start → Owner Ready
+were Product-tested. Bakery Mark Ready / Undo Ready remain **M5-P3**.
+
+Payment Attention: `(started OR ready) AND status != paid`.
+Q13: Started/Ready remain visible after financial demotion until terminal
+handoff — accepted via **automated coverage**; no Owner Paid → Awaiting
+Payment demotion control (refunds / payment-correction remain Future).
+
+### Accepted P2 refinements (same close)
+
+**Effective pickup schedule foundation:** authoritative
+`getEffectivePickupSchedule(ymd)` — weekly base profiles + code-config
+`PICKUP_DATE_OVERRIDES`. Customer pickup slots and Bakery Early Pickup
+consume this truth only. No Admin UI / DB persistence in P2.
+
+**Early Pickup:** derived only (`time < usualPickupStart` on open dates;
+closed ⇒ not applicable); coexists with manual Owner Bakery Attention;
+never writes `needs_bakery_attention` / `bakery_attention_note`.
+
+**Owner outside-hours:** Custom clock time retained; closed / outside
+public hours surface warnings only (`OwnerPickupFields`); continue allowed
+for approved exceptions. Customer Operations schedule validation not
+widened (future debt).
+
+### Explicitly out of accepted M5-P2
+
+- Bakery Mark Ready / Undo Ready — **M5-P3**
+- Business Calendar Admin UI / DB override persistence
+- Dedicated Paid → Awaiting Payment demotion control
+- EXTRA · Collection activation · packing persistence · member Bakery Start
+  · Owner Start outside Bakery
+
 ## 2026-08-12 — M5-P1 · Live Bakery Board
 
 **STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-12).** Milestone 5 remains
-**IN PROGRESS.** Next slice is **M5-P2 — Start Production** (NOT STARTED).
-M5-P3 remains NOT STARTED. No schema/migration in P1.
+**IN PROGRESS.** M5-P2 Start Production is **PRODUCT ACCEPTED / CLOSED
+(2026-08-13)** — see entry above. M5-P3 remains NOT STARTED.
 
 Product closed M5-P1 after the final reconciliation report and Product
 manual testing, including the amended unsecured-preorder visibility
@@ -56,7 +126,8 @@ Bakery design recon (Batches 1–4). Implementation sequence locked. EXTRA
 and Collection remain Future — not scheduled by this lock.
 
 **M5-P1:** PRODUCT ACCEPTED / CLOSED (2026-08-12) — see entry above.
-**M5-P2 — Start Production:** authoritative next slice · NOT STARTED.
+**M5-P2 — Start Production:** PRODUCT ACCEPTED / CLOSED (2026-08-13) — see
+entry above.
 **M5-P3:** NOT STARTED.
 
 **M5-P1 schema boundary (approved):** Do **not** add

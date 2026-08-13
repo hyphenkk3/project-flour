@@ -7,6 +7,10 @@ import {
   isValidPickupSlot,
   normalizePickupTimeValue,
 } from "@/engines/business-calendar/pickup-slots";
+import {
+  getEffectivePickupSchedule,
+  getStaffPickupExceptionWarning,
+} from "@/engines/business-calendar/pickup-schedule";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form";
 
 const CUSTOM_VALUE = "__custom__";
@@ -24,6 +28,8 @@ type OwnerPickupFieldsProps = {
  * Owner staff entry / edit: public slots plus any valid clock time.
  * Customer storefront continues to use PickupSlotFields (slots only).
  * Free-text pickupInstruction is retired from Owner UI (legacy values remain in DB).
+ *
+ * Closed / outside-hours selections remain allowed; warnings only.
  */
 export function OwnerPickupFields({
   defaultDate,
@@ -58,6 +64,15 @@ export function OwnerPickupFields({
   );
 
   const effectiveTime = mode === "custom" ? customTime : slotTime;
+
+  const exceptionWarning = useMemo(() => {
+    if (!date) return null;
+    const schedule = getEffectivePickupSchedule(date);
+    const normalized = effectiveTime
+      ? normalizePickupTimeValue(effectiveTime)
+      : "";
+    return getStaffPickupExceptionWarning(date, normalized || null, schedule);
+  }, [date, effectiveTime]);
 
   return (
     <div className="space-y-4">
@@ -131,6 +146,15 @@ export function OwnerPickupFields({
             value={customTime}
           />
         </FormField>
+      ) : null}
+
+      {exceptionWarning ? (
+        <p
+          className="border-status-warning/30 bg-status-warning-soft text-status-warning rounded-lg border px-4 py-3 text-sm"
+          role="status"
+        >
+          {exceptionWarning.message}
+        </p>
       ) : null}
 
       <input name="pickup_time" type="hidden" value={effectiveTime} />

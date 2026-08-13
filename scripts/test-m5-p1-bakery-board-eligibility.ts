@@ -9,10 +9,12 @@ import {
   bakeryPrimaryCakeSummary,
   bakeryProductionLabel,
   bakeryProductionPresentation,
+  bakeryStartSurface,
   deriveBakeryPackingReminders,
   hasPaymentAttention,
   isActiveOnBakeryBoard,
   isBakeryOrderSecured,
+  isBakeryStartEligibleStatus,
 } from "@/workspaces/bakery/eligibility";
 import {
   bakeryPlusTwoYmd,
@@ -195,11 +197,88 @@ assert.equal(
 
 assert.equal(bakeryProductionPresentation({ readyAt: null }), "not_started");
 assert.equal(
+  bakeryProductionPresentation({
+    productionStartedAt: "2026-09-15T07:00:00Z",
+    readyAt: null,
+  }),
+  "in_production",
+);
+assert.equal(
   bakeryProductionPresentation({ readyAt: "2026-09-15T08:00:00Z" }),
   "ready",
 );
+assert.equal(
+  bakeryProductionPresentation({
+    productionStartedAt: "2026-09-15T07:00:00Z",
+    readyAt: "2026-09-15T08:00:00Z",
+  }),
+  "ready",
+  "Ready wins over Start",
+);
 assert.equal(bakeryProductionLabel("not_started"), "Not started");
+assert.equal(bakeryProductionLabel("in_production"), "In Production");
 assert.equal(bakeryProductionLabel("ready"), "Ready");
+assert.equal(
+  hasPaymentAttention({
+    productionStartedAt: "2026-09-15T07:00:00Z",
+    readyAt: null,
+    status: "awaiting_payment",
+  }),
+  true,
+  "Started + unpaid is Payment Attention",
+);
+
+assert.equal(isBakeryStartEligibleStatus("submitted"), false);
+assert.equal(isBakeryStartEligibleStatus("pending_confirmation"), false);
+assert.equal(isBakeryStartEligibleStatus("awaiting_payment"), true);
+assert.equal(isBakeryStartEligibleStatus("paid"), true);
+
+assert.equal(
+  bakeryStartSurface({
+    presentation: "not_started",
+    status: "submitted",
+    canStartProduction: true,
+    canUndoStart: true,
+  }).kind,
+  "waiting_confirmation",
+);
+assert.equal(
+  bakeryStartSurface({
+    presentation: "not_started",
+    status: "awaiting_payment",
+    canStartProduction: true,
+    canUndoStart: true,
+  }).kind,
+  "start_unsecured",
+);
+assert.equal(
+  bakeryStartSurface({
+    presentation: "not_started",
+    status: "paid",
+    canStartProduction: true,
+    canUndoStart: true,
+  }).kind,
+  "start_paid",
+);
+assert.equal(
+  bakeryStartSurface({
+    presentation: "in_production",
+    status: "paid",
+    canStartProduction: true,
+    canUndoStart: true,
+  }).kind,
+  "undo_start",
+);
+assert.equal(
+  bakeryStartSurface({
+    presentation: "ready",
+    status: "paid",
+    canStartProduction: true,
+    canUndoStart: true,
+  }).kind,
+  "none",
+);
+
 assert.equal(bakeryFulfilmentCue("delivery"), "Delivery");
 assert.equal(bakeryFulfilmentCue("pickup"), "Pickup");
 
@@ -249,6 +328,8 @@ const mapped = mapBakeryBoardOrder({
   customer_notes: "Less sweet",
   needs_bakery_attention: true,
   bakery_attention_note: "Stage topper last",
+  production_started_at: null,
+  production_started_by: null,
   ready_at: null,
   picked_up_at: null,
   out_for_delivery_at: null,

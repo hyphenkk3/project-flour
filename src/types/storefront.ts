@@ -332,6 +332,8 @@ export type OrderTimelineEventType =
   | "rm10_voucher_owner_override"
   | "discount_removed"
   | "discount_changed"
+  | "order_production_started"
+  | "order_production_start_undone"
   | "order_marked_ready"
   | "order_ready_undone"
   | "order_picked_up"

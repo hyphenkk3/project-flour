@@ -7,8 +7,11 @@ import type {
   StorefrontOrderFulfilmentMethod,
 } from "@/types/storefront";
 
-/** P1 production presentation — no In Production until M5-P2 Start. */
-export type BakeryProductionPresentation = "not_started" | "ready";
+/** P2 production presentation — Ready wins when both Start and Ready exist. */
+export type BakeryProductionPresentation =
+  | "not_started"
+  | "in_production"
+  | "ready";
 
 export type BakeryCakeLine = {
   id: string;
@@ -50,6 +53,8 @@ export type BakeryBoardOrder = {
   customerNotes: string | null;
   needsBakeryAttention: boolean;
   bakeryAttentionNote: string | null;
+  productionStartedAt: string | null;
+  productionStartedBy: string | null;
   readyAt: string | null;
   pickedUpAt: string | null;
   outForDeliveryAt: string | null;

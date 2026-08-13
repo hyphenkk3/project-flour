@@ -1,11 +1,13 @@
 /**
- * M5-P1 — pure Bakery board eligibility + presentation helpers.
- * No network. Pre-Start equation (Start columns arrive in M5-P2).
+ * M5 Bakery board eligibility + presentation helpers.
+ * No network.
  *
- * Visibility ≠ permission to produce. Unsecured preorders are visible for
- * planning; Start rules for unsecured orders are reconciled in M5-P2.
+ * Visibility ≠ permission to produce.
+ * Start is allowed only after commercial confirmation (awaiting_payment | paid).
  */
 
+import type { StatusTone } from "@/lib/design-tokens";
+import { isEarlyPickupAttention } from "@/engines/business-calendar/early-pickup";
 import { isDeliveryFulfilment } from "@/engines/orders/operational-state";
 import type { GuestOrderStatus } from "@/types/storefront";
 import type {
@@ -22,11 +24,52 @@ export const BAKERY_ACTIVE_PREORDER_STATUSES: readonly GuestOrderStatus[] = [
   "paid",
 ];
 
+/** Product lock: Start only after customer confirmation. */
+export const BAKERY_START_ELIGIBLE_STATUSES: readonly GuestOrderStatus[] = [
+  "awaiting_payment",
+  "paid",
+];
+
+export const BAKERY_WAITING_CONFIRMATION_REASON =
+  "Waiting for customer confirmation before production can start.";
+
+export const BAKERY_WAITING_CONFIRMATION_START_LABEL = "Waiting for confirmation";
+
+export const BAKERY_EARLY_PICKUP_DETAIL =
+  "Early pickup — this order is due before the usual Bakery pickup window.";
+
+export { isEarlyPickupAttention };
+
+/** Manual Owner flag OR derived early pickup. Does not mutate persistence. */
+export function hasEffectiveBakeryAttention(input: {
+  needsBakeryAttention: boolean;
+  pickupDate: string;
+  pickupTime: string;
+}): boolean {
+  return (
+    input.needsBakeryAttention ||
+    isEarlyPickupAttention(input.pickupDate, input.pickupTime)
+  );
+}
+
+/** Board badge label — Early pickup cue when automatic reason applies. */
+export function bakeryAttentionBadgeLabel(input: {
+  needsBakeryAttention: boolean;
+  pickupDate: string;
+  pickupTime: string;
+}): string | null {
+  const early = isEarlyPickupAttention(input.pickupDate, input.pickupTime);
+  if (early) return "Bakery Attention · Early pickup";
+  if (input.needsBakeryAttention) return "Bakery Attention";
+  return null;
+}
+
 export type BakeryEligibilityInput = {
   customerId: string | null;
   pickupDate: string;
   selectedPickupDate: string;
   status: GuestOrderStatus | string;
+  productionStartedAt?: string | null;
   readyAt: string | null;
   pickedUpAt: string | null;
   outForDeliveryAt: string | null;
@@ -46,15 +89,28 @@ export function isBakeryOrderSecured(
   return status === "paid";
 }
 
+export function isBakeryStartEligibleStatus(
+  status: GuestOrderStatus | string,
+): boolean {
+  return (BAKERY_START_ELIGIBLE_STATUSES as readonly string[]).includes(status);
+}
+
+export function isWaitingCustomerConfirmation(
+  status: GuestOrderStatus | string,
+): boolean {
+  return status === "submitted" || status === "pending_confirmation";
+}
+
 /**
- * M5-P1 active-board equation (Product-amended):
- * all active guest preorders for the selected fulfilment date,
- * until Pickup Picked Up / Delivery Out for Delivery.
+ * Active-board equation:
+ * guest + selected fulfilment date + (active preorder status OR already
+ * Started/Ready) until Pickup Picked Up / Delivery Out for Delivery.
+ * Cancelled never stays. Financial demotion does not clear Start/Ready.
  */
 export function isActiveOnBakeryBoard(input: BakeryEligibilityInput): boolean {
   if (input.customerId != null) return false;
   if (input.pickupDate !== input.selectedPickupDate) return false;
-  if (!isActivePreorderStatus(input.status)) return false;
+  if (input.status === "cancelled") return false;
 
   if (isDeliveryFulfilment(input.fulfilmentMethod as never)) {
     if (input.outForDeliveryAt) return false;
@@ -62,27 +118,73 @@ export function isActiveOnBakeryBoard(input: BakeryEligibilityInput): boolean {
     return false;
   }
 
-  return true;
+  if (isActivePreorderStatus(input.status)) return true;
+  return Boolean(input.productionStartedAt) || Boolean(input.readyAt);
 }
 
-/** P1 Payment Attention: Ready but no longer paid (exception after production). */
+/** Payment Attention: Started or Ready, and no longer paid. */
 export function hasPaymentAttention(input: {
+  productionStartedAt?: string | null;
   readyAt: string | null;
   status: GuestOrderStatus | string;
 }): boolean {
-  return Boolean(input.readyAt) && input.status !== "paid";
+  const inProduction =
+    Boolean(input.productionStartedAt) || Boolean(input.readyAt);
+  return inProduction && input.status !== "paid";
 }
 
 export function bakeryProductionPresentation(input: {
+  productionStartedAt?: string | null;
   readyAt: string | null;
 }): BakeryProductionPresentation {
-  return input.readyAt ? "ready" : "not_started";
+  if (input.readyAt) return "ready";
+  if (input.productionStartedAt) return "in_production";
+  return "not_started";
 }
 
 export function bakeryProductionLabel(
   presentation: BakeryProductionPresentation,
 ): string {
-  return presentation === "ready" ? "Ready" : "Not started";
+  if (presentation === "ready") return "Ready";
+  if (presentation === "in_production") return "In Production";
+  return "Not started";
+}
+
+export function bakeryProductionBadgeTone(
+  presentation: BakeryProductionPresentation,
+): StatusTone {
+  if (presentation === "ready") return "success";
+  if (presentation === "in_production") return "warning";
+  return "info";
+}
+
+export type BakeryStartSurface =
+  | { kind: "none" }
+  | { kind: "waiting_confirmation"; reason: string }
+  | { kind: "start_paid" }
+  | { kind: "start_unsecured" }
+  | { kind: "undo_start" };
+
+export function bakeryStartSurface(input: {
+  presentation: BakeryProductionPresentation;
+  status: GuestOrderStatus | string;
+  canStartProduction: boolean;
+  canUndoStart: boolean;
+}): BakeryStartSurface {
+  if (input.presentation === "ready") return { kind: "none" };
+  if (input.presentation === "in_production") {
+    return input.canUndoStart ? { kind: "undo_start" } : { kind: "none" };
+  }
+  if (!input.canStartProduction) return { kind: "none" };
+  if (isWaitingCustomerConfirmation(input.status)) {
+    return {
+      kind: "waiting_confirmation",
+      reason: BAKERY_WAITING_CONFIRMATION_REASON,
+    };
+  }
+  if (input.status === "awaiting_payment") return { kind: "start_unsecured" };
+  if (input.status === "paid") return { kind: "start_paid" };
+  return { kind: "none" };
 }
 
 export function bakeryFulfilmentCue(
@@ -121,7 +223,7 @@ export function bakeryCustomerNotesExcerpt(
 
 /**
  * Packing reminder lines from structured truth only (Q6).
- * Local UI checkboxes — not persisted.
+ * Local UI checkboxes — not persisted. Does not gate Start.
  */
 export function deriveBakeryPackingReminders(order: {
   complimentaryItems: Array<{ id: string; name: string; quantity: number }>;

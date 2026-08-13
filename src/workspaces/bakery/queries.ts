@@ -24,6 +24,7 @@ function rowPassesBoard(
     pickupDate: row.pickup_date,
     selectedPickupDate,
     status: row.status,
+    productionStartedAt: row.production_started_at,
     readyAt: row.ready_at,
     pickedUpAt: row.picked_up_at,
     outForDeliveryAt: row.out_for_delivery_at,
@@ -44,7 +45,13 @@ export async function listBakeryBoardOrders(
     .select(BAKERY_ORDER_SELECT)
     .is("customer_id", null)
     .eq("pickup_date", selectedPickupDate)
-    .in("status", [...BAKERY_ACTIVE_PREORDER_STATUSES])
+    .or(
+      [
+        `status.in.(${BAKERY_ACTIVE_PREORDER_STATUSES.join(",")})`,
+        "production_started_at.not.is.null",
+        "ready_at.not.is.null",
+      ].join(","),
+    )
     .order("pickup_time", { ascending: true });
 
   if (error) {
