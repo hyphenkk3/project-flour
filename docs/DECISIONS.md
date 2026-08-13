@@ -2,12 +2,63 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-13 — Live Collection workspace activation (v1)
+
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-13).** M5-P1/P2/P3 remain
+PRODUCT ACCEPTED / CLOSED. No Milestone 6 program invented — this is the
+roadmap slice immediately after Bakery Ready Authority.
+
+Product closed Collection Activation v1 after completed Product acceptance
+and automated / live verification (role-hardened Picked Up RPCs, pickup
+Ready → Collected / Undo, Bakery visibility via existing `picked_up_at`
+exit, AP Ready payment independence, packing reminder-only, fixture
+cleanup).
+
+### Accepted Collection v1 surface (frozen unless Product reopens)
+
+**Workspace:** Authenticated `/collection` for **collection · manager ·
+owner**. Bakery and Customer Operations have no Collection access.
+
+**Lifecycle:** Pickup guest Ready → **Mark Collected** →
+`picked_up_at` / `picked_up_by`. **Undo Collected** clears Picked Up and
+returns the order to Collection Ready; Bakery Ready visibility restores
+via the accepted M5 board equation. Bakery exits only on `picked_up_at`
+(not Customer Arrives).
+
+**Board eligibility:** Guest + pickup + `ready_at` set + `picked_up_at`
+null + active preorder status + selected fulfilment date. Delivery
+excluded.
+
+**RPC:** Hardened `mark_guest_order_picked_up` /
+`undo_guest_order_picked_up` (roles owner|manager|collection). Guest +
+pickup-only. Ready not required at SQL (Owner Ops may still Collect
+without Ready); Collection UI/actions require Ready. Payment independent
+(3A-5): AP Ready may Collect without mutating finance.
+
+**Owner Ops:** Existing Picked Up / Undo Picked Up controls remain as
+override. Manager does not gain Owner Ops access merely from Collection.
+
+**UI:** Detail **Mark Collected** / **Undo Collected** only. Packing
+checklist is local reminder-only (refresh clears; does not gate Collect).
+No fake Arrived/Verified saved states.
+
+### Explicitly out of accepted Collection v1
+
+- Customer Arrives / Verify persistence
+- Delivery Collection desk (Out / Delivered)
+- Bakery Mark Collected / Picked Up controls
+- Collection Mark Ready authority
+- Packing persistence
+- EXTRA · refunds · WhatsApp automation · Business Calendar Admin · POS ·
+  member Collection
+
 ## 2026-08-13 — M5-P3 · Bakery Ready Authority
 
 **STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-13).** Milestone 5 locked
 sequence (M5-P1 → M5-P2 → M5-P3) is complete. M5-P4 does not exist.
-Collection activation / EXTRA / packing persistence / Business Calendar
-Admin remain Future — not part of P3.
+Collection Activation v1 shipped separately and is **PRODUCT ACCEPTED /
+CLOSED (2026-08-13)** — see entry above. EXTRA / packing persistence /
+Business Calendar Admin remain Future — not part of P3.
 
 Product closed M5-P3 after completed Product acceptance and automated /
 live verification (including Bakery Start-first Mark Ready, Undo Ready
@@ -174,9 +225,10 @@ entry below.
 ## 2026-08-12 — Milestone 5 · Bakery Activation (LOCKED)
 
 **STATUS:** Locked sequence **complete** (M5-P1 → M5-P2 → M5-P3 all
-PRODUCT ACCEPTED / CLOSED). EXTRA and Collection remain Future — not
-scheduled by this lock. Next implementation slice is **NOT STARTED**
-until Product directs.
+PRODUCT ACCEPTED / CLOSED). EXTRA remains Future. **Live Collection
+workspace activation (v1)** is **PRODUCT ACCEPTED / CLOSED (2026-08-13)**
+— see entry above. Next implementation slice is **NOT STARTED** until
+Product directs.
 
 **M5-P1:** PRODUCT ACCEPTED / CLOSED (2026-08-12) — see entry above.
 **M5-P2 — Start Production:** PRODUCT ACCEPTED / CLOSED (2026-08-13) — see

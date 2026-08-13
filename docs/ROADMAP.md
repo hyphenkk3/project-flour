@@ -20,9 +20,11 @@ Detailed business rules, message formats, financial/lifecycle rationale, and his
 - **M5-P2 — Start Production:** **PRODUCT ACCEPTED / CLOSED (2026-08-13)**
 - **M5-P3 — Bakery Ready Authority:** **PRODUCT ACCEPTED / CLOSED
   (2026-08-13)**
+- **Live Collection workspace activation (v1):** **PRODUCT ACCEPTED /
+  CLOSED (2026-08-13)**
 - **Next implementation slice:** **NOT STARTED** (Product must direct;
-  Collection / EXTRA / packing persistence / Business Calendar Admin remain
-  Future)
+  EXTRA / packing persistence / Business Calendar Admin / Delivery
+  Collection remain Future)
 - Working tree may include untracked `tmp/` Product-review assets only —
   do not stage.
 
@@ -183,8 +185,25 @@ Production through canonical Ready.
 `docs/DECISIONS.md` (Milestone 5 lock entry + M5-P3 accepted freeze).
 
 **Next implementation slice:** **NOT STARTED** — Product must direct.
-Collection activation / EXTRA / packing persistence / Business Calendar
-Admin remain Future (not implied shipped by P3).
+EXTRA / packing persistence / Business Calendar Admin / Delivery Collection
+remain Future.
+
+### Live Collection workspace activation (v1) — PRODUCT ACCEPTED / CLOSED (2026-08-13)
+
+- Authenticated `/collection` for **collection · manager · owner**.
+- Pickup-only Ready queue → **Mark Collected** → canonical `picked_up_at` /
+  `picked_up_by`; **Undo Collected** restores Ready on Collection + Bakery.
+- Hardened `mark/undo_guest_order_picked_up` (roles owner|manager|collection;
+  bakery/CO denied). Guest + pickup-only.
+- Keep M5 Bakery exit on `picked_up_at` (no Arrived exit). Owner Ops Picked Up
+  remains override.
+- No Arrive/Verify persistence; packing reminder-only (local; does not gate).
+- Delivery Out/Delivered remain Owner Ops; no Collection Delivery desk.
+- Payment independent: AP Ready may Collect; finance unchanged.
+- Bakery has no Collect controls; Collection has no Ready authority.
+
+**Authority / exclusions:** `docs/DECISIONS.md` (Live Collection accepted
+freeze).
 
 ---
 
@@ -194,12 +213,14 @@ Product-approved deferred domains (not next unless Product reorders):
 
 - EXTRA / walk-in Hold and recording workflow (separate physical-stock
   domain — **not** part of Milestone 5)
-- Real Counter / Collection workspace activation (beyond V0.5 mocks)
 - Refunds / overpayment / payment-correction workflows
 - WhatsApp automation (send API / tracking) — messages remain copy-only until then
 - Email / preorder submission-receipt provider
 - Promotions administration / Business Settings (beyond temporary August Promo rules)
 - POS checkout / completion
+- Packing checklist persistence
+- Business Calendar Admin UI / DB override persistence
+- Delivery Collection desk workflow (Collection v1 is Pickup-only)
 
 Details and rationale: `docs/DECISIONS.md`.
 
@@ -216,4 +237,4 @@ Details and rationale: `docs/DECISIONS.md`.
 
 - ESLint reports approximately **20** `react-hooks/set-state-in-effect` findings (pre-existing and some dialog/preview patterns).
 - Build and Product-tested Milestone 3–4 flows are green.
-- Maintenance debt only — **does not block Milestone 5**; not a Product milestone.
+- Maintenance debt only — **does not block** live Collection activation; not a Product milestone.
