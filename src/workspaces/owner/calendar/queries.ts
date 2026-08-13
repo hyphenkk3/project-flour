@@ -9,6 +9,10 @@ import type {
   StorefrontOrderFulfilmentMethod,
 } from "@/types/storefront";
 import { guestOrderDisplayName } from "@/workspaces/owner/orders/labels";
+import {
+  mapExtraStockRowToCalendarMarker,
+  type CalendarExtraMarker,
+} from "@/engines/extra/calendar-visibility";
 import type {
   CalendarCakeItem,
   CalendarEntry,
@@ -238,6 +242,47 @@ export async function listCalendarEntriesForPickupRange(
   return rows
     .map((row) => mapEntry(row, rm10ByOrder.get(row.id) ?? false))
     .sort(compareCalendarEntries);
+}
+
+/**
+ * Active EXTRA markers for Whole Cake Calendar.
+ * Placement date = prepared_on. Rejected / null prepared_on / expired confirmed excluded.
+ */
+export async function listCalendarExtraMarkersForPreparedRange(
+  fromYmd: string,
+  toYmd: string,
+): Promise<CalendarExtraMarker[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("extra_stock")
+    .select(
+      "id, cake_name, size_label, lifecycle, prepared_on, pickup_through_at, library_cake_id, library_cake_size_id",
+    )
+    .in("lifecycle", ["proposed", "confirmed"])
+    .not("prepared_on", "is", null)
+    .gte("prepared_on", fromYmd)
+    .lte("prepared_on", toYmd)
+    .order("prepared_on", { ascending: true })
+    .order("cake_name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const markers: CalendarExtraMarker[] = [];
+  for (const row of data ?? []) {
+    const marker = mapExtraStockRowToCalendarMarker(row);
+    if (marker) markers.push(marker);
+  }
+  return markers;
+}
+
+export async function listCalendarExtraMarkersForMonth(
+  year: number,
+  month: number,
+): Promise<CalendarExtraMarker[]> {
+  const { from, to } = monthVisibleRange(year, month);
+  return listCalendarExtraMarkersForPreparedRange(from, to);
 }
 
 /** Single-entry refresh for realtime upsert (null if not a calendar guest order). */

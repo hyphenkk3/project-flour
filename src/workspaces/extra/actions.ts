@@ -23,8 +23,9 @@ async function requireExtraStaff() {
 function revalidateExtraPaths() {
   revalidatePath("/bakery");
   revalidatePath("/bakery/extra");
+  // Calendar shows EXTRA by prepared_on — keep Owner Matrix in sync after propose.
+  revalidatePath("/owner/calendar");
 }
-
 export async function listExtraStockUnitsAction(): Promise<ExtraStockUnit[]> {
   await requireExtraStaff();
   return listExtraStockUnits();

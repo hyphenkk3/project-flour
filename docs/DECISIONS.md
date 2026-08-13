@@ -2,6 +2,47 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-13 — EXTRA v1.1 Calendar-assisted proposal
+
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-13).** EXTRA Activation v1
+remains PRODUCT ACCEPTED / CLOSED. No Milestone 6 invented.
+
+Product closed EXTRA v1.1 after manual Calendar retest (Chocolate D'Amour
+6" EXTRA proposed on prepared_on 2026-08-17 Matrix row; proposed vs
+confirmed differentiation; Quick View Propose EXTRA; Quick View persists
+after submit; Calendar stays put; EXTRA domain-distinct from guest
+preorders) plus helper/live suites, Product-data safety, and scope audit.
+
+### Accepted EXTRA v1.1 surface (frozen unless Product reopens)
+
+- Entry: Owner Whole Cake Calendar Quick View — **Propose EXTRA** on each
+  cake/item line (not Matrix/calendar cards).
+- Prefill from full Storefront order item: cake/size snapshots + library IDs
+  when present. Item quantity is context only; one submit = one
+  `extra_stock` row.
+- `prepared_on` default = fulfilment/pickup_date minus one Singapore
+  calendar day; editable. No closed-day / previous-open-business-day logic.
+- Reuse EXTRA v1 `propose_extra_stock`. Result stays `proposed` (not
+  Available). Bakery final Confirm/Reject/Undo unchanged.
+- Post-submit: remain on Calendar; **keep/reopen same Quick View**; light
+  success on the cake line; no forced Bakery navigation.
+- Matrix visibility: proposed + confirmed EXTRA appear on **`prepared_on`**
+  under matching cake/size with explicit `EXTRA` badge (proposed vs
+  confirmed). Rejected excluded. Null `prepared_on` never invents a date.
+  Confirmed past `pickup_through_at` excluded from active planning display.
+- No `source_order_id` / `source_order_item_id`. No generated context note.
+- Duplicates allowed. No Calendar Confirm/Reject/Undo.
+- Compact badge treatment accepted; further proposed/confirmed visual
+  polish is out of scope for this closeout.
+
+### Explicitly deferred (unchanged)
+
+Hold/Release · walk-in sale/recording · public EXTRA · POS · Collection
+EXTRA · Slice · origin enum · previous-day customer acknowledgement ·
+automatic carry-forward UI · source preorder clone/mutation · fake EXTRA
+financial orders · Bakery Production-column overload · broader Calendar
+redesign · Milestone 6.
+
 ## 2026-08-13 — EXTRA Activation v1
 
 **STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-13).** M5 Bakery and Collection

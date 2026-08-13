@@ -5,7 +5,14 @@ import { createClient } from "@/lib/supabase/client";
 import {
   getCalendarEntryByOrderIdAction,
   listCalendarEntriesForMonthAction,
+  listCalendarExtraMarkersForMonthAction,
 } from "@/workspaces/owner/calendar/actions";
+import type { CalendarExtraMarker } from "@/engines/extra/calendar-visibility";
+import {
+  clearRememberedCalendarQuickViewOrder,
+  rememberCalendarQuickViewOrder,
+  takeRememberedCalendarQuickViewOrder,
+} from "@/workspaces/owner/calendar/quick-view-persistence";
 import {
   clearTakenCalendarReturnPosition,
   discardCalendarReturnPosition,
@@ -48,6 +55,7 @@ type WholeCakeCalendarProps = {
   /** True only for Order Workspace ← Whole Cake Calendar (rp=1). */
   restorePosition: boolean;
   initialEntries: CalendarEntry[];
+  initialExtras?: CalendarExtraMarker[];
   /** Default sender for Customer Ready Message. */
   staffDisplayName: string;
 };
@@ -81,9 +89,11 @@ export function WholeCakeCalendar({
   focusToday,
   restorePosition,
   initialEntries,
+  initialExtras = [],
   staffDisplayName,
 }: WholeCakeCalendarProps) {
   const [entries, setEntries] = useState(initialEntries);
+  const [extras, setExtras] = useState(initialExtras);
   const [quickViewOrderId, setQuickViewOrderId] = useState<string | null>(null);
   const [quickViewRefreshKey, setQuickViewRefreshKey] = useState(0);
   const quickViewOrderIdRef = useRef<string | null>(null);
@@ -102,6 +112,28 @@ export function WholeCakeCalendar({
   useEffect(() => {
     setEntries(initialEntries);
   }, [initialEntries, year, month]);
+
+  useEffect(() => {
+    setExtras(initialExtras);
+  }, [initialExtras, year, month]);
+
+  // Restore Quick View after Propose EXTRA server-action remount.
+  useEffect(() => {
+    const remembered = takeRememberedCalendarQuickViewOrder();
+    if (remembered) {
+      setQuickViewOrderId(remembered);
+    }
+  }, []);
+
+  const openQuickView = useCallback((orderId: string) => {
+    rememberCalendarQuickViewOrder(orderId);
+    setQuickViewOrderId(orderId);
+  }, []);
+
+  const closeQuickView = useCallback(() => {
+    clearRememberedCalendarQuickViewOrder();
+    setQuickViewOrderId(null);
+  }, []);
 
   const upsertEntry = useCallback(
     (entry: CalendarEntry) => {
@@ -146,10 +178,26 @@ export function WholeCakeCalendar({
 
   const reconcileFromServer = useCallback(async () => {
     try {
-      const latest = await listCalendarEntriesForMonthAction(year, month);
+      const [latest, latestExtras] = await Promise.all([
+        listCalendarEntriesForMonthAction(year, month),
+        listCalendarExtraMarkersForMonthAction(year, month),
+      ]);
       setEntries(latest);
+      setExtras(latestExtras);
     } catch {
       // Keep last successful calendar state.
+    }
+  }, [year, month]);
+
+  const refreshExtrasOnly = useCallback(async () => {
+    try {
+      const latestExtras = await listCalendarExtraMarkersForMonthAction(
+        year,
+        month,
+      );
+      setExtras(latestExtras);
+    } catch {
+      // Keep last successful EXTRA markers.
     }
   }, [year, month]);
 
@@ -315,11 +363,12 @@ export function WholeCakeCalendar({
         <CalendarMatrixView
           columns={matrixColumns}
           entries={entries}
+          extras={extras}
           focusToday={focusToday}
           matrixHref={matrixHref}
           mode={matrixMode}
           month={month}
-          onOpenQuickView={setQuickViewOrderId}
+          onOpenQuickView={openQuickView}
           onOrderReturnMatrixApplied={clearOrderReturnMatrix}
           orderReturnMatrixScrollLeft={orderReturnMatrixScrollLeft}
           year={year}
@@ -328,12 +377,13 @@ export function WholeCakeCalendar({
         <CalendarMonthGrid
           cells={cells}
           entries={entries}
-          onOpenQuickView={setQuickViewOrderId}
+          onOpenQuickView={openQuickView}
           view={view}
         />
       )}
       <CalendarQuickView
-        onClose={() => setQuickViewOrderId(null)}
+        onClose={closeQuickView}
+        onExtraProposed={refreshExtrasOnly}
         orderId={quickViewOrderId}
         refreshKey={quickViewRefreshKey}
         returnTo={calendarReturnTo}

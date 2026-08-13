@@ -86,12 +86,29 @@ export function CalendarGuide() {
               <span className="text-ink line-through">Strikethrough</span>
               {" = RM10 Discount Card redeemed"}
             </li>
+            <li>
+              <span className="border-line/70 bg-mist inline-flex items-center gap-1 rounded border px-1 py-0.5 text-[10px]">
+                <span className="font-semibold tracking-wide uppercase">
+                  EXTRA
+                </span>
+                <span>proposed</span>
+              </span>
+              {" / "}
+              <span className="border-line/70 bg-status-info-soft/50 inline-flex items-center gap-1 rounded border px-1 py-0.5 text-[10px]">
+                <span className="font-semibold tracking-wide uppercase">
+                  EXTRA
+                </span>
+                <span>confirmed</span>
+              </span>
+              {" = physical stock on prepared date (Matrix)"}
+            </li>
           </ul>
         </div>
       </div>
       <p className="mt-2 text-[11px] text-zinc-500">
         Status colour = order/payment state. Soft background = fulfilment method.
-        Same status colours as Operations. Tap a line to open Quick View.
+        EXTRA markers are physical stock (not customers). Tap a customer line to
+        open Quick View.
       </p>
     </aside>
   );

@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { CalendarGuide } from "@/workspaces/owner/calendar/CalendarGuide";
-import { buildCalendarMatrix } from "@/workspaces/owner/calendar/matrix";
+import type { CalendarExtraMarker } from "@/engines/extra/calendar-visibility";
+import {
+  buildCalendarMatrix,
+  matrixCellHasContent,
+} from "@/workspaces/owner/calendar/matrix";
 import type { CalendarDayCell } from "@/workspaces/owner/calendar/month-grid";
 import { singaporeTodayParts } from "@/workspaces/owner/calendar/month-grid";
 import type {
@@ -18,6 +22,7 @@ import { withOperationalMarker } from "@/engines/orders/operational-state";
 type CalendarMatrixViewProps = {
   columns: CalendarDayCell[];
   entries: CalendarEntry[];
+  extras?: CalendarExtraMarker[];
   mode: CalendarMatrixMode;
   year: number;
   month: number;
@@ -124,6 +129,7 @@ export function focusMatrixTodayColumn() {
 export function CalendarMatrixView({
   columns,
   entries,
+  extras = [],
   mode,
   year,
   month,
@@ -137,8 +143,8 @@ export function CalendarMatrixView({
   const scrollRef = useRef<HTMLDivElement>(null);
   const dateYmids = useMemo(() => columns.map((col) => col.ymd), [columns]);
   const rows = useMemo(
-    () => buildCalendarMatrix(entries, dateYmids),
-    [entries, dateYmids],
+    () => buildCalendarMatrix(entries, dateYmids, extras),
+    [entries, dateYmids, extras],
   );
 
   // Persist manual scroll in memory (same-month remount only).
@@ -309,6 +315,7 @@ export function CalendarMatrixView({
                   </th>
                   {columns.map((col) => {
                     const cell = row.cellsByDate[col.ymd];
+                    const hasContent = matrixCellHasContent(cell);
                     return (
                       <td
                         className={[
@@ -321,15 +328,24 @@ export function CalendarMatrixView({
                           width: DATE_COL_WIDTH,
                         }}
                       >
-                        {!cell || cell.totalQuantity === 0 ? (
+                        {!hasContent ? (
                           <span className="text-zinc-300">—</span>
                         ) : mode === "totals" ? (
-                          <span className="text-ink font-medium">
-                            ×{cell.totalQuantity}
-                          </span>
+                          <div className="space-y-0.5">
+                            {cell && cell.totalQuantity > 0 ? (
+                              <span className="text-ink font-medium">
+                                ×{cell.totalQuantity}
+                              </span>
+                            ) : null}
+                            {(cell?.extras.length ?? 0) > 0 ? (
+                              <span className="text-skyline block text-[10px] font-medium tracking-wide uppercase">
+                                EXTRA ×{cell!.extras.length}
+                              </span>
+                            ) : null}
+                          </div>
                         ) : (
                           <ul className="space-y-0.5">
-                            {cell.customers.map((customer) => {
+                            {(cell?.customers ?? []).map((customer) => {
                               const nameWithMarker = withOperationalMarker(
                                 customer.displayName,
                                 {
@@ -371,6 +387,28 @@ export function CalendarMatrixView({
                                 </li>
                               );
                             })}
+                            {(cell?.extras ?? []).map((extra) => (
+                              <li key={extra.id}>
+                                <span
+                                  className={[
+                                    "border-line/70 text-ink inline-flex max-w-full items-center gap-1 rounded border px-1 py-0.5 text-left leading-snug",
+                                    extra.lifecycle === "proposed"
+                                      ? "bg-mist"
+                                      : "bg-status-info-soft/50",
+                                  ].join(" ")}
+                                  title={`EXTRA ${extra.lifecycle} · prepared ${extra.preparedOn}`}
+                                >
+                                  <span className="text-[9px] font-semibold tracking-wide uppercase">
+                                    EXTRA
+                                  </span>
+                                  <span className="text-[10px] font-medium">
+                                    {extra.lifecycle === "proposed"
+                                      ? "proposed"
+                                      : "confirmed"}
+                                  </span>
+                                </span>
+                              </li>
+                            ))}
                           </ul>
                         )}
                       </td>

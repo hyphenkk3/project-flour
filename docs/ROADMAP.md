@@ -23,8 +23,10 @@ Detailed business rules, message formats, financial/lifecycle rationale, and his
 - **Live Collection workspace activation (v1):** **PRODUCT ACCEPTED /
   CLOSED (2026-08-13)**
 - **EXTRA Activation v1:** **PRODUCT ACCEPTED / CLOSED (2026-08-13)**
-  (Propose / Confirm / Reject+Undo / Available; no Hold/sale/public /
-  Calendar-assisted EXTRA)
+  (Propose / Confirm / Reject+Undo / Available; no Hold/sale/public)
+- **EXTRA v1.1 — Calendar-assisted proposal:** **PRODUCT ACCEPTED /
+  CLOSED (2026-08-13)** (Calendar Quick View Propose EXTRA; Matrix EXTRA
+  on prepared_on; no Hold/sale/public / Confirm-on-Calendar)
 - Working tree may include untracked `tmp/` Product-review assets only —
   do not stage.
 
@@ -202,6 +204,25 @@ Production through canonical Ready.
 **Authority / exclusions:** `docs/DECISIONS.md` (EXTRA Activation v1
 accepted freeze).
 
+### EXTRA v1.1 — Calendar-assisted proposal — PRODUCT ACCEPTED / CLOSED (2026-08-13)
+
+- Owner Whole Cake Calendar Quick View: per cake line **Propose EXTRA**.
+- Prefills cake/size (+ library IDs when present) from the selected item.
+- One submit = one `extra_stock` proposed unit (item qty is context only).
+- `prepared_on` defaults to fulfilment `pickup_date` minus one Singapore
+  calendar day; editable before submit.
+- Reuses EXTRA v1 propose path; no order clone/mutation; no Confirm.
+- After submit: stay on Calendar; **keep same Quick View open** with line
+  success; do not force Bakery navigation.
+- Matrix shows proposed/confirmed EXTRA on **`prepared_on`** with explicit
+  EXTRA badge (rejected / null prepared_on / expired confirmed excluded).
+- No source-order FK / generated context note. No Calendar Confirm/Reject.
+- Explicitly deferred (unchanged): Hold/Release, walk-in sale, public
+  EXTRA, POS, Collection EXTRA, Slice, origin enum, previous-day customer
+  acknowledgement, automatic carry-forward UI, source preorder
+  clone/mutation, fake EXTRA financial orders, Bakery Production-column
+  overload, broader Calendar redesign, Milestone 6.
+
 ### Live Collection workspace activation (v1) — PRODUCT ACCEPTED / CLOSED (2026-08-13)
 
 - Authenticated `/collection` for **collection · manager · owner**.
@@ -226,7 +247,7 @@ freeze).
 Product-approved deferred domains (not next unless Product reorders):
 
 - EXTRA Hold / Release, walk-in sale recording, public EXTRA listing
-- Calendar-assisted EXTRA proposal (likely follow-on; not started)
+- Calendar EXTRA Confirm/Reject/Undo (Bakery EXTRA remains authority)
 - Previous-day customer acknowledgement for EXTRA / walk-in context
 - Collection EXTRA desk · EXTRA Slice · EXTRA origin enum
 - Refunds / overpayment / payment-correction workflows

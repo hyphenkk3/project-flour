@@ -3,7 +3,10 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { requireStaff } from "@/foundation/auth/session";
 import { resolveCalendarMonthParams } from "@/workspaces/owner/calendar/calendar-url";
 import { WholeCakeCalendar } from "@/workspaces/owner/calendar/WholeCakeCalendar";
-import { listCalendarEntriesForMonth } from "@/workspaces/owner/calendar/queries";
+import {
+  listCalendarEntriesForMonth,
+  listCalendarExtraMarkersForMonth,
+} from "@/workspaces/owner/calendar/queries";
 import type {
   CalendarMatrixMode,
   CalendarViewMode,
@@ -36,13 +39,16 @@ export async function WholeCakeCalendarPage({
     notFound();
   }
 
-  const entries = await listCalendarEntriesForMonth(year, month);
+  const [entries, extras] = await Promise.all([
+    listCalendarEntriesForMonth(year, month),
+    listCalendarExtraMarkersForMonth(year, month),
+  ]);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <PageHeader
-          description="Production scan by fulfilment date. Matrix is cake×date density; Cakes and Orders remain available."
+          description="Production scan by fulfilment date. Matrix is cake×date density; EXTRA appears on prepared_on. Cakes and Orders remain available."
           title="Whole Cake Calendar"
         />
         <Link
@@ -55,6 +61,7 @@ export async function WholeCakeCalendarPage({
       <WholeCakeCalendar
         focusToday={focusToday}
         initialEntries={entries}
+        initialExtras={extras}
         matrixMode={matrixMode}
         month={month}
         restorePosition={restorePosition}

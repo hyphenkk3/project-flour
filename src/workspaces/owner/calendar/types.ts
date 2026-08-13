@@ -4,9 +4,9 @@ import type {
 } from "@/types/storefront";
 
 /**
- * Slim Whole Cake Calendar read model.
- * `kind` is reserved so future EXTRA operational rows can normalize here
- * without treating EXTRA as a financial order.
+ * Slim Whole Cake Calendar guest-order read model.
+ * EXTRA physical stock is a parallel CalendarExtraMarker list (prepared_on),
+ * not fake orders — see engines/extra/calendar-visibility.ts.
  */
 export type CalendarEntryKind = "order";
 

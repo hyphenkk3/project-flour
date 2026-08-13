@@ -30,6 +30,11 @@ import {
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import { OrderMessagesSection } from "@/workspaces/owner/orders/OrderMessagesSection";
 import { OrderOperationalControls } from "@/workspaces/owner/orders/OrderOperationalControls";
+import {
+  ProposeExtraFromCalendarPanel,
+  useProposeExtraFromCalendar,
+} from "@/workspaces/owner/calendar/ProposeExtraFromCalendarDialog";
+import { takeRememberedCalendarExtraProposedItem } from "@/workspaces/owner/calendar/quick-view-persistence";
 
 type CalendarQuickViewProps = {
   orderId: string | null;
@@ -42,6 +47,8 @@ type CalendarQuickViewProps = {
    * can quietly refetch without an elaborate sync system.
    */
   refreshKey?: number;
+  /** After EXTRA propose succeeds — refresh calendar EXTRA markers. */
+  onExtraProposed?: () => void | Promise<void>;
   onClose: () => void;
 };
 
@@ -50,6 +57,7 @@ export function CalendarQuickView({
   returnTo,
   staffDisplayName,
   refreshKey = 0,
+  onExtraProposed,
   onClose,
 }: CalendarQuickViewProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -195,6 +203,7 @@ export function CalendarQuickView({
             {order ? (
               <CalendarQuickViewBody
                 loading={loading}
+                onExtraProposed={onExtraProposed}
                 onRefresh={() => {
                   if (orderId) return load(orderId);
                 }}
@@ -225,11 +234,13 @@ function CalendarQuickViewBody({
   order,
   loading,
   onRefresh,
+  onExtraProposed,
   staffDisplayName,
 }: {
   order: StorefrontOrder;
   loading: boolean;
   onRefresh: () => void | Promise<void>;
+  onExtraProposed?: () => void | Promise<void>;
   staffDisplayName: string;
 }) {
   const settlement = order.settlement;
@@ -240,6 +251,18 @@ function CalendarQuickViewBody({
   );
   const paidAddonBlocks = buildQuickViewPaidAddonBlocks(order.paidAddons);
   const fulfilment = buildQuickViewFulfilmentSummary(order);
+  const proposeExtra = useProposeExtraFromCalendar({
+    onProposed: onExtraProposed,
+  });
+
+  useEffect(() => {
+    const remembered = takeRememberedCalendarExtraProposedItem();
+    if (remembered) {
+      proposeExtra.seedSuccessItemId(remembered);
+    }
+    // Seed once when this order body mounts after a propose remount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.id]);
 
   return (
     <div className={["space-y-5", loading ? "opacity-70" : ""].join(" ")}>
@@ -319,13 +342,44 @@ function CalendarQuickViewBody({
         <h3 className="text-skyline text-[11px] font-semibold tracking-wide uppercase">
           Cakes
         </h3>
-        <ul className="space-y-2">
+        <ul className="space-y-3">
           {order.items.map((item) => (
             <li className="text-ink text-sm" key={item.id}>
               <p className="font-medium">{item.cakeName}</p>
               <p className="text-skyline">
                 {item.sizeLabel} ×{item.quantity}
               </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {proposeExtra.target?.item.id === item.id ? null : (
+                  <button
+                    className="border-line text-ink hover:bg-mist inline-flex min-h-9 items-center justify-center rounded-lg border px-3 text-xs font-medium"
+                    onClick={() =>
+                      proposeExtra.openForItem(
+                        order.id,
+                        item,
+                        order.pickupDate,
+                      )
+                    }
+                    type="button"
+                  >
+                    Propose EXTRA
+                  </button>
+                )}
+                {proposeExtra.successItemId === item.id ? (
+                  <p className="text-status-success text-xs font-medium">
+                    EXTRA proposed
+                  </p>
+                ) : null}
+              </div>
+              {proposeExtra.target?.item.id === item.id ? (
+                <ProposeExtraFromCalendarPanel
+                  error={proposeExtra.error}
+                  onCancel={proposeExtra.cancel}
+                  onSubmit={proposeExtra.submit}
+                  pending={proposeExtra.pending}
+                  target={proposeExtra.target}
+                />
+              ) : null}
             </li>
           ))}
         </ul>

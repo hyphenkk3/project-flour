@@ -2,9 +2,11 @@
 
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/foundation/auth/session";
+import type { CalendarExtraMarker } from "@/engines/extra/calendar-visibility";
 import {
   getCalendarEntryByOrderId,
   listCalendarEntriesForMonth,
+  listCalendarExtraMarkersForMonth,
 } from "@/workspaces/owner/calendar/queries";
 import type { CalendarEntry } from "@/workspaces/owner/calendar/types";
 import { getGuestOrderById } from "@/workspaces/owner/orders/queries";
@@ -24,6 +26,14 @@ export async function listCalendarEntriesForMonthAction(
 ): Promise<CalendarEntry[]> {
   await requireOwner();
   return listCalendarEntriesForMonth(year, month);
+}
+
+export async function listCalendarExtraMarkersForMonthAction(
+  year: number,
+  month: number,
+): Promise<CalendarExtraMarker[]> {
+  await requireOwner();
+  return listCalendarExtraMarkersForMonth(year, month);
 }
 
 export async function getCalendarEntryByOrderIdAction(
