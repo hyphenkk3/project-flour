@@ -5,12 +5,14 @@ import { useState } from "react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DATA_FETCH_TIMEOUT_MS } from "@/lib/supabase/fetch-timeout";
 import {
+  markBakeryOrderReadyAction,
   startBakeryProductionAction,
+  undoBakeryOrderReadyAction,
   undoBakeryProductionStartAction,
 } from "@/workspaces/bakery/actions";
 import {
   BAKERY_WAITING_CONFIRMATION_START_LABEL,
-  type BakeryStartSurface,
+  type BakeryProductionSurface,
 } from "@/workspaces/bakery/eligibility";
 
 const ACTION_TIMEOUT_MS = Math.max(DATA_FETCH_TIMEOUT_MS, 15_000);
@@ -35,10 +37,10 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 type BakeryProductionActionsProps = {
   orderId: string;
-  surface: BakeryStartSurface;
+  surface: BakeryProductionSurface;
 };
 
-type MutationKind = "start" | "undo_start";
+type MutationKind = "start" | "undo_start" | "mark_ready" | "undo_ready";
 
 export function BakeryProductionActions({
   orderId,
@@ -115,10 +117,14 @@ export function BakeryProductionActions({
               <p className="text-skyline mt-1.5 text-sm leading-relaxed">
                 {surface.reason}
               </p>
-            ) : surface.kind === "undo_start" ? (
+            ) : surface.kind === "in_production" ? (
               <p className="text-skyline mt-1.5 text-sm leading-relaxed">
-                This order is in production. Undo Start only if it has not been
-                marked Ready.
+                Mark Ready when this order can leave Bakery. Undo Start only if
+                production has not finished.
+              </p>
+            ) : surface.kind === "undo_ready" ? (
+              <p className="text-skyline mt-1.5 text-sm leading-relaxed">
+                This order is Ready. Undo Ready only before Collection handoff.
               </p>
             ) : surface.kind === "start_unsecured" ? (
               <p className="text-skyline mt-1.5 text-sm leading-relaxed">
@@ -140,16 +146,45 @@ export function BakeryProductionActions({
             >
               {BAKERY_WAITING_CONFIRMATION_START_LABEL}
             </span>
-          ) : surface.kind === "undo_start" ? (
+          ) : surface.kind === "in_production" ? (
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+              {surface.canMarkReady ? (
+                <button
+                  className={primaryClass}
+                  disabled={pending}
+                  onClick={() =>
+                    run("mark_ready", () => markBakeryOrderReadyAction(orderId))
+                  }
+                  type="button"
+                >
+                  {workingLabel("mark_ready", "Mark Ready")}
+                </button>
+              ) : null}
+              {surface.canUndoStart ? (
+                <button
+                  className={secondaryClass}
+                  disabled={pending}
+                  onClick={() =>
+                    run("undo_start", () =>
+                      undoBakeryProductionStartAction(orderId),
+                    )
+                  }
+                  type="button"
+                >
+                  {workingLabel("undo_start", "Undo Start")}
+                </button>
+              ) : null}
+            </div>
+          ) : surface.kind === "undo_ready" ? (
             <button
               className={secondaryClass}
               disabled={pending}
               onClick={() =>
-                run("undo_start", () => undoBakeryProductionStartAction(orderId))
+                run("undo_ready", () => undoBakeryOrderReadyAction(orderId))
               }
               type="button"
             >
-              {workingLabel("undo_start", "Undo Start")}
+              {workingLabel("undo_ready", "Undo Ready")}
             </button>
           ) : surface.kind === "start_unsecured" ? (
             <button

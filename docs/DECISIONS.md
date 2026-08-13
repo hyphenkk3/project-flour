@@ -2,10 +2,61 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-13 — M5-P3 · Bakery Ready Authority
+
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-13).** Milestone 5 locked
+sequence (M5-P1 → M5-P2 → M5-P3) is complete. M5-P4 does not exist.
+Collection activation / EXTRA / packing persistence / Business Calendar
+Admin remain Future — not part of P3.
+
+Product closed M5-P3 after completed Product acceptance and automated /
+live verification (including Bakery Start-first Mark Ready, Undo Ready
+preserving Start, Owner Ready-without-Start, AP Ready + Payment Attention,
+RPC role + terminal guards, and the fixture-cleanup test fix).
+
+### Accepted P3 surface (frozen unless Product reopens)
+
+**Q1=A:** Bakery Mark Ready requires In Production first
+(`production_started_at` set). Bakery cannot skip Not started → Ready.
+
+**Authority:** Bakery / Manager / Owner on Bakery detail only
+(server/RPC enforced; UI capability must agree).
+
+**UI:** Detail sticky footer — In Production: Mark Ready + Undo Start;
+Ready: Undo Ready only. No confirmation for Mark Ready. Packing does not
+gate Ready.
+
+**Undo Ready:** Not actor-owned. Preserves Start → returns In Production.
+Without Start → returns Not started. Start is never fabricated.
+
+**Owner Ops / Calendar:** Ready-without-Start remains supported (RPC
+Start-agnostic). Does not remove Owner Ready on existing Owner surfaces.
+
+**Payment Attention:** AP · In Production may Mark Ready; Ready retains
+Awaiting Payment / Not secured and Payment Attention. Undo Ready restores
+In Production with Attention retained when still unsecured.
+
+**RPC:** Hardened existing `mark_guest_order_ready` /
+`undo_guest_order_ready` (roles bakery|manager|owner; Mark Ready terminal
+guards). No duplicate Ready RPCs. No new schema columns.
+
+**Tests:** `scripts/test-m5-p3-bakery-ready-live.ts` (including the
+fixture-cleanup fix that avoids `process.exit` after fixture creation) is
+part of the P3 close.
+
+### Explicitly out of accepted M5-P3
+
+- Collection workspace activation
+- EXTRA / walk-in Hold
+- Packing checklist persistence
+- Business Calendar Admin UI / DB override persistence
+- Bakery Picked Up / Out for Delivery / Delivered controls
+
 ## 2026-08-13 — M5-P2 · Start Production
 
-**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-13).** Milestone 5 remains
-**IN PROGRESS.** M5-P3 remains NOT STARTED.
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-13).** Milestone 5 locked
+sequence continues; **M5-P3 is PRODUCT ACCEPTED / CLOSED (2026-08-13)** —
+see entry above.
 
 Product closed M5-P2 after completed Product acceptance and automated
 verification (including Start lifecycle, Waiting for confirmation UX,
@@ -66,7 +117,7 @@ widened (future debt).
 
 ### Explicitly out of accepted M5-P2
 
-- Bakery Mark Ready / Undo Ready — **M5-P3**
+- Bakery Mark Ready / Undo Ready — shipped later in **M5-P3** (accepted)
 - Business Calendar Admin UI / DB override persistence
 - Dedicated Paid → Awaiting Payment demotion control
 - EXTRA · Collection activation · packing persistence · member Bakery Start
@@ -74,9 +125,10 @@ widened (future debt).
 
 ## 2026-08-12 — M5-P1 · Live Bakery Board
 
-**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-12).** Milestone 5 remains
-**IN PROGRESS.** M5-P2 Start Production is **PRODUCT ACCEPTED / CLOSED
-(2026-08-13)** — see entry above. M5-P3 remains NOT STARTED.
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-12).** Milestone 5 locked
+sequence complete through **M5-P3 PRODUCT ACCEPTED / CLOSED (2026-08-13)**.
+M5-P2 Start Production is **PRODUCT ACCEPTED / CLOSED (2026-08-13)** —
+see entries above.
 
 Product closed M5-P1 after the final reconciliation report and Product
 manual testing, including the amended unsecured-preorder visibility
@@ -121,14 +173,15 @@ entry below.
 
 ## 2026-08-12 — Milestone 5 · Bakery Activation (LOCKED)
 
-**STATUS: IN PROGRESS.** Product formalized Milestone 5 after post-M4
-Bakery design recon (Batches 1–4). Implementation sequence locked. EXTRA
-and Collection remain Future — not scheduled by this lock.
+**STATUS:** Locked sequence **complete** (M5-P1 → M5-P2 → M5-P3 all
+PRODUCT ACCEPTED / CLOSED). EXTRA and Collection remain Future — not
+scheduled by this lock. Next implementation slice is **NOT STARTED**
+until Product directs.
 
 **M5-P1:** PRODUCT ACCEPTED / CLOSED (2026-08-12) — see entry above.
 **M5-P2 — Start Production:** PRODUCT ACCEPTED / CLOSED (2026-08-13) — see
 entry above.
-**M5-P3:** NOT STARTED.
+**M5-P3:** PRODUCT ACCEPTED / CLOSED (2026-08-13) — see entry above.
 
 **M5-P1 schema boundary (approved):** Do **not** add
 `production_started_at` / `production_started_by` in P1. Those columns and

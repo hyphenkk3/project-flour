@@ -18,7 +18,7 @@ import {
   bakeryProductionBadgeTone,
   bakeryProductionLabel,
   bakeryProductionPresentation,
-  bakeryStartSurface,
+  bakeryProductionSurface,
   deriveBakeryPackingReminders,
   hasPaymentAttention,
   isBakeryOrderSecured,
@@ -50,11 +50,13 @@ export function BakeryOrderDetail({
   const packing = deriveBakeryPackingReminders(order);
   const fulfilment = bakeryFulfilmentCue(order.fulfilmentMethod);
   const secured = isBakeryOrderSecured(order.status);
-  const surface = bakeryStartSurface({
+  const surface = bakeryProductionSurface({
     presentation,
     status: order.status,
     canStartProduction: capabilities.canStartProduction,
     canUndoStart: capabilities.canUndoStart,
+    canMarkReady: capabilities.canMarkReady,
+    canUndoReady: capabilities.canUndoReady,
   });
   const waitingConfirmation = isWaitingCustomerConfirmation(order.status);
   const earlyPickup = isEarlyPickupAttention(order.pickupDate, order.pickupTime);

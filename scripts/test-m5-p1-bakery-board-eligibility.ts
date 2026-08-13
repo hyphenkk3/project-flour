@@ -9,10 +9,12 @@ import {
   bakeryPrimaryCakeSummary,
   bakeryProductionLabel,
   bakeryProductionPresentation,
+  bakeryProductionSurface,
   bakeryStartSurface,
   deriveBakeryPackingReminders,
   hasPaymentAttention,
   isActiveOnBakeryBoard,
+  isBakeryMarkReadyEligible,
   isBakeryOrderSecured,
   isBakeryStartEligibleStatus,
 } from "@/workspaces/bakery/eligibility";
@@ -266,8 +268,10 @@ assert.equal(
     status: "paid",
     canStartProduction: true,
     canUndoStart: true,
+    canMarkReady: true,
+    canUndoReady: true,
   }).kind,
-  "undo_start",
+  "in_production",
 );
 assert.equal(
   bakeryStartSurface({
@@ -275,6 +279,19 @@ assert.equal(
     status: "paid",
     canStartProduction: true,
     canUndoStart: true,
+    canMarkReady: true,
+    canUndoReady: true,
+  }).kind,
+  "undo_ready",
+);
+assert.equal(
+  bakeryStartSurface({
+    presentation: "ready",
+    status: "paid",
+    canStartProduction: true,
+    canUndoStart: true,
+    canMarkReady: true,
+    canUndoReady: false,
   }).kind,
   "none",
 );
@@ -381,5 +398,85 @@ assert.equal(
   bakeryTomorrowYmd(new Date("2026-08-12T04:00:00Z")),
   bakeryPlusTwoYmd(new Date("2026-08-11T04:00:00Z")),
 );
+
+assert.equal(
+  isBakeryMarkReadyEligible({
+    productionStartedAt: "t",
+    readyAt: null,
+    status: "paid",
+  }),
+  true,
+  "In Production Paid may Mark Ready",
+);
+assert.equal(
+  isBakeryMarkReadyEligible({
+    productionStartedAt: "t",
+    readyAt: null,
+    status: "awaiting_payment",
+  }),
+  true,
+  "In Production AP may Mark Ready",
+);
+assert.equal(
+  isBakeryMarkReadyEligible({
+    productionStartedAt: null,
+    readyAt: null,
+    status: "paid",
+  }),
+  false,
+  "Not started cannot Mark Ready on Bakery",
+);
+assert.equal(
+  isBakeryMarkReadyEligible({
+    productionStartedAt: "t",
+    readyAt: null,
+    status: "submitted",
+  }),
+  false,
+  "Submitted cannot Mark Ready",
+);
+assert.equal(
+  isBakeryMarkReadyEligible({
+    productionStartedAt: "t",
+    readyAt: "r",
+    status: "paid",
+  }),
+  false,
+  "Already Ready cannot Mark Ready",
+);
+assert.equal(
+  isBakeryMarkReadyEligible({
+    productionStartedAt: "t",
+    readyAt: null,
+    status: "paid",
+    pickedUpAt: "p",
+  }),
+  false,
+  "Terminal cannot Mark Ready",
+);
+
+const readySurface = bakeryProductionSurface({
+  presentation: "ready",
+  status: "awaiting_payment",
+  canStartProduction: true,
+  canUndoStart: true,
+  canMarkReady: true,
+  canUndoReady: true,
+});
+assert.equal(readySurface.kind, "undo_ready");
+
+const inProd = bakeryProductionSurface({
+  presentation: "in_production",
+  status: "awaiting_payment",
+  canStartProduction: true,
+  canUndoStart: true,
+  canMarkReady: true,
+  canUndoReady: true,
+});
+assert.equal(inProd.kind, "in_production");
+if (inProd.kind === "in_production") {
+  assert.equal(inProd.canMarkReady, true);
+  assert.equal(inProd.canUndoStart, true);
+}
 
 console.log("PASS M5-P1 bakery board eligibility / read-model helpers");

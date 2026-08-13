@@ -87,3 +87,78 @@ export async function undoBakeryProductionStartAction(
   revalidatePath(`/bakery/orders/${orderId}`);
   return { error: null };
 }
+
+export async function markBakeryOrderReadyAction(
+  orderId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireBakeryStaff();
+  const caps = buildBakeryWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canMarkReady) {
+    return { error: "Not authorized to mark ready." };
+  }
+
+  const supabase = await createClient();
+  const { data: row, error: loadError } = await supabase
+    .from("orders")
+    .select(
+      "id, customer_id, status, production_started_at, ready_at, picked_up_at, out_for_delivery_at, delivered_at",
+    )
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (loadError) {
+    return { error: loadError.message };
+  }
+  if (!row || row.customer_id != null) {
+    return { error: "Order not found." };
+  }
+  if (!row.production_started_at) {
+    return {
+      error: "Start production before marking this order Ready.",
+    };
+  }
+  if (row.ready_at) {
+    return { error: "Order is already marked ready." };
+  }
+
+  const { error } = await supabase.rpc("mark_guest_order_ready", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+  revalidatePath("/bakery");
+  revalidatePath(`/bakery/orders/${orderId}`);
+  return { error: null };
+}
+
+export async function undoBakeryOrderReadyAction(
+  orderId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireBakeryStaff();
+  const caps = buildBakeryWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canUndoReady) {
+    return { error: "Not authorized to undo ready." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("undo_guest_order_ready", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+  revalidatePath("/bakery");
+  revalidatePath(`/bakery/orders/${orderId}`);
+  return { error: null };
+}

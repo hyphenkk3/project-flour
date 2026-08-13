@@ -14,10 +14,15 @@ Detailed business rules, message formats, financial/lifecycle rationale, and his
 - **Milestone 3 — Owner Pickup Operations:** **COMPLETE**
 - **Milestone 4 — Delivery & Order Fulfilment Foundation:** **COMPLETE**
   through **M4-P5** (PRODUCT ACCEPTED / CLOSED 2026-08-12). No M4-P6.
-- **Milestone 5 — Bakery Activation:** **IN PROGRESS**
+- **Milestone 5 — Bakery Activation:** locked sequence **M5-P1 → M5-P2 →
+  M5-P3** complete (Milestone 5 board/Start/Ready activation closed)
 - **M5-P1 — Live Bakery Board:** **PRODUCT ACCEPTED / CLOSED (2026-08-12)**
 - **M5-P2 — Start Production:** **PRODUCT ACCEPTED / CLOSED (2026-08-13)**
-- **M5-P3** remains NOT STARTED
+- **M5-P3 — Bakery Ready Authority:** **PRODUCT ACCEPTED / CLOSED
+  (2026-08-13)**
+- **Next implementation slice:** **NOT STARTED** (Product must direct;
+  Collection / EXTRA / packing persistence / Business Calendar Admin remain
+  Future)
 - Working tree may include untracked `tmp/` Product-review assets only —
   do not stage.
 
@@ -101,10 +106,10 @@ Website remained Pickup-only for Milestone 4 only. Details:
 
 ### Milestone 5 — Bakery Activation
 
-**STATUS: IN PROGRESS** · Product-approved 2026-08-12.
+**STATUS:** Locked sequence **complete** (P1–P3 PRODUCT ACCEPTED / CLOSED).
 **M5-P1:** PRODUCT ACCEPTED / CLOSED (2026-08-12).
 **M5-P2:** PRODUCT ACCEPTED / CLOSED (2026-08-13).
-**M5-P3:** NOT STARTED.
+**M5-P3:** PRODUCT ACCEPTED / CLOSED (2026-08-13).
 
 **Mission:** Replace the V0.5 Bakery preview with a live, authenticated
 Bakery workspace on the existing **guest-order** spine, allowing Bakery —
@@ -158,22 +163,28 @@ Production through canonical Ready.
   Attention) + Owner outside-hours warning/continue. Code-config date
   overrides only — no Business Calendar Admin UI / DB persistence.
 
-#### M5-P3 — Bakery Ready Authority + Exception Polish
+#### M5-P3 — Bakery Ready Authority + Exception Polish — PRODUCT ACCEPTED / CLOSED (2026-08-13)
 
-- Bakery / Manager / Owner Mark Ready / Undo Ready from Bakery on
-  canonical `ready_at` / `ready_by`.
-- **Server/RPC authority required** (UI capability and server must agree).
-- Owner Ready controls remain on existing Owner surfaces (override).
-- Payment Attention (derived) + demotion retention rules; terminal board
-  exit verified.
-- Does **not** remove Owner Ready; does **not** give Bakery
+- Bakery / Manager / Owner Mark Ready / Undo Ready from Bakery detail on
+  canonical `ready_at` / `ready_by` (**server/RPC enforced**).
+- **Q1=A:** Bakery Mark Ready requires In Production (Start first). Owner
+  Ops / Calendar may still Ready without Start (no fabricated Start).
+- Ready footer: **Undo Ready only**. In Production: Mark Ready + Undo Start.
+  No Mark Ready confirmation. Packing does not gate.
+- Undo Ready preserves Start → In Production; without Start → Not started.
+- AP · In Production may Ready; Payment Attention / Not secured retained.
+- Hardened `mark_guest_order_ready` / `undo_guest_order_ready` (roles +
+  terminal guards). Fixture-cleanup live-test fix included in P3 close.
+- Does **not** remove Owner Ready; does **not** ship Collection / EXTRA /
+  packing persistence / Business Calendar Admin; does **not** give Bakery
   Picked Up / Out / Delivered.
 
 **Authority / board equation / non-goals / EXTRA compatibility:**
-`docs/DECISIONS.md` (Milestone 5 lock entry).
+`docs/DECISIONS.md` (Milestone 5 lock entry + M5-P3 accepted freeze).
 
-**Next implementation slice:** **M5-P3 — Bakery Ready Authority + Exception
-Polish** (NOT STARTED).
+**Next implementation slice:** **NOT STARTED** — Product must direct.
+Collection activation / EXTRA / packing persistence / Business Calendar
+Admin remain Future (not implied shipped by P3).
 
 ---
 

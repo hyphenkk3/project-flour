@@ -25,8 +25,8 @@ for (const role of ["bakery", "manager", "owner"] as const) {
   assert.equal(caps.canAccessBakeryWorkspace, true);
   assert.equal(caps.canStartProduction, true, `${role} Start true in P2`);
   assert.equal(caps.canUndoStart, true);
-  assert.equal(caps.canMarkReady, false, `${role} Mark Ready still P3`);
-  assert.equal(caps.canUndoReady, false);
+  assert.equal(caps.canMarkReady, true, `${role} Mark Ready true in P3`);
+  assert.equal(caps.canUndoReady, true);
 }
 
 const denied = buildBakeryWorkspaceCapabilities({
@@ -36,6 +36,8 @@ const denied = buildBakeryWorkspaceCapabilities({
 assert.equal(denied.canAccessBakeryWorkspace, false);
 assert.equal(denied.canStartProduction, false);
 assert.equal(denied.canUndoStart, false);
+assert.equal(denied.canMarkReady, false);
+assert.equal(denied.canUndoReady, false);
 
 // Owner Ops matrix unchanged for bakery role.
 assert.equal(canAccessGuestOrderWorkspace("bakery"), false);

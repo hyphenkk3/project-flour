@@ -1,7 +1,8 @@
 /**
  * M5 — Bakery workspace capability matrix.
  * Workspace access is separate from Owner Ops / Delivery finance capabilities.
- * P2: Start / Undo Start for Bakery · Manager · Owner. Ready mutations remain P3.
+ * P2: Start / Undo Start. P3: Mark Ready / Undo Ready (Bakery surface).
+ * Owner Ops Ready-without-Start remains on Owner surfaces only.
  */
 
 import type { RoleCode } from "@/types/staff";
@@ -41,8 +42,7 @@ export function buildBakeryWorkspaceCapabilities(input: {
     canAccessBakeryWorkspace: canAccess,
     canStartProduction: canProduce,
     canUndoStart: canProduce,
-    // M5-P3: no Bakery Ready mutations yet.
-    canMarkReady: false,
-    canUndoReady: false,
+    canMarkReady: canProduce,
+    canUndoReady: canProduce,
   };
 }

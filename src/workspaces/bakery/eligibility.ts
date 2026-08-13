@@ -158,22 +158,42 @@ export function bakeryProductionBadgeTone(
   return "info";
 }
 
-export type BakeryStartSurface =
+export type BakeryProductionSurface =
   | { kind: "none" }
   | { kind: "waiting_confirmation"; reason: string }
   | { kind: "start_paid" }
   | { kind: "start_unsecured" }
-  | { kind: "undo_start" };
+  | {
+      kind: "in_production";
+      canUndoStart: boolean;
+      canMarkReady: boolean;
+    }
+  | { kind: "undo_ready" };
 
-export function bakeryStartSurface(input: {
+/** @deprecated Prefer bakeryProductionSurface — kept for older helper names. */
+export type BakeryStartSurface = BakeryProductionSurface;
+
+/**
+ * Bakery detail production footer surface.
+ * Mark Ready only when In Production (Start required on Bakery — Product Q1=A).
+ */
+export function bakeryProductionSurface(input: {
   presentation: BakeryProductionPresentation;
   status: GuestOrderStatus | string;
   canStartProduction: boolean;
   canUndoStart: boolean;
-}): BakeryStartSurface {
-  if (input.presentation === "ready") return { kind: "none" };
+  canMarkReady: boolean;
+  canUndoReady: boolean;
+}): BakeryProductionSurface {
+  if (input.presentation === "ready") {
+    return input.canUndoReady ? { kind: "undo_ready" } : { kind: "none" };
+  }
   if (input.presentation === "in_production") {
-    return input.canUndoStart ? { kind: "undo_start" } : { kind: "none" };
+    return {
+      kind: "in_production",
+      canUndoStart: input.canUndoStart,
+      canMarkReady: input.canMarkReady,
+    };
   }
   if (!input.canStartProduction) return { kind: "none" };
   if (isWaitingCustomerConfirmation(input.status)) {
@@ -185,6 +205,42 @@ export function bakeryStartSurface(input: {
   if (input.status === "awaiting_payment") return { kind: "start_unsecured" };
   if (input.status === "paid") return { kind: "start_paid" };
   return { kind: "none" };
+}
+
+/** Alias used by P2 helpers/tests — same as bakeryProductionSurface without Ready caps. */
+export function bakeryStartSurface(input: {
+  presentation: BakeryProductionPresentation;
+  status: GuestOrderStatus | string;
+  canStartProduction: boolean;
+  canUndoStart: boolean;
+  canMarkReady?: boolean;
+  canUndoReady?: boolean;
+}): BakeryProductionSurface {
+  return bakeryProductionSurface({
+    canMarkReady: input.canMarkReady ?? false,
+    canUndoReady: input.canUndoReady ?? false,
+    canStartProduction: input.canStartProduction,
+    canUndoStart: input.canUndoStart,
+    presentation: input.presentation,
+    status: input.status,
+  });
+}
+
+/** Bakery-layer Mark Ready gate (Start required). RPC itself stays Start-agnostic. */
+export function isBakeryMarkReadyEligible(input: {
+  productionStartedAt: string | null | undefined;
+  readyAt: string | null | undefined;
+  status: GuestOrderStatus | string;
+  pickedUpAt?: string | null;
+  outForDeliveryAt?: string | null;
+  deliveredAt?: string | null;
+}): boolean {
+  if (!input.productionStartedAt) return false;
+  if (input.readyAt) return false;
+  if (input.pickedUpAt || input.outForDeliveryAt || input.deliveredAt) {
+    return false;
+  }
+  return isBakeryStartEligibleStatus(input.status);
 }
 
 export function bakeryFulfilmentCue(
