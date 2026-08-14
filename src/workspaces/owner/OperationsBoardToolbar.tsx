@@ -73,7 +73,7 @@ export function OperationsBoardToolbar({
               Today · {matchCount}{" "}
               {matchCount === 1 ? "order" : "orders"}
             </p>
-            <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+            <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2">
               <p className="text-status-warning text-sm font-bold tracking-wide uppercase">
                 <span className="tabular-nums text-base sm:text-lg">
                   {todayGroupCounts.needsAttention}
@@ -131,12 +131,12 @@ export function OperationsBoardToolbar({
         </div>
       )}
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="space-y-2">
         <label className="sr-only" htmlFor="operations-search">
           Search
         </label>
         <input
-          className={`${formStyles.fieldClass} min-h-10 sm:min-w-[14rem] sm:flex-1`}
+          className={`${formStyles.fieldClass} min-h-10 w-full`}
           id="operations-search"
           onChange={(event) => patch({ search: event.target.value })}
           placeholder="Search orders…"
@@ -144,84 +144,86 @@ export function OperationsBoardToolbar({
           value={query.search}
         />
 
-        <label className="sr-only" htmlFor="operations-pickup">
-          Pickup
-        </label>
-        <select
-          aria-label="Pickup period"
-          className={`${compactSelectClass} sm:w-40`}
-          id="operations-pickup"
-          onChange={(event) =>
-            setPickupFilter(event.target.value as OperationsPickupFilter)
-          }
-          value={query.pickupFilter}
-        >
-          {OPERATIONS_PICKUP_FILTERS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <label className="sr-only" htmlFor="operations-pickup">
+            Pickup
+          </label>
+          <select
+            aria-label="Pickup period"
+            className={`${compactSelectClass} sm:w-40`}
+            id="operations-pickup"
+            onChange={(event) =>
+              setPickupFilter(event.target.value as OperationsPickupFilter)
+            }
+            value={query.pickupFilter}
+          >
+            {OPERATIONS_PICKUP_FILTERS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
 
-        {query.pickupFilter === "custom" ? (
-          <>
-            <label className="sr-only" htmlFor="operations-pickup-date">
-              Pickup date
-            </label>
-            <input
-              className={`${compactSelectClass} sm:w-40`}
-              id="operations-pickup-date"
-              onChange={(event) =>
-                patch({
-                  pickupFilter: "custom",
-                  customPickupDate: event.target.value || null,
-                })
-              }
-              type="date"
-              value={query.customPickupDate ?? ""}
-            />
-          </>
-        ) : null}
+          {query.pickupFilter === "custom" ? (
+            <>
+              <label className="sr-only" htmlFor="operations-pickup-date">
+                Pickup date
+              </label>
+              <input
+                className={`${compactSelectClass} sm:w-40`}
+                id="operations-pickup-date"
+                onChange={(event) =>
+                  patch({
+                    pickupFilter: "custom",
+                    customPickupDate: event.target.value || null,
+                  })
+                }
+                type="date"
+                value={query.customPickupDate ?? ""}
+              />
+            </>
+          ) : null}
 
-        <label className="sr-only" htmlFor="operations-status">
-          Status
-        </label>
-        <select
-          aria-label="Status"
-          className={`${compactSelectClass} sm:min-w-[11rem] sm:flex-none`}
-          id="operations-status"
-          onChange={(event) =>
-            patch({
-              statusFilter: event.target.value as OperationsStatusFilter,
-            })
-          }
-          value={query.statusFilter}
-        >
-          {OPERATIONS_STATUS_FILTERS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          <label className="sr-only" htmlFor="operations-status">
+            Status
+          </label>
+          <select
+            aria-label="Status"
+            className={`${compactSelectClass} sm:min-w-[11rem] sm:flex-none`}
+            id="operations-status"
+            onChange={(event) =>
+              patch({
+                statusFilter: event.target.value as OperationsStatusFilter,
+              })
+            }
+            value={query.statusFilter}
+          >
+            {OPERATIONS_STATUS_FILTERS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
 
-        <label className="sr-only" htmlFor="operations-sort">
-          Sort
-        </label>
-        <select
-          aria-label="Sort"
-          className={`${compactSelectClass} sm:min-w-[12rem] sm:flex-1 lg:max-w-xs`}
-          id="operations-sort"
-          onChange={(event) =>
-            patch({ sort: event.target.value as OperationsSortOption })
-          }
-          value={query.sort}
-        >
-          {OPERATIONS_SORT_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          <label className="sr-only" htmlFor="operations-sort">
+            Sort
+          </label>
+          <select
+            aria-label="Sort"
+            className={`${compactSelectClass} sm:min-w-[12rem] sm:flex-1 lg:max-w-xs`}
+            id="operations-sort"
+            onChange={(event) =>
+              patch({ sort: event.target.value as OperationsSortOption })
+            }
+            value={query.sort}
+          >
+            {OPERATIONS_SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
     </div>
   );

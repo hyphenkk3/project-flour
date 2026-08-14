@@ -29,6 +29,7 @@ import {
   isReconfirmationCurrentlyActionable,
   shouldWarnMissingDeliveryFeeBeforeConfirmation,
 } from "@/engines/orders/confirmation-validity";
+import { OrderWorkspaceAttentionBlock } from "@/workspaces/owner/orders/OrderWorkspaceAttentionBlock";
 import {
   buildEditablePaidAddonDrafts,
   paidAddonDraftsToMutationPayload,
@@ -58,7 +59,6 @@ import {
   deliveryChargesRemovalWarning,
   deliveryFinanceFactsFromDelivery,
 } from "@/engines/orders/delivery-finance";
-import { pendingFeeRequestAttentionCopy } from "@/engines/orders/delivery-fee-request-attribution";
 import type { GuestOrderWorkspaceCapabilities } from "@/engines/orders/delivery-finance-capabilities";
 import { CustomerConfirmedButton } from "@/workspaces/owner/orders/CustomerConfirmedButton";
 import { DeliveryChargesSection } from "@/workspaces/owner/orders/DeliveryChargesSection";
@@ -226,16 +226,6 @@ export function OrderWorkspaceForm({
     return warning;
   })();
   const hasVerifiedPayment = order.settlement.netReceived > 0;
-  const feeAttentionCopy =
-    capabilities.canResolveFeeRequests && order.delivery
-      ? pendingFeeRequestAttentionCopy({
-          deliveryPending:
-            order.delivery.deliveryFeeRequest.status === "pending",
-          processingPending:
-            order.delivery.processingFeeRequest.status === "pending",
-          processingKind: order.delivery.processingFeeRequest.kind,
-        })
-      : null;
   const [missingFeeConfirmationHref, setMissingFeeConfirmationHref] = useState<
     string | null
   >(null);
@@ -456,39 +446,11 @@ export function OrderWorkspaceForm({
           </p>
         ) : null}
 
-        {isReconfirmationCurrentlyActionable({
-          status: order.status,
-          confirmationNeedsResend: order.confirmationNeedsResend,
-          readyAt: order.readyAt,
-          pickedUpAt: order.pickedUpAt,
-          outForDeliveryAt: order.outForDeliveryAt,
-          deliveredAt: order.deliveredAt,
-          fulfilmentMethod: order.fulfilmentMethod,
-        }) ? (
-          <div className="border-status-warning/30 bg-status-warning-soft rounded-lg border px-4 py-3">
-            <p className="text-status-warning text-sm font-semibold">
-              Customer reconfirmation needed
-            </p>
-            <p className="text-ink mt-1 text-sm leading-relaxed">
-              Order changed after the customer&apos;s previous confirmation.
-            </p>
-            {capabilities.canPrepareConfirmation ? (
-              <button
-                className="bg-ink text-mist hover:bg-skyline mt-3 inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-medium"
-                onClick={() => handlePrepareConfirmation(true)}
-                type="button"
-              >
-                Prepare Updated Confirmation
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-
-        {feeAttentionCopy ? (
-          <p className="border-status-warning/30 bg-status-warning-soft text-ink rounded-lg border px-4 py-3 text-sm">
-            {feeAttentionCopy}
-          </p>
-        ) : null}
+        <OrderWorkspaceAttentionBlock
+          capabilities={capabilities}
+          onPrepareConfirmation={handlePrepareConfirmation}
+          order={order}
+        />
 
         <ViewBlock title="Customer">
           <div className="space-y-1">

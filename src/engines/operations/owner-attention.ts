@@ -34,6 +34,60 @@ export type OwnerAttentionOrderInput = OperationalTimestamps & {
   hasPendingFeeRequest?: boolean;
 };
 
+/** Map full StorefrontOrder (or list-shaped) fields into attention input. */
+export function ownerAttentionInputFromOrder(order: {
+  status: GuestOrderStatus;
+  confirmationNeedsResend: boolean;
+  fulfilmentMethod: StorefrontOrderFulfilmentMethod;
+  readyAt: string | null;
+  pickedUpAt: string | null;
+  outForDeliveryAt?: string | null;
+  deliveredAt?: string | null;
+  paymentDeadlineAt?: string | null;
+  hasPendingFeeRequest?: boolean;
+  delivery?: {
+    deliveryFeeRequest?: { status: string | null } | null;
+    processingFeeRequest?: { status: string | null } | null;
+  } | null;
+}): OwnerAttentionOrderInput {
+  const hasPendingFeeRequest =
+    order.hasPendingFeeRequest ??
+    Boolean(
+      order.delivery?.deliveryFeeRequest?.status === "pending" ||
+        order.delivery?.processingFeeRequest?.status === "pending",
+    );
+  return {
+    status: order.status,
+    confirmationNeedsResend: order.confirmationNeedsResend,
+    fulfilmentMethod: order.fulfilmentMethod,
+    readyAt: order.readyAt,
+    pickedUpAt: order.pickedUpAt,
+    outForDeliveryAt: order.outForDeliveryAt ?? null,
+    deliveredAt: order.deliveredAt ?? null,
+    paymentDeadlineAt: order.paymentDeadlineAt ?? null,
+    hasPendingFeeRequest,
+  };
+}
+
+export const OWNER_ATTENTION_SUPPORTING_COPY: Record<
+  OwnerAttentionReasonKey,
+  string
+> = {
+  prepare_confirmation:
+    "Prepare the customer confirmation before progressing this order.",
+  awaiting_customer_confirmation:
+    "Waiting for the customer to confirm. Mark Customer Confirmed when they reply.",
+  reconfirmation_required:
+    "Order changed after the customer's previous confirmation.",
+  payment_needed: "Payment is still outstanding for this order.",
+  payment_overdue: "The payment deadline has passed — follow up manually.",
+  fee_request_pending: "A fee request is waiting for Owner/Manager review.",
+};
+
+export const OWNER_ORDER_PAYMENT_SECTION_ID = "owner-order-payment";
+export const OWNER_CUSTOMER_CONFIRMED_ACTION_ID =
+  "owner-customer-confirmed-action";
+
 export type OwnerOperationsTodayGroup =
   | "needs_attention"
   | "all_clear"

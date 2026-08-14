@@ -14,6 +14,7 @@ import { buildCakePriceBreakdown } from "@/engines/orders/cake-price-breakdown";
 import { paymentMethodLabel } from "@/engines/orders/payment-details";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type { StorefrontOrder } from "@/types/storefront";
+import { OWNER_ORDER_PAYMENT_SECTION_ID } from "@/engines/operations/owner-attention";
 import { extendPaymentDeadlineAction } from "@/workspaces/owner/orders/actions";
 import {
   formatPaymentDueRelative,
@@ -74,8 +75,10 @@ export function PaymentSection({
   }, [extendState.success, router]);
 
   return (
-    <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <section
+      className="border-fog space-y-4 rounded-xl border bg-white p-5"
+      id={OWNER_ORDER_PAYMENT_SECTION_ID}
+    >      <div className="flex flex-wrap items-start justify-between gap-3">
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
           Payment
         </h2>

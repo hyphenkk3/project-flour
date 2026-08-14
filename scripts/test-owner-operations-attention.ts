@@ -13,6 +13,7 @@ import {
 } from "@/engines/operations/order-board";
 import {
   deriveOwnerAttention,
+  ownerAttentionInputFromOrder,
   ownerOperationsTodayGroup,
   partitionOwnerOperationsTodayOrders,
 } from "@/engines/operations/owner-attention";
@@ -287,6 +288,51 @@ assert.equal(
   });
   assert.equal(byStatus.length, 1);
   assert.equal(byStatus[0]?.status, "submitted");
+}
+
+// Workspace mapping: Storefront-shaped order → same attention keys
+{
+  const mapped = ownerAttentionInputFromOrder({
+    status: "awaiting_payment",
+    confirmationNeedsResend: false,
+    fulfilmentMethod: "pickup",
+    readyAt: null,
+    pickedUpAt: null,
+    paymentDeadlineAt: "2020-01-01T00:00:00.000Z",
+    delivery: null,
+  });
+  const keys = deriveOwnerAttention(mapped).map((r) => r.key);
+  assert.ok(keys.includes("payment_needed"));
+  assert.ok(keys.includes("payment_overdue"));
+}
+
+{
+  const mapped = ownerAttentionInputFromOrder({
+    status: "paid",
+    confirmationNeedsResend: false,
+    fulfilmentMethod: "delivery",
+    readyAt: null,
+    pickedUpAt: null,
+    delivery: {
+      deliveryFeeRequest: { status: "pending" },
+      processingFeeRequest: { status: "idle" },
+    },
+  });
+  assert.ok(
+    deriveOwnerAttention(mapped).some((r) => r.key === "fee_request_pending"),
+  );
+}
+
+{
+  // No attention → empty (workspace should omit block)
+  const mapped = ownerAttentionInputFromOrder({
+    status: "paid",
+    confirmationNeedsResend: false,
+    fulfilmentMethod: "pickup",
+    readyAt: null,
+    pickedUpAt: null,
+  });
+  assert.equal(deriveOwnerAttention(mapped).length, 0);
 }
 
 console.log("Owner Operations attention helpers: PASS");

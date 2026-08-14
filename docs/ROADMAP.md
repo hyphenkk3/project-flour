@@ -29,6 +29,9 @@ Detailed business rules, message formats, financial/lifecycle rationale, and his
   on prepared_on; no Hold/sale/public / Confirm-on-Calendar)
 - **Operations Smoothness Pass — Slice 1:** **PRODUCT ACCEPTED / CLOSED
   (2026-08-14)** (Today-first Ops grouping + derived attention; no migration)
+- **Operations Smoothness Pass — Slice 2:** **PRODUCT ACCEPTED / CLOSED
+  (2026-08-14)** (Attention → Action in Order Workspace + Ops search-row
+  layout; no migration)
 - Working tree may include untracked `tmp/` Product-review assets only —
   do not stage.
 
@@ -241,6 +244,16 @@ accepted freeze).
   Completed muted.
 - Deferred polish: clearer horizontal spacing between Today summary counts
   (cosmetic; did not block acceptance).
+
+### Operations Smoothness Pass — Slice 2 — PRODUCT ACCEPTED / CLOSED (2026-08-14)
+
+- Unified Order Workspace **Needs Attention** block (same Slice 1
+  `deriveOwnerAttention`); reason → existing action / section jump.
+- Ops toolbar: Search full-width row above Pickup / Status / Sort; Today
+  summary spacing correction (`gap-x-8`).
+- Product manual PASS: Submitted → Prepare Confirmation; Awaiting Payment →
+  Go to Payment scroll; no-attention quiet workspace; Ops layout/hierarchy.
+- No migration; Slice 1 semantics preserved.
 
 ### Live Collection workspace activation (v1) — PRODUCT ACCEPTED / CLOSED (2026-08-13)
 

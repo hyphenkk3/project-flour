@@ -2,6 +2,52 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-14 — Operations Smoothness Pass Slice 2
+
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-14).** Slice 1 remains PRODUCT
+ACCEPTED / CLOSED. No Milestone 6. No migration.
+
+Product closed Slice 2 after manual Product review:
+
+- Operations layout PASS — Search on its own row above Pickup / Status /
+  Sort; NEED ATTENTION / ALL CLEAR / COMPLETED spacing and hierarchy good.
+- Submitted attention PASS — Operations shows `Confirmation not prepared`;
+  opening the order immediately shows Needs Attention; `Prepare Confirmation`
+  obvious and correctly positioned.
+- Awaiting Payment PASS — Operations shows `Payment needed`; workspace
+  immediately shows `Payment needed`; Product clicked `Go to Payment` and
+  confirmed it scrolls to the existing Payment section.
+- No-attention / All Clear PASS — paid/no-current-attention order: no
+  unnecessary Needs Attention block; workspace remains visually quiet.
+- Overall UX intent PASS — Operations tells WHAT requires attention;
+  Workspace explains WHY; relevant action available without hunting; status
+  and actionable task clearly distinguished.
+
+Automated helper coverage (attention / confirmation-reconfirm / Bakery /
+Collection / EXTRA / Calendar Quick View) and `tsc` / `diff --check` /
+`build` were re-run at closeout. Product did not manually exercise every
+automated scenario (e.g. multi-reason fee-request / terminal reconfirm
+suppression in workspace); those remain covered by helpers only.
+
+### Accepted surface (frozen unless Product reopens)
+
+- Order Workspace shows compact **Needs Attention** below status/order
+  number and before Customer when current Slice 1 attention reasons exist.
+- Reason labels match Operations cards; actions reuse existing confirmation /
+  payment / fee-request workflows (or section jumps).
+- No second attention ruleset — `deriveOwnerAttention` is authoritative.
+- No competing orange reconfirmation banner; unified into the attention block.
+- Ops toolbar: Search on its own full-width row above Pickup / Status / Sort;
+  Today summary horizontal spacing corrected (`gap-x-8`).
+- Preserve Slice 1 terminal reconfirmation gate and historical flags.
+- Viewing Operations / workspace does not mutate lifecycle / payment /
+  confirmation state.
+
+### Explicitly deferred
+
+Full workspace redesign · RM on Ops cards · Bakery Attention in Ops ·
+WhatsApp send · urgency scoring · Slice 3.
+
 ## 2026-08-14 — Operations Smoothness Pass Slice 1
 
 **STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-14).** EXTRA v1 / v1.1 remain
