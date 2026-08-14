@@ -37,24 +37,36 @@ assert.equal(owner.canResolveFeeRequests, true);
 assert.equal(owner.canCancelAnyFeeRequest, true);
 assert.equal(owner.canPrepareConfirmation, true);
 assert.equal(owner.canManagePayments, true);
+assert.equal(owner.canPreparePaymentRequest, true);
+assert.equal(owner.canRecordPayment, true);
 assert.equal(owner.canManageDiscounts, true);
+assert.equal(owner.canOverrideDiscountEligibility, true);
+assert.equal(owner.canEditOrderWorkspace, true);
+assert.equal(owner.canOverridePickupMonth, true);
 assert.equal(owner.canEnableDeliveryFinance, true);
 
 const vivian = buildGuestOrderWorkspaceCapabilities({
   role: "customer_operations",
   staffId: "vivian-1",
 });
-assert.equal(vivian.canEditOrderWorkspace, false);
+assert.equal(vivian.canEditOrderWorkspace, true);
+assert.equal(vivian.canOverridePickupMonth, false);
 assert.equal(vivian.canDirectFeeExceptions, false);
 assert.equal(vivian.canRequestFeeExceptions, true);
 assert.equal(vivian.canResolveFeeRequests, false);
 assert.equal(vivian.canQuoteDeliveryFee, true);
 assert.equal(vivian.canCancelAnyFeeRequest, false);
-assert.equal(vivian.canPrepareConfirmation, false);
-assert.equal(vivian.canManagePayments, false);
-assert.equal(vivian.canManageDiscounts, false);
+assert.equal(vivian.canPrepareConfirmation, true);
+assert.equal(vivian.canPreparePaymentRequest, true);
+assert.equal(vivian.canRecordPayment, true);
+assert.equal(vivian.canManagePayments, true);
+assert.equal(vivian.canExtendPaymentDeadline, false);
+assert.equal(vivian.canManageDiscounts, true);
+assert.equal(vivian.canOverrideDiscountEligibility, false);
 assert.equal(vivian.canEnableDeliveryFinance, false);
 assert.equal(vivian.canOperateCollectionControls, false);
+assert.equal(vivian.canUseOwnerBoardTools, false);
+assert.equal(vivian.canViewWholeCakeCalendar, true);
 
 const manager = buildGuestOrderWorkspaceCapabilities({
   role: "manager",
@@ -71,6 +83,8 @@ assert.equal(manager.canPrepareConfirmation, false);
 assert.equal(manager.canManagePayments, false);
 assert.equal(manager.canManageDiscounts, false);
 assert.equal(manager.canOperateCollectionControls, false);
+assert.equal(manager.canAccessOperationsBoard, false);
+assert.equal(manager.canReviewOperationsApprovals, true);
 
 assert.equal(
   canCancelPendingFeeRequest({

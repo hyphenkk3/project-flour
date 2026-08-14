@@ -20,7 +20,7 @@ const PRODUCT_ORDER_ID = "7e9779ac-152b-42e0-8002-34ba8e9b11b5";
 const BOARD_DATE = "2026-10-24";
 const MIGRATION_PATH = resolve(
   process.cwd(),
-  "supabase/migrations/20260813140000_collection_picked_up_authority.sql",
+  "supabase/migrations/20260814140000_collection_customer_operations_picked_up.sql",
 );
 
 class MigrationBlockedError extends Error {
@@ -225,33 +225,26 @@ async function main() {
       return data;
     }
 
-    // Migration gate: bakery/CO must be denied at RPC
+    // Migration gate: bakery remains denied. Customer Operations is allowed
+    // after 20260814140000.
     {
-      const denied = bakery ?? co;
-      if (denied?.id) {
+      if (bakery?.id) {
         const id = await createOrder(`${SIG} Auth Probe`);
         await makeReadyPaid(id);
         const { error } = await admin.rpc("mark_guest_order_picked_up", {
           p_order_id: id,
-          p_actor_staff_id: denied.id,
+          p_actor_staff_id: bakery.id,
         });
         const msg = rpcMessage(error).toLowerCase();
         if (!error || !msg.includes("not authorized")) {
           migrationBlocked = true;
           throw new MigrationBlockedError(
-            `Collection Picked Up RPC role hardening not live. Apply ${MIGRATION_PATH}. rpc=${rpcMessage(error)}`,
+            `Collection Picked Up bakery deny not live. Apply ${MIGRATION_PATH}. rpc=${rpcMessage(error)}`,
           );
         }
-        check(
-          true,
-          "unauthorized role cannot Mark Collected",
-          rpcMessage(error),
-        );
+        check(true, "bakery cannot Mark Collected", rpcMessage(error));
       } else {
-        pass(
-          "unauthorized role cannot Mark Collected",
-          "SKIP — no bakery/CO staff",
-        );
+        pass("bakery cannot Mark Collected", "SKIP — no bakery staff");
       }
     }
 
@@ -403,24 +396,25 @@ async function main() {
     }
 
     if (co?.id) {
-      const id = await createOrder(`${SIG} CO Deny`);
+      const id = await createOrder(`${SIG} CO Collect`);
       await makeReadyPaid(id);
-      await admin.rpc("mark_guest_order_picked_up", {
+      const { error } = await admin.rpc("mark_guest_order_picked_up", {
         p_order_id: id,
-        p_actor_staff_id: owner.id,
+        p_actor_staff_id: co.id,
       });
-      const { error } = await admin.rpc("undo_guest_order_picked_up", {
+      check(!error, "Customer Operations Mark Collected", rpcMessage(error));
+      const { error: undoErr } = await admin.rpc("undo_guest_order_picked_up", {
         p_order_id: id,
         p_actor_staff_id: co.id,
       });
       check(
-        Boolean(error) &&
-          rpcMessage(error).toLowerCase().includes("not authorized"),
-        "CO cannot Undo Collected",
-        rpcMessage(error),
+        !undoErr,
+        "Customer Operations Undo Collected",
+        rpcMessage(undoErr),
       );
     } else {
-      pass("CO cannot Undo Collected", "SKIP — no CO staff");
+      pass("Customer Operations Mark Collected", "SKIP — no CO staff");
+      pass("Customer Operations Undo Collected", "SKIP — no CO staff");
     }
 
     {

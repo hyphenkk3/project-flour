@@ -1,4 +1,8 @@
 import {
+  buildOperationsBoardPath,
+  parseOperationsBoardSearchParams,
+} from "@/engines/operations/order-board";
+import {
   buildWholeCakeCalendarPath,
   resolveCalendarMonthParams,
 } from "@/workspaces/owner/calendar/calendar-url";
@@ -22,10 +26,23 @@ function isSafeRelativeOwnerPath(value: string): boolean {
   return true;
 }
 
+function pathnameOf(value: string): { pathname: string; search: string } {
+  const qIndex = value.indexOf("?");
+  const pathname = qIndex >= 0 ? value.slice(0, qIndex) : value;
+  const search = qIndex >= 0 ? value.slice(qIndex + 1) : "";
+  const hashIndex = pathname.indexOf("#");
+  return {
+    pathname: hashIndex >= 0 ? pathname.slice(0, hashIndex) : pathname,
+    search,
+  };
+}
+
 /**
  * Validate returnTo for Owner Order Workspace.
- * Only Whole Cake Calendar (with approved params) is accepted as an alternate
- * destination. Anything else falls back to Operations.
+ * Accepted destinations:
+ * - Operations (`/owner`, optionally with approved board query params)
+ * - Whole Cake Calendar (with approved params)
+ * Anything else falls back to default Operations (Today).
  */
 export function resolveOwnerReturnTo(
   raw: string | null | undefined,
@@ -44,36 +61,57 @@ export function resolveOwnerReturnTo(
 
   if (!isSafeRelativeOwnerPath(decoded)) return OPERATIONS_RETURN;
 
-  const qIndex = decoded.indexOf("?");
-  const pathname = qIndex >= 0 ? decoded.slice(0, qIndex) : decoded;
-  const search = qIndex >= 0 ? decoded.slice(qIndex + 1) : "";
+  const { pathname, search } = pathnameOf(decoded);
 
-  if (pathname !== "/owner/calendar") return OPERATIONS_RETURN;
+  if (pathname === "/owner/calendar") {
+    const params = new URLSearchParams(search);
+    const resolved = resolveCalendarMonthParams({
+      year: params.get("year") ?? undefined,
+      month: params.get("month") ?? undefined,
+      view: params.get("view") ?? undefined,
+      matrix: params.get("matrix") ?? undefined,
+    });
 
-  const params = new URLSearchParams(search);
-  const resolved = resolveCalendarMonthParams({
-    year: params.get("year") ?? undefined,
-    month: params.get("month") ?? undefined,
-    view: params.get("view") ?? undefined,
-    matrix: params.get("matrix") ?? undefined,
-  });
+    return {
+      href: buildWholeCakeCalendarPath(resolved),
+      label: "Whole Cake Calendar",
+    };
+  }
 
-  return {
-    href: buildWholeCakeCalendarPath(resolved),
-    label: "Whole Cake Calendar",
-  };
+  if (pathname === "/owner") {
+    const params = new URLSearchParams(search);
+    const query = parseOperationsBoardSearchParams({
+      pickup: params.get("pickup") ?? undefined,
+      date: params.get("date") ?? undefined,
+      status: params.get("status") ?? undefined,
+      sort: params.get("sort") ?? undefined,
+    });
+    return {
+      href: buildOperationsBoardPath(query),
+      label: "Operations",
+    };
+  }
+
+  return OPERATIONS_RETURN;
+}
+
+/** True when returnTo should be forwarded on nested Owner workspace links. */
+export function shouldPropagateOwnerReturnTo(
+  ctx: OwnerReturnContext,
+): boolean {
+  return ctx.href !== OPERATIONS_RETURN.href;
 }
 
 /**
  * Append a validated returnTo query to an Owner path.
- * Operations (default) omits the param so direct URLs stay clean.
+ * Default Operations (Today, `/owner`) omits the param so direct URLs stay clean.
  */
 export function withOwnerReturnTo(
   href: string,
   returnTo: string | null | undefined,
 ): string {
   const ctx = resolveOwnerReturnTo(returnTo);
-  if (ctx.label === "Operations") return href;
+  if (!shouldPropagateOwnerReturnTo(ctx)) return href;
 
   const hashIndex = href.indexOf("#");
   const withoutHash = hashIndex >= 0 ? href.slice(0, hashIndex) : href;

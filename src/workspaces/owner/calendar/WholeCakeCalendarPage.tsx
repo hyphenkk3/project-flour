@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { canViewWholeCakeCalendar } from "@/engines/orders/delivery-finance-capabilities";
 import { requireStaff } from "@/foundation/auth/session";
 import { resolveCalendarMonthParams } from "@/workspaces/owner/calendar/calendar-url";
 import { WholeCakeCalendar } from "@/workspaces/owner/calendar/WholeCakeCalendar";
@@ -35,7 +36,7 @@ export async function WholeCakeCalendarPage({
   restorePosition,
 }: WholeCakeCalendarPageProps) {
   const staff = await requireStaff();
-  if (staff.role.code !== "owner") {
+  if (!canViewWholeCakeCalendar(staff.role.code)) {
     notFound();
   }
 
@@ -43,6 +44,7 @@ export async function WholeCakeCalendarPage({
     listCalendarEntriesForMonth(year, month),
     listCalendarExtraMarkersForMonth(year, month),
   ]);
+  const canMutateCalendarOrderActions = staff.role.code === "owner";
 
   return (
     <div className="space-y-6">
@@ -59,6 +61,7 @@ export async function WholeCakeCalendarPage({
         </Link>
       </div>
       <WholeCakeCalendar
+        canMutateCalendarOrderActions={canMutateCalendarOrderActions}
         focusToday={focusToday}
         initialEntries={entries}
         initialExtras={extras}

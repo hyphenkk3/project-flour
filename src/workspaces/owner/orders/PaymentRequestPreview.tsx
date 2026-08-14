@@ -31,6 +31,7 @@ import { FormField, FormInput } from "@/components/ui/form";
 import {
   ownerOrderWorkspaceHref,
   resolveOwnerReturnTo,
+  shouldPropagateOwnerReturnTo,
 } from "@/workspaces/owner/navigation/return-to";
 
 type PaymentRequestPreviewProps = {
@@ -53,7 +54,7 @@ export function PaymentRequestPreview({
   const back = resolveOwnerReturnTo(returnTo);
   const workspaceHref = ownerOrderWorkspaceHref(
     order.id,
-    back.label === "Whole Cake Calendar" ? back.href : null,
+    shouldPropagateOwnerReturnTo(back) ? back.href : null,
   );
 
   const settlement = order.settlement;

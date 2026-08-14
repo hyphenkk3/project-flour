@@ -27,15 +27,30 @@ import { OrderDiscountsPanel } from "@/workspaces/owner/orders/OrderDiscountsPan
 import { DeliveryFinanceBreakdown } from "@/workspaces/owner/orders/DeliveryFinanceBreakdown";
 import { RecordPaymentForm } from "@/workspaces/owner/orders/RecordPaymentForm";
 import { withOwnerReturnTo } from "@/workspaces/owner/navigation/return-to";
+import type { OperationsApprovalRecord } from "@/engines/operations/approvals";
 
 type PaymentSectionProps = {
   order: StorefrontOrder;
   returnTo?: string | null;
+  canPreparePaymentRequest?: boolean;
+  canRecordPayment?: boolean;
+  canManageDiscounts?: boolean;
+  canOverrideDiscountEligibility?: boolean;
+  canRequestOperationsApproval?: boolean;
+  pendingDiscountApproval?: OperationsApprovalRecord | null;
+  canExtendPaymentDeadline?: boolean;
 };
 
 export function PaymentSection({
   order,
   returnTo = null,
+  canPreparePaymentRequest = false,
+  canRecordPayment = false,
+  canManageDiscounts = false,
+  canOverrideDiscountEligibility = false,
+  canRequestOperationsApproval = false,
+  pendingDiscountApproval = null,
+  canExtendPaymentDeadline = false,
 }: PaymentSectionProps) {
   const router = useRouter();
   const [showRecord, setShowRecord] = useState(false);
@@ -47,11 +62,17 @@ export function PaymentSection({
     order.paymentDeadlineAt,
   );
   const canRecord =
-    order.status === "awaiting_payment" && settlement.remainingBalance > 0;
+    canRecordPayment &&
+    order.status === "awaiting_payment" &&
+    settlement.remainingBalance > 0;
   const canRequest =
-    order.status === "awaiting_payment" && settlement.remainingBalance > 0;
+    canPreparePaymentRequest &&
+    order.status === "awaiting_payment" &&
+    settlement.remainingBalance > 0;
   const canExtendFollowUp =
-    order.status === "awaiting_payment" && Boolean(order.paymentDeadlineAt);
+    canExtendPaymentDeadline &&
+    order.status === "awaiting_payment" &&
+    Boolean(order.paymentDeadlineAt);
 
   const cakeBreakdown = buildCakePriceBreakdown(
     order.items.map((item) => ({
@@ -76,8 +97,9 @@ export function PaymentSection({
 
   return (
     <section
-      className="border-fog space-y-4 rounded-xl border bg-white p-5"
+      className="border-fog scroll-mt-24 space-y-4 rounded-xl border bg-white p-5"
       id={OWNER_ORDER_PAYMENT_SECTION_ID}
+      tabIndex={-1}
     >      <div className="flex flex-wrap items-start justify-between gap-3">
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
           Payment
@@ -145,7 +167,14 @@ export function PaymentSection({
 
       <DeliveryFinanceBreakdown order={order} />
 
-      <OrderDiscountsPanel order={order} />
+      {canManageDiscounts ? (
+        <OrderDiscountsPanel
+          canOverrideDiscountEligibility={canOverrideDiscountEligibility}
+          canRequestOperationsApproval={canRequestOperationsApproval}
+          order={order}
+          pendingDiscountApproval={pendingDiscountApproval}
+        />
+      ) : null}
 
       <dl
         className={`grid gap-2 text-sm ${settlement.overpayment > 0 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}

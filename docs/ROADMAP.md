@@ -41,6 +41,17 @@ Detailed business rules, message formats, financial/lifecycle rationale, and his
 - **Collection handoff UX polish:** **PRODUCT ACCEPTED / CLOSED
   (2026-08-14)** (compact board cards + inline Mark Collected placement;
   presentation only; no migration)
+- **Shared Operations access (Customer Operations):** **PRODUCT ACCEPTED /
+  CLOSED (2026-08-14)** — `customer_operations` executes normal preorder
+  work on the shared Operations board (edit, eligible RM10, confirmation,
+  payment request, Record Payment, Collection Mark/Undo, Calendar
+  read-only); same `deriveOwnerAttention`; no CO attention queue
+- **Customer Operations exception / approval workflow:** **PRODUCT
+  ACCEPTED / CLOSED (2026-08-14)** — typed
+  `operations_approval_requests` (`discount_exception`, `late_order_edit`,
+  `cross_month_pickup`); calendar-date 2-day cutoff (Asia/Singapore);
+  CO requests / Owner+Manager execute the exact mutation; fee workflow
+  unchanged; Collection RPC + RM10 allowlist migrations applied live
 - Working tree may include untracked `tmp/` Product-review assets only —
   do not stage.
 
@@ -290,6 +301,40 @@ accepted freeze).
 - Presentation/layout only — Collection lifecycle / eligibility / capabilities
   / payment semantics unchanged; no migration.
 
+### Customer Operations exception / approval workflow — PRODUCT ACCEPTED / CLOSED (2026-08-14)
+
+- CO = normal execution. Owner and Manager approve/reject the three types;
+  Approve executes the exact requested mutation. Requester cannot decide
+  their own request. Bakery / Collection cannot request or approve.
+- Calendar-date 2-day cutoff (not 48 hours); Asia/Singapore; pickup time
+  ignored. Direct when `pickup_date - today >= 2`; approval when `< 2`.
+  Pickup 16 Aug: 14 Aug 23:59:59 direct; 15 Aug 00:00 approval required.
+- Requests do not expire by time; stale = fingerprint mismatch only.
+- One pending per `(order_id, request_type)`. Requester can cancel own
+  pending. History retained (`approved` / `rejected` / `cancelled`).
+- Manager reviews via `/owner/approvals` (CO nav link). No Operations board.
+- Fee request/resolve stays on the existing independent fee workflow.
+- RM10: normal eligible = `owner | manager | customer_operations`;
+  override = `owner | manager`. CO cannot forge override.
+- Migrations applied live: `20260814150000_operations_approval_requests.sql`,
+  `20260814160000_rm10_valid_path_customer_operations.sql`.
+- Out of scope: pickup-overdue indicator/reminder; approval notifications.
+- Details: `docs/DECISIONS.md`.
+
+### Shared Operations access (Customer Operations) — PRODUCT ACCEPTED / CLOSED (2026-08-14)
+
+- Role `customer_operations`: Operations board, guest workspace, normal Edit
+  Order, eligible RM10, confirmation, Payment Request, Record Payment,
+  Collection Mark/Undo, Whole Cake Calendar **read-only**.
+- Same `deriveOwnerAttention`; no CO attention queue; no lifecycle change.
+- Collection RPC allowlist (live):
+  `owner | manager | collection | customer_operations`. Bakery denied.
+  Migration: `20260814140000_collection_customer_operations_picked_up.sql`.
+- Operations selected-date context survives order workspace round-trip
+  (`/owner?date=YYYY-MM-DD` + `returnTo`). Calendar/direct entry unchanged.
+- Go to Payment scroll preserved. Owner behavior intact.
+- Details: `docs/DECISIONS.md`.
+
 ### Live Collection workspace activation (v1) — PRODUCT ACCEPTED / CLOSED (2026-08-13)
 
 - Authenticated `/collection` for **collection · manager · owner**.
@@ -325,6 +370,9 @@ Product-approved deferred domains (not next unless Product reorders):
 - Packing checklist persistence
 - Business Calendar Admin UI / DB override persistence
 - Delivery Collection desk workflow (Collection v1 is Pickup-only)
+- Pickup overdue indicator/reminder (Ready/uncollected after pickup
+  date+time; must not auto-mark collected) — separate future Product slice;
+  not part of Shared Operations / approval closeout
 
 Details and rationale: `docs/DECISIONS.md`.
 

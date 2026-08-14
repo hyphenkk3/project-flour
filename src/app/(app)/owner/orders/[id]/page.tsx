@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ returnTo?: string }>;
+  searchParams: Promise<{ returnTo?: string; approval?: string }>;
 };
 
 export default async function OwnerOrderPage({
@@ -13,5 +13,11 @@ export default async function OwnerOrderPage({
 }: PageProps) {
   const { id } = await params;
   const query = await searchParams;
-  return <OwnerOrderDetail orderId={id} returnTo={query.returnTo} />;
+  return (
+    <OwnerOrderDetail
+      approvalId={query.approval}
+      orderId={id}
+      returnTo={query.returnTo}
+    />
+  );
 }

@@ -95,8 +95,13 @@ export const ROLE_NAVIGATION: Record<RoleCode, readonly WorkspaceId[]> = {
     "library",
     "management",
   ],
-  // Collection desk is not for Customer Operations (fee “Counter” ≠ Collection).
-  customer_operations: ["home", "customer_operations"],
+  customer_operations: [
+    "home",
+    "owner",
+    "customer_operations",
+    "owner_calendar",
+    "collection",
+  ],
   bakery: ["home", "bakery"],
   collection: ["home", "collection"],
 };

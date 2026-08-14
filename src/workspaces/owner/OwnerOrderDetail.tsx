@@ -7,7 +7,10 @@ import {
   canAccessGuestOrderWorkspace,
 } from "@/engines/orders/delivery-finance-capabilities";
 import { withCalendarReturnPositionFlag } from "@/workspaces/owner/calendar/calendar-return-position";
-import { resolveOwnerReturnTo } from "@/workspaces/owner/navigation/return-to";
+import {
+  resolveOwnerReturnTo,
+  shouldPropagateOwnerReturnTo,
+} from "@/workspaces/owner/navigation/return-to";
 import { OrderWorkspaceForm } from "@/workspaces/owner/orders/OrderWorkspaceForm";
 import {
   getGuestOrderById,
@@ -16,6 +19,7 @@ import {
   listConfirmationSnapshots,
   listOrderTimeline,
 } from "@/workspaces/owner/orders/queries";
+import { listApprovalsForOrder } from "@/workspaces/owner/approvals/queries";
 import {
   getAvailableCakeById,
   getCurrentCollection,
@@ -27,11 +31,13 @@ export const dynamic = "force-dynamic";
 type OwnerOrderDetailProps = {
   orderId: string;
   returnTo?: string;
+  approvalId?: string;
 };
 
 export async function OwnerOrderDetail({
   orderId,
   returnTo,
+  approvalId,
 }: OwnerOrderDetailProps) {
   const staff = await requireStaff();
   if (!canAccessGuestOrderWorkspace(staff.role.code)) {
@@ -75,20 +81,25 @@ export async function OwnerOrderDetail({
 
   const timeline = await listOrderTimeline(orderId);
   const confirmations = await listConfirmationSnapshots(orderId);
+  const approvals = await listApprovalsForOrder(orderId);
   const back = resolveOwnerReturnTo(returnTo);
-  const safeReturnTo =
-    back.label === "Whole Cake Calendar" ? back.href : null;
+  const safeReturnTo = shouldPropagateOwnerReturnTo(back) ? back.href : null;
   const backHref =
     back.label === "Whole Cake Calendar"
       ? withCalendarReturnPositionFlag(back.href)
-      : capabilities.canEditOrderWorkspace
+      : capabilities.canAccessOperationsBoard
         ? back.href
-        : staff.role.code === "manager"
-          ? "/customer-operations/orders"
+        : capabilities.canReviewOperationsApprovals
+          ? "/owner/approvals"
           : "/customer-operations/orders";
-  const backLabel = capabilities.canEditOrderWorkspace
-    ? back.label
-    : "Customer Operations";
+  const backLabel =
+    back.label === "Whole Cake Calendar"
+      ? back.label
+      : capabilities.canAccessOperationsBoard
+        ? "Operations"
+        : capabilities.canReviewOperationsApprovals
+          ? "Approvals"
+          : "Customer Operations";
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -105,10 +116,12 @@ export async function OwnerOrderDetail({
       </div>
 
       <OrderWorkspaceForm
+        approvals={approvals}
         cakes={cakes}
         capabilities={capabilities}
         complimentaryOptions={complimentaryOptions}
         confirmations={confirmations}
+        highlightApprovalId={approvalId ?? null}
         order={order}
         paidAddonCatalog={paidAddonCatalog}
         returnTo={safeReturnTo}

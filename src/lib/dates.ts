@@ -131,3 +131,25 @@ export function isDifferentBusinessMonth(
   if (!from || !to) return false;
   return from !== to;
 }
+
+/** Add whole calendar days to a YYYY-MM-DD business date (no timezone shift). */
+export function addBusinessCalendarDays(ymd: string, days: number): string | null {
+  const date = parseBusinessDate(ymd);
+  if (!date) return null;
+  date.setDate(date.getDate() + days);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Whole calendar days from `fromYmd` to `toYmd`.
+ * 16 Aug minus 14 Aug = 2. Pickup time is irrelevant.
+ */
+export function calendarDaysBetween(fromYmd: string, toYmd: string): number | null {
+  const from = parseBusinessDate(fromYmd);
+  const to = parseBusinessDate(toYmd);
+  if (!from || !to) return null;
+  return Math.round((to.getTime() - from.getTime()) / 86_400_000);
+}

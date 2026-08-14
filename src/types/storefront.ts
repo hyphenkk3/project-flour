@@ -346,7 +346,11 @@ export type OrderTimelineEventType =
   | "order_out_for_delivery_undone"
   | "order_delivered"
   | "order_delivered_undone"
-  | "staff_preorder_created";
+  | "staff_preorder_created"
+  | "operations_approval_requested"
+  | "operations_approval_approved"
+  | "operations_approval_rejected"
+  | "operations_approval_cancelled";
 
 export type OrderTimelineEvent = {
   id: string;

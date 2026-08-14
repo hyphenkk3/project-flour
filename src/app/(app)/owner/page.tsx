@@ -1,19 +1,29 @@
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/foundation/auth/session";
+import { parseOperationsBoardSearchParams } from "@/engines/operations/order-board";
+import { canAccessOperationsBoard } from "@/engines/orders/delivery-finance-capabilities";
 import { OwnerDashboard } from "@/workspaces/owner/OwnerDashboard";
 
 export const dynamic = "force-dynamic";
 
-/** Operations Live Board remains Owner-only. */
-export default async function OwnerPage() {
+type PageProps = {
+  searchParams: Promise<{
+    pickup?: string;
+    date?: string;
+    status?: string;
+    sort?: string;
+  }>;
+};
+
+/** Operations Live Board — Owner + Customer Operations preorder operators. */
+export default async function OwnerPage({ searchParams }: PageProps) {
   const staff = await requireStaff();
-  if (staff.role.code !== "owner") {
+  if (!canAccessOperationsBoard(staff.role.code)) {
     redirect(
-      staff.role.code === "customer_operations" ||
-        staff.role.code === "manager"
-        ? "/customer-operations/orders"
-        : "/home",
+      staff.role.code === "manager" ? "/owner/approvals" : "/home",
     );
   }
-  return <OwnerDashboard />;
+  const params = await searchParams;
+  const initialQuery = parseOperationsBoardSearchParams(params);
+  return <OwnerDashboard initialQuery={initialQuery} />;
 }

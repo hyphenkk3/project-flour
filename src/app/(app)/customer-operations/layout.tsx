@@ -18,7 +18,9 @@ export default async function CustomerOperationsLayout({
 
   return (
     <div>
-      <CustomerOperationsNav />
+      <CustomerOperationsNav
+        showApprovalsLink={staff.role.code === "manager"}
+      />
       {children}
     </div>
   );

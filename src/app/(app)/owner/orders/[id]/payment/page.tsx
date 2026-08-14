@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { canAccessOperationsBoard } from "@/engines/orders/delivery-finance-capabilities";
 import { requireStaff } from "@/foundation/auth/session";
 import { PaymentRequestPreview } from "@/workspaces/owner/orders/PaymentRequestPreview";
 import { getGuestOrderById } from "@/workspaces/owner/orders/queries";
@@ -15,7 +16,7 @@ export default async function PaymentRequestPage({
   searchParams,
 }: PageProps) {
   const staff = await requireStaff();
-  if (staff.role.code !== "owner") {
+  if (!canAccessOperationsBoard(staff.role.code)) {
     notFound();
   }
 

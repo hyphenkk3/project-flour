@@ -4,9 +4,13 @@ import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type { StorefrontOrder } from "@/types/storefront";
 import { DeliveryFinanceBreakdown } from "@/workspaces/owner/orders/DeliveryFinanceBreakdown";
 import { OrderDiscountsPanel } from "@/workspaces/owner/orders/OrderDiscountsPanel";
+import type { OperationsApprovalRecord } from "@/engines/operations/approvals";
 
 type OrderTotalAdjustmentsSectionProps = {
   order: StorefrontOrder;
+  canOverrideDiscountEligibility?: boolean;
+  canRequestOperationsApproval?: boolean;
+  pendingDiscountApproval?: OperationsApprovalRecord | null;
 };
 
 /**
@@ -15,6 +19,9 @@ type OrderTotalAdjustmentsSectionProps = {
  */
 export function OrderTotalAdjustmentsSection({
   order,
+  canOverrideDiscountEligibility = false,
+  canRequestOperationsApproval = false,
+  pendingDiscountApproval = null,
 }: OrderTotalAdjustmentsSectionProps) {
   const settlement = order.settlement;
 
@@ -41,7 +48,12 @@ export function OrderTotalAdjustmentsSection({
         </div>
       </dl>
       <DeliveryFinanceBreakdown order={order} />
-      <OrderDiscountsPanel order={order} />
+      <OrderDiscountsPanel
+        canOverrideDiscountEligibility={canOverrideDiscountEligibility}
+        canRequestOperationsApproval={canRequestOperationsApproval}
+        order={order}
+        pendingDiscountApproval={pendingDiscountApproval}
+      />
     </section>
   );
 }

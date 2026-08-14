@@ -23,6 +23,7 @@ import {
 import {
   ownerOrderWorkspaceHref,
   resolveOwnerReturnTo,
+  shouldPropagateOwnerReturnTo,
 } from "@/workspaces/owner/navigation/return-to";
 
 type ConfirmationPreviewProps = {
@@ -54,7 +55,7 @@ export function ConfirmationPreview({
   const back = resolveOwnerReturnTo(returnTo);
   const workspaceHref = ownerOrderWorkspaceHref(
     order.id,
-    back.label === "Whole Cake Calendar" ? back.href : null,
+    shouldPropagateOwnerReturnTo(back) ? back.href : null,
   );
   const deliveryChargesHref = deliveryChargesSectionHref(workspaceHref);
 

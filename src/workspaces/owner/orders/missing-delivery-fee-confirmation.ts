@@ -4,6 +4,7 @@
  */
 
 import { DELIVERY_CHARGES_SECTION_ID } from "@/engines/orders/delivery-finance";
+import { scrollWorkspaceSectionIntoView } from "@/workspaces/owner/orders/scroll-workspace-section";
 
 const ACK_KEY_PREFIX = "wb-conf-missing-df-ack:";
 
@@ -41,10 +42,5 @@ export function deliveryChargesSectionHref(workspaceHref: string): string {
 }
 
 export function focusDeliveryChargesSection(): void {
-  const el = document.getElementById(DELIVERY_CHARGES_SECTION_ID);
-  if (!el) return;
-  el.scrollIntoView({ behavior: "smooth", block: "start" });
-  if (typeof el.focus === "function") {
-    el.focus({ preventScroll: true });
-  }
+  scrollWorkspaceSectionIntoView(DELIVERY_CHARGES_SECTION_ID, { focus: true });
 }

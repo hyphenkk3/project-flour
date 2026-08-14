@@ -8,15 +8,25 @@ const ITEMS = [
   { href: "/customer-operations/orders", label: "Orders" },
 ] as const;
 
-export function CustomerOperationsNav() {
+type CustomerOperationsNavProps = {
+  /** Manager-only: review pending exception approvals without the Operations board. */
+  showApprovalsLink?: boolean;
+};
+
+export function CustomerOperationsNav({
+  showApprovalsLink = false,
+}: CustomerOperationsNavProps) {
   const pathname = usePathname();
+  const items = showApprovalsLink
+    ? [...ITEMS, { href: "/owner/approvals", label: "Approvals" }]
+    : [...ITEMS];
 
   return (
     <nav
       aria-label="Customer Operations sections"
       className="border-fog mb-6 flex gap-1 border-b"
     >
-      {ITEMS.map((item) => {
+      {items.map((item) => {
         const active =
           pathname === item.href || pathname.startsWith(`${item.href}/`);
 

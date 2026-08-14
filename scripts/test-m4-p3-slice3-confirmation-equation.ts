@@ -785,7 +785,7 @@ assert.equal(
   assert.ok(confirmDialogSrc.includes("allowDismiss"));
 
   assert.ok(pageSrc.includes("ConfirmationPreview"));
-  assert.ok(pageSrc.includes('staff.role.code !== "owner"'));
+  assert.ok(pageSrc.includes("canAccessOperationsBoard"));
 }
 
 console.log("M4-P3 Slice 3 Confirmation equation tests: PASSED");

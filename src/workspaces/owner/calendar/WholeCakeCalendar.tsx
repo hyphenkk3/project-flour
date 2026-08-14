@@ -58,6 +58,8 @@ type WholeCakeCalendarProps = {
   initialExtras?: CalendarExtraMarker[];
   /** Default sender for Customer Ready Message. */
   staffDisplayName: string;
+  /** Owner-only: Ready/Picked Up, messages, Propose EXTRA in Quick View. */
+  canMutateCalendarOrderActions?: boolean;
 };
 
 type OrderRowPayload = {
@@ -91,6 +93,7 @@ export function WholeCakeCalendar({
   initialEntries,
   initialExtras = [],
   staffDisplayName,
+  canMutateCalendarOrderActions = false,
 }: WholeCakeCalendarProps) {
   const [entries, setEntries] = useState(initialEntries);
   const [extras, setExtras] = useState(initialExtras);
@@ -369,6 +372,7 @@ export function WholeCakeCalendar({
         />
       )}
       <CalendarQuickView
+        canMutateCalendarOrderActions={canMutateCalendarOrderActions}
         onClose={closeQuickView}
         onExtraProposed={refreshExtrasOnly}
         orderId={quickViewOrderId}

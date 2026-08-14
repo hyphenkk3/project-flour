@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useTransition,
   type ReactNode,
 } from "react";
 import Link from "next/link";
@@ -21,6 +22,13 @@ import {
 } from "@/components/ui/form";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatLongBusinessDate, formatBusinessMonthYear, isDifferentBusinessMonth } from "@/lib/dates";
+import {
+  canCancelOperationsApproval,
+  isWithinTwoDayChangeCutoff,
+  lateOrderEditRestrictionReason,
+  type LateOrderEditProposedItem,
+  type OperationsApprovalRecord,
+} from "@/engines/operations/approvals";
 import {
   describeTimelineActor,
   timelineEventLabel,
@@ -60,6 +68,8 @@ import {
   deliveryFinanceFactsFromDelivery,
 } from "@/engines/orders/delivery-finance";
 import type { GuestOrderWorkspaceCapabilities } from "@/engines/orders/delivery-finance-capabilities";
+import { OrderApprovalPanel } from "@/workspaces/owner/approvals/OrderApprovalPanel";
+import { createOperationsApprovalAction } from "@/workspaces/owner/approvals/actions";
 import { CustomerConfirmedButton } from "@/workspaces/owner/orders/CustomerConfirmedButton";
 import { DeliveryChargesSection } from "@/workspaces/owner/orders/DeliveryChargesSection";
 import { MissingDeliveryFeeConfirmationDialog } from "@/workspaces/owner/orders/MissingDeliveryFeeConfirmationDialog";
@@ -120,6 +130,8 @@ type OrderWorkspaceFormProps = {
   staffDisplayName: string;
   /** Role-aware gates for shared guest Order Workspace (2B-1). */
   capabilities: GuestOrderWorkspaceCapabilities;
+  approvals?: OperationsApprovalRecord[];
+  highlightApprovalId?: string | null;
 };
 
 function ViewBlock({
@@ -167,6 +179,8 @@ export function OrderWorkspaceForm({
   returnTo = null,
   staffDisplayName,
   capabilities,
+  approvals = [],
+  highlightApprovalId = null,
 }: OrderWorkspaceFormProps) {
   const router = useRouter();
   const boundSave = saveOrderWorkspaceAction.bind(null, order.id);
@@ -211,11 +225,176 @@ export function OrderWorkspaceForm({
   );
   const [editPickupDate, setEditPickupDate] = useState(order.pickupDate);
   const [pickupMonthOverride, setPickupMonthOverride] = useState(false);
+  const [crossMonthReason, setCrossMonthReason] = useState("");
+  const [crossMonthError, setCrossMonthError] = useState<string | null>(null);
+  const [lateEditReason, setLateEditReason] = useState("");
+  const [lateEditError, setLateEditError] = useState<string | null>(null);
+  const [approvalPending, startApproval] = useTransition();
 
   const pickupMonthChanging = isDifferentBusinessMonth(
     order.pickupDate,
     editPickupDate,
   );
+  const lateChangeRequired = isWithinTwoDayChangeCutoff({
+    pickupDate: order.pickupDate,
+  });
+  const lateChangeReason = lateOrderEditRestrictionReason({
+    pickupDate: order.pickupDate,
+  });
+  const pendingApprovals = approvals.filter((row) => row.status === "pending");
+  const decidedApprovals = approvals.filter((row) => row.status !== "pending");
+  const pendingCrossMonth = pendingApprovals.find(
+    (row) => row.requestType === "cross_month_pickup",
+  );
+  const pendingLateEdit = pendingApprovals.find(
+    (row) => row.requestType === "late_order_edit",
+  );
+  const blockDirectSave =
+    capabilities.canRequestOperationsApproval && lateChangeRequired;
+
+  function describeEditItems(
+    items: EditableItem[],
+  ): LateOrderEditProposedItem[] {
+    return items.flatMap((item) => {
+      const cake = cakes.find((entry) => entry.id === item.cakeId);
+      const size = cake?.sizes.find((entry) => entry.id === item.cakeSizeId);
+      if (!cake || !size) return [];
+      return [
+        {
+          cakeId: cake.id,
+          cakeSizeId: size.id,
+          quantity: item.quantity,
+          unitPrice: size.price,
+          cakeName: cake.name,
+          sizeLabel: size.size,
+        },
+      ];
+    });
+  }
+
+  const currentItemSnapshot: LateOrderEditProposedItem[] = order.items.map(
+    (item) => ({
+      cakeId: item.cakeId,
+      cakeSizeId: item.cakeSizeId,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      cakeName: item.cakeName,
+      sizeLabel: item.sizeLabel,
+    }),
+  );
+  const proposedItemSnapshot = describeEditItems(editItems);
+
+  function renderApprovalPanels() {
+    const visible = [...pendingApprovals, ...decidedApprovals.slice(0, 5)];
+    if (visible.length === 0) return null;
+    return (
+      <div className="space-y-3">
+        {visible.map((request) => (
+          <OrderApprovalPanel
+            key={request.id}
+            canCancel={canCancelOperationsApproval({
+              role: capabilities.role,
+              staffId: capabilities.staffId,
+              requestedBy: request.requestedBy,
+              status: request.status,
+            })}
+            canReview={capabilities.canReviewOperationsApprovals}
+            customerName={order.customerName}
+            highlighted={highlightApprovalId === request.id}
+            orderNumber={order.orderNumber}
+            pickupDate={order.pickupDate}
+            pickupTime={order.pickupTime}
+            request={request}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  function handleRequestCrossMonth(event: { currentTarget: HTMLElement }) {
+    const form = event.currentTarget.closest("form");
+    const pickupTime = form
+      ? String(new FormData(form).get("pickup_time") ?? "").trim()
+      : order.pickupTime;
+    const reason = crossMonthReason.trim();
+    if (!reason) {
+      setCrossMonthError("A reason is required.");
+      return;
+    }
+    if (!pickupTime) {
+      setCrossMonthError("Choose a pickup time before requesting approval.");
+      return;
+    }
+    setCrossMonthError(null);
+    startApproval(async () => {
+      const result = await createOperationsApprovalAction({
+        orderId: order.id,
+        requestType: "cross_month_pickup",
+        reason,
+        payload: {
+          kind: "cross_month_pickup",
+          currentPickupDate: order.pickupDate,
+          currentPickupTime: order.pickupTime,
+          proposedPickupDate: editPickupDate,
+          proposedPickupTime: pickupTime,
+          fulfilmentMethod: editFulfilmentMethod,
+        },
+      });
+      if (result.error) {
+        setCrossMonthError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  function handleRequestLateEdit(event: { currentTarget: HTMLElement }) {
+    const form = event.currentTarget.closest("form");
+    const pickupTime = form
+      ? String(new FormData(form).get("pickup_time") ?? "").trim()
+      : order.pickupTime;
+    const reason = lateEditReason.trim();
+    if (!reason) {
+      setLateEditError("A reason is required.");
+      return;
+    }
+    const proposedItems = describeEditItems(editItems);
+    if (proposedItems.length === 0) {
+      setLateEditError("Add at least one cake before requesting approval.");
+      return;
+    }
+    const includePickup = !pickupMonthChanging;
+    if (includePickup && (!editPickupDate || !pickupTime)) {
+      setLateEditError("Choose a pickup date and time before requesting approval.");
+      return;
+    }
+    setLateEditError(null);
+    startApproval(async () => {
+      const result = await createOperationsApprovalAction({
+        orderId: order.id,
+        requestType: "late_order_edit",
+        reason,
+        payload: {
+          kind: "late_order_edit",
+          current: {
+            pickupDate: order.pickupDate,
+            pickupTime: order.pickupTime,
+            items: currentItemSnapshot,
+          },
+          proposed: {
+            pickupDate: includePickup ? editPickupDate : undefined,
+            pickupTime: includePickup ? pickupTime : undefined,
+            items: proposedItems,
+          },
+        },
+      });
+      if (result.error) {
+        setLateEditError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
   const deliveryToPickupWarning = (() => {
     if (editFulfilmentMethod !== "pickup") return null;
     if (order.fulfilmentMethod !== "delivery") return null;
@@ -452,6 +631,8 @@ export function OrderWorkspaceForm({
           order={order}
         />
 
+        {renderApprovalPanels()}
+
         <ViewBlock title="Customer">
           <div className="space-y-1">
             <p className="text-ink text-base font-semibold">{order.customerName}</p>
@@ -620,12 +801,39 @@ export function OrderWorkspaceForm({
         {capabilities.canManageDiscounts &&
         (order.status === "submitted" ||
           order.status === "pending_confirmation") ? (
-          <OrderTotalAdjustmentsSection order={order} />
+          <OrderTotalAdjustmentsSection
+            canOverrideDiscountEligibility={
+              capabilities.canOverrideDiscountEligibility
+            }
+            canRequestOperationsApproval={
+              capabilities.canRequestOperationsApproval
+            }
+            order={order}
+            pendingDiscountApproval={pendingApprovals.find(
+              (row) => row.requestType === "discount_exception",
+            )}
+          />
         ) : null}
 
         {capabilities.canManagePayments &&
         (order.status === "awaiting_payment" || order.status === "paid") ? (
-          <PaymentSection order={order} returnTo={returnTo} />
+          <PaymentSection
+            canExtendPaymentDeadline={capabilities.canExtendPaymentDeadline}
+            canManageDiscounts={capabilities.canManageDiscounts}
+            canOverrideDiscountEligibility={
+              capabilities.canOverrideDiscountEligibility
+            }
+            canPreparePaymentRequest={capabilities.canPreparePaymentRequest}
+            canRecordPayment={capabilities.canRecordPayment}
+            canRequestOperationsApproval={
+              capabilities.canRequestOperationsApproval
+            }
+            order={order}
+            pendingDiscountApproval={pendingApprovals.find(
+              (row) => row.requestType === "discount_exception",
+            )}
+            returnTo={returnTo}
+          />
         ) : null}
 
         {capabilities.canOperateCollectionControls ? (
@@ -642,7 +850,7 @@ export function OrderWorkspaceForm({
           </ViewBlock>
         ) : null}
 
-        {capabilities.canEditOrderWorkspace ? (
+        {capabilities.canManageOrderMessages ? (
           <ViewBlock title="Messages">
             <OrderMessagesSection
               compact
@@ -794,6 +1002,8 @@ export function OrderWorkspaceForm({
         <p className="text-skyline text-sm">{order.orderNumber}</p>
       </div>
 
+      {renderApprovalPanels()}
+
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
           Customer
@@ -897,24 +1107,76 @@ export function OrderWorkspaceForm({
               month from {formatBusinessMonthYear(order.pickupDate)} to{" "}
               {formatBusinessMonthYear(editPickupDate)}.
             </p>
-            <label className="text-ink flex items-start gap-2 text-sm">
-              <input
-                checked={pickupMonthOverride}
-                className="mt-0.5"
-                name="pickup_month_override"
-                onChange={(event) =>
-                  setPickupMonthOverride(event.target.checked)
-                }
-                required
-                type="checkbox"
-                value="1"
-              />
-              <span>
-                Owner override — allow{" "}
-                {editFulfilmentMethod === "delivery" ? "delivery" : "pickup"}{" "}
-                month change
-              </span>
-            </label>
+            {capabilities.canOverridePickupMonth ? (
+              <label className="text-ink flex items-start gap-2 text-sm">
+                <input
+                  checked={pickupMonthOverride}
+                  className="mt-0.5"
+                  name="pickup_month_override"
+                  onChange={(event) =>
+                    setPickupMonthOverride(event.target.checked)
+                  }
+                  required
+                  type="checkbox"
+                  value="1"
+                />
+                <span>
+                  Owner override — allow{" "}
+                  {editFulfilmentMethod === "delivery" ? "delivery" : "pickup"}{" "}
+                  month change
+                </span>
+              </label>
+            ) : capabilities.canRequestOperationsApproval ? (
+              <>
+                <p className="text-ink text-sm">
+                  This pickup date requires higher-authority approval.
+                </p>
+                {pendingCrossMonth ? (
+                  <p className="text-skyline text-sm">
+                    An approval request is already pending for this exception.
+                  </p>
+                ) : (
+                  <>
+                    <FormField
+                      htmlFor="cross_month_approval_reason"
+                      label="Reason"
+                    >
+                      <FormTextarea
+                        id="cross_month_approval_reason"
+                        onChange={(event) =>
+                          setCrossMonthReason(event.target.value)
+                        }
+                        placeholder="Why this pickup month needs to change"
+                        rows={2}
+                        value={crossMonthReason}
+                      />
+                    </FormField>
+                    {crossMonthError ? (
+                      <p className="text-status-danger text-sm" role="alert">
+                        {crossMonthError}
+                      </p>
+                    ) : null}
+                    <button
+                      className="bg-ink text-mist hover:bg-skyline inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-medium disabled:opacity-60"
+                      disabled={approvalPending}
+                      onClick={handleRequestCrossMonth}
+                      type="button"
+                    >
+                      {approvalPending ? "Requesting…" : "Request Approval"}
+                    </button>
+                  </>
+                )}
+                <input name="pickup_month_override" type="hidden" value="0" />
+              </>
+            ) : (
+              <>
+                <p className="text-ink text-sm">
+                  Cross-month changes require Owner override. Ask Owner/Manager
+                  to review this exception.
+                </p>
+                <input name="pickup_month_override" type="hidden" value="0" />
+              </>
+            )}
           </div>
         ) : (
           <input name="pickup_month_override" type="hidden" value="0" />
@@ -1161,8 +1423,69 @@ export function OrderWorkspaceForm({
 
       <FormError message={state.error} />
 
+      {blockDirectSave ? (
+        <div className="border-status-warning/30 bg-status-warning-soft space-y-3 rounded-lg border px-4 py-3">
+          <p className="text-status-warning text-sm font-semibold">
+            Late-change approval required
+          </p>
+          <p className="text-ink text-sm">
+            {lateChangeReason ?? "This order is within the 2-day change cutoff."}
+          </p>
+          <dl className="grid gap-2 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-skyline">Current</dt>
+              <dd className="text-ink">
+                {currentItemSnapshot
+                  .map((item) => `${item.cakeName} · ${item.sizeLabel}`)
+                  .join(", ") || "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-skyline">Requested</dt>
+              <dd className="text-ink">
+                {proposedItemSnapshot
+                  .map((item) => `${item.cakeName} · ${item.sizeLabel}`)
+                  .join(", ") || "—"}
+              </dd>
+            </div>
+          </dl>
+          {pendingLateEdit ? (
+            <p className="text-skyline text-sm">
+              An approval request is already pending for this exception.
+            </p>
+          ) : (
+            <>
+              <FormField htmlFor="late_edit_approval_reason" label="Reason">
+                <FormTextarea
+                  id="late_edit_approval_reason"
+                  onChange={(event) => setLateEditReason(event.target.value)}
+                  placeholder="Customer requested a larger cake."
+                  rows={2}
+                  value={lateEditReason}
+                />
+              </FormField>
+              {lateEditError ? (
+                <p className="text-status-danger text-sm" role="alert">
+                  {lateEditError}
+                </p>
+              ) : null}
+              <button
+                className="bg-ink text-mist hover:bg-skyline inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-medium disabled:opacity-60"
+                disabled={approvalPending}
+                onClick={handleRequestLateEdit}
+                type="button"
+              >
+                {approvalPending ? "Requesting…" : "Request Approval"}
+              </button>
+            </>
+          )}
+        </div>
+      ) : null}
+
       <FormActions>
-        <FormSubmitButton pending={pending}>Save Changes</FormSubmitButton>
+        {blockDirectSave ? null : (
+          <FormSubmitButton pending={pending}>Save Changes</FormSubmitButton>
+        )}
         <button
           className="border-fog text-ink hover:bg-mist inline-flex min-h-12 items-center justify-center rounded-lg border px-5 text-sm font-medium"
           disabled={pending}

@@ -287,3 +287,122 @@ export function operationsPickupFilterLabel(
       return customPickupDate ?? "Choose Date";
   }
 }
+
+export const OPERATIONS_BOARD_PATH = "/owner";
+
+const OPERATIONS_BOARD_YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function isOperationsBoardDate(value: string): boolean {
+  if (!OPERATIONS_BOARD_YMD_RE.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const probe = new Date(year, month - 1, day);
+  return (
+    probe.getFullYear() === year &&
+    probe.getMonth() === month - 1 &&
+    probe.getDate() === day
+  );
+}
+
+export function isOperationsPickupFilter(
+  value: string,
+): value is OperationsPickupFilter {
+  return OPERATIONS_PICKUP_FILTERS.some((option) => option.value === value);
+}
+
+export function isOperationsStatusFilter(
+  value: string,
+): value is OperationsStatusFilter {
+  return OPERATIONS_STATUS_FILTERS.some((option) => option.value === value);
+}
+
+export function isOperationsSortOption(
+  value: string,
+): value is OperationsSortOption {
+  return OPERATIONS_SORT_OPTIONS.some((option) => option.value === value);
+}
+
+export type OperationsBoardSearchParams = {
+  pickup?: string;
+  date?: string;
+  status?: string;
+  sort?: string;
+};
+
+/**
+ * Read Operations board filters from URL query params.
+ * `date=YYYY-MM-DD` selects that pickup date (Choose Date).
+ * Search stays in client state and is not encoded.
+ */
+export function parseOperationsBoardSearchParams(
+  input: OperationsBoardSearchParams,
+): OperationsBoardQuery {
+  const pickupRaw = input.pickup?.trim() ?? "";
+  const pickup = isOperationsPickupFilter(pickupRaw) ? pickupRaw : null;
+  const dateRaw = input.date?.trim() ?? "";
+  const date = isOperationsBoardDate(dateRaw) ? dateRaw : null;
+  const statusRaw = input.status?.trim() ?? "";
+  const sortRaw = input.sort?.trim() ?? "";
+
+  const statusFilter = isOperationsStatusFilter(statusRaw)
+    ? statusRaw
+    : DEFAULT_OPERATIONS_QUERY.statusFilter;
+  const sort = isOperationsSortOption(sortRaw)
+    ? sortRaw
+    : DEFAULT_OPERATIONS_QUERY.sort;
+
+  if (date && (pickup == null || pickup === "today" || pickup === "custom")) {
+    return {
+      search: "",
+      pickupFilter: "custom",
+      customPickupDate: date,
+      statusFilter,
+      sort,
+    };
+  }
+
+  if (pickup === "custom") {
+    return {
+      search: "",
+      pickupFilter: "custom",
+      customPickupDate: date,
+      statusFilter,
+      sort,
+    };
+  }
+
+  if (pickup && pickup !== "today") {
+    return {
+      search: "",
+      pickupFilter: pickup,
+      customPickupDate: null,
+      statusFilter,
+      sort,
+    };
+  }
+
+  return {
+    ...DEFAULT_OPERATIONS_QUERY,
+    statusFilter,
+    sort,
+  };
+}
+
+/** Canonical Operations board href for the current filters. Default Today is `/owner`. */
+export function buildOperationsBoardPath(query: OperationsBoardQuery): string {
+  const params = new URLSearchParams();
+  if (query.pickupFilter === "custom" && query.customPickupDate) {
+    params.set("date", query.customPickupDate);
+  } else if (query.pickupFilter === "custom") {
+    params.set("pickup", "custom");
+  } else if (query.pickupFilter !== "today") {
+    params.set("pickup", query.pickupFilter);
+  }
+  if (query.statusFilter !== "all") {
+    params.set("status", query.statusFilter);
+  }
+  if (query.sort !== DEFAULT_OPERATIONS_SORT) {
+    params.set("sort", query.sort);
+  }
+  const search = params.toString();
+  return search ? `${OPERATIONS_BOARD_PATH}?${search}` : OPERATIONS_BOARD_PATH;
+}

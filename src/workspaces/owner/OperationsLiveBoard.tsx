@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import {
   DEFAULT_OPERATIONS_QUERY,
+  buildOperationsBoardPath,
   filterAndSortOperationsOrders,
   type OperationsBoardQuery,
 } from "@/engines/operations/order-board";
@@ -20,12 +21,18 @@ import {
 } from "@/workspaces/owner/orders/actions";
 import { OwnerOrderCard } from "@/workspaces/owner/orders/OwnerOrderCard";
 import { OperationsBoardToolbar } from "@/workspaces/owner/OperationsBoardToolbar";
+import { OperationsApprovalsSection } from "@/workspaces/owner/approvals/OperationsApprovalsSection";
+import type { OperationsApprovalRecord } from "@/engines/operations/approvals";
 
 const POLL_INTERVAL_MS = 30_000;
 const HIGHLIGHT_MS = 4500;
 
 type OperationsLiveBoardProps = {
   initialOrders: StorefrontOrderListItem[];
+  /** Owner-only board tools: Calendar, Propose EXTRA, + New Order. */
+  showOwnerBoardTools?: boolean;
+  pendingApprovals?: OperationsApprovalRecord[];
+  initialQuery?: OperationsBoardQuery;
 };
 
 type OrderRowPayload = {
@@ -36,12 +43,13 @@ type OrderRowPayload = {
 
 export function OperationsLiveBoard({
   initialOrders,
+  showOwnerBoardTools = false,
+  pendingApprovals = [],
+  initialQuery = DEFAULT_OPERATIONS_QUERY,
 }: OperationsLiveBoardProps) {
   const { toast } = useToast();
   const [orders, setOrders] = useState(initialOrders);
-  const [query, setQuery] = useState<OperationsBoardQuery>(
-    DEFAULT_OPERATIONS_QUERY,
-  );
+  const [query, setQuery] = useState<OperationsBoardQuery>(initialQuery);
   const [highlightedIds, setHighlightedIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -217,6 +225,17 @@ export function OperationsLiveBoard({
     [visibleOrders],
   );
 
+  const boardHref = useMemo(() => buildOperationsBoardPath(query), [query]);
+
+  const handleQueryChange = useCallback((next: OperationsBoardQuery) => {
+    setQuery(next);
+    if (typeof window === "undefined") return;
+    const href = buildOperationsBoardPath(next);
+    const current = `${window.location.pathname}${window.location.search}`;
+    if (current === href || window.location.pathname !== "/owner") return;
+    window.history.replaceState(window.history.state, "", href);
+  }, []);
+
   function renderOrderList(list: StorefrontOrderListItem[]) {
     return (
       <ul className="grid gap-3">
@@ -225,6 +244,7 @@ export function OperationsLiveBoard({
             <OwnerOrderCard
               highlight={highlightedIds.has(order.id)}
               order={order}
+              returnTo={boardHref}
             />
           </li>
         ))}
@@ -240,35 +260,46 @@ export function OperationsLiveBoard({
           title="Operations"
         />
         <div className="flex shrink-0 flex-wrap gap-2">
-          <Link
-            className="border-line text-ink hover:bg-mist inline-flex min-h-10 items-center justify-center rounded-lg border px-4 text-sm font-medium"
-            href="/owner/calendar"
-            scroll={false}
-          >
-            Whole Cake Calendar
-          </Link>
-          <Link
-            className="border-line text-ink hover:bg-mist inline-flex min-h-10 items-center justify-center rounded-lg border px-4 text-sm font-medium"
-            href="/bakery/extra?mode=propose"
-          >
-            Propose EXTRA
-          </Link>
-          <Link
-            className="bg-ink text-mist hover:bg-skyline inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-medium"
-            href="/owner/orders/new"
-          >
-            + New Order
-          </Link>
+          {showOwnerBoardTools ? (
+            <>
+              <Link
+                className="border-line text-ink hover:bg-mist inline-flex min-h-10 items-center justify-center rounded-lg border px-4 text-sm font-medium"
+                href="/owner/calendar"
+                scroll={false}
+              >
+                Whole Cake Calendar
+              </Link>
+              <Link
+                className="border-line text-ink hover:bg-mist inline-flex min-h-10 items-center justify-center rounded-lg border px-4 text-sm font-medium"
+                href="/bakery/extra?mode=propose"
+              >
+                Propose EXTRA
+              </Link>
+              <Link
+                className="bg-ink text-mist hover:bg-skyline inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-medium"
+                href="/owner/orders/new"
+              >
+                + New Order
+              </Link>
+            </>
+          ) : null}
         </div>
       </div>
 
       <OperationsBoardToolbar
         matchCount={visibleOrders.length}
         newCount={newCount}
-        onChange={setQuery}
+        onChange={handleQueryChange}
         query={query}
         todayGroupCounts={todayGroupCounts}
       />
+
+      {todayBuckets ? null : (
+        <OperationsApprovalsSection
+          approvals={pendingApprovals}
+          returnTo={boardHref}
+        />
+      )}
 
       <section className="space-y-3">
         {visibleOrders.length === 0 ? (
@@ -297,6 +328,10 @@ export function OperationsLiveBoard({
                 renderOrderList(todayBuckets.needsAttention)
               )}
             </section>
+            <OperationsApprovalsSection
+              approvals={pendingApprovals}
+              returnTo={boardHref}
+            />
             <section className="space-y-2.5">
               <h2 className="text-status-success text-sm font-semibold tracking-wide uppercase">
                 All Clear

@@ -16,9 +16,14 @@ assert.equal(canAccessCollectionWorkspace("collection"), true);
 assert.equal(canAccessCollectionWorkspace("manager"), true);
 assert.equal(canAccessCollectionWorkspace("owner"), true);
 assert.equal(canAccessCollectionWorkspace("bakery"), false);
-assert.equal(canAccessCollectionWorkspace("customer_operations"), false);
+assert.equal(canAccessCollectionWorkspace("customer_operations"), true);
 
-for (const role of ["collection", "manager", "owner"] as const) {
+for (const role of [
+  "collection",
+  "manager",
+  "owner",
+  "customer_operations",
+] as const) {
   const caps = buildCollectionWorkspaceCapabilities({
     role,
     staffId: `${role}-1`,
@@ -36,13 +41,6 @@ assert.equal(bakeryDenied.canAccessCollectionWorkspace, false);
 assert.equal(bakeryDenied.canMarkCollected, false);
 assert.equal(bakeryDenied.canUndoCollected, false);
 
-const coDenied = buildCollectionWorkspaceCapabilities({
-  role: "customer_operations",
-  staffId: "co-1",
-});
-assert.equal(coDenied.canAccessCollectionWorkspace, false);
-assert.equal(coDenied.canMarkCollected, false);
-
 // Owner Ops Collection controls remain Owner-only (override path).
 assert.equal(
   buildGuestOrderWorkspaceCapabilities({ role: "owner", staffId: "o1" })
@@ -52,6 +50,13 @@ assert.equal(
 assert.equal(
   buildGuestOrderWorkspaceCapabilities({ role: "manager", staffId: "m1" })
     .canOperateCollectionControls,
+  false,
+);
+assert.equal(
+  buildGuestOrderWorkspaceCapabilities({
+    role: "customer_operations",
+    staffId: "co1",
+  }).canOperateCollectionControls,
   false,
 );
 assert.equal(
@@ -68,7 +73,7 @@ assert.equal(canAccessWorkspace("owner", "collection"), true);
 assert.equal(canAccessWorkspace("manager", "collection"), true);
 assert.equal(canAccessWorkspace("collection", "collection"), true);
 assert.equal(canAccessWorkspace("bakery", "collection"), false);
-assert.equal(canAccessWorkspace("customer_operations", "collection"), false);
+assert.equal(canAccessWorkspace("customer_operations", "collection"), true);
 
 const ownerNav = getNavigationForRole("owner");
 assert.ok(
@@ -92,8 +97,9 @@ assert.ok(!bakeryNav.some((item) => item.id === "collection"));
 
 const coNav = getNavigationForRole("customer_operations");
 assert.ok(
-  !coNav.some((item) => item.id === "collection"),
-  "CO must not see Collection nav",
+  coNav.some((item) => item.id === "collection"),
+  "CO must see Collection nav",
 );
+assert.ok(!coNav.some((item) => item.id === "bakery"));
 
 console.log("PASS Collection capabilities / nav");

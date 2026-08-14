@@ -29,6 +29,7 @@ import {
   validateOwnerCreateFulfilment,
   type DeliveryCreateDraft,
 } from "@/engines/orders/fulfilment";
+import { isWithinTwoDayChangeCutoff } from "@/engines/operations/approvals";
 import { reconcilePaymentLifecycleStatus } from "@/engines/orders/payment-status";
 import { isValidClockPickupTime, isValidPickupSlot } from "@/engines/business-calendar/pickup-slots";
 import { requireStaff } from "@/foundation/auth/session";
@@ -69,6 +70,18 @@ export type CreateStaffGuestOrderState = {
 async function requireOwner() {
   const staff = await requireStaff();
   if (staff.role.code !== "owner") {
+    redirect("/home");
+  }
+  return staff;
+}
+
+/** Owner or Customer Operations — shared Operations board + preorder follow-up. */
+async function requireOwnerOrCustomerOperations() {
+  const staff = await requireStaff();
+  if (
+    staff.role.code !== "owner" &&
+    staff.role.code !== "customer_operations"
+  ) {
     redirect("/home");
   }
   return staff;
@@ -490,7 +503,7 @@ export async function saveOrderWorkspaceAction(
   _prev: OrderWorkspaceSaveState,
   formData: FormData,
 ): Promise<OrderWorkspaceSaveState> {
-  const staff = await requireOwner();
+  const staff = await requireOwnerOrCustomerOperations();
 
   const guestName = String(formData.get("guest_name") ?? "").trim();
   const guestPhone = String(formData.get("guest_phone") ?? "").trim();
@@ -522,6 +535,17 @@ export async function saveOrderWorkspaceAction(
   if (!isGuestOrderEditable(before.status)) {
     return {
       error: "This order can no longer be edited.",
+      success: false,
+    };
+  }
+
+  if (
+    staff.role.code === "customer_operations" &&
+    isWithinTwoDayChangeCutoff({ pickupDate: before.pickupDate })
+  ) {
+    return {
+      error:
+        "This order is within the 2-day change cutoff. Request approval for the exact change.",
       success: false,
     };
   }
@@ -586,7 +610,13 @@ export async function saveOrderWorkspaceAction(
         success: false,
       };
     }
-    // requireOwner() already gated this action; override checkbox is the explicit intent.
+    if (staff.role.code !== "owner") {
+      return {
+        error:
+          "Cross-month pickup changes require Owner override. Ask Owner/Manager to approve the exception.",
+        success: false,
+      };
+    }
   }
 
   if (nextSource === "customer_website") {
@@ -952,7 +982,7 @@ export async function saveOrderWorkspaceAction(
 export async function markConfirmationSentAction(
   orderId: string,
 ): Promise<{ error: string | null }> {
-  const staff = await requireOwner();
+  const staff = await requireOwnerOrCustomerOperations();
   const order = await getGuestOrderById(orderId);
   if (!order) {
     return { error: "Order not found." };
@@ -1051,7 +1081,7 @@ export async function recordConfirmationPreparedAction(
   orderId: string,
   isUpdated: boolean,
 ): Promise<void> {
-  const staff = await requireOwner();
+  const staff = await requireOwnerOrCustomerOperations();
   await insertTimelineEvent({
     orderId,
     eventType: isUpdated
@@ -1065,7 +1095,7 @@ export async function recordConfirmationPreparedAction(
 export async function customerConfirmedAction(
   orderId: string,
 ): Promise<{ error: string | null }> {
-  const staff = await requireOwner();
+  const staff = await requireOwnerOrCustomerOperations();
   const order = await getGuestOrderById(orderId);
   if (!order) {
     return { error: "Order not found." };
@@ -1106,14 +1136,14 @@ export async function customerConfirmedAction(
 }
 
 export async function listGuestOrdersAction(): Promise<StorefrontOrderListItem[]> {
-  await requireOwner();
+  await requireOwnerOrCustomerOperations();
   return listGuestOrders();
 }
 
 export async function getGuestOrderListItemAction(
   id: string,
 ): Promise<StorefrontOrderListItem | null> {
-  await requireOwner();
+  await requireOwnerOrCustomerOperations();
   return getGuestOrderListItem(id);
 }
 
@@ -1138,7 +1168,7 @@ export type RecordPaymentState = {
 export async function recordPaymentRequestPreparedAction(
   orderId: string,
 ): Promise<void> {
-  const staff = await requireOwner();
+  const staff = await requireOwnerOrCustomerOperations();
   const order = await getGuestOrderById(orderId);
   if (!order || order.status !== "awaiting_payment") return;
 
@@ -1158,7 +1188,7 @@ export async function markPaymentRequestSentAction(
     deadlineAtIso: string;
   },
 ): Promise<{ error: string | null }> {
-  const staff = await requireOwner();
+  const staff = await requireOwnerOrCustomerOperations();
   const order = await getGuestOrderById(orderId);
   if (!order) {
     return { error: "Order not found." };
@@ -1252,7 +1282,7 @@ export async function recordAndVerifyPaymentAction(
   _prev: RecordPaymentState,
   formData: FormData,
 ): Promise<RecordPaymentState> {
-  const staff = await requireOwner();
+  const staff = await requireOwnerOrCustomerOperations();
   const order = await getGuestOrderById(orderId);
   if (!order) {
     return { error: "Order not found.", success: false };
@@ -1327,7 +1357,7 @@ export async function recordAndVerifyPaymentAction(
 export async function applyAugustPromoAction(
   orderId: string,
 ): Promise<{ error: string | null }> {
-  const staff = await requireOwner();
+  const staff = await requireOwnerOrCustomerOperations();
   const order = await getGuestOrderById(orderId);
   if (!order) {
     return { error: "Order not found." };
@@ -1368,7 +1398,7 @@ export async function redeemRm10VoucherAction(
   _prev: RedeemRm10State,
   formData: FormData,
 ): Promise<RedeemRm10State> {
-  const staff = await requireOwner();
+  const staff = await requireOwnerOrCustomerOperations();
   const order = await getGuestOrderById(orderId);
   if (!order) {
     return { error: "Order not found.", success: false };
@@ -1384,6 +1414,13 @@ export async function redeemRm10VoucherAction(
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) {
     return { error: "Enter a valid expiry date.", success: false };
+  }
+  if (ownerOverride && staff.role.code !== "owner") {
+    return {
+      error:
+        "Owner override for invalid vouchers is Owner-only. Use a valid voucher or ask Owner to apply the exception.",
+      success: false,
+    };
   }
   if (ownerOverride && !overrideReason) {
     return {
@@ -1428,7 +1465,7 @@ export async function removeOrderDiscountAction(
   orderId: string,
   adjustmentId: string,
 ): Promise<{ error: string | null }> {
-  const staff = await requireOwner();
+  const staff = await requireOwnerOrCustomerOperations();
   const order = await getGuestOrderById(orderId);
   if (!order) {
     return { error: "Order not found." };
@@ -1468,7 +1505,7 @@ export async function changeAugustPromoToRm10Action(
   _prev: RedeemRm10State,
   formData: FormData,
 ): Promise<RedeemRm10State> {
-  const staff = await requireOwner();
+  const staff = await requireOwnerOrCustomerOperations();
   const order = await getGuestOrderById(orderId);
   if (!order) {
     return { error: "Order not found.", success: false };
@@ -1484,6 +1521,13 @@ export async function changeAugustPromoToRm10Action(
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) {
     return { error: "Enter a valid expiry date.", success: false };
+  }
+  if (ownerOverride && staff.role.code !== "owner") {
+    return {
+      error:
+        "Owner override for invalid vouchers is Owner-only. Use a valid voucher or ask Owner to apply the exception.",
+      success: false,
+    };
   }
   if (ownerOverride && !overrideReason) {
     return {

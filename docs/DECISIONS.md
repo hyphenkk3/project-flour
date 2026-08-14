@@ -2,6 +2,242 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-14 — Customer Operations exception / approval workflow
+
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-14).** Shared Operations access
+is PRODUCT ACCEPTED / CLOSED in the same closeout. No Milestone 6. No further
+migration in this closeout.
+
+Product closed after live RPC verification + manual Product verification.
+Disposable fixtures only; Product order `7e9779ac-…` was not mutated.
+
+### Product decision
+
+Customer Operations is the **normal execution** role. Owner and Manager are
+the **exception approval** roles. When an action is outside CO authority,
+Whitebird explains why approval is required. CO requests approval for a
+**specific order + exact proposed mutation**. Owner or Manager review it.
+Approve **executes that mutation automatically**. Reject does not perform it.
+CO does not WhatsApp anyone, wait for a login, or repeat the change.
+
+Approval is not “temporarily grant extra role power.”
+
+### Supported request types (locked)
+
+| Type | When | Who may approve |
+|---|---|---|
+| `discount_exception` | Invalid/expired/ineligible RM10 (existing eligibility rule) | Owner, Manager |
+| `late_order_edit` | Normal order edit inside the calendar-date 2-day cutoff | Owner, Manager |
+| `cross_month_pickup` | Existing cross-month pickup/delivery restriction | Owner, Manager |
+
+Do not add refund, compensation, generic financial, fulfilment, or payment
+exception types in this slice. **Fee request/resolve stays on the existing
+independent workflow** — not migrated into `operations_approval_requests`.
+
+### Approval authority (locked)
+
+- **Owner:** approve/reject all three types.
+- **Manager:** approve/reject all three types. Does **not** grant the
+  Operations board, Calendar Owner controls, EXTRA, or other Owner tools.
+  Manager reaches pending approvals via `/owner/approvals` (link from
+  Customer Operations nav). `ROLE_NAVIGATION` is unchanged.
+- **Customer Operations:** create request + cancel own pending only.
+  Cannot approve/reject, including their own request.
+- **Bakery / Collection:** neither request nor approve these types.
+- Requester cannot approve/reject their own request.
+- Owner/Manager may still edit an order while an approval is pending.
+  If that makes the request stale, approve fails safely and requires
+  re-review. The order is not locked while pending.
+
+### 2-day cutoff (locked — calendar date, not 48 hours)
+
+Canonical business timezone: **Asia/Singapore** (`src/lib/dates.ts`
+`TIME_ZONE` / `toBusinessDateKey`). Pickup time-of-day is **ignored**.
+
+Changes are **direct** when `pickup_date - today >= 2` Singapore calendar
+days. Changes **require approval** when `pickup_date - today < 2`.
+
+Examples: pickup 16 Aug (12:00 or 21:30 — same cutoff) → 14 Aug 23:59:59
+direct; 15 Aug 00:00 requires approval. Same-day and next-day pickup require
+approval. Two-days-away is the boundary (still direct). 3+ days: direct.
+
+Pending requests **do not expire** merely because time or the cutoff passes.
+They go stale only when the server-computed order fingerprint no longer
+matches.
+
+### Data model
+
+Table: `operations_approval_requests` (live).
+
+Envelope: id, order_id, request_type, status (`pending` / `approved` /
+`rejected` / `cancelled`), reason, typed `payload`, `order_fingerprint`,
+requested_by, reviewed_by, reviewed_at, reviewer_note, timestamps.
+
+One pending request per `(order_id, request_type)`. Different types may be
+pending on the same order. Historical rows are not deleted.
+
+Payloads:
+
+- **discount_exception:** action (`redeem_rm10` \| `change_august_to_rm10`),
+  voucher_number, expiry_date, eligibility_reason, current/requested amount due
+- **cross_month_pickup:** current vs proposed pickup date/time, fulfilment method
+- **late_order_edit:** current snapshot + proposed pickup (same month only)
+  and/or items (cake_id, cake_size_id, quantity, unit_price, cake_name,
+  size_label). Cross-month pickup cannot ride on late_order_edit.
+
+Fingerprint is computed server-side from live order state (pickup, status,
+items signature, RM10/August flags). Approve refuses stale requests and does
+not apply the mutation.
+
+Requester may cancel their own pending request. Cancelled cannot later be
+approved.
+
+### Security
+
+Every mutation is a security-definer RPC plus app-layer session/role checks.
+Approver id is the authenticated staff id, never a client-supplied role.
+Requester cannot decide their own request. Already-decided rows cannot be
+decided again. Approve re-validates fingerprint and the requested mutation
+(including not bypassing the independent cross-month rule).
+
+### RM10 authorization (locked)
+
+Valid RM10 / eligible August Promo → RM10: Customer Operations UI offers
+direct Redeem. Live migration
+`20260814160000_rm10_valid_path_customer_operations.sql`:
+
+- `p_owner_override = false` (normal eligible) →
+  `owner | manager | customer_operations`
+- `p_owner_override = true` (exception / override) → `owner | manager`
+
+CO cannot set or forge the override flag. Bakery and Collection are denied
+on both paths. Do not weaken `p_owner_override`.
+
+Invalid/expired RM10: Request Approval → Owner/Manager approve → existing
+override RPC as the reviewing actor.
+
+### Late edit UX
+
+Inside cutoff, CO sees “Late-change approval required” / “This order is
+within the 2-day change cutoff.” / Request Approval capturing the exact
+proposed items and same-month pickup. Direct Save is blocked server-side for
+`customer_operations`. Owner Save remains direct.
+
+### v1 freshness
+
+Page-load / navigation only. No realtime, push, WhatsApp, or email.
+
+### Intentionally out of scope / future follow-up
+
+- **Pickup overdue indicator/reminder** — separate future Product slice:
+  at pickup date + pickup time, a Ready/uncollected order should become
+  visibly “Pickup overdue”; it must **not** automatically be marked
+  collected. Not implemented in this closeout.
+- Notifications (realtime / push / email / WhatsApp) for approvals
+- Generic workflow engine · refunds / compensation · fee-request rewrite
+- Manager Operations board · person-specific Vivian/Peter/Khalil/Lily logic
+- Collection/Bakery/EXTRA/Calendar redesign · new Collection attention engine
+- Any 2-day workflow beyond this locked calendar-date rule
+
+### Collection / Go to Payment / Operations date context
+
+Collection Mark/Undo live RPC allowlist:
+`owner | manager | collection | customer_operations`
+(`20260814140000_collection_customer_operations_picked_up.sql`). Bakery
+denied. Lifecycle otherwise unchanged.
+
+`scrollWorkspaceSectionIntoView` / Payment section id unchanged (Go to
+Payment).
+
+Operations selected-date context is preserved on order workspace round-trip
+via `/owner?date=YYYY-MM-DD` (and other approved board query params) +
+`returnTo`. Calendar / direct / Manager `/owner/approvals` entry does not
+force an Operations date.
+
+## 2026-08-14 — Shared Operations access (Customer Operations)
+
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-14).** Approval workflow is
+PRODUCT ACCEPTED / CLOSED in the same closeout. No Milestone 6.
+
+### Product authority
+
+- **Operations** = normal day-to-day preorder execution (communication,
+  confirmation, payment follow-up, ordinary payment recording, normal edits,
+  routine discounts).
+- **Customer Operations** CRM surface remains separate (profiles / addresses /
+  member orders) — no second Needs Attention queue.
+- Role receiving shared capability: **`customer_operations`** (role-based;
+  not person-specific).
+- **Normal execution** = Customer Operations. **Exception / override authority**
+  = Owner (and Manager where already supported — including the three typed
+  approval exceptions).
+- Manager is **not** automatically broadened to the Operations board in this
+  pass.
+- Bakery unchanged (no Operations / Collection expansion from this slice).
+
+### Canonical model (locked)
+
+ONE preorder → ONE Operations board → ONE `deriveOwnerAttention` → ONE
+order workspace → role-appropriate actions.
+
+### Customer Operations — allowed (accepted)
+
+- Operations board + Needs Attention + guest Order Workspace
+- Normal Edit Order (existing UI/mutations; late-edit inside 2-day cutoff
+  uses Request Approval — see approval workflow)
+- Routine eligible August Promo / RM10 voucher apply/change/remove
+- Confirmation / Updated Confirmation / Customer Confirmed
+- Payment Request + Record ordinary payment
+- Delivery fee quote / fee-request (not Approve/Reject; fee exceptions
+  remain on the existing fee workflow)
+- Collection nav + board + Mark/Undo Collected (live RPC allowlist)
+- Whole Cake Calendar **read-only**
+
+### Explicitly denied to Customer Operations
+
+- Cross-month pickup Owner override (self-approve) — request
+  `cross_month_pickup` instead
+- RM10 / discount eligibility Owner override — request
+  `discount_exception` instead
+- Fee Approve/Reject
+- Extend payment deadline · Owner Ops fulfilment controls · Messages tools
+- Calendar mutations · Propose EXTRA · Bakery production · EXTRA board
+- Refunds / exceptional compensation / arbitrary financial overrides
+- Ops board tools: + New Order / Propose EXTRA / Calendar shortcut chrome
+  (Calendar is via primary nav instead)
+
+### Collection Mark/Undo — narrow RPC (applied live)
+
+App-layer Collection access for `customer_operations` is implemented.
+Migration `20260814140000_collection_customer_operations_picked_up.sql`
+adds `customer_operations` to existing
+`mark_guest_order_picked_up` / `undo_guest_order_picked_up` allowlists only.
+Live allowlist: `owner | manager | collection | customer_operations`.
+No lifecycle, column, Ready-rule, or Delivery semantics changes. Bakery
+remains denied.
+
+### Capability split
+
+Explicit capabilities preferred over bundled Owner flags
+(`canEditOrderWorkspace`, `canOverridePickupMonth`, `canManageDiscounts`,
+`canOverrideDiscountEligibility`, `canPreparePaymentRequest`,
+`canRecordPayment`, `canViewWholeCakeCalendar`, `canUseOwnerBoardTools`, …).
+Server-side authorization must match UI.
+
+### Operations selected-date return context
+
+Choosing a non-Today pickup date on Operations writes
+`/owner?date=YYYY-MM-DD` (and other approved board query params). Opening an
+order from that board passes `returnTo`. “← Operations” restores that date.
+Direct order URLs and Calendar `returnTo` are unchanged. Manager still
+returns to `/owner/approvals`.
+
+### Explicitly deferred
+
+Manager Operations board · CO CRM redesign · pickup overdue
+indicator/reminder (see approval-workflow out-of-scope) · approval
+notifications.
+
 ## 2026-08-14 — Collection handoff UX polish
 
 **STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-14).** Live Collection activation

@@ -770,7 +770,7 @@ const counter = buildGuestOrderWorkspaceCapabilities({
 });
 assert.equal(owner.canPrepareConfirmation, true);
 assert.equal(manager.canPrepareConfirmation, false);
-assert.equal(counter.canPrepareConfirmation, false);
+assert.equal(counter.canPrepareConfirmation, true);
 assert.equal(manager.canDirectFeeExceptions, true);
 assert.equal(counter.canRequestFeeExceptions, true);
 

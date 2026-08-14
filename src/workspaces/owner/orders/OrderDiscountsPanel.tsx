@@ -37,9 +37,19 @@ import {
   removeOrderDiscountAction,
   type RedeemRm10State,
 } from "@/workspaces/owner/orders/actions";
+import {
+  discountExceptionEligibilityReason,
+  projectedAmountDueAfterRm10,
+  type OperationsApprovalRecord,
+} from "@/engines/operations/approvals";
+import { createOperationsApprovalAction } from "@/workspaces/owner/approvals/actions";
 
 type OrderDiscountsPanelProps = {
   order: StorefrontOrder;
+  /** Owner-only invalid-voucher / eligibility override checkbox. */
+  canOverrideDiscountEligibility?: boolean;
+  canRequestOperationsApproval?: boolean;
+  pendingDiscountApproval?: OperationsApprovalRecord | null;
 };
 
 const initialRedeemState: RedeemRm10State = {
@@ -53,7 +63,12 @@ function formatAdjustmentAmount(amount: number): string {
   return formatRm(0);
 }
 
-export function OrderDiscountsPanel({ order }: OrderDiscountsPanelProps) {
+export function OrderDiscountsPanel({
+  order,
+  canOverrideDiscountEligibility = false,
+  canRequestOperationsApproval = false,
+  pendingDiscountApproval = null,
+}: OrderDiscountsPanelProps) {
   const router = useRouter();
   const [promoPending, startPromo] = useTransition();
   const [lifecyclePending, startLifecycle] = useTransition();
@@ -63,6 +78,13 @@ export function OrderDiscountsPanel({ order }: OrderDiscountsPanelProps) {
   const [showChangeForm, setShowChangeForm] = useState(false);
   const [ownerOverride, setOwnerOverride] = useState(false);
   const [changeOverride, setChangeOverride] = useState(false);
+  const [voucherNumber, setVoucherNumber] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
+  const [changeVoucherNumber, setChangeVoucherNumber] = useState("");
+  const [changeExpiryDate, setChangeExpiryDate] = useState("");
+  const [approvalReason, setApprovalReason] = useState("");
+  const [approvalError, setApprovalError] = useState<string | null>(null);
+  const [approvalPending, startApproval] = useTransition();
 
   const effective = useMemo(
     () =>
@@ -118,6 +140,68 @@ export function OrderDiscountsPanel({ order }: OrderDiscountsPanelProps) {
       });
 
   const canOfferRm10Form = canMutateDiscounts && !hasAugust && !hasRm10;
+  const redeemException = expiryDate
+    ? discountExceptionEligibilityReason({
+        items: order.items,
+        orderDate,
+        pickupDate: order.pickupDate,
+        expiryDate,
+        hasAugustPromo: hasAugust,
+        hasRm10Card: hasRm10,
+      })
+    : { canRequest: false, reason: null };
+  const changeException = changeExpiryDate
+    ? discountExceptionEligibilityReason({
+        items: order.items,
+        orderDate,
+        pickupDate: order.pickupDate,
+        expiryDate: changeExpiryDate,
+        hasAugustPromo: false,
+        hasRm10Card: hasRm10,
+      })
+    : { canRequest: false, reason: null };
+
+  function requestDiscountApproval(input: {
+    action: "redeem_rm10" | "change_august_to_rm10";
+    voucherNumber: string;
+    expiryDate: string;
+    eligibilityReason: string;
+  }) {
+    const reason = approvalReason.trim() || input.eligibilityReason;
+    if (!reason) {
+      setApprovalError("A reason is required.");
+      return;
+    }
+    if (!input.voucherNumber.trim() || !input.expiryDate) {
+      setApprovalError("Enter the voucher number and expiry date.");
+      return;
+    }
+    setApprovalError(null);
+    startApproval(async () => {
+      const result = await createOperationsApprovalAction({
+        orderId: order.id,
+        requestType: "discount_exception",
+        reason,
+        payload: {
+          kind: "discount_exception",
+          action: input.action,
+          voucherNumber: input.voucherNumber.trim(),
+          expiryDate: input.expiryDate,
+          eligibilityReason: input.eligibilityReason,
+          currentAmountDue: order.settlement.amountDue,
+          requestedAmountDue: projectedAmountDueAfterRm10({
+            currentAmountDue: order.settlement.amountDue,
+            action: input.action,
+          }),
+        },
+      });
+      if (result.error) {
+        setApprovalError(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
 
   const boundRedeem = redeemRm10VoucherAction.bind(null, order.id);
   const [redeemState, redeemAction, redeemPending] = useActionState(
@@ -274,6 +358,12 @@ export function OrderDiscountsPanel({ order }: OrderDiscountsPanelProps) {
         </p>
       ) : null}
 
+      {pendingDiscountApproval ? (
+        <p className="border-status-warning/30 bg-status-warning-soft text-status-warning rounded-lg border px-4 py-3 text-sm">
+          Discount exception approval is pending Owner review.
+        </p>
+      ) : null}
+
       {showChangeForm && activePromo && canMutateDiscounts ? (
         <form
           action={changeAction}
@@ -291,46 +381,94 @@ export function OrderDiscountsPanel({ order }: OrderDiscountsPanelProps) {
             <FormInput
               id="change_voucher_number"
               name="voucher_number"
+              onChange={(event) => setChangeVoucherNumber(event.target.value)}
               placeholder="e.g. 325"
               required
+              value={changeVoucherNumber}
             />
           </FormField>
           <FormField htmlFor="change_expiry_date" label="Expiry date">
             <FormInput
               id="change_expiry_date"
               name="expiry_date"
+              onChange={(event) => setChangeExpiryDate(event.target.value)}
               required
               type="date"
+              value={changeExpiryDate}
             />
           </FormField>
-          <label className="text-ink flex items-center gap-2 text-sm">
-            <input
-              checked={changeOverride}
-              name="owner_override"
-              onChange={(event) => setChangeOverride(event.target.checked)}
-              type="checkbox"
-              value="1"
-            />
-            Owner override (invalid voucher exception)
-          </label>
-          {changeOverride ? (
-            <FormField htmlFor="change_override_reason" label="Override reason">
-              <FormTextarea
-                id="change_override_reason"
-                name="override_reason"
-                placeholder="Required reason for the exception"
-                required
-                rows={2}
-              />
-            </FormField>
+          {canOverrideDiscountEligibility ? (
+            <>
+              <label className="text-ink flex items-center gap-2 text-sm">
+                <input
+                  checked={changeOverride}
+                  name="owner_override"
+                  onChange={(event) => setChangeOverride(event.target.checked)}
+                  type="checkbox"
+                  value="1"
+                />
+                Owner override (invalid voucher exception)
+              </label>
+              {changeOverride ? (
+                <FormField htmlFor="change_override_reason" label="Override reason">
+                  <FormTextarea
+                    id="change_override_reason"
+                    name="override_reason"
+                    placeholder="Required reason for the exception"
+                    required
+                    rows={2}
+                  />
+                </FormField>
+              ) : (
+                <input name="owner_override" type="hidden" value="0" />
+              )}
+            </>
+          ) : canRequestOperationsApproval && changeException.canRequest ? (
+            <div className="space-y-2">
+              <p className="text-status-warning text-sm">
+                Voucher cannot be applied automatically.
+              </p>
+              <p className="text-ink text-sm">
+                This voucher does not meet the normal eligibility rules.
+                {changeException.reason ? ` ${changeException.reason}` : ""}
+              </p>
+              <FormField htmlFor="change_approval_reason" label="Reason">
+                <FormTextarea
+                  id="change_approval_reason"
+                  onChange={(event) => setApprovalReason(event.target.value)}
+                  placeholder={changeException.reason ?? "Why this exception is needed"}
+                  rows={2}
+                  value={approvalReason}
+                />
+              </FormField>
+              <input name="owner_override" type="hidden" value="0" />
+            </div>
           ) : (
             <input name="owner_override" type="hidden" value="0" />
           )}
-          <FormError message={changeState.error} />
+          <FormError message={changeState.error ?? approvalError} />
           <FormActions>
-            <FormSubmitButton pending={changePending}>
-              Confirm Change
-            </FormSubmitButton>
+            {canRequestOperationsApproval && changeException.canRequest ? (
+              <button
+                className="bg-ink text-mist hover:bg-skyline inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-medium disabled:opacity-60"
+                disabled={approvalPending || Boolean(pendingDiscountApproval)}
+                onClick={() =>
+                  requestDiscountApproval({
+                    action: "change_august_to_rm10",
+                    voucherNumber: changeVoucherNumber,
+                    expiryDate: changeExpiryDate,
+                    eligibilityReason: changeException.reason ?? "",
+                  })
+                }
+                type="button"
+              >
+                {approvalPending ? "Requesting…" : "Request Approval"}
+              </button>
+            ) : (
+              <FormSubmitButton pending={changePending}>
+                Confirm Change
+              </FormSubmitButton>
+            )}
             <button
               className="text-skyline hover:text-ink text-sm font-medium"
               onClick={() => setShowChangeForm(false)}
@@ -367,7 +505,7 @@ export function OrderDiscountsPanel({ order }: OrderDiscountsPanelProps) {
             </div>
           ) : null}
 
-          {canOfferRm10Form ? (
+          {canOfferRm10Form && !pendingDiscountApproval ? (
             <div className="space-y-2">
               {!showRm10Form ? (
                 <button
@@ -396,48 +534,104 @@ export function OrderDiscountsPanel({ order }: OrderDiscountsPanelProps) {
                     <FormInput
                       id="voucher_number"
                       name="voucher_number"
+                      onChange={(event) => setVoucherNumber(event.target.value)}
                       placeholder="e.g. 325"
                       required
+                      value={voucherNumber}
                     />
                   </FormField>
                   <FormField htmlFor="expiry_date" label="Expiry date">
                     <FormInput
                       id="expiry_date"
                       name="expiry_date"
+                      onChange={(event) => setExpiryDate(event.target.value)}
                       required
                       type="date"
+                      value={expiryDate}
                     />
                   </FormField>
-                  <label className="text-ink flex items-center gap-2 text-sm">
-                    <input
-                      checked={ownerOverride}
-                      name="owner_override"
-                      onChange={(event) =>
-                        setOwnerOverride(event.target.checked)
-                      }
-                      type="checkbox"
-                      value="1"
-                    />
-                    Owner override (invalid voucher exception)
-                  </label>
-                  {ownerOverride ? (
-                    <FormField htmlFor="override_reason" label="Override reason">
-                      <FormTextarea
-                        id="override_reason"
-                        name="override_reason"
-                        placeholder="Required reason for the exception"
-                        required
-                        rows={2}
-                      />
-                    </FormField>
+                  {canOverrideDiscountEligibility ? (
+                    <>
+                      <label className="text-ink flex items-center gap-2 text-sm">
+                        <input
+                          checked={ownerOverride}
+                          name="owner_override"
+                          onChange={(event) =>
+                            setOwnerOverride(event.target.checked)
+                          }
+                          type="checkbox"
+                          value="1"
+                        />
+                        Owner override (invalid voucher exception)
+                      </label>
+                      {ownerOverride ? (
+                        <FormField htmlFor="override_reason" label="Override reason">
+                          <FormTextarea
+                            id="override_reason"
+                            name="override_reason"
+                            placeholder="Required reason for the exception"
+                            required
+                            rows={2}
+                          />
+                        </FormField>
+                      ) : (
+                        <input name="owner_override" type="hidden" value="0" />
+                      )}
+                    </>
+                  ) : canRequestOperationsApproval && redeemException.canRequest ? (
+                    <div className="space-y-2">
+                      <p className="text-status-warning text-sm">
+                        Voucher cannot be applied automatically.
+                      </p>
+                      <p className="text-ink text-sm">
+                        This voucher does not meet the normal eligibility rules.
+                        {redeemException.reason
+                          ? ` ${redeemException.reason}`
+                          : ""}
+                      </p>
+                      <FormField htmlFor="rm10_approval_reason" label="Reason">
+                        <FormTextarea
+                          id="rm10_approval_reason"
+                          onChange={(event) =>
+                            setApprovalReason(event.target.value)
+                          }
+                          placeholder={
+                            redeemException.reason ??
+                            "Why this exception is needed"
+                          }
+                          rows={2}
+                          value={approvalReason}
+                        />
+                      </FormField>
+                      <input name="owner_override" type="hidden" value="0" />
+                    </div>
                   ) : (
                     <input name="owner_override" type="hidden" value="0" />
                   )}
-                  <FormError message={redeemState.error} />
+                  <FormError message={redeemState.error ?? approvalError} />
                   <FormActions>
-                    <FormSubmitButton pending={redeemPending}>
-                      Redeem & Apply
-                    </FormSubmitButton>
+                    {canRequestOperationsApproval &&
+                    redeemException.canRequest ? (
+                      <button
+                        className="bg-ink text-mist hover:bg-skyline inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-medium disabled:opacity-60"
+                        disabled={approvalPending}
+                        onClick={() =>
+                          requestDiscountApproval({
+                            action: "redeem_rm10",
+                            voucherNumber,
+                            expiryDate,
+                            eligibilityReason: redeemException.reason ?? "",
+                          })
+                        }
+                        type="button"
+                      >
+                        {approvalPending ? "Requesting…" : "Request Approval"}
+                      </button>
+                    ) : (
+                      <FormSubmitButton pending={redeemPending}>
+                        Redeem & Apply
+                      </FormSubmitButton>
+                    )}
                     <button
                       className="text-skyline hover:text-ink text-sm font-medium"
                       onClick={() => setShowRm10Form(false)}

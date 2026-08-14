@@ -50,6 +50,8 @@ type CalendarQuickViewProps = {
   /** After EXTRA propose succeeds — refresh calendar EXTRA markers. */
   onExtraProposed?: () => void | Promise<void>;
   onClose: () => void;
+  /** Owner-only fulfilment / messages / Propose EXTRA controls. */
+  canMutateCalendarOrderActions?: boolean;
 };
 
 export function CalendarQuickView({
@@ -59,6 +61,7 @@ export function CalendarQuickView({
   refreshKey = 0,
   onExtraProposed,
   onClose,
+  canMutateCalendarOrderActions = false,
 }: CalendarQuickViewProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closingFromParentRef = useRef(false);
@@ -202,6 +205,7 @@ export function CalendarQuickView({
 
             {order ? (
               <CalendarQuickViewBody
+                canMutateCalendarOrderActions={canMutateCalendarOrderActions}
                 loading={loading}
                 onExtraProposed={onExtraProposed}
                 onRefresh={() => {
@@ -236,12 +240,14 @@ function CalendarQuickViewBody({
   onRefresh,
   onExtraProposed,
   staffDisplayName,
+  canMutateCalendarOrderActions = false,
 }: {
   order: StorefrontOrder;
   loading: boolean;
   onRefresh: () => void | Promise<void>;
   onExtraProposed?: () => void | Promise<void>;
   staffDisplayName: string;
+  canMutateCalendarOrderActions?: boolean;
 }) {
   const settlement = order.settlement;
   const effectiveAdjustments = getEffectiveAdjustments(order.adjustments);
@@ -315,17 +321,21 @@ function CalendarQuickViewBody({
         </div>
       </section>
 
-      <OrderOperationalControls
-        deliveredAt={order.deliveredAt}
-        fulfilmentMethod={order.fulfilmentMethod}
-        onSuccess={onRefresh}
-        orderId={order.id}
-        outForDeliveryAt={order.outForDeliveryAt}
-        pickedUpAt={order.pickedUpAt}
-        readyAt={order.readyAt}
-      />
+      {canMutateCalendarOrderActions ? (
+        <OrderOperationalControls
+          deliveredAt={order.deliveredAt}
+          fulfilmentMethod={order.fulfilmentMethod}
+          onSuccess={onRefresh}
+          orderId={order.id}
+          outForDeliveryAt={order.outForDeliveryAt}
+          pickedUpAt={order.pickedUpAt}
+          readyAt={order.readyAt}
+        />
+      ) : null}
 
-      <OrderMessagesSection order={order} staffDisplayName={staffDisplayName} />
+      {canMutateCalendarOrderActions ? (
+        <OrderMessagesSection order={order} staffDisplayName={staffDisplayName} />
+      ) : null}
 
       <section className="space-y-1">
         <h3 className="text-skyline text-[11px] font-semibold tracking-wide uppercase">
@@ -350,7 +360,8 @@ function CalendarQuickViewBody({
                 {item.sizeLabel} ×{item.quantity}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                {proposeExtra.target?.item.id === item.id ? null : (
+                {canMutateCalendarOrderActions &&
+                proposeExtra.target?.item.id !== item.id ? (
                   <button
                     className="border-line text-ink hover:bg-mist inline-flex min-h-9 items-center justify-center rounded-lg border px-3 text-xs font-medium"
                     onClick={() =>
@@ -364,14 +375,15 @@ function CalendarQuickViewBody({
                   >
                     Propose EXTRA
                   </button>
-                )}
+                ) : null}
                 {proposeExtra.successItemId === item.id ? (
                   <p className="text-status-success text-xs font-medium">
                     EXTRA proposed
                   </p>
                 ) : null}
               </div>
-              {proposeExtra.target?.item.id === item.id ? (
+              {canMutateCalendarOrderActions &&
+              proposeExtra.target?.item.id === item.id ? (
                 <ProposeExtraFromCalendarPanel
                   error={proposeExtra.error}
                   onCancel={proposeExtra.cancel}

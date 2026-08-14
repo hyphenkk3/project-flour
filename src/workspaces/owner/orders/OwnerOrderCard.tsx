@@ -17,10 +17,13 @@ import {
 } from "@/workspaces/owner/orders/labels";
 import type { StorefrontOrderListItem } from "@/types/storefront";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { ownerOrderWorkspaceHref } from "@/workspaces/owner/navigation/return-to";
 
 type OwnerOrderCardProps = {
   order: StorefrontOrderListItem;
   highlight?: boolean;
+  /** Validated Operations or Calendar return path. */
+  returnTo?: string | null;
 };
 
 function attentionInput(order: StorefrontOrderListItem) {
@@ -40,6 +43,7 @@ function attentionInput(order: StorefrontOrderListItem) {
 export function OwnerOrderCard({
   order,
   highlight = false,
+  returnTo = null,
 }: OwnerOrderCardProps) {
   const cakeLine =
     order.additionalItemCount > 0
@@ -72,7 +76,7 @@ export function OwnerOrderCard({
             ? "border-fog/80 bg-mist/40 text-skyline block rounded-xl border p-4 transition-colors"
             : "border-fog hover:border-skyline block rounded-xl border bg-white p-4 transition-colors"
       }
-      href={`/owner/orders/${order.id}`}
+      href={ownerOrderWorkspaceHref(order.id, returnTo)}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">

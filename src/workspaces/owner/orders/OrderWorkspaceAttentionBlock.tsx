@@ -12,6 +12,7 @@ import {
 } from "@/engines/operations/owner-attention";
 import type { GuestOrderWorkspaceCapabilities } from "@/engines/orders/delivery-finance-capabilities";
 import { focusDeliveryChargesSection } from "@/workspaces/owner/orders/missing-delivery-fee-confirmation";
+import { scrollWorkspaceSectionIntoView } from "@/workspaces/owner/orders/scroll-workspace-section";
 import { CustomerConfirmedButton } from "@/workspaces/owner/orders/CustomerConfirmedButton";
 import type { StorefrontOrder } from "@/types/storefront";
 
@@ -26,18 +27,14 @@ const primaryButtonClass =
 const secondaryButtonClass =
   "border-fog text-ink hover:bg-mist inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg border bg-white px-4 text-sm font-medium";
 
-function scrollToId(id: string) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
 function ReasonRow({
   reason,
   action,
+  supportingCopy,
 }: {
   reason: OwnerAttentionReason;
   action: ReactNode;
+  supportingCopy?: string;
 }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
@@ -46,7 +43,7 @@ function ReasonRow({
           {reason.label}
         </p>
         <p className="text-ink mt-0.5 text-sm leading-relaxed">
-          {OWNER_ATTENTION_SUPPORTING_COPY[reason.key]}
+          {supportingCopy ?? OWNER_ATTENTION_SUPPORTING_COPY[reason.key]}
         </p>
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
@@ -102,15 +99,19 @@ export function OrderWorkspaceAttentionBlock({
       case "payment_needed":
       case "payment_overdue":
         if (paymentActionKey !== key) return null;
-        return (
+        return capabilities.canManagePayments ? (
           <button
             className={primaryButtonClass}
-            onClick={() => scrollToId(OWNER_ORDER_PAYMENT_SECTION_ID)}
+            onClick={() =>
+              scrollWorkspaceSectionIntoView(OWNER_ORDER_PAYMENT_SECTION_ID, {
+                focus: true,
+              })
+            }
             type="button"
           >
             Go to Payment
           </button>
-        );
+        ) : null;
       case "fee_request_pending":
         return (
           <button
@@ -137,7 +138,16 @@ export function OrderWorkspaceAttentionBlock({
       <ul className="mt-3 space-y-3">
         {reasons.map((reason) => (
           <li key={reason.key}>
-            <ReasonRow action={actionFor(reason.key)} reason={reason} />
+            <ReasonRow
+              action={actionFor(reason.key)}
+              reason={reason}
+              supportingCopy={
+                reason.key === "fee_request_pending" &&
+                !capabilities.canResolveFeeRequests
+                  ? "Awaiting Owner/Manager review."
+                  : undefined
+              }
+            />
           </li>
         ))}
       </ul>
