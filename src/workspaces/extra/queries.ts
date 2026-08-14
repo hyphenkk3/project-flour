@@ -106,6 +106,24 @@ export async function listExtraStockUnits(): Promise<ExtraStockUnit[]> {
   );
 }
 
+/**
+ * Lightweight count of EXTRA awaiting Bakery review.
+ * Canonical: lifecycle === "proposed" (same as ExtraBoard Proposed).
+ */
+export async function countExtraStockProposed(): Promise<number> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("extra_stock")
+    .select("id", { count: "exact", head: true })
+    .eq("lifecycle", "proposed");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return count ?? 0;
+}
+
 export async function listExtraCakeOptions(): Promise<ExtraCakeOption[]> {
   const supabase = await createClient();
   const { data, error } = await supabase

@@ -2,6 +2,47 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-14 — Bakery EXTRA awareness
+
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-14).** EXTRA v1 / v1.1 remain
+PRODUCT ACCEPTED / CLOSED. No Milestone 6. No migration.
+
+Product closed after manual Bakery Production review:
+
+- Production awareness visual hierarchy PASS
+- `EXTRA · N` navigation awareness PASS
+- Compact warning-colour callout (`N EXTRA proposals awaiting review →`) PASS
+- Callout placement/density PASS; callout → EXTRA navigation PASS
+- After actioning one proposal, pending count refresh observed:
+  `EXTRA · 3` → `EXTRA · 2` PASS
+
+Automated helper coverage (proposed-count / capabilities / Calendar / Bakery
+eligibility) was re-run at closeout. Product did not manually exercise every
+automated exclusion case (e.g. Create Available / rejected / null prepared_on);
+those remain covered by helpers only.
+
+### Accepted surface (frozen unless Product reopens)
+
+- Canonical pending count: `lifecycle === "proposed"` (all proposed rows;
+  no Owner-only / origin / prepared_on / date / expiry filters).
+- EXTRA tab: `EXTRA · N` when count > 0; plain `EXTRA` at zero.
+- Production: compact callout only when count > 0 —
+  singular `1 EXTRA proposal awaiting review →` /
+  plural `N EXTRA proposals awaiting review →` → `/bakery/extra`
+  with subtle `text-status-warning` hierarchy (not a banner/card).
+- Freshness: page-load / navigation only. No EXTRA realtime, poll,
+  notification centre, push, WhatsApp, or toast infrastructure.
+- Lightweight count query — do not load full EXTRA inventory on Production
+  merely for the badge.
+- ExtraBoard Confirm Available / Reject / Undo Reject / Create Available
+  and EXTRA lifecycle RPCs unchanged. Create Available remains direct
+  `confirmed` and does not count. Viewing/counting is read-only.
+
+### Explicitly deferred
+
+Realtime EXTRA awareness · notification systems · origin enum ·
+Calendar/Operations redesign · Production board redesign.
+
 ## 2026-08-14 — Whole Cake Calendar compact-controls polish
 
 **STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-14).** Layout density only.

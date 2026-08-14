@@ -2,13 +2,20 @@ import Link from "next/link";
 
 type BakeryWorkspaceNavProps = {
   active: "production" | "extra";
+  /** lifecycle === "proposed" count; omit or 0 → no tab count. */
+  proposedCount?: number;
 };
 
-export function BakeryWorkspaceNav({ active }: BakeryWorkspaceNavProps) {
+export function BakeryWorkspaceNav({
+  active,
+  proposedCount = 0,
+}: BakeryWorkspaceNavProps) {
   const base =
     "inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-medium transition";
   const idle = `${base} text-skyline hover:text-ink hover:bg-mist`;
   const on = `${base} bg-ink text-mist`;
+  const extraLabel =
+    proposedCount > 0 ? `EXTRA · ${proposedCount}` : "EXTRA";
 
   return (
     <nav
@@ -25,7 +32,7 @@ export function BakeryWorkspaceNav({ active }: BakeryWorkspaceNavProps) {
         className={active === "extra" ? on : idle}
         href="/bakery/extra"
       >
-        EXTRA
+        {extraLabel}
       </Link>
     </nav>
   );

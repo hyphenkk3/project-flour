@@ -35,6 +35,9 @@ Detailed business rules, message formats, financial/lifecycle rationale, and his
 - **Whole Cake Calendar compact-controls polish:** **PRODUCT ACCEPTED /
   CLOSED (2026-08-14)** (single desktop toolbar; Matrix-only controls;
   no business/data change; no migration)
+- **Bakery EXTRA awareness:** **PRODUCT ACCEPTED / CLOSED (2026-08-14)**
+  (`EXTRA · N` + Production awaiting-review callout; page-load freshness;
+  no migration)
 - Working tree may include untracked `tmp/` Product-review assets only —
   do not stage.
 
@@ -264,6 +267,15 @@ accepted freeze).
   toolbar; Matrix controls only when View = Matrix; responsive wrap.
 - Calendar/matrix begins immediately below; no separate secondary toolbar.
 - Density/layout only — no business/data behavior change; no migration.
+
+### Bakery EXTRA awareness — PRODUCT ACCEPTED / CLOSED (2026-08-14)
+
+- Canonical pending: `lifecycle === "proposed"`; lightweight count query.
+- EXTRA tab: `EXTRA · N` when count > 0; Production compact warning callout
+  → `/bakery/extra`; zero-state hidden; page-load/nav freshness only.
+- Product manual PASS: Production hierarchy; `EXTRA · N`; warning callout;
+  callout → EXTRA; count refresh after actioning (`EXTRA · 3` → `EXTRA · 2`).
+- No realtime/notifications; ExtraBoard Confirm/Reject unchanged; no migration.
 
 ### Live Collection workspace activation (v1) — PRODUCT ACCEPTED / CLOSED (2026-08-13)
 

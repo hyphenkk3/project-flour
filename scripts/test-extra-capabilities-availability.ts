@@ -4,6 +4,9 @@
  */
 import assert from "node:assert/strict";
 import {
+  bakeryExtraProposalsAwaitingReviewLabel,
+  countBakeryExtraProposalsAwaitingReview,
+  isBakeryExtraProposalActionable,
   isExtraAvailable,
   isExtraExpiredConfirmed,
 } from "@/engines/extra/availability";
@@ -107,6 +110,47 @@ assert.equal(
     staffId: "b1",
   }).canMarkCollected,
   false,
+);
+
+assert.equal(isBakeryExtraProposalActionable({ lifecycle: "proposed" }), true);
+assert.equal(isBakeryExtraProposalActionable({ lifecycle: "confirmed" }), false);
+assert.equal(isBakeryExtraProposalActionable({ lifecycle: "rejected" }), false);
+
+assert.equal(
+  countBakeryExtraProposalsAwaitingReview([]),
+  0,
+  "zero proposed → 0",
+);
+assert.equal(
+  countBakeryExtraProposalsAwaitingReview([{ lifecycle: "proposed" }]),
+  1,
+);
+assert.equal(
+  countBakeryExtraProposalsAwaitingReview([
+    { lifecycle: "proposed" },
+    { lifecycle: "proposed" },
+    { lifecycle: "confirmed" },
+    { lifecycle: "rejected" },
+  ]),
+  2,
+  "only proposed counted",
+);
+assert.equal(
+  countBakeryExtraProposalsAwaitingReview([
+    { lifecycle: "confirmed" },
+    { lifecycle: "rejected" },
+  ]),
+  0,
+  "Create Available / confirmed / rejected excluded",
+);
+
+assert.equal(
+  bakeryExtraProposalsAwaitingReviewLabel(1),
+  "1 EXTRA proposal awaiting review →",
+);
+assert.equal(
+  bakeryExtraProposalsAwaitingReviewLabel(2),
+  "2 EXTRA proposals awaiting review →",
 );
 
 console.log("EXTRA capabilities + availability: PASS");

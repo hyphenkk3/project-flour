@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { FormField, FormTextarea } from "@/components/ui/form";
 import { formatLongBusinessDate } from "@/lib/dates";
 import type { ExtraWorkspaceCapabilities } from "@/engines/extra/capabilities";
+import { isBakeryExtraProposalActionable } from "@/engines/extra/availability";
 import {
   confirmExtraStockAction,
   createConfirmedExtraStockAction,
@@ -66,7 +67,7 @@ export function ExtraBoard({
   const [rejectReason, setRejectReason] = useState("");
 
   const proposed = useMemo(
-    () => units.filter((u) => u.lifecycle === "proposed"),
+    () => units.filter((u) => isBakeryExtraProposalActionable(u)),
     [units],
   );
   const available = useMemo(

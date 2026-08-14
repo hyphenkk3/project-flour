@@ -3,6 +3,7 @@ import { buildExtraWorkspaceCapabilities } from "@/engines/extra/capabilities";
 import { BakeryWorkspaceNav } from "@/workspaces/bakery/BakeryWorkspaceNav";
 import { ExtraBoard } from "@/workspaces/extra/ExtraBoard";
 import {
+  countExtraStockProposed,
   listExtraCakeOptions,
   listExtraStockUnits,
 } from "@/workspaces/extra/queries";
@@ -23,15 +24,16 @@ export default async function BakeryExtraPage({
     role: staff.role.code,
     staffId: staff.id,
   });
-  const [units, cakes] = await Promise.all([
+  const [units, cakes, proposedCount] = await Promise.all([
     listExtraStockUnits(),
     listExtraCakeOptions(),
+    countExtraStockProposed(),
   ]);
 
   return (
     <>
       <div className="px-5 sm:px-8">
-        <BakeryWorkspaceNav active="extra" />
+        <BakeryWorkspaceNav active="extra" proposedCount={proposedCount} />
       </div>
       <ExtraBoard
         cakes={cakes}
