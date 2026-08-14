@@ -461,6 +461,11 @@ function mapListItem(row: OrderRow): StorefrontOrderListItem {
     pickedUpAt: order.pickedUpAt,
     outForDeliveryAt: order.outForDeliveryAt,
     deliveredAt: order.deliveredAt,
+    paymentDeadlineAt: order.paymentDeadlineAt,
+    hasPendingFeeRequest: Boolean(
+      order.delivery?.deliveryFeeRequest.status === "pending" ||
+        order.delivery?.processingFeeRequest.status === "pending",
+    ),
   };
 }
 

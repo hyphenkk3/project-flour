@@ -27,6 +27,8 @@ Detailed business rules, message formats, financial/lifecycle rationale, and his
 - **EXTRA v1.1 — Calendar-assisted proposal:** **PRODUCT ACCEPTED /
   CLOSED (2026-08-13)** (Calendar Quick View Propose EXTRA; Matrix EXTRA
   on prepared_on; no Hold/sale/public / Confirm-on-Calendar)
+- **Operations Smoothness Pass — Slice 1:** **PRODUCT ACCEPTED / CLOSED
+  (2026-08-14)** (Today-first Ops grouping + derived attention; no migration)
 - Working tree may include untracked `tmp/` Product-review assets only —
   do not stage.
 
@@ -222,6 +224,23 @@ accepted freeze).
   acknowledgement, automatic carry-forward UI, source preorder
   clone/mutation, fake EXTRA financial orders, Bakery Production-column
   overload, broader Calendar redesign, Milestone 6.
+
+### Operations Smoothness Pass — Slice 1 — PRODUCT ACCEPTED / CLOSED (2026-08-14)
+
+- Owner Operations default pickup filter = **Today**.
+- Today groups: **Needs Attention** / **All Clear** / **Completed**.
+- Derived `deriveOwnerAttention` (not persisted): Confirmation not prepared;
+  Waiting for customer confirmation; Customer reconfirmation needed;
+  Payment needed; Payment overdue; Fee request pending.
+- Bakery Attention excluded from Ops Needs Attention. No RM on cards.
+- Reconfirmation current only until fulfilment terminal (`picked_up` /
+  `delivered`); `out_for_delivery` remains actionable; history flag kept.
+- Workspace: actionable reconfirmation warning + Prepare Updated Confirmation.
+- Compact toolbar: Search / Pickup / Status / Sort.
+- Visual hierarchy: Needs Attention strongest → All Clear positive →
+  Completed muted.
+- Deferred polish: clearer horizontal spacing between Today summary counts
+  (cosmetic; did not block acceptance).
 
 ### Live Collection workspace activation (v1) — PRODUCT ACCEPTED / CLOSED (2026-08-13)
 

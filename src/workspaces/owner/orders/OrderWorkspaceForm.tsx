@@ -26,7 +26,7 @@ import {
   timelineEventLabel,
 } from "@/engines/orders/timeline";
 import {
-  shouldOfferUpdatedConfirmationAction,
+  isReconfirmationCurrentlyActionable,
   shouldWarnMissingDeliveryFeeBeforeConfirmation,
 } from "@/engines/orders/confirmation-validity";
 import {
@@ -456,10 +456,32 @@ export function OrderWorkspaceForm({
           </p>
         ) : null}
 
-        {order.confirmationNeedsResend ? (
-          <p className="border-status-warning/30 bg-status-warning-soft text-status-warning rounded-lg border px-4 py-3 text-sm">
-            Previous confirmation is outdated — customer reconfirmation required
-          </p>
+        {isReconfirmationCurrentlyActionable({
+          status: order.status,
+          confirmationNeedsResend: order.confirmationNeedsResend,
+          readyAt: order.readyAt,
+          pickedUpAt: order.pickedUpAt,
+          outForDeliveryAt: order.outForDeliveryAt,
+          deliveredAt: order.deliveredAt,
+          fulfilmentMethod: order.fulfilmentMethod,
+        }) ? (
+          <div className="border-status-warning/30 bg-status-warning-soft rounded-lg border px-4 py-3">
+            <p className="text-status-warning text-sm font-semibold">
+              Customer reconfirmation needed
+            </p>
+            <p className="text-ink mt-1 text-sm leading-relaxed">
+              Order changed after the customer&apos;s previous confirmation.
+            </p>
+            {capabilities.canPrepareConfirmation ? (
+              <button
+                className="bg-ink text-mist hover:bg-skyline mt-3 inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-medium"
+                onClick={() => handlePrepareConfirmation(true)}
+                type="button"
+              >
+                Prepare Updated Confirmation
+              </button>
+            ) : null}
+          </div>
         ) : null}
 
         {feeAttentionCopy ? (
@@ -714,9 +736,14 @@ export function OrderWorkspaceForm({
           ) : null}
 
           {capabilities.canPrepareConfirmation &&
-          shouldOfferUpdatedConfirmationAction({
+          isReconfirmationCurrentlyActionable({
             status: order.status,
             confirmationNeedsResend: order.confirmationNeedsResend,
+            readyAt: order.readyAt,
+            pickedUpAt: order.pickedUpAt,
+            outForDeliveryAt: order.outForDeliveryAt,
+            deliveredAt: order.deliveredAt,
+            fulfilmentMethod: order.fulfilmentMethod,
           }) ? (
             <button
               className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium"

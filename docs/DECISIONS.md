@@ -2,6 +2,53 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-14 — Operations Smoothness Pass Slice 1
+
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-14).** EXTRA v1 / v1.1 remain
+PRODUCT ACCEPTED / CLOSED. No Milestone 6 invented. No migration.
+
+Product closed Slice 1 after manual Ops review of Today-first grouping,
+attention derivation, terminal reconfirmation handling, compact toolbar,
+and visual hierarchy (Needs Attention / All Clear / Completed).
+
+### Accepted surface (frozen unless Product reopens)
+
+- Owner Operations default pickup filter = **Today**.
+- Today groups: **Needs Attention** / **All Clear** / **Completed**.
+- Pure derived `deriveOwnerAttention` (not persisted):
+  - `submitted` → Confirmation not prepared
+  - `pending_confirmation` (no actionable resend) → Waiting for customer
+    confirmation
+  - actionable outdated confirmation → Customer reconfirmation needed
+  - `awaiting_payment` → Payment needed
+  - payment overdue supported (from list `paymentDeadlineAt`)
+  - pending fee request supported (from list mapping)
+- Bakery Attention flag **excluded** from Operations Needs Attention.
+- Reconfirmation is **currently actionable** only while fulfilment is not
+  terminal (pickup: `picked_up`; delivery: `delivered`). `out_for_delivery`
+  is not terminal. Do **not** clear `confirmation_needs_resend` on
+  fulfilment — Timeline / Confirmation History / stored flag remain.
+- Multiple attention reasons retained independently on cards.
+- Workspace: actionable reconfirmation warning embeds Prepare Updated
+  Confirmation (existing workflow).
+- Compact Operations toolbar: Search / Pickup / Status / Sort.
+- Visual hierarchy: Needs Attention strongest (warning amber) → All Clear
+  positive/secondary (success green) → Completed muted (skyline).
+- No RM outstanding amount on Operations cards in this slice.
+- Viewing/grouping Operations does not mutate Product order data.
+
+### Deferred polish (cosmetic; did not block acceptance)
+
+Clearer horizontal spacing/separation between compact Today summary items
+(“3 NEED ATTENTION / 2 ALL CLEAR / 1 COMPLETED”) when labels visually run
+together.
+
+### Explicitly deferred (not this slice)
+
+Settlement amounts on Ops cards · broader workspace hierarchy · Bakery /
+Collection / EXTRA / Calendar · urgency columns · notification engine ·
+Slice 2.
+
 ## 2026-08-13 — EXTRA v1.1 Calendar-assisted proposal
 
 **STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-13).** EXTRA Activation v1

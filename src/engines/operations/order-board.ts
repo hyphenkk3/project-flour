@@ -58,7 +58,7 @@ export type OperationsBoardQuery = {
 
 export const DEFAULT_OPERATIONS_QUERY: OperationsBoardQuery = {
   search: "",
-  pickupFilter: "all",
+  pickupFilter: "today",
   customPickupDate: null,
   statusFilter: "all",
   sort: DEFAULT_OPERATIONS_SORT,
@@ -225,7 +225,7 @@ export function filterAndSortOperationsOrders<T extends OperationsBoardOrder>(
 export function isOperationsQueryDefault(query: OperationsBoardQuery): boolean {
   return (
     query.search.trim() === "" &&
-    query.pickupFilter === "all" &&
+    query.pickupFilter === "today" &&
     !query.customPickupDate &&
     query.statusFilter === "all" &&
     query.sort === DEFAULT_OPERATIONS_SORT

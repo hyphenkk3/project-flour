@@ -10,6 +10,7 @@ import {
   filterAndSortOperationsOrders,
   type OperationsBoardQuery,
 } from "@/engines/operations/order-board";
+import { partitionOwnerOperationsTodayOrders } from "@/engines/operations/owner-attention";
 import { formatShortBusinessDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 import type { StorefrontOrderListItem } from "@/types/storefront";
@@ -195,16 +196,47 @@ export function OperationsLiveBoard({
     [orders, query],
   );
 
+  const isTodayView = query.pickupFilter === "today";
+
+  const todayBuckets = useMemo(() => {
+    if (!isTodayView) return null;
+    return partitionOwnerOperationsTodayOrders(visibleOrders);
+  }, [isTodayView, visibleOrders]);
+
+  const todayGroupCounts = useMemo(() => {
+    if (!todayBuckets) return null;
+    return {
+      needsAttention: todayBuckets.needsAttention.length,
+      allClear: todayBuckets.allClear.length,
+      completed: todayBuckets.completed.length,
+    };
+  }, [todayBuckets]);
+
   const newCount = useMemo(
     () => visibleOrders.filter((order) => order.status === "submitted").length,
     [visibleOrders],
   );
 
+  function renderOrderList(list: StorefrontOrderListItem[]) {
+    return (
+      <ul className="grid gap-3">
+        {list.map((order) => (
+          <li key={order.id}>
+            <OwnerOrderCard
+              highlight={highlightedIds.has(order.id)}
+              order={order}
+            />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <PageHeader
-          description="Customer preorders requiring attention."
+          description="Today’s fulfilment work, first."
           title="Operations"
         />
         <div className="flex shrink-0 flex-wrap gap-2">
@@ -235,9 +267,10 @@ export function OperationsLiveBoard({
         newCount={newCount}
         onChange={setQuery}
         query={query}
+        todayGroupCounts={todayGroupCounts}
       />
 
-      <section className="space-y-4">
+      <section className="space-y-3">
         {visibleOrders.length === 0 ? (
           <EmptyState
             description={
@@ -249,17 +282,50 @@ export function OperationsLiveBoard({
               orders.length === 0 ? "You’re all caught up." : "No matching orders."
             }
           />
+        ) : todayBuckets ? (
+          <div className="space-y-6">
+            <section className="space-y-2.5">
+              <h2 className="text-status-warning text-sm font-bold tracking-wide uppercase">
+                Needs Attention
+                <span className="ml-2 font-bold normal-case tabular-nums">
+                  {todayBuckets.needsAttention.length}
+                </span>
+              </h2>
+              {todayBuckets.needsAttention.length === 0 ? (
+                <p className="text-skyline text-sm">Nothing needs attention.</p>
+              ) : (
+                renderOrderList(todayBuckets.needsAttention)
+              )}
+            </section>
+            <section className="space-y-2.5">
+              <h2 className="text-status-success text-sm font-semibold tracking-wide uppercase">
+                All Clear
+                <span className="ml-2 font-semibold normal-case tabular-nums">
+                  {todayBuckets.allClear.length}
+                </span>
+              </h2>
+              {todayBuckets.allClear.length === 0 ? (
+                <p className="text-skyline text-sm">No all-clear orders.</p>
+              ) : (
+                renderOrderList(todayBuckets.allClear)
+              )}
+            </section>
+            <section className="space-y-2.5">
+              <h2 className="text-skyline/80 text-sm font-medium tracking-wide uppercase">
+                Completed
+                <span className="ml-2 font-medium normal-case tabular-nums">
+                  {todayBuckets.completed.length}
+                </span>
+              </h2>
+              {todayBuckets.completed.length === 0 ? (
+                <p className="text-skyline text-sm">No completed orders yet.</p>
+              ) : (
+                renderOrderList(todayBuckets.completed)
+              )}
+            </section>
+          </div>
         ) : (
-          <ul className="grid gap-3">
-            {visibleOrders.map((order) => (
-              <li key={order.id}>
-                <OwnerOrderCard
-                  highlight={highlightedIds.has(order.id)}
-                  order={order}
-                />
-              </li>
-            ))}
-          </ul>
+          renderOrderList(visibleOrders)
         )}
       </section>
     </div>

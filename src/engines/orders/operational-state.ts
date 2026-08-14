@@ -119,6 +119,16 @@ export function operationalMarkerFromTimestamps(
   return operationalStateMarker(deriveOperationalState(input));
 }
 
+/**
+ * Fulfilment is complete for Owner attention cutoffs.
+ * Pickup → picked_up; Delivery → delivered.
+ * out_for_delivery is NOT terminal.
+ */
+export function isFulfilmentTerminal(input: OperationalTimestamps): boolean {
+  const state = deriveOperationalState(input);
+  return state === "picked_up" || state === "delivered";
+}
+
 /** Prefix display name with ● / ○ / ✓ when present. */
 export function withOperationalMarker(
   displayName: string,

@@ -311,6 +311,10 @@ export type StorefrontOrderListItem = {
   pickedUpAt: string | null;
   outForDeliveryAt: string | null;
   deliveredAt: string | null;
+  /** Already selected on board query — enables overdue attention without N+1. */
+  paymentDeadlineAt: string | null;
+  /** Pending delivery/processing fee request from nested delivery row. */
+  hasPendingFeeRequest: boolean;
 };
 
 export type OrderTimelineEventType =

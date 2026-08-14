@@ -1,5 +1,9 @@
 import { deliveryFinanceFactsFromDelivery } from "@/engines/orders/delivery-finance";
 import { moneyCompare } from "@/engines/orders/money";
+import {
+  isFulfilmentTerminal,
+  type OperationalTimestamps,
+} from "@/engines/orders/operational-state";
 import { paidAddonsMateriallyDiffer } from "@/engines/orders/paid-addons";
 import { fulfilmentMateriallyDiffer } from "@/engines/orders/fulfilment";
 import type {
@@ -181,6 +185,27 @@ export function shouldOfferUpdatedConfirmationAction(input: {
     input.status === "awaiting_payment" ||
     input.status === "paid"
   );
+}
+
+/**
+ * Current Owner reconfirmation attention / CTA eligibility.
+ * Does NOT clear confirmation_needs_resend — history remains.
+ * Terminal fulfilment (picked_up / delivered) retires CURRENT attention only.
+ * out_for_delivery is not terminal.
+ */
+export function isReconfirmationCurrentlyActionable(input: {
+  status: GuestOrderStatus;
+  confirmationNeedsResend: boolean;
+} & OperationalTimestamps): boolean {
+  if (
+    !shouldOfferUpdatedConfirmationAction({
+      status: input.status,
+      confirmationNeedsResend: input.confirmationNeedsResend,
+    })
+  ) {
+    return false;
+  }
+  return !isFulfilmentTerminal(input);
 }
 
 /**
