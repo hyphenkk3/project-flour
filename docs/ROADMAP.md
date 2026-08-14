@@ -38,6 +38,9 @@ Detailed business rules, message formats, financial/lifecycle rationale, and his
 - **Bakery EXTRA awareness:** **PRODUCT ACCEPTED / CLOSED (2026-08-14)**
   (`EXTRA · N` + Production awaiting-review callout; page-load freshness;
   no migration)
+- **Collection handoff UX polish:** **PRODUCT ACCEPTED / CLOSED
+  (2026-08-14)** (compact board cards + inline Mark Collected placement;
+  presentation only; no migration)
 - Working tree may include untracked `tmp/` Product-review assets only —
   do not stage.
 
@@ -276,6 +279,16 @@ accepted freeze).
 - Product manual PASS: Production hierarchy; `EXTRA · N`; warning callout;
   callout → EXTRA; count refresh after actioning (`EXTRA · 3` → `EXTRA · 2`).
 - No realtime/notifications; ExtraBoard Confirm/Reject unchanged; no migration.
+
+### Collection handoff UX polish — PRODUCT ACCEPTED / CLOSED (2026-08-14)
+
+- Compact Collection board cards; reduced whitespace; scannable Ready/payment
+  + Open →.
+- Detail: Mark Collected inline (desktop/tablet), right-aligned, after
+  Cakes/Notes; complete button visible on initial desktop viewport; mobile
+  sticky-bottom preserved; single action instance.
+- Presentation/layout only — Collection lifecycle / eligibility / capabilities
+  / payment semantics unchanged; no migration.
 
 ### Live Collection workspace activation (v1) — PRODUCT ACCEPTED / CLOSED (2026-08-13)
 

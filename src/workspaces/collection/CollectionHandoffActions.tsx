@@ -12,6 +12,11 @@ type CollectionHandoffActionsProps = {
   canUndoCollected: boolean;
 };
 
+/**
+ * Mark Collected / Undo — same mutations as before.
+ * sm+/desktop: inline in order content (right-aligned).
+ * Narrow mobile only: sticky bottom for handoff reach.
+ */
 export function CollectionHandoffActions({
   orderId,
   canMarkCollected,
@@ -38,17 +43,25 @@ export function CollectionHandoffActions({
   }
 
   return (
-    <div className="border-fog fixed inset-x-0 bottom-0 z-20 border-t bg-white/95 px-5 py-3 backdrop-blur sm:px-8">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-2">
+    <div
+      className={[
+        // Default (tablet/desktop): in-flow, attached to order content
+        "sm:mt-0",
+        // Narrow mobile: sticky handoff bar (single instance)
+        "max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-20 max-sm:mt-0",
+        "max-sm:border-fog max-sm:border-t max-sm:bg-white/95 max-sm:px-5 max-sm:py-3 max-sm:backdrop-blur",
+      ].join(" ")}
+    >
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 sm:max-w-none">
         {error ? (
           <p className="text-status-danger text-sm" role="alert">
             {error}
           </p>
         ) : null}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 sm:justify-end">
           {canMarkCollected ? (
             <button
-              className="bg-ink text-mist hover:bg-signal inline-flex min-h-12 flex-1 items-center justify-center rounded-xl px-5 text-sm font-semibold transition disabled:opacity-60 sm:flex-none"
+              className="bg-ink text-mist hover:bg-signal inline-flex min-h-12 flex-1 items-center justify-center rounded-xl px-5 text-sm font-semibold transition disabled:opacity-60 sm:min-w-[12rem] sm:flex-none"
               disabled={pending}
               onClick={() =>
                 run("mark", () => markCollectionOrderCollectedAction(orderId))

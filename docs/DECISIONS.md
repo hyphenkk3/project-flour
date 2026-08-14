@@ -2,6 +2,37 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-14 — Collection handoff UX polish
+
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-14).** Live Collection activation
+v1 remains PRODUCT ACCEPTED / CLOSED. No Milestone 6. No migration.
+
+Product closed after manual visual review:
+
+- Collection board card density PASS — compact cards; reduced whitespace;
+  pickup info scannable; Ready/payment visible; Open → accessible
+- Mark Collected placement PASS — inline with order content on
+  desktop/tablet; right-aligned; not global/fixed desktop chrome; full
+  button visible in initial Product-tested desktop viewport without small
+  manual scroll; after Cakes/Notes and before Packing Reminder; mobile/
+  narrow sticky-bottom intentional; single action instance only
+- Collection detail vertical density PASS — final compact spacing accepted;
+  header/detail/cards remain readable; no excessive compression
+
+### Accepted surface (frozen unless Product reopens)
+
+- Presentation/layout polish only for Collection board cards and order
+  detail Mark Collected placement + vertical density.
+- Existing Mark Collected / Undo Collected mutations and safeguards reused
+  unchanged.
+- Collection eligibility, Ready derivation, capabilities, payment ownership,
+  and lifecycle transitions unchanged.
+
+### Explicitly deferred
+
+Collection workflow redesign · payment desk changes · Delivery Collection
+desk · lifecycle/eligibility changes.
+
 ## 2026-08-14 — Bakery EXTRA awareness
 
 **STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-14).** EXTRA v1 / v1.1 remain

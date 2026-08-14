@@ -117,7 +117,7 @@ export function CollectionLiveBoard({
           />
         </div>
       ) : (
-        <div className="mt-8 space-y-4">
+        <div className="mt-6 space-y-2.5">
           {orders.map((order) => (
             <CollectionOrderCard
               key={order.id}

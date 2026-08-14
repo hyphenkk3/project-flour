@@ -37,53 +37,65 @@ export function CollectionOrderCard({
     readyAt: order.readyAt,
     status: order.status,
   });
+  const notes = order.customerNotes?.trim() ?? "";
 
   return (
-    <article className="border-fog rounded-2xl border bg-white p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <p className="text-signal text-sm font-semibold tracking-tight">
-          {formatPickupTime(order.pickupTime)}
-        </p>
+    <article className="border-fog rounded-xl border bg-white px-3.5 py-2.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-signal shrink-0 text-sm font-semibold tracking-tight">
+              {formatPickupTime(order.pickupTime)}
+            </span>
+            <h3 className="text-ink min-w-0 truncate text-sm font-semibold tracking-tight">
+              {order.guestName}
+            </h3>
+          </div>
+          <p className="text-ink mt-0.5 text-sm leading-snug">
+            {cakeName}
+            {sizeLabel ? (
+              <span className="text-skyline"> · {sizeLabel}</span>
+            ) : null}
+          </p>
+          {additionalCakeCount > 0 ? (
+            <p className="text-skyline mt-0.5 text-xs leading-snug">
+              +{additionalCakeCount} more
+            </p>
+          ) : null}
+          {notes ? (
+            <p className="text-ink mt-0.5 line-clamp-1 text-xs font-medium">
+              {notes}
+            </p>
+          ) : null}
+        </div>
         <StatusBadge
           label={collectionDeskLabel(presentation)}
           tone={collectionDeskBadgeTone(presentation)}
         />
       </div>
-      <h3 className="font-display text-ink mt-1 text-xl leading-tight tracking-tight">
-        {order.guestName}
-      </h3>
-      <p className="text-ink mt-1 text-sm">
-        {cakeName}
-        {sizeLabel ? <span className="text-skyline"> · {sizeLabel}</span> : null}
-      </p>
-      {additionalCakeCount > 0 ? (
-        <p className="text-skyline mt-1 text-sm">+{additionalCakeCount} more</p>
-      ) : null}
-      <p className="text-skyline mt-3 text-sm">{order.orderNumber}</p>
-      <div className="mt-2 flex flex-wrap gap-2">
-        <StatusBadge
-          className={guestOrderStatusBadgeClassName(order.status)}
-          label={guestOrderStatusLabel(order.status)}
-          tone={guestOrderStatusBadgeTone(order.status)}
-        />
-        {!secured ? (
-          <StatusBadge label="Not secured" tone="warning" />
-        ) : null}
-        {paymentAttention ? (
-          <StatusBadge label="Payment Attention" tone="danger" />
-        ) : null}
+
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-skyline text-xs">{order.orderNumber}</span>
+          <StatusBadge
+            className={guestOrderStatusBadgeClassName(order.status)}
+            label={guestOrderStatusLabel(order.status)}
+            tone={guestOrderStatusBadgeTone(order.status)}
+          />
+          {!secured ? (
+            <StatusBadge label="Not secured" tone="warning" />
+          ) : null}
+          {paymentAttention ? (
+            <StatusBadge label="Payment Attention" tone="danger" />
+          ) : null}
+        </div>
+        <Link
+          className="text-signal hover:text-ink inline-flex min-h-9 shrink-0 items-center text-sm font-medium transition"
+          href={collectionOrderHref(order.id, boardDate)}
+        >
+          Open →
+        </Link>
       </div>
-      {order.customerNotes?.trim() ? (
-        <p className="text-ink mt-2 line-clamp-2 text-sm font-medium">
-          {order.customerNotes.trim()}
-        </p>
-      ) : null}
-      <Link
-        className="text-signal hover:text-ink mt-4 inline-flex min-h-11 items-center text-sm font-medium transition"
-        href={collectionOrderHref(order.id, boardDate)}
-      >
-        Open →
-      </Link>
     </article>
   );
 }
