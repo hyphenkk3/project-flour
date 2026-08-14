@@ -235,18 +235,6 @@ export function WholeCakeCalendar({
     };
   }, [handleIncoming, reconcileFromServer, year, month]);
 
-  const matrixHref = useCallback(
-    (nextMode: CalendarMatrixMode) => {
-      return buildWholeCakeCalendarPath({
-        year,
-        month,
-        view: "matrix",
-        matrixMode: nextMode,
-      });
-    },
-    [year, month],
-  );
-
   const calendarReturnTo = useMemo(
     () =>
       buildWholeCakeCalendarPath({
@@ -352,7 +340,7 @@ export function WholeCakeCalendar({
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <CalendarMonthHeader
         matrixMode={matrixMode}
         month={month}
@@ -365,7 +353,6 @@ export function WholeCakeCalendar({
           entries={entries}
           extras={extras}
           focusToday={focusToday}
-          matrixHref={matrixHref}
           mode={matrixMode}
           month={month}
           onOpenQuickView={openQuickView}

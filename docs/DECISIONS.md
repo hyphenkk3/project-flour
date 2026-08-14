@@ -2,6 +2,28 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-14 — Whole Cake Calendar compact-controls polish
+
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-14).** Layout density only.
+No Milestone 6. No migration. No business/data behavior change.
+
+Product visually accepted the compact Calendar toolbar after screenshot
+review:
+
+- Left: month previous / title / next
+- Right: VIEW [Matrix | Cakes | Orders], MATRIX [Customers | Totals] when
+  View = Matrix, Today at far right
+- One desktop toolbar (no stacked secondary control row)
+- Matrix controls absent on Cakes/Orders (no reserved blank space)
+- Responsive wrap at narrower widths
+- Calendar/matrix content begins immediately below with modest gap
+
+### Explicitly out of scope (unchanged)
+
+Matrix cell redesign · calendar date/business logic · EXTRA semantics ·
+Customers/Totals meaning · Today / prev-next behavior · Operations /
+Bakery / Collection / Customer Operations · storefront · database.
+
 ## 2026-08-14 — Operations Smoothness Pass Slice 2
 
 **STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-14).** Slice 1 remains PRODUCT

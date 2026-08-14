@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { CalendarGuide } from "@/workspaces/owner/calendar/CalendarGuide";
@@ -28,7 +27,6 @@ type CalendarMatrixViewProps = {
   month: number;
   /** When true, force horizontal position to Today (e.g. Today button). */
   focusToday: boolean;
-  matrixHref: (mode: CalendarMatrixMode) => string;
   /** Open Calendar Quick View for this order (Matrix Customers only). */
   onOpenQuickView: (orderId: string) => void;
   /**
@@ -134,7 +132,6 @@ export function CalendarMatrixView({
   year,
   month,
   focusToday,
-  matrixHref,
   onOpenQuickView,
   orderReturnMatrixScrollLeft = null,
   onOrderReturnMatrixApplied,
@@ -212,45 +209,7 @@ export function CalendarMatrixView({
   ]);
 
   return (
-    <div className="space-y-4">
-      <div
-        aria-label="Matrix cell mode"
-        className="flex flex-wrap items-center gap-2 text-sm"
-        role="group"
-      >
-        <span className="text-skyline text-xs font-medium tracking-wide uppercase">
-          Matrix
-        </span>
-        <div className="border-line inline-flex rounded-lg border p-0.5">
-          <Link
-            aria-current={mode === "customers" ? "page" : undefined}
-            className={[
-              "inline-flex min-h-9 items-center justify-center rounded-md px-3 text-sm font-medium",
-              mode === "customers"
-                ? "bg-ink text-mist"
-                : "text-ink hover:bg-mist",
-            ].join(" ")}
-            href={matrixHref("customers")}
-            scroll={false}
-          >
-            Customers
-          </Link>
-          <Link
-            aria-current={mode === "totals" ? "page" : undefined}
-            className={[
-              "inline-flex min-h-9 items-center justify-center rounded-md px-3 text-sm font-medium",
-              mode === "totals"
-                ? "bg-ink text-mist"
-                : "text-ink hover:bg-mist",
-            ].join(" ")}
-            href={matrixHref("totals")}
-            scroll={false}
-          >
-            Totals
-          </Link>
-        </div>
-      </div>
-
+    <div className="space-y-3">
       <div
         className="border-line/80 max-h-[min(70vh,44rem)] overflow-auto rounded-xl border bg-white"
         data-matrix-scroll

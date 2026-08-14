@@ -41,6 +41,12 @@ function calendarHref(
   return `/owner/calendar?${params.toString()}`;
 }
 
+const segmentLinkClass = (active: boolean) =>
+  [
+    "inline-flex min-h-8 items-center justify-center rounded-md px-2.5 text-sm font-medium",
+    active ? "bg-ink text-mist" : "text-ink hover:bg-mist",
+  ].join(" ");
+
 export function CalendarMonthHeader({
   year,
   month,
@@ -72,32 +78,92 @@ export function CalendarMonthHeader({
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <Link
-            aria-label="Previous month"
-            className="border-line text-ink hover:bg-mist inline-flex h-10 w-10 items-center justify-center rounded-lg border text-lg"
-            href={calendarHref(prev.year, prev.month, view, matrixMode)}
-            scroll={false}
-          >
-            ‹
-          </Link>
-          <h2 className="font-display text-ink min-w-[10rem] text-center text-2xl tracking-tight sm:min-w-[12rem] sm:text-3xl">
-            {formatMonthYearLabel(year, month)}
-          </h2>
-          <Link
-            aria-label="Next month"
-            className="border-line text-ink hover:bg-mist inline-flex h-10 w-10 items-center justify-center rounded-lg border text-lg"
-            href={calendarHref(next.year, next.month, view, matrixMode)}
-            scroll={false}
-          >
-            ›
-          </Link>
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        <Link
+          aria-label="Previous month"
+          className="border-line text-ink hover:bg-mist inline-flex h-9 w-9 items-center justify-center rounded-lg border text-lg"
+          href={calendarHref(prev.year, prev.month, view, matrixMode)}
+          scroll={false}
+        >
+          ‹
+        </Link>
+        <h2 className="font-display text-ink min-w-[9.5rem] text-center text-xl tracking-tight sm:min-w-[12rem] sm:text-2xl">
+          {formatMonthYearLabel(year, month)}
+        </h2>
+        <Link
+          aria-label="Next month"
+          className="border-line text-ink hover:bg-mist inline-flex h-9 w-9 items-center justify-center rounded-lg border text-lg"
+          href={calendarHref(next.year, next.month, view, matrixMode)}
+          scroll={false}
+        >
+          ›
+        </Link>
+      </div>
+
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-2">
+        <div
+          aria-label="Calendar view"
+          className="flex items-center gap-1.5 text-sm"
+          role="group"
+        >
+          <span className="text-skyline text-xs font-medium tracking-wide uppercase">
+            View
+          </span>
+          <div className="border-line inline-flex rounded-lg border p-0.5">
+            {(
+              [
+                ["matrix", "Matrix"],
+                ["cakes", "Cakes"],
+                ["orders", "Orders"],
+              ] as const
+            ).map(([value, label]) => (
+              <Link
+                aria-current={view === value ? "page" : undefined}
+                className={segmentLinkClass(view === value)}
+                href={calendarHref(year, month, value, matrixMode)}
+                key={value}
+                scroll={false}
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
         </div>
+
+        {view === "matrix" ? (
+          <div
+            aria-label="Matrix cell mode"
+            className="flex items-center gap-1.5 text-sm"
+            role="group"
+          >
+            <span className="text-skyline text-xs font-medium tracking-wide uppercase">
+              Matrix
+            </span>
+            <div className="border-line inline-flex rounded-lg border p-0.5">
+              <Link
+                aria-current={matrixMode === "customers" ? "page" : undefined}
+                className={segmentLinkClass(matrixMode === "customers")}
+                href={calendarHref(year, month, "matrix", "customers")}
+                scroll={false}
+              >
+                Customers
+              </Link>
+              <Link
+                aria-current={matrixMode === "totals" ? "page" : undefined}
+                className={segmentLinkClass(matrixMode === "totals")}
+                href={calendarHref(year, month, "matrix", "totals")}
+                scroll={false}
+              >
+                Totals
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
         <button
           className={[
-            "inline-flex min-h-10 items-center justify-center rounded-lg border px-4 text-sm font-medium",
+            "inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg border px-3.5 text-sm font-medium",
             isCurrentMonth
               ? "border-line text-skyline bg-mist"
               : "border-line text-ink hover:bg-mist",
@@ -107,40 +173,6 @@ export function CalendarMonthHeader({
         >
           Today
         </button>
-      </div>
-
-      <div
-        aria-label="Calendar view"
-        className="flex flex-wrap items-center gap-2 text-sm"
-        role="group"
-      >
-        <span className="text-skyline text-xs font-medium tracking-wide uppercase">
-          View
-        </span>
-        <div className="border-line inline-flex rounded-lg border p-0.5">
-          {(
-            [
-              ["matrix", "Matrix"],
-              ["cakes", "Cakes"],
-              ["orders", "Orders"],
-            ] as const
-          ).map(([value, label]) => (
-            <Link
-              aria-current={view === value ? "page" : undefined}
-              className={[
-                "inline-flex min-h-9 items-center justify-center rounded-md px-3 text-sm font-medium",
-                view === value
-                  ? "bg-ink text-mist"
-                  : "text-ink hover:bg-mist",
-              ].join(" ")}
-              href={calendarHref(year, month, value, matrixMode)}
-              key={value}
-              scroll={false}
-            >
-              {label}
-            </Link>
-          ))}
-        </div>
       </div>
     </div>
   );

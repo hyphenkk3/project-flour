@@ -32,6 +32,9 @@ Detailed business rules, message formats, financial/lifecycle rationale, and his
 - **Operations Smoothness Pass — Slice 2:** **PRODUCT ACCEPTED / CLOSED
   (2026-08-14)** (Attention → Action in Order Workspace + Ops search-row
   layout; no migration)
+- **Whole Cake Calendar compact-controls polish:** **PRODUCT ACCEPTED /
+  CLOSED (2026-08-14)** (single desktop toolbar; Matrix-only controls;
+  no business/data change; no migration)
 - Working tree may include untracked `tmp/` Product-review assets only —
   do not stage.
 
@@ -254,6 +257,13 @@ accepted freeze).
 - Product manual PASS: Submitted → Prepare Confirmation; Awaiting Payment →
   Go to Payment scroll; no-attention quiet workspace; Ops layout/hierarchy.
 - No migration; Slice 1 semantics preserved.
+
+### Whole Cake Calendar compact-controls polish — PRODUCT ACCEPTED / CLOSED (2026-08-14)
+
+- Month navigation + View / Matrix / Today consolidated into one desktop
+  toolbar; Matrix controls only when View = Matrix; responsive wrap.
+- Calendar/matrix begins immediately below; no separate secondary toolbar.
+- Density/layout only — no business/data behavior change; no migration.
 
 ### Live Collection workspace activation (v1) — PRODUCT ACCEPTED / CLOSED (2026-08-13)
 
