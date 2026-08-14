@@ -12,8 +12,7 @@ import { CollectionHandoffActions } from "@/workspaces/collection/CollectionHand
 import { CollectionPackingChecklist } from "@/workspaces/collection/CollectionPackingChecklist";
 import { collectionDateNavHref } from "@/workspaces/collection/date";
 import {
-  collectionDeskBadgeTone,
-  collectionDeskLabel,
+  collectionDeskAttention,
   collectionDeskPresentation,
   collectionHandoffSurface,
   hasCollectionPaymentAttention,
@@ -38,6 +37,13 @@ export function CollectionOrderDetail({
   const presentation = collectionDeskPresentation({
     readyAt: order.readyAt,
     pickedUpAt: order.pickedUpAt,
+  });
+  const desk = collectionDeskAttention({
+    readyAt: order.readyAt,
+    pickedUpAt: order.pickedUpAt,
+    pickupDate: order.pickupDate,
+    pickupTime: order.pickupTime,
+    now: new Date(),
   });
   const secured = isCollectionOrderSecured(order.status);
   const paymentAttention = hasCollectionPaymentAttention({
@@ -73,8 +79,8 @@ export function CollectionOrderDetail({
       <header className="mt-3 space-y-2">
         <div className="flex flex-wrap gap-2">
           <StatusBadge
-            label={collectionDeskLabel(presentation)}
-            tone={collectionDeskBadgeTone(presentation)}
+            label={desk.label}
+            tone={desk.tone}
           />
           <StatusBadge
             className={guestOrderStatusBadgeClassName(order.status)}
@@ -135,8 +141,14 @@ export function CollectionOrderDetail({
             </div>
             <div>
               <dt className="text-skyline">Desk</dt>
-              <dd className="text-ink mt-0.5 font-medium">
-                {collectionDeskLabel(presentation)}
+              <dd
+                className={
+                  desk.overdue
+                    ? "text-status-warning mt-0.5 font-medium"
+                    : "text-ink mt-0.5 font-medium"
+                }
+              >
+                {desk.label}
               </dd>
             </div>
           </dl>

@@ -10,6 +10,7 @@ import {
 } from "@/workspaces/collection/actions";
 import { CollectionDateNav } from "@/workspaces/collection/CollectionDateNav";
 import { CollectionOrderCard } from "@/workspaces/collection/CollectionOrderCard";
+import { countCollectionPickupOverdue } from "@/workspaces/collection/eligibility";
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
 
 const POLL_INTERVAL_MS = 30_000;
@@ -91,6 +92,9 @@ export function CollectionLiveBoard({
     };
   }, [boardDate, handleIncoming, reconcileList]);
 
+  const now = new Date();
+  const overdueCount = countCollectionPickupOverdue(orders, now);
+
   return (
     <main className="mx-auto w-full max-w-3xl px-5 py-7 pb-16 sm:px-8 sm:py-10">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
@@ -102,6 +106,11 @@ export function CollectionLiveBoard({
             {formatLongBusinessDate(boardDate)} · {orders.length} ready pickup
             {orders.length === 1 ? "" : "s"}
           </p>
+          {overdueCount > 0 ? (
+            <p className="text-status-warning mt-1 text-sm font-semibold tracking-wide">
+              Pickup overdue · {overdueCount}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -122,6 +131,7 @@ export function CollectionLiveBoard({
             <CollectionOrderCard
               key={order.id}
               boardDate={boardDate}
+              now={now}
               order={order}
             />
           ))}

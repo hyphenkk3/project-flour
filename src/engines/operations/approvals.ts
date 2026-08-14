@@ -79,10 +79,19 @@ export type LateOrderEditProposedItem = {
   sizeLabel: string;
 };
 
+/** Canonical paid-add-on snapshot for late_order_edit (matches sync_guest_order_paid_addons). */
+export type LateOrderEditPaidAddon = {
+  code: string;
+  name: string;
+  quantity: number;
+  messages: Array<string | null>;
+};
+
 export type LateOrderEditSnapshot = {
   pickupDate: string;
   pickupTime: string;
   items: LateOrderEditProposedItem[];
+  paidAddons: LateOrderEditPaidAddon[];
 };
 
 export type LateOrderEditPayload = {
@@ -92,6 +101,7 @@ export type LateOrderEditPayload = {
     pickupDate?: string;
     pickupTime?: string;
     items?: LateOrderEditProposedItem[];
+    paidAddons?: LateOrderEditPaidAddon[];
   };
 };
 
@@ -107,6 +117,7 @@ export type OperationsApprovalFingerprint = {
   hasRm10: boolean;
   hasAugust: boolean;
   itemsSignature: string;
+  paidAddonsSignature: string;
 };
 
 export type OperationsApprovalRecord = {
@@ -238,6 +249,25 @@ export function itemsSignatureFromLines(
     .join("|");
 }
 
+export function paidAddonsSignatureFromLines(
+  addons: Array<{
+    code: string;
+    quantity: number;
+    messages?: Array<string | null>;
+  }>,
+): string {
+  return [...addons]
+    .map((addon) => {
+      const quantity = Math.max(0, Math.floor(Number(addon.quantity) || 0));
+      const slots = Array.from({ length: quantity }, (_, index) =>
+        (addon.messages?.[index] ?? "").trim(),
+      );
+      return `${addon.code}:${quantity}:${slots.join("~")}`;
+    })
+    .sort()
+    .join("|");
+}
+
 export function buildOperationsApprovalFingerprint(input: {
   pickupDate: string;
   pickupTime: string;
@@ -245,6 +275,11 @@ export function buildOperationsApprovalFingerprint(input: {
   hasRm10: boolean;
   hasAugust: boolean;
   items: Array<{ cakeId: string; cakeSizeId: string; quantity: number }>;
+  paidAddons?: Array<{
+    code: string;
+    quantity: number;
+    messages?: Array<string | null>;
+  }>;
 }): OperationsApprovalFingerprint {
   return {
     pickupDate: input.pickupDate,
@@ -253,6 +288,7 @@ export function buildOperationsApprovalFingerprint(input: {
     hasRm10: input.hasRm10,
     hasAugust: input.hasAugust,
     itemsSignature: itemsSignatureFromLines(input.items),
+    paidAddonsSignature: paidAddonsSignatureFromLines(input.paidAddons ?? []),
   };
 }
 
@@ -268,7 +304,10 @@ export function fingerprintsMatch(
     return stored.hasRm10 === current.hasRm10 && stored.hasAugust === current.hasAugust;
   }
   if (requestType === "late_order_edit") {
-    return stored.itemsSignature === current.itemsSignature;
+    return (
+      stored.itemsSignature === current.itemsSignature &&
+      stored.paidAddonsSignature === current.paidAddonsSignature
+    );
   }
   return true;
 }
@@ -402,7 +441,15 @@ export function parseOperationsApprovalPayload(
   const pickupDate = stringField(proposedRaw.pickup_date ?? proposedRaw.pickupDate);
   const pickupTime = stringField(proposedRaw.pickup_time ?? proposedRaw.pickupTime);
   const items = parseLateEditItems(proposedRaw.items);
-  if (!pickupDate && !pickupTime && (!items || items.length === 0)) {
+  const paidAddons = parseLateEditPaidAddons(
+    proposedRaw.paid_addons ?? proposedRaw.paidAddons,
+  );
+  if (
+    !pickupDate &&
+    !pickupTime &&
+    (!items || items.length === 0) &&
+    paidAddons === undefined
+  ) {
     return null;
   }
   const currentPickupDate = currentRaw
@@ -412,6 +459,9 @@ export function parseOperationsApprovalPayload(
     ? stringField(currentRaw.pickup_time ?? currentRaw.pickupTime)
     : null;
   const currentItems = currentRaw ? parseLateEditItems(currentRaw.items) : undefined;
+  const currentPaidAddons = currentRaw
+    ? parseLateEditPaidAddons(currentRaw.paid_addons ?? currentRaw.paidAddons)
+    : undefined;
   return {
     kind: "late_order_edit",
     current:
@@ -420,12 +470,14 @@ export function parseOperationsApprovalPayload(
             pickupDate: currentPickupDate,
             pickupTime: currentPickupTime,
             items: currentItems ?? [],
+            paidAddons: currentPaidAddons ?? [],
           }
         : undefined,
     proposed: {
       pickupDate: pickupDate ?? undefined,
       pickupTime: pickupTime ?? undefined,
       items,
+      paidAddons,
     },
   };
 }
@@ -446,6 +498,8 @@ export function parseOperationsApprovalFingerprint(
     hasRm10: Boolean(row.has_rm10 ?? row.hasRm10),
     hasAugust: Boolean(row.has_august ?? row.hasAugust),
     itemsSignature: stringField(row.items_signature ?? row.itemsSignature) ?? "",
+    paidAddonsSignature:
+      stringField(row.paid_addons_signature ?? row.paidAddonsSignature) ?? "",
   };
 }
 
@@ -486,12 +540,18 @@ export function lateOrderEditPayloadToRpc(
           pickup_date: payload.current.pickupDate,
           pickup_time: payload.current.pickupTime,
           items: payload.current.items.map(lateEditItemToRpc),
+          paid_addons: payload.current.paidAddons.map(lateEditPaidAddonToRpc),
         }
       : null,
     proposed: {
       pickup_date: payload.proposed.pickupDate ?? null,
       pickup_time: payload.proposed.pickupTime ?? null,
       items: (payload.proposed.items ?? []).map(lateEditItemToRpc),
+      ...(payload.proposed.paidAddons !== undefined
+        ? {
+            paid_addons: payload.proposed.paidAddons.map(lateEditPaidAddonToRpc),
+          }
+        : {}),
     },
   };
 }
@@ -520,6 +580,17 @@ function lateEditItemToRpc(item: LateOrderEditProposedItem): Record<string, unkn
   };
 }
 
+function lateEditPaidAddonToRpc(
+  addon: LateOrderEditPaidAddon,
+): Record<string, unknown> {
+  return {
+    code: addon.code,
+    name: addon.name,
+    quantity: addon.quantity,
+    messages: addon.messages,
+  };
+}
+
 function parseLateEditItems(itemsRaw: unknown): LateOrderEditProposedItem[] | undefined {
   if (!Array.isArray(itemsRaw)) return undefined;
   return itemsRaw
@@ -544,6 +615,45 @@ function parseLateEditItems(itemsRaw: unknown): LateOrderEditProposedItem[] | un
       };
     })
     .filter((item): item is LateOrderEditProposedItem => item != null);
+}
+
+function parseLateEditPaidAddons(
+  addonsRaw: unknown,
+): LateOrderEditPaidAddon[] | undefined {
+  if (!Array.isArray(addonsRaw)) return undefined;
+  return addonsRaw
+    .map((addon) => {
+      if (!addon || typeof addon !== "object") return null;
+      const entry = addon as Record<string, unknown>;
+      const code = stringField(entry.code);
+      if (!code) return null;
+      const quantity = Number(entry.quantity ?? 0);
+      if (!Number.isInteger(quantity) || quantity < 1) return null;
+      const name = stringField(entry.name) ?? code;
+      let messages: Array<string | null> = [];
+      if (Array.isArray(entry.messages)) {
+        messages = entry.messages.map((message) => {
+          if (message == null) return null;
+          if (typeof message === "string") {
+            const trimmed = message.trim();
+            return trimmed.length > 0 ? trimmed : null;
+          }
+          if (typeof message === "object") {
+            const slot = message as Record<string, unknown>;
+            return stringField(slot.written_message ?? slot.writtenMessage);
+          }
+          return null;
+        });
+      }
+      while (messages.length < quantity) messages.push(null);
+      return {
+        code,
+        name,
+        quantity,
+        messages: messages.slice(0, quantity),
+      };
+    })
+    .filter((addon): addon is LateOrderEditPaidAddon => addon != null);
 }
 
 function stringField(value: unknown): string | null {

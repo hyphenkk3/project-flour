@@ -22,6 +22,7 @@ import {
   isWithinTwoDayChangeCutoff,
   lateOrderEditRestrictionReason,
   parseOperationsApprovalPayload,
+  paidAddonsSignatureFromLines,
   projectedAmountDueAfterRm10,
   requesterCannotDecideOwnRequest,
   requiresCrossMonthApproval,
@@ -311,6 +312,97 @@ assert.equal(
   true,
 );
 
+const addonsUnchanged = buildOperationsApprovalFingerprint({
+  pickupDate: stored.pickupDate,
+  pickupTime: stored.pickupTime,
+  status: stored.status,
+  hasRm10: false,
+  hasAugust: false,
+  items: [{ cakeId: "c1", cakeSizeId: "s1", quantity: 1 }],
+  paidAddons: [],
+});
+assert.equal(
+  isStaleOperationsApproval({
+    requestType: "late_order_edit",
+    stored,
+    current: addonsUnchanged,
+  }),
+  false,
+  "empty paid add-ons match the default fingerprint signature",
+);
+
+const addonsChanged = buildOperationsApprovalFingerprint({
+  pickupDate: stored.pickupDate,
+  pickupTime: stored.pickupTime,
+  status: stored.status,
+  hasRm10: false,
+  hasAugust: false,
+  items: [{ cakeId: "c1", cakeSizeId: "s1", quantity: 1 }],
+  paidAddons: [{ code: "birthday_card", quantity: 1, messages: [null] }],
+});
+assert.equal(
+  isStaleOperationsApproval({
+    requestType: "late_order_edit",
+    stored,
+    current: addonsChanged,
+  }),
+  true,
+  "paid add-on change stales late_order_edit",
+);
+assert.notEqual(
+  paidAddonsSignatureFromLines([]),
+  paidAddonsSignatureFromLines([
+    { code: "birthday_card", quantity: 1, messages: [null] },
+  ]),
+);
+
+const parsedLate = parseOperationsApprovalPayload("late_order_edit", {
+  kind: "late_order_edit",
+  current: {
+    pickup_date: "2026-08-15",
+    pickup_time: "13:00",
+    items: [
+      {
+        cake_id: "c1",
+        cake_size_id: "s1",
+        quantity: 1,
+        unit_price: 125,
+        cake_name: "Chocolate D'Amour",
+        size_label: '6"',
+      },
+    ],
+    paid_addons: [],
+  },
+  proposed: {
+    pickup_date: "2026-08-15",
+    pickup_time: "13:00",
+    items: [
+      {
+        cake_id: "c1",
+        cake_size_id: "s1",
+        quantity: 1,
+        unit_price: 125,
+        cake_name: "Chocolate D'Amour",
+        size_label: '6"',
+      },
+    ],
+    paid_addons: [
+      {
+        code: "birthday_card",
+        name: "Birthday Card",
+        quantity: 1,
+        messages: [null],
+      },
+    ],
+  },
+});
+assert.equal(parsedLate?.kind, "late_order_edit");
+if (parsedLate?.kind === "late_order_edit") {
+  assert.equal(parsedLate.proposed.paidAddons?.[0]?.code, "birthday_card");
+  assert.equal(parsedLate.proposed.paidAddons?.[0]?.name, "Birthday Card");
+  assert.equal(parsedLate.current?.paidAddons?.length, 0);
+}
+
 const parsed = parseOperationsApprovalPayload("discount_exception", {
   action: "redeem_rm10",
   voucher_number: "325",
@@ -406,6 +498,48 @@ assert.match(
 );
 assert.doesNotMatch(migration, /mark_guest_order_picked_up/);
 assert.doesNotMatch(migration, /order_delivery_details/);
+
+const addonMigration = readFileSync(
+  resolve("supabase/migrations/20260814170000_late_order_edit_paid_addons.sql"),
+  "utf8",
+);
+assert.match(addonMigration, /sync_guest_order_paid_addons/);
+assert.match(addonMigration, /paid_addons_signature/);
+assert.match(addonMigration, /_operations_approval_paid_addons_snapshot/);
+assert.doesNotMatch(addonMigration, /mark_guest_order_picked_up/);
+assert.doesNotMatch(
+  addonMigration,
+  /create or replace function public.redeem_rm10_physical_voucher_for_guest_order/,
+);
+assert.match(
+  addonMigration,
+  /v_role is distinct from 'customer_operations'/,
+  "create authority unchanged",
+);
+assert.match(
+  addonMigration,
+  /_operations_approval_can_review/,
+  "approve still uses existing review helper",
+);
+{
+  const approveIdx = addonMigration.indexOf(
+    "create or replace function public.approve_operations_approval_request",
+  );
+  const addonSyncIdx = addonMigration.indexOf(
+    "perform public.sync_guest_order_paid_addons",
+  );
+  const approvedIdx = addonMigration.indexOf("status = 'approved'");
+  assert.ok(approveIdx > 0 && addonSyncIdx > approveIdx, "approve RPC syncs paid add-ons");
+  assert.ok(
+    addonSyncIdx < approvedIdx,
+    "paid-add-on sync runs before the request is marked approved",
+  );
+  assert.doesNotMatch(
+    addonMigration.slice(approveIdx),
+    /exception when others/i,
+    "approve must not swallow add-on execution errors",
+  );
+}
 
 const rm10Migration = readFileSync(
   resolve(

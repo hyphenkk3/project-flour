@@ -2,11 +2,84 @@
 
 Record of durable project decisions. Newest first.
 
+## 2026-08-14 — late_order_edit paid add-ons (approval execution)
+
+**STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-14).** The original Customer
+Operations exception / approval workflow remains PRODUCT ACCEPTED / CLOSED.
+Pickup Overdue remains a **separate** already-accepted follow-up. No
+Milestone 6. Do not modify the applied migration. Historical Product test
+order `bd79ac76-d1b8-4d4f-8981-4d615ba8ba54` remains intentionally
+unrepaired. Guarded Product order `7e9779ac-152b-42e0-8002-34ba8e9b11b5`
+was not mutated.
+
+Product closed after live backend verification + manual UI verification.
+Live suite **PASS (121)** on disposable fixtures. No further migration in
+this closeout.
+
+### Product problem closed
+
+`late_order_edit` originally stored cake items and optional same-month
+pickup only. Approve called `sync_guest_order_items` and did **not** call
+`sync_guest_order_paid_addons`. The review UI could show Birthday Card from
+the client payload while execution never persisted it. Fingerprint compared
+cakes (`items_signature`) but not paid add-ons.
+
+### Accepted behaviour (frozen unless Product reopens)
+
+- **`late_order_edit` stored payload** includes current/proposed paid
+  add-ons (`code`, `name`, `quantity`, `messages`) alongside cake items and
+  optional same-month pickup.
+- **Approve execution** persists paid add-ons through the existing
+  `sync_guest_order_paid_addons` RPC (after cake items, before pickup).
+- **`paid_addons_signature`** participates in stale detection with the
+  existing fingerprint (`code:quantity:padded-messages` per line). Changing
+  live paid-add-on state after request creation makes Approve refuse as
+  stale; no partial mutation.
+- **Approve is one PostgreSQL transaction.** If paid-add-on sync fails, cake
+  and pickup mutations do not remain applied; the request does not become
+  `approved`.
+- **Change Summary** on the approval review is **system-derived from the
+  stored mutation**, not from the free-text reason. Unchanged paid add-ons
+  are not described as a change.
+- **Birthday Card** add, remove, and quantity change (including ×1 → ×2)
+  are supported. Cake + paid add-on, and cake + paid add-on + pickup, persist
+  together when requested.
+- **Amount due** follows persisted paid add-ons (Birthday Card RM3 each).
+
+### Live migration (already applied — do not modify)
+
+`supabase/migrations/20260814170000_late_order_edit_paid_addons.sql`
+
+SHA-256:
+`d08294544ef38d28683a9281880bc39d6a0e66a0df6adcd8e3570516dae791e2`
+
+Replaces fingerprint / create / approve functions only (JSONB payload; no
+table change). Function
+`public._operations_approval_paid_addons_signature` is live.
+
+### Historical Product test order (intentionally unrepaired)
+
+`bd79ac76-d1b8-4d4f-8981-4d615ba8ba54` was approved **before** this
+migration. Expected leftover state: Chocolate D'Amour 8", no Birthday
+Card, RM165. Product will decide separately whether to create a new
+late-edit request. Do not repair it.
+
+### Intentionally out of scope / unchanged
+
+- Approval authorization, requester ≠ approver, 2-day cutoff, and the three
+  request types
+- Collection workspace and **Pickup Overdue** (separate already-accepted
+  follow-up)
+- Fee workflow · RM10 allowlist · Collection Mark/Undo RPC
+- Notifications · generic workflow engine
+
 ## 2026-08-14 — Customer Operations exception / approval workflow
 
 **STATUS: PRODUCT ACCEPTED / CLOSED (2026-08-14).** Shared Operations access
 is PRODUCT ACCEPTED / CLOSED in the same closeout. No Milestone 6. No further
-migration in this closeout.
+migration in this closeout. Paid-add-on late-edit execution is a later
+same-day follow-up — see **late_order_edit paid add-ons (approval
+execution)** above.
 
 Product closed after live RPC verification + manual Product verification.
 Disposable fixtures only; Product order `7e9779ac-…` was not mutated.
@@ -84,9 +157,12 @@ Payloads:
 - **late_order_edit:** current snapshot + proposed pickup (same month only)
   and/or items (cake_id, cake_size_id, quantity, unit_price, cake_name,
   size_label). Cross-month pickup cannot ride on late_order_edit.
+  Paid add-ons in the stored payload and Approve execution: see the
+  2026-08-14 paid-add-on follow-up above.
 
 Fingerprint is computed server-side from live order state (pickup, status,
-items signature, RM10/August flags). Approve refuses stale requests and does
+items signature, RM10/August flags). `paid_addons_signature` was added in
+the 2026-08-14 paid-add-on follow-up. Approve refuses stale requests and does
 not apply the mutation.
 
 Requester may cancel their own pending request. Cancelled cannot later be

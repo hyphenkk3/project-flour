@@ -22,10 +22,12 @@ import {
 } from "@/components/ui/form";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatLongBusinessDate, formatBusinessMonthYear, isDifferentBusinessMonth } from "@/lib/dates";
+import { buildApprovalChangeSummary } from "@/engines/operations/approval-change-summary";
 import {
   canCancelOperationsApproval,
   isWithinTwoDayChangeCutoff,
   lateOrderEditRestrictionReason,
+  type LateOrderEditPaidAddon,
   type LateOrderEditProposedItem,
   type OperationsApprovalRecord,
 } from "@/engines/operations/approvals";
@@ -284,6 +286,25 @@ export function OrderWorkspaceForm({
   );
   const proposedItemSnapshot = describeEditItems(editItems);
 
+  function describeCurrentPaidAddons(): LateOrderEditPaidAddon[] {
+    return (order.paidAddons ?? []).map((addon) => ({
+      code: addon.code,
+      name: addon.name,
+      quantity: addon.quantity,
+      messages: (addon.messages ?? []).map((slot) => slot.writtenMessage),
+    }));
+  }
+
+  function describeProposedPaidAddons(): LateOrderEditPaidAddon[] {
+    const names = new Map(editPaidAddons.map((row) => [row.code, row.name]));
+    return paidAddonDraftsToMutationPayload(editPaidAddons).map((row) => ({
+      code: row.code,
+      name: names.get(row.code) ?? row.code,
+      quantity: row.quantity,
+      messages: row.messages,
+    }));
+  }
+
   function renderApprovalPanels() {
     const visible = [...pendingApprovals, ...decidedApprovals.slice(0, 5)];
     if (visible.length === 0) return null;
@@ -302,8 +323,6 @@ export function OrderWorkspaceForm({
             customerName={order.customerName}
             highlighted={highlightApprovalId === request.id}
             orderNumber={order.orderNumber}
-            pickupDate={order.pickupDate}
-            pickupTime={order.pickupTime}
             request={request}
           />
         ))}
@@ -380,11 +399,13 @@ export function OrderWorkspaceForm({
             pickupDate: order.pickupDate,
             pickupTime: order.pickupTime,
             items: currentItemSnapshot,
+            paidAddons: describeCurrentPaidAddons(),
           },
           proposed: {
             pickupDate: includePickup ? editPickupDate : undefined,
             pickupTime: includePickup ? pickupTime : undefined,
             items: proposedItems,
+            paidAddons: describeProposedPaidAddons(),
           },
         },
       });
@@ -1431,24 +1452,55 @@ export function OrderWorkspaceForm({
           <p className="text-ink text-sm">
             {lateChangeReason ?? "This order is within the 2-day change cutoff."}
           </p>
-          <dl className="grid gap-2 text-sm sm:grid-cols-2">
-            <div>
-              <dt className="text-skyline">Current</dt>
-              <dd className="text-ink">
-                {currentItemSnapshot
-                  .map((item) => `${item.cakeName} · ${item.sizeLabel}`)
-                  .join(", ") || "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-skyline">Requested</dt>
-              <dd className="text-ink">
-                {proposedItemSnapshot
-                  .map((item) => `${item.cakeName} · ${item.sizeLabel}`)
-                  .join(", ") || "—"}
-              </dd>
-            </div>
-          </dl>
+          {(() => {
+            const preview = buildApprovalChangeSummary({
+              kind: "late_order_edit",
+              current: {
+                pickupDate: order.pickupDate,
+                pickupTime: order.pickupTime,
+                items: currentItemSnapshot,
+                paidAddons: describeCurrentPaidAddons(),
+              },
+              proposed: {
+                pickupDate: pickupMonthChanging ? undefined : editPickupDate,
+                pickupTime: pickupMonthChanging ? undefined : order.pickupTime,
+                items: proposedItemSnapshot,
+                paidAddons: describeProposedPaidAddons(),
+              },
+            });
+            return (
+              <div className="space-y-2 text-sm">
+                {preview.lines.length > 0 ? (
+                  <div>
+                    <p className="text-skyline text-xs font-semibold tracking-[0.14em] uppercase">
+                      Change requested
+                    </p>
+                    <div className="text-ink whitespace-pre-wrap">
+                      {preview.lines.join("\n")}
+                    </div>
+                  </div>
+                ) : null}
+                <dl className="grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-skyline text-xs font-semibold tracking-[0.14em] uppercase">
+                      Current
+                    </dt>
+                    <dd className="text-ink whitespace-pre-wrap">
+                      {preview.currentLines.join("\n") || "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-skyline text-xs font-semibold tracking-[0.14em] uppercase">
+                      Requested
+                    </dt>
+                    <dd className="text-ink whitespace-pre-wrap">
+                      {preview.requestedLines.join("\n") || "—"}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            );
+          })()}
           {pendingLateEdit ? (
             <p className="text-skyline text-sm">
               An approval request is already pending for this exception.

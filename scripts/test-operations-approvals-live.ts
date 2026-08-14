@@ -3,9 +3,10 @@
  *
  * Prerequisites: apply
  *   supabase/migrations/20260814150000_operations_approval_requests.sql
+ *   supabase/migrations/20260814170000_late_order_edit_paid_addons.sql
  * Optional for Manager discount execution:
  *   supabase/migrations/20260814160000_rm10_valid_path_customer_operations.sql
- * Expected SHA-256 of the approval migration is asserted below.
+ * Expected SHA-256 of the original approval migration is asserted below.
  *
  * Run: npx tsx scripts/test-operations-approvals-live.ts
  *
@@ -18,6 +19,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { buildQuickViewPaidAddonBlocks } from "@/workspaces/owner/calendar/quick-view-paid-addons";
 
 function loadEnvLocal() {
   const envPath = resolve(process.cwd(), ".env.local");
@@ -236,6 +238,48 @@ async function main() {
     }
     if (!size) throw new Error("No cake size");
 
+    const { data: siblingSizes } = await admin
+      .from("library_cake_sizes")
+      .select("id, cake_id, price, label")
+      .eq("cake_id", size.cake_id);
+    const size6 =
+      (siblingSizes ?? []).find((row) => String(row.label ?? "").startsWith('6"')) ??
+      size;
+    const size8 =
+      (siblingSizes ?? []).find((row) => String(row.label ?? "").startsWith('8"')) ??
+      null;
+    const { data: birthdayType } = await admin
+      .from("paid_addon_types")
+      .select("code, name, unit_price")
+      .eq("code", "birthday_card")
+      .maybeSingle();
+    if (!birthdayType?.code) throw new Error("birthday_card catalog type missing");
+    const birthdayUnitPrice = Number(birthdayType.unit_price);
+
+    function cakeItemFromSize(
+      row: { id: string; cake_id: string; price: number; label: string },
+      quantity = 1,
+      cakeName = "Cake",
+    ) {
+      return {
+        cake_id: row.cake_id,
+        cake_size_id: row.id,
+        quantity,
+        unit_price: row.price,
+        cake_name: cakeName,
+        size_label: row.label,
+      };
+    }
+
+    function birthdayPayload(quantity: number) {
+      return {
+        code: "birthday_card",
+        name: birthdayType!.name ?? "Birthday Card",
+        quantity,
+        messages: Array.from({ length: quantity }, () => null),
+      };
+    }
+
     async function createOrder(name: string, pickupDate: string) {
       const { data, error } = await admin.rpc("create_staff_guest_preorder", {
         p_actor_staff_id: ownerId,
@@ -249,8 +293,8 @@ async function main() {
         p_pickup_instruction: null,
         p_items: [
           {
-            cake_id: size!.cake_id,
-            cake_size_id: size!.id,
+            cake_id: size6.cake_id,
+            cake_size_id: size6.id,
             quantity: 1,
           },
         ],
@@ -947,6 +991,426 @@ async function main() {
         "Owner cross-month executed exact time",
         String(after?.pickup_time),
       );
+    }
+
+    // Paid-add-on late_order_edit execution (requires 20260814170000)
+    {
+      async function cakeItems(orderId: string) {
+        const { data } = await admin
+          .from("order_items")
+          .select(
+            "cake_id, cake_size_id, quantity, unit_price, cake_name, size_label",
+          )
+          .eq("order_id", orderId);
+        return data ?? [];
+      }
+      async function paidAddons(orderId: string) {
+        const { data } = await admin
+          .from("order_paid_addons")
+          .select(
+            "id, order_id, paid_addon_type_id, code, name, unit_price, financial_shorthand, quantity, sort_order",
+          )
+          .eq("order_id", orderId);
+        return data ?? [];
+      }
+      async function amountDue(orderId: string) {
+        const { data } = await admin.rpc("order_amount_due", {
+          p_order_id: orderId,
+        });
+        return Number(data ?? 0);
+      }
+      function itemPayload(
+        rows: Array<{
+          cake_id: string;
+          cake_size_id: string;
+          quantity: number;
+          unit_price: number;
+          cake_name: string;
+          size_label: string;
+        }>,
+      ) {
+        return rows.map((row) => ({
+          cake_id: row.cake_id,
+          cake_size_id: row.cake_size_id,
+          quantity: row.quantity,
+          unit_price: row.unit_price,
+          cake_name: row.cake_name,
+          size_label: row.size_label,
+        }));
+      }
+
+      const probeOrder = await createOrder(`${SIG} AddonProbe`, tomorrowYmd);
+      const probeItems = await cakeItems(probeOrder);
+      const probeCreate = await admin.rpc("create_operations_approval_request", {
+        p_order_id: probeOrder,
+        p_actor_staff_id: coId,
+        p_request_type: "late_order_edit",
+        p_reason: "please help",
+        p_payload: {
+          proposed: {
+            pickup_date: tomorrowYmd,
+            pickup_time: "16:00",
+            items: itemPayload(probeItems),
+            paid_addons: [birthdayPayload(1)],
+          },
+        },
+      });
+      const probeId = (probeCreate.data as { id?: string } | null)?.id ?? null;
+      const { data: probeRow } = probeId
+        ? await admin
+            .from("operations_approval_requests")
+            .select("payload, order_fingerprint")
+            .eq("id", probeId)
+            .maybeSingle()
+        : { data: null };
+      const probeFingerprint = probeRow?.order_fingerprint as
+        | Record<string, unknown>
+        | null;
+      const migrationApplied =
+        Boolean(probeFingerprint) &&
+        Object.prototype.hasOwnProperty.call(
+          probeFingerprint,
+          "paid_addons_signature",
+        );
+      check(
+        migrationApplied,
+        "live fingerprint includes paid_addons_signature",
+        JSON.stringify(probeFingerprint ? Object.keys(probeFingerprint) : null),
+      );
+      if (!migrationApplied || probeCreate.error || !probeId) {
+        check(
+          false,
+          "20260814170000 paid-addon approval execution is live",
+          probeCreate.error?.message ?? "fingerprint missing paid_addons_signature",
+        );
+      } else {
+        const proposed = ((probeRow?.payload as Record<string, unknown> | null)
+          ?.proposed ?? {}) as Record<string, unknown>;
+        const proposedAddons = proposed.paid_addons as
+          | Array<{ code?: string; quantity?: number }>
+          | undefined;
+        check(
+          proposedAddons?.[0]?.code === "birthday_card",
+          "stored late_order_edit payload contains Birthday Card",
+          JSON.stringify(proposedAddons),
+        );
+        check(
+          probeCreate.error == null,
+          "reason 'please help' is not required to store the add-on",
+        );
+
+        const beforeDue = await amountDue(probeOrder);
+        const approved = await admin.rpc("approve_operations_approval_request", {
+          p_request_id: probeId,
+          p_actor_staff_id: ownerId,
+          p_reviewer_note: null,
+        });
+        check(
+          !approved.error,
+          "Owner approves Birthday Card late_order_edit",
+          approved.error?.message,
+        );
+        const addons = await paidAddons(probeOrder);
+        check(
+          addons.some(
+            (row) => row.code === "birthday_card" && Number(row.quantity) === 1,
+          ),
+          "Approve executed Birthday Card ×1 from payload",
+          JSON.stringify(addons),
+        );
+        const afterDue = await amountDue(probeOrder);
+        check(
+          afterDue === beforeDue + birthdayUnitPrice,
+          "persisted Birthday Card changes amount due",
+          `before=${beforeDue} after=${afterDue} card=${birthdayUnitPrice}`,
+        );
+        const quickView = buildQuickViewPaidAddonBlocks(
+          addons.map((row) => ({
+            id: String(row.id),
+            orderId: String(row.order_id),
+            paidAddonTypeId: row.paid_addon_type_id
+              ? String(row.paid_addon_type_id)
+              : null,
+            code: String(row.code),
+            name: String(row.name),
+            unitPrice: Number(row.unit_price),
+            financialShorthand: String(row.financial_shorthand ?? ""),
+            quantity: Number(row.quantity),
+            writtenMessage: null,
+            messages: [],
+            sortOrder: Number(row.sort_order ?? 0),
+          })),
+        );
+        check(
+          quickView.some((block) => block.title === `${birthdayType.name} ×1`),
+          "Quick View reads persisted Birthday Card",
+          JSON.stringify(quickView),
+        );
+        check(
+          addons.some((row) => String(row.name).toLowerCase().includes("birthday")),
+          "Order Workspace add-ons source contains Birthday Card",
+        );
+
+        // Remove Birthday Card
+        const removeOrder = await createOrder(`${SIG} AddonRm`, tomorrowYmd);
+        await admin.rpc("sync_guest_order_paid_addons", {
+          p_order_id: removeOrder,
+          p_paid_addons: [{ code: "birthday_card", quantity: 1, messages: [null] }],
+        });
+        const removeItems = await cakeItems(removeOrder);
+        const removeCreated = await admin.rpc("create_operations_approval_request", {
+          p_order_id: removeOrder,
+          p_actor_staff_id: coId,
+          p_request_type: "late_order_edit",
+          p_reason: "remove card",
+          p_payload: {
+            proposed: {
+              pickup_date: tomorrowYmd,
+              pickup_time: "16:00",
+              items: itemPayload(removeItems),
+              paid_addons: [],
+            },
+          },
+        });
+        check(!removeCreated.error, "CO requests Birthday Card removal", removeCreated.error?.message);
+        const removeId = (removeCreated.data as { id?: string } | null)?.id ?? null;
+        const removeApproved = await admin.rpc("approve_operations_approval_request", {
+          p_request_id: removeId,
+          p_actor_staff_id: ownerId,
+          p_reviewer_note: null,
+        });
+        check(!removeApproved.error, "Approve removes Birthday Card", removeApproved.error?.message);
+        const afterRemove = await paidAddons(removeOrder);
+        check(afterRemove.length === 0, "Birthday Card removed from persisted add-ons", JSON.stringify(afterRemove));
+
+        // Quantity ×1 → ×2
+        const qtyOrder = await createOrder(`${SIG} AddonQty`, tomorrowYmd);
+        await admin.rpc("sync_guest_order_paid_addons", {
+          p_order_id: qtyOrder,
+          p_paid_addons: [{ code: "birthday_card", quantity: 1, messages: [null] }],
+        });
+        const qtyItems = await cakeItems(qtyOrder);
+        const qtyCreated = await admin.rpc("create_operations_approval_request", {
+          p_order_id: qtyOrder,
+          p_actor_staff_id: coId,
+          p_request_type: "late_order_edit",
+          p_reason: "qty",
+          p_payload: {
+            proposed: {
+              pickup_date: tomorrowYmd,
+              pickup_time: "16:00",
+              items: itemPayload(qtyItems),
+              paid_addons: [birthdayPayload(2)],
+            },
+          },
+        });
+        check(!qtyCreated.error, "CO requests Birthday Card ×2", qtyCreated.error?.message);
+        const qtyId = (qtyCreated.data as { id?: string } | null)?.id ?? null;
+        const qtyApproved = await admin.rpc("approve_operations_approval_request", {
+          p_request_id: qtyId,
+          p_actor_staff_id: ownerId,
+          p_reviewer_note: null,
+        });
+        check(!qtyApproved.error, "Approve Birthday Card quantity change", qtyApproved.error?.message);
+        const afterQty = await paidAddons(qtyOrder);
+        check(
+          afterQty.some((row) => row.code === "birthday_card" && Number(row.quantity) === 2),
+          "Birthday Card quantity persisted as ×2",
+          JSON.stringify(afterQty),
+        );
+
+        // Cake 6" → 8" + Birthday Card
+        if (size8) {
+          const comboOrder = await createOrder(`${SIG} CakeAddon`, tomorrowYmd);
+          const comboItems = await cakeItems(comboOrder);
+          const cakeName = comboItems[0]?.cake_name ?? "Cake";
+          const comboCreated = await admin.rpc("create_operations_approval_request", {
+            p_order_id: comboOrder,
+            p_actor_staff_id: coId,
+            p_request_type: "late_order_edit",
+            p_reason: "size and card",
+            p_payload: {
+              proposed: {
+                pickup_date: tomorrowYmd,
+                pickup_time: "16:00",
+                items: [cakeItemFromSize(size8, 1, cakeName)],
+                paid_addons: [birthdayPayload(1)],
+              },
+            },
+          });
+          check(!comboCreated.error, "CO requests cake + Birthday Card", comboCreated.error?.message);
+          const comboId = (comboCreated.data as { id?: string } | null)?.id ?? null;
+          const comboApproved = await admin.rpc("approve_operations_approval_request", {
+            p_request_id: comboId,
+            p_actor_staff_id: ownerId,
+            p_reviewer_note: null,
+          });
+          check(!comboApproved.error, "Approve cake + Birthday Card", comboApproved.error?.message);
+          const comboCakes = await cakeItems(comboOrder);
+          const comboAddons = await paidAddons(comboOrder);
+          check(
+            comboCakes.some((row) => String(row.size_label).startsWith('8"')),
+            "cake + add-on: cake persisted as 8\"",
+            JSON.stringify(comboCakes),
+          );
+          check(
+            comboAddons.some((row) => row.code === "birthday_card" && Number(row.quantity) === 1),
+            "cake + add-on: Birthday Card persisted",
+            JSON.stringify(comboAddons),
+          );
+
+          const tripleOrder = await createOrder(`${SIG} Triple`, tomorrowYmd);
+          const tripleItems = await cakeItems(tripleOrder);
+          const tripleName = tripleItems[0]?.cake_name ?? "Cake";
+          const tripleCreated = await admin.rpc("create_operations_approval_request", {
+            p_order_id: tripleOrder,
+            p_actor_staff_id: coId,
+            p_request_type: "late_order_edit",
+            p_reason: "all three",
+            p_payload: {
+              proposed: {
+                pickup_date: tomorrowYmd,
+                pickup_time: "14:15",
+                items: [cakeItemFromSize(size8, 1, tripleName)],
+                paid_addons: [birthdayPayload(1)],
+              },
+            },
+          });
+          check(!tripleCreated.error, "CO requests pickup + cake + add-on", tripleCreated.error?.message);
+          const tripleId = (tripleCreated.data as { id?: string } | null)?.id ?? null;
+          const tripleApproved = await admin.rpc("approve_operations_approval_request", {
+            p_request_id: tripleId,
+            p_actor_staff_id: ownerId,
+            p_reviewer_note: null,
+          });
+          check(!tripleApproved.error, "Approve pickup + cake + add-on", tripleApproved.error?.message);
+          const { data: tripleOrderRow } = await admin
+            .from("orders")
+            .select("pickup_time")
+            .eq("id", tripleOrder)
+            .single();
+          const tripleCakes = await cakeItems(tripleOrder);
+          const tripleAddons = await paidAddons(tripleOrder);
+          check(
+            String(tripleOrderRow?.pickup_time).startsWith("14:15"),
+            "triple mutation applied pickup time",
+            String(tripleOrderRow?.pickup_time),
+          );
+          check(
+            tripleCakes.some((row) => String(row.size_label).startsWith('8"')),
+            "triple mutation applied cake size",
+          );
+          check(
+            tripleAddons.some((row) => row.code === "birthday_card"),
+            "triple mutation applied Birthday Card",
+          );
+
+          // Rollback: cake would change, add-on sync fails
+          const failOrder = await createOrder(`${SIG} Rollback`, tomorrowYmd);
+          const failBefore = await cakeItems(failOrder);
+          const failCreated = await admin.rpc("create_operations_approval_request", {
+            p_order_id: failOrder,
+            p_actor_staff_id: coId,
+            p_request_type: "late_order_edit",
+            p_reason: "invalid add-on",
+            p_payload: {
+              proposed: {
+                pickup_date: tomorrowYmd,
+                pickup_time: "16:00",
+                items: [cakeItemFromSize(size8, 1, failBefore[0]?.cake_name ?? "Cake")],
+                paid_addons: [
+                  {
+                    code: "not_a_real_addon",
+                    name: "Fake",
+                    quantity: 1,
+                    messages: [null],
+                  },
+                ],
+              },
+            },
+          });
+          check(!failCreated.error, "CO creates failing add-on request", failCreated.error?.message);
+          const failId = (failCreated.data as { id?: string } | null)?.id ?? null;
+          const failApproved = await admin.rpc("approve_operations_approval_request", {
+            p_request_id: failId,
+            p_actor_staff_id: ownerId,
+            p_reviewer_note: null,
+          });
+          check(Boolean(failApproved.error), "Approve fails when add-on sync fails", failApproved.error?.message);
+          const { data: failReq } = await admin
+            .from("operations_approval_requests")
+            .select("status")
+            .eq("id", failId)
+            .maybeSingle();
+          check(failReq?.status === "pending", "failed Approve does not mark request approved", String(failReq?.status));
+          const failAfterCakes = await cakeItems(failOrder);
+          check(
+            failAfterCakes.some((row) => row.cake_size_id === failBefore[0]?.cake_size_id) &&
+              !failAfterCakes.some((row) => row.cake_size_id === size8.id),
+            "failed add-on sync rolls back cake mutation",
+            JSON.stringify(failAfterCakes),
+          );
+        } else {
+          check(false, "6\" and 8\" sizes available for cake+add-on live tests");
+        }
+
+        const staleOrder = await createOrder(`${SIG} AddonStale`, tomorrowYmd);
+        const staleItems = await cakeItems(staleOrder);
+        const staleCreated = await admin.rpc("create_operations_approval_request", {
+          p_order_id: staleOrder,
+          p_actor_staff_id: coId,
+          p_request_type: "late_order_edit",
+          p_reason: "add on birthday card",
+          p_payload: {
+            proposed: {
+              pickup_date: tomorrowYmd,
+              pickup_time: "16:00",
+              items: itemPayload(staleItems),
+              paid_addons: [birthdayPayload(1)],
+            },
+          },
+        });
+        check(
+          !staleCreated.error,
+          "CO creates add-on request before intervening edit",
+          staleCreated.error?.message,
+        );
+        const staleId =
+          (staleCreated.data as { id?: string } | null)?.id ?? null;
+        const { error: interveneErr } = await admin.rpc(
+          "sync_guest_order_paid_addons",
+          {
+            p_order_id: staleOrder,
+            p_paid_addons: [
+              { code: "birthday_card", quantity: 2, messages: [null, null] },
+            ],
+          },
+        );
+        check(!interveneErr, "intervening add-on change applied", interveneErr?.message);
+        const staleApprove = await admin.rpc("approve_operations_approval_request", {
+          p_request_id: staleId,
+          p_actor_staff_id: ownerId,
+          p_reviewer_note: null,
+        });
+        check(
+          Boolean(staleApprove.error),
+          "Approve fails as stale after add-on change",
+          staleApprove.error?.message,
+        );
+        check(
+          /stale/i.test(staleApprove.error?.message ?? ""),
+          "stale add-on change uses existing stale message",
+          staleApprove.error?.message,
+        );
+        const afterStale = await paidAddons(staleOrder);
+        check(
+          afterStale.some(
+            (row) => row.code === "birthday_card" && Number(row.quantity) === 2,
+          ),
+          "stale approve did not overwrite newer add-on state",
+          JSON.stringify(afterStale),
+        );
+      }
     }
 
       const invalidDirect = await createOrder(`${SIG} CO-inv`, "2026-08-28");

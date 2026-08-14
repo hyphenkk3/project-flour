@@ -61,3 +61,36 @@ export function collectionDateNavHref(ymd: string): string {
 export function collectionOrderHref(orderId: string, boardDate: string): string {
   return `/collection/orders/${orderId}?date=${encodeURIComponent(boardDate)}`;
 }
+
+export type CollectionSingaporeWallClock = {
+  ymd: string;
+  hour: number;
+  minute: number;
+  second: number;
+};
+
+/** Asia/Singapore wall clock for an instant. Does not use the host timezone. */
+export function collectionSingaporeWallClock(
+  now: Date,
+): CollectionSingaporeWallClock {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  let hour = Number(value("hour"));
+  if (hour === 24) hour = 0;
+  return {
+    ymd: `${value("year")}-${value("month")}-${value("day")}`,
+    hour,
+    minute: Number(value("minute")),
+    second: Number(value("second")),
+  };
+}

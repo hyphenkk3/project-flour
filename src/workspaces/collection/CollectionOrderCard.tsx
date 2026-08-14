@@ -8,9 +8,7 @@ import {
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { collectionOrderHref } from "@/workspaces/collection/date";
 import {
-  collectionDeskBadgeTone,
-  collectionDeskLabel,
-  collectionDeskPresentation,
+  collectionDeskAttention,
   collectionPrimaryCakeSummary,
   hasCollectionPaymentAttention,
   isCollectionOrderSecured,
@@ -20,15 +18,20 @@ import type { CollectionBoardOrder } from "@/workspaces/collection/types";
 type CollectionOrderCardProps = {
   order: CollectionBoardOrder;
   boardDate: string;
+  now: Date;
 };
 
 export function CollectionOrderCard({
   order,
   boardDate,
+  now,
 }: CollectionOrderCardProps) {
-  const presentation = collectionDeskPresentation({
+  const desk = collectionDeskAttention({
     readyAt: order.readyAt,
     pickedUpAt: order.pickedUpAt,
+    pickupDate: order.pickupDate,
+    pickupTime: order.pickupTime,
+    now,
   });
   const { cakeName, sizeLabel, additionalCakeCount } =
     collectionPrimaryCakeSummary(order);
@@ -44,7 +47,13 @@ export function CollectionOrderCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="text-signal shrink-0 text-sm font-semibold tracking-tight">
+            <span
+              className={
+                desk.overdue
+                  ? "text-status-warning shrink-0 text-sm font-semibold tracking-tight"
+                  : "text-signal shrink-0 text-sm font-semibold tracking-tight"
+              }
+            >
               {formatPickupTime(order.pickupTime)}
             </span>
             <h3 className="text-ink min-w-0 truncate text-sm font-semibold tracking-tight">
@@ -69,8 +78,8 @@ export function CollectionOrderCard({
           ) : null}
         </div>
         <StatusBadge
-          label={collectionDeskLabel(presentation)}
-          tone={collectionDeskBadgeTone(presentation)}
+          label={desk.label}
+          tone={desk.tone}
         />
       </div>
 

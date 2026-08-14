@@ -52,6 +52,15 @@ Detailed business rules, message formats, financial/lifecycle rationale, and his
   `cross_month_pickup`); calendar-date 2-day cutoff (Asia/Singapore);
   CO requests / Owner+Manager execute the exact mutation; fee workflow
   unchanged; Collection RPC + RM10 allowlist migrations applied live
+- **late_order_edit paid add-ons (approval execution):** **PRODUCT
+  ACCEPTED / CLOSED (2026-08-14)** — stored payload includes paid add-ons;
+  Approve persists via `sync_guest_order_paid_addons`;
+  `paid_addons_signature` in stale detection; transactional Approve;
+  Change Summary derived from the stored mutation, not the reason;
+  Birthday Card add/remove/quantity supported. Historical Product test
+  order `bd79ac76-…` left unrepaired. Pickup Overdue remains a separate
+  already-accepted follow-up. Migration
+  `20260814170000_late_order_edit_paid_addons.sql` applied live.
 - Working tree may include untracked `tmp/` Product-review assets only —
   do not stage.
 
@@ -319,7 +328,30 @@ accepted freeze).
 - Migrations applied live: `20260814150000_operations_approval_requests.sql`,
   `20260814160000_rm10_valid_path_customer_operations.sql`.
 - Out of scope: pickup-overdue indicator/reminder; approval notifications.
+- Paid-add-on execution is a later same-day follow-up (closed below).
 - Details: `docs/DECISIONS.md`.
+
+### late_order_edit paid add-ons (approval execution) — PRODUCT ACCEPTED / CLOSED (2026-08-14)
+
+- `late_order_edit` stored payload includes paid add-ons (Birthday Card
+  add / remove / quantity). Cake + add-on and cake + add-on + pickup persist
+  together when requested.
+- Approve executes `sync_guest_order_paid_addons`. One PostgreSQL
+  transaction: paid-add-on failure rolls back cake/pickup; request stays
+  pending.
+- Stale detection includes `paid_addons_signature`. Intervening add-on
+  change → Approve refuses; no partial mutation.
+- Change Summary is system-derived from the stored mutation, not the
+  free-text reason. Unchanged add-ons are not described as a change.
+- Live migration (do not modify):
+  `20260814170000_late_order_edit_paid_addons.sql`
+  (SHA-256 `d08294544ef38d28683a9281880bc39d6a0e66a0df6adcd8e3570516dae791e2`).
+- Historical Product test order `bd79ac76-…` remains intentionally
+  unrepaired (approved before this migration). Guarded Product order
+  `7e9779ac-…` was not mutated.
+- Pickup Overdue remains a separate already-accepted follow-up. Approval
+  authorization / 2-day cutoff / Collection unchanged.
+- Live suite PASS (121). Details: `docs/DECISIONS.md`.
 
 ### Shared Operations access (Customer Operations) — PRODUCT ACCEPTED / CLOSED (2026-08-14)
 

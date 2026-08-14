@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { buildApprovalChangeSummary } from "@/engines/operations/approval-change-summary";
 import {
   approvalTypeLabel,
   formatApprovalAge,
   type OperationsApprovalRecord,
 } from "@/engines/operations/approvals";
-import { formatRm } from "@/workspaces/storefront/catalog/pricing";
-import { formatDdMmYyyy, formatBusinessMonthYear, formatDateTime } from "@/lib/dates";
-import { formatPickupTime } from "@/workspaces/owner/orders/labels";
+import { formatDateTime } from "@/lib/dates";
 import {
   approveOperationsApprovalAction,
   cancelOperationsApprovalAction,
@@ -20,8 +19,6 @@ type OrderApprovalPanelProps = {
   request: OperationsApprovalRecord;
   orderNumber: string;
   customerName: string;
-  pickupDate: string;
-  pickupTime: string;
   canReview: boolean;
   canCancel: boolean;
   highlighted?: boolean;
@@ -31,8 +28,6 @@ export function OrderApprovalPanel({
   request,
   orderNumber,
   customerName,
-  pickupDate,
-  pickupTime,
   canReview,
   canCancel,
   highlighted = false,
@@ -44,6 +39,7 @@ export function OrderApprovalPanel({
 
   const payload = request.payload;
   const isPending = request.status === "pending";
+  const summary = buildApprovalChangeSummary(payload);
 
   function run(
     fn: () => Promise<{ error: string | null; success: boolean }>,
@@ -77,103 +73,63 @@ export function OrderApprovalPanel({
           <dd className="text-ink font-medium">{customerName}</dd>
         </div>
         <div>
-          <dt className="text-skyline">Pickup</dt>
-          <dd className="text-ink">
-            {formatDdMmYyyy(pickupDate)} · {formatPickupTime(pickupTime)}
-          </dd>
-        </div>
-        <div>
           <dt className="text-skyline">Requested by</dt>
           <dd className="text-ink">
             {request.requestedByName ?? "Staff"} ·{" "}
             {formatApprovalAge(request.createdAt)}
           </dd>
         </div>
+        <div>
+          <dt className="text-skyline">Request</dt>
+          <dd className="text-ink">{approvalTypeLabel(request.requestType)}</dd>
+        </div>
       </dl>
-      <p className="text-ink text-sm">
-        <span className="font-medium">Request:</span>{" "}
-        {approvalTypeLabel(request.requestType)}
-      </p>
+
+      {summary.lines.length > 0 ? (
+        <div>
+          <p className="text-skyline text-xs font-semibold tracking-[0.14em] uppercase">
+            Change requested
+          </p>
+          {summary.lines.length === 1 ? (
+            <p className="text-ink text-sm font-medium">{summary.lines[0]}</p>
+          ) : (
+            <ul className="text-ink list-disc space-y-1 pl-5 text-sm font-medium">
+              {summary.lines.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
+
+      {summary.currentLines.length > 0 ? (
+        <div>
+          <p className="text-skyline text-xs font-semibold tracking-[0.14em] uppercase">
+            Current
+          </p>
+          <div className="text-ink text-sm whitespace-pre-wrap">
+            {summary.currentLines.join("\n")}
+          </div>
+        </div>
+      ) : null}
+
+      {summary.requestedLines.length > 0 ? (
+        <div>
+          <p className="text-skyline text-xs font-semibold tracking-[0.14em] uppercase">
+            Requested
+          </p>
+          <div className="text-ink text-sm whitespace-pre-wrap">
+            {summary.requestedLines.join("\n")}
+          </div>
+        </div>
+      ) : null}
+
       <div>
-        <p className="text-skyline text-sm">Reason</p>
+        <p className="text-skyline text-xs font-semibold tracking-[0.14em] uppercase">
+          Reason
+        </p>
         <p className="text-ink text-sm whitespace-pre-wrap">{request.reason}</p>
       </div>
-      {payload.kind === "discount_exception" ? (
-        <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-skyline">Current</dt>
-            <dd className="text-ink font-medium">
-              {formatRm(payload.currentAmountDue)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-skyline">Requested</dt>
-            <dd className="text-ink font-medium">
-              {formatRm(payload.requestedAmountDue)}
-            </dd>
-          </div>
-          <div className="sm:col-span-2">
-            <dt className="text-skyline">Voucher</dt>
-            <dd className="text-ink">
-              {payload.voucherNumber} · expiry {payload.expiryDate}
-              {payload.eligibilityReason
-                ? ` · ${payload.eligibilityReason}`
-                : ""}
-            </dd>
-          </div>
-        </dl>
-      ) : null}
-      {payload.kind === "cross_month_pickup" ? (
-        <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-skyline">Current</dt>
-            <dd className="text-ink">
-              {formatDdMmYyyy(payload.currentPickupDate)} ·{" "}
-              {formatPickupTime(payload.currentPickupTime)} (
-              {formatBusinessMonthYear(payload.currentPickupDate)})
-            </dd>
-          </div>
-          <div>
-            <dt className="text-skyline">Requested</dt>
-            <dd className="text-ink">
-              {formatDdMmYyyy(payload.proposedPickupDate)} ·{" "}
-              {formatPickupTime(payload.proposedPickupTime)} (
-              {formatBusinessMonthYear(payload.proposedPickupDate)})
-            </dd>
-          </div>
-        </dl>
-      ) : null}
-      {payload.kind === "late_order_edit" ? (
-        <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-skyline">Current</dt>
-            <dd className="text-ink">
-              {(payload.current?.items ?? [])
-                .map((item) => `${item.cakeName} · ${item.sizeLabel}`)
-                .join(", ") ||
-                (payload.current
-                  ? `${formatDdMmYyyy(payload.current.pickupDate)} · ${formatPickupTime(payload.current.pickupTime)}`
-                  : "—")}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-skyline">Requested</dt>
-            <dd className="text-ink">
-              {(payload.proposed.items ?? [])
-                .map((item) => `${item.cakeName} · ${item.sizeLabel}`)
-                .join(", ") || "—"}
-              {payload.proposed.pickupDate ? (
-                <span className="block">
-                  Pickup {formatDdMmYyyy(payload.proposed.pickupDate)}
-                  {payload.proposed.pickupTime
-                    ? ` · ${formatPickupTime(payload.proposed.pickupTime)}`
-                    : ""}
-                </span>
-              ) : null}
-            </dd>
-          </div>
-        </dl>
-      ) : null}
 
       {!isPending && request.reviewedAt ? (
         <p className="text-ink text-sm">
@@ -189,7 +145,7 @@ export function OrderApprovalPanel({
 
       {request.reviewerNote && !isPending ? (
         <p className="text-ink text-sm">
-          {request.status === "rejected" ? "Reason" : "Reviewer note"}:{" "}
+          {request.status === "rejected" ? "Rejection note" : "Reviewer note"}:{" "}
           {request.reviewerNote}
         </p>
       ) : null}

@@ -7,6 +7,7 @@ import type { StatusTone } from "@/lib/design-tokens";
 import { normalizeFulfilmentMethod } from "@/engines/orders/fulfilment";
 import type { GuestOrderStatus } from "@/types/storefront";
 import type { StorefrontOrderFulfilmentMethod } from "@/types/storefront";
+import { collectionSingaporeWallClock } from "@/workspaces/collection/date";
 
 export const COLLECTION_ACTIVE_PREORDER_STATUSES: readonly GuestOrderStatus[] = [
   "submitted",
@@ -89,6 +90,124 @@ export function collectionDeskBadgeTone(
   presentation: CollectionDeskPresentation,
 ): StatusTone {
   return presentation === "collected" ? "success" : "info";
+}
+
+const PICKUP_TIME_RE = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/;
+const PICKUP_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseCollectionPickupTime(pickupTime: string): {
+  hour: number;
+  minute: number;
+  second: number;
+} | null {
+  const match = PICKUP_TIME_RE.exec(pickupTime.trim());
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const second = Number(match[3] ?? "0");
+  if (
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute) ||
+    !Number.isInteger(second) ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
+  ) {
+    return null;
+  }
+  return { hour, minute, second };
+}
+
+/**
+ * Derived Collection attention: Ready and not collected, and Singapore
+ * now is at or after pickup date + pickup time. Not a persisted state.
+ */
+export function isCollectionPickupOverdue(input: {
+  pickupDate: string;
+  pickupTime: string;
+  pickedUpAt: string | null;
+  readyAt?: string | null;
+  now: Date;
+}): boolean {
+  if (input.pickedUpAt) return false;
+  if (input.readyAt === null) return false;
+  const time = parseCollectionPickupTime(input.pickupTime);
+  if (!time) return false;
+  if (!PICKUP_DATE_RE.test(input.pickupDate.trim())) return false;
+
+  const nowClock = collectionSingaporeWallClock(input.now);
+  const pickupDate = input.pickupDate.trim();
+  if (pickupDate < nowClock.ymd) return true;
+  if (pickupDate > nowClock.ymd) return false;
+
+  const pickupSeconds = time.hour * 3600 + time.minute * 60 + time.second;
+  const nowSeconds =
+    nowClock.hour * 3600 + nowClock.minute * 60 + nowClock.second;
+  return nowSeconds >= pickupSeconds;
+}
+
+export const COLLECTION_PICKUP_OVERDUE_LABEL = "Pickup overdue";
+
+export function collectionDeskAttention(input: {
+  readyAt: string | null;
+  pickedUpAt: string | null;
+  pickupDate: string;
+  pickupTime: string;
+  now: Date;
+}): {
+  label: string;
+  tone: StatusTone;
+  overdue: boolean;
+} {
+  const presentation = collectionDeskPresentation({
+    readyAt: input.readyAt,
+    pickedUpAt: input.pickedUpAt,
+  });
+  if (presentation === "collected") {
+    return {
+      label: collectionDeskLabel(presentation),
+      tone: collectionDeskBadgeTone(presentation),
+      overdue: false,
+    };
+  }
+  const overdue = isCollectionPickupOverdue({
+    pickupDate: input.pickupDate,
+    pickupTime: input.pickupTime,
+    pickedUpAt: input.pickedUpAt,
+    readyAt: input.readyAt,
+    now: input.now,
+  });
+  if (overdue) {
+    return {
+      label: COLLECTION_PICKUP_OVERDUE_LABEL,
+      tone: "warning",
+      overdue: true,
+    };
+  }
+  return {
+    label: collectionDeskLabel(presentation),
+    tone: collectionDeskBadgeTone(presentation),
+    overdue: false,
+  };
+}
+
+export function countCollectionPickupOverdue<
+  T extends {
+    pickupDate: string;
+    pickupTime: string;
+    pickedUpAt: string | null;
+    readyAt: string | null;
+  },
+>(orders: T[], now: Date): number {
+  return orders.filter((order) =>
+    isCollectionPickupOverdue({
+      pickupDate: order.pickupDate,
+      pickupTime: order.pickupTime,
+      pickedUpAt: order.pickedUpAt,
+      readyAt: order.readyAt,
+      now,
+    }),
+  ).length;
 }
 
 /** Collection Mark Collected requires Ready (stricter than Owner Ops RPC). */
