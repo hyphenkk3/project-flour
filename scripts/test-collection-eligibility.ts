@@ -65,8 +65,8 @@ assert.equal(
     readyAt: null,
     pickedUpAt: "2026-10-23T02:00:00Z",
   }),
-  false,
-  "Collected without Ready not on Collection detail",
+  true,
+  "Completed Picked Up remains openable from Collection history",
 );
 
 assert.equal(
@@ -108,7 +108,7 @@ assert.equal(
     readyAt: base.readyAt,
     pickedUpAt: "x",
   }),
-  "collected",
+  "picked_up",
 );
 
 const readySurface = collectionHandoffSurface({

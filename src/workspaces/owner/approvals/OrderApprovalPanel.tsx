@@ -3,6 +3,10 @@
 import { useState, useTransition } from "react";
 import { buildApprovalChangeSummary } from "@/engines/operations/approval-change-summary";
 import {
+  approvalPanelDomId,
+  formatApprovalActorLabel,
+} from "@/engines/operations/approval-ux";
+import {
   approvalTypeLabel,
   formatApprovalAge,
   type OperationsApprovalRecord,
@@ -13,6 +17,7 @@ import {
   cancelOperationsApprovalAction,
   rejectOperationsApprovalAction,
 } from "@/workspaces/owner/approvals/actions";
+import { ApprovalChangeLines } from "@/workspaces/owner/approvals/ApprovalChangeLines";
 import { FormField, FormTextarea } from "@/components/ui/form";
 
 type OrderApprovalPanelProps = {
@@ -40,6 +45,15 @@ export function OrderApprovalPanel({
   const payload = request.payload;
   const isPending = request.status === "pending";
   const summary = buildApprovalChangeSummary(payload);
+  const requesterLabel = formatApprovalActorLabel({
+    name: request.requestedByName,
+    roleName: request.requestedByRoleName,
+  });
+  const reviewerLabel = formatApprovalActorLabel({
+    name: request.reviewedByName,
+    roleName: request.reviewedByRoleName,
+    includeRole: false,
+  });
 
   function run(
     fn: () => Promise<{ error: string | null; success: boolean }>,
@@ -55,10 +69,10 @@ export function OrderApprovalPanel({
     <section
       className={
         highlighted
-          ? "border-signal bg-signal/5 ring-signal/20 space-y-3 rounded-xl border-2 p-5 ring-2"
-          : "border-status-warning/30 bg-status-warning-soft space-y-3 rounded-xl border p-5"
+          ? "border-signal bg-signal/5 ring-signal/20 scroll-mt-24 space-y-3 rounded-xl border-2 p-5 ring-2"
+          : "border-status-warning/30 bg-status-warning-soft scroll-mt-24 space-y-3 rounded-xl border p-5"
       }
-      id={`approval-${request.id}`}
+      id={approvalPanelDomId(request.id)}
     >
       <p className="text-status-warning text-xs font-semibold tracking-[0.14em] uppercase">
         {isPending ? "Approval requested" : `Approval ${request.status}`}
@@ -75,8 +89,7 @@ export function OrderApprovalPanel({
         <div>
           <dt className="text-skyline">Requested by</dt>
           <dd className="text-ink">
-            {request.requestedByName ?? "Staff"} ·{" "}
-            {formatApprovalAge(request.createdAt)}
+            {requesterLabel} · {formatApprovalAge(request.createdAt)}
           </dd>
         </div>
         <div>
@@ -85,20 +98,12 @@ export function OrderApprovalPanel({
         </div>
       </dl>
 
-      {summary.lines.length > 0 ? (
+      {summary.changeLines.length > 0 ? (
         <div>
           <p className="text-skyline text-xs font-semibold tracking-[0.14em] uppercase">
             Change requested
           </p>
-          {summary.lines.length === 1 ? (
-            <p className="text-ink text-sm font-medium">{summary.lines[0]}</p>
-          ) : (
-            <ul className="text-ink list-disc space-y-1 pl-5 text-sm font-medium">
-              {summary.lines.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          )}
+          <ApprovalChangeLines lines={summary.changeLines} />
         </div>
       ) : null}
 
@@ -138,8 +143,7 @@ export function OrderApprovalPanel({
             : request.status === "rejected"
               ? "Rejected"
               : "Cancelled"}{" "}
-          by {request.reviewedByName ?? "Staff"} ·{" "}
-          {formatDateTime(request.reviewedAt)}
+          by {reviewerLabel} · {formatDateTime(request.reviewedAt)}
         </p>
       ) : null}
 

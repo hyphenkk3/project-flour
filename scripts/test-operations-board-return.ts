@@ -16,6 +16,7 @@ import {
   shouldPropagateOwnerReturnTo,
   withOwnerReturnTo,
 } from "@/workspaces/owner/navigation/return-to";
+import { withApprovalHistoryReturnPositionFlag } from "@/workspaces/owner/approvals/approval-history-return-position";
 
 const custom16 = parseOperationsBoardSearchParams({ date: "2026-08-16" });
 assert.equal(custom16.pickupFilter, "custom");
@@ -51,6 +52,26 @@ assert.equal(
   null,
 );
 
+assert.equal(
+  parseOperationsBoardSearchParams({ search: " testdeli " }).search,
+  "testdeli",
+);
+assert.equal(
+  buildOperationsBoardPath({
+    ...DEFAULT_OPERATIONS_QUERY,
+    search: "testdeli",
+  }),
+  "/owner?search=testdeli",
+);
+assert.equal(
+  resolveOwnerReturnTo("/owner?search=testdeli").href,
+  "/owner?search=testdeli",
+);
+assert.equal(
+  ownerOrderWorkspaceHref("ord-1", "/owner?search=testdeli"),
+  `/owner/orders/ord-1?returnTo=${encodeURIComponent("/owner?search=testdeli")}`,
+);
+
 const from16 = resolveOwnerReturnTo("/owner?date=2026-08-16");
 assert.equal(from16.label, "Operations");
 assert.equal(from16.href, "/owner?date=2026-08-16");
@@ -72,7 +93,23 @@ assert.equal(
   resolveOwnerReturnTo("/customer-operations/orders").href,
   "/owner",
 );
-assert.equal(resolveOwnerReturnTo("/owner/approvals").href, "/owner");
+assert.equal(resolveOwnerReturnTo("/owner/approvals").href, "/owner/approvals");
+assert.equal(resolveOwnerReturnTo("/owner/approvals").label, "Approvals");
+assert.equal(
+  resolveOwnerReturnTo("/owner/approvals/history").href,
+  "/owner/approvals/history",
+);
+assert.equal(
+  resolveOwnerReturnTo("/owner/approvals/history").label,
+  "Approval History",
+);
+assert.equal(resolveOwnerReturnTo("/home").href, "/home");
+assert.equal(resolveOwnerReturnTo("/home").label, "Home");
+assert.equal(shouldPropagateOwnerReturnTo(resolveOwnerReturnTo("/home")), true);
+assert.equal(
+  ownerOrderWorkspaceHref("ord-1", "/home"),
+  `/owner/orders/ord-1?returnTo=${encodeURIComponent("/home")}`,
+);
 assert.equal(
   resolveOwnerReturnTo("https://example.com/owner?date=2026-08-16").href,
   "/owner",
@@ -129,6 +166,39 @@ assert.match(
   detailSrc,
   /capabilities\.canReviewOperationsApprovals\s*\?\s*"\/owner\/approvals"/,
 );
+assert.match(detailSrc, /back\.label === "Home"/);
+assert.match(detailSrc, /withApprovalHistoryReturnPositionFlag/);
+assert.match(detailSrc, /preserveReturnScroll/);
+
+const toolbarSrc = readFileSync(
+  resolve("src/workspaces/owner/OperationsBoardToolbar.tsx"),
+  "utf8",
+);
+assert.match(toolbarSrc, /Needs Attention/);
+assert.doesNotMatch(toolbarSrc, /Need Attention/);
+
+assert.equal(
+  withApprovalHistoryReturnPositionFlag("/owner/approvals/history"),
+  "/owner/approvals/history?rp=1",
+);
+assert.equal(
+  withApprovalHistoryReturnPositionFlag("/owner"),
+  "/owner",
+);
+
+const historyPageSrc = readFileSync(
+  resolve("src/app/(app)/owner/approvals/history/page.tsx"),
+  "utf8",
+);
+assert.match(historyPageSrc, /restorePosition/);
+assert.match(historyPageSrc, /APPROVAL_HISTORY_RETURN_POSITION_PARAM/);
+
+const historyListSrc = readFileSync(
+  resolve("src/workspaces/owner/approvals/OperationsApprovalHistory.tsx"),
+  "utf8",
+);
+assert.match(historyListSrc, /captureApprovalHistoryReturnPosition/);
+assert.match(historyListSrc, /takeApprovalHistoryReturnPosition/);
 
 const inboxSrc = readFileSync(
   resolve("src/app/(app)/owner/approvals/page.tsx"),
@@ -136,8 +206,8 @@ const inboxSrc = readFileSync(
 );
 assert.match(
   inboxSrc,
-  /<OperationsApprovalsSection approvals=\{pendingApprovals\} \/>/,
+  /<OperationsApprovalsSection[\s\S]*returnTo="\/owner\/approvals"/,
 );
-assert.doesNotMatch(inboxSrc, /returnTo=/);
+assert.match(inboxSrc, /approvals=\{pendingApprovals\}/);
 
 console.log("PASS operations board selected-date return");

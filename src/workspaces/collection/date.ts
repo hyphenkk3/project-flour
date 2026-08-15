@@ -2,6 +2,8 @@
  * Collection fulfilment-date helpers (Asia/Singapore) — same calendar as Bakery.
  */
 
+import type { CollectionBoardTab } from "@/workspaces/collection/board-tab";
+
 const TIME_ZONE = "Asia/Singapore";
 
 function singaporeYmd(date: Date = new Date()): string {
@@ -13,7 +15,7 @@ function singaporeYmd(date: Date = new Date()): string {
   }).format(date);
 }
 
-function addCalendarDaysYmd(ymd: string, days: number): string {
+export function addCalendarDaysYmd(ymd: string, days: number): string {
   const [y, m, d] = ymd.split("-").map(Number);
   const date = new Date(Date.UTC(y, m - 1, d + days));
   const year = date.getUTCFullYear();
@@ -54,12 +56,25 @@ export function resolveCollectionBoardDate(
   return value;
 }
 
-export function collectionDateNavHref(ymd: string): string {
-  return `/collection?date=${encodeURIComponent(ymd)}`;
+export function collectionDateNavHref(
+  ymd: string,
+  tab: CollectionBoardTab = "ready",
+): string {
+  const params = new URLSearchParams();
+  params.set("date", ymd);
+  if (tab !== "ready") params.set("tab", tab);
+  return `/collection?${params.toString()}`;
 }
 
-export function collectionOrderHref(orderId: string, boardDate: string): string {
-  return `/collection/orders/${orderId}?date=${encodeURIComponent(boardDate)}`;
+export function collectionOrderHref(
+  orderId: string,
+  boardDate: string,
+  tab: CollectionBoardTab = "ready",
+): string {
+  const params = new URLSearchParams();
+  params.set("date", boardDate);
+  if (tab !== "ready") params.set("tab", tab);
+  return `/collection/orders/${orderId}?${params.toString()}`;
 }
 
 export type CollectionSingaporeWallClock = {

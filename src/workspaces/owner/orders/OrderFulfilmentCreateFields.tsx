@@ -1,5 +1,3 @@
-"use client";
-
 import { FormField, FormInput } from "@/components/ui/form";
 import { OwnerPickupFields } from "@/components/ui/OwnerPickupFields";
 import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
@@ -11,6 +9,10 @@ import {
   type DeliveryCreateDraft,
   type OwnerCreateFulfilmentMethod,
 } from "@/engines/orders/fulfilment";
+import {
+  LATE_ORDER_EDIT_SECTION_EXCLUDED,
+  LATE_ORDER_EDIT_SECTION_PICKUP_INCLUDED,
+} from "@/engines/operations/approval-ux";
 import type { RecipientNotifyPreference } from "@/types/storefront";
 
 type OrderFulfilmentCreateFieldsProps = {
@@ -25,6 +27,9 @@ type OrderFulfilmentCreateFieldsProps = {
   defaultDate?: string;
   defaultTime?: string;
   onDateChange?: (date: string) => void;
+  onTimeChange?: (time: string) => void;
+  /** CO late-edit cutoff: muted scope cues near method vs pickup. */
+  lateEditCutoffHints?: boolean;
 };
 
 export function OrderFulfilmentCreateFields({
@@ -38,6 +43,8 @@ export function OrderFulfilmentCreateFields({
   defaultDate,
   defaultTime,
   onDateChange,
+  onTimeChange,
+  lateEditCutoffHints = false,
 }: OrderFulfilmentCreateFieldsProps) {
   const isDelivery = method === "delivery";
   const showNotifyChoice = !delivery.sameAsCustomer;
@@ -66,6 +73,9 @@ export function OrderFulfilmentCreateFields({
 
       <fieldset className="space-y-2">
         <legend className="text-ink text-sm font-medium">Method</legend>
+        {lateEditCutoffHints ? (
+          <p className="text-skyline text-sm">{LATE_ORDER_EDIT_SECTION_EXCLUDED}</p>
+        ) : null}
         <div
           aria-label="Fulfilment method"
           className="grid grid-cols-2 gap-2"
@@ -93,12 +103,19 @@ export function OrderFulfilmentCreateFields({
         </div>
       </fieldset>
 
+      {lateEditCutoffHints ? (
+        <p className="text-skyline text-sm">
+          {LATE_ORDER_EDIT_SECTION_PICKUP_INCLUDED}
+        </p>
+      ) : null}
+
       {scheduleMode === "slots" ? (
         <PickupSlotFields
           dateLabel={dateLabel}
           defaultDate={defaultDate}
           defaultTime={defaultTime}
           onDateChange={onDateChange}
+          onTimeChange={onTimeChange}
           timeLabel={timeLabel}
         />
       ) : (
@@ -107,12 +124,16 @@ export function OrderFulfilmentCreateFields({
           defaultDate={defaultDate}
           defaultTime={defaultTime}
           onDateChange={onDateChange}
+          onTimeChange={onTimeChange}
           timeLabel={timeLabel}
         />
       )}
 
       {isDelivery ? (
         <div className="border-fog space-y-4 rounded-lg border p-3">
+          {lateEditCutoffHints ? (
+            <p className="text-skyline text-sm">{LATE_ORDER_EDIT_SECTION_EXCLUDED}</p>
+          ) : null}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-ink text-xs font-semibold tracking-[0.12em] uppercase">
               Delivery details

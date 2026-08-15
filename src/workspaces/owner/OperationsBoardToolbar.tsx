@@ -5,15 +5,22 @@ import {
   OPERATIONS_PICKUP_FILTERS,
   OPERATIONS_SORT_OPTIONS,
   OPERATIONS_STATUS_FILTERS,
+  OPERATIONS_SEARCH_ALL_DATES_CUE,
   isOperationsQueryDefault,
   operationsBoardSummary,
   operationsPickupFilterLabel,
+  operationsSearchSpansPickupDates,
   type OperationsBoardQuery,
   type OperationsPickupFilter,
   type OperationsSortOption,
   type OperationsStatusFilter,
 } from "@/engines/operations/order-board";
 import { formStyles } from "@/components/ui/form/FormControls";
+import {
+  OPERATIONS_APPROVALS_SECTION_ID,
+  pendingApprovalsLabel,
+} from "@/engines/operations/approval-ux";
+import { scrollWorkspaceSectionIntoView } from "@/workspaces/owner/orders/scroll-workspace-section";
 
 export type OperationsTodayGroupCounts = {
   needsAttention: number;
@@ -27,6 +34,7 @@ type OperationsBoardToolbarProps = {
   /** Non-Today: optional submitted count hint. */
   newCount?: number;
   todayGroupCounts?: OperationsTodayGroupCounts | null;
+  pendingApprovalCount?: number;
   onChange: (next: OperationsBoardQuery) => void;
 };
 
@@ -38,12 +46,16 @@ export function OperationsBoardToolbar({
   matchCount,
   newCount = 0,
   todayGroupCounts = null,
+  pendingApprovalCount = 0,
   onChange,
 }: OperationsBoardToolbarProps) {
   const isDefault = isOperationsQueryDefault(query);
   const summary = operationsBoardSummary(query, matchCount);
+  const searchingAllDates = operationsSearchSpansPickupDates(query);
   const showTodayGroups =
-    query.pickupFilter === "today" && todayGroupCounts != null;
+    query.pickupFilter === "today" &&
+    todayGroupCounts != null &&
+    !searchingAllDates;
   const pickupLabel = operationsPickupFilterLabel(
     query.pickupFilter,
     query.customPickupDate,
@@ -78,8 +90,33 @@ export function OperationsBoardToolbar({
                 <span className="tabular-nums text-base sm:text-lg">
                   {todayGroupCounts.needsAttention}
                 </span>{" "}
-                Need Attention
+                Needs Attention
               </p>
+              <button
+                className={
+                  pendingApprovalCount > 0
+                    ? "text-status-warning text-sm font-bold tracking-wide uppercase"
+                    : "text-skyline/80 text-sm font-medium tracking-wide uppercase"
+                }
+                onClick={() =>
+                  scrollWorkspaceSectionIntoView(
+                    OPERATIONS_APPROVALS_SECTION_ID,
+                    { focus: true },
+                  )
+                }
+                type="button"
+              >
+                <span
+                  className={
+                    pendingApprovalCount > 0
+                      ? "tabular-nums text-base sm:text-lg"
+                      : "tabular-nums"
+                  }
+                >
+                  {pendingApprovalCount}
+                </span>{" "}
+                {pendingApprovalsLabel(pendingApprovalCount)}
+              </button>
               <p className="text-status-success text-sm font-semibold tracking-wide uppercase">
                 <span className="tabular-nums">
                   {todayGroupCounts.allClear}
@@ -108,9 +145,31 @@ export function OperationsBoardToolbar({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0 space-y-1">
             <p className="text-ink text-lg font-semibold tracking-tight sm:text-xl">
-              {summary}
+              {searchingAllDates
+                ? `${matchCount} ${matchCount === 1 ? "order" : "orders"}`
+                : summary}
             </p>
-            <p className="text-skyline text-sm">Pickup · {pickupLabel}</p>
+            <p className="text-skyline text-sm">
+              {searchingAllDates
+                ? OPERATIONS_SEARCH_ALL_DATES_CUE
+                : `Pickup · ${pickupLabel}`}
+            </p>
+            <button
+              className={
+                pendingApprovalCount > 0
+                  ? "text-status-warning text-sm font-bold tracking-wide uppercase"
+                  : "text-skyline text-sm font-medium tracking-wide uppercase"
+              }
+              onClick={() =>
+                scrollWorkspaceSectionIntoView(OPERATIONS_APPROVALS_SECTION_ID, {
+                  focus: true,
+                })
+              }
+              type="button"
+            >
+              <span className="tabular-nums">{pendingApprovalCount}</span>{" "}
+              {pendingApprovalsLabel(pendingApprovalCount)}
+            </button>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {newCount > 0 ? (

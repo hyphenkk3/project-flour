@@ -13,6 +13,7 @@ export const COLLECTION_ORDER_SELECT = `
   production_started_at,
   ready_at,
   picked_up_at,
+  delivered_at,
   include_receipt,
   order_items (
     id,

@@ -25,12 +25,25 @@ import { formatLongBusinessDate, formatBusinessMonthYear, isDifferentBusinessMon
 import { buildApprovalChangeSummary } from "@/engines/operations/approval-change-summary";
 import {
   canCancelOperationsApproval,
+  canReviewPendingOperationsApproval,
   isWithinTwoDayChangeCutoff,
   lateOrderEditRestrictionReason,
   type LateOrderEditPaidAddon,
   type LateOrderEditProposedItem,
   type OperationsApprovalRecord,
 } from "@/engines/operations/approvals";
+import {
+  pendingLateOrderEdit,
+  approvalPanelDomId,
+  visibleDecidedApprovalsForOrder,
+  LATE_ORDER_EDIT_APPROVAL_SCOPE_EXCLUSIONS,
+  LATE_ORDER_EDIT_APPROVAL_SCOPE_SUMMARY,
+  LATE_ORDER_EDIT_SECTION_EXCLUDED,
+  LATE_ORDER_EDIT_SECTION_INCLUDED,
+  LATE_ORDER_EDIT_SECTION_PICKUP_INCLUDED,
+} from "@/engines/operations/approval-ux";
+import { normalizePickupTimeValue } from "@/engines/business-calendar/pickup-slots";
+import { scrollWorkspaceSectionIntoView } from "@/workspaces/owner/orders/scroll-workspace-section";
 import {
   describeTimelineActor,
   timelineEventLabel,
@@ -71,6 +84,7 @@ import {
 } from "@/engines/orders/delivery-finance";
 import type { GuestOrderWorkspaceCapabilities } from "@/engines/orders/delivery-finance-capabilities";
 import { OrderApprovalPanel } from "@/workspaces/owner/approvals/OrderApprovalPanel";
+import { PendingLateOrderEditNotice } from "@/workspaces/owner/approvals/PendingLateOrderEditNotice";
 import { createOperationsApprovalAction } from "@/workspaces/owner/approvals/actions";
 import { CustomerConfirmedButton } from "@/workspaces/owner/orders/CustomerConfirmedButton";
 import { DeliveryChargesSection } from "@/workspaces/owner/orders/DeliveryChargesSection";
@@ -226,6 +240,9 @@ export function OrderWorkspaceForm({
     order.needsBakeryAttention,
   );
   const [editPickupDate, setEditPickupDate] = useState(order.pickupDate);
+  const [editPickupTime, setEditPickupTime] = useState(() =>
+    normalizePickupTimeValue(order.pickupTime),
+  );
   const [pickupMonthOverride, setPickupMonthOverride] = useState(false);
   const [crossMonthReason, setCrossMonthReason] = useState("");
   const [crossMonthError, setCrossMonthError] = useState<string | null>(null);
@@ -248,11 +265,22 @@ export function OrderWorkspaceForm({
   const pendingCrossMonth = pendingApprovals.find(
     (row) => row.requestType === "cross_month_pickup",
   );
-  const pendingLateEdit = pendingApprovals.find(
-    (row) => row.requestType === "late_order_edit",
-  );
+  const pendingLateEdit = pendingLateOrderEdit(pendingApprovals);
   const blockDirectSave =
     capabilities.canRequestOperationsApproval && lateChangeRequired;
+
+  function lateEditScopeHint(
+    kind: "included" | "pickup" | "excluded",
+  ): ReactNode {
+    if (!blockDirectSave) return null;
+    const text =
+      kind === "included"
+        ? LATE_ORDER_EDIT_SECTION_INCLUDED
+        : kind === "pickup"
+          ? LATE_ORDER_EDIT_SECTION_PICKUP_INCLUDED
+          : LATE_ORDER_EDIT_SECTION_EXCLUDED;
+    return <p className="text-skyline text-sm">{text}</p>;
+  }
 
   function describeEditItems(
     items: EditableItem[],
@@ -306,7 +334,13 @@ export function OrderWorkspaceForm({
   }
 
   function renderApprovalPanels() {
-    const visible = [...pendingApprovals, ...decidedApprovals.slice(0, 5)];
+    const visible = [
+      ...pendingApprovals,
+      ...visibleDecidedApprovalsForOrder(
+        decidedApprovals,
+        highlightApprovalId,
+      ),
+    ];
     if (visible.length === 0) return null;
     return (
       <div className="space-y-3">
@@ -319,7 +353,12 @@ export function OrderWorkspaceForm({
               requestedBy: request.requestedBy,
               status: request.status,
             })}
-            canReview={capabilities.canReviewOperationsApprovals}
+            canReview={canReviewPendingOperationsApproval({
+              role: capabilities.role,
+              staffId: capabilities.staffId,
+              requestedBy: request.requestedBy,
+              requestType: request.requestType,
+            })}
             customerName={order.customerName}
             highlighted={highlightApprovalId === request.id}
             orderNumber={order.orderNumber}
@@ -369,9 +408,10 @@ export function OrderWorkspaceForm({
 
   function handleRequestLateEdit(event: { currentTarget: HTMLElement }) {
     const form = event.currentTarget.closest("form");
-    const pickupTime = form
+    const formTime = form
       ? String(new FormData(form).get("pickup_time") ?? "").trim()
-      : order.pickupTime;
+      : "";
+    const pickupTime = (formTime || editPickupTime).trim();
     const reason = lateEditReason.trim();
     if (!reason) {
       setLateEditError("A reason is required.");
@@ -471,6 +511,7 @@ export function OrderWorkspaceForm({
     if (mode !== "edit") return;
     setNeedsAttention(order.needsBakeryAttention);
     setEditPickupDate(order.pickupDate);
+    setEditPickupTime(normalizePickupTimeValue(order.pickupTime));
     setPickupMonthOverride(false);
     setEditGuestName(order.customerName);
     setEditGuestPhone(order.phone);
@@ -501,6 +542,13 @@ export function OrderWorkspaceForm({
       setPickupMonthOverride(false);
     }
   }, [pickupMonthChanging]);
+
+  useEffect(() => {
+    if (!highlightApprovalId) return;
+    scrollWorkspaceSectionIntoView(approvalPanelDomId(highlightApprovalId), {
+      focus: true,
+    });
+  }, [highlightApprovalId]);
 
   useEffect(() => {
     if (!state.success) return;
@@ -860,6 +908,7 @@ export function OrderWorkspaceForm({
         {capabilities.canOperateCollectionControls ? (
           <ViewBlock title={operationalSectionTitle(order.fulfilmentMethod)}>
             <OrderOperationalControls
+              canMarkReady={capabilities.role === "owner"}
               compact
               fulfilmentMethod={order.fulfilmentMethod}
               deliveredAt={order.deliveredAt}
@@ -1029,6 +1078,7 @@ export function OrderWorkspaceForm({
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
           Customer
         </h2>
+        {lateEditScopeHint("excluded")}
         <FormField htmlFor="guest_name" label="Name">
           <FormInput
             id="guest_name"
@@ -1114,10 +1164,12 @@ export function OrderWorkspaceForm({
           defaultDate={order.pickupDate}
           defaultTime={order.pickupTime}
           delivery={editDeliveryDraft}
+          lateEditCutoffHints={blockDirectSave}
           method={editFulfilmentMethod}
           onDateChange={setEditPickupDate}
           onDeliveryChange={setEditDeliveryDraft}
           onMethodChange={setEditFulfilmentMethod}
+          onTimeChange={setEditPickupTime}
           scheduleMode={sourceLocked ? "slots" : "owner"}
         />
         {pickupMonthChanging ? (
@@ -1147,10 +1199,11 @@ export function OrderWorkspaceForm({
                   month change
                 </span>
               </label>
-            ) : capabilities.canRequestOperationsApproval ? (
+            ) : capabilities.canRequestCrossMonthPickupApproval ? (
               <>
                 <p className="text-ink text-sm">
-                  This pickup date requires higher-authority approval.
+                  Request Approval to change the pickup month. Owner can override
+                  this change directly.
                 </p>
                 {pendingCrossMonth ? (
                   <p className="text-skyline text-sm">
@@ -1192,8 +1245,8 @@ export function OrderWorkspaceForm({
             ) : (
               <>
                 <p className="text-ink text-sm">
-                  Cross-month changes require Owner override. Ask Owner/Manager
-                  to review this exception.
+                  Cross-month changes require Owner override or an approval
+                  request.
                 </p>
                 <input name="pickup_month_override" type="hidden" value="0" />
               </>
@@ -1241,6 +1294,7 @@ export function OrderWorkspaceForm({
             + Add cake
           </button>
         </div>
+        {lateEditScopeHint("included")}
         <ul className="space-y-4">
           {editItems.map((item) => {
             const cake =
@@ -1324,6 +1378,7 @@ export function OrderWorkspaceForm({
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
           Add-ons
         </h2>
+        {lateEditScopeHint("included")}
         <OrderPaidAddonsEditor
           drafts={editPaidAddons}
           onChange={setEditPaidAddons}
@@ -1335,6 +1390,7 @@ export function OrderWorkspaceForm({
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
           Complimentary items
         </h2>
+        {lateEditScopeHint("excluded")}
         <ul className="space-y-3">
           {editComplimentary.map((item, index) => (
             <li
@@ -1370,36 +1426,42 @@ export function OrderWorkspaceForm({
         />
       </section>
 
-      <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
-        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-          {operationalSectionTitle(order.fulfilmentMethod)}
-        </h2>
-        <OrderOperationalControls
-          compact
-          fulfilmentMethod={order.fulfilmentMethod}
-          deliveredAt={order.deliveredAt}
-          orderId={order.id}
-          outForDeliveryAt={order.outForDeliveryAt}
-          pickedUpAt={order.pickedUpAt}
-          readyAt={order.readyAt}
-        />
-      </section>
+      {capabilities.canOperateCollectionControls ? (
+        <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
+          <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
+            {operationalSectionTitle(order.fulfilmentMethod)}
+          </h2>
+          <OrderOperationalControls
+            canMarkReady={capabilities.role === "owner"}
+            compact
+            fulfilmentMethod={order.fulfilmentMethod}
+            deliveredAt={order.deliveredAt}
+            orderId={order.id}
+            outForDeliveryAt={order.outForDeliveryAt}
+            pickedUpAt={order.pickedUpAt}
+            readyAt={order.readyAt}
+          />
+        </section>
+      ) : null}
 
-      <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
-        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-          Messages
-        </h2>
-        <OrderMessagesSection
-          compact
-          order={order}
-          staffDisplayName={staffDisplayName}
-        />
-      </section>
+      {capabilities.canManageOrderMessages ? (
+        <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
+          <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
+            Messages
+          </h2>
+          <OrderMessagesSection
+            compact
+            order={order}
+            staffDisplayName={staffDisplayName}
+          />
+        </section>
+      ) : null}
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
           Internal notes
         </h2>
+        {lateEditScopeHint("excluded")}
         {/* Preserve existing customer_notes on save — field hidden from UI. */}
         <input
           name="customer_notes"
@@ -1420,6 +1482,7 @@ export function OrderWorkspaceForm({
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
           Bakery attention
         </h2>
+        {lateEditScopeHint("excluded")}
         <FormCheckbox
           checked={needsAttention}
           label="Needs bakery attention"
@@ -1452,7 +1515,12 @@ export function OrderWorkspaceForm({
           <p className="text-ink text-sm">
             {lateChangeReason ?? "This order is within the 2-day change cutoff."}
           </p>
+          <p className="text-ink text-sm">{LATE_ORDER_EDIT_APPROVAL_SCOPE_SUMMARY}</p>
+          <p className="text-skyline text-sm">
+            {LATE_ORDER_EDIT_APPROVAL_SCOPE_EXCLUSIONS}
+          </p>
           {(() => {
+            const includePickup = !pickupMonthChanging;
             const preview = buildApprovalChangeSummary({
               kind: "late_order_edit",
               current: {
@@ -1462,8 +1530,8 @@ export function OrderWorkspaceForm({
                 paidAddons: describeCurrentPaidAddons(),
               },
               proposed: {
-                pickupDate: pickupMonthChanging ? undefined : editPickupDate,
-                pickupTime: pickupMonthChanging ? undefined : order.pickupTime,
+                pickupDate: includePickup ? editPickupDate : undefined,
+                pickupTime: includePickup ? editPickupTime : undefined,
                 items: proposedItemSnapshot,
                 paidAddons: describeProposedPaidAddons(),
               },
@@ -1502,9 +1570,15 @@ export function OrderWorkspaceForm({
             );
           })()}
           {pendingLateEdit ? (
-            <p className="text-skyline text-sm">
-              An approval request is already pending for this exception.
-            </p>
+            <PendingLateOrderEditNotice
+              canCancel={canCancelOperationsApproval({
+                role: capabilities.role,
+                staffId: capabilities.staffId,
+                requestedBy: pendingLateEdit.requestedBy,
+                status: pendingLateEdit.status,
+              })}
+              request={pendingLateEdit}
+            />
           ) : (
             <>
               <FormField htmlFor="late_edit_approval_reason" label="Reason">

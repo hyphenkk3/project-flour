@@ -75,11 +75,17 @@ async function requireOwner() {
   return staff;
 }
 
-/** Owner or Customer Operations — shared Operations board + preorder follow-up. */
+/**
+ * Owner, Manager, or Customer Operations — Order Workspace routine servicing
+ * (edit/save, payments, confirmation prep, fulfilment ops).
+ * Does not grant the Operations board or Owner-only overrides.
+ * Name retained: callers already use this helper for shared preorder actions.
+ */
 async function requireOwnerOrCustomerOperations() {
   const staff = await requireStaff();
   if (
     staff.role.code !== "owner" &&
+    staff.role.code !== "manager" &&
     staff.role.code !== "customer_operations"
   ) {
     redirect("/home");
@@ -539,6 +545,8 @@ export async function saveOrderWorkspaceAction(
     };
   }
 
+  // Customer Operations only: D−1/D−0 requires late_order_edit approval.
+  // Manager and Owner may direct-save inside cutoff (Product-locked).
   if (
     staff.role.code === "customer_operations" &&
     isWithinTwoDayChangeCutoff({ pickupDate: before.pickupDate })
@@ -613,7 +621,7 @@ export async function saveOrderWorkspaceAction(
     if (staff.role.code !== "owner") {
       return {
         error:
-          "Cross-month pickup changes require Owner override. Ask Owner/Manager to approve the exception.",
+          "Cross-month pickup changes require Owner override. Request approval instead.",
         success: false,
       };
     }
@@ -1626,7 +1634,7 @@ export async function undoOrderReadyAction(
 export async function markOrderPickedUpAction(
   orderId: string,
 ): Promise<{ error: string | null }> {
-  const staff = await requireOwner();
+  const staff = await requireOwnerOrCustomerOperations();
   const order = await getGuestOrderById(orderId);
   if (!order) {
     return { error: "Order not found." };
@@ -1656,7 +1664,7 @@ export async function markOrderPickedUpAction(
 export async function undoOrderPickedUpAction(
   orderId: string,
 ): Promise<{ error: string | null }> {
-  const staff = await requireOwner();
+  const staff = await requireOwnerOrCustomerOperations();
   const order = await getGuestOrderById(orderId);
   if (!order) {
     return { error: "Order not found." };
@@ -1681,7 +1689,7 @@ export async function undoOrderPickedUpAction(
 export async function markOrderOutForDeliveryAction(
   orderId: string,
 ): Promise<{ error: string | null }> {
-  const staff = await requireOwner();
+  const staff = await requireOwnerOrCustomerOperations();
   const order = await getGuestOrderById(orderId);
   if (!order) {
     return { error: "Order not found." };
@@ -1709,7 +1717,7 @@ export async function markOrderOutForDeliveryAction(
 export async function undoOrderOutForDeliveryAction(
   orderId: string,
 ): Promise<{ error: string | null }> {
-  const staff = await requireOwner();
+  const staff = await requireOwnerOrCustomerOperations();
   const order = await getGuestOrderById(orderId);
   if (!order) {
     return { error: "Order not found." };
@@ -1737,7 +1745,7 @@ export async function undoOrderOutForDeliveryAction(
 export async function markOrderDeliveredAction(
   orderId: string,
 ): Promise<{ error: string | null }> {
-  const staff = await requireOwner();
+  const staff = await requireOwnerOrCustomerOperations();
   const order = await getGuestOrderById(orderId);
   if (!order) {
     return { error: "Order not found." };
@@ -1765,7 +1773,7 @@ export async function markOrderDeliveredAction(
 export async function undoOrderDeliveredAction(
   orderId: string,
 ): Promise<{ error: string | null }> {
-  const staff = await requireOwner();
+  const staff = await requireOwnerOrCustomerOperations();
   const order = await getGuestOrderById(orderId);
   if (!order) {
     return { error: "Order not found." };

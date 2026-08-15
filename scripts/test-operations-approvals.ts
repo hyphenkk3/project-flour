@@ -14,7 +14,9 @@ import {
   canAccessOperationsApprovalsInbox,
   canCancelOperationsApproval,
   canRequestOperationsApproval,
+  canRequestOperationsApprovalType,
   canReviewOperationsApprovalType,
+  canReviewPendingOperationsApproval,
   discountExceptionEligibilityReason,
   fingerprintsMatch,
   formatApprovalAge,
@@ -27,13 +29,50 @@ import {
   requesterCannotDecideOwnRequest,
   requiresCrossMonthApproval,
 } from "@/engines/operations/approvals";
-import { OWNER_ORDER_PAYMENT_SECTION_ID } from "@/engines/operations/owner-attention";
+import {
+  OWNER_ORDER_PAYMENT_SECTION_ID,
+  deriveOwnerAttention,
+} from "@/engines/operations/owner-attention";
+import { reconcilePaymentLifecycleStatus } from "@/engines/orders/payment-status";
+import type { OrderSettlement } from "@/types/storefront";
 
 assert.equal(canRequestOperationsApproval("customer_operations"), true);
 assert.equal(canRequestOperationsApproval("owner"), false);
 assert.equal(canRequestOperationsApproval("manager"), false);
 assert.equal(canRequestOperationsApproval("bakery"), false);
 assert.equal(canRequestOperationsApproval("collection"), false);
+assert.equal(
+  canRequestOperationsApprovalType("customer_operations", "cross_month_pickup"),
+  true,
+);
+assert.equal(
+  canRequestOperationsApprovalType("customer_operations", "late_order_edit"),
+  true,
+);
+assert.equal(
+  canRequestOperationsApprovalType("customer_operations", "discount_exception"),
+  true,
+);
+assert.equal(
+  canRequestOperationsApprovalType("manager", "cross_month_pickup"),
+  true,
+);
+assert.equal(
+  canRequestOperationsApprovalType("manager", "late_order_edit"),
+  false,
+);
+assert.equal(
+  canRequestOperationsApprovalType("manager", "discount_exception"),
+  false,
+);
+assert.equal(
+  canRequestOperationsApprovalType("owner", "cross_month_pickup"),
+  false,
+);
+assert.equal(
+  canRequestOperationsApprovalType("bakery", "cross_month_pickup"),
+  false,
+);
 
 for (const type of [
   "discount_exception",
@@ -62,6 +101,52 @@ assert.equal(
   requesterCannotDecideOwnRequest({
     actorStaffId: "owner-1",
     requestedBy: "co-1",
+  }),
+  false,
+);
+assert.equal(
+  requesterCannotDecideOwnRequest({
+    actorStaffId: "mgr-1",
+    requestedBy: "mgr-1",
+  }),
+  true,
+  "Manager cannot approve own cross-month request",
+);
+
+assert.equal(
+  canReviewPendingOperationsApproval({
+    role: "manager",
+    staffId: "mgr-1",
+    requestedBy: "mgr-1",
+    requestType: "cross_month_pickup",
+  }),
+  false,
+  "Manager panel hides Approve/Reject on own request",
+);
+assert.equal(
+  canReviewPendingOperationsApproval({
+    role: "manager",
+    staffId: "mgr-1",
+    requestedBy: "co-1",
+    requestType: "cross_month_pickup",
+  }),
+  true,
+);
+assert.equal(
+  canReviewPendingOperationsApproval({
+    role: "owner",
+    staffId: "owner-1",
+    requestedBy: "mgr-1",
+    requestType: "cross_month_pickup",
+  }),
+  true,
+);
+assert.equal(
+  canReviewPendingOperationsApproval({
+    role: "customer_operations",
+    staffId: "co-1",
+    requestedBy: "co-2",
+    requestType: "cross_month_pickup",
   }),
   false,
 );
@@ -131,6 +216,98 @@ assert.equal(
   }),
   "This order is within the 2-day change cutoff.",
 );
+
+function settlement(partial: Partial<OrderSettlement>): OrderSettlement {
+  return {
+    commercialSubtotal: 100,
+    discountTotal: 0,
+    amountDue: 100,
+    verifiedAllocated: 100,
+    pendingUnverified: 0,
+    netReceived: 100,
+    remainingBalance: 0,
+    isFullyPaid: true,
+    ...partial,
+  };
+}
+
+// Paid order + financial late-edit (underpaid) → awaiting_payment + payment_needed
+{
+  const after = settlement({
+    amountDue: 110,
+    verifiedAllocated: 100,
+    netReceived: 100,
+    remainingBalance: 10,
+    isFullyPaid: false,
+  });
+  const reconciled = reconcilePaymentLifecycleStatus({
+    previousStatus: "paid",
+    previousNetReceived: 100,
+    settlement: after,
+  });
+  assert.equal(reconciled.newStatus, "awaiting_payment");
+  assert.equal(reconciled.statusChanged, true);
+  const attention = deriveOwnerAttention({
+    status: reconciled.newStatus,
+    confirmationNeedsResend: false,
+    fulfilmentMethod: "pickup",
+    readyAt: null,
+    pickedUpAt: null,
+  });
+  assert.ok(attention.some((r) => r.key === "payment_needed"));
+}
+
+// Fully covered after late-edit → stays paid
+{
+  const reconciled = reconcilePaymentLifecycleStatus({
+    previousStatus: "paid",
+    previousNetReceived: 110,
+    settlement: settlement({
+      amountDue: 110,
+      verifiedAllocated: 110,
+      netReceived: 110,
+      remainingBalance: 0,
+      isFullyPaid: true,
+    }),
+  });
+  assert.equal(reconciled.newStatus, "paid");
+  assert.equal(reconciled.statusChanged, false);
+}
+
+// Non-financial late edit while awaiting_payment and still covered → paid
+{
+  const reconciled = reconcilePaymentLifecycleStatus({
+    previousStatus: "awaiting_payment",
+    previousNetReceived: 100,
+    settlement: settlement({
+      amountDue: 100,
+      verifiedAllocated: 100,
+      netReceived: 100,
+      remainingBalance: 0,
+      isFullyPaid: true,
+    }),
+  });
+  assert.equal(reconciled.newStatus, "paid");
+  assert.equal(reconciled.statusChanged, true);
+}
+
+// Pre-payment lifecycle (pending_confirmation, no receipts) — no forced payment status
+{
+  const reconciled = reconcilePaymentLifecycleStatus({
+    previousStatus: "pending_confirmation",
+    previousNetReceived: 0,
+    settlement: settlement({
+      amountDue: 120,
+      verifiedAllocated: 0,
+      netReceived: 0,
+      remainingBalance: 120,
+      isFullyPaid: false,
+    }),
+  });
+  assert.equal(reconciled.newStatus, "pending_confirmation");
+  assert.equal(reconciled.statusChanged, false);
+  assert.equal(reconciled.enteredPaymentLifecycle, false);
+}
 
 assert.equal(
   isWithinTwoDayChangeCutoff({
@@ -425,6 +602,7 @@ const co = buildGuestOrderWorkspaceCapabilities({
   staffId: "co-1",
 });
 assert.equal(co.canRequestOperationsApproval, true);
+assert.equal(co.canRequestCrossMonthPickupApproval, true);
 assert.equal(co.canReviewOperationsApprovals, false);
 assert.equal(co.canOverridePickupMonth, false);
 assert.equal(co.canOverrideDiscountEligibility, false);
@@ -435,21 +613,30 @@ const owner = buildGuestOrderWorkspaceCapabilities({
   staffId: "owner-1",
 });
 assert.equal(owner.canRequestOperationsApproval, false);
+assert.equal(owner.canRequestCrossMonthPickupApproval, false);
 assert.equal(owner.canReviewOperationsApprovals, true);
 
 const manager = buildGuestOrderWorkspaceCapabilities({
   role: "manager",
   staffId: "mgr-1",
 });
-assert.equal(manager.canAccessOperationsBoard, false);
+assert.equal(manager.canAccessOperationsBoard, true);
 assert.equal(manager.canReviewOperationsApprovals, true);
-assert.equal(manager.canEditOrderWorkspace, false);
+assert.equal(manager.canEditOrderWorkspace, true);
+assert.equal(manager.canRequestOperationsApproval, false);
+assert.equal(manager.canRequestCrossMonthPickupApproval, true);
 assert.equal(manager.canResolveFeeRequests, true);
 assert.equal(manager.canUseOwnerBoardTools, false);
-assert.equal(manager.canViewWholeCakeCalendar, false);
+assert.equal(manager.canViewWholeCakeCalendar, true);
+assert.equal(manager.canOverridePickupMonth, false);
+assert.equal(manager.canOverrideDiscountEligibility, false);
 const managerNav = getNavigationForRole("manager").map((item) => item.id);
-assert.ok(!managerNav.includes("owner"), "Manager does not get Operations nav");
-assert.ok(!managerNav.includes("owner_calendar"));
+assert.ok(managerNav.includes("owner"), "Manager gets Operations nav");
+assert.ok(managerNav.includes("owner_calendar"), "Manager gets Calendar nav");
+assert.ok(managerNav.includes("customer_operations"));
+assert.ok(managerNav.includes("bakery"));
+assert.ok(managerNav.includes("collection"));
+assert.ok(managerNav.includes("library"));
 
 const bakery = buildGuestOrderWorkspaceCapabilities({
   role: "bakery",
@@ -482,7 +669,10 @@ assert.match(migration, /This approval request is stale/);
 assert.match(migration, /p_role in \('owner', 'manager'\)/);
 assert.match(migration, /singapore_calendar_date/);
 assert.match(migration, /2-day change cutoff/);
-assert.match(migration, /Cross-month pickup must use the cross-month approval type/);
+assert.match(
+  migration,
+  /A pending approval of this type already exists for this order/,
+);
 assert.doesNotMatch(
   migration,
   /create or replace function public.redeem_rm10_physical_voucher_for_guest_order/,
@@ -514,12 +704,39 @@ assert.doesNotMatch(
 assert.match(
   addonMigration,
   /v_role is distinct from 'customer_operations'/,
-  "create authority unchanged",
+  "141700 create authority was CO-only",
 );
 assert.match(
   addonMigration,
   /_operations_approval_can_review/,
   "approve still uses existing review helper",
+);
+
+const managerCrossMonthMigration = readFileSync(
+  resolve(
+    "supabase/migrations/20260815120000_manager_cross_month_approval_request.sql",
+  ),
+  "utf8",
+);
+assert.match(
+  managerCrossMonthMigration,
+  /_operations_approval_can_request/,
+);
+assert.match(
+  managerCrossMonthMigration,
+  /p_role = 'manager'\s+and p_request_type = 'cross_month_pickup'/,
+);
+assert.doesNotMatch(
+  managerCrossMonthMigration,
+  /p_role = 'manager'\s+and p_request_type = 'late_order_edit'/,
+);
+assert.doesNotMatch(
+  managerCrossMonthMigration,
+  /p_role = 'manager'\s+and p_request_type = 'discount_exception'/,
+);
+assert.match(
+  managerCrossMonthMigration,
+  /if not public\._operations_approval_can_request\(v_role, p_request_type\)/,
 );
 {
   const approveIdx = addonMigration.indexOf(
@@ -619,10 +836,63 @@ const workspaceForm = readFileSync(
   resolve("src/workspaces/owner/orders/OrderWorkspaceForm.tsx"),
   "utf8",
 );
-assert.match(workspaceForm, /This pickup date requires higher-authority approval/);
+assert.match(workspaceForm, /Request Approval to change the pickup month/);
+assert.match(workspaceForm, /Owner can override/);
+assert.match(workspaceForm, /canRequestCrossMonthPickupApproval/);
+assert.match(workspaceForm, /canReviewPendingOperationsApproval/);
+assert.doesNotMatch(
+  workspaceForm,
+  /canReview=\{capabilities\.canReviewOperationsApprovals\}/,
+);
+assert.doesNotMatch(workspaceForm, /Ask Owner\/Manager/);
 assert.match(workspaceForm, /Late-change approval required/);
 assert.match(workspaceForm, /late_order_edit/);
 assert.match(workspaceForm, /lateOrderEditRestrictionReason/);
+assert.match(workspaceForm, /PendingLateOrderEditNotice/);
+assert.match(workspaceForm, /pendingLateOrderEdit/);
+assert.match(workspaceForm, /LATE_ORDER_EDIT_APPROVAL_SCOPE_SUMMARY/);
+assert.match(workspaceForm, /LATE_ORDER_EDIT_APPROVAL_SCOPE_EXCLUSIONS/);
+assert.match(workspaceForm, /LATE_ORDER_EDIT_SECTION_INCLUDED/);
+assert.match(workspaceForm, /LATE_ORDER_EDIT_SECTION_EXCLUDED/);
+assert.match(workspaceForm, /lateEditScopeHint/);
+assert.match(workspaceForm, /lateEditCutoffHints=\{blockDirectSave\}/);
+assert.match(
+  workspaceForm,
+  /blockDirectSave =\s*capabilities\.canRequestOperationsApproval && lateChangeRequired/,
+);
+assert.match(workspaceForm, /editPickupTime/);
+assert.match(workspaceForm, /onTimeChange=\{setEditPickupTime\}/);
+assert.doesNotMatch(
+  workspaceForm,
+  /pickupTime: pickupMonthChanging \? undefined : order\.pickupTime/,
+);
+
+const fulfilmentFields = readFileSync(
+  resolve("src/workspaces/owner/orders/OrderFulfilmentCreateFields.tsx"),
+  "utf8",
+);
+assert.match(fulfilmentFields, /lateEditCutoffHints/);
+assert.match(fulfilmentFields, /LATE_ORDER_EDIT_SECTION_PICKUP_INCLUDED/);
+assert.match(fulfilmentFields, /LATE_ORDER_EDIT_SECTION_EXCLUDED/);
+
+const approvalsActions = readFileSync(
+  resolve("src/workspaces/owner/approvals/actions.ts"),
+  "utf8",
+);
+assert.match(approvalsActions, /canRequestOperationsApprovalType/);
+assert.match(approvalsActions, /reconcilePaymentLifecycleAfterApproval/);
+assert.match(
+  approvalsActions,
+  /row\.request_type === "late_order_edit"/,
+);
+assert.match(
+  approvalsActions,
+  /row\.request_type === "discount_exception"/,
+);
+assert.doesNotMatch(
+  approvalsActions,
+  /row\.request_type === "cross_month_pickup"/,
+);
 
 const saveSrc = readFileSync(
   resolve("src/workspaces/owner/orders/actions.ts"),
@@ -630,6 +900,11 @@ const saveSrc = readFileSync(
 );
 assert.match(saveSrc, /isWithinTwoDayChangeCutoff/);
 assert.match(saveSrc, /customer_operations/);
+assert.match(
+  saveSrc,
+  /staff\.role\.code !== "owner"/,
+);
+assert.match(saveSrc, /Request approval instead/);
 
 const paymentSrc = readFileSync(
   resolve("src/workspaces/owner/orders/PaymentSection.tsx"),

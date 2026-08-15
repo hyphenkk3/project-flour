@@ -47,6 +47,7 @@ export type CollectionBoardOrder = {
   productionStartedAt: string | null;
   readyAt: string | null;
   pickedUpAt: string | null;
+  deliveredAt: string | null;
   includeReceipt: boolean;
   cakeLines: CollectionCakeLine[];
   complimentaryItems: CollectionComplimentaryLine[];

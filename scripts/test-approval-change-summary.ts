@@ -85,6 +85,29 @@ function lateEdit(input: {
     }),
   );
   assert.deepEqual(summary.lines, ["Chocolate D'Amour 6\" ×1 → ×2"]);
+  assert.deepEqual(summary.changeLines[0]?.parts, [
+    { kind: "text", text: 'Chocolate D\'Amour 6" ' },
+    { kind: "muted", text: "×1" },
+    { kind: "text", text: " → " },
+    { kind: "emphasis", text: "×2" },
+  ]);
+}
+
+// B2. Quantity decrease ×2 → ×1 (struck old, emphasize new)
+{
+  const summary = buildApprovalChangeSummary(
+    lateEdit({
+      currentItems: [{ ...cake8, quantity: 2 }],
+      proposedItems: [{ ...cake8, quantity: 1 }],
+    }),
+  );
+  assert.deepEqual(summary.lines, ["Chocolate D'Amour 8\" ×2 → ×1"]);
+  assert.deepEqual(summary.changeLines[0]?.parts, [
+    { kind: "text", text: 'Chocolate D\'Amour 8" ' },
+    { kind: "struck", text: "×2" },
+    { kind: "text", text: " → " },
+    { kind: "emphasis", text: "×1" },
+  ]);
 }
 
 // C. Add-on added
@@ -93,6 +116,8 @@ function lateEdit(input: {
     lateEdit({ proposedAddons: [birthday1] }),
   );
   assert.deepEqual(summary.lines, ["Add Birthday Card ×1"]);
+  assert.equal(summary.changeLines[0]?.parts[0]?.kind, "emphasis");
+  assert.equal(summary.changeLines[0]?.parts[0]?.text, "Add");
 }
 
 // D. Add-on removed
@@ -120,6 +145,22 @@ function lateEdit(input: {
     lateEdit({ proposedPickupTime: "15:00" }),
   );
   assert.deepEqual(summary.lines, ["Pickup 15/08/2026 · 1:00 PM → 3:00 PM"]);
+}
+
+// F2. Preview/submit parity: form time 15:00 → requested 13:00
+{
+  const summary = buildApprovalChangeSummary(
+    lateEdit({
+      currentPickupTime: "15:00",
+      proposedPickupTime: "13:00",
+    }),
+  );
+  assert.deepEqual(summary.lines, ["Pickup 15/08/2026 · 3:00 PM → 1:00 PM"]);
+  assert.ok(
+    summary.changeLines[0]?.parts.some(
+      (part) => part.kind === "emphasis" && part.text.includes("1:00 PM"),
+    ),
+  );
 }
 
 // G. Same-month pickup date change
@@ -281,6 +322,7 @@ const panelSrc = readFileSync(
 );
 assert.match(panelSrc, /buildApprovalChangeSummary/);
 assert.match(panelSrc, /Change requested/);
+assert.match(panelSrc, /ApprovalChangeLines/);
 assert.doesNotMatch(
   panelSrc,
   /payload\.proposed\.items[\s\S]*item\.cakeName/,

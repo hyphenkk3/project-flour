@@ -6,6 +6,11 @@ import {
   formatApprovalAge,
   type OperationsApprovalRecord,
 } from "@/engines/operations/approvals";
+import {
+  OPERATIONS_APPROVALS_SECTION_ID,
+  OPERATIONS_APPROVAL_HISTORY_PATH,
+  formatApprovalActorLabel,
+} from "@/engines/operations/approval-ux";
 import { formatDdMmYyyy } from "@/lib/dates";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import { withOwnerReturnTo } from "@/workspaces/owner/navigation/return-to";
@@ -23,15 +28,27 @@ export function OperationsApprovalsSection({
   const pending = approvals.filter((row) => row.status === "pending");
 
   return (
-    <section className="space-y-2.5">
-      <h2 className="text-ink text-sm font-semibold tracking-wide uppercase">
-        Approvals
-        {pending.length > 0 ? (
-          <span className="ml-2 font-semibold normal-case tabular-nums">
-            · {pending.length}
-          </span>
-        ) : null}
-      </h2>
+    <section
+      className="scroll-mt-24 space-y-2.5"
+      id={OPERATIONS_APPROVALS_SECTION_ID}
+      tabIndex={-1}
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-ink text-sm font-semibold tracking-wide uppercase">
+          Approvals
+          {pending.length > 0 ? (
+            <span className="ml-2 font-semibold normal-case tabular-nums">
+              · {pending.length}
+            </span>
+          ) : null}
+        </h2>
+        <Link
+          className="text-signal text-sm font-medium"
+          href={OPERATIONS_APPROVAL_HISTORY_PATH}
+        >
+          Approval History
+        </Link>
+      </div>
       {pending.length === 0 ? (
         <p className="text-skyline text-sm">No pending approvals.</p>
       ) : (
@@ -58,8 +75,11 @@ export function OperationsApprovalsSection({
                     <p className="text-skyline text-sm">
                       {formatDdMmYyyy(row.pickupDate)} ·{" "}
                       {formatPickupTime(row.pickupTime)} · requested by{" "}
-                      {row.requestedByName ?? "Staff"} ·{" "}
-                      {formatApprovalAge(row.createdAt)}
+                      {formatApprovalActorLabel({
+                        name: row.requestedByName,
+                        roleName: row.requestedByRoleName,
+                      })}{" "}
+                      · {formatApprovalAge(row.createdAt)}
                     </p>
                   </div>
                   <span className="text-status-warning shrink-0 text-xs font-semibold tracking-wide uppercase">

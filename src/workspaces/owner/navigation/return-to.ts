@@ -40,8 +40,11 @@ function pathnameOf(value: string): { pathname: string; search: string } {
 /**
  * Validate returnTo for Owner Order Workspace.
  * Accepted destinations:
+ * - Home (`/home`) — Home cockpit deep-links into Order Workspace
  * - Operations (`/owner`, optionally with approved board query params)
  * - Whole Cake Calendar (with approved params)
+ * - Approvals inbox (`/owner/approvals`)
+ * - Approval History (`/owner/approvals/history`)
  * Anything else falls back to default Operations (Today).
  */
 export function resolveOwnerReturnTo(
@@ -62,6 +65,10 @@ export function resolveOwnerReturnTo(
   if (!isSafeRelativeOwnerPath(decoded)) return OPERATIONS_RETURN;
 
   const { pathname, search } = pathnameOf(decoded);
+
+  if (pathname === "/home") {
+    return { href: "/home", label: "Home" };
+  }
 
   if (pathname === "/owner/calendar") {
     const params = new URLSearchParams(search);
@@ -85,10 +92,25 @@ export function resolveOwnerReturnTo(
       date: params.get("date") ?? undefined,
       status: params.get("status") ?? undefined,
       sort: params.get("sort") ?? undefined,
+      search: params.get("search") ?? undefined,
     });
     return {
       href: buildOperationsBoardPath(query),
       label: "Operations",
+    };
+  }
+
+  if (pathname === "/owner/approvals/history") {
+    return {
+      href: "/owner/approvals/history",
+      label: "Approval History",
+    };
+  }
+
+  if (pathname === "/owner/approvals") {
+    return {
+      href: "/owner/approvals",
+      label: "Approvals",
     };
   }
 

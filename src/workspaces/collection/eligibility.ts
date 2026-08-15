@@ -1,5 +1,6 @@
 /**
- * Live Collection — pickup desk eligibility (Ready → Collected).
+ * Live Collection — pickup desk eligibility (Ready → Collected) plus
+ * completed handoff views (Picked Up / Delivered + History).
  * No Arrived / Verified persisted states.
  */
 
@@ -7,7 +8,11 @@ import type { StatusTone } from "@/lib/design-tokens";
 import { normalizeFulfilmentMethod } from "@/engines/orders/fulfilment";
 import type { GuestOrderStatus } from "@/types/storefront";
 import type { StorefrontOrderFulfilmentMethod } from "@/types/storefront";
+import type { CollectionBoardTab } from "@/workspaces/collection/board-tab";
 import { collectionSingaporeWallClock } from "@/workspaces/collection/date";
+
+export type { CollectionBoardTab } from "@/workspaces/collection/board-tab";
+export { parseCollectionBoardTab } from "@/workspaces/collection/board-tab";
 
 export const COLLECTION_ACTIVE_PREORDER_STATUSES: readonly GuestOrderStatus[] = [
   "submitted",
@@ -15,6 +20,9 @@ export const COLLECTION_ACTIVE_PREORDER_STATUSES: readonly GuestOrderStatus[] = 
   "awaiting_payment",
   "paid",
 ];
+
+/** History lookback ending at the selected board date (inclusive). */
+export const COLLECTION_HISTORY_LOOKBACK_DAYS = 30;
 
 export function isCollectionActiveStatus(
   status: GuestOrderStatus | string,
@@ -28,6 +36,12 @@ export function isCollectionPickupMethod(
   fulfilmentMethod: string | null | undefined,
 ): boolean {
   return normalizeFulfilmentMethod(fulfilmentMethod) === "pickup";
+}
+
+export function isCollectionDeliveryMethod(
+  fulfilmentMethod: string | null | undefined,
+): boolean {
+  return normalizeFulfilmentMethod(fulfilmentMethod) === "delivery";
 }
 
 /** Active Collection queue: Ready pickup, not yet Collected. */
@@ -49,7 +63,90 @@ export function isActiveOnCollectionBoard(input: {
   return true;
 }
 
-/** Detail may open Ready (active) or same-date Collected (for Undo). */
+/**
+ * Completed desk handoff: Pickup → Picked Up, Delivery → Delivered.
+ * Guest preorders only; Ready queue stays pickup-only.
+ */
+export function isCompletedCollectionHandoff(input: {
+  customerId: string | null;
+  status: GuestOrderStatus | string;
+  fulfilmentMethod: string | null | undefined;
+  pickedUpAt: string | null;
+  deliveredAt: string | null;
+}): boolean {
+  if (input.customerId != null) return false;
+  if (!isCollectionActiveStatus(input.status)) return false;
+  if (isCollectionPickupMethod(input.fulfilmentMethod)) {
+    return Boolean(input.pickedUpAt);
+  }
+  if (isCollectionDeliveryMethod(input.fulfilmentMethod)) {
+    return Boolean(input.deliveredAt);
+  }
+  return false;
+}
+
+/** Same-day / selected-date completed handoffs (Picked Up / Delivered tab). */
+export function isCompletedOnCollectionBoard(input: {
+  customerId: string | null;
+  pickupDate: string;
+  selectedPickupDate: string;
+  status: GuestOrderStatus | string;
+  fulfilmentMethod: string | null | undefined;
+  pickedUpAt: string | null;
+  deliveredAt: string | null;
+}): boolean {
+  if (input.pickupDate !== input.selectedPickupDate) return false;
+  return isCompletedCollectionHandoff(input);
+}
+
+/** History window: completed handoffs with pickup_date in [rangeStart, rangeEnd]. */
+export function isCompletedInCollectionHistory(input: {
+  customerId: string | null;
+  pickupDate: string;
+  rangeStart: string;
+  rangeEnd: string;
+  status: GuestOrderStatus | string;
+  fulfilmentMethod: string | null | undefined;
+  pickedUpAt: string | null;
+  deliveredAt: string | null;
+}): boolean {
+  if (input.pickupDate < input.rangeStart) return false;
+  if (input.pickupDate > input.rangeEnd) return false;
+  return isCompletedCollectionHandoff(input);
+}
+
+export function collectionHandoffCompletedAt(input: {
+  fulfilmentMethod: string | null | undefined;
+  pickedUpAt: string | null;
+  deliveredAt: string | null;
+}): string | null {
+  if (isCollectionDeliveryMethod(input.fulfilmentMethod)) {
+    return input.deliveredAt;
+  }
+  if (isCollectionPickupMethod(input.fulfilmentMethod)) {
+    return input.pickedUpAt;
+  }
+  return input.deliveredAt ?? input.pickedUpAt;
+}
+
+/** Newest completed handoffs first (completion timestamp, then order number). */
+export function sortCollectionCompletedOrdersDesc<
+  T extends {
+    fulfilmentMethod: string | null | undefined;
+    pickedUpAt: string | null;
+    deliveredAt: string | null;
+    orderNumber: string;
+  },
+>(orders: T[]): T[] {
+  return [...orders].sort((a, b) => {
+    const aDone = collectionHandoffCompletedAt(a) ?? "";
+    const bDone = collectionHandoffCompletedAt(b) ?? "";
+    if (aDone !== bDone) return bDone.localeCompare(aDone);
+    return b.orderNumber.localeCompare(a.orderNumber, "en");
+  });
+}
+
+/** Detail may open Ready, same-date Collected, or any completed handoff (Open). */
 export function isVisibleOnCollectionDetail(input: {
   customerId: string | null;
   pickupDate: string;
@@ -58,10 +155,24 @@ export function isVisibleOnCollectionDetail(input: {
   fulfilmentMethod: string | null | undefined;
   readyAt: string | null;
   pickedUpAt: string | null;
+  deliveredAt?: string | null;
 }): boolean {
   if (input.customerId != null) return false;
-  if (input.pickupDate !== input.selectedPickupDate) return false;
   if (!isCollectionActiveStatus(input.status)) return false;
+
+  if (
+    isCompletedCollectionHandoff({
+      customerId: input.customerId,
+      status: input.status,
+      fulfilmentMethod: input.fulfilmentMethod,
+      pickedUpAt: input.pickedUpAt,
+      deliveredAt: input.deliveredAt ?? null,
+    })
+  ) {
+    return true;
+  }
+
+  if (input.pickupDate !== input.selectedPickupDate) return false;
   if (!isCollectionPickupMethod(input.fulfilmentMethod)) return false;
   // Active Ready queue
   if (input.readyAt && !input.pickedUpAt) return true;
@@ -70,26 +181,51 @@ export function isVisibleOnCollectionDetail(input: {
   return false;
 }
 
-export type CollectionDeskPresentation = "ready" | "collected";
+export type CollectionDeskPresentation =
+  | "ready"
+  | "collected"
+  | "picked_up"
+  | "delivered";
 
 export function collectionDeskPresentation(input: {
   readyAt: string | null;
   pickedUpAt: string | null;
+  deliveredAt?: string | null;
+  fulfilmentMethod?: string | null;
 }): CollectionDeskPresentation {
-  if (input.pickedUpAt) return "collected";
+  if (
+    isCollectionDeliveryMethod(input.fulfilmentMethod) &&
+    input.deliveredAt
+  ) {
+    return "delivered";
+  }
+  if (input.pickedUpAt) {
+    return isCollectionPickupMethod(input.fulfilmentMethod ?? "pickup")
+      ? "picked_up"
+      : "collected";
+  }
   return "ready";
 }
 
 export function collectionDeskLabel(
   presentation: CollectionDeskPresentation,
 ): string {
-  return presentation === "collected" ? "Collected" : "Ready";
+  switch (presentation) {
+    case "delivered":
+      return "Delivered";
+    case "picked_up":
+      return "Picked Up";
+    case "collected":
+      return "Collected";
+    case "ready":
+      return "Ready";
+  }
 }
 
 export function collectionDeskBadgeTone(
   presentation: CollectionDeskPresentation,
 ): StatusTone {
-  return presentation === "collected" ? "success" : "info";
+  return presentation === "ready" ? "info" : "success";
 }
 
 const PICKUP_TIME_RE = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/;
@@ -151,6 +287,8 @@ export const COLLECTION_PICKUP_OVERDUE_LABEL = "Pickup overdue";
 export function collectionDeskAttention(input: {
   readyAt: string | null;
   pickedUpAt: string | null;
+  deliveredAt?: string | null;
+  fulfilmentMethod?: string | null;
   pickupDate: string;
   pickupTime: string;
   now: Date;
@@ -162,8 +300,10 @@ export function collectionDeskAttention(input: {
   const presentation = collectionDeskPresentation({
     readyAt: input.readyAt,
     pickedUpAt: input.pickedUpAt,
+    deliveredAt: input.deliveredAt,
+    fulfilmentMethod: input.fulfilmentMethod,
   });
-  if (presentation === "collected") {
+  if (presentation !== "ready") {
     return {
       label: collectionDeskLabel(presentation),
       tone: collectionDeskBadgeTone(presentation),
@@ -242,11 +382,14 @@ export function collectionHandoffSurface(input: {
   canMarkCollected: boolean;
   canUndoCollected: boolean;
 } {
-  if (input.presentation === "collected") {
+  if (input.presentation !== "ready") {
     return {
       canMarkCollected: false,
       canUndoCollected:
-        input.canUndoCollected && input.undoCollectedEligible,
+        input.presentation === "picked_up" ||
+        input.presentation === "collected"
+          ? input.canUndoCollected && input.undoCollectedEligible
+          : false,
     };
   }
   return {

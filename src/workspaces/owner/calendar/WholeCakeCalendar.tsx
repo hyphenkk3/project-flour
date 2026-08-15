@@ -58,7 +58,19 @@ type WholeCakeCalendarProps = {
   initialExtras?: CalendarExtraMarker[];
   /** Default sender for Customer Ready Message. */
   staffDisplayName: string;
-  /** Owner-only: Ready/Picked Up, messages, Propose EXTRA in Quick View. */
+  /**
+   * Routine fulfilment controls in Quick View
+   * (Owner + Manager + Customer Operations).
+   */
+  canOperateOrderActions?: boolean;
+  /**
+   * Crew + customer messages in Quick View
+   * (Owner + Manager + Customer Operations).
+   */
+  canManageOrderMessages?: boolean;
+  /** Mark/Undo Ready in Quick View (Owner; SQL bakery|manager|owner). */
+  canMarkReady?: boolean;
+  /** Owner-only Propose EXTRA in Quick View. */
   canMutateCalendarOrderActions?: boolean;
 };
 
@@ -93,6 +105,9 @@ export function WholeCakeCalendar({
   initialEntries,
   initialExtras = [],
   staffDisplayName,
+  canOperateOrderActions = false,
+  canManageOrderMessages = false,
+  canMarkReady = false,
   canMutateCalendarOrderActions = false,
 }: WholeCakeCalendarProps) {
   const [entries, setEntries] = useState(initialEntries);
@@ -372,7 +387,10 @@ export function WholeCakeCalendar({
         />
       )}
       <CalendarQuickView
+        canManageOrderMessages={canManageOrderMessages}
+        canMarkReady={canMarkReady}
         canMutateCalendarOrderActions={canMutateCalendarOrderActions}
+        canOperateOrderActions={canOperateOrderActions}
         onClose={closeQuickView}
         onExtraProposed={refreshExtrasOnly}
         orderId={quickViewOrderId}

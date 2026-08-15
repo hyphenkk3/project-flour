@@ -12,16 +12,15 @@ type PageProps = {
     date?: string;
     status?: string;
     sort?: string;
+    search?: string;
   }>;
 };
 
-/** Operations Live Board — Owner + Customer Operations preorder operators. */
+/** Operations Live Board — Owner + Manager + Customer Operations (view). */
 export default async function OwnerPage({ searchParams }: PageProps) {
   const staff = await requireStaff();
   if (!canAccessOperationsBoard(staff.role.code)) {
-    redirect(
-      staff.role.code === "manager" ? "/owner/approvals" : "/home",
-    );
+    redirect("/home");
   }
   const params = await searchParams;
   const initialQuery = parseOperationsBoardSearchParams(params);

@@ -15,8 +15,10 @@ import {
   getCollectionBoardOrderById,
   getCollectionOrderDetail,
   listCollectionBoardOrders,
+  listCollectionOrdersForTab,
 } from "@/workspaces/collection/queries";
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
+import type { CollectionBoardTab } from "@/workspaces/collection/eligibility";
 
 async function requireCollectionStaff() {
   const staff = await requireStaff();
@@ -33,12 +35,21 @@ export async function listCollectionBoardOrdersAction(
   return listCollectionBoardOrders(selectedPickupDate);
 }
 
+export async function listCollectionOrdersForTabAction(
+  tab: CollectionBoardTab,
+  selectedPickupDate: string,
+): Promise<CollectionBoardOrder[]> {
+  await requireCollectionStaff();
+  return listCollectionOrdersForTab(tab, selectedPickupDate);
+}
+
 export async function getCollectionBoardOrderAction(
   orderId: string,
   selectedPickupDate: string,
+  tab: CollectionBoardTab = "ready",
 ): Promise<CollectionBoardOrder | null> {
   await requireCollectionStaff();
-  return getCollectionBoardOrderById(orderId, selectedPickupDate);
+  return getCollectionBoardOrderById(orderId, selectedPickupDate, tab);
 }
 
 export async function markCollectionOrderCollectedAction(

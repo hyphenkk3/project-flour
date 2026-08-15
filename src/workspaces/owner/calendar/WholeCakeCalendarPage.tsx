@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { canViewWholeCakeCalendar } from "@/engines/orders/delivery-finance-capabilities";
+import {
+  buildGuestOrderWorkspaceCapabilities,
+  canViewWholeCakeCalendar,
+} from "@/engines/orders/delivery-finance-capabilities";
 import { requireStaff } from "@/foundation/auth/session";
 import { resolveCalendarMonthParams } from "@/workspaces/owner/calendar/calendar-url";
 import { WholeCakeCalendar } from "@/workspaces/owner/calendar/WholeCakeCalendar";
@@ -44,7 +47,15 @@ export async function WholeCakeCalendarPage({
     listCalendarEntriesForMonth(year, month),
     listCalendarExtraMarkersForMonth(year, month),
   ]);
-  const canMutateCalendarOrderActions = staff.role.code === "owner";
+  const capabilities = buildGuestOrderWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  const canOperateOrderActions = capabilities.canOperateCollectionControls;
+  const canManageOrderMessages = capabilities.canManageOrderMessages;
+  const canMarkReady = capabilities.role === "owner";
+  /** Owner-only Propose EXTRA (beyond routine ops). */
+  const canMutateCalendarOrderActions = capabilities.role === "owner";
 
   return (
     <div className="space-y-6">
@@ -61,7 +72,10 @@ export async function WholeCakeCalendarPage({
         </Link>
       </div>
       <WholeCakeCalendar
+        canManageOrderMessages={canManageOrderMessages}
+        canMarkReady={canMarkReady}
         canMutateCalendarOrderActions={canMutateCalendarOrderActions}
+        canOperateOrderActions={canOperateOrderActions}
         focusToday={focusToday}
         initialEntries={entries}
         initialExtras={extras}

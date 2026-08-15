@@ -3,13 +3,14 @@ import { requireStaff } from "@/foundation/auth/session";
 import { buildCollectionWorkspaceCapabilities } from "@/engines/collection/capabilities";
 import { CollectionOrderDetail } from "@/workspaces/collection/CollectionOrderDetail";
 import { resolveCollectionBoardDate } from "@/workspaces/collection/date";
+import { parseCollectionBoardTab } from "@/workspaces/collection/eligibility";
 import { getCollectionOrderDetail } from "@/workspaces/collection/queries";
 
 export const dynamic = "force-dynamic";
 
 type CollectionOrderPageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; tab?: string }>;
 };
 
 export default async function CollectionOrderPage({
@@ -24,6 +25,7 @@ export default async function CollectionOrderPage({
   const { id } = await params;
   const query = await searchParams;
   const boardDate = resolveCollectionBoardDate(query.date);
+  const tab = parseCollectionBoardTab(query.tab);
   const order = await getCollectionOrderDetail(id, boardDate);
 
   if (!order) {
@@ -35,6 +37,7 @@ export default async function CollectionOrderPage({
       boardDate={boardDate}
       capabilities={capabilities}
       order={order}
+      tab={tab}
     />
   );
 }

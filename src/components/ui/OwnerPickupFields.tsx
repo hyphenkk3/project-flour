@@ -19,6 +19,7 @@ type OwnerPickupFieldsProps = {
   defaultDate?: string;
   defaultTime?: string;
   onDateChange?: (date: string) => void;
+  onTimeChange?: (time: string) => void;
   /** Contextual schedule labels (Delivery reuses pickup_date / pickup_time). */
   dateLabel?: string;
   timeLabel?: string;
@@ -35,6 +36,7 @@ export function OwnerPickupFields({
   defaultDate,
   defaultTime,
   onDateChange,
+  onTimeChange,
   dateLabel = "Pickup date",
   timeLabel = "Pickup time",
 }: OwnerPickupFieldsProps) {
@@ -65,6 +67,16 @@ export function OwnerPickupFields({
 
   const effectiveTime = mode === "custom" ? customTime : slotTime;
 
+  function setSlotAndNotify(next: string) {
+    setSlotTime(next);
+    onTimeChange?.(next);
+  }
+
+  function setCustomAndNotify(next: string) {
+    setCustomTime(next);
+    onTimeChange?.(next);
+  }
+
   const exceptionWarning = useMemo(() => {
     if (!date) return null;
     const schedule = getEffectivePickupSchedule(date);
@@ -90,7 +102,7 @@ export function OwnerPickupFields({
                 const stillValid = getPickupSlotsForDate(next).some(
                   (slot) => slot.value === slotTime,
                 );
-                if (!stillValid) setSlotTime("");
+                if (!stillValid) setSlotAndNotify("");
               }
             }}
             required
@@ -111,10 +123,11 @@ export function OwnerPickupFields({
               const value = event.target.value;
               if (value === CUSTOM_VALUE) {
                 setMode("custom");
+                onTimeChange?.(customTime);
                 return;
               }
               setMode("slot");
-              setSlotTime(value);
+              setSlotAndNotify(value);
             }}
             required={mode === "slot"}
             value={mode === "custom" ? CUSTOM_VALUE : slotTime}
@@ -140,7 +153,7 @@ export function OwnerPickupFields({
         >
           <FormInput
             id="pickup_time_custom"
-            onChange={(event) => setCustomTime(event.target.value)}
+            onChange={(event) => setCustomAndNotify(event.target.value)}
             required
             type="time"
             value={customTime}

@@ -281,6 +281,14 @@ assert.equal(
   assert.equal(searched.length, 1);
   assert.equal(searched[0]?.id, "todayish");
 
+  const todayWindowSearch = filterAndSortOperationsOrders(
+    rows,
+    { ...DEFAULT_OPERATIONS_QUERY, search: "B" },
+    new Date("2026-08-15T08:00:00+08:00"),
+  );
+  assert.equal(todayWindowSearch.length, 1);
+  assert.equal(todayWindowSearch[0]?.id, "todayish");
+
   const byStatus = filterAndSortOperationsOrders(rows, {
     ...DEFAULT_OPERATIONS_QUERY,
     pickupFilter: "all",

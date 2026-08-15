@@ -157,6 +157,20 @@ export function matchesOperationsStatusFilter(
   return order.status === statusFilter;
 }
 
+/** Non-empty search finds guest preorders across pickup dates. */
+export function operationsSearchSpansPickupDates(
+  query: Pick<OperationsBoardQuery, "search">,
+): boolean {
+  return query.search.trim() !== "";
+}
+
+export const OPERATIONS_SEARCH_ALL_DATES_CUE = "Searching all pickup dates";
+
+export const OPERATIONS_SEARCH_EMPTY_TITLE = "No matching orders.";
+
+export const OPERATIONS_SEARCH_EMPTY_DESCRIPTION =
+  "No order matched this search across all pickup dates.";
+
 function comparePickup(
   a: OperationsBoardOrder,
   b: OperationsBoardOrder,
@@ -208,15 +222,17 @@ export function filterAndSortOperationsOrders<T extends OperationsBoardOrder>(
   query: OperationsBoardQuery,
   now: Date = new Date(),
 ): T[] {
+  const spanPickupDates = operationsSearchSpansPickupDates(query);
   const filtered = orders.filter(
     (order) =>
       matchesOperationsSearch(order, query.search) &&
-      matchesOperationsPickupFilter(
-        order,
-        query.pickupFilter,
-        query.customPickupDate,
-        now,
-      ) &&
+      (spanPickupDates ||
+        matchesOperationsPickupFilter(
+          order,
+          query.pickupFilter,
+          query.customPickupDate,
+          now,
+        )) &&
       matchesOperationsStatusFilter(order, query.statusFilter),
   );
   return sortOperationsOrders(filtered, query.sort);
@@ -326,12 +342,14 @@ export type OperationsBoardSearchParams = {
   date?: string;
   status?: string;
   sort?: string;
+  search?: string;
 };
 
 /**
  * Read Operations board filters from URL query params.
  * `date=YYYY-MM-DD` selects that pickup date (Choose Date).
- * Search stays in client state and is not encoded.
+ * `search=` is restored after opening an order; a non-empty search
+ * finds matching guest preorders across pickup dates.
  */
 export function parseOperationsBoardSearchParams(
   input: OperationsBoardSearchParams,
@@ -342,6 +360,7 @@ export function parseOperationsBoardSearchParams(
   const date = isOperationsBoardDate(dateRaw) ? dateRaw : null;
   const statusRaw = input.status?.trim() ?? "";
   const sortRaw = input.sort?.trim() ?? "";
+  const search = input.search?.trim() ?? "";
 
   const statusFilter = isOperationsStatusFilter(statusRaw)
     ? statusRaw
@@ -352,7 +371,7 @@ export function parseOperationsBoardSearchParams(
 
   if (date && (pickup == null || pickup === "today" || pickup === "custom")) {
     return {
-      search: "",
+      search,
       pickupFilter: "custom",
       customPickupDate: date,
       statusFilter,
@@ -362,7 +381,7 @@ export function parseOperationsBoardSearchParams(
 
   if (pickup === "custom") {
     return {
-      search: "",
+      search,
       pickupFilter: "custom",
       customPickupDate: date,
       statusFilter,
@@ -372,7 +391,7 @@ export function parseOperationsBoardSearchParams(
 
   if (pickup && pickup !== "today") {
     return {
-      search: "",
+      search,
       pickupFilter: pickup,
       customPickupDate: null,
       statusFilter,
@@ -382,6 +401,7 @@ export function parseOperationsBoardSearchParams(
 
   return {
     ...DEFAULT_OPERATIONS_QUERY,
+    search,
     statusFilter,
     sort,
   };
@@ -390,6 +410,10 @@ export function parseOperationsBoardSearchParams(
 /** Canonical Operations board href for the current filters. Default Today is `/owner`. */
 export function buildOperationsBoardPath(query: OperationsBoardQuery): string {
   const params = new URLSearchParams();
+  const search = query.search.trim();
+  if (search) {
+    params.set("search", search);
+  }
   if (query.pickupFilter === "custom" && query.customPickupDate) {
     params.set("date", query.customPickupDate);
   } else if (query.pickupFilter === "custom") {
@@ -403,6 +427,8 @@ export function buildOperationsBoardPath(query: OperationsBoardQuery): string {
   if (query.sort !== DEFAULT_OPERATIONS_SORT) {
     params.set("sort", query.sort);
   }
-  const search = params.toString();
-  return search ? `${OPERATIONS_BOARD_PATH}?${search}` : OPERATIONS_BOARD_PATH;
+  const encoded = params.toString();
+  return encoded
+    ? `${OPERATIONS_BOARD_PATH}?${encoded}`
+    : OPERATIONS_BOARD_PATH;
 }

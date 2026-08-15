@@ -1,61 +1,91 @@
 import { requireStaff } from "@/foundation/auth/session";
 import { getNavigationForRole } from "@/foundation/navigation/workspaces";
-import { EmptyState } from "@/components/shell/EmptyState";
-import { PageHeader } from "@/components/shell/PageHeader";
-import { WorkspaceLink } from "@/components/shell/WorkspaceLink";
+import {
+  buildGuestOrderWorkspaceCapabilities,
+  canAccessOperationsBoard,
+  canViewWholeCakeCalendar,
+} from "@/engines/orders/delivery-finance-capabilities";
+import { canAccessBakeryWorkspace } from "@/engines/bakery/capabilities";
+import { canAccessCollectionWorkspace } from "@/engines/collection/capabilities";
+import { homePendingApprovalsHref } from "@/engines/operations/approval-ux";
+import { operationsTodayYmd } from "@/engines/operations/order-board";
+import { listPendingOperationsApprovals } from "@/workspaces/owner/approvals/queries";
+import { listGuestOrders } from "@/workspaces/owner/orders/queries";
+import { listBakeryBoardOrders } from "@/workspaces/bakery/queries";
+import {
+  listCollectionBoardOrders,
+  listCollectionCompletedOrders,
+} from "@/workspaces/collection/queries";
+import { buildHomeCockpitModel } from "@/workspaces/home/cockpit-model";
+import { HomeCockpit } from "@/workspaces/home/HomeCockpit";
 
 export const dynamic = "force-dynamic";
 
-function formatToday(date: Date) {
-  return new Intl.DateTimeFormat("en-SG", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "Asia/Singapore",
-  }).format(date);
-}
-
 export default async function HomePage() {
   const staff = await requireStaff();
-  const navigation = getNavigationForRole(staff.role.code);
-  const today = formatToday(new Date());
+  const role = staff.role.code;
+  const navigation = getNavigationForRole(role);
+  const capabilities = buildGuestOrderWorkspaceCapabilities({
+    role,
+    staffId: staff.id,
+  });
+  const todayYmd = operationsTodayYmd();
+
+  const canOps = canAccessOperationsBoard(role);
+  const canGuestWorkspace = capabilities.canAccessGuestOrderWorkspace;
+  const canCollection = canAccessCollectionWorkspace(role);
+  const canBakery = canAccessBakeryWorkspace(role);
+  const canCalendar = canViewWholeCakeCalendar(role);
+  const canApprovals =
+    capabilities.canReviewOperationsApprovals ||
+    capabilities.canRequestOperationsApproval;
+
+  const shouldLoadOrders = canOps || canGuestWorkspace || canCollection;
+  const shouldLoadApprovals = canApprovals || canOps;
+
+  const [
+    orders,
+    readyCollection,
+    completedCollection,
+    bakeryOrders,
+    pendingApprovals,
+  ] = await Promise.all([
+    shouldLoadOrders ? listGuestOrders() : Promise.resolve([]),
+    canCollection
+      ? listCollectionBoardOrders(todayYmd)
+      : Promise.resolve([]),
+    canCollection
+      ? listCollectionCompletedOrders(todayYmd)
+      : Promise.resolve([]),
+    canBakery || canCalendar
+      ? listBakeryBoardOrders(todayYmd)
+      : Promise.resolve([]),
+    shouldLoadApprovals
+      ? listPendingOperationsApprovals()
+      : Promise.resolve([]),
+  ]);
+
+  const model = buildHomeCockpitModel({
+    orders,
+    readyCollection,
+    completedCollection,
+    bakeryOrders,
+    pendingApprovals,
+    navigation,
+  });
 
   return (
-    <div className="space-y-8">
-      <div>
-        <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
-          Whitebird
-        </p>
-        <PageHeader
-          description={`${staff.role.name} · ${today}`}
-          title={`Hello, ${staff.displayName}`}
-        />
-      </div>
-
-      <EmptyState title="Your Whitebird workspace is ready." />
-
-      <section aria-labelledby="available-workspaces">
-        <div className="mb-4 flex items-end justify-between gap-4">
-          <h3
-            className="text-ink text-sm font-semibold tracking-wide"
-            id="available-workspaces"
-          >
-            Your workspaces
-          </h3>
-          <p className="text-skyline text-xs">V0.1.1</p>
-        </div>
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {navigation.map((item) => (
-            <li
-              className="border-fog rounded-xl border bg-white/80 p-1 shadow-sm"
-              key={item.id}
-            >
-              <WorkspaceLink active={item.id === "home"} item={item} />
-            </li>
-          ))}
-        </ul>
-      </section>
-    </div>
+    <HomeCockpit
+      canAccessApprovals={canApprovals}
+      pendingApprovalsHref={homePendingApprovalsHref(role)}
+      canAccessBakery={canBakery}
+      canAccessCalendar={canCalendar}
+      canAccessCollection={canCollection}
+      canAccessOperations={canOps}
+      model={model}
+      preferCalendarScheduleCta={role === "owner"}
+      roleName={staff.role.name}
+      staffDisplayName={staff.displayName}
+    />
   );
 }

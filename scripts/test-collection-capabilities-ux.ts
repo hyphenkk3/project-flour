@@ -41,7 +41,7 @@ assert.equal(bakeryDenied.canAccessCollectionWorkspace, false);
 assert.equal(bakeryDenied.canMarkCollected, false);
 assert.equal(bakeryDenied.canUndoCollected, false);
 
-// Owner Ops Collection controls remain Owner-only (override path).
+// Owner Ops Collection controls: Owner + Manager + Customer Operations.
 assert.equal(
   buildGuestOrderWorkspaceCapabilities({ role: "owner", staffId: "o1" })
     .canOperateCollectionControls,
@@ -50,14 +50,14 @@ assert.equal(
 assert.equal(
   buildGuestOrderWorkspaceCapabilities({ role: "manager", staffId: "m1" })
     .canOperateCollectionControls,
-  false,
+  true,
 );
 assert.equal(
   buildGuestOrderWorkspaceCapabilities({
     role: "customer_operations",
     staffId: "co1",
   }).canOperateCollectionControls,
-  false,
+  true,
 );
 assert.equal(
   buildGuestOrderWorkspaceCapabilities({ role: "collection", staffId: "c1" })

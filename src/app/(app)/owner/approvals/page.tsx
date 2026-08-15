@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { requireStaff } from "@/foundation/auth/session";
 import { canAccessOperationsApprovalsInbox } from "@/engines/operations/approvals";
 import { canAccessOperationsBoard } from "@/engines/orders/delivery-finance-capabilities";
+import { OPERATIONS_APPROVAL_HISTORY_PATH } from "@/engines/operations/approval-ux";
 import { OperationsApprovalsSection } from "@/workspaces/owner/approvals/OperationsApprovalsSection";
 import { listPendingOperationsApprovals } from "@/workspaces/owner/approvals/queries";
 import Link from "next/link";
@@ -43,8 +44,19 @@ export default async function OperationsApprovalsPage() {
           Review Customer Operations exception requests. Approval applies the
           exact requested change.
         </p>
+        <p className="mt-2">
+          <Link
+            className="text-signal text-sm font-medium"
+            href={OPERATIONS_APPROVAL_HISTORY_PATH}
+          >
+            Approval History
+          </Link>
+        </p>
       </div>
-      <OperationsApprovalsSection approvals={pendingApprovals} />
+      <OperationsApprovalsSection
+        approvals={pendingApprovals}
+        returnTo="/owner/approvals"
+      />
     </div>
   );
 }

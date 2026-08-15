@@ -9,6 +9,9 @@ import {
   DEFAULT_OPERATIONS_QUERY,
   buildOperationsBoardPath,
   filterAndSortOperationsOrders,
+  OPERATIONS_SEARCH_EMPTY_DESCRIPTION,
+  OPERATIONS_SEARCH_EMPTY_TITLE,
+  operationsSearchSpansPickupDates,
   type OperationsBoardQuery,
 } from "@/engines/operations/order-board";
 import { partitionOwnerOperationsTodayOrders } from "@/engines/operations/owner-attention";
@@ -23,6 +26,11 @@ import { OwnerOrderCard } from "@/workspaces/owner/orders/OwnerOrderCard";
 import { OperationsBoardToolbar } from "@/workspaces/owner/OperationsBoardToolbar";
 import { OperationsApprovalsSection } from "@/workspaces/owner/approvals/OperationsApprovalsSection";
 import type { OperationsApprovalRecord } from "@/engines/operations/approvals";
+import {
+  OPERATIONS_APPROVALS_SECTION_ID,
+  pendingOperationsApprovalCount,
+} from "@/engines/operations/approval-ux";
+import { scrollWorkspaceSectionIntoView } from "@/workspaces/owner/orders/scroll-workspace-section";
 
 const POLL_INTERVAL_MS = 30_000;
 const HIGHLIGHT_MS = 4500;
@@ -166,6 +174,14 @@ export function OperationsLiveBoard({
   }, [initialOrders]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash !== `#${OPERATIONS_APPROVALS_SECTION_ID}`) return;
+    scrollWorkspaceSectionIntoView(OPERATIONS_APPROVALS_SECTION_ID, {
+      focus: true,
+    });
+  }, []);
+
+  useEffect(() => {
     const supabase = createClient();
     const channel = supabase
       .channel("operations-guest-orders")
@@ -204,7 +220,8 @@ export function OperationsLiveBoard({
     [orders, query],
   );
 
-  const isTodayView = query.pickupFilter === "today";
+  const isTodayView =
+    query.pickupFilter === "today" && !operationsSearchSpansPickupDates(query);
 
   const todayBuckets = useMemo(() => {
     if (!isTodayView) return null;
@@ -290,6 +307,7 @@ export function OperationsLiveBoard({
         matchCount={visibleOrders.length}
         newCount={newCount}
         onChange={handleQueryChange}
+        pendingApprovalCount={pendingOperationsApprovalCount(pendingApprovals)}
         query={query}
         todayGroupCounts={todayGroupCounts}
       />
@@ -305,12 +323,18 @@ export function OperationsLiveBoard({
         {visibleOrders.length === 0 ? (
           <EmptyState
             description={
-              orders.length === 0
-                ? "New customer preorders will appear here automatically."
-                : "Try clearing search or filters to see more orders."
+              operationsSearchSpansPickupDates(query)
+                ? OPERATIONS_SEARCH_EMPTY_DESCRIPTION
+                : orders.length === 0
+                  ? "New customer preorders will appear here automatically."
+                  : "Try clearing search or filters to see more orders."
             }
             title={
-              orders.length === 0 ? "You’re all caught up." : "No matching orders."
+              operationsSearchSpansPickupDates(query)
+                ? OPERATIONS_SEARCH_EMPTY_TITLE
+                : orders.length === 0
+                  ? "You’re all caught up."
+                  : "No matching orders."
             }
           />
         ) : todayBuckets ? (

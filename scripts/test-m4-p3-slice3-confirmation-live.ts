@@ -280,12 +280,18 @@ async function main() {
       staffId: "mgr-live",
     });
     check(
-      managerCaps.canPrepareConfirmation === false &&
-        managerCaps.canManagePayments === false &&
-        managerCaps.canManageDiscounts === false &&
-        managerCaps.canEditOrderWorkspace === false &&
-        managerCaps.canEnableDeliveryFinance === false,
-      "Manager still has no Confirmation/Payment/Discount/Edit/Enable Charges",
+      managerCaps.canPrepareConfirmation === true &&
+        managerCaps.canManagePayments === true &&
+        managerCaps.canManageDiscounts === true &&
+        managerCaps.canEditOrderWorkspace === true &&
+        managerCaps.canEnableDeliveryFinance === false &&
+        managerCaps.canAccessOperationsBoard === true &&
+        managerCaps.canViewWholeCakeCalendar === true &&
+        managerCaps.canUseOwnerBoardTools === false &&
+        managerCaps.canRequestOperationsApproval === false &&
+        managerCaps.canRequestCrossMonthPickupApproval === true &&
+        managerCaps.canOverridePickupMonth === false,
+      "Manager has Operations/Calendar view + routine Edit; not Owner board tools/approval-create/Enable Charges",
     );
 
     // Pickup

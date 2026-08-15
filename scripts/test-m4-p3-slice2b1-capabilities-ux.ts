@@ -64,7 +64,8 @@ assert.equal(vivian.canExtendPaymentDeadline, false);
 assert.equal(vivian.canManageDiscounts, true);
 assert.equal(vivian.canOverrideDiscountEligibility, false);
 assert.equal(vivian.canEnableDeliveryFinance, false);
-assert.equal(vivian.canOperateCollectionControls, false);
+assert.equal(vivian.canOperateCollectionControls, true);
+assert.equal(vivian.canManageOrderMessages, true);
 assert.equal(vivian.canUseOwnerBoardTools, false);
 assert.equal(vivian.canViewWholeCakeCalendar, true);
 
@@ -77,14 +78,23 @@ assert.equal(manager.canDirectFeeExceptions, true);
 assert.equal(manager.canResolveFeeRequests, true);
 assert.equal(manager.canCancelAnyFeeRequest, true);
 assert.equal(manager.canQuoteDeliveryFee, true);
-assert.equal(manager.canEditOrderWorkspace, false);
+assert.equal(manager.canEditOrderWorkspace, true);
 assert.equal(manager.canEnableDeliveryFinance, false);
-assert.equal(manager.canPrepareConfirmation, false);
-assert.equal(manager.canManagePayments, false);
-assert.equal(manager.canManageDiscounts, false);
-assert.equal(manager.canOperateCollectionControls, false);
-assert.equal(manager.canAccessOperationsBoard, false);
+assert.equal(manager.canPrepareConfirmation, true);
+assert.equal(manager.canPreparePaymentRequest, true);
+assert.equal(manager.canRecordPayment, true);
+assert.equal(manager.canManagePayments, true);
+assert.equal(manager.canManageDiscounts, true);
+assert.equal(manager.canOverrideDiscountEligibility, false);
+assert.equal(manager.canOverridePickupMonth, false);
+assert.equal(manager.canOperateCollectionControls, true);
+assert.equal(manager.canManageOrderMessages, true);
+assert.equal(manager.canRequestOperationsApproval, false);
+assert.equal(manager.canRequestCrossMonthPickupApproval, true);
+assert.equal(manager.canAccessOperationsBoard, true);
 assert.equal(manager.canReviewOperationsApprovals, true);
+assert.equal(manager.canViewWholeCakeCalendar, true);
+assert.equal(manager.canUseOwnerBoardTools, false);
 
 assert.equal(
   canCancelPendingFeeRequest({

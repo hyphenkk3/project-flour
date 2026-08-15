@@ -5,7 +5,7 @@ import { requireStaff } from "@/foundation/auth/session";
 import {
   STALE_APPROVAL_MESSAGE,
   canCancelOperationsApproval,
-  canRequestOperationsApproval,
+  canRequestOperationsApprovalType,
   canReviewOperationsApprovalType,
   crossMonthPayloadToRpc,
   discountExceptionToRpcPayload,
@@ -42,6 +42,7 @@ function rpcErrorMessage(error: { message: string } | null): string {
 async function revalidateApprovalPaths(orderId: string) {
   revalidatePath("/owner");
   revalidatePath("/owner/approvals");
+  revalidatePath("/owner/approvals/history");
   revalidatePath("/customer-operations/orders");
   revalidatePath(`/owner/orders/${orderId}`);
   revalidatePath(`/owner/orders/${orderId}/payment`);
@@ -58,14 +59,14 @@ export async function createOperationsApprovalAction(input: {
     | LateOrderEditPayload;
 }): Promise<OperationsApprovalActionState> {
   const staff = await requireStaff();
-  if (!canRequestOperationsApproval(staff.role.code)) {
-    return {
-      error: "Only Customer Operations can request this approval.",
-      success: false,
-    };
-  }
   if (!isOperationsApprovalType(input.requestType)) {
     return { error: "Unsupported approval type.", success: false };
+  }
+  if (!canRequestOperationsApprovalType(staff.role.code, input.requestType)) {
+    return {
+      error: "Not authorized to request this approval.",
+      success: false,
+    };
   }
   const reason = input.reason.trim();
   if (!reason) {
@@ -272,13 +273,28 @@ export async function approveOperationsApprovalAction(
     if (reconcile.error) {
       return { error: reconcile.error, success: false };
     }
+  } else if (row.request_type === "late_order_edit") {
+    // Same Paid ↔ Awaiting Payment path as discount approve / direct save.
+    // Confirmation outdate already runs inside the approve RPC.
+    const reconcile = await reconcilePaymentLifecycleAfterApproval({
+      orderId,
+      before: order,
+      staffId: staff.id,
+    });
+    if (reconcile.error) {
+      return { error: reconcile.error, success: false };
+    }
   }
 
   await revalidateApprovalPaths(orderId);
   return { error: null, success: true };
 }
 
-async function reconcileAfterDiscountApproval(input: {
+/**
+ * After a financial approval mutation: Paid ↔ Awaiting Payment from settlement.
+ * Does not touch payment rows. Same rules as direct workspace save.
+ */
+async function reconcilePaymentLifecycleAfterApproval(input: {
   orderId: string;
   before: StorefrontOrder;
   staffId: string;
@@ -309,6 +325,17 @@ async function reconcileAfterDiscountApproval(input: {
       return { error: error.message };
     }
   }
+
+  return { error: null };
+}
+
+async function reconcileAfterDiscountApproval(input: {
+  orderId: string;
+  before: StorefrontOrder;
+  staffId: string;
+}): Promise<{ error: string | null }> {
+  const payment = await reconcilePaymentLifecycleAfterApproval(input);
+  if (payment.error) return payment;
 
   if (!orderStatusAllowsConfirmationInvalidation(input.before.status)) {
     return { error: null };

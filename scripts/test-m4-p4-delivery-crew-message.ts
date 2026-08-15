@@ -754,7 +754,7 @@ assert.ok(driveThrough.includes("Pick-up order:"));
 assert.ok(!driveThrough.includes("Delivery Order:"));
 
 // ---------------------------------------------------------------------------
-// Authority unchanged (no new Crew capability; Confirmation still Owner-only)
+// Authority: Confirmation prep shared with Manager (routine servicing parity)
 // ---------------------------------------------------------------------------
 const owner = buildGuestOrderWorkspaceCapabilities({
   role: "owner",
@@ -769,7 +769,7 @@ const counter = buildGuestOrderWorkspaceCapabilities({
   staffId: "co-1",
 });
 assert.equal(owner.canPrepareConfirmation, true);
-assert.equal(manager.canPrepareConfirmation, false);
+assert.equal(manager.canPrepareConfirmation, true);
 assert.equal(counter.canPrepareConfirmation, true);
 assert.equal(manager.canDirectFeeExceptions, true);
 assert.equal(counter.canRequestFeeExceptions, true);

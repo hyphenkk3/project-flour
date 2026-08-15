@@ -13,8 +13,23 @@ import type {
   OperationsApprovalPayload,
 } from "@/engines/operations/approvals";
 
+export type ApprovalChangeLinePart =
+  | { kind: "text"; text: string }
+  | { kind: "muted"; text: string }
+  | { kind: "struck"; text: string }
+  | { kind: "emphasis"; text: string };
+
+export type ApprovalChangeLine = {
+  /** Plain-text form for tests, search, and accessibility. */
+  plain: string;
+  parts: ApprovalChangeLinePart[];
+};
+
 export type ApprovalChangeSummary = {
+  /** Plain-text change lines (same content as changeLines[].plain). */
   lines: string[];
+  /** Structured change lines for restrained visual emphasis. */
+  changeLines: ApprovalChangeLine[];
   currentLines: string[];
   requestedLines: string[];
 };
@@ -47,8 +62,12 @@ function summarizeDiscountException(
   if (payload.eligibilityReason) {
     currentLines.push(payload.eligibilityReason);
   }
+  const changeLines = [
+    plainLine(actionLine),
+  ];
   return {
-    lines: [actionLine],
+    lines: changeLines.map((line) => line.plain),
+    changeLines,
     currentLines,
     requestedLines: [`Amount due ${formatRmAmount(payload.requestedAmountDue)}`],
   };
@@ -65,8 +84,17 @@ function summarizeCrossMonthPickup(
     payload.proposedPickupDate,
     payload.proposedPickupTime,
   );
+  const changeLines = [
+    plainLine("Cross-month pickup"),
+    changeLine(`${currentPickup} → ${requestedPickup}`, [
+      { kind: "struck", text: currentPickup },
+      { kind: "text", text: " → " },
+      { kind: "emphasis", text: requestedPickup },
+    ]),
+  ];
   return {
-    lines: [`Cross-month pickup`, `${currentPickup} → ${requestedPickup}`],
+    lines: changeLines.map((line) => line.plain),
+    changeLines,
     currentLines: [currentPickup],
     requestedLines: [requestedPickup],
   };
@@ -84,7 +112,7 @@ function summarizeLateOrderEdit(
   const proposedPickupDate = payload.proposed.pickupDate ?? currentPickupDate;
   const proposedPickupTime = payload.proposed.pickupTime ?? currentPickupTime;
 
-  const lines = [
+  const changeLines = [
     ...diffCakeItems(currentItems, proposedItems),
     ...diffPaidAddons(currentAddons, proposedAddons),
     ...diffPickup({
@@ -98,7 +126,8 @@ function summarizeLateOrderEdit(
   ];
 
   return {
-    lines,
+    lines: changeLines.map((line) => line.plain),
+    changeLines,
     currentLines: snapshotLines({
       items: currentItems,
       paidAddons: currentAddons,
@@ -139,8 +168,8 @@ function snapshotLines(input: {
 function diffCakeItems(
   current: LateOrderEditProposedItem[],
   proposed: LateOrderEditProposedItem[],
-): string[] {
-  const lines: string[] = [];
+): ApprovalChangeLine[] {
+  const lines: ApprovalChangeLine[] = [];
   const currentByIdentity = new Map(
     current.map((item) => [cakeIdentity(item), item]),
   );
@@ -155,7 +184,11 @@ function diffCakeItems(
     usedProposed.add(key);
     if (currentItem.quantity !== proposedItem.quantity) {
       lines.push(
-        `${currentItem.cakeName} ${currentItem.sizeLabel} ×${currentItem.quantity} → ×${proposedItem.quantity}`,
+        quantityChangeLine({
+          label: `${currentItem.cakeName} ${currentItem.sizeLabel}`,
+          fromQty: currentItem.quantity,
+          toQty: proposedItem.quantity,
+        }),
       );
     }
   }
@@ -181,29 +214,65 @@ function diffCakeItems(
       const sizeChanged = currentItem.sizeLabel !== proposedItem.sizeLabel;
       const qtyChanged = currentItem.quantity !== proposedItem.quantity;
       if (sizeChanged && qtyChanged) {
+        const plain = `${currentItem.cakeName} ${currentItem.sizeLabel} ×${currentItem.quantity} → ${proposedItem.sizeLabel} ×${proposedItem.quantity}`;
         lines.push(
-          `${currentItem.cakeName} ${currentItem.sizeLabel} ×${currentItem.quantity} → ${proposedItem.sizeLabel} ×${proposedItem.quantity}`,
+          changeLine(plain, [
+            { kind: "text", text: `${currentItem.cakeName} ` },
+            {
+              kind: "struck",
+              text: `${currentItem.sizeLabel} ×${currentItem.quantity}`,
+            },
+            { kind: "text", text: " → " },
+            {
+              kind: "emphasis",
+              text: `${proposedItem.sizeLabel} ×${proposedItem.quantity}`,
+            },
+          ]),
         );
       } else if (sizeChanged) {
+        const plain = `${currentItem.cakeName} ${currentItem.sizeLabel} → ${proposedItem.sizeLabel}`;
         lines.push(
-          `${currentItem.cakeName} ${currentItem.sizeLabel} → ${proposedItem.sizeLabel}`,
+          changeLine(plain, [
+            { kind: "text", text: `${currentItem.cakeName} ` },
+            { kind: "struck", text: currentItem.sizeLabel },
+            { kind: "text", text: " → " },
+            { kind: "emphasis", text: proposedItem.sizeLabel },
+          ]),
         );
       } else if (qtyChanged) {
         lines.push(
-          `${currentItem.cakeName} ${currentItem.sizeLabel} ×${currentItem.quantity} → ×${proposedItem.quantity}`,
+          quantityChangeLine({
+            label: `${currentItem.cakeName} ${currentItem.sizeLabel}`,
+            fromQty: currentItem.quantity,
+            toQty: proposedItem.quantity,
+          }),
         );
       }
     } else {
+      const plain = `Add ${proposedItem.cakeName} ${proposedItem.sizeLabel} ×${proposedItem.quantity}`;
       lines.push(
-        `Add ${proposedItem.cakeName} ${proposedItem.sizeLabel} ×${proposedItem.quantity}`,
+        changeLine(plain, [
+          { kind: "emphasis", text: "Add" },
+          {
+            kind: "text",
+            text: ` ${proposedItem.cakeName} ${proposedItem.sizeLabel} ×${proposedItem.quantity}`,
+          },
+        ]),
       );
     }
   }
 
   for (const currentItem of unmatchedCurrent) {
     if (usedCurrent.has(cakeIdentity(currentItem))) continue;
+    const plain = `Remove ${currentItem.cakeName} ${currentItem.sizeLabel} ×${currentItem.quantity}`;
     lines.push(
-      `Remove ${currentItem.cakeName} ${currentItem.sizeLabel} ×${currentItem.quantity}`,
+      changeLine(plain, [
+        { kind: "text", text: "Remove " },
+        {
+          kind: "struck",
+          text: `${currentItem.cakeName} ${currentItem.sizeLabel} ×${currentItem.quantity}`,
+        },
+      ]),
     );
   }
 
@@ -213,8 +282,8 @@ function diffCakeItems(
 function diffPaidAddons(
   current: LateOrderEditPaidAddon[],
   proposed: LateOrderEditPaidAddon[],
-): string[] {
-  const lines: string[] = [];
+): ApprovalChangeLine[] {
+  const lines: ApprovalChangeLine[] = [];
   const currentByCode = new Map(current.map((addon) => [addon.code, addon]));
   const proposedByCode = new Map(proposed.map((addon) => [addon.code, addon]));
   const codes = new Set([...currentByCode.keys(), ...proposedByCode.keys()]);
@@ -223,20 +292,38 @@ function diffPaidAddons(
     const before = currentByCode.get(code);
     const after = proposedByCode.get(code);
     if (!before && after) {
-      lines.push(`Add ${after.name} ×${after.quantity}`);
+      const plain = `Add ${after.name} ×${after.quantity}`;
+      lines.push(
+        changeLine(plain, [
+          { kind: "emphasis", text: "Add" },
+          { kind: "text", text: ` ${after.name} ×${after.quantity}` },
+        ]),
+      );
       continue;
     }
     if (before && !after) {
-      lines.push(`Remove ${before.name} ×${before.quantity}`);
+      const plain = `Remove ${before.name} ×${before.quantity}`;
+      lines.push(
+        changeLine(plain, [
+          { kind: "text", text: "Remove " },
+          { kind: "struck", text: `${before.name} ×${before.quantity}` },
+        ]),
+      );
       continue;
     }
     if (!before || !after) continue;
     if (before.quantity !== after.quantity) {
-      lines.push(`${before.name} ×${before.quantity} → ×${after.quantity}`);
+      lines.push(
+        quantityChangeLine({
+          label: before.name,
+          fromQty: before.quantity,
+          toQty: after.quantity,
+        }),
+      );
       continue;
     }
     if (messagesSignature(before) !== messagesSignature(after)) {
-      lines.push(`${before.name} message updated`);
+      lines.push(plainLine(`${before.name} message updated`));
     }
   }
 
@@ -249,7 +336,7 @@ function diffPickup(input: {
   proposedDate: string;
   proposedTime: string;
   proposedPickupSpecified: boolean;
-}): string[] {
+}): ApprovalChangeLine[] {
   if (!input.proposedPickupSpecified) return [];
   if (!input.proposedDate && !input.proposedTime) return [];
   const currentDate = input.currentDate;
@@ -259,13 +346,66 @@ function diffPickup(input: {
   if (!proposedDate || !proposedTime) return [];
   if (currentDate === proposedDate && currentTime === proposedTime) return [];
   if (currentDate === proposedDate) {
+    const fromClock = formatPickupClock(currentTime);
+    const toClock = formatPickupClock(proposedTime);
+    const plain = `Pickup ${formatDdMmYyyy(proposedDate)} · ${fromClock} → ${toClock}`;
     return [
-      `Pickup ${formatDdMmYyyy(proposedDate)} · ${formatPickupClock(currentTime)} → ${formatPickupClock(proposedTime)}`,
+      changeLine(plain, [
+        {
+          kind: "text",
+          text: `Pickup ${formatDdMmYyyy(proposedDate)} · `,
+        },
+        { kind: "struck", text: fromClock },
+        { kind: "text", text: " → " },
+        { kind: "emphasis", text: toClock },
+      ]),
     ];
   }
+  const fromPickup = formatPickup(currentDate, currentTime);
+  const toPickup = formatPickup(proposedDate, proposedTime);
+  const plain = `Pickup ${fromPickup} → ${toPickup}`;
   return [
-    `Pickup ${formatPickup(currentDate, currentTime)} → ${formatPickup(proposedDate, proposedTime)}`,
+    changeLine(plain, [
+      { kind: "text", text: "Pickup " },
+      { kind: "struck", text: fromPickup },
+      { kind: "text", text: " → " },
+      { kind: "emphasis", text: toPickup },
+    ]),
   ];
+}
+
+function quantityChangeLine(input: {
+  label: string;
+  fromQty: number;
+  toQty: number;
+}): ApprovalChangeLine {
+  const plain = `${input.label} ×${input.fromQty} → ×${input.toQty}`;
+  if (input.toQty < input.fromQty) {
+    return changeLine(plain, [
+      { kind: "text", text: `${input.label} ` },
+      { kind: "struck", text: `×${input.fromQty}` },
+      { kind: "text", text: " → " },
+      { kind: "emphasis", text: `×${input.toQty}` },
+    ]);
+  }
+  // Increase: mute old quantity, emphasize new (no strike — value still valid as baseline).
+  return changeLine(plain, [
+    { kind: "text", text: `${input.label} ` },
+    { kind: "muted", text: `×${input.fromQty}` },
+    { kind: "text", text: " → " },
+    { kind: "emphasis", text: `×${input.toQty}` },
+  ]);
+}
+
+function plainLine(text: string): ApprovalChangeLine {
+  return changeLine(text, [{ kind: "text", text }]);
+}
+
+function changeLine(
+  plain: string,
+  parts: ApprovalChangeLinePart[],
+): ApprovalChangeLine {
+  return { plain, parts };
 }
 
 function cakeIdentity(item: LateOrderEditProposedItem): string {

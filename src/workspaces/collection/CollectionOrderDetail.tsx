@@ -19,6 +19,7 @@ import {
   isCollectionMarkCollectedEligible,
   isCollectionOrderSecured,
   isCollectionUndoCollectedEligible,
+  type CollectionBoardTab,
 } from "@/workspaces/collection/eligibility";
 import { deriveCollectionPackingReminders } from "@/workspaces/collection/packing";
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
@@ -26,21 +27,27 @@ import type { CollectionBoardOrder } from "@/workspaces/collection/types";
 type CollectionOrderDetailProps = {
   order: CollectionBoardOrder;
   boardDate: string;
+  tab?: CollectionBoardTab;
   capabilities: CollectionWorkspaceCapabilities;
 };
 
 export function CollectionOrderDetail({
   order,
   boardDate,
+  tab = "ready",
   capabilities,
 }: CollectionOrderDetailProps) {
   const presentation = collectionDeskPresentation({
     readyAt: order.readyAt,
     pickedUpAt: order.pickedUpAt,
+    deliveredAt: order.deliveredAt,
+    fulfilmentMethod: order.fulfilmentMethod,
   });
   const desk = collectionDeskAttention({
     readyAt: order.readyAt,
     pickedUpAt: order.pickedUpAt,
+    deliveredAt: order.deliveredAt,
+    fulfilmentMethod: order.fulfilmentMethod,
     pickupDate: order.pickupDate,
     pickupTime: order.pickupTime,
     now: new Date(),
@@ -71,7 +78,7 @@ export function CollectionOrderDetail({
     <main className="mx-auto w-full max-w-3xl px-5 pt-3 pb-28 sm:px-8 sm:pt-4 sm:pb-12">
       <Link
         className="text-skyline hover:text-ink inline-flex min-h-9 items-center text-sm font-medium transition"
-        href={collectionDateNavHref(boardDate)}
+        href={collectionDateNavHref(boardDate, tab)}
       >
         ← Board
       </Link>

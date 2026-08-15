@@ -3,9 +3,12 @@
  *
  * Customer Operations executes normal preorder work directly.
  * When an existing restriction blocks that role, they request approval for a
- * specific order + specific proposed mutation. Owner and Manager approve/reject
- * the three supported types. Approval executes that mutation. It does not grant
- * temporary extra role power. Time passing does not expire a pending request.
+ * specific order + specific proposed mutation. Manager may also request
+ * cross_month_pickup (not late_order_edit or discount_exception).
+ * Owner and Manager approve/reject the three supported types. Owner remains
+ * the only role with direct cross-month override. Approval executes that
+ * mutation. It does not grant temporary extra role power. Time passing does
+ * not expire a pending request.
  *
  * Delivery fee request/resolve remains a separate existing workflow.
  */
@@ -134,8 +137,11 @@ export type OperationsApprovalRecord = {
   orderFingerprint: OperationsApprovalFingerprint;
   requestedBy: string;
   requestedByName: string | null;
+  /** Role display name from roles.name (e.g. Customer Operations). */
+  requestedByRoleName: string | null;
   reviewedBy: string | null;
   reviewedByName: string | null;
+  reviewedByRoleName: string | null;
   reviewedAt: string | null;
   reviewerNote: string | null;
   createdAt: string;
@@ -154,9 +160,25 @@ export function isOperationsApprovalStatus(
   return (OPERATIONS_APPROVAL_STATUSES as readonly string[]).includes(value);
 }
 
-/** Customer Operations may create requests. Owner executes exceptions directly. */
+/** Customer Operations may create late-edit and discount requests. */
 export function canRequestOperationsApproval(role: RoleCode): boolean {
   return role === "customer_operations";
+}
+
+/**
+ * Type-aware request authority.
+ * Customer Operations: all three types.
+ * Manager: cross_month_pickup only — not late_order_edit or discount_exception.
+ * Owner executes exceptions directly and does not file requests.
+ */
+export function canRequestOperationsApprovalType(
+  role: RoleCode,
+  requestType: string,
+): boolean {
+  if (!isOperationsApprovalType(requestType)) return false;
+  if (role === "customer_operations") return true;
+  if (role === "manager") return requestType === "cross_month_pickup";
+  return false;
 }
 
 /**
@@ -199,6 +221,24 @@ export function requesterCannotDecideOwnRequest(input: {
   requestedBy: string;
 }): boolean {
   return input.actorStaffId === input.requestedBy;
+}
+
+/** Review buttons: role can review the type, and actor is not the requester. */
+export function canReviewPendingOperationsApproval(input: {
+  role: RoleCode;
+  staffId: string;
+  requestedBy: string;
+  requestType: string;
+}): boolean {
+  if (
+    requesterCannotDecideOwnRequest({
+      actorStaffId: input.staffId,
+      requestedBy: input.requestedBy,
+    })
+  ) {
+    return false;
+  }
+  return canReviewOperationsApprovalType(input.role, input.requestType);
 }
 
 export function approvalTypeLabel(type: OperationsApprovalType): string {

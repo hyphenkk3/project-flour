@@ -201,7 +201,7 @@ assert.equal(
     pickupTime: "15:00:00",
     now: now16at1501,
   });
-  assert.equal(collected.label, "Collected");
+  assert.equal(collected.label, "Picked Up");
   assert.equal(collected.overdue, false);
 }
 

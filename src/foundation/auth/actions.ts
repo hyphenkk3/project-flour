@@ -1,11 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { resolvePostLoginDestination } from "@/foundation/auth/post-login-destination";
 import {
   findStaffByUsername,
   getAuthEmailForUserId,
 } from "@/foundation/staff/queries";
 import { createClient } from "@/lib/supabase/server";
+import type { RoleCode } from "@/types/staff";
 
 export type LoginState = {
   error: string | null;
@@ -19,12 +21,13 @@ export async function loginAction(
 ): Promise<LoginState> {
   const username = String(formData.get("username") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const requestedNext = String(formData.get("next") ?? "").trim() || null;
 
   if (!username || !password) {
     return { error: genericLoginError };
   }
 
-  let roleCode: string | null = null;
+  let roleCode: RoleCode | null = null;
 
   try {
     const staff = await findStaffByUsername(username);
@@ -54,7 +57,11 @@ export async function loginAction(
     return { error: genericLoginError };
   }
 
-  redirect(roleCode === "owner" ? "/owner" : "/home");
+  if (!roleCode) {
+    return { error: genericLoginError };
+  }
+
+  redirect(resolvePostLoginDestination(roleCode, requestedNext));
 }
 
 export async function logoutAction() {

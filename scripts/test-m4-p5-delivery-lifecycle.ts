@@ -558,11 +558,12 @@ const counter = buildGuestOrderWorkspaceCapabilities({
   role: "customer_operations",
   staffId: "co-1",
 });
+// Authority: Owner + Manager + Customer Operations operate collection controls.
 assert.equal(owner.canOperateCollectionControls, true);
-assert.equal(manager.canOperateCollectionControls, false);
-assert.equal(counter.canOperateCollectionControls, false);
+assert.equal(manager.canOperateCollectionControls, true);
+assert.equal(counter.canOperateCollectionControls, true);
 assert.equal(owner.canPrepareConfirmation, true);
-assert.equal(manager.canPrepareConfirmation, false);
+assert.equal(manager.canPrepareConfirmation, true);
 
 const actionsSrc = readFileSync(
   resolve("src/workspaces/owner/orders/actions.ts"),
@@ -571,9 +572,18 @@ const actionsSrc = readFileSync(
 assert.ok(actionsSrc.includes("export async function markOrderOutForDeliveryAction"));
 assert.ok(actionsSrc.includes("export async function markOrderDeliveredAction"));
 assert.ok(
-  /markOrderOutForDeliveryAction[\s\S]*requireOwner\(\)/.test(actionsSrc),
+  /markOrderOutForDeliveryAction[\s\S]*requireOwnerOrCustomerOperations\(\)/.test(
+    actionsSrc,
+  ),
 );
-assert.ok(/markOrderDeliveredAction[\s\S]*requireOwner\(\)/.test(actionsSrc));
+assert.ok(
+  /markOrderDeliveredAction[\s\S]*requireOwnerOrCustomerOperations\(\)/.test(
+    actionsSrc,
+  ),
+);
+assert.ok(
+  /markOrderReadyAction[\s\S]*requireOwner\(\)/.test(actionsSrc),
+);
 
 // ---------------------------------------------------------------------------
 // Calendar Guide fulfilment-aware ● / ○ / ✓; no emoji; no provisional wording

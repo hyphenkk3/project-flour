@@ -80,6 +80,7 @@ export const WORKSPACE_CATALOG: Record<WorkspaceId, WorkspaceNavItem> = {
  */
 export const ROLE_NAVIGATION: Record<RoleCode, readonly WorkspaceId[]> = {
   owner: [
+    "home",
     "owner",
     "owner_calendar",
     "bakery",
@@ -89,6 +90,8 @@ export const ROLE_NAVIGATION: Record<RoleCode, readonly WorkspaceId[]> = {
   ],
   manager: [
     "home",
+    "owner",
+    "owner_calendar",
     "customer_operations",
     "bakery",
     "collection",

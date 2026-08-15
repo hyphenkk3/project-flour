@@ -5,9 +5,11 @@ import {
   collectionTodayYmd,
   collectionTomorrowYmd,
 } from "@/workspaces/collection/date";
+import type { CollectionBoardTab } from "@/workspaces/collection/eligibility";
 
 type CollectionDateNavProps = {
   selectedDate: string;
+  tab?: CollectionBoardTab;
 };
 
 function chipClass(active: boolean): string {
@@ -16,7 +18,10 @@ function chipClass(active: boolean): string {
     : "border-fog text-ink hover:border-skyline inline-flex min-h-11 items-center justify-center rounded-xl border bg-white px-4 text-sm font-medium transition";
 }
 
-export function CollectionDateNav({ selectedDate }: CollectionDateNavProps) {
+export function CollectionDateNav({
+  selectedDate,
+  tab = "ready",
+}: CollectionDateNavProps) {
   const today = collectionTodayYmd();
   const tomorrow = collectionTomorrowYmd();
   const plusTwo = collectionPlusTwoYmd();
@@ -30,19 +35,19 @@ export function CollectionDateNav({ selectedDate }: CollectionDateNavProps) {
       <div className="flex flex-wrap gap-2">
         <Link
           className={chipClass(selectedDate === today)}
-          href={collectionDateNavHref(today)}
+          href={collectionDateNavHref(today, tab)}
         >
           Today
         </Link>
         <Link
           className={chipClass(selectedDate === tomorrow)}
-          href={collectionDateNavHref(tomorrow)}
+          href={collectionDateNavHref(tomorrow, tab)}
         >
           Tomorrow
         </Link>
         <Link
           className={chipClass(selectedDate === plusTwo)}
-          href={collectionDateNavHref(plusTwo)}
+          href={collectionDateNavHref(plusTwo, tab)}
         >
           +2
         </Link>
@@ -52,6 +57,9 @@ export function CollectionDateNav({ selectedDate }: CollectionDateNavProps) {
         className="flex min-h-11 items-center gap-2"
         method="get"
       >
+        {tab !== "ready" ? (
+          <input name="tab" type="hidden" value={tab} />
+        ) : null}
         <label className="text-skyline text-sm" htmlFor="collection-date">
           Date
         </label>

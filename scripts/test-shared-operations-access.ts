@@ -23,12 +23,12 @@ import { OWNER_ORDER_PAYMENT_SECTION_ID } from "@/engines/operations/owner-atten
 
 assert.equal(canAccessOperationsBoard("owner"), true);
 assert.equal(canAccessOperationsBoard("customer_operations"), true);
-assert.equal(canAccessOperationsBoard("manager"), false);
+assert.equal(canAccessOperationsBoard("manager"), true);
 assert.equal(canAccessOperationsBoard("bakery"), false);
 
 assert.equal(canViewWholeCakeCalendar("owner"), true);
 assert.equal(canViewWholeCakeCalendar("customer_operations"), true);
-assert.equal(canViewWholeCakeCalendar("manager"), false);
+assert.equal(canViewWholeCakeCalendar("manager"), true);
 assert.equal(canViewWholeCakeCalendar("bakery"), false);
 
 assert.equal(canAccessCollectionWorkspace("customer_operations"), true);
@@ -63,6 +63,7 @@ assert.equal(owner.canManageDiscounts, true);
 assert.equal(owner.canOverrideDiscountEligibility, true);
 assert.equal(owner.canUseOwnerBoardTools, true);
 assert.equal(owner.canRequestOperationsApproval, false);
+assert.equal(owner.canRequestCrossMonthPickupApproval, false);
 assert.equal(owner.canReviewOperationsApprovals, true);
 assert.equal(owner.canManageOrderMessages, true);
 assert.equal(owner.canOperateCollectionControls, true);
@@ -74,6 +75,7 @@ const co = buildGuestOrderWorkspaceCapabilities({
 });
 assert.equal(co.canAccessOperationsBoard, true);
 assert.equal(co.canRequestOperationsApproval, true);
+assert.equal(co.canRequestCrossMonthPickupApproval, true);
 assert.equal(co.canReviewOperationsApprovals, false);
 assert.equal(co.canEditOrderWorkspace, true);
 assert.equal(co.canOverridePickupMonth, false, "CO cannot self-override month");
@@ -82,11 +84,12 @@ assert.equal(co.canOverrideDiscountEligibility, false);
 assert.equal(co.canPrepareConfirmation, true);
 assert.equal(co.canPreparePaymentRequest, true);
 assert.equal(co.canRecordPayment, true);
+assert.equal(co.canManagePayments, true);
 assert.equal(co.canExtendPaymentDeadline, false);
 assert.equal(co.canResolveFeeRequests, false);
 assert.equal(co.canUseOwnerBoardTools, false);
-assert.equal(co.canManageOrderMessages, false);
-assert.equal(co.canOperateCollectionControls, false);
+assert.equal(co.canManageOrderMessages, true);
+assert.equal(co.canOperateCollectionControls, true);
 assert.equal(co.canViewWholeCakeCalendar, true);
 assert.equal(co.canEnableDeliveryFinance, false);
 
@@ -94,12 +97,33 @@ const manager = buildGuestOrderWorkspaceCapabilities({
   role: "manager",
   staffId: "mgr-1",
 });
-assert.equal(manager.canAccessOperationsBoard, false);
+assert.equal(manager.canAccessOperationsBoard, true);
 assert.equal(manager.canReviewOperationsApprovals, true);
-assert.equal(manager.canEditOrderWorkspace, false);
-assert.equal(manager.canManageDiscounts, false);
+assert.equal(manager.canEditOrderWorkspace, true);
+assert.equal(manager.canManageDiscounts, true);
+assert.equal(manager.canOverrideDiscountEligibility, false);
+assert.equal(manager.canOverridePickupMonth, false);
+assert.equal(manager.canRequestOperationsApproval, false);
+assert.equal(manager.canRequestCrossMonthPickupApproval, true);
+assert.equal(manager.canUseOwnerBoardTools, false);
 assert.equal(manager.canResolveFeeRequests, true);
-assert.equal(manager.canViewWholeCakeCalendar, false);
+assert.equal(manager.canViewWholeCakeCalendar, true);
+assert.equal(manager.canManageOrderMessages, true);
+assert.equal(manager.canOperateCollectionControls, true);
+assert.equal(manager.canPrepareConfirmation, true);
+assert.equal(manager.canPreparePaymentRequest, true);
+assert.equal(manager.canRecordPayment, true);
+assert.equal(manager.canManagePayments, true);
+
+assert.equal(canAccessWorkspace("manager", "owner"), true);
+assert.equal(canAccessWorkspace("manager", "owner_calendar"), true);
+const managerNav = getNavigationForRole("manager").map((i) => i.id);
+assert.ok(managerNav.includes("owner"));
+assert.ok(managerNav.includes("owner_calendar"));
+assert.ok(managerNav.includes("customer_operations"));
+assert.ok(managerNav.includes("bakery"));
+assert.ok(managerNav.includes("collection"));
+assert.ok(managerNav.includes("library"));
 
 const bakery = buildGuestOrderWorkspaceCapabilities({
   role: "bakery",
@@ -165,7 +189,19 @@ const actionsSrc = readFileSync(
 );
 assert.match(
   actionsSrc,
+  /staff\.role\.code !== "owner" &&\s*staff\.role\.code !== "manager" &&\s*staff\.role\.code !== "customer_operations"/,
+);
+assert.match(
+  actionsSrc,
   /export async function saveOrderWorkspaceAction[\s\S]*?requireOwnerOrCustomerOperations/,
+);
+assert.match(
+  actionsSrc,
+  /staff\.role\.code === "customer_operations" &&\s*isWithinTwoDayChangeCutoff/,
+);
+assert.doesNotMatch(
+  actionsSrc,
+  /staff\.role\.code === "manager" &&\s*isWithinTwoDayChangeCutoff/,
 );
 assert.match(
   actionsSrc,
@@ -183,6 +219,75 @@ assert.match(
   actionsSrc,
   /export async function recordAndVerifyPaymentAction[\s\S]*?requireOwnerOrCustomerOperations/,
 );
+assert.match(
+  actionsSrc,
+  /export async function markOrderPickedUpAction[\s\S]*?requireOwnerOrCustomerOperations/,
+);
+assert.match(
+  actionsSrc,
+  /export async function undoOrderPickedUpAction[\s\S]*?requireOwnerOrCustomerOperations/,
+);
+assert.match(
+  actionsSrc,
+  /export async function markOrderDeliveredAction[\s\S]*?requireOwnerOrCustomerOperations/,
+);
+assert.match(
+  actionsSrc,
+  /export async function undoOrderDeliveredAction[\s\S]*?requireOwnerOrCustomerOperations/,
+);
+assert.match(
+  actionsSrc,
+  /export async function markOrderOutForDeliveryAction[\s\S]*?requireOwnerOrCustomerOperations/,
+);
+assert.match(
+  actionsSrc,
+  /export async function undoOrderOutForDeliveryAction[\s\S]*?requireOwnerOrCustomerOperations/,
+);
+assert.match(
+  actionsSrc,
+  /export async function markOrderReadyAction[\s\S]*?requireOwner\(\)/,
+);
+assert.match(
+  actionsSrc,
+  /export async function undoOrderReadyAction[\s\S]*?requireOwner\(\)/,
+);
+
+const calendarPageSrc = readFileSync(
+  resolve("src/workspaces/owner/calendar/WholeCakeCalendarPage.tsx"),
+  "utf8",
+);
+assert.match(calendarPageSrc, /canOperateOrderActions/);
+assert.match(calendarPageSrc, /canManageOrderMessages/);
+assert.match(calendarPageSrc, /canMarkReady/);
+assert.match(calendarPageSrc, /canMutateCalendarOrderActions/);
+
+const quickViewSrc = readFileSync(
+  resolve("src/workspaces/owner/calendar/CalendarQuickView.tsx"),
+  "utf8",
+);
+assert.match(quickViewSrc, /canOperateOrderActions/);
+assert.match(quickViewSrc, /canManageOrderMessages/);
+assert.match(quickViewSrc, /canMarkReady/);
+assert.match(
+  quickViewSrc,
+  /canManageOrderMessages \? \(\s*<OrderMessagesSection/,
+);
+assert.match(quickViewSrc, /canMutateCalendarOrderActions/);
+
+const operationalSrc = readFileSync(
+  resolve("src/workspaces/owner/orders/OrderOperationalControls.tsx"),
+  "utf8",
+);
+assert.match(operationalSrc, /canMarkReady/);
+
+const workspaceFormSrc = readFileSync(
+  resolve("src/workspaces/owner/orders/OrderWorkspaceForm.tsx"),
+  "utf8",
+);
+assert.match(workspaceFormSrc, /canMarkReady=\{capabilities\.role === "owner"\}/);
+assert.match(workspaceFormSrc, /canOperateCollectionControls/);
+assert.match(workspaceFormSrc, /canManageOrderMessages/);
+assert.match(workspaceFormSrc, /canManagePayments/);
 
 const calendarActionsSrc = readFileSync(
   resolve("src/workspaces/owner/calendar/actions.ts"),

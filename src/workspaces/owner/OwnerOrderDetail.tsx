@@ -6,6 +6,7 @@ import {
   buildGuestOrderWorkspaceCapabilities,
   canAccessGuestOrderWorkspace,
 } from "@/engines/orders/delivery-finance-capabilities";
+import { withApprovalHistoryReturnPositionFlag } from "@/workspaces/owner/approvals/approval-history-return-position";
 import { withCalendarReturnPositionFlag } from "@/workspaces/owner/calendar/calendar-return-position";
 import {
   resolveOwnerReturnTo,
@@ -87,19 +88,29 @@ export async function OwnerOrderDetail({
   const backHref =
     back.label === "Whole Cake Calendar"
       ? withCalendarReturnPositionFlag(back.href)
-      : capabilities.canAccessOperationsBoard
-        ? back.href
-        : capabilities.canReviewOperationsApprovals
-          ? "/owner/approvals"
-          : "/customer-operations/orders";
+      : back.label === "Approval History"
+        ? withApprovalHistoryReturnPositionFlag(back.href)
+        : back.label === "Approvals" || back.label === "Home"
+          ? back.href
+          : capabilities.canAccessOperationsBoard
+            ? back.href
+            : capabilities.canReviewOperationsApprovals
+              ? "/owner/approvals"
+              : "/customer-operations/orders";
   const backLabel =
-    back.label === "Whole Cake Calendar"
+    back.label === "Whole Cake Calendar" ||
+    back.label === "Approval History" ||
+    back.label === "Approvals" ||
+    back.label === "Home"
       ? back.label
       : capabilities.canAccessOperationsBoard
         ? "Operations"
         : capabilities.canReviewOperationsApprovals
           ? "Approvals"
           : "Customer Operations";
+  const preserveReturnScroll =
+    back.label === "Whole Cake Calendar" ||
+    back.label === "Approval History";
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -107,7 +118,7 @@ export async function OwnerOrderDetail({
         <Link
           className="text-skyline hover:text-ink text-sm font-medium"
           href={backHref}
-          scroll={back.label === "Whole Cake Calendar" ? false : undefined}
+          scroll={preserveReturnScroll ? false : undefined}
         >
           ← {backLabel}
         </Link>

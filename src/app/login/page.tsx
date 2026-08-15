@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LoginForm } from "@/components/LoginForm";
+import { sanitizePostLoginPath } from "@/foundation/auth/post-login-destination";
 
 export const dynamic = "force-dynamic";
 
@@ -7,7 +8,14 @@ export const metadata: Metadata = {
   title: "Staff Login · Whitebird Operating System",
 };
 
-export default function LoginPage() {
+type LoginPageProps = {
+  searchParams: Promise<{ next?: string }>;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = await searchParams;
+  const next = sanitizePostLoginPath(params.next);
+
   return (
     <main className="relative flex min-h-dvh flex-col justify-center px-6 py-16 sm:px-10">
       <div
@@ -24,7 +32,7 @@ export default function LoginPage() {
         <p className="text-skyline mt-3">
           Sign in with your staff username and password.
         </p>
-        <LoginForm />
+        <LoginForm next={next} />
       </div>
     </main>
   );

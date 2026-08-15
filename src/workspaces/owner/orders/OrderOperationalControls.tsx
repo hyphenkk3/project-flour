@@ -38,6 +38,11 @@ type OrderOperationalControlsProps = {
   onSuccess?: () => void | Promise<void>;
   /** Quieter layout for dense surfaces (e.g. Order Workspace). */
   compact?: boolean;
+  /**
+   * Mark/Undo Ready (Owner). SQL allowlist is bakery|manager|owner —
+   * Customer Operations must not see these controls.
+   */
+  canMarkReady?: boolean;
 };
 
 type MutationKind =
@@ -79,6 +84,7 @@ export function OrderOperationalControls({
   fulfilmentMethod = null,
   onSuccess,
   compact = false,
+  canMarkReady = true,
 }: OrderOperationalControlsProps) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -190,18 +196,20 @@ export function OrderOperationalControls({
           <>
             {state === "not_ready" ? (
               <>
+                {canMarkReady ? (
+                  <button
+                    className={primaryClass}
+                    disabled={pending}
+                    onClick={() =>
+                      run("ready", () => markOrderReadyAction(orderId))
+                    }
+                    type="button"
+                  >
+                    {workingLabel("ready", "Mark Ready")}
+                  </button>
+                ) : null}
                 <button
-                  className={primaryClass}
-                  disabled={pending}
-                  onClick={() =>
-                    run("ready", () => markOrderReadyAction(orderId))
-                  }
-                  type="button"
-                >
-                  {workingLabel("ready", "Mark Ready")}
-                </button>
-                <button
-                  className={secondaryClass}
+                  className={canMarkReady ? secondaryClass : primaryClass}
                   disabled={pending}
                   onClick={() =>
                     run("out_for_delivery", () =>
@@ -239,16 +247,18 @@ export function OrderOperationalControls({
                 >
                   {workingLabel("delivered", completeLabel)}
                 </button>
-                <button
-                  className={secondaryClass}
-                  disabled={pending}
-                  onClick={() =>
-                    run("undo_ready", () => undoOrderReadyAction(orderId))
-                  }
-                  type="button"
-                >
-                  {workingLabel("undo_ready", "Undo Ready")}
-                </button>
+                {canMarkReady ? (
+                  <button
+                    className={secondaryClass}
+                    disabled={pending}
+                    onClick={() =>
+                      run("undo_ready", () => undoOrderReadyAction(orderId))
+                    }
+                    type="button"
+                  >
+                    {workingLabel("undo_ready", "Undo Ready")}
+                  </button>
+                ) : null}
               </>
             ) : null}
 
@@ -299,18 +309,20 @@ export function OrderOperationalControls({
           <>
             {state === "not_ready" ? (
               <>
+                {canMarkReady ? (
+                  <button
+                    className={primaryClass}
+                    disabled={pending}
+                    onClick={() =>
+                      run("ready", () => markOrderReadyAction(orderId))
+                    }
+                    type="button"
+                  >
+                    {workingLabel("ready", "Mark Ready")}
+                  </button>
+                ) : null}
                 <button
-                  className={primaryClass}
-                  disabled={pending}
-                  onClick={() =>
-                    run("ready", () => markOrderReadyAction(orderId))
-                  }
-                  type="button"
-                >
-                  {workingLabel("ready", "Mark Ready")}
-                </button>
-                <button
-                  className={secondaryClass}
+                  className={canMarkReady ? secondaryClass : primaryClass}
                   disabled={pending}
                   onClick={() =>
                     run("picked_up", () => markOrderPickedUpAction(orderId))
@@ -334,16 +346,18 @@ export function OrderOperationalControls({
                 >
                   {workingLabel("picked_up", completeLabel)}
                 </button>
-                <button
-                  className={secondaryClass}
-                  disabled={pending}
-                  onClick={() =>
-                    run("undo_ready", () => undoOrderReadyAction(orderId))
-                  }
-                  type="button"
-                >
-                  {workingLabel("undo_ready", "Undo Ready")}
-                </button>
+                {canMarkReady ? (
+                  <button
+                    className={secondaryClass}
+                    disabled={pending}
+                    onClick={() =>
+                      run("undo_ready", () => undoOrderReadyAction(orderId))
+                    }
+                    type="button"
+                  >
+                    {workingLabel("undo_ready", "Undo Ready")}
+                  </button>
+                ) : null}
               </>
             ) : null}
 

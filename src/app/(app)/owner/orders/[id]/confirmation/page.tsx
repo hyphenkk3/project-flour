@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { canAccessCustomerConfirmation } from "@/engines/orders/confirmation-validity";
-import { canAccessOperationsBoard } from "@/engines/orders/delivery-finance-capabilities";
+import { buildGuestOrderWorkspaceCapabilities } from "@/engines/orders/delivery-finance-capabilities";
 import { requireStaff } from "@/foundation/auth/session";
 import { ConfirmationPreview } from "@/workspaces/owner/orders/ConfirmationPreview";
 import { getGuestOrderById } from "@/workspaces/owner/orders/queries";
@@ -17,7 +17,11 @@ export default async function ConfirmationPage({
   searchParams,
 }: PageProps) {
   const staff = await requireStaff();
-  if (!canAccessOperationsBoard(staff.role.code)) {
+  const capabilities = buildGuestOrderWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!capabilities.canPrepareConfirmation) {
     notFound();
   }
 

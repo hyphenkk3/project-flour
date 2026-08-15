@@ -50,7 +50,19 @@ type CalendarQuickViewProps = {
   /** After EXTRA propose succeeds — refresh calendar EXTRA markers. */
   onExtraProposed?: () => void | Promise<void>;
   onClose: () => void;
-  /** Owner-only fulfilment / messages / Propose EXTRA controls. */
+  /**
+   * Routine fulfilment controls (Owner + Manager + Customer Operations).
+   * Independent of messaging.
+   */
+  canOperateOrderActions?: boolean;
+  /**
+   * Crew + customer message compose (Owner + Manager + Customer Operations).
+   * Uses canManageOrderMessages — not Owner mutation authority.
+   */
+  canManageOrderMessages?: boolean;
+  /** Mark/Undo Ready (Owner). */
+  canMarkReady?: boolean;
+  /** Owner-only Propose EXTRA. */
   canMutateCalendarOrderActions?: boolean;
 };
 
@@ -61,6 +73,9 @@ export function CalendarQuickView({
   refreshKey = 0,
   onExtraProposed,
   onClose,
+  canOperateOrderActions = false,
+  canManageOrderMessages = false,
+  canMarkReady = false,
   canMutateCalendarOrderActions = false,
 }: CalendarQuickViewProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -205,7 +220,10 @@ export function CalendarQuickView({
 
             {order ? (
               <CalendarQuickViewBody
+                canManageOrderMessages={canManageOrderMessages}
+                canMarkReady={canMarkReady}
                 canMutateCalendarOrderActions={canMutateCalendarOrderActions}
+                canOperateOrderActions={canOperateOrderActions}
                 loading={loading}
                 onExtraProposed={onExtraProposed}
                 onRefresh={() => {
@@ -240,6 +258,9 @@ function CalendarQuickViewBody({
   onRefresh,
   onExtraProposed,
   staffDisplayName,
+  canOperateOrderActions = false,
+  canManageOrderMessages = false,
+  canMarkReady = false,
   canMutateCalendarOrderActions = false,
 }: {
   order: StorefrontOrder;
@@ -247,6 +268,9 @@ function CalendarQuickViewBody({
   onRefresh: () => void | Promise<void>;
   onExtraProposed?: () => void | Promise<void>;
   staffDisplayName: string;
+  canOperateOrderActions?: boolean;
+  canManageOrderMessages?: boolean;
+  canMarkReady?: boolean;
   canMutateCalendarOrderActions?: boolean;
 }) {
   const settlement = order.settlement;
@@ -321,8 +345,9 @@ function CalendarQuickViewBody({
         </div>
       </section>
 
-      {canMutateCalendarOrderActions ? (
+      {canOperateOrderActions ? (
         <OrderOperationalControls
+          canMarkReady={canMarkReady}
           deliveredAt={order.deliveredAt}
           fulfilmentMethod={order.fulfilmentMethod}
           onSuccess={onRefresh}
@@ -333,7 +358,7 @@ function CalendarQuickViewBody({
         />
       ) : null}
 
-      {canMutateCalendarOrderActions ? (
+      {canManageOrderMessages ? (
         <OrderMessagesSection order={order} staffDisplayName={staffDisplayName} />
       ) : null}
 

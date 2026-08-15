@@ -22,8 +22,9 @@ export default async function CollectionLayout({
           Collection
         </p>
         <p className="text-skyline mt-0.5 text-sm leading-snug">
-          Desk handoff for Ready pickup orders. Mark Collected when the guest
-          leaves with the cake — Owner still owns payment and Delivery.
+          Ready pickup handoffs, recent Picked Up / Delivered completions, and
+          Collection history — Mark Collected when the guest leaves with the
+          cake.
         </p>
       </div>
       {children}

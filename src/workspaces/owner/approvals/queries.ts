@@ -1,3 +1,4 @@
+import { createServiceClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   isOperationsApprovalStatus,
@@ -24,8 +25,26 @@ type ApprovalRow = {
   updated_at: string;
 };
 
+type StaffAttribution = {
+  displayName: string;
+  roleName: string | null;
+};
+
 function isMissingRelation(message: string): boolean {
   return /does not exist|schema cache|could not find/i.test(message);
+}
+
+function unwrapRoleName(
+  roles:
+    | { name: string }
+    | { name: string }[]
+    | null
+    | undefined,
+): string | null {
+  if (!roles) return null;
+  const row = Array.isArray(roles) ? roles[0] : roles;
+  const name = row?.name?.trim();
+  return name || null;
 }
 
 export async function listPendingOperationsApprovals(): Promise<
@@ -101,18 +120,13 @@ async function hydrateApprovalRows(
     ),
   ];
 
-  const [{ data: orders }, { data: staff }] = await Promise.all([
+  const [{ data: orders }, staffMap] = await Promise.all([
     supabase
       .from("orders")
       .select("id, order_number, guest_name, pickup_date, pickup_time")
       .in("id", orderIds)
       .is("customer_id", null),
-    staffIds.length > 0
-      ? supabase
-          .from("staff_profiles")
-          .select("id, display_name")
-          .in("id", staffIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; display_name: string }> }),
+    loadStaffAttribution(staffIds),
   ]);
 
   const orderMap = new Map(
@@ -127,9 +141,6 @@ async function hydrateApprovalRows(
       },
     ]),
   );
-  const staffMap = new Map(
-    (staff ?? []).map((row) => [row.id as string, row.display_name as string]),
-  );
 
   const mapped: OperationsApprovalRecord[] = [];
   for (const row of rows) {
@@ -139,6 +150,10 @@ async function hydrateApprovalRows(
     const fingerprint = parseOperationsApprovalFingerprint(row.order_fingerprint);
     if (!payload || !fingerprint) continue;
     const order = orderMap.get(row.order_id);
+    const requester = staffMap.get(row.requested_by) ?? null;
+    const reviewer = row.reviewed_by
+      ? (staffMap.get(row.reviewed_by) ?? null)
+      : null;
     mapped.push({
       id: row.id,
       orderId: row.order_id,
@@ -152,11 +167,11 @@ async function hydrateApprovalRows(
       payload,
       orderFingerprint: fingerprint,
       requestedBy: row.requested_by,
-      requestedByName: staffMap.get(row.requested_by) ?? null,
+      requestedByName: requester?.displayName ?? null,
+      requestedByRoleName: requester?.roleName ?? null,
       reviewedBy: row.reviewed_by,
-      reviewedByName: row.reviewed_by
-        ? (staffMap.get(row.reviewed_by) ?? null)
-        : null,
+      reviewedByName: reviewer?.displayName ?? null,
+      reviewedByRoleName: reviewer?.roleName ?? null,
       reviewedAt: row.reviewed_at,
       reviewerNote: row.reviewer_note,
       createdAt: row.created_at,
@@ -164,4 +179,39 @@ async function hydrateApprovalRows(
     });
   }
   return mapped;
+}
+
+/**
+ * Attribution names must resolve for any authorized viewer. Session RLS on
+ * staff_profiles is own-row-only ("Staff can read own profile"), so an Owner
+ * reviewing Vivian's request would otherwise fall back to "Staff". Use service
+ * role for this presentation lookup only — same pattern as fee-request attribution.
+ */
+async function loadStaffAttribution(
+  staffIds: string[],
+): Promise<Map<string, StaffAttribution>> {
+  const map = new Map<string, StaffAttribution>();
+  if (staffIds.length === 0) return map;
+  try {
+    const admin = createServiceClient();
+    const { data, error } = await admin
+      .from("staff_profiles")
+      .select("id, display_name, roles!inner ( name )")
+      .in("id", staffIds);
+    if (error) return map;
+    for (const row of data ?? []) {
+      const displayName = String(row.display_name ?? "").trim();
+      if (!displayName) continue;
+      map.set(row.id as string, {
+        displayName,
+        roleName: unwrapRoleName(
+          (row as { roles?: { name: string } | { name: string }[] | null })
+            .roles,
+        ),
+      });
+    }
+  } catch {
+    // Presentation-only; do not fail approval list loads.
+  }
+  return map;
 }

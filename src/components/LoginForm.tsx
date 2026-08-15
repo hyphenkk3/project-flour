@@ -5,7 +5,12 @@ import { loginAction, type LoginState } from "@/foundation/auth/actions";
 
 const initialState: LoginState = { error: null };
 
-export function LoginForm() {
+type LoginFormProps = {
+  /** Optional same-origin return path from `/login?next=…`. */
+  next?: string | null;
+};
+
+export function LoginForm({ next = null }: LoginFormProps) {
   const [state, formAction, pending] = useActionState(
     loginAction,
     initialState,
@@ -16,6 +21,8 @@ export function LoginForm() {
       action={formAction}
       className="mt-10 flex w-full max-w-sm flex-col gap-5"
     >
+      {next ? <input name="next" type="hidden" value={next} /> : null}
+
       <label className="text-skyline flex flex-col gap-2 text-sm">
         Username
         <input
