@@ -281,10 +281,13 @@ export function generateConfirmationMessage(
       )
     : null;
 
-  // Complimentary + Delivery notify are adjacent (no blank line between).
+  // Complimentary + Include RECEIPT + Delivery notify are adjacent (no blank line between).
   const postAmountLines: string[] = [];
   if (complimentary) {
     postAmountLines.push(`*Complimentary ${complimentary}`);
+  }
+  if (payload.includeReceipt) {
+    postAmountLines.push("*Include RECEIPT");
   }
   if (notifyInstruction) {
     postAmountLines.push(notifyInstruction);
@@ -436,6 +439,7 @@ export function buildConfirmationPayload(input: {
   amountDue: number;
   fulfilmentMethod?: StorefrontOrderFulfilmentMethod;
   delivery?: StorefrontOrderDelivery | null;
+  includeReceipt?: boolean;
 }): ConfirmationPayload {
   return {
     staffCustomerFacingName: input.staffCustomerFacingName.trim() || "Whitebird",
@@ -455,6 +459,7 @@ export function buildConfirmationPayload(input: {
     amountDue: input.amountDue,
     /** Snapshot compatibility: total = payable amount due. */
     total: input.amountDue,
+    includeReceipt: Boolean(input.includeReceipt),
   };
 }
 
@@ -502,5 +507,6 @@ export function buildConfirmationPayloadFromOrder(input: {
       metadata: row.metadata,
     })),
     amountDue: order.settlement.amountDue,
+    includeReceipt: order.includeReceipt,
   });
 }

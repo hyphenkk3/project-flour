@@ -100,7 +100,7 @@ export function CalendarGuide() {
                 </span>
                 <span>confirmed</span>
               </span>
-              {" = physical stock on prepared date (Matrix)"}
+              {" = physical stock spanning pickup validity (Matrix)"}
             </li>
           </ul>
         </div>

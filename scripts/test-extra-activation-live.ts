@@ -11,6 +11,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { isExtraAvailable } from "@/engines/extra/availability";
+import {
+  extraOperatingSlotsForDate,
+  extraPickupThroughIso,
+  defaultExtraOrderCutoffSlot,
+  defaultExtraPickupFromSlot,
+} from "@/engines/extra/fresh-picks-eligibility";
+import { addBusinessCalendarDays, toBusinessDateKey } from "@/lib/dates";
 
 const PRODUCT_ORDER_ID = "7e9779ac-152b-42e0-8002-34ba8e9b11b5";
 const MIGRATION_PATH = resolve(
@@ -47,6 +54,47 @@ loadEnvLocal();
 
 const SIG = `EXTRAV1-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 console.log(`fixture signature SIG=${SIG}`);
+
+const TODAY_YMD = toBusinessDateKey();
+const TOMORROW_YMD = addBusinessCalendarDays(TODAY_YMD, 1);
+const nowForWindow = new Date();
+const todaySlot = defaultExtraOrderCutoffSlot({
+  cutoffDate: TODAY_YMD,
+  todayYmd: TODAY_YMD,
+  now: nowForWindow,
+});
+const CONFIRM_PREPARED_ON = todaySlot
+  ? TODAY_YMD
+  : (TOMORROW_YMD ?? TODAY_YMD);
+const CONFIRM_SLOT =
+  todaySlot ??
+  defaultExtraOrderCutoffSlot({
+    cutoffDate: CONFIRM_PREPARED_ON,
+    todayYmd: TODAY_YMD,
+    now: nowForWindow,
+  }) ??
+  extraOperatingSlotsForDate(CONFIRM_PREPARED_ON).at(-1) ??
+  "17:30";
+const CONFIRM_FROM_SLOT =
+  defaultExtraPickupFromSlot({
+    pickupFromDate: CONFIRM_PREPARED_ON,
+    todayYmd: TODAY_YMD,
+    now: nowForWindow,
+  }) ??
+  extraOperatingSlotsForDate(CONFIRM_PREPARED_ON)[0]?.value ??
+  "12:00";
+const CONFIRM_FROM = extraPickupThroughIso(
+  CONFIRM_PREPARED_ON,
+  CONFIRM_FROM_SLOT,
+);
+const CONFIRM_THROUGH = extraPickupThroughIso(
+  CONFIRM_PREPARED_ON,
+  CONFIRM_SLOT,
+);
+
+if (!CONFIRM_FROM || !CONFIRM_THROUGH) {
+  throw new Error("Could not build a Fresh Picks pickup/order window");
+}
 
 type Check = { label: string; ok: boolean; detail?: string };
 
@@ -197,8 +245,9 @@ async function main() {
         p_actor_staff_id: co.id,
         p_cake_name: `Cake ${SIG}`,
         p_size_label: '6"',
-        p_prepared_on: "2026-08-15",
-        p_pickup_through_at: "2026-08-16T07:00:00.000Z",
+        p_prepared_on: CONFIRM_PREPARED_ON,
+        p_pickup_available_from_at: CONFIRM_FROM,
+        p_pickup_through_at: CONFIRM_THROUGH,
         p_note: SIG,
       });
       check(Boolean(error), "CO create confirmed denied", rpcMessage(error));
@@ -243,28 +292,28 @@ async function main() {
     }
 
     {
-      const through = "2026-08-16T07:00:00.000Z";
       const { data, error } = await admin.rpc("confirm_extra_stock", {
         p_extra_stock_id: proposedId,
         p_actor_staff_id: bakeryActor!.id,
-        p_prepared_on: "2026-08-15",
-        p_pickup_through_at: through,
+        p_prepared_on: CONFIRM_PREPARED_ON,
+        p_pickup_available_from_at: CONFIRM_FROM,
+        p_pickup_through_at: CONFIRM_THROUGH,
       });
       check(!error, "bakery-capable confirm", rpcMessage(error));
       check(data?.lifecycle === "confirmed", "confirm lifecycle");
       check(
         isExtraAvailable({
           lifecycle: "confirmed",
-          pickupThroughAt: through,
-          now: new Date("2026-08-16T07:00:00.000Z"),
+          pickupThroughAt: CONFIRM_THROUGH,
+          now: new Date(CONFIRM_THROUGH),
         }),
         "available at exact cutoff",
       );
       check(
         !isExtraAvailable({
           lifecycle: "confirmed",
-          pickupThroughAt: through,
-          now: new Date("2026-08-16T07:00:00.001Z"),
+          pickupThroughAt: CONFIRM_THROUGH,
+          now: new Date(Date.parse(CONFIRM_THROUGH) + 1),
         }),
         "unavailable 1ms after cutoff",
       );
@@ -376,7 +425,7 @@ async function main() {
         const { error } = await admin.rpc("confirm_extra_stock", {
           p_extra_stock_id: id,
           p_actor_staff_id: bakeryActor!.id,
-          p_prepared_on: "2026-08-15",
+          p_prepared_on: CONFIRM_PREPARED_ON,
           p_pickup_through_at: null,
         });
         check(
@@ -386,33 +435,33 @@ async function main() {
         );
       }
 
-      const through = "2026-08-16T07:00:00.000Z";
       const { data: rec, error: cErr } = await admin.rpc("confirm_extra_stock", {
         p_extra_stock_id: id,
         p_actor_staff_id: bakeryActor!.id,
-        p_prepared_on: "2026-08-15",
-        p_pickup_through_at: through,
+        p_prepared_on: CONFIRM_PREPARED_ON,
+        p_pickup_available_from_at: CONFIRM_FROM,
+        p_pickup_through_at: CONFIRM_THROUGH,
       });
       check(!cErr, "confirm after undo", rpcMessage(cErr));
       check(rec?.lifecycle === "confirmed", "confirm after undo lifecycle");
       check(
         isExtraAvailable({
           lifecycle: "confirmed",
-          pickupThroughAt: through,
-          now: new Date("2026-08-16T07:00:00.000Z"),
+          pickupThroughAt: CONFIRM_THROUGH,
+          now: new Date(CONFIRM_THROUGH),
         }),
         "available after confirm following undo",
       );
     }
 
     {
-      const through = "2026-12-01T10:00:00.000Z";
       const { data, error } = await admin.rpc("create_confirmed_extra_stock", {
         p_actor_staff_id: bakeryActor!.id,
         p_cake_name: `Direct ${SIG}`,
         p_size_label: '6"',
-        p_prepared_on: "2026-08-15",
-        p_pickup_through_at: through,
+        p_prepared_on: CONFIRM_PREPARED_ON,
+        p_pickup_available_from_at: CONFIRM_FROM,
+        p_pickup_through_at: CONFIRM_THROUGH,
         p_note: SIG,
       });
       check(!error, "bakery-capable direct create confirmed", rpcMessage(error));
@@ -429,8 +478,9 @@ async function main() {
       const { error } = await admin.rpc("confirm_extra_stock", {
         p_extra_stock_id: id,
         p_actor_staff_id: bakeryActor!.id,
-        p_prepared_on: "2026-08-15",
-        p_pickup_through_at: "2026-12-01T10:00:00.000Z",
+        p_prepared_on: CONFIRM_PREPARED_ON,
+        p_pickup_available_from_at: CONFIRM_FROM,
+        p_pickup_through_at: CONFIRM_THROUGH,
       });
       check(Boolean(error), "reconfirm confirmed denied", rpcMessage(error));
     }

@@ -2,8 +2,12 @@
 
 import { useEffect, useState } from "react";
 import {
+  ORDERS_CLOSED_CUSTOMER_LABEL,
+  customerPickupSlotsForDate,
+  isPickupOrdersClosed,
+} from "@/engines/business-calendar/order-availability";
+import {
   earliestPickupDateYmd,
-  getPickupSlotsForDate,
   normalizePickupTimeValue,
 } from "@/engines/business-calendar/pickup-slots";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form";
@@ -20,6 +24,10 @@ type PickupSlotFieldsProps = {
   onTimeChange?: (time: string) => void;
   dateLabel?: string;
   timeLabel?: string;
+  /** Pickup dates closed for new customer preorders. Staff create omits this. */
+  closedDates?: readonly string[];
+  /** Last selectable pickup date (latest published monthly catalogue). */
+  maxDate?: string;
 };
 
 export function PickupSlotFields({
@@ -34,6 +42,8 @@ export function PickupSlotFields({
   onTimeChange,
   dateLabel = "Pickup date",
   timeLabel = "Pickup time",
+  closedDates = [],
+  maxDate,
 }: PickupSlotFieldsProps) {
   const minDate = earliestPickupDateYmd();
   const [date, setDate] = useState(defaultDate ?? "");
@@ -41,24 +51,28 @@ export function PickupSlotFields({
     defaultTime ? normalizePickupTimeValue(defaultTime) : "",
   );
 
-  const slots = date ? getPickupSlotsForDate(date) : [];
+  const ordersClosed = date
+    ? isPickupOrdersClosed(date, closedDates)
+    : false;
+  const slots = date ? customerPickupSlotsForDate(date, closedDates) : [];
 
   useEffect(() => {
     if (!date || !time) return;
-    const stillValid = getPickupSlotsForDate(date).some(
+    const stillValid = customerPickupSlotsForDate(date, closedDates).some(
       (slot) => slot.value === time,
     );
     if (!stillValid) {
       setTime("");
       onTimeChange?.("");
     }
-  }, [date, time, onTimeChange]);
+  }, [closedDates, date, time, onTimeChange]);
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <FormField htmlFor={dateId} label={dateLabel}>
         <FormInput
           id={dateId}
+          max={maxDate || undefined}
           min={minDate}
           name={dateName}
           onChange={(event) => {
@@ -73,7 +87,7 @@ export function PickupSlotFields({
       </FormField>
       <FormField htmlFor={timeId} label={timeLabel}>
         <FormSelect
-          disabled={!date || slots.length === 0}
+          disabled={!date || slots.length === 0 || ordersClosed}
           id={timeId}
           name={timeName}
           onChange={(event) => {
@@ -81,11 +95,15 @@ export function PickupSlotFields({
             setTime(next);
             onTimeChange?.(next);
           }}
-          required={required}
+          required={required && !ordersClosed}
           value={time}
         >
           <option value="">
-            {date ? "Choose a time" : "Choose a date first"}
+            {ordersClosed
+              ? ORDERS_CLOSED_CUSTOMER_LABEL
+              : date
+                ? "Choose a time"
+                : "Choose a date first"}
           </option>
           {slots.map((slot) => (
             <option key={slot.value} value={slot.value}>
@@ -94,6 +112,11 @@ export function PickupSlotFields({
           ))}
         </FormSelect>
       </FormField>
+      {ordersClosed ? (
+        <p className="text-sm font-medium text-red-800 sm:col-span-2" role="status">
+          {ORDERS_CLOSED_CUSTOMER_LABEL}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -133,15 +133,20 @@ const matrix = buildCalendarMatrix(
       lifecycle: "proposed",
       libraryCakeId: null,
       libraryCakeSizeId: null,
+      pickupAvailableFromAt: null,
       pickupThroughAt: null,
+      validFromYmd: "2026-08-17",
+      validToYmd: "2026-08-17",
     },
   ],
 );
 assert.equal(matrix.length, 1);
 assert.equal(matrix[0]!.cellsByDate["2026-08-17"]!.customers.length, 1);
-assert.equal(matrix[0]!.cellsByDate["2026-08-17"]!.extras.length, 1);
+assert.equal(matrix[0]!.extraSpans.length, 1);
+assert.equal(matrix[0]!.extraSpans[0]!.extra.id, "extra-1");
+assert.equal(matrix[0]!.extraSpans[0]!.columnSpan, 1);
 assert.equal(
-  matrix[0]!.cellsByDate["2026-08-17"]!.extras[0]!.lifecycle,
+  matrix[0]!.extraSpans[0]!.extra.lifecycle,
   "proposed",
 );
 assert.equal(

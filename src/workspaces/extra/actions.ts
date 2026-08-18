@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/foundation/auth/session";
 import { canAccessBakeryWorkspace } from "@/engines/bakery/capabilities";
 import { buildExtraWorkspaceCapabilities } from "@/engines/extra/capabilities";
+import { evaluateExtraConfirm } from "@/engines/extra/fresh-picks-eligibility";
 import { normalizeExtraRejectReason } from "@/engines/extra/reject-reason";
+import { toBusinessDateKey } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import {
   listExtraCakeOptions,
@@ -23,8 +25,27 @@ async function requireExtraStaff() {
 function revalidateExtraPaths() {
   revalidatePath("/bakery");
   revalidatePath("/bakery/extra");
+  revalidatePath("/extra");
+  revalidatePath("/extra", "layout");
+  revalidatePath("/");
   // Calendar shows EXTRA by prepared_on — keep Owner Matrix in sync after propose.
   revalidatePath("/owner/calendar");
+}
+
+function evaluateFreshPickConfirm(input: {
+  pickupFromDate: string;
+  pickupFromSlot: string;
+  cutoffDate: string;
+  cutoffSlot: string;
+}) {
+  return evaluateExtraConfirm({
+    pickupFromDate: input.pickupFromDate,
+    pickupFromSlot: input.pickupFromSlot,
+    cutoffDate: input.cutoffDate,
+    cutoffSlot: input.cutoffSlot,
+    todayYmd: toBusinessDateKey(),
+    now: new Date(),
+  });
 }
 export async function listExtraStockUnitsAction(): Promise<ExtraStockUnit[]> {
   await requireExtraStaff();
@@ -78,8 +99,10 @@ export async function proposeExtraStockAction(
 export type CreateConfirmedExtraInput = {
   cakeName: string;
   sizeLabel: string;
-  preparedOn: string;
-  pickupThroughAt: string;
+  pickupFromDate: string;
+  pickupFromSlot: string;
+  cutoffDate: string;
+  cutoffSlot: string;
   note?: string | null;
   libraryCakeId?: string | null;
   libraryCakeSizeId?: string | null;
@@ -97,13 +120,24 @@ export async function createConfirmedExtraStockAction(
     return { error: "Not authorized to create confirmed EXTRA." };
   }
 
+  const window = evaluateFreshPickConfirm({
+    pickupFromDate: input.pickupFromDate,
+    pickupFromSlot: input.pickupFromSlot,
+    cutoffDate: input.cutoffDate,
+    cutoffSlot: input.cutoffSlot,
+  });
+  if (!window.ok) {
+    return { error: window.error };
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.rpc("create_confirmed_extra_stock", {
     p_actor_staff_id: staff.id,
     p_cake_name: input.cakeName,
     p_size_label: input.sizeLabel,
-    p_prepared_on: input.preparedOn,
-    p_pickup_through_at: input.pickupThroughAt,
+    p_prepared_on: window.preparedOn,
+    p_pickup_available_from_at: window.pickupAvailableFromIso,
+    p_pickup_through_at: window.orderCutoffIso,
     p_note: input.note?.trim() || null,
     p_library_cake_id: input.libraryCakeId || null,
     p_library_cake_size_id: input.libraryCakeSizeId || null,
@@ -118,8 +152,10 @@ export async function createConfirmedExtraStockAction(
 
 export type ConfirmExtraInput = {
   extraStockId: string;
-  preparedOn: string;
-  pickupThroughAt: string;
+  pickupFromDate: string;
+  pickupFromSlot: string;
+  cutoffDate: string;
+  cutoffSlot: string;
   note?: string | null;
 };
 
@@ -135,13 +171,49 @@ export async function confirmExtraStockAction(
     return { error: "Not authorized to confirm EXTRA." };
   }
 
+  const window = evaluateFreshPickConfirm({
+    pickupFromDate: input.pickupFromDate,
+    pickupFromSlot: input.pickupFromSlot,
+    cutoffDate: input.cutoffDate,
+    cutoffSlot: input.cutoffSlot,
+  });
+  if (!window.ok) {
+    return { error: window.error };
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.rpc("confirm_extra_stock", {
     p_extra_stock_id: input.extraStockId,
     p_actor_staff_id: staff.id,
-    p_prepared_on: input.preparedOn,
-    p_pickup_through_at: input.pickupThroughAt,
+    p_prepared_on: window.preparedOn,
+    p_pickup_available_from_at: window.pickupAvailableFromIso,
+    p_pickup_through_at: window.orderCutoffIso,
     p_note: input.note?.trim() || null,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+  revalidateExtraPaths();
+  return { error: null };
+}
+
+export async function unconfirmExtraStockAction(
+  extraStockId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireExtraStaff();
+  const caps = buildExtraWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canUnconfirmExtra) {
+    return { error: "Not authorized to undo EXTRA availability." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("unconfirm_extra_stock", {
+    p_extra_stock_id: extraStockId,
+    p_actor_staff_id: staff.id,
   });
 
   if (error) {

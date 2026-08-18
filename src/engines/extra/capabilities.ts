@@ -21,6 +21,11 @@ export type ExtraWorkspaceCapabilities = {
   canRejectExtra: boolean;
   /** Bakery final authority: restore rejected EXTRA to proposed. */
   canUndoRejectExtra: boolean;
+  /**
+   * Bakery final authority: revoke a confirmed Fresh Pick back to proposed.
+   * Does not delete the Library cake; does not write rejected (Past).
+   */
+  canUnconfirmExtra: boolean;
   /** Bakery direct-create confirmed Available stock. */
   canCreateConfirmedExtra: boolean;
 };
@@ -43,6 +48,7 @@ export function buildExtraWorkspaceCapabilities(input: {
     canConfirmExtra: canMutate,
     canRejectExtra: canMutate,
     canUndoRejectExtra: canMutate,
+    canUnconfirmExtra: canMutate,
     canCreateConfirmedExtra: canMutate,
   };
 }

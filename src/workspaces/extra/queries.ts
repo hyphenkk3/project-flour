@@ -2,6 +2,7 @@ import {
   isExtraAvailable,
   type ExtraLifecycle,
 } from "@/engines/extra/availability";
+import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
 import { createClient } from "@/lib/supabase/server";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
 
@@ -13,7 +14,9 @@ type ExtraStockRow = {
   library_cake_id: string | null;
   library_cake_size_id: string | null;
   prepared_on: string | null;
+  pickup_available_from_at: string | null;
   pickup_through_at: string | null;
+  sold_at: string | null;
   note: string | null;
   proposed_at: string;
   proposed_by: string;
@@ -35,7 +38,9 @@ const EXTRA_SELECT = `
   library_cake_id,
   library_cake_size_id,
   prepared_on,
+  pickup_available_from_at,
   pickup_through_at,
+  sold_at,
   note,
   proposed_at,
   proposed_by,
@@ -69,7 +74,9 @@ export function mapExtraStockRow(
     libraryCakeId: row.library_cake_id,
     libraryCakeSizeId: row.library_cake_size_id,
     preparedOn: row.prepared_on,
+    pickupAvailableFromAt: row.pickup_available_from_at,
     pickupThroughAt: row.pickup_through_at,
+    soldAt: row.sold_at,
     note: row.note,
     proposedAt: row.proposed_at,
     proposedBy: row.proposed_by,
@@ -84,6 +91,7 @@ export function mapExtraStockRow(
     available: isExtraAvailable({
       lifecycle: row.lifecycle,
       pickupThroughAt: row.pickup_through_at,
+      soldAt: row.sold_at,
       now,
     }),
   };
@@ -148,8 +156,9 @@ export async function listExtraCakeOptions(): Promise<ExtraCakeOption[]> {
   return ((data ?? []) as CakeRow[]).map((cake) => ({
     id: cake.id,
     name: cake.name,
-    sizes: [...(cake.library_cake_sizes ?? [])]
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map((size) => ({ id: size.id, label: size.label })),
+    sizes: sortCakeSizesByNumericLabel(
+      cake.library_cake_sizes ?? [],
+      (size) => size.label,
+    ).map((size) => ({ id: size.id, label: size.label })),
   }));
 }

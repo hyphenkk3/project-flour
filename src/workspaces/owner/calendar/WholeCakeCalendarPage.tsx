@@ -61,7 +61,7 @@ export async function WholeCakeCalendarPage({
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <PageHeader
-          description="Production scan by fulfilment date. Matrix is cake×date density; EXTRA appears on prepared_on. Cakes and Orders remain available."
+          description="Production scan by fulfilment date. Matrix is cake×date density; each EXTRA spans its pickup validity range. Cakes and Orders remain available."
           title="Whole Cake Calendar"
         />
         <Link

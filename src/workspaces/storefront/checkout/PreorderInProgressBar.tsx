@@ -11,8 +11,8 @@ import {
 } from "@/workspaces/storefront/checkout/preorder-draft";
 
 /**
- * Subtle in-progress preorder indicator for Collection / Cake Detail.
- * Client-only — draft lives in sessionStorage.
+ * Subtle in-progress preorder indicator for Browse / Collection / Cake Detail.
+ * Continues at checkout. Client-only — draft lives in sessionStorage.
  */
 export function PreorderInProgressBar() {
   const [summary, setSummary] = useState<{
@@ -50,7 +50,7 @@ export function PreorderInProgressBar() {
     <div className="border-fog mb-6 rounded-xl border bg-white px-4 py-3">
       <Link
         className="text-ink hover:text-signal flex flex-wrap items-center justify-between gap-2 text-sm"
-        href="/order"
+        href="/order/checkout"
       >
         <span className="font-medium">Your Preorder · {cakeLabel}</span>
         <span className="text-skyline tabular-nums">

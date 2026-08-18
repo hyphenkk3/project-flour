@@ -1,5 +1,6 @@
 import { requireStaff } from "@/foundation/auth/session";
 import { buildExtraWorkspaceCapabilities } from "@/engines/extra/capabilities";
+import { toBusinessDateKey } from "@/lib/dates";
 import { BakeryWorkspaceNav } from "@/workspaces/bakery/BakeryWorkspaceNav";
 import { ExtraBoard } from "@/workspaces/extra/ExtraBoard";
 import {
@@ -39,6 +40,7 @@ export default async function BakeryExtraPage({
         cakes={cakes}
         capabilities={capabilities}
         initialMode={initialMode}
+        todayYmd={toBusinessDateKey()}
         units={units}
       />
     </>

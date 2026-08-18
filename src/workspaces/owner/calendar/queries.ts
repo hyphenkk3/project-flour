@@ -11,6 +11,7 @@ import type {
 import { guestOrderDisplayName } from "@/workspaces/owner/orders/labels";
 import {
   mapExtraStockRowToCalendarMarker,
+  extraCalendarRangeOverlaps,
   type CalendarExtraMarker,
 } from "@/engines/extra/calendar-visibility";
 import type {
@@ -246,7 +247,7 @@ export async function listCalendarEntriesForPickupRange(
 
 /**
  * Active EXTRA markers for Whole Cake Calendar.
- * Placement date = prepared_on. Rejected / null prepared_on / expired confirmed excluded.
+ * Validity range overlaps the visible window (not prepared_on-only placement).
  */
 export async function listCalendarExtraMarkersForPreparedRange(
   fromYmd: string,
@@ -256,12 +257,14 @@ export async function listCalendarExtraMarkersForPreparedRange(
   const { data, error } = await supabase
     .from("extra_stock")
     .select(
-      "id, cake_name, size_label, lifecycle, prepared_on, pickup_through_at, library_cake_id, library_cake_size_id",
+      "id, cake_name, size_label, lifecycle, prepared_on, pickup_available_from_at, pickup_through_at, library_cake_id, library_cake_size_id",
     )
     .in("lifecycle", ["proposed", "confirmed"])
     .not("prepared_on", "is", null)
-    .gte("prepared_on", fromYmd)
     .lte("prepared_on", toYmd)
+    .or(
+      `lifecycle.eq.proposed,pickup_through_at.gte.${fromYmd}T00:00:00+08:00,pickup_through_at.is.null`,
+    )
     .order("prepared_on", { ascending: true })
     .order("cake_name", { ascending: true });
 
@@ -272,7 +275,9 @@ export async function listCalendarExtraMarkersForPreparedRange(
   const markers: CalendarExtraMarker[] = [];
   for (const row of data ?? []) {
     const marker = mapExtraStockRowToCalendarMarker(row);
-    if (marker) markers.push(marker);
+    if (marker && extraCalendarRangeOverlaps(marker, fromYmd, toYmd)) {
+      markers.push(marker);
+    }
   }
   return markers;
 }

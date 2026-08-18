@@ -1,6 +1,9 @@
 /**
  * EXTRA Activation v1 — derived availability.
- * Inclusive cutoff: available while now <= pickup_through_at.
+ *
+ * `pickup_through_at` is the ORDER CUTOFF (new-order window), not last pickup.
+ * Inclusive cutoff: new orders while now <= pickup_through_at.
+ * Sold (`sold_at`) is independent and hides the Extra without becoming Past.
  */
 
 export type ExtraLifecycle = "proposed" | "confirmed" | "rejected";
@@ -34,9 +37,11 @@ export function bakeryExtraProposalsAwaitingReviewLabel(count: number): string {
 export function isExtraAvailable(input: {
   lifecycle: ExtraLifecycle;
   pickupThroughAt: string | null;
+  soldAt?: string | null;
   now?: Date;
 }): boolean {
   if (input.lifecycle !== "confirmed") return false;
+  if (input.soldAt) return false;
   if (!input.pickupThroughAt) return false;
   const throughMs = Date.parse(input.pickupThroughAt);
   if (!Number.isFinite(throughMs)) return false;
@@ -47,9 +52,16 @@ export function isExtraAvailable(input: {
 export function isExtraExpiredConfirmed(input: {
   lifecycle: ExtraLifecycle;
   pickupThroughAt: string | null;
+  soldAt?: string | null;
   now?: Date;
 }): boolean {
   if (input.lifecycle !== "confirmed") return false;
+  if (input.soldAt) return false;
   if (!input.pickupThroughAt) return false;
-  return !isExtraAvailable(input);
+  return !isExtraAvailable({
+    lifecycle: input.lifecycle,
+    pickupThroughAt: input.pickupThroughAt,
+    soldAt: input.soldAt,
+    now: input.now,
+  });
 }

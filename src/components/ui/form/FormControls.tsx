@@ -153,6 +153,57 @@ export function FormCheckbox({
   );
 }
 
+type FormRadioOption = {
+  value: string;
+  label: string;
+};
+
+type FormRadioGroupProps = {
+  name: string;
+  legend: string;
+  help?: string;
+  value: string;
+  required?: boolean;
+  options: readonly FormRadioOption[];
+  onChange: (value: string) => void;
+};
+
+export function FormRadioGroup({
+  name,
+  legend,
+  help,
+  value,
+  required = false,
+  options,
+  onChange,
+}: FormRadioGroupProps) {
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-ink text-sm font-medium">{legend}</legend>
+      {help ? <p className={formStyles.helpClass}>{help}</p> : null}
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map((option, index) => (
+          <label
+            className="border-fog text-ink flex min-h-12 items-center gap-3 rounded-lg border bg-white px-3 text-sm"
+            key={option.value}
+          >
+            <input
+              checked={value === option.value}
+              className="size-4 accent-[var(--color-signal)]"
+              name={name}
+              onChange={() => onChange(option.value)}
+              required={required && index === 0}
+              type="radio"
+              value={option.value}
+            />
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 type FormSubmitButtonProps = {
   children: ReactNode;
   pending?: boolean;

@@ -4,6 +4,7 @@ export {
   FormError,
   FormField,
   FormInput,
+  FormRadioGroup,
   FormSelect,
   FormSubmitButton,
   FormTextarea,

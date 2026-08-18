@@ -1,26 +1,19 @@
+import type { LibraryCakeCategory } from "@/types/library-cake";
+
 export type GuestOrderStatus =
-  | "submitted"
-  | "pending_confirmation"
-  | "awaiting_payment"
-  | "paid";
+  "submitted" | "pending_confirmation" | "awaiting_payment" | "paid";
 
 /** Guest Owner fulfilment methods (DB also has drive_through). */
 export type StorefrontOrderFulfilmentMethod =
-  | "pickup"
-  | "delivery"
-  | "drive_through";
+  "pickup" | "delivery" | "drive_through";
 
 /** Explicit Delivery recipient-notify preference (not customer messaging consent). */
 export type RecipientNotifyPreference =
-  | "inform_recipient"
-  | "do_not_inform_recipient";
+  "inform_recipient" | "do_not_inform_recipient";
 
 /** M4-P3 fee exception request lifecycle (independent per charge category). */
 export type DeliveryFeeRequestStatus =
-  | "pending"
-  | "approved"
-  | "rejected"
-  | "cancelled";
+  "pending" | "approved" | "rejected" | "cancelled";
 
 /** Pending/resolved Delivery Fee waiver request (independent of Processing). */
 export type StorefrontDeliveryFeeRequest = {
@@ -104,9 +97,7 @@ export type OrderSource =
   | "other";
 
 export type Rm10IssuanceSuppressionCode =
-  | "august_promo_applied"
-  | "rm10_voucher_redeemed";
-
+  "august_promo_applied" | "rm10_voucher_redeemed";
 
 export type OrderPaymentAllocationView = {
   id: string;
@@ -150,7 +141,7 @@ export type OrderSettlement = {
 export type StorefrontCollection = {
   id: string;
   name: string;
-  month: string;
+  month: string | null;
 };
 
 export type StorefrontCakeSize = {
@@ -161,11 +152,18 @@ export type StorefrontCakeSize = {
   sortOrder: number;
 };
 
+export type StorefrontCakePhoto = {
+  url: string;
+  altText: string | null;
+};
+
 export type StorefrontCake = {
   id: string;
   name: string;
   description: string | null;
+  category: LibraryCakeCategory | null;
   image: string | null;
+  photos: StorefrontCakePhoto[];
   sharingGuide: string | null;
   allergens: string[];
   sizes: StorefrontCakeSize[];
@@ -442,4 +440,10 @@ export type ConfirmationPayload = {
   }>;
   /** Authoritative settlement amount due (when present). */
   amountDue?: number;
+  /**
+   * Physical receipt attached at pickup (`orders.include_receipt`).
+   * Optional for historical snapshots; missing/false omits `*Include RECEIPT`.
+   * Independent of email submission copy.
+   */
+  includeReceipt?: boolean;
 };

@@ -9,6 +9,10 @@ import {
   formatPickupClockLabel,
   getEffectivePickupSchedule,
 } from "@/engines/business-calendar/pickup-schedule";
+import {
+  addBusinessCalendarDays,
+  toBusinessDateKey,
+} from "@/lib/dates";
 
 export type PickupSlot = {
   /** 24-hour time, e.g. "12:00" or "17:30" */
@@ -58,8 +62,8 @@ export function isValidClockPickupTime(timeValue: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(normalized);
 }
 
+/** Tomorrow in Asia/Singapore — same earliest date as website checkout HTML min. */
 export function earliestPickupDateYmd(from = new Date()): string {
-  const next = new Date(from);
-  next.setDate(next.getDate() + 1);
-  return `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}`;
+  const todaySg = toBusinessDateKey(from);
+  return addBusinessCalendarDays(todaySg, 1) ?? todaySg;
 }

@@ -1,4 +1,7 @@
-import type { CalendarExtraMarker } from "@/engines/extra/calendar-visibility";
+import {
+  clipExtraCalendarSpan,
+  type CalendarExtraMarker,
+} from "@/engines/extra/calendar-visibility";
 import type { CalendarEntry } from "@/workspaces/owner/calendar/types";
 
 export type MatrixCustomerEntry = {
@@ -20,8 +23,15 @@ export type MatrixCustomerEntry = {
 export type MatrixCell = {
   totalQuantity: number;
   customers: MatrixCustomerEntry[];
-  /** EXTRA units placed by prepared_on (not order customers). */
-  extras: CalendarExtraMarker[];
+};
+
+/** One physical EXTRA rendered as a single spanning bar across date columns. */
+export type MatrixExtraSpan = {
+  extra: CalendarExtraMarker;
+  startYmd: string;
+  endYmd: string;
+  startColumnIndex: number;
+  columnSpan: number;
 };
 
 export type MatrixRow = {
@@ -30,6 +40,8 @@ export type MatrixRow = {
   sizeLabel: string;
   label: string;
   cellsByDate: Record<string, MatrixCell>;
+  /** Same underlying extra_stock id — never duplicated per date cell. */
+  extraSpans: MatrixExtraSpan[];
 };
 
 function rowKey(cakeName: string, sizeLabel: string): string {
@@ -69,10 +81,12 @@ function compareCustomers(a: MatrixCustomerEntry, b: MatrixCustomerEntry): numbe
   });
 }
 
-function compareExtras(a: CalendarExtraMarker, b: CalendarExtraMarker): number {
-  const lifeCmp = a.lifecycle.localeCompare(b.lifecycle);
+function compareExtraSpans(a: MatrixExtraSpan, b: MatrixExtraSpan): number {
+  const lifeCmp = a.extra.lifecycle.localeCompare(b.extra.lifecycle);
   if (lifeCmp !== 0) return lifeCmp;
-  return a.id.localeCompare(b.id);
+  const fromCmp = a.startYmd.localeCompare(b.startYmd);
+  if (fromCmp !== 0) return fromCmp;
+  return a.extra.id.localeCompare(b.extra.id);
 }
 
 function ensureRow(
@@ -89,6 +103,7 @@ function ensureRow(
       sizeLabel,
       label: `${cakeName} ${sizeLabel}`,
       cellsByDate: {},
+      extraSpans: [],
     };
     rows.set(key, row);
   }
@@ -98,7 +113,7 @@ function ensureRow(
 function ensureCell(row: MatrixRow, ymd: string): MatrixCell {
   let cell = row.cellsByDate[ymd];
   if (!cell) {
-    cell = { totalQuantity: 0, customers: [], extras: [] };
+    cell = { totalQuantity: 0, customers: [] };
     row.cellsByDate[ymd] = cell;
   }
   return cell;
@@ -106,8 +121,7 @@ function ensureCell(row: MatrixRow, ymd: string): MatrixCell {
 
 /**
  * Build Matrix rows from guest CalendarEntry month data + EXTRA markers.
- * Orders place on pickup_date; EXTRA places on prepared_on only.
- * Only includes dates in `dateYmids` (selected month).
+ * Orders place on pickup_date. Each EXTRA is one span across its validity range.
  */
 export function buildCalendarMatrix(
   entries: CalendarEntry[],
@@ -156,25 +170,30 @@ export function buildCalendarMatrix(
   }
 
   for (const extra of extras) {
-    if (!dateSet.has(extra.preparedOn)) continue;
+    const span = clipExtraCalendarSpan(extra, dateYmids);
+    if (!span) continue;
     const cakeName = extra.cakeName.trim() || "Cake";
     const sizeLabel = extra.sizeLabel.trim() || "Size";
     const row = ensureRow(rows, cakeName, sizeLabel);
-    const cell = ensureCell(row, extra.preparedOn);
-    cell.extras.push(extra);
+    row.extraSpans.push(span);
   }
 
   const result = Array.from(rows.values()).sort(compareRows);
   for (const row of result) {
     for (const cell of Object.values(row.cellsByDate)) {
       cell.customers.sort(compareCustomers);
-      cell.extras.sort(compareExtras);
     }
+    row.extraSpans.sort(compareExtraSpans);
   }
   return result;
 }
 
 export function matrixCellHasContent(cell: MatrixCell | undefined): boolean {
   if (!cell) return false;
-  return cell.totalQuantity > 0 || cell.extras.length > 0;
+  return cell.totalQuantity > 0;
+}
+
+export function matrixRowHasContent(row: MatrixRow): boolean {
+  if (row.extraSpans.length > 0) return true;
+  return Object.values(row.cellsByDate).some(matrixCellHasContent);
 }

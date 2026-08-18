@@ -6,6 +6,7 @@ const PUBLIC_PATHS = new Set([
   "/",
   "/login",
   "/browse",
+  "/extra",
   "/order",
   "/order/success",
 ]);
@@ -16,6 +17,7 @@ function isPublicPath(pathname: string) {
     pathname.startsWith("/browse/") ||
     pathname.startsWith("/cakes/") ||
     pathname.startsWith("/order/") ||
+    pathname.startsWith("/extra/") ||
     pathname.startsWith("/preview")
   );
 }

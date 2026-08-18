@@ -1,12 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
 import { CalendarGuide } from "@/workspaces/owner/calendar/CalendarGuide";
 import type { CalendarExtraMarker } from "@/engines/extra/calendar-visibility";
 import {
   buildCalendarMatrix,
   matrixCellHasContent,
+  matrixRowHasContent,
+  type MatrixExtraSpan,
+  type MatrixRow,
 } from "@/workspaces/owner/calendar/matrix";
 import type { CalendarDayCell } from "@/workspaces/owner/calendar/month-grid";
 import { singaporeTodayParts } from "@/workspaces/owner/calendar/month-grid";
@@ -122,6 +125,106 @@ export function focusMatrixTodayColumn() {
   const today = singaporeTodayParts();
   scrollMatrixToInitialPosition(container, today.year, today.month);
   rememberScroll(today.year, today.month, container.scrollLeft);
+}
+
+function extraSpanTitle(span: MatrixExtraSpan): string {
+  const { extra } = span;
+  const range =
+    span.startYmd === span.endYmd
+      ? span.startYmd
+      : `${span.startYmd} → ${span.endYmd}`;
+  return `EXTRA ${extra.lifecycle} · ${range} · ${extra.id}`;
+}
+
+function ExtraSpanBadge({
+  span,
+  totalsMode,
+}: {
+  span: MatrixExtraSpan;
+  totalsMode: boolean;
+}) {
+  const { extra } = span;
+  return (
+    <span
+      className={[
+        "border-line/70 text-ink flex w-full min-w-0 items-center gap-1 rounded border px-1 py-0.5 text-left leading-snug",
+        extra.lifecycle === "proposed" ? "bg-mist" : "bg-status-info-soft/50",
+      ].join(" ")}
+      data-extra-id={extra.id}
+      title={extraSpanTitle(span)}
+    >
+      <span className="text-[9px] font-semibold tracking-wide uppercase">
+        EXTRA
+      </span>
+      <span className="text-[10px] font-medium">
+        {totalsMode
+          ? "×1"
+          : extra.lifecycle === "proposed"
+            ? "proposed"
+            : "confirmed"}
+      </span>
+    </span>
+  );
+}
+
+function renderExtraSpanRow(
+  row: MatrixRow,
+  columns: CalendarDayCell[],
+  mode: CalendarMatrixMode,
+) {
+  if (row.extraSpans.length === 0) return null;
+
+  return row.extraSpans.map((span) => {
+    const cells: ReactNode[] = [];
+    let colIndex = 0;
+    while (colIndex < columns.length) {
+      const col = columns[colIndex]!;
+      if (span.startColumnIndex === colIndex) {
+        cells.push(
+          <td
+            className={[
+              "border-line/40 align-top border-b px-1.5 py-0.5",
+              col.isToday ? "bg-status-info-soft/30" : "bg-white",
+            ].join(" ")}
+            colSpan={span.columnSpan}
+            key={`${row.key}:extra:${span.extra.id}:${col.ymd}`}
+            style={{
+              minWidth: `calc(${DATE_COL_WIDTH} * ${span.columnSpan})`,
+            }}
+          >
+            <ExtraSpanBadge span={span} totalsMode={mode === "totals"} />
+          </td>,
+        );
+        colIndex += span.columnSpan;
+        continue;
+      }
+      cells.push(
+        <td
+          className={[
+            "border-line/40 border-b",
+            col.isToday ? "bg-status-info-soft/30" : "bg-white",
+          ].join(" ")}
+          key={`${row.key}:extra-pad:${span.extra.id}:${col.ymd}`}
+          style={{ minWidth: DATE_COL_WIDTH, width: DATE_COL_WIDTH }}
+        />,
+      );
+      colIndex += 1;
+    }
+
+    return (
+      <tr key={`${row.key}:extra-span:${span.extra.id}`}>
+        <th
+          className="border-line/50 bg-white text-skyline sticky left-0 z-10 border-r border-b px-2 py-0.5 text-left text-[10px] font-normal"
+          scope="row"
+          style={{
+            minWidth: LABEL_COL_WIDTH,
+            width: LABEL_COL_WIDTH,
+          }}
+        />
+        {cells}
+      </tr>
+    );
+  });
 }
 
 export function CalendarMatrixView({
@@ -256,125 +359,99 @@ export function CalendarMatrixView({
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
-                <tr key={row.key}>
-                  <th
-                    className="border-line/50 bg-white text-ink sticky left-0 z-10 border-r border-b px-2 py-1.5 text-left font-medium"
-                    scope="row"
-                    style={{
-                      minWidth: LABEL_COL_WIDTH,
-                      width: LABEL_COL_WIDTH,
-                    }}
-                    title={row.label}
-                  >
-                    <span className="block leading-snug">{row.cakeName}</span>
-                    <span className="text-skyline block text-[10px] font-normal">
-                      {row.sizeLabel}
-                    </span>
-                  </th>
-                  {columns.map((col) => {
-                    const cell = row.cellsByDate[col.ymd];
-                    const hasContent = matrixCellHasContent(cell);
-                    return (
-                      <td
-                        className={[
-                          "border-line/40 align-top border-b px-1.5 py-1",
-                          col.isToday ? "bg-status-info-soft/30" : "bg-white",
-                        ].join(" ")}
-                        key={`${row.key}:${col.ymd}`}
-                        style={{
-                          minWidth: DATE_COL_WIDTH,
-                          width: DATE_COL_WIDTH,
-                        }}
-                      >
-                        {!hasContent ? (
-                          <span className="text-zinc-300">—</span>
-                        ) : mode === "totals" ? (
-                          <div className="space-y-0.5">
-                            {cell && cell.totalQuantity > 0 ? (
-                              <span className="text-ink font-medium">
-                                ×{cell.totalQuantity}
-                              </span>
-                            ) : null}
-                            {(cell?.extras.length ?? 0) > 0 ? (
-                              <span className="text-skyline block text-[10px] font-medium tracking-wide uppercase">
-                                EXTRA ×{cell!.extras.length}
-                              </span>
-                            ) : null}
-                          </div>
-                        ) : (
-                          <ul className="space-y-0.5">
-                            {(cell?.customers ?? []).map((customer) => {
-                              const nameWithMarker = withOperationalMarker(
-                                customer.displayName,
-                                {
-                                  readyAt: customer.readyAt,
-                                  pickedUpAt: customer.pickedUpAt,
-                                  outForDeliveryAt: customer.outForDeliveryAt,
-                                  deliveredAt: customer.deliveredAt,
-                                  fulfilmentMethod: customer.fulfilmentMethod,
-                                },
-                              );
-                              const label =
-                                customer.quantity > 1
-                                  ? `${nameWithMarker} ×${customer.quantity}`
-                                  : nameWithMarker;
-                              return (
-                                <li key={customer.orderId}>
-                                  <button
-                                    className={[
-                                      guestOrderStatusTextClass(customer.status),
-                                      customer.needsBakeryAttention
-                                        ? "font-bold"
-                                        : "",
-                                      customer.hasEffectiveRm10
-                                        ? "line-through"
-                                        : "",
-                                      calendarFulfilmentBackgroundClass(
-                                        customer.fulfilmentMethod,
-                                      ),
-                                      "block w-full cursor-pointer text-left leading-snug hover:underline",
-                                    ].join(" ")}
-                                    onClick={() =>
-                                      onOpenQuickView(customer.orderId)
-                                    }
-                                    title={label}
-                                    type="button"
-                                  >
-                                    {label}
-                                  </button>
-                                </li>
-                              );
-                            })}
-                            {(cell?.extras ?? []).map((extra) => (
-                              <li key={extra.id}>
-                                <span
-                                  className={[
-                                    "border-line/70 text-ink inline-flex max-w-full items-center gap-1 rounded border px-1 py-0.5 text-left leading-snug",
-                                    extra.lifecycle === "proposed"
-                                      ? "bg-mist"
-                                      : "bg-status-info-soft/50",
-                                  ].join(" ")}
-                                  title={`EXTRA ${extra.lifecycle} · prepared ${extra.preparedOn}`}
-                                >
-                                  <span className="text-[9px] font-semibold tracking-wide uppercase">
-                                    EXTRA
-                                  </span>
-                                  <span className="text-[10px] font-medium">
-                                    {extra.lifecycle === "proposed"
-                                      ? "proposed"
-                                      : "confirmed"}
-                                  </span>
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))
+              rows.flatMap((row) => {
+                if (!matrixRowHasContent(row)) return [];
+                const customerRow = (
+                  <tr key={row.key}>
+                    <th
+                      className="border-line/50 bg-white text-ink sticky left-0 z-10 border-r border-b px-2 py-1.5 text-left font-medium"
+                      scope="row"
+                      style={{
+                        minWidth: LABEL_COL_WIDTH,
+                        width: LABEL_COL_WIDTH,
+                      }}
+                      title={row.label}
+                    >
+                      <span className="block leading-snug">{row.cakeName}</span>
+                      <span className="text-skyline block text-[10px] font-normal">
+                        {row.sizeLabel}
+                      </span>
+                    </th>
+                    {columns.map((col) => {
+                      const cell = row.cellsByDate[col.ymd];
+                      const hasContent = matrixCellHasContent(cell);
+                      return (
+                        <td
+                          className={[
+                            "border-line/40 align-top border-b px-1.5 py-1",
+                            col.isToday ? "bg-status-info-soft/30" : "bg-white",
+                          ].join(" ")}
+                          key={`${row.key}:${col.ymd}`}
+                          style={{
+                            minWidth: DATE_COL_WIDTH,
+                            width: DATE_COL_WIDTH,
+                          }}
+                        >
+                          {!hasContent ? (
+                            <span className="text-zinc-300">—</span>
+                          ) : mode === "totals" ? (
+                            <span className="text-ink font-medium">
+                              ×{cell!.totalQuantity}
+                            </span>
+                          ) : (
+                            <ul className="space-y-0.5">
+                              {(cell?.customers ?? []).map((customer) => {
+                                const nameWithMarker = withOperationalMarker(
+                                  customer.displayName,
+                                  {
+                                    readyAt: customer.readyAt,
+                                    pickedUpAt: customer.pickedUpAt,
+                                    outForDeliveryAt: customer.outForDeliveryAt,
+                                    deliveredAt: customer.deliveredAt,
+                                    fulfilmentMethod: customer.fulfilmentMethod,
+                                  },
+                                );
+                                const label =
+                                  customer.quantity > 1
+                                    ? `${nameWithMarker} ×${customer.quantity}`
+                                    : nameWithMarker;
+                                return (
+                                  <li key={customer.orderId}>
+                                    <button
+                                      className={[
+                                        guestOrderStatusTextClass(customer.status),
+                                        customer.needsBakeryAttention
+                                          ? "font-bold"
+                                          : "",
+                                        customer.hasEffectiveRm10
+                                          ? "line-through"
+                                          : "",
+                                        calendarFulfilmentBackgroundClass(
+                                          customer.fulfilmentMethod,
+                                        ),
+                                        "block w-full cursor-pointer text-left leading-snug hover:underline",
+                                      ].join(" ")}
+                                      onClick={() =>
+                                        onOpenQuickView(customer.orderId)
+                                      }
+                                      title={label}
+                                      type="button"
+                                    >
+                                      {label}
+                                    </button>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+                const extraRows = renderExtraSpanRow(row, columns, mode);
+                return [customerRow, ...(extraRows ?? [])];
+              })
             )}
           </tbody>
         </table>

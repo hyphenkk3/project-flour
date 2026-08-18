@@ -61,6 +61,28 @@ assert.equal(
 );
 
 assert.equal(
+  isExtraAvailable({
+    lifecycle: "confirmed",
+    pickupThroughAt: through,
+    soldAt: "2026-08-15T14:00:00.000Z",
+    now: new Date("2026-08-15T14:00:00.000Z"),
+  }),
+  false,
+  "sold Extra is not newly orderable",
+);
+
+assert.equal(
+  isExtraExpiredConfirmed({
+    lifecycle: "confirmed",
+    pickupThroughAt: through,
+    soldAt: "2026-08-15T14:00:00.000Z",
+    now: new Date("2026-08-15T14:00:00.000Z"),
+  }),
+  false,
+  "sold Extra is not Past",
+);
+
+assert.equal(
   isExtraExpiredConfirmed({
     lifecycle: "confirmed",
     pickupThroughAt: through,
@@ -84,6 +106,7 @@ for (const role of ["bakery", "manager", "owner"] as const) {
   assert.equal(caps.canConfirmExtra, true, `${role} confirm`);
   assert.equal(caps.canRejectExtra, true, `${role} reject`);
   assert.equal(caps.canUndoRejectExtra, true, `${role} undo reject`);
+  assert.equal(caps.canUnconfirmExtra, true, `${role} unconfirm`);
   assert.equal(caps.canCreateConfirmedExtra, true, `${role} create confirmed`);
   assert.equal(canAccessBakeryWorkspace(role), true);
 }
@@ -98,6 +121,7 @@ for (const role of ["collection", "customer_operations"] as const) {
   assert.equal(caps.canConfirmExtra, false);
   assert.equal(caps.canRejectExtra, false);
   assert.equal(caps.canUndoRejectExtra, false);
+  assert.equal(caps.canUnconfirmExtra, false);
   assert.equal(caps.canCreateConfirmedExtra, false);
 }
 

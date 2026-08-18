@@ -10,7 +10,14 @@ export type ExtraStockUnit = {
   libraryCakeId: string | null;
   libraryCakeSizeId: string | null;
   preparedOn: string | null;
+  /** Earliest customer pickup instant. */
+  pickupAvailableFromAt: string | null;
+  /**
+   * ORDER CUTOFF (`pickup_through_at` column).
+   * Latest time a NEW customer may order — not last pickup.
+   */
   pickupThroughAt: string | null;
+  soldAt: string | null;
   note: string | null;
   proposedAt: string;
   proposedBy: string;
@@ -22,7 +29,7 @@ export type ExtraStockUnit = {
   rejectedBy: string | null;
   rejectedByName: string | null;
   rejectReason: string | null;
-  /** Derived: confirmed && now <= pickup_through_at */
+  /** Derived: confirmed, unsold, now <= order cutoff. */
   available: boolean;
 };
 

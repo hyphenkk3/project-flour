@@ -5,8 +5,8 @@ import type {
 
 /**
  * Slim Whole Cake Calendar guest-order read model.
- * EXTRA physical stock is a parallel CalendarExtraMarker list (prepared_on),
- * not fake orders — see engines/extra/calendar-visibility.ts.
+ * EXTRA physical stock is a parallel CalendarExtraMarker list spanning its
+ * pickup validity range, not fake orders — see engines/extra/calendar-visibility.ts.
  */
 export type CalendarEntryKind = "order";
 

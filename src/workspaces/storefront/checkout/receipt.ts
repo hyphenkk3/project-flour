@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { calculateOrderTotal } from "@/engines/orders/totals";
 
@@ -16,11 +17,60 @@ export type GuestPreorderReceipt = {
   total: number;
 };
 
+/** httpOnly cookie bound to the just-submitted guest order. Path-scoped to /order. */
+export const GUEST_PREORDER_RECEIPT_COOKIE = "wb_guest_preorder_receipt";
+const RECEIPT_COOKIE_MAX_AGE_SECONDS = 60 * 60;
+
+export function guestPreorderReceiptAuthorized(
+  orderId: string,
+  cookieOrderId: string | null | undefined,
+): boolean {
+  if (!orderId || !cookieOrderId) return false;
+  return orderId === cookieOrderId;
+}
+
+export async function setGuestPreorderReceiptCookie(
+  orderId: string,
+): Promise<void> {
+  const store = await cookies();
+  store.set({
+    name: GUEST_PREORDER_RECEIPT_COOKIE,
+    value: orderId,
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: RECEIPT_COOKIE_MAX_AGE_SECONDS,
+    path: "/order",
+  });
+}
+
 /**
- * Thank-you page receipt for a just-submitted guest preorder.
- * Uses service role so anon customers can see their own recap by order id.
+ * Thank-you recap. Requires the submit cookie for `orderId`.
+ * Never loads another guest order from a bare UUID.
  */
 export async function getGuestPreorderReceipt(
+  orderId: string,
+  cookieOrderId?: string | null,
+): Promise<GuestPreorderReceipt | null> {
+  if (!orderId) return null;
+
+  let allowed = cookieOrderId;
+  if (allowed === undefined) {
+    const store = await cookies();
+    allowed = store.get(GUEST_PREORDER_RECEIPT_COOKIE)?.value ?? null;
+  }
+  if (!guestPreorderReceiptAuthorized(orderId, allowed)) {
+    return null;
+  }
+
+  return loadGuestPreorderReceipt(orderId);
+}
+
+/**
+ * Loads a guest preorder recap by id (no cookie check).
+ * Used only after `guestPreorderReceiptAuthorized`.
+ */
+export async function loadGuestPreorderReceipt(
   orderId: string,
 ): Promise<GuestPreorderReceipt | null> {
   if (!orderId) return null;
