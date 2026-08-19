@@ -1,6 +1,7 @@
 import type { CalendarEntry } from "@/workspaces/owner/calendar/types";
 import {
   CALENDAR_FULFILMENT_DELIVERY_BG_CLASS,
+  CALENDAR_FULFILMENT_DINE_IN_BG_CLASS,
   calendarFulfilmentBackgroundClass,
 } from "@/workspaces/owner/calendar/calendar-fulfilment-presentation";
 import { guestOrderStatusTextClass } from "@/workspaces/owner/orders/labels";
@@ -54,6 +55,16 @@ export function CalendarGuide() {
             <li>
               <span className="text-ink/70">Pickup</span>
               {" = default (no fill)"}
+            </li>
+            <li className="flex items-center gap-2">
+              <span
+                aria-hidden
+                className={[
+                  CALENDAR_FULFILMENT_DINE_IN_BG_CLASS,
+                  "border-line/40 inline-block h-3 w-5 shrink-0 rounded-sm border",
+                ].join(" ")}
+              />
+              <span>Dine-in = blue</span>
             </li>
           </ul>
         </div>

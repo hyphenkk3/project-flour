@@ -485,7 +485,83 @@ const modelSrc = readFileSync(
   "utf8",
 );
 assert.match(modelSrc, /partitionOwnerOperationsTodayOrders/);
+assert.match(modelSrc, /appendPrepareConfirmationInbox/);
 assert.match(modelSrc, /deriveOwnerAttention/);
 assert.match(modelSrc, /homeQuickLinksFromNavigation/);
+
+assert.ok(
+  model.attentionPreview.some((item) => item.id === "e"),
+  "future submitted preorder must appear on Home attention",
+);
+
+{
+  const futureOnly = buildHomeCockpitModel({
+    orders: [
+      listItem({
+        id: "future-sub-pickup",
+        pickupDate: "2026-08-21",
+        status: "submitted",
+        fulfilmentMethod: "pickup",
+        orderNumber: "WB-FS-P",
+        customerName: "Pat",
+      }),
+      listItem({
+        id: "future-sub-delivery",
+        pickupDate: "2026-08-21",
+        status: "submitted",
+        fulfilmentMethod: "delivery",
+        orderNumber: "WB-FS-D",
+        customerName: "Del",
+      }),
+      listItem({
+        id: "future-sub-dine",
+        pickupDate: "2026-08-21",
+        status: "submitted",
+        fulfilmentMethod: "dine_in",
+        orderNumber: "WB-FS-DI",
+        customerName: "Din",
+      }),
+      listItem({
+        id: "future-pay",
+        pickupDate: "2026-08-21",
+        status: "awaiting_payment",
+        orderNumber: "WB-FS-PAY",
+      }),
+      listItem({
+        id: "future-conf",
+        pickupDate: "2026-08-21",
+        status: "pending_confirmation",
+        orderNumber: "WB-FS-CONF",
+      }),
+    ],
+    readyCollection: [],
+    completedCollection: [],
+    bakeryOrders: [],
+    pendingApprovals: [],
+    navigation: getNavigationForRole("manager"),
+    now,
+  });
+  assert.equal(futureOnly.summary.ordersToday, 0);
+  assert.equal(futureOnly.summary.needAttention, 3);
+  assert.equal(
+    futureOnly.attentionGroups.find((group) => group.key === "prepare_confirmation")
+      ?.count,
+    3,
+  );
+  assert.equal(
+    futureOnly.attentionGroups.some((group) => group.key === "payment_needed"),
+    false,
+  );
+  assert.equal(
+    futureOnly.attentionGroups.some(
+      (group) => group.key === "awaiting_customer_confirmation",
+    ),
+    false,
+  );
+  assert.deepEqual(
+    futureOnly.attentionPreview.map((item) => item.id).sort(),
+    ["future-sub-delivery", "future-sub-dine", "future-sub-pickup"],
+  );
+}
 
 console.log("PASS Home cockpit");

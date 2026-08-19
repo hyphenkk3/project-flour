@@ -9,10 +9,14 @@ import {
   DEFAULT_OPERATIONS_QUERY,
   filterAndSortOperationsOrders,
   isOperationsQueryDefault,
+  operationsSearchAndStatusMatches,
+  operationsTodayYmd,
   type OperationsBoardOrder,
 } from "@/engines/operations/order-board";
 import {
+  appendPrepareConfirmationInbox,
   deriveOwnerAttention,
+  hasPrepareConfirmationAttention,
   ownerAttentionInputFromOrder,
   ownerOperationsTodayGroup,
   partitionOwnerOperationsTodayOrders,
@@ -31,8 +35,11 @@ type AttentionFixture = {
   paymentDeadlineAt?: string | null;
   hasPendingFeeRequest?: boolean;
   pickupTime: string;
+  pickupDate: string;
   orderNumber: string;
   createdAt: string;
+  customerName: string;
+  phone: string;
 };
 
 function base(partial: Partial<AttentionFixture> & Pick<AttentionFixture, "id" | "status">): AttentionFixture {
@@ -46,8 +53,11 @@ function base(partial: Partial<AttentionFixture> & Pick<AttentionFixture, "id" |
     paymentDeadlineAt: null,
     hasPendingFeeRequest: false,
     pickupTime: "14:30",
+    pickupDate: "2026-08-15",
     orderNumber: "WB-TEST",
     createdAt: "2026-08-14T00:00:00.000Z",
+    customerName: "Test Guest",
+    phone: "012",
     ...partial,
   };
 }
@@ -341,6 +351,147 @@ assert.equal(
     pickedUpAt: null,
   });
   assert.equal(deriveOwnerAttention(mapped).length, 0);
+}
+
+
+// Future submitted (any fulfilment) joins Today inbox; later confirmation/payment do not
+{
+  const now = new Date("2026-08-19T04:00:00.000Z");
+  const todayYmd = operationsTodayYmd(now);
+  assert.equal(todayYmd, "2026-08-19");
+
+  const todayPaid = base({
+    id: "today-paid",
+    status: "paid",
+    pickupDate: "2026-08-19",
+    pickupTime: "11:00",
+    orderNumber: "WB-TODAY",
+  });
+  const futurePickup = base({
+    id: "future-pickup",
+    status: "submitted",
+    fulfilmentMethod: "pickup",
+    pickupDate: "2026-08-21",
+    pickupTime: "14:00",
+    orderNumber: "WB-P",
+    customerName: "Pickup Guest",
+  });
+  const futureDelivery = base({
+    id: "future-delivery",
+    status: "submitted",
+    fulfilmentMethod: "delivery",
+    pickupDate: "2026-08-21",
+    pickupTime: "15:00",
+    orderNumber: "WB-D",
+    customerName: "Delivery Guest",
+  });
+  const futureDineIn = base({
+    id: "future-dine-in",
+    status: "submitted",
+    fulfilmentMethod: "dine_in",
+    pickupDate: "2026-08-21",
+    pickupTime: "16:00",
+    orderNumber: "WB-DI",
+    customerName: "Dine-in Guest",
+  });
+  const futurePay = base({
+    id: "future-pay",
+    status: "awaiting_payment",
+    pickupDate: "2026-08-21",
+    pickupTime: "10:00",
+    orderNumber: "WB-PAY",
+  });
+  const futureConfirm = base({
+    id: "future-confirm",
+    status: "pending_confirmation",
+    pickupDate: "2026-08-21",
+    pickupTime: "10:30",
+    orderNumber: "WB-CONF",
+  });
+
+  assert.equal(hasPrepareConfirmationAttention(futurePickup, now), true);
+  assert.equal(hasPrepareConfirmationAttention(futurePay, now), false);
+  assert.equal(hasPrepareConfirmationAttention(futureConfirm, now), false);
+
+  const rows = [
+    todayPaid,
+    futurePickup,
+    futureDelivery,
+    futureDineIn,
+    futurePay,
+    futureConfirm,
+  ];
+  const visible = filterAndSortOperationsOrders(
+    rows,
+    DEFAULT_OPERATIONS_QUERY,
+    now,
+  );
+  assert.deepEqual(
+    visible.map((order) => order.id),
+    ["today-paid"],
+  );
+
+  const buckets = appendPrepareConfirmationInbox(
+    partitionOwnerOperationsTodayOrders(visible, now),
+    operationsSearchAndStatusMatches(rows, DEFAULT_OPERATIONS_QUERY),
+    todayYmd,
+    now,
+  );
+  assert.deepEqual(
+    buckets.needsAttention.map((order) => order.id),
+    ["future-pickup", "future-delivery", "future-dine-in"],
+  );
+  assert.deepEqual(
+    buckets.allClear.map((order) => order.id),
+    ["today-paid"],
+  );
+
+  const submittedOnly = appendPrepareConfirmationInbox(
+    partitionOwnerOperationsTodayOrders(
+      filterAndSortOperationsOrders(
+        rows,
+        { ...DEFAULT_OPERATIONS_QUERY, statusFilter: "submitted" },
+        now,
+      ),
+      now,
+    ),
+    operationsSearchAndStatusMatches(rows, {
+      ...DEFAULT_OPERATIONS_QUERY,
+      statusFilter: "submitted",
+    }),
+    todayYmd,
+    now,
+  );
+  assert.deepEqual(
+    submittedOnly.needsAttention.map((order) => order.id),
+    ["future-pickup", "future-delivery", "future-dine-in"],
+  );
+
+  const paidOnly = appendPrepareConfirmationInbox(
+    partitionOwnerOperationsTodayOrders(
+      filterAndSortOperationsOrders(
+        rows,
+        { ...DEFAULT_OPERATIONS_QUERY, statusFilter: "paid" },
+        now,
+      ),
+      now,
+    ),
+    operationsSearchAndStatusMatches(rows, {
+      ...DEFAULT_OPERATIONS_QUERY,
+      statusFilter: "paid",
+    }),
+    todayYmd,
+    now,
+  );
+  assert.equal(
+    paidOnly.needsAttention.length,
+    0,
+    "paid filter must not pull future submitted into inbox",
+  );
+  assert.deepEqual(
+    paidOnly.allClear.map((order) => order.id),
+    ["today-paid"],
+  );
 }
 
 console.log("Owner Operations attention helpers: PASS");

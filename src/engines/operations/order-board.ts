@@ -238,6 +238,18 @@ export function filterAndSortOperationsOrders<T extends OperationsBoardOrder>(
   return sortOperationsOrders(filtered, query.sort);
 }
 
+/** Search + status only — used to surface confirmation-not-prepared inbox beyond Today. */
+export function operationsSearchAndStatusMatches<T extends OperationsBoardOrder>(
+  orders: T[],
+  query: Pick<OperationsBoardQuery, "search" | "statusFilter">,
+): T[] {
+  return orders.filter(
+    (order) =>
+      matchesOperationsSearch(order, query.search) &&
+      matchesOperationsStatusFilter(order, query.statusFilter),
+  );
+}
+
 export function isOperationsQueryDefault(query: OperationsBoardQuery): boolean {
   return (
     query.search.trim() === "" &&

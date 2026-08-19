@@ -4,6 +4,7 @@
  */
 
 import {
+  appendPrepareConfirmationInbox,
   deriveOwnerAttention,
   ownerAttentionInputFromOrder,
   partitionOwnerOperationsTodayOrders,
@@ -153,23 +154,31 @@ export function buildHomeCockpitModel(input: {
 
   type TodayAttentionOrder = ReturnType<typeof ownerAttentionInputFromOrder> & {
     pickupTime: string;
+    pickupDate: string;
     orderNumber: string;
     id: string;
     customerName: string;
   };
 
-  const todayAttentionOrders: TodayAttentionOrder[] = todayOrders.map(
-    (order) => ({
+  function toAttentionOrder(order: StorefrontOrderListItem): TodayAttentionOrder {
+    return {
       ...ownerAttentionInputFromOrder(order),
       pickupTime: order.pickupTime,
+      pickupDate: order.pickupDate,
       orderNumber: order.orderNumber,
       id: order.id,
       customerName: order.customerName,
-    }),
+    };
+  }
+
+  const todayAttentionOrders: TodayAttentionOrder[] = todayOrders.map(
+    toAttentionOrder,
   );
 
-  const buckets = partitionOwnerOperationsTodayOrders(
-    todayAttentionOrders,
+  const buckets = appendPrepareConfirmationInbox(
+    partitionOwnerOperationsTodayOrders(todayAttentionOrders, now),
+    input.orders.map(toAttentionOrder),
+    todayYmd,
     now,
   );
 

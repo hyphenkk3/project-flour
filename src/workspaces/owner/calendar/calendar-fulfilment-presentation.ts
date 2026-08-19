@@ -3,15 +3,21 @@
  * PRESENTATION ONLY — never feeds Matrix/Cakes counts, finance, or lifecycle.
  *
  * Derives from stored/normalized fulfilment_method only — never customer name text.
- * Future Dine-In can extend this map without Calendar component rewrites.
+ * Status colour stays on the customer name independently of this background.
  */
 
 /**
  * Pale warm yellow / beige — Whitebird operational Delivery convention.
  * Reuses `--color-status-warning-soft` (`#ffefd9`); presentation only.
- * Distinct from status-info (Today chrome).
+ * Distinct from status-info (Today chrome / Dine-in fill).
  */
 export const CALENDAR_FULFILMENT_DELIVERY_BG_CLASS = "bg-status-warning-soft";
+
+/**
+ * Pale blue — Whitebird operational Dine-in convention (Jotform / spreadsheet).
+ * Reuses `--color-status-info-soft` (`#e0effc`); presentation only.
+ */
+export const CALENDAR_FULFILMENT_DINE_IN_BG_CLASS = "bg-status-info-soft";
 
 /**
  * Identity-line chrome: intentional small highlighted block (not a tight text wash).
@@ -22,7 +28,7 @@ export const CALENDAR_FULFILMENT_DELIVERY_LINE_CHROME_CLASS =
 
 /**
  * Returns Tailwind background classes for a Calendar identity line.
- * Only `delivery` receives a non-empty background; all else → baseline.
+ * `delivery` and `dine_in` receive fills; pickup and unknown stay baseline.
  */
 export function calendarFulfilmentBackgroundClass(
   fulfilmentMethod: string | null | undefined,
@@ -30,6 +36,12 @@ export function calendarFulfilmentBackgroundClass(
   if (fulfilmentMethod === "delivery") {
     return [
       CALENDAR_FULFILMENT_DELIVERY_BG_CLASS,
+      CALENDAR_FULFILMENT_DELIVERY_LINE_CHROME_CLASS,
+    ].join(" ");
+  }
+  if (fulfilmentMethod === "dine_in") {
+    return [
+      CALENDAR_FULFILMENT_DINE_IN_BG_CLASS,
       CALENDAR_FULFILMENT_DELIVERY_LINE_CHROME_CLASS,
     ].join(" ");
   }

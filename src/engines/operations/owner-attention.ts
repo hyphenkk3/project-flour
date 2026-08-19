@@ -183,6 +183,53 @@ export function deriveOwnerAttention(
   return reasons;
 }
 
+/** Confirmation not prepared — staff must act now, even if pickup is later. */
+export function hasPrepareConfirmationAttention(
+  order: OwnerAttentionOrderInput,
+  now: Date = new Date(),
+): boolean {
+  return deriveOwnerAttention(order, now).some(
+    (reason) => reason.key === "prepare_confirmation",
+  );
+}
+
+export function appendPrepareConfirmationInbox<
+  T extends OwnerAttentionOrderInput & {
+    id: string;
+    pickupDate: string;
+    pickupTime: string;
+    orderNumber?: string;
+    createdAt?: string;
+  },
+>(
+  buckets: OwnerOperationsTodayBuckets<T>,
+  allOrders: T[],
+  todayYmd: string,
+  now: Date = new Date(),
+): OwnerOperationsTodayBuckets<T> {
+  const seen = new Set([
+    ...buckets.needsAttention.map((order) => order.id),
+    ...buckets.allClear.map((order) => order.id),
+    ...buckets.completed.map((order) => order.id),
+  ]);
+  const extras = allOrders.filter(
+    (order) =>
+      !seen.has(order.id) &&
+      order.pickupDate !== todayYmd &&
+      hasPrepareConfirmationAttention(order, now),
+  );
+  if (extras.length === 0) return buckets;
+  extras.sort((a, b) => {
+    const dateCmp = a.pickupDate.localeCompare(b.pickupDate);
+    if (dateCmp !== 0) return dateCmp;
+    return compareByPickupTimeAsc(a, b);
+  });
+  return {
+    ...buckets,
+    needsAttention: [...buckets.needsAttention, ...extras],
+  };
+}
+
 export function ownerOperationsTodayGroup(
   order: OwnerAttentionOrderInput,
   now: Date = new Date(),

@@ -20,6 +20,7 @@ import {
 import {
   CALENDAR_FULFILMENT_DELIVERY_BG_CLASS,
   CALENDAR_FULFILMENT_DELIVERY_LINE_CHROME_CLASS,
+  CALENDAR_FULFILMENT_DINE_IN_BG_CLASS,
   calendarFulfilmentBackgroundClass,
   isCalendarDeliveryFulfilmentPresentation,
 } from "@/workspaces/owner/calendar/calendar-fulfilment-presentation";
@@ -93,7 +94,21 @@ const cakeItem = {
   assert.equal(calendarFulfilmentBackgroundClass(null), "");
   assert.equal(calendarFulfilmentBackgroundClass(undefined), "");
   assert.equal(calendarFulfilmentBackgroundClass("drive_through"), "");
-  assert.equal(calendarFulfilmentBackgroundClass("dine_in"), "");
+  assert.ok(
+    calendarFulfilmentBackgroundClass("dine_in").includes(
+      CALENDAR_FULFILMENT_DINE_IN_BG_CLASS,
+    ),
+  );
+  assert.ok(
+    calendarFulfilmentBackgroundClass("dine_in").includes(
+      CALENDAR_FULFILMENT_DELIVERY_LINE_CHROME_CLASS,
+    ),
+  );
+  assert.equal(CALENDAR_FULFILMENT_DINE_IN_BG_CLASS, "bg-status-info-soft");
+  assert.notEqual(
+    CALENDAR_FULFILMENT_DINE_IN_BG_CLASS,
+    CALENDAR_FULFILMENT_DELIVERY_BG_CLASS,
+  );
   assert.equal(calendarFulfilmentBackgroundClass("unknown_future"), "");
   assert.equal(isCalendarDeliveryFulfilmentPresentation("delivery"), true);
   assert.equal(isCalendarDeliveryFulfilmentPresentation("pickup"), false);
@@ -152,6 +167,19 @@ const cakeItem = {
     );
     assert.ok(
       !calendarFulfilmentBackgroundClass("delivery").includes("text-ink"),
+    );
+    const dineIn = entry({ fulfilmentMethod: "dine_in", status });
+    const dineInLine = calendarCustomerLineClass(dineIn);
+    assert.ok(dineInLine.includes(guestOrderStatusTextClass(status)));
+    assert.ok(dineInLine.includes(CALENDAR_FULFILMENT_DINE_IN_BG_CLASS));
+    assert.ok(
+      !dineInLine.includes(CALENDAR_FULFILMENT_DELIVERY_BG_CLASS),
+    );
+    assert.ok(
+      !calendarFulfilmentBackgroundClass("dine_in").includes("text-status"),
+    );
+    assert.ok(
+      !calendarFulfilmentBackgroundClass("dine_in").includes("text-ink"),
     );
   }
 }
@@ -396,7 +424,9 @@ const cakeItem = {
     ),
     "utf8",
   );
-  assert.ok(!/dine_in|🍽️/.test(presentation));
+  assert.ok(presentation.includes("dine_in"));
+  assert.ok(presentation.includes("CALENDAR_FULFILMENT_DINE_IN_BG_CLASS"));
+  assert.ok(!presentation.includes("🍽️"));
 }
 
 // ---------------------------------------------------------------------------
@@ -411,10 +441,12 @@ const cakeItem = {
   assert.ok(guide.includes("Fulfilment background"));
   assert.ok(guide.includes("Delivery"));
   assert.ok(guide.includes("CALENDAR_FULFILMENT_DELIVERY_BG_CLASS"));
+  assert.ok(guide.includes("CALENDAR_FULFILMENT_DINE_IN_BG_CLASS"));
   assert.ok(guide.includes("Soft background = fulfilment method"));
+  assert.ok(guide.includes("Pickup"));
+  assert.ok(guide.includes("Dine-in = blue"));
   assert.ok(!guide.includes("🚗"));
   assert.ok(!guide.includes("Dine-In"));
-  assert.ok(!guide.includes("Dine-in"));
 
   const matrixSrc = readFileSync(
     resolve("src/workspaces/owner/calendar/CalendarMatrixView.tsx"),
@@ -439,6 +471,11 @@ const cakeItem = {
   );
   assert.equal(CALENDAR_FULFILMENT_DELIVERY_BG_CLASS, "bg-status-warning-soft");
   assert.notEqual(CALENDAR_FULFILMENT_DELIVERY_BG_CLASS, "bg-signal-soft");
+  assert.equal(CALENDAR_FULFILMENT_DINE_IN_BG_CLASS, "bg-status-info-soft");
+  assert.notEqual(
+    CALENDAR_FULFILMENT_DINE_IN_BG_CLASS,
+    CALENDAR_FULFILMENT_DELIVERY_BG_CLASS,
+  );
 
   const globals = readFileSync(resolve("src/app/globals.css"), "utf8");
   assert.ok(globals.includes("--color-status-warning-soft"));
@@ -473,11 +510,14 @@ const cakeItem = {
     "pickup",
     "delivery",
     "drive_through",
+    "dine_in",
   ];
   for (const method of methods) {
     const bg = calendarFulfilmentBackgroundClass(method);
     if (method === "delivery") {
       assert.ok(bg.includes(CALENDAR_FULFILMENT_DELIVERY_BG_CLASS));
+    } else if (method === "dine_in") {
+      assert.ok(bg.includes(CALENDAR_FULFILMENT_DINE_IN_BG_CLASS));
     } else {
       assert.equal(bg, "");
     }

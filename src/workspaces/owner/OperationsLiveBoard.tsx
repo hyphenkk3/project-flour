@@ -11,10 +11,15 @@ import {
   filterAndSortOperationsOrders,
   OPERATIONS_SEARCH_EMPTY_DESCRIPTION,
   OPERATIONS_SEARCH_EMPTY_TITLE,
+  operationsSearchAndStatusMatches,
   operationsSearchSpansPickupDates,
+  operationsTodayYmd,
   type OperationsBoardQuery,
 } from "@/engines/operations/order-board";
-import { partitionOwnerOperationsTodayOrders } from "@/engines/operations/owner-attention";
+import {
+  appendPrepareConfirmationInbox,
+  partitionOwnerOperationsTodayOrders,
+} from "@/engines/operations/owner-attention";
 import { formatShortBusinessDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 import type { StorefrontOrderListItem } from "@/types/storefront";
@@ -225,8 +230,12 @@ export function OperationsLiveBoard({
 
   const todayBuckets = useMemo(() => {
     if (!isTodayView) return null;
-    return partitionOwnerOperationsTodayOrders(visibleOrders);
-  }, [isTodayView, visibleOrders]);
+    return appendPrepareConfirmationInbox(
+      partitionOwnerOperationsTodayOrders(visibleOrders),
+      operationsSearchAndStatusMatches(orders, query),
+      operationsTodayYmd(),
+    );
+  }, [isTodayView, visibleOrders, orders, query]);
 
   const todayGroupCounts = useMemo(() => {
     if (!todayBuckets) return null;
@@ -237,9 +246,18 @@ export function OperationsLiveBoard({
     };
   }, [todayBuckets]);
 
+  const listedCount = todayBuckets
+    ? todayBuckets.needsAttention.length +
+      todayBuckets.allClear.length +
+      todayBuckets.completed.length
+    : visibleOrders.length;
+
   const newCount = useMemo(
-    () => visibleOrders.filter((order) => order.status === "submitted").length,
-    [visibleOrders],
+    () =>
+      (todayBuckets?.needsAttention ?? visibleOrders).filter(
+        (order) => order.status === "submitted",
+      ).length,
+    [todayBuckets, visibleOrders],
   );
 
   const boardHref = useMemo(() => buildOperationsBoardPath(query), [query]);
@@ -304,7 +322,7 @@ export function OperationsLiveBoard({
       </div>
 
       <OperationsBoardToolbar
-        matchCount={visibleOrders.length}
+        matchCount={listedCount}
         newCount={newCount}
         onChange={handleQueryChange}
         pendingApprovalCount={pendingOperationsApprovalCount(pendingApprovals)}
@@ -320,24 +338,7 @@ export function OperationsLiveBoard({
       )}
 
       <section className="space-y-3">
-        {visibleOrders.length === 0 ? (
-          <EmptyState
-            description={
-              operationsSearchSpansPickupDates(query)
-                ? OPERATIONS_SEARCH_EMPTY_DESCRIPTION
-                : orders.length === 0
-                  ? "New customer preorders will appear here automatically."
-                  : "Try clearing search or filters to see more orders."
-            }
-            title={
-              operationsSearchSpansPickupDates(query)
-                ? OPERATIONS_SEARCH_EMPTY_TITLE
-                : orders.length === 0
-                  ? "You’re all caught up."
-                  : "No matching orders."
-            }
-          />
-        ) : todayBuckets ? (
+        {todayBuckets ? (
           <div className="space-y-6">
             <section className="space-y-2.5">
               <h2 className="text-status-warning text-sm font-bold tracking-wide uppercase">
@@ -383,6 +384,23 @@ export function OperationsLiveBoard({
               )}
             </section>
           </div>
+        ) : visibleOrders.length === 0 ? (
+          <EmptyState
+            description={
+              operationsSearchSpansPickupDates(query)
+                ? OPERATIONS_SEARCH_EMPTY_DESCRIPTION
+                : orders.length === 0
+                  ? "New customer preorders will appear here automatically."
+                  : "Try clearing search or filters to see more orders."
+            }
+            title={
+              operationsSearchSpansPickupDates(query)
+                ? OPERATIONS_SEARCH_EMPTY_TITLE
+                : orders.length === 0
+                  ? "You’re all caught up."
+                  : "No matching orders."
+            }
+          />
         ) : (
           renderOrderList(visibleOrders)
         )}
