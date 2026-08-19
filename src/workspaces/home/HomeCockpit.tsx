@@ -3,8 +3,13 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { formatLongBusinessDate } from "@/lib/dates";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import { ownerOrderWorkspaceHref } from "@/workspaces/owner/navigation/return-to";
-import { collectionDateNavHref } from "@/workspaces/collection/date";
+import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
+import {
+  collectionDateNavHref,
+  collectionOrderHref,
+} from "@/workspaces/collection/date";
 import type { HomeCockpitModel } from "@/workspaces/home/cockpit-model";
+import type { HomeDineInHandoffPreview } from "@/workspaces/home/cockpit-model";
 import { homeGreetingTitle } from "@/workspaces/home/greeting";
 
 const HOME_RETURN = "/home";
@@ -61,24 +66,59 @@ function SectionHeader({
   title,
   href,
   linkLabel,
+  extraLinks,
 }: {
   title: string;
   href?: string | null;
   linkLabel?: string;
+  extraLinks?: Array<{ href: string; label: string }>;
 }) {
   return (
     <div className="mb-3 flex items-end justify-between gap-3">
       <h2 className="text-ink text-sm font-semibold tracking-wide">{title}</h2>
-      {href && linkLabel ? (
-        <Link
-          className="text-signal hover:text-ink text-sm font-medium transition"
-          href={href}
-        >
-          {linkLabel}
-        </Link>
+      {href || (extraLinks && extraLinks.length > 0) ? (
+        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+          {href && linkLabel ? (
+            <Link
+              className="text-signal hover:text-ink text-sm font-medium transition"
+              href={href}
+            >
+              {linkLabel}
+            </Link>
+          ) : null}
+          {extraLinks?.map((link) => (
+            <Link
+              className="text-signal hover:text-ink text-sm font-medium transition"
+              href={link.href}
+              key={link.href}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
       ) : null}
     </div>
   );
+}
+
+function dineInPreviewMeta(item: HomeDineInHandoffPreview): string {
+  const parts: string[] = [];
+  if (item.venue) parts.push(dineInVenueLabel(item.venue));
+  if (item.guestCount != null && item.guestCount > 0) {
+    parts.push(
+      `${item.guestCount} guest${item.guestCount === 1 ? "" : "s"}`,
+    );
+  }
+  const reservation = item.reservationTime
+    ? formatPickupTime(item.reservationTime)
+    : null;
+  const serving = formatPickupTime(item.servingTime);
+  if (reservation) {
+    parts.push(`Reservation ${reservation}`);
+  }
+  parts.push(`Cake ${serving}`);
+  parts.push(item.orderNumber);
+  return parts.join(" · ");
 }
 
 export function HomeCockpit({
@@ -121,6 +161,7 @@ export function HomeCockpit({
     { label: "Orders", value: summary.ordersToday },
     { label: "Pickups", value: summary.pickupsToday },
     { label: "Deliveries", value: summary.deliveriesToday },
+    { label: "Dine-in", value: summary.dineInsToday },
     { label: "Ready", value: summary.ready },
     { label: "Completed", value: summary.completed },
     {
@@ -144,6 +185,8 @@ export function HomeCockpit({
     handoffs.ready > 0 ||
     handoffs.pickedUp > 0 ||
     handoffs.delivered > 0 ||
+    handoffs.dineInPending > 0 ||
+    handoffs.dineInCompleted > 0 ||
     schedule.total > 0;
 
   return (
@@ -259,69 +302,170 @@ export function HomeCockpit({
       {canAccessCollection ? (
         <section aria-labelledby="home-handoffs">
           <SectionHeader
+            extraLinks={[
+              {
+                href: collectionDateNavHref(model.todayYmd, "dine_in"),
+                label: "View Dine-in →",
+              },
+            ]}
             href={collectionDateNavHref(model.todayYmd, "ready")}
-            linkLabel="View Collection →"
+            linkLabel="View Pickup →"
             title="Today's Handoffs"
           />
-          {handoffs.ready === 0 &&
-          handoffs.pickedUp === 0 &&
-          handoffs.outForDelivery === 0 &&
-          handoffs.delivered === 0 ? (
-            <p className="text-skyline text-sm">
-              No pickups or deliveries yet.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {(
-                  [
-                    ["Ready", handoffs.ready],
-                    ["Picked Up", handoffs.pickedUp],
-                    ["Out for Delivery", handoffs.outForDelivery],
-                    ["Delivered", handoffs.delivered],
-                  ] as const
-                ).map(([label, value]) => (
-                  <div
-                    className="border-fog rounded-xl border bg-white px-3 py-2.5"
-                    key={label}
-                  >
-                    <p className="text-skyline text-[11px] font-medium tracking-wide uppercase">
-                      {label}
-                    </p>
-                    <p className="text-ink mt-1 text-xl font-semibold">
-                      {value}
-                    </p>
+          {(() => {
+            const hasPickupDeliveryHandoffs =
+              handoffs.ready > 0 ||
+              handoffs.pickedUp > 0 ||
+              handoffs.outForDelivery > 0 ||
+              handoffs.delivered > 0;
+            const hasDineInHandoffs =
+              handoffs.dineInPending > 0 || handoffs.dineInCompleted > 0;
+            if (!hasPickupDeliveryHandoffs && !hasDineInHandoffs) {
+              return (
+                <p className="text-skyline text-sm">
+                  No pickups or deliveries yet.
+                </p>
+              );
+            }
+            return (
+              <div className="space-y-4">
+                {hasPickupDeliveryHandoffs ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {(
+                        [
+                          ["Ready", handoffs.ready],
+                          ["Picked Up", handoffs.pickedUp],
+                          ["Out for Delivery", handoffs.outForDelivery],
+                          ["Delivered", handoffs.delivered],
+                        ] as const
+                      ).map(([label, value]) => (
+                        <div
+                          className="border-fog rounded-xl border bg-white px-3 py-2.5"
+                          key={label}
+                        >
+                          <p className="text-skyline text-[11px] font-medium tracking-wide uppercase">
+                            {label}
+                          </p>
+                          <p className="text-ink mt-1 text-xl font-semibold">
+                            {value}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    {handoffs.readyPreview.length > 0 ? (
+                      <ul className="border-fog divide-fog divide-y rounded-xl border bg-white">
+                        {handoffs.readyPreview.map((item) => (
+                          <li
+                            className="flex items-center justify-between gap-3 px-3.5 py-2.5"
+                            key={item.id}
+                          >
+                            <span className="min-w-0">
+                              <span className="text-ink block truncate text-sm font-medium">
+                                {item.guestName}
+                              </span>
+                              <span className="text-skyline text-xs">
+                                {formatPickupTime(item.pickupTime)} ·{" "}
+                                {item.orderNumber}
+                              </span>
+                            </span>
+                            <Link
+                              className="text-signal hover:text-ink shrink-0 text-sm font-medium"
+                              href={`/collection/orders/${item.id}?date=${encodeURIComponent(model.todayYmd)}`}
+                            >
+                              Open →
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </div>
-                ))}
+                ) : null}
+                {hasDineInHandoffs ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      {(
+                        [
+                          ["Dine-in pending", handoffs.dineInPending],
+                          ["Dine-in completed", handoffs.dineInCompleted],
+                        ] as const
+                      ).map(([label, value]) => (
+                        <div
+                          className="border-fog rounded-xl border bg-white px-3 py-2.5"
+                          key={label}
+                        >
+                          <p className="text-skyline text-[11px] font-medium tracking-wide uppercase">
+                            {label}
+                          </p>
+                          <p className="text-ink mt-1 text-xl font-semibold">
+                            {value}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    {handoffs.dineInPreview.length > 0 ? (
+                      <ul className="border-fog divide-fog divide-y rounded-xl border bg-white">
+                        {handoffs.dineInPreview.map((item) => (
+                          <li
+                            className="flex items-center justify-between gap-3 px-3.5 py-2.5"
+                            key={item.id}
+                          >
+                            <span className="min-w-0">
+                              <span className="text-ink block truncate text-sm font-medium">
+                                {item.guestName}
+                              </span>
+                              <span className="text-skyline text-xs">
+                                {dineInPreviewMeta(item)}
+                              </span>
+                            </span>
+                            <Link
+                              className="text-signal hover:text-ink shrink-0 text-sm font-medium"
+                              href={collectionOrderHref(
+                                item.id,
+                                model.todayYmd,
+                                "dine_in",
+                              )}
+                            >
+                              Open →
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {handoffs.dineInCompletedPreview.length > 0 ? (
+                      <ul className="border-fog divide-fog divide-y rounded-xl border bg-white">
+                        {handoffs.dineInCompletedPreview.map((item) => (
+                          <li
+                            className="flex items-center justify-between gap-3 px-3.5 py-2.5"
+                            key={`done-${item.id}`}
+                          >
+                            <span className="min-w-0">
+                              <span className="text-ink block truncate text-sm font-medium">
+                                {item.guestName}
+                              </span>
+                              <span className="text-skyline text-xs">
+                                Completed · {dineInPreviewMeta(item)}
+                              </span>
+                            </span>
+                            <Link
+                              className="text-signal hover:text-ink shrink-0 text-sm font-medium"
+                              href={collectionOrderHref(
+                                item.id,
+                                model.todayYmd,
+                                "completed",
+                              )}
+                            >
+                              Open →
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
-              {handoffs.readyPreview.length > 0 ? (
-                <ul className="border-fog divide-fog divide-y rounded-xl border bg-white">
-                  {handoffs.readyPreview.map((item) => (
-                    <li
-                      className="flex items-center justify-between gap-3 px-3.5 py-2.5"
-                      key={item.id}
-                    >
-                      <span className="min-w-0">
-                        <span className="text-ink block truncate text-sm font-medium">
-                          {item.guestName}
-                        </span>
-                        <span className="text-skyline text-xs">
-                          {formatPickupTime(item.pickupTime)} ·{" "}
-                          {item.orderNumber}
-                        </span>
-                      </span>
-                      <Link
-                        className="text-signal hover:text-ink shrink-0 text-sm font-medium"
-                        href={`/collection/orders/${item.id}?date=${encodeURIComponent(model.todayYmd)}`}
-                      >
-                        Open →
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          )}
+            );
+          })()}
         </section>
       ) : null}
 

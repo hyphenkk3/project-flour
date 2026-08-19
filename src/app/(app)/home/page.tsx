@@ -15,6 +15,7 @@ import { listBakeryBoardOrders } from "@/workspaces/bakery/queries";
 import {
   listCollectionBoardOrders,
   listCollectionCompletedOrders,
+  listCollectionDineInOrders,
 } from "@/workspaces/collection/queries";
 import { buildHomeCockpitModel } from "@/workspaces/home/cockpit-model";
 import { HomeCockpit } from "@/workspaces/home/HomeCockpit";
@@ -47,6 +48,7 @@ export default async function HomePage() {
     orders,
     readyCollection,
     completedCollection,
+    dineInCollection,
     bakeryOrders,
     pendingApprovals,
   ] = await Promise.all([
@@ -56,6 +58,9 @@ export default async function HomePage() {
       : Promise.resolve([]),
     canCollection
       ? listCollectionCompletedOrders(todayYmd)
+      : Promise.resolve([]),
+    canCollection
+      ? listCollectionDineInOrders(todayYmd)
       : Promise.resolve([]),
     canBakery || canCalendar
       ? listBakeryBoardOrders(todayYmd)
@@ -69,6 +74,7 @@ export default async function HomePage() {
     orders,
     readyCollection,
     completedCollection,
+    dineInCollection,
     bakeryOrders,
     pendingApprovals,
     navigation,

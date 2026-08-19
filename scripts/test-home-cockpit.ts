@@ -172,6 +172,10 @@ assert.ok(model.attentionGroups.length > 0);
 assert.equal(model.handoffs.ready, 1);
 assert.equal(model.handoffs.pickedUp, 1);
 assert.equal(model.handoffs.delivered, 1);
+assert.equal(model.handoffs.outForDelivery, 0);
+assert.equal(model.summary.dineInsToday, 0);
+assert.equal(model.handoffs.dineInPending, 0);
+assert.equal(model.handoffs.dineInCompleted, 0);
 assert.equal(model.schedule.total, 1);
 assert.equal(model.schedule.ready, 1);
 
@@ -253,8 +257,166 @@ const empty = buildHomeCockpitModel({
   now,
 });
 assert.equal(empty.summary.ordersToday, 0);
+assert.equal(empty.summary.dineInsToday, 0);
 assert.equal(empty.attentionGroups.length, 0);
 assert.equal(empty.handoffs.ready, 0);
+assert.equal(empty.handoffs.dineInPending, 0);
+assert.equal(empty.handoffs.dineInCompleted, 0);
+
+assert.equal(canAccessCollectionWorkspace("bakery"), false);
+assert.equal(canAccessCollectionWorkspace("collection"), true);
+assert.equal(canAccessCollectionWorkspace("owner"), true);
+assert.equal(canAccessCollectionWorkspace("manager"), true);
+assert.equal(canAccessCollectionWorkspace("customer_operations"), true);
+assert.equal(canAccessBakeryWorkspace("bakery"), true);
+
+const pendingDineInOrder: CollectionBoardOrder = {
+  ...readyCollection[0],
+  id: "di-pending",
+  orderNumber: "WB-DI-1",
+  guestName: "Gia",
+  guestPhone: "0190000001",
+  fulfilmentMethod: "dine_in",
+  pickupTime: "15:00:00",
+  readyAt: "2026-08-15T01:00:00.000Z",
+  pickedUpAt: null,
+  deliveredAt: null,
+  dineIn: {
+    reservationDate: "2026-08-15",
+    reservationTime: "14:00:00",
+    venue: "hyphen",
+    guestCount: 2,
+    reservationNote: null,
+  },
+};
+
+const completedDineInOrder: CollectionBoardOrder = {
+  ...pendingDineInOrder,
+  id: "di-done",
+  orderNumber: "WB-DI-2",
+  guestName: "Han",
+  pickupTime: "16:00:00",
+  pickedUpAt: "2026-08-15T08:00:00.000Z",
+  dineIn: {
+    reservationDate: "2026-08-15",
+    reservationTime: "15:00:00",
+    venue: "whitebird",
+    guestCount: 4,
+    reservationNote: null,
+  },
+};
+
+const deliveryOutOrder = listItem({
+  id: "g",
+  pickupDate: "2026-08-15",
+  status: "paid",
+  fulfilmentMethod: "delivery",
+  orderNumber: "WB-6",
+  customerName: "Eve",
+  readyAt: "2026-08-15T01:00:00.000Z",
+  outForDeliveryAt: "2026-08-15T02:00:00.000Z",
+});
+
+const dineInModel = buildHomeCockpitModel({
+  orders: [
+    ...orders,
+    listItem({
+      id: "di-pending",
+      pickupDate: "2026-08-15",
+      status: "paid",
+      fulfilmentMethod: "dine_in",
+      readyAt: "2026-08-15T01:00:00.000Z",
+      orderNumber: "WB-DI-1",
+      customerName: "Gia",
+    }),
+    listItem({
+      id: "di-done",
+      pickupDate: "2026-08-15",
+      status: "paid",
+      fulfilmentMethod: "dine_in",
+      readyAt: "2026-08-15T01:00:00.000Z",
+      pickedUpAt: "2026-08-15T08:00:00.000Z",
+      orderNumber: "WB-DI-2",
+      customerName: "Han",
+    }),
+  ],
+  readyCollection,
+  completedCollection: [...completedCollection, completedDineInOrder],
+  dineInCollection: [pendingDineInOrder],
+  bakeryOrders,
+  pendingApprovals: [],
+  navigation: getNavigationForRole("owner"),
+  now,
+});
+
+assert.equal(dineInModel.summary.dineInsToday, 2);
+assert.equal(dineInModel.summary.pickupsToday, 3);
+assert.equal(dineInModel.summary.deliveriesToday, 1);
+assert.equal(dineInModel.summary.ready, 1, "dine-in ready must not increment Ready");
+assert.equal(dineInModel.handoffs.ready, 1, "pickup Ready queue unchanged");
+assert.equal(dineInModel.handoffs.pickedUp, 1, "completed dine-in is not Picked Up");
+assert.equal(dineInModel.handoffs.delivered, 1, "completed dine-in is not Delivered");
+assert.equal(dineInModel.handoffs.outForDelivery, 0);
+
+const deliveryOutModel = buildHomeCockpitModel({
+  orders: [...orders, deliveryOutOrder],
+  readyCollection,
+  completedCollection,
+  bakeryOrders,
+  pendingApprovals: [],
+  navigation: getNavigationForRole("manager"),
+  now,
+});
+assert.equal(deliveryOutModel.handoffs.outForDelivery, 1);
+assert.equal(deliveryOutModel.handoffs.delivered, 1);
+assert.equal(deliveryOutModel.handoffs.dineInPending, 0);
+assert.equal(deliveryOutModel.summary.dineInsToday, 0);
+assert.equal(dineInModel.handoffs.dineInPending, 1);
+assert.equal(dineInModel.handoffs.dineInCompleted, 1);
+assert.equal(dineInModel.handoffs.dineInPreview[0]?.guestName, "Gia");
+assert.equal(dineInModel.handoffs.dineInPreview[0]?.venue, "hyphen");
+assert.equal(dineInModel.handoffs.dineInPreview[0]?.reservationTime, "14:00:00");
+assert.equal(dineInModel.handoffs.dineInPreview[0]?.servingTime, "15:00:00");
+assert.equal(dineInModel.handoffs.dineInPreview[0]?.guestCount, 2);
+assert.equal(dineInModel.handoffs.dineInCompletedPreview[0]?.guestName, "Han");
+assert.equal(dineInModel.handoffs.dineInCompletedPreview[0]?.venue, "whitebird");
+
+const dineInOnly = buildHomeCockpitModel({
+  orders: [
+    listItem({
+      id: "di-only",
+      pickupDate: "2026-08-15",
+      status: "paid",
+      fulfilmentMethod: "dine_in",
+      orderNumber: "WB-DI-3",
+      customerName: "Ivy",
+    }),
+  ],
+  readyCollection: [],
+  completedCollection: [],
+  dineInCollection: [
+    {
+      ...pendingDineInOrder,
+      id: "di-only",
+      orderNumber: "WB-DI-3",
+      guestName: "Ivy",
+      readyAt: null,
+    },
+  ],
+  bakeryOrders: [],
+  pendingApprovals: [],
+  navigation: getNavigationForRole("collection"),
+  now,
+});
+assert.equal(dineInOnly.summary.ordersToday, 1);
+assert.equal(dineInOnly.summary.dineInsToday, 1);
+assert.equal(dineInOnly.summary.pickupsToday, 0);
+assert.equal(dineInOnly.summary.deliveriesToday, 0);
+assert.equal(dineInOnly.summary.ready, 0);
+assert.equal(dineInOnly.handoffs.ready, 0);
+assert.equal(dineInOnly.handoffs.pickedUp, 0);
+assert.equal(dineInOnly.handoffs.delivered, 0);
+assert.equal(dineInOnly.handoffs.dineInPending, 1);
 
 assert.equal(canAccessOperationsApprovalsInbox("owner"), true);
 assert.equal(canAccessOperationsApprovalsInbox("manager"), true);
@@ -272,6 +434,8 @@ assert.match(pageSrc, /HomeCockpit/);
 assert.match(pageSrc, /listGuestOrders/);
 assert.match(pageSrc, /listCollectionBoardOrders/);
 assert.match(pageSrc, /listCollectionCompletedOrders/);
+assert.match(pageSrc, /listCollectionDineInOrders/);
+assert.match(pageSrc, /dineInCollection/);
 assert.match(pageSrc, /listBakeryBoardOrders/);
 assert.match(pageSrc, /listPendingOperationsApprovals/);
 assert.match(pageSrc, /homePendingApprovalsHref/);
@@ -293,7 +457,12 @@ assert.match(uiSrc, /No pickups or deliveries yet/);
 assert.match(uiSrc, /ownerOrderWorkspaceHref/);
 assert.match(uiSrc, /returnTo|HOME_RETURN|\/home/);
 assert.match(uiSrc, /View Operations/);
-assert.match(uiSrc, /View Collection/);
+assert.match(uiSrc, /View Pickup/);
+assert.match(uiSrc, /View Dine-in/);
+assert.match(uiSrc, /collectionDateNavHref\(model\.todayYmd, "dine_in"\)/);
+assert.match(uiSrc, /canAccessCollection \?/);
+assert.match(uiSrc, /hasDineInHandoffs/);
+assert.doesNotMatch(uiSrc, /payment_overdue.*dine/i);
 assert.match(uiSrc, /homeGreetingTitle/);
 assert.match(uiSrc, /preferCalendarScheduleCta/);
 assert.match(uiSrc, /View Calendar →/);

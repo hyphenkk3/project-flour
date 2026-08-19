@@ -15,6 +15,7 @@ import { bakeryProductionPresentation } from "@/workspaces/bakery/eligibility";
 import type { BakeryBoardOrder } from "@/workspaces/bakery/types";
 import {
   isCollectionDeliveryMethod,
+  isCollectionDineInMethod,
   isCollectionPickupMethod,
 } from "@/workspaces/collection/eligibility";
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
@@ -26,6 +27,7 @@ export type HomeTodaySummary = {
   ordersToday: number;
   pickupsToday: number;
   deliveriesToday: number;
+  dineInsToday: number;
   ready: number;
   completed: number;
   needAttention: number;
@@ -45,6 +47,16 @@ export type HomeAttentionPreview = {
   primaryLabel: string;
 };
 
+export type HomeDineInHandoffPreview = {
+  id: string;
+  orderNumber: string;
+  guestName: string;
+  reservationTime: string | null;
+  servingTime: string;
+  venue: "hyphen" | "whitebird" | null;
+  guestCount: number | null;
+};
+
 export type HomeHandoffSummary = {
   ready: number;
   pickedUp: number;
@@ -56,6 +68,10 @@ export type HomeHandoffSummary = {
     guestName: string;
     pickupTime: string;
   }>;
+  dineInPending: number;
+  dineInCompleted: number;
+  dineInPreview: HomeDineInHandoffPreview[];
+  dineInCompletedPreview: HomeDineInHandoffPreview[];
 };
 
 export type HomeScheduleSummary = {
@@ -105,10 +121,25 @@ export function homeQuickLinksFromNavigation(
   return navigation.filter((item) => QUICK_LINK_IDS.has(item.id));
 }
 
+function dineInHandoffPreview(
+  order: CollectionBoardOrder,
+): HomeDineInHandoffPreview {
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    guestName: order.guestName,
+    reservationTime: order.dineIn?.reservationTime ?? null,
+    servingTime: order.pickupTime,
+    venue: order.dineIn?.venue ?? null,
+    guestCount: order.dineIn?.guestCount ?? null,
+  };
+}
+
 export function buildHomeCockpitModel(input: {
   orders: StorefrontOrderListItem[];
   readyCollection: CollectionBoardOrder[];
   completedCollection: CollectionBoardOrder[];
+  dineInCollection?: CollectionBoardOrder[];
   bakeryOrders: BakeryBoardOrder[];
   pendingApprovals: OperationsApprovalRecord[];
   navigation: WorkspaceNavItem[];
@@ -148,9 +179,13 @@ export function buildHomeCockpitModel(input: {
   const deliveriesToday = todayOrders.filter((order) =>
     isCollectionDeliveryMethod(order.fulfilmentMethod),
   ).length;
+  const dineInsToday = todayOrders.filter((order) =>
+    isCollectionDineInMethod(order.fulfilmentMethod),
+  ).length;
 
   const ready = todayOrders.filter(
     (order) =>
+      !isCollectionDineInMethod(order.fulfilmentMethod) &&
       Boolean(order.readyAt) &&
       !isFulfilmentTerminal({
         readyAt: order.readyAt,
@@ -164,6 +199,7 @@ export function buildHomeCockpitModel(input: {
     ordersToday: todayOrders.length,
     pickupsToday,
     deliveriesToday,
+    dineInsToday,
     ready,
     completed: buckets.completed.length,
     needAttention: buckets.needsAttention.length,
@@ -222,6 +258,11 @@ export function buildHomeCockpitModel(input: {
       !order.deliveredAt,
   ).length;
 
+  const dineInPendingOrders = input.dineInCollection ?? [];
+  const dineInCompletedOrders = input.completedCollection.filter((order) =>
+    isCollectionDineInMethod(order.fulfilmentMethod),
+  );
+
   const handoffs: HomeHandoffSummary = {
     ready: input.readyCollection.length,
     pickedUp,
@@ -233,6 +274,12 @@ export function buildHomeCockpitModel(input: {
       guestName: order.guestName,
       pickupTime: order.pickupTime,
     })),
+    dineInPending: dineInPendingOrders.length,
+    dineInCompleted: dineInCompletedOrders.length,
+    dineInPreview: dineInPendingOrders.slice(0, 3).map(dineInHandoffPreview),
+    dineInCompletedPreview: dineInCompletedOrders
+      .slice(0, 3)
+      .map(dineInHandoffPreview),
   };
 
   let notStarted = 0;
