@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
+import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
   earliestPickupDateYmd,
   getPickupSlotsForDate,
@@ -23,6 +25,7 @@ type OwnerPickupFieldsProps = {
   /** Contextual schedule labels (Delivery reuses pickup_date / pickup_time). */
   dateLabel?: string;
   timeLabel?: string;
+  hoursSnapshot?: OperatingHoursSnapshot;
 };
 
 /**
@@ -39,6 +42,7 @@ export function OwnerPickupFields({
   onTimeChange,
   dateLabel = "Pickup date",
   timeLabel = "Pickup time",
+  hoursSnapshot = OPERATING_HOURS_SEED,
 }: OwnerPickupFieldsProps) {
   const minDate = earliestPickupDateYmd();
   const initialTime = defaultTime
@@ -47,7 +51,7 @@ export function OwnerPickupFields({
   const initialIsCustom =
     Boolean(initialTime) &&
     Boolean(defaultDate) &&
-    !isValidPickupSlot(defaultDate!, initialTime);
+    !isValidPickupSlot(defaultDate!, initialTime, hoursSnapshot);
 
   const [date, setDate] = useState(defaultDate ?? "");
   const [mode, setMode] = useState<"slot" | "custom">(
@@ -61,8 +65,8 @@ export function OwnerPickupFields({
   );
 
   const slots = useMemo(
-    () => (date ? getPickupSlotsForDate(date) : []),
-    [date],
+    () => (date ? getPickupSlotsForDate(date, hoursSnapshot) : []),
+    [date, hoursSnapshot],
   );
 
   const effectiveTime = mode === "custom" ? customTime : slotTime;
@@ -79,12 +83,12 @@ export function OwnerPickupFields({
 
   const exceptionWarning = useMemo(() => {
     if (!date) return null;
-    const schedule = getEffectivePickupSchedule(date);
+    const schedule = getEffectivePickupSchedule(date, hoursSnapshot);
     const normalized = effectiveTime
       ? normalizePickupTimeValue(effectiveTime)
       : "";
     return getStaffPickupExceptionWarning(date, normalized || null, schedule);
-  }, [date, effectiveTime]);
+  }, [date, effectiveTime, hoursSnapshot]);
 
   return (
     <div className="space-y-4">
@@ -99,7 +103,7 @@ export function OwnerPickupFields({
               setDate(next);
               onDateChange?.(next);
               if (mode === "slot" && slotTime) {
-                const stillValid = getPickupSlotsForDate(next).some(
+                const stillValid = getPickupSlotsForDate(next, hoursSnapshot).some(
                   (slot) => slot.value === slotTime,
                 );
                 if (!stillValid) setSlotAndNotify("");

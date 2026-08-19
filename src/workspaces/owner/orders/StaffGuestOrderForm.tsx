@@ -32,6 +32,8 @@ import {
 } from "@/workspaces/owner/orders/actions";
 import { STAFF_GUEST_ORDER_SOURCES } from "@/workspaces/owner/orders/labels";
 import { OrderPaidAddonsEditor } from "@/workspaces/owner/orders/OrderPaidAddonsEditor";
+import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
+import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import { OrderFulfilmentCreateFields } from "@/workspaces/owner/orders/OrderFulfilmentCreateFields";
 
 type EditableItem = {
@@ -52,6 +54,7 @@ type StaffGuestOrderFormProps = {
   cakes: StorefrontCake[];
   complimentaryOptions: CollectionComplimentaryOption[];
   paidAddonCatalog: PaidAddonType[];
+  hoursSnapshot?: OperatingHoursSnapshot;
 };
 
 const initialState: CreateStaffGuestOrderState = {
@@ -62,6 +65,7 @@ export function StaffGuestOrderForm({
   cakes,
   complimentaryOptions,
   paidAddonCatalog,
+  hoursSnapshot = OPERATING_HOURS_SEED,
 }: StaffGuestOrderFormProps) {
   const [state, formAction, pending] = useActionState(
     createStaffGuestOrderAction,
@@ -222,6 +226,7 @@ export function StaffGuestOrderForm({
         customerName={guestName}
         customerPhone={guestPhone}
         delivery={deliveryDraft}
+        hoursSnapshot={hoursSnapshot}
         method={fulfilmentMethod}
         onDeliveryChange={setDeliveryDraft}
         onMethodChange={setFulfilmentMethod}

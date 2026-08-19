@@ -529,16 +529,16 @@ assert.deepEqual(
   { p_fulfilment_method: "pickup", p_delivery: null },
 );
 
-// AH. website checkout action still has no Delivery picker args (static source check)
+// AH. website Whole Cake checkout now sends fulfilment args (Pickup default).
 {
   const checkoutSrc = readFileSync(
     resolve(process.cwd(), "src/workspaces/storefront/checkout/actions.ts"),
     "utf8",
   );
   assert.ok(checkoutSrc.includes("submit_guest_preorder"));
-  assert.ok(!checkoutSrc.includes("p_fulfilment_method"));
-  assert.ok(!checkoutSrc.includes("p_delivery"));
-  assert.ok(!checkoutSrc.includes("delivery_json"));
+  assert.ok(checkoutSrc.includes("p_fulfilment_method"));
+  assert.ok(checkoutSrc.includes("p_delivery"));
+  assert.ok(checkoutSrc.includes("p_dine_in"));
 }
 
 console.log("M4-P2 Slice 3 helper/materiality tests: PASSED");

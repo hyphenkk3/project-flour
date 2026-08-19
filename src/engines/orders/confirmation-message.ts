@@ -1,3 +1,4 @@
+import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import {
   commercialEquationItems,
@@ -23,6 +24,7 @@ import type {
   RecipientNotifyPreference,
   StorefrontOrder,
   StorefrontOrderDelivery,
+  StorefrontOrderDineInReservation,
   StorefrontOrderFulfilmentMethod,
 } from "@/types/storefront";
 
@@ -35,6 +37,15 @@ const MESSAGE_SEPARATOR = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~";
  */
 export const CONFIRMATION_SECTION_SEPARATOR =
   "____________________________________________________________";
+
+/** Single customer-facing order-type colour. Not month-coded. */
+export const CUSTOMER_ORDER_TYPE_COLOUR = "🟠";
+export const CUSTOMER_PICKUP_ORDER_MARKER = "🟠 Pick-up order:";
+export const CUSTOMER_DELIVERY_ORDER_MARKER = "🟠🚗 Delivery order:";
+export const CUSTOMER_DINE_IN_ORDER_MARKER = "🟠🍽️ Dine-In order:";
+
+export const DINE_IN_RESERVATION_INCLUDED_COPY =
+  "Dine-in reservation is included — your reservation is made together with your cake order. No separate reservation is needed.";
 
 function parseYmd(ymd: string): Date | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim());
@@ -63,6 +74,56 @@ export function formatComplimentaryLine(
   return active
     .map((item) => `${item.name} x${item.quantity}`)
     .join(", ");
+}
+
+function gcdPositive(a: number, b: number): number {
+  let x = Math.abs(a);
+  let y = Math.abs(b);
+  while (y !== 0) {
+    const next = x % y;
+    x = y;
+    y = next;
+  }
+  return x || 1;
+}
+
+/**
+ * Customer confirmation complimentary line.
+ * Equal quantities collapse into sets: (Topper x1, Candle x1, Knife x1) × 2 sets.
+ */
+export function formatCustomerConfirmationComplimentaryLine(
+  items: Array<{ name: string; quantity: number }>,
+): string | null {
+  const active = items.filter((item) => item.quantity > 0);
+  if (active.length === 0) return null;
+  const quantities = active.map((item) =>
+    Math.max(1, Math.floor(Number(item.quantity) || 1)),
+  );
+  const setCount = quantities.reduce((acc, qty) => gcdPositive(acc, qty));
+  const inner = active
+    .map((item, index) => `${item.name} x${quantities[index]! / setCount}`)
+    .join(", ");
+  if (setCount > 1) {
+    return `*Complimentary (${inner}) × ${setCount} sets`;
+  }
+  return `*Complimentary ${inner}`;
+}
+
+export function formatCustomerDineInReservationFooter(input: {
+  customerName: string;
+  dineInReservation: StorefrontOrderDineInReservation;
+}): string {
+  const reservation = input.dineInReservation;
+  const timeLabel = formatPickupTime(reservation.reservationTime);
+  const venue = dineInVenueLabel(reservation.venue);
+  const lines = [
+    `* Dine-in reservation: ${timeLabel} @ ${venue}`,
+    `* Guests: ${reservation.guestCount}`,
+  ];
+  const note = reservation.reservationNote?.trim();
+  if (note) lines.push(`* ${note}`);
+  lines.push(DINE_IN_RESERVATION_INCLUDED_COPY);
+  return lines.join("\n");
 }
 
 /** Cake + paid-add-on commercial lines under Whole Cake; (no separate Add-ons heading). */
@@ -263,6 +324,7 @@ export function generateConfirmationMessage(
   );
 
   const isDelivery = payload.fulfilmentMethod === "delivery";
+  const isDineIn = payload.fulfilmentMethod === "dine_in";
   const samePerson =
     isDelivery &&
     isDeliveryRecipientSameAsOrderingCustomer({
@@ -274,7 +336,9 @@ export function generateConfirmationMessage(
     isDelivery && payload.delivery && !samePerson,
   );
 
-  const complimentary = formatComplimentaryLine(payload.complimentaryItems);
+  const complimentary = formatCustomerConfirmationComplimentaryLine(
+    payload.complimentaryItems,
+  );
   const notifyInstruction = showDeliveryNotify
     ? formatConfirmationRecipientNotifyInstruction(
         payload.delivery!.recipientNotifyPreference,
@@ -284,7 +348,7 @@ export function generateConfirmationMessage(
   // Complimentary + Include RECEIPT + Delivery notify are adjacent (no blank line between).
   const postAmountLines: string[] = [];
   if (complimentary) {
-    postAmountLines.push(`*Complimentary ${complimentary}`);
+    postAmountLines.push(complimentary);
   }
   if (payload.includeReceipt) {
     postAmountLines.push("*Include RECEIPT");
@@ -298,6 +362,7 @@ export function generateConfirmationMessage(
   const fulfilmentBlock = formatConfirmationFulfilmentBlock({
     fulfilmentMethod: payload.fulfilmentMethod,
     delivery: payload.delivery,
+    dineInReservation: payload.dineInReservation,
     customerName: payload.customerName,
     customerPhone: payload.customerPhone,
     pickupDate: payload.pickupDate,
@@ -318,6 +383,12 @@ export function generateConfirmationMessage(
   orderSection += `\n\n${amountSection}`;
   if (postAmountBlock) {
     orderSection += `\n\n${postAmountBlock}`;
+  }
+  if (isDineIn && payload.dineInReservation) {
+    orderSection += `\n\n${formatCustomerDineInReservationFooter({
+      customerName: payload.customerName,
+      dineInReservation: payload.dineInReservation,
+    })}`;
   }
 
   return (
@@ -372,6 +443,7 @@ export function formatConfirmationRecipientNotifyInstruction(
 export function formatConfirmationFulfilmentBlock(input: {
   fulfilmentMethod?: StorefrontOrderFulfilmentMethod | null;
   delivery?: StorefrontOrderDelivery | null;
+  dineInReservation?: StorefrontOrderDineInReservation | null;
   customerName: string;
   customerPhone: string;
   pickupDate: string;
@@ -380,17 +452,26 @@ export function formatConfirmationFulfilmentBlock(input: {
   weekday: string;
   timeLabel: string;
 }): string {
+  if (input.fulfilmentMethod === "dine_in") {
+    return (
+      `${CUSTOMER_DINE_IN_ORDER_MARKER} ${input.dateShort} (${input.weekday})\n\n` +
+      `Ordered by: ${input.customerName}\n` +
+      `Phone No: ${input.customerPhone}\n` +
+      `Cake serving time: ${input.timeLabel}`
+    );
+  }
+
   const isDelivery = input.fulfilmentMethod === "delivery";
   if (!isDelivery) {
     return (
-      `🟠Pick-up order: ${input.dateShort} (${input.weekday})\n\n` +
+      `${CUSTOMER_PICKUP_ORDER_MARKER} ${input.dateShort} (${input.weekday})\n\n` +
       `Ordered by: ${input.customerName}\n` +
       `Phone No: ${input.customerPhone}\n` +
       `Time: ${input.timeLabel}`
     );
   }
 
-  const header = `🟠🚗 Delivery order: ${input.dateShort} (${input.weekday})`;
+  const header = `${CUSTOMER_DELIVERY_ORDER_MARKER} ${input.dateShort} (${input.weekday})`;
   const delivery = input.delivery ?? null;
   const samePerson = isDeliveryRecipientSameAsOrderingCustomer({
     customerName: input.customerName,
@@ -439,6 +520,7 @@ export function buildConfirmationPayload(input: {
   amountDue: number;
   fulfilmentMethod?: StorefrontOrderFulfilmentMethod;
   delivery?: StorefrontOrderDelivery | null;
+  dineInReservation?: StorefrontOrderDineInReservation | null;
   includeReceipt?: boolean;
 }): ConfirmationPayload {
   return {
@@ -449,6 +531,7 @@ export function buildConfirmationPayload(input: {
     pickupTime: input.pickupTime,
     fulfilmentMethod: input.fulfilmentMethod,
     delivery: input.delivery ?? null,
+    dineInReservation: input.dineInReservation ?? null,
     items: input.items,
     complimentaryItems: input.complimentaryItems.filter(
       (item) => item.quantity > 0,
@@ -478,6 +561,7 @@ export function buildConfirmationPayloadFromOrder(input: {
     pickupTime: order.pickupTime,
     fulfilmentMethod: order.fulfilmentMethod,
     delivery: order.delivery,
+    dineInReservation: order.dineInReservation,
     items: order.items.map((item) => ({
       cakeName: item.cakeName,
       sizeLabel: item.sizeLabel,

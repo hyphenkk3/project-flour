@@ -12,6 +12,7 @@ import {
   resolveOwnerReturnTo,
   shouldPropagateOwnerReturnTo,
 } from "@/workspaces/owner/navigation/return-to";
+import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import { OrderWorkspaceForm } from "@/workspaces/owner/orders/OrderWorkspaceForm";
 import {
   getGuestOrderById,
@@ -83,6 +84,7 @@ export async function OwnerOrderDetail({
   const timeline = await listOrderTimeline(orderId);
   const confirmations = await listConfirmationSnapshots(orderId);
   const approvals = await listApprovalsForOrder(orderId);
+  const hoursSnapshot = await loadOperatingHoursSnapshot();
   const back = resolveOwnerReturnTo(returnTo);
   const safeReturnTo = shouldPropagateOwnerReturnTo(back) ? back.href : null;
   const backHref =
@@ -133,6 +135,7 @@ export async function OwnerOrderDetail({
         complimentaryOptions={complimentaryOptions}
         confirmations={confirmations}
         highlightApprovalId={approvalId ?? null}
+        hoursSnapshot={hoursSnapshot}
         order={order}
         paidAddonCatalog={paidAddonCatalog}
         returnTo={safeReturnTo}

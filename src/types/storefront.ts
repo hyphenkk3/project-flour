@@ -5,7 +5,7 @@ export type GuestOrderStatus =
 
 /** Guest Owner fulfilment methods (DB also has drive_through). */
 export type StorefrontOrderFulfilmentMethod =
-  "pickup" | "delivery" | "drive_through";
+  "pickup" | "delivery" | "drive_through" | "dine_in";
 
 /** Explicit Delivery recipient-notify preference (not customer messaging consent). */
 export type RecipientNotifyPreference =
@@ -46,6 +46,17 @@ export type StorefrontProcessingFeeRequest = {
 };
 
 /** Snapshotted Delivery details on a guest order (null when Pickup). */
+export type StorefrontDineInVenue = "hyphen" | "whitebird";
+
+export type StorefrontOrderDineInReservation = {
+  reservationDate: string;
+  reservationTime: string;
+  venue: StorefrontDineInVenue;
+  guestCount: number;
+  reservationNote: string | null;
+  status: string;
+};
+
 export type StorefrontOrderDelivery = {
   recipientName: string;
   recipientPhone: string;
@@ -142,6 +153,7 @@ export type StorefrontCollection = {
   id: string;
   name: string;
   month: string | null;
+  displayOrder?: number | null;
 };
 
 export type StorefrontCakeSize = {
@@ -248,8 +260,10 @@ export type StorefrontOrder = {
   pickupInstruction: string | null;
   /** DB fulfilment_method. Historical / missing maps to pickup in readers. */
   fulfilmentMethod: StorefrontOrderFulfilmentMethod;
-  /** Snapshotted Delivery details; null for Pickup (and when no details row). */
+  /** Snapshotted Delivery details; null unless fulfilment is delivery. */
   delivery: StorefrontOrderDelivery | null;
+  /** Dine-in reservation; null unless fulfilment is dine_in. */
+  dineInReservation: StorefrontOrderDineInReservation | null;
   notes: string | null;
   internalNotes: string | null;
   status: GuestOrderStatus;
@@ -393,6 +407,7 @@ export type ConfirmationPayload = {
    * remain reproducible from payload without live-order drift.
    */
   delivery?: StorefrontOrderDelivery | null;
+  dineInReservation?: StorefrontOrderDineInReservation | null;
   items: Array<{
     cakeName: string;
     sizeLabel: string;

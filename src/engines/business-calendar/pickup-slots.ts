@@ -5,6 +5,8 @@
  * Values are 24h "HH:MM" (Postgres time-compatible).
  */
 
+import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
+import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
   formatPickupClockLabel,
   getEffectivePickupSchedule,
@@ -29,8 +31,11 @@ function pad(n: number): string {
  * Returns valid pickup slots for a calendar date (YYYY-MM-DD).
  * Closed operating dates return [].
  */
-export function getPickupSlotsForDate(dateYmd: string): PickupSlot[] {
-  const schedule = getEffectivePickupSchedule(dateYmd);
+export function getPickupSlotsForDate(
+  dateYmd: string,
+  snapshot: OperatingHoursSnapshot = OPERATING_HOURS_SEED,
+): PickupSlot[] {
+  const schedule = getEffectivePickupSchedule(dateYmd, snapshot);
   if (schedule.status !== "open") return [];
 
   return schedule.selectableSlots.map((value) => ({
@@ -46,9 +51,13 @@ export function normalizePickupTimeValue(time: string): string {
   return `${pad(Number(parts[0]))}:${pad(Number(parts[1]))}`;
 }
 
-export function isValidPickupSlot(dateYmd: string, timeValue: string): boolean {
+export function isValidPickupSlot(
+  dateYmd: string,
+  timeValue: string,
+  snapshot: OperatingHoursSnapshot = OPERATING_HOURS_SEED,
+): boolean {
   const normalized = normalizePickupTimeValue(timeValue);
-  return getPickupSlotsForDate(dateYmd).some(
+  return getPickupSlotsForDate(dateYmd, snapshot).some(
     (slot) => slot.value === normalized,
   );
 }
@@ -62,8 +71,16 @@ export function isValidClockPickupTime(timeValue: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(normalized);
 }
 
-/** Tomorrow in Asia/Singapore — same earliest date as website checkout HTML min. */
+/**
+ * Whole Cake customer orders: at least 2 calendar days after Singapore today.
+ * Same earliest date as website checkout HTML min (Pickup, Dine-in, Delivery).
+ */
+export const WHOLE_CAKE_MIN_LEAD_CALENDAR_DAYS = 2;
+
 export function earliestPickupDateYmd(from = new Date()): string {
   const todaySg = toBusinessDateKey(from);
-  return addBusinessCalendarDays(todaySg, 1) ?? todaySg;
+  return (
+    addBusinessCalendarDays(todaySg, WHOLE_CAKE_MIN_LEAD_CALENDAR_DAYS) ??
+    todaySg
+  );
 }

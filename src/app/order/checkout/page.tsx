@@ -6,12 +6,18 @@ export const metadata: Metadata = {
 };
 
 type CheckoutPageProps = {
-  searchParams: Promise<{ pickup?: string }>;
+  searchParams: Promise<{ pickup?: string; from?: string; to?: string }>;
 };
 
 export default async function OrderCheckoutPage({
   searchParams,
 }: CheckoutPageProps) {
   const params = await searchParams;
-  return <StorefrontCheckoutPage pickupQuery={params.pickup} />;
+  return (
+    <StorefrontCheckoutPage
+      fromQuery={params.from}
+      pickupQuery={params.pickup}
+      toQuery={params.to}
+    />
+  );
 }

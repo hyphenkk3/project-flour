@@ -65,6 +65,8 @@ export function fulfilmentMethodLabel(method: FulfilmentMethod): string {
       return "Delivery";
     case "drive_through":
       return "Drive-through";
+    case "dine_in":
+      return "Dine-in";
   }
 }
 

@@ -135,6 +135,7 @@ function storefrontOrder(
     confirmationNeedsResend: false,
     fulfilmentMethod: "pickup",
     delivery: null,
+    dineInReservation: null,
     readyAt: null,
     pickedUpAt: null,
     outForDeliveryAt: null,
@@ -219,7 +220,7 @@ function storefrontOrder(
 {
   const body = generateConfirmationMessage(basePayload());
   assert.match(body, /^Hello Owner \(Dev\) here,/m);
-  assert.ok(body.includes("🟠Pick-up order: 15/8 (Sat)"));
+  assert.ok(body.includes("🟠 Pick-up order: 15/8 (Sat)"));
   assert.ok(body.includes("Ordered by: Amy"));
   assert.ok(body.includes("Phone No: 0123456789"));
   assert.ok(body.includes("Time: 1:00 PM"));
@@ -229,12 +230,40 @@ function storefrontOrder(
   assert.ok(!body.includes("🚗"));
   assert.ok(!body.includes("Inform Recipient before delivery"));
   assert.ok(!body.includes("DO NOT inform Recipient"));
-  // Closing separator after order content, before review
+}
+
+{
+  const dineInBody = generateConfirmationMessage(
+    basePayload({
+      fulfilmentMethod: "dine_in",
+      dineInReservation: {
+        reservationDate: "2026-08-15",
+        reservationTime: "13:00",
+        venue: "whitebird",
+        guestCount: 4,
+        reservationNote: "Window seat if possible",
+        status: "pending",
+      },
+    }),
+  );
+  assert.ok(dineInBody.includes("🟠🍽️ Dine-In order: 15/8 (Sat)"));
+  assert.ok(dineInBody.includes("Cake serving time: 1:00 PM"));
   assert.ok(
-    body.includes(
-      `${CONFIRMATION_SECTION_SEPARATOR}\n\nKindly review ALL the details`,
+    dineInBody.includes("* Dine-in reservation: 1:00 PM @ Whitebird"),
+  );
+  assert.ok(dineInBody.includes("* Guests: 4"));
+  assert.ok(dineInBody.includes("Window seat if possible"));
+  assert.ok(
+    dineInBody.includes(
+      "Dine-in reservation is included — your reservation is made together with your cake order. No separate reservation is needed.",
     ),
   );
+  assert.ok(!dineInBody.includes("Venue: Whitebird"));
+  assert.ok(!dineInBody.includes("🟠 Pick-up order:"));
+  assert.ok(!dineInBody.includes("Delivery order"));
+  assert.ok(!dineInBody.includes("(jw)"));
+  assert.ok(!dineInBody.includes("WB QR"));
+  assert.ok(!dineInBody.includes("c/o"));
 }
 
 // Missing fulfilmentMethod still Pickup (historical)
@@ -243,7 +272,7 @@ function storefrontOrder(
   delete (p as { fulfilmentMethod?: unknown }).fulfilmentMethod;
   delete (p as { delivery?: unknown }).delivery;
   const body = generateConfirmationMessage(p);
-  assert.ok(body.includes("🟠Pick-up order: 15/8 (Sat)"));
+  assert.ok(body.includes("🟠 Pick-up order: 15/8 (Sat)"));
   assert.ok(!body.includes("Delivery order"));
   assert.ok(body.includes("Time: 1:00 PM\n\nWhole Cake;"));
 }
@@ -615,7 +644,7 @@ function storefrontOrder(
       amountDue: 125,
     }),
   );
-  assert.ok(historical.includes("🟠Pick-up order:"));
+  assert.ok(historical.includes("🟠 Pick-up order:"));
   assert.ok(!historical.includes("Delivery order"));
 }
 
@@ -828,8 +857,9 @@ function storefrontOrder(
     "utf8",
   );
   assert.ok(checkoutSrc.includes("submit_guest_preorder"));
-  assert.ok(!checkoutSrc.includes("p_fulfilment_method"));
-  assert.ok(!checkoutSrc.includes("p_delivery"));
+  assert.ok(checkoutSrc.includes("p_fulfilment_method"));
+  assert.ok(checkoutSrc.includes("p_delivery"));
+  assert.ok(checkoutSrc.includes("p_dine_in"));
 
   const confirmationSrc = readFileSync(
     resolve(process.cwd(), "src/engines/orders/confirmation-message.ts"),

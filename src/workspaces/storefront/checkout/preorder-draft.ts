@@ -1,4 +1,10 @@
 import { customerPreorderCommercialTotal } from "@/engines/orders/customer-preorder-options";
+import {
+  OWNER_DELIVERY_CITY,
+  OWNER_DELIVERY_STATE,
+  parseCustomerWebsiteFulfilmentMethod,
+  type CustomerWebsiteFulfilmentMethod,
+} from "@/engines/orders/fulfilment";
 import { calculateOrderTotal } from "@/engines/orders/totals";
 
 export type PreorderDraftItem = {
@@ -20,6 +26,21 @@ export type PreorderDraftFields = {
   includeReceiptChoice: PhysicalReceiptChoice;
   pickupDate: string;
   pickupTime: string;
+  /** Dine-in table-start time. Independent of cake serving (`pickupTime`). */
+  reservationTime: string;
+  fulfilmentMethod: CustomerWebsiteFulfilmentMethod;
+  dineInVenue: string;
+  guestCount: string;
+  reservationNote: string;
+  recipientName: string;
+  recipientPhone: string;
+  addressLine1: string;
+  addressLine2: string;
+  postcode: string;
+  city: string;
+  state: string;
+  recipientNotifyPreference: string;
+  sameAsCustomer: boolean;
   notes: string;
   complimentaryCodes: string[];
   paidAddonCodes: string[];
@@ -55,6 +76,20 @@ export const emptyPreorderFields = (): PreorderDraftFields => ({
   includeReceiptChoice: "",
   pickupDate: "",
   pickupTime: "",
+  reservationTime: "",
+  fulfilmentMethod: "pickup",
+  dineInVenue: "",
+  guestCount: "",
+  reservationNote: "",
+  recipientName: "",
+  recipientPhone: "",
+  addressLine1: "",
+  addressLine2: "",
+  postcode: "",
+  city: OWNER_DELIVERY_CITY,
+  state: OWNER_DELIVERY_STATE,
+  recipientNotifyPreference: "",
+  sameAsCustomer: true,
   notes: "",
   complimentaryCodes: [],
   paidAddonCodes: [],
@@ -92,6 +127,24 @@ export function readPreorderDraft(): PreorderDraft | null {
       ),
       pickupDate: String(parsed.pickupDate ?? ""),
       pickupTime: String(parsed.pickupTime ?? ""),
+      reservationTime: String(parsed.reservationTime ?? ""),
+      fulfilmentMethod: parseCustomerWebsiteFulfilmentMethod(
+        parsed.fulfilmentMethod,
+      ),
+      dineInVenue: String(parsed.dineInVenue ?? ""),
+      guestCount: String(parsed.guestCount ?? ""),
+      reservationNote: String(parsed.reservationNote ?? ""),
+      recipientName: String(parsed.recipientName ?? ""),
+      recipientPhone: String(parsed.recipientPhone ?? ""),
+      addressLine1: String(parsed.addressLine1 ?? ""),
+      addressLine2: String(parsed.addressLine2 ?? ""),
+      postcode: String(parsed.postcode ?? ""),
+      city: String(parsed.city ?? OWNER_DELIVERY_CITY),
+      state: String(parsed.state ?? OWNER_DELIVERY_STATE),
+      recipientNotifyPreference: String(
+        parsed.recipientNotifyPreference ?? "",
+      ),
+      sameAsCustomer: parsed.sameAsCustomer !== false,
       notes: String(parsed.notes ?? ""),
       complimentaryCodes: Array.isArray(parsed.complimentaryCodes)
         ? parsed.complimentaryCodes.map((code) => String(code))
@@ -230,4 +283,30 @@ export function patchPreorderDraft(
   const next = { ...current, ...patch, items: patch.items ?? current.items };
   writePreorderDraft(next);
   return next;
+}
+
+/** Clear method-specific fields when the customer switches fulfilment. */
+export function fieldsAfterFulfilmentChange(
+  fields: PreorderDraftFields,
+  method: CustomerWebsiteFulfilmentMethod,
+): PreorderDraftFields {
+  return {
+    ...fields,
+    fulfilmentMethod: method,
+    pickupTime: "",
+    reservationTime: "",
+    dineInVenue: "",
+    guestCount: method === "dine_in" ? fields.guestCount : "",
+    reservationNote: method === "dine_in" ? fields.reservationNote : "",
+    recipientName: method === "delivery" ? fields.recipientName : "",
+    recipientPhone: method === "delivery" ? fields.recipientPhone : "",
+    addressLine1: method === "delivery" ? fields.addressLine1 : "",
+    addressLine2: method === "delivery" ? fields.addressLine2 : "",
+    postcode: method === "delivery" ? fields.postcode : "",
+    city: method === "delivery" ? fields.city : OWNER_DELIVERY_CITY,
+    state: method === "delivery" ? fields.state : OWNER_DELIVERY_STATE,
+    recipientNotifyPreference:
+      method === "delivery" ? fields.recipientNotifyPreference : "",
+    sameAsCustomer: method === "delivery" ? fields.sameAsCustomer : true,
+  };
 }

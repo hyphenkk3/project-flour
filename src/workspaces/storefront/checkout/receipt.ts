@@ -14,6 +14,10 @@ export type GuestPreorderReceipt = {
   items: GuestPreorderReceiptItem[];
   pickupDate: string;
   pickupTime: string;
+  fulfilmentMethod: "pickup" | "dine_in" | "delivery";
+  guestCount: number | null;
+  dineInVenue: "hyphen" | "whitebird" | null;
+  reservationTime: string | null;
   total: number;
 };
 
@@ -83,7 +87,9 @@ export async function loadGuestPreorderReceipt(
         `
         pickup_date,
         pickup_time,
+        fulfilment_method,
         customer_id,
+        order_dine_in_reservations ( guest_count, venue, reservation_time ),
         order_items (
           id,
           quantity,
@@ -127,10 +133,50 @@ export async function loadGuestPreorderReceipt(
       };
     });
 
+    const reservationRel = (
+      data as {
+        order_dine_in_reservations?:
+          | {
+              guest_count?: number | null;
+              venue?: string | null;
+              reservation_time?: string | null;
+            }
+          | {
+              guest_count?: number | null;
+              venue?: string | null;
+              reservation_time?: string | null;
+            }[]
+          | null;
+      }
+    ).order_dine_in_reservations;
+    const reservation = Array.isArray(reservationRel)
+      ? reservationRel[0]
+      : reservationRel;
+    const methodRaw = String(
+      (data as { fulfilment_method?: string | null }).fulfilment_method ?? "",
+    );
+    const fulfilmentMethod =
+      methodRaw === "dine_in" || methodRaw === "delivery"
+        ? methodRaw
+        : "pickup";
+    const guestCountRaw = Number(reservation?.guest_count);
+    const venueRaw = String(reservation?.venue ?? "").trim().toLowerCase();
+    const dineInVenue =
+      venueRaw === "hyphen" || venueRaw === "whitebird" ? venueRaw : null;
     return {
       items,
       pickupDate: String(data.pickup_date),
       pickupTime: String(data.pickup_time),
+      fulfilmentMethod,
+      guestCount:
+        fulfilmentMethod === "dine_in" && Number.isInteger(guestCountRaw)
+          ? guestCountRaw
+          : null,
+      dineInVenue: fulfilmentMethod === "dine_in" ? dineInVenue : null,
+      reservationTime:
+        fulfilmentMethod === "dine_in"
+          ? String(reservation?.reservation_time ?? "").slice(0, 5) || null
+          : null,
       total: calculateOrderTotal(
         items.map((item) => ({
           unitPrice: item.unitPrice ?? 0,

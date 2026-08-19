@@ -8,6 +8,7 @@
 
 import type { StatusTone } from "@/lib/design-tokens";
 import { isEarlyPickupAttention } from "@/engines/business-calendar/early-pickup";
+import { normalizeFulfilmentMethod } from "@/engines/orders/fulfilment";
 import { isDeliveryFulfilment } from "@/engines/orders/operational-state";
 import type { GuestOrderStatus } from "@/types/storefront";
 import type {
@@ -245,10 +246,10 @@ export function isBakeryMarkReadyEligible(input: {
 
 export function bakeryFulfilmentCue(
   fulfilmentMethod: string | null | undefined,
-): "Pickup" | "Delivery" {
-  return isDeliveryFulfilment(fulfilmentMethod as never)
-    ? "Delivery"
-    : "Pickup";
+): "Pickup" | "Delivery" | "Dine-in" {
+  if (isDeliveryFulfilment(fulfilmentMethod as never)) return "Delivery";
+  if (normalizeFulfilmentMethod(fulfilmentMethod) === "dine_in") return "Dine-in";
+  return "Pickup";
 }
 
 /** Primary cake line + remaining count for board cards. */

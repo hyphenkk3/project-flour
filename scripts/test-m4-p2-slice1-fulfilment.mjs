@@ -672,7 +672,7 @@ async function main() {
       p_customer_name: `M4P2 Web ${Date.now()}`,
       p_phone: "0123456789",
       p_email: null,
-      p_pickup_date: "2026-08-26",
+      p_pickup_date: "2026-08-28",
       p_pickup_time: "16:00:00",
       p_notes: null,
       p_items: [

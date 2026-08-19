@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { requireStaff } from "@/foundation/auth/session";
 import { StaffGuestOrderForm } from "@/workspaces/owner/orders/StaffGuestOrderForm";
+import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import {
   listActivePaidAddonTypes,
   listCollectionComplimentaryOptions,
@@ -32,6 +33,7 @@ export default async function OwnerNewOrderPage() {
   } catch {
     paidAddonCatalog = [];
   }
+  const hoursSnapshot = await loadOperatingHoursSnapshot();
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -53,6 +55,7 @@ export default async function OwnerNewOrderPage() {
       <StaffGuestOrderForm
         cakes={cakes}
         complimentaryOptions={complimentaryOptions}
+        hoursSnapshot={hoursSnapshot}
         paidAddonCatalog={paidAddonCatalog}
       />
     </div>

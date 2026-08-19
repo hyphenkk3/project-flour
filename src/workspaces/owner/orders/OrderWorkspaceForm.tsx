@@ -43,6 +43,8 @@ import {
   LATE_ORDER_EDIT_SECTION_INCLUDED,
   LATE_ORDER_EDIT_SECTION_PICKUP_INCLUDED,
 } from "@/engines/operations/approval-ux";
+import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
+import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import { normalizePickupTimeValue } from "@/engines/business-calendar/pickup-slots";
 import { scrollWorkspaceSectionIntoView } from "@/workspaces/owner/orders/scroll-workspace-section";
 import {
@@ -149,6 +151,7 @@ type OrderWorkspaceFormProps = {
   capabilities: GuestOrderWorkspaceCapabilities;
   approvals?: OperationsApprovalRecord[];
   highlightApprovalId?: string | null;
+  hoursSnapshot?: OperatingHoursSnapshot;
 };
 
 function ViewBlock({
@@ -180,6 +183,7 @@ export function OrderWorkspaceForm({
   capabilities,
   approvals = [],
   highlightApprovalId = null,
+  hoursSnapshot = OPERATING_HOURS_SEED,
 }: OrderWorkspaceFormProps) {
   const router = useRouter();
   const boundSave = saveOrderWorkspaceAction.bind(null, order.id);
@@ -702,7 +706,7 @@ export function OrderWorkspaceForm({
         </ViewBlock>
 
         <ViewBlock title={fulfilmentView.sectionTitle}>
-          {fulfilmentView.isDelivery ? (
+          {fulfilmentView.isDelivery || fulfilmentView.isDineIn ? (
             <div className="space-y-1">
               <p className="text-skyline text-xs font-medium tracking-wide uppercase">
                 {fulfilmentView.dateLabel}
@@ -711,7 +715,9 @@ export function OrderWorkspaceForm({
                 {formatLongBusinessDate(order.pickupDate)}
               </p>
               <p className="text-skyline mt-2 text-xs font-medium tracking-wide uppercase">
-                {fulfilmentView.timeLabel}
+                {fulfilmentView.isDineIn
+                  ? "Cake serving time"
+                  : fulfilmentView.timeLabel}
               </p>
               <p className="text-ink text-sm">
                 {formatPickupTime(order.pickupTime)}
@@ -727,6 +733,38 @@ export function OrderWorkspaceForm({
               </p>
             </div>
           )}
+          {fulfilmentView.isDineIn && fulfilmentView.dineInReservation ? (
+            <div className="border-fog mt-4 space-y-2 border-t pt-4">
+              <p className="text-ink text-sm">
+                <span className="text-skyline">Venue · </span>
+                {fulfilmentView.dineInReservation.venue === "hyphen"
+                  ? "Hyphen"
+                  : fulfilmentView.dineInReservation.venue === "whitebird"
+                    ? "Whitebird"
+                    : fulfilmentView.dineInReservation.venue}
+              </p>
+              <p className="text-ink text-sm">
+                <span className="text-skyline">Guests · </span>
+                {fulfilmentView.dineInReservation.guestCount}
+              </p>
+              <p className="text-ink text-sm">
+                <span className="text-skyline">Dine-in reservation time · </span>
+                {formatPickupTime(
+                  fulfilmentView.dineInReservation.reservationTime,
+                )}
+              </p>
+              {fulfilmentView.dineInReservation.reservationNote ? (
+                <p className="text-ink text-sm">
+                  <span className="text-skyline">Reservation note · </span>
+                  {fulfilmentView.dineInReservation.reservationNote}
+                </p>
+              ) : null}
+              <p className="text-ink text-sm">
+                <span className="text-skyline">Reservation · </span>
+                {fulfilmentView.dineInReservation.status}
+              </p>
+            </div>
+          ) : null}
           {fulfilmentView.isDelivery && fulfilmentView.delivery ? (
             <div className="border-fog mt-4 space-y-2 border-t pt-4">
               <p className="text-ink text-sm">
@@ -1043,7 +1081,15 @@ export function OrderWorkspaceForm({
       <input name="items_json" type="hidden" value={itemsJson} />
       <input name="complimentary_json" type="hidden" value={complimentaryJson} />
       <input name="paid_addons_json" type="hidden" value={paidAddonsJson} />
-      <input name="fulfilment_method" type="hidden" value={editFulfilmentMethod} />
+      <input
+        name="fulfilment_method"
+        type="hidden"
+        value={
+          order.fulfilmentMethod === "dine_in"
+            ? "dine_in"
+            : editFulfilmentMethod
+        }
+      />
       <input name="delivery_json" type="hidden" value={deliveryJson} />
 
       <div className="flex flex-wrap items-center gap-3">
@@ -1141,20 +1187,89 @@ export function OrderWorkspaceForm({
       </section>
 
       <div className="space-y-4">
-        <OrderFulfilmentCreateFields
-          customerName={editGuestName}
-          customerPhone={editGuestPhone}
-          defaultDate={order.pickupDate}
-          defaultTime={order.pickupTime}
-          delivery={editDeliveryDraft}
-          lateEditCutoffHints={blockDirectSave}
-          method={editFulfilmentMethod}
-          onDateChange={setEditPickupDate}
-          onDeliveryChange={setEditDeliveryDraft}
-          onMethodChange={setEditFulfilmentMethod}
-          onTimeChange={setEditPickupTime}
-          scheduleMode={sourceLocked ? "slots" : "owner"}
-        />
+        {order.fulfilmentMethod === "dine_in" && order.dineInReservation ? (
+          <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
+            <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
+              Dine-in
+            </h2>
+            <input
+              name="dine_in_venue"
+              type="hidden"
+              value={order.dineInReservation.venue}
+            />
+            <FormField htmlFor="pickup_date" label="Dine-in date">
+              <FormInput
+                defaultValue={order.pickupDate}
+                id="pickup_date"
+                name="pickup_date"
+                onChange={(event) => setEditPickupDate(event.target.value)}
+                required
+                type="date"
+              />
+            </FormField>
+            <FormField
+              help="When the table reservation starts."
+              htmlFor="reservation_time"
+              label="Dine-in reservation time"
+            >
+              <FormInput
+                defaultValue={order.dineInReservation.reservationTime}
+                id="reservation_time"
+                name="reservation_time"
+                required
+                type="time"
+              />
+            </FormField>
+            <FormField
+              help="When the cake should be served. Must be within 1 hour of the reservation time."
+              htmlFor="pickup_time"
+              label="Cake serving time"
+            >
+              <FormInput
+                defaultValue={order.pickupTime}
+                id="pickup_time"
+                name="pickup_time"
+                onChange={(event) => setEditPickupTime(event.target.value)}
+                required
+                type="time"
+              />
+            </FormField>
+            <FormField htmlFor="guest_count" label="Guests">
+              <FormInput
+                defaultValue={order.dineInReservation.guestCount}
+                id="guest_count"
+                min={1}
+                name="guest_count"
+                required
+                type="number"
+              />
+            </FormField>
+            <FormField htmlFor="reservation_note" label="Reservation note">
+              <FormTextarea
+                defaultValue={order.dineInReservation.reservationNote ?? ""}
+                id="reservation_note"
+                name="reservation_note"
+                rows={3}
+              />
+            </FormField>
+          </section>
+        ) : (
+          <OrderFulfilmentCreateFields
+            customerName={editGuestName}
+            customerPhone={editGuestPhone}
+            defaultDate={order.pickupDate}
+            defaultTime={order.pickupTime}
+            delivery={editDeliveryDraft}
+            lateEditCutoffHints={blockDirectSave}
+            method={editFulfilmentMethod}
+            onDateChange={setEditPickupDate}
+            onDeliveryChange={setEditDeliveryDraft}
+            onMethodChange={setEditFulfilmentMethod}
+            onTimeChange={setEditPickupTime}
+            hoursSnapshot={hoursSnapshot}
+            scheduleMode={sourceLocked ? "slots" : "owner"}
+          />
+        )}
         {pickupMonthChanging ? (
           <div className="border-status-warning/30 bg-status-warning-soft space-y-3 rounded-lg border px-4 py-3">
             <p className="text-status-warning text-sm">

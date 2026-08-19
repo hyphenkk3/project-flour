@@ -1,6 +1,8 @@
 import { FormField, FormInput } from "@/components/ui/form";
 import { OwnerPickupFields } from "@/components/ui/OwnerPickupFields";
 import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
+import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
+import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
   OWNER_CREATE_FULFILMENT_OPTIONS,
   RECIPIENT_NOTIFY_OPTIONS,
@@ -30,6 +32,7 @@ type OrderFulfilmentCreateFieldsProps = {
   onTimeChange?: (time: string) => void;
   /** CO late-edit cutoff: muted scope cues near method vs pickup. */
   lateEditCutoffHints?: boolean;
+  hoursSnapshot?: OperatingHoursSnapshot;
 };
 
 export function OrderFulfilmentCreateFields({
@@ -45,6 +48,7 @@ export function OrderFulfilmentCreateFields({
   onDateChange,
   onTimeChange,
   lateEditCutoffHints = false,
+  hoursSnapshot = OPERATING_HOURS_SEED,
 }: OrderFulfilmentCreateFieldsProps) {
   const isDelivery = method === "delivery";
   const showNotifyChoice = !delivery.sameAsCustomer;
@@ -114,6 +118,7 @@ export function OrderFulfilmentCreateFields({
           dateLabel={dateLabel}
           defaultDate={defaultDate}
           defaultTime={defaultTime}
+          hoursSnapshot={hoursSnapshot}
           onDateChange={onDateChange}
           onTimeChange={onTimeChange}
           timeLabel={timeLabel}
@@ -123,6 +128,7 @@ export function OrderFulfilmentCreateFields({
           dateLabel={dateLabel}
           defaultDate={defaultDate}
           defaultTime={defaultTime}
+          hoursSnapshot={hoursSnapshot}
           onDateChange={onDateChange}
           onTimeChange={onTimeChange}
           timeLabel={timeLabel}

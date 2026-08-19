@@ -2,44 +2,64 @@ import Link from "next/link";
 import { earliestPickupDateYmd } from "@/engines/business-calendar/pickup-slots";
 import {
   CUSTOMER_PICKUP_DATE_CAKE_NOTICE,
+  clampCustomerPickupWindow,
   latestOrderableCataloguePickupEnd,
 } from "@/engines/menu/customer-browse";
 import { listOrderableMonthlyCatalogues } from "@/workspaces/storefront/catalog/queries";
+import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import { GuestCheckoutForm } from "@/workspaces/storefront/checkout/GuestCheckoutForm";
 import { listClosedPickupOrderDates } from "@/workspaces/storefront/checkout/order-availability";
 import { StorefrontHomeLink } from "@/workspaces/storefront/StorefrontBrand";
 
 export const dynamic = "force-dynamic";
 
+function ymdQuery(value: string | null | undefined): string | null {
+  const key = value?.trim().slice(0, 10) ?? "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : null;
+}
+
 function suggestedPickupFromQuery(
   value: string | null | undefined,
-  earliest: string,
+  minPickup: string,
   maxPickup: string | null,
 ): string | null {
-  const key = value?.trim().slice(0, 10) ?? "";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
-  if (key < earliest) return earliest;
+  const key = ymdQuery(value);
+  if (!key) return null;
+  if (key < minPickup) return minPickup;
   if (maxPickup && key > maxPickup) return null;
   return key;
 }
 
 type StorefrontCheckoutPageProps = {
   pickupQuery?: string | null;
+  fromQuery?: string | null;
+  toQuery?: string | null;
 };
 
 export async function StorefrontCheckoutPage({
   pickupQuery = null,
+  fromQuery = null,
+  toQuery = null,
 }: StorefrontCheckoutPageProps) {
   const fromDate = earliestPickupDateYmd();
   const catalogues = await listOrderableMonthlyCatalogues();
-  const maxPickupDate = latestOrderableCataloguePickupEnd(
+  const catalogueMaxPickup = latestOrderableCataloguePickupEnd(
     catalogues.map((catalogue) => catalogue.month ?? ""),
   );
-  const toDate = maxPickupDate ?? fromDate;
-  const closedDates = await listClosedPickupOrderDates(fromDate, toDate);
+  const scopeFrom = ymdQuery(fromQuery);
+  const scopeTo = ymdQuery(toQuery);
+  const scoped =
+    scopeFrom && scopeTo
+      ? clampCustomerPickupWindow(fromDate, scopeFrom, scopeTo)
+      : null;
+  const minPickupDate = scoped?.min ?? fromDate;
+  const maxPickupDate = scoped?.max ?? catalogueMaxPickup;
+  const toDate = maxPickupDate ?? minPickupDate;
+  const closedDates = await listClosedPickupOrderDates(minPickupDate, toDate);
+  const hoursSnapshot = await loadOperatingHoursSnapshot();
   const suggestedPickupDate = suggestedPickupFromQuery(
     pickupQuery,
-    fromDate,
+    minPickupDate,
     maxPickupDate,
   );
 
@@ -62,7 +82,9 @@ export async function StorefrontCheckoutPage({
       <div className="mt-6">
         <GuestCheckoutForm
           closedDates={closedDates}
+          hoursSnapshot={hoursSnapshot}
           maxPickupDate={maxPickupDate}
+          minPickupDate={minPickupDate}
           suggestedPickupDate={suggestedPickupDate}
         />
       </div>

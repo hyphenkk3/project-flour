@@ -9,7 +9,11 @@ export type OrderStatus =
 
 export type PaymentStatus = "unpaid" | "paid" | "refunded";
 
-export type FulfilmentMethod = "pickup" | "delivery" | "drive_through";
+export type FulfilmentMethod =
+  | "pickup"
+  | "delivery"
+  | "drive_through"
+  | "dine_in";
 
 export type Order = {
   id: string;

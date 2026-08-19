@@ -6,10 +6,16 @@
  * Business Calendar / Special Operating Dates without changing consumers.
  */
 
+import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import {
-  PICKUP_DATE_OVERRIDES,
-  type PickupDateOverride,
-  type PickupScheduleBaseProfile,
+  resolveOperatingHours,
+  slotsWithinHours,
+  weekdayFromYmd,
+  type OperatingHoursSnapshot,
+} from "@/engines/business-calendar/operating-hours";
+import type {
+  PickupDateOverride,
+  PickupScheduleBaseProfile,
 } from "@/engines/business-calendar/pickup-date-overrides";
 
 export type { PickupDateOverride, PickupScheduleBaseProfile };
@@ -189,14 +195,35 @@ export function resolveEffectivePickupSchedule(
   return openFromProfile(baseProfile, windows);
 }
 
-/** Production entry: weekly base + code-config date overrides. */
+function pickupScheduleFromHours(
+  dateYmd: string,
+  snapshot: OperatingHoursSnapshot,
+): EffectivePickupSchedule {
+  const weekday = weekdayFromYmd(dateYmd);
+  if (weekday == null) return { status: "closed" };
+  const row = resolveOperatingHours(snapshot, "pickup", dateYmd);
+  const times = slotsWithinHours(row);
+  if (!row.enabled || times.length === 0 || !row.opensAt) {
+    return { status: "closed" };
+  }
+  const latest = row.latestBookable ?? row.closesAt ?? times[times.length - 1] ?? row.opensAt;
+  return {
+    status: "open",
+    baseProfile: weekdayBaseProfile(weekday),
+    earliestSelectable: row.opensAt,
+    usualPickupStart: row.usualStart ?? row.opensAt,
+    usualPickupEnd: row.usualEnd ?? latest,
+    latestSelectable: latest,
+    selectableSlots: times,
+  };
+}
+
+/** Production entry: persisted operating hours (seed until DB is applied). */
 export function getEffectivePickupSchedule(
   dateYmd: string,
+  snapshot: OperatingHoursSnapshot = OPERATING_HOURS_SEED,
 ): EffectivePickupSchedule {
-  return resolveEffectivePickupSchedule(
-    dateYmd,
-    PICKUP_DATE_OVERRIDES[dateYmd],
-  );
+  return pickupScheduleFromHours(dateYmd, snapshot);
 }
 
 export function isPublicPickupTimeOnSchedule(

@@ -10,6 +10,8 @@
  * The weekly pickup schedule remains the default.
  */
 
+import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
+import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import { getEffectivePickupSchedule } from "@/engines/business-calendar/pickup-schedule";
 import {
   getPickupSlotsForDate,
@@ -44,19 +46,21 @@ export function isPickupOrdersClosed(
 export function customerPickupSlotsForDate(
   dateYmd: string,
   closedDates: readonly string[],
+  snapshot: OperatingHoursSnapshot = OPERATING_HOURS_SEED,
 ): PickupSlot[] {
   if (isPickupOrdersClosed(dateYmd, closedDates)) return [];
-  return getPickupSlotsForDate(dateYmd);
+  return getPickupSlotsForDate(dateYmd, snapshot);
 }
 
 export function customerMaySelectPickupDate(
   dateYmd: string,
   closedDates: readonly string[],
   earliestYmd?: string,
+  snapshot: OperatingHoursSnapshot = OPERATING_HOURS_SEED,
 ): boolean {
   if (earliestYmd && dateYmd < earliestYmd) return false;
   if (isPickupOrdersClosed(dateYmd, closedDates)) return false;
-  return getEffectivePickupSchedule(dateYmd).status === "open";
+  return getEffectivePickupSchedule(dateYmd, snapshot).status === "open";
 }
 
 export function parseOrderAvailabilityMonth(

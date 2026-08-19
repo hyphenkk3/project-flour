@@ -1,8 +1,10 @@
+import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
 import {
   formatPickupDateShort,
   formatPickupWeekdayShort,
   formatComplimentaryLine,
 } from "@/engines/orders/confirmation-message";
+import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import { formatDeliveryFinanceWaiverLines } from "@/engines/orders/delivery-finance";
 import {
   isDeliveryRecipientSameAsOrderingCustomer,
@@ -453,6 +455,37 @@ function appendCrewCommercialSettlementAndFooters(
   }
 }
 
+function generateDineInCrewOrderMessage(order: StorefrontOrder): string {
+  const unpaid = order.settlement.remainingBalance > 0;
+  const headerPrefix = unpaid ? "🔺🟢🍽️" : "🟢🍽️";
+  const dateShort = formatPickupDateShort(order.pickupDate);
+  const weekday = formatPickupWeekdayShort(order.pickupDate);
+  const reservation = order.dineInReservation;
+  const lines: string[] = [
+    `${headerPrefix} Dine-In order: ${dateShort} (${weekday})`,
+    "",
+    `Ordered by: ${crewDisplayName(order)}`,
+    `Phone No: ${order.phone.trim()}`,
+    `Cake serving time: ${crewTimeLabel(order)}`,
+    "",
+  ];
+  appendCrewCommercialSettlementAndFooters(order, lines);
+  if (reservation) {
+    const venue = dineInVenueLabel(reservation.venue);
+    const reservationTime = formatPickupTime(reservation.reservationTime);
+    lines.push("");
+    lines.push(
+      `* Dine-in reservation: ${reservationTime} @ ${venue}`,
+    );
+    lines.push(`* Guests: ${reservation.guestCount}`);
+    if (reservation.reservationNote?.trim()) {
+      lines.push(`* ${reservation.reservationNote.trim()}`);
+    }
+    lines.push(`* Reservation status: ${reservation.status}`);
+  }
+  return lines.join("\n");
+}
+
 function generatePickupCrewOrderMessage(order: StorefrontOrder): string {
   const unpaid = order.settlement.remainingBalance > 0;
   const headerPrefix = unpaid ? "🔺🟢" : "🟢";
@@ -499,6 +532,9 @@ function generateDeliveryCrewOrderMessage(order: StorefrontOrder): string {
 export function generateCrewOrderMessage(order: StorefrontOrder): string {
   if (order.fulfilmentMethod === "delivery") {
     return generateDeliveryCrewOrderMessage(order);
+  }
+  if (order.fulfilmentMethod === "dine_in") {
+    return generateDineInCrewOrderMessage(order);
   }
   return generatePickupCrewOrderMessage(order);
 }

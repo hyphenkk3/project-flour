@@ -30,6 +30,12 @@ export function isDeliveryFulfilment(
   return fulfilmentMethod === "delivery";
 }
 
+export function isDineInFulfilment(
+  fulfilmentMethod?: StorefrontOrderFulfilmentMethod | null,
+): boolean {
+  return fulfilmentMethod === "dine_in";
+}
+
 export function deriveOperationalState(
   input: OperationalTimestamps,
 ): OperationalState {
@@ -47,8 +53,10 @@ export function deriveOperationalState(
 /** Workspace / Quick View operational section title. */
 export function operationalSectionTitle(
   fulfilmentMethod?: StorefrontOrderFulfilmentMethod | null,
-): "Collection" | "Delivery" {
-  return isDeliveryFulfilment(fulfilmentMethod) ? "Delivery" : "Collection";
+): "Collection" | "Delivery" | "Dine-in" {
+  if (isDeliveryFulfilment(fulfilmentMethod)) return "Delivery";
+  if (isDineInFulfilment(fulfilmentMethod)) return "Dine-in";
+  return "Collection";
 }
 
 export function operationalStateLabel(

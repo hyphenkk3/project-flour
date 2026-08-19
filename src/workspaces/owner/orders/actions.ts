@@ -31,8 +31,14 @@ import {
 } from "@/engines/orders/fulfilment";
 import { isWithinTwoDayChangeCutoff } from "@/engines/operations/approvals";
 import { reconcilePaymentLifecycleStatus } from "@/engines/orders/payment-status";
+import {
+  isValidDineInReservationPair,
+  parseDineInVenue,
+  parseGuestCount,
+} from "@/engines/business-calendar/dine-in-hours";
 import { isValidClockPickupTime, isValidPickupSlot } from "@/engines/business-calendar/pickup-slots";
 import { requireStaff } from "@/foundation/auth/session";
+import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import {
   formatBusinessMonthYear,
   isDifferentBusinessMonth,
@@ -529,8 +535,11 @@ export async function saveOrderWorkspaceAction(
   const draftItems = parseItemsFromForm(formData);
   const draftComplimentary = parseComplimentaryFromForm(formData);
   const draftPaidAddons = parsePaidAddonsMutationFromForm(formData);
+  const requestedFulfilmentMethod = String(
+    formData.get("fulfilment_method") ?? "",
+  ).trim();
   const fulfilmentMethod = normalizeOwnerCreateFulfilmentMethod(
-    String(formData.get("fulfilment_method") ?? ""),
+    requestedFulfilmentMethod,
   );
   const deliveryDraft = parseDeliveryDraftFromForm(formData);
 
@@ -544,6 +553,9 @@ export async function saveOrderWorkspaceAction(
       success: false,
     };
   }
+  const preserveDineIn =
+    before.fulfilmentMethod === "dine_in" &&
+    requestedFulfilmentMethod === "dine_in";
 
   // Customer Operations only: D−1/D−0 requires late_order_edit approval.
   // Manager and Owner may direct-save inside cutoff (Product-locked).
@@ -627,8 +639,38 @@ export async function saveOrderWorkspaceAction(
     }
   }
 
-  if (nextSource === "customer_website") {
-    if (!isValidPickupSlot(pickupDate, pickupTime)) {
+  const dineInReservationTime = String(
+    formData.get("reservation_time") ?? "",
+  ).trim();
+  const hoursSnapshot = await loadOperatingHoursSnapshot();
+  if (preserveDineIn) {
+    const venue =
+      parseDineInVenue(formData.get("dine_in_venue")) ??
+      before.dineInReservation?.venue ??
+      null;
+    const guests =
+      parseGuestCount(formData.get("guest_count")) ??
+      before.dineInReservation?.guestCount ??
+      null;
+    if (
+      !venue ||
+      guests == null ||
+      !isValidDineInReservationPair({
+        dateYmd: pickupDate,
+        reservationTime: dineInReservationTime,
+        servingTime: pickupTime,
+        venue,
+        snapshot: hoursSnapshot,
+      })
+    ) {
+      return {
+        error:
+          "Cake serving time must be within 1 hour of the dine-in reservation time, and the venue must be available for both times.",
+        success: false,
+      };
+    }
+  } else if (nextSource === "customer_website") {
+    if (!isValidPickupSlot(pickupDate, pickupTime, hoursSnapshot)) {
       return {
         error:
           fulfilmentMethod === "delivery"
@@ -650,20 +692,23 @@ export async function saveOrderWorkspaceAction(
     return { error: "Please keep at least one cake on the order.", success: false };
   }
 
-  let fulfilmentRpc: ReturnType<typeof buildCreateStaffFulfilmentRpcParams>;
-  try {
-    fulfilmentRpc = buildCreateStaffFulfilmentRpcParams({
-      method: fulfilmentMethod,
-      delivery: deliveryDraft,
-    });
-  } catch (error) {
-    return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Please complete Delivery details before saving.",
-      success: false,
-    };
+  let fulfilmentRpc: ReturnType<typeof buildCreateStaffFulfilmentRpcParams> | null =
+    null;
+  if (!preserveDineIn) {
+    try {
+      fulfilmentRpc = buildCreateStaffFulfilmentRpcParams({
+        method: fulfilmentMethod,
+        delivery: deliveryDraft,
+      });
+    } catch (error) {
+      return {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Please complete Delivery details before saving.",
+        success: false,
+      };
+    }
   }
 
   const cakes = await listOfferableLibraryCakes();
@@ -809,18 +854,41 @@ export async function saveOrderWorkspaceAction(
     return { error: syncPaidAddonsError.message, success: false };
   }
 
-  // Atomic method + delivery-details sync (Pickup clears sibling row).
-  const { error: syncFulfilmentError } = await supabase.rpc(
-    "sync_guest_order_fulfilment",
-    {
-      p_order_id: orderId,
-      p_fulfilment_method: fulfilmentRpc.p_fulfilment_method,
-      p_delivery: fulfilmentRpc.p_delivery,
-    },
-  );
+  if (preserveDineIn && before.dineInReservation) {
+    const venue =
+      parseDineInVenue(formData.get("dine_in_venue")) ??
+      before.dineInReservation.venue;
+    const guests =
+      parseGuestCount(formData.get("guest_count")) ??
+      before.dineInReservation.guestCount;
+    const { error: reservationError } = await supabase
+      .from("order_dine_in_reservations")
+      .update({
+        reservation_date: pickupDate,
+        reservation_time: dineInReservationTime,
+        venue,
+        guest_count: guests,
+        reservation_note:
+          String(formData.get("reservation_note") ?? "").trim() || null,
+      })
+      .eq("order_id", orderId);
+    if (reservationError) {
+      return { error: reservationError.message, success: false };
+    }
+  } else if (fulfilmentRpc) {
+    // Atomic method + delivery-details sync (Pickup clears sibling row).
+    const { error: syncFulfilmentError } = await supabase.rpc(
+      "sync_guest_order_fulfilment",
+      {
+        p_order_id: orderId,
+        p_fulfilment_method: fulfilmentRpc.p_fulfilment_method,
+        p_delivery: fulfilmentRpc.p_delivery,
+      },
+    );
 
-  if (syncFulfilmentError) {
-    return { error: syncFulfilmentError.message, success: false };
+    if (syncFulfilmentError) {
+      return { error: syncFulfilmentError.message, success: false };
+    }
   }
 
   const afterPaidAddons = await getGuestOrderById(orderId);

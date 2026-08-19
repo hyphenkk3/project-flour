@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { applyDeliveryFeeRequestStaffNames } from "@/engines/orders/delivery-fee-request-attribution";
 import {
   mapOrderDeliveryDetails,
+  mapOrderDineInReservation,
   normalizeFulfilmentMethod,
 } from "@/engines/orders/fulfilment";
 import { calculateOrderSettlement } from "@/engines/orders/settlement";
@@ -86,6 +87,24 @@ type OrderRow = {
         city: string;
         state: string;
         recipient_notify_preference: string;
+      }[]
+    | null;
+  order_dine_in_reservations?:
+    | {
+        reservation_date: string;
+        reservation_time: string;
+        venue: string;
+        guest_count: number;
+        reservation_note: string | null;
+        status: string;
+      }
+    | {
+        reservation_date: string;
+        reservation_time: string;
+        venue: string;
+        guest_count: number;
+        reservation_note: string | null;
+        status: string;
       }[]
     | null;
   order_items?: Array<{
@@ -221,6 +240,10 @@ function mapOrder(
     fulfilmentMethod === "delivery"
       ? mapOrderDeliveryDetails(deliveryRow)
       : null;
+  const dineInReservation =
+    fulfilmentMethod === "dine_in"
+      ? mapOrderDineInReservation(relationOne(row.order_dine_in_reservations))
+      : null;
 
   const adjustments = financial?.adjustments ?? [];
   const paymentAllocations = financial?.paymentAllocations ?? [];
@@ -243,6 +266,7 @@ function mapOrder(
     pickupInstruction: row.pickup_instruction,
     fulfilmentMethod,
     delivery,
+    dineInReservation,
     notes: row.customer_notes,
     internalNotes: row.internal_notes,
     status: row.status,
@@ -354,6 +378,14 @@ const orderSelect = `
     fee_resolved_by,
     fee_resolved_at,
     fee_resolution_note
+  ),
+  order_dine_in_reservations (
+    reservation_date,
+    reservation_time,
+    venue,
+    guest_count,
+    reservation_note,
+    status
   ),
   order_items (
     id,

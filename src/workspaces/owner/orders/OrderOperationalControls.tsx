@@ -5,6 +5,7 @@ import { DATA_FETCH_TIMEOUT_MS } from "@/lib/supabase/fetch-timeout";
 import {
   deriveOperationalState,
   isDeliveryFulfilment,
+  isDineInFulfilment,
   MARK_OUT_FOR_DELIVERY_LABEL,
   operationalCompleteActionLabel,
   operationalCompletedAtPrefix,
@@ -91,6 +92,7 @@ export function OrderOperationalControls({
   const [activeKind, setActiveKind] = useState<MutationKind | null>(null);
 
   const isDelivery = isDeliveryFulfilment(fulfilmentMethod);
+  const isDineIn = isDineInFulfilment(fulfilmentMethod);
   const timestamps: OperationalTimestamps = {
     readyAt,
     pickedUpAt,
@@ -302,6 +304,33 @@ export function OrderOperationalControls({
                 type="button"
               >
                 {workingLabel("undo_delivered", undoCompleteLabel)}
+              </button>
+            ) : null}
+          </>
+        ) : isDineIn ? (
+          <>
+            {state === "not_ready" && canMarkReady ? (
+              <button
+                className={primaryClass}
+                disabled={pending}
+                onClick={() =>
+                  run("ready", () => markOrderReadyAction(orderId))
+                }
+                type="button"
+              >
+                {workingLabel("ready", "Mark Ready")}
+              </button>
+            ) : null}
+            {state === "ready" && canMarkReady ? (
+              <button
+                className={secondaryClass}
+                disabled={pending}
+                onClick={() =>
+                  run("undo_ready", () => undoOrderReadyAction(orderId))
+                }
+                type="button"
+              >
+                {workingLabel("undo_ready", "Undo Ready")}
               </button>
             ) : null}
           </>

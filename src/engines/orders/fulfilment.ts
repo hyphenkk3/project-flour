@@ -8,6 +8,7 @@ import type {
   RecipientNotifyPreference,
   StorefrontDeliveryFeeRequest,
   StorefrontOrderDelivery,
+  StorefrontOrderDineInReservation,
   StorefrontOrderFulfilmentMethod,
   StorefrontProcessingFeeRequest,
 } from "@/types/storefront";
@@ -39,20 +40,26 @@ export const RECIPIENT_NOTIFY_OPTIONS = [
 /** Owner Workspace section title (view + edit chrome). Drive-through → Delivery label avoided; treat as Pickup chrome until P2 expands. */
 export function workspaceFulfilmentSectionTitle(
   method: StorefrontOrderFulfilmentMethod | null | undefined,
-): "Pickup" | "Delivery" {
-  return method === "delivery" ? "Delivery" : "Pickup";
+): "Pickup" | "Delivery" | "Dine-in" {
+  if (method === "delivery") return "Delivery";
+  if (method === "dine_in") return "Dine-in";
+  return "Pickup";
 }
 
 export function workspaceScheduleDateLabel(
   method: StorefrontOrderFulfilmentMethod | null | undefined,
 ): string {
-  return method === "delivery" ? "Delivery date" : "Pickup date";
+  if (method === "delivery") return "Delivery date";
+  if (method === "dine_in") return "Dine-in date";
+  return "Pickup date";
 }
 
 export function workspaceScheduleTimeLabel(
   method: StorefrontOrderFulfilmentMethod | null | undefined,
 ): string {
-  return method === "delivery" ? "Delivery time" : "Pickup time";
+  if (method === "delivery") return "Delivery time";
+  if (method === "dine_in") return "Cake serving time";
+  return "Pickup time";
 }
 
 export function recipientNotifyPreferenceLabel(
@@ -109,11 +116,13 @@ export function isDeliveryRecipientSameAsOrderingCustomer(input: {
  * Same-as-customer omits Notify (internal inform_recipient is not Owner-facing).
  */
 export type WorkspaceFulfilmentViewModel = {
-  sectionTitle: "Pickup" | "Delivery";
+  sectionTitle: "Pickup" | "Delivery" | "Dine-in";
   dateLabel: string;
   timeLabel: string;
   isDelivery: boolean;
+  isDineIn: boolean;
   delivery: StorefrontOrderDelivery | null;
+  dineInReservation: StorefrontOrderDineInReservation | null;
   /** Null when Pickup, missing delivery, or recipient same as ordering customer. */
   notifyLabel: string | null;
   recipientSameAsCustomer: boolean;
@@ -122,11 +131,16 @@ export type WorkspaceFulfilmentViewModel = {
 export function buildWorkspaceFulfilmentViewModel(order: {
   fulfilmentMethod: StorefrontOrderFulfilmentMethod;
   delivery: StorefrontOrderDelivery | null;
+  dineInReservation?: StorefrontOrderDineInReservation | null;
   customerName: string;
   phone: string;
 }): WorkspaceFulfilmentViewModel {
   const isDelivery = order.fulfilmentMethod === "delivery";
+  const isDineIn = order.fulfilmentMethod === "dine_in";
   const delivery = isDelivery ? order.delivery : null;
+  const dineInReservation = isDineIn
+    ? (order.dineInReservation ?? null)
+    : null;
   const recipientSameAsCustomer = isDeliveryRecipientSameAsOrderingCustomer({
     customerName: order.customerName,
     customerPhone: order.phone,
@@ -137,7 +151,9 @@ export function buildWorkspaceFulfilmentViewModel(order: {
     dateLabel: workspaceScheduleDateLabel(order.fulfilmentMethod),
     timeLabel: workspaceScheduleTimeLabel(order.fulfilmentMethod),
     isDelivery,
+    isDineIn,
     delivery,
+    dineInReservation,
     recipientSameAsCustomer,
     notifyLabel:
       delivery && !recipientSameAsCustomer
@@ -327,7 +343,12 @@ export function validateOwnerCreateFulfilment(input: {
 export function normalizeFulfilmentMethod(
   value: string | null | undefined,
 ): StorefrontOrderFulfilmentMethod {
-  if (value === "delivery" || value === "drive_through" || value === "pickup") {
+  if (
+    value === "delivery" ||
+    value === "drive_through" ||
+    value === "pickup" ||
+    value === "dine_in"
+  ) {
     return value;
   }
   return "pickup";
@@ -830,7 +851,50 @@ export function buildQuickViewFulfilmentSummary(order: {
 export function isPickupCrewMessageAvailable(
   fulfilmentMethod: StorefrontOrderFulfilmentMethod | null | undefined,
 ): boolean {
-  return fulfilmentMethod !== "delivery";
+  return (
+    fulfilmentMethod !== "delivery" && fulfilmentMethod !== "dine_in"
+  );
+}
+
+export type CustomerWebsiteFulfilmentMethod = "pickup" | "dine_in" | "delivery";
+
+export function parseCustomerWebsiteFulfilmentMethod(
+  value: string | null | undefined,
+): CustomerWebsiteFulfilmentMethod {
+  if (value === "dine_in" || value === "delivery") return value;
+  return "pickup";
+}
+
+export function mapOrderDineInReservation(
+  row:
+    | {
+        reservation_date?: string | null;
+        reservation_time?: string | null;
+        venue?: string | null;
+        guest_count?: number | string | null;
+        reservation_note?: string | null;
+        status?: string | null;
+      }
+    | null
+    | undefined,
+): StorefrontOrderDineInReservation | null {
+  if (!row) return null;
+  const guestCount = Number(row.guest_count);
+  if (!Number.isInteger(guestCount) || guestCount < 1) return null;
+  const reservationDate = String(row.reservation_date ?? "").slice(0, 10);
+  const reservationTime = String(row.reservation_time ?? "").slice(0, 5);
+  const venueRaw = String(row.venue ?? "").trim().toLowerCase();
+  const venue = venueRaw === "hyphen" || venueRaw === "whitebird" ? venueRaw : null;
+  if (!reservationDate || !reservationTime || !venue) return null;
+  const note = String(row.reservation_note ?? "").trim();
+  return {
+    reservationDate,
+    reservationTime,
+    venue,
+    guestCount,
+    reservationNote: note.length > 0 ? note : null,
+    status: String(row.status ?? "pending") || "pending",
+  };
 }
 
 /**
