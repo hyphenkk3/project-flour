@@ -8,8 +8,11 @@ import {
 } from "@/engines/collection/capabilities";
 import { createClient } from "@/lib/supabase/server";
 import {
+  isCollectionCompleteDineInEligible,
+  isCollectionDineInMethod,
   isCollectionMarkCollectedEligible,
   isCollectionUndoCollectedEligible,
+  isCollectionUndoDineInEligible,
 } from "@/workspaces/collection/eligibility";
 import {
   getCollectionBoardOrderById,
@@ -23,7 +26,7 @@ import type { CollectionBoardTab } from "@/workspaces/collection/eligibility";
 async function requireCollectionStaff() {
   const staff = await requireStaff();
   if (!canAccessCollectionWorkspace(staff.role.code)) {
-    throw new Error("Collection workspace is not available for this role.");
+    throw new Error("Pickup workspace is not available for this role.");
   }
   return staff;
 }
@@ -81,17 +84,25 @@ export async function markCollectionOrderCollectedAction(
     return { error: "Order not found." };
   }
 
-  if (
-    !isCollectionMarkCollectedEligible({
-      readyAt: row.ready_at,
-      pickedUpAt: row.picked_up_at,
-      fulfilmentMethod: row.fulfilment_method,
-      status: row.status,
-    })
-  ) {
+  const dineIn = isCollectionDineInMethod(row.fulfilment_method);
+  const eligible = dineIn
+    ? isCollectionCompleteDineInEligible({
+        readyAt: row.ready_at,
+        pickedUpAt: row.picked_up_at,
+        fulfilmentMethod: row.fulfilment_method,
+        status: row.status,
+      })
+    : isCollectionMarkCollectedEligible({
+        readyAt: row.ready_at,
+        pickedUpAt: row.picked_up_at,
+        fulfilmentMethod: row.fulfilment_method,
+        status: row.status,
+      });
+  if (!eligible) {
     return {
-      error:
-        "Only Ready pickup orders can be marked collected in Collection.",
+      error: dineIn
+        ? "Only Ready dine-in orders can be completed in Collection."
+        : "Only Ready pickup orders can be marked collected in Pickup.",
     };
   }
 
@@ -136,13 +147,22 @@ export async function undoCollectionOrderCollectedAction(
     return { error: "Order not found." };
   }
 
-  if (
-    !isCollectionUndoCollectedEligible({
-      pickedUpAt: row.picked_up_at,
-      fulfilmentMethod: row.fulfilment_method,
-    })
-  ) {
-    return { error: "Order is not collected." };
+  const dineIn = isCollectionDineInMethod(row.fulfilment_method);
+  const canUndo = dineIn
+    ? isCollectionUndoDineInEligible({
+        pickedUpAt: row.picked_up_at,
+        fulfilmentMethod: row.fulfilment_method,
+      })
+    : isCollectionUndoCollectedEligible({
+        pickedUpAt: row.picked_up_at,
+        fulfilmentMethod: row.fulfilment_method,
+      });
+  if (!canUndo) {
+    return {
+      error: dineIn
+        ? "Dine-in visit is not completed."
+        : "Order is not collected.",
+    };
   }
 
   const { error } = await supabase.rpc("undo_guest_order_picked_up", {

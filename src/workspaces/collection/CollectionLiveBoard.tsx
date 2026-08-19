@@ -1,16 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
 import { createClient } from "@/lib/supabase/client";
 import { formatLongBusinessDate } from "@/lib/dates";
 import {
   getCollectionBoardOrderAction,
   listCollectionOrdersForTabAction,
 } from "@/workspaces/collection/actions";
+import type { CollectionDineInVenueFilter } from "@/workspaces/collection/board-tab";
 import { CollectionDateNav } from "@/workspaces/collection/CollectionDateNav";
 import { CollectionOrderCard } from "@/workspaces/collection/CollectionOrderCard";
 import { CollectionWorkspaceNav } from "@/workspaces/collection/CollectionWorkspaceNav";
+import { collectionDateNavHref } from "@/workspaces/collection/date";
 import {
   COLLECTION_HISTORY_LOOKBACK_DAYS,
   countCollectionPickupOverdue,
@@ -24,6 +27,7 @@ type CollectionLiveBoardProps = {
   boardDate: string;
   tab: CollectionBoardTab;
   initialOrders: CollectionBoardOrder[];
+  venueFilter?: CollectionDineInVenueFilter;
 };
 
 type OrderRowPayload = {
@@ -37,9 +41,11 @@ function boardTitle(tab: CollectionBoardTab): string {
     case "completed":
       return "Picked Up / Delivered";
     case "history":
-      return "Collection History";
+      return "Pickup History";
+    case "dine_in":
+      return "Dine-in";
     default:
-      return "Ready for Collection";
+      return "Ready for Pickup";
   }
 }
 
@@ -55,6 +61,9 @@ function boardSubtitle(
   if (tab === "history") {
     return `${dateLabel} · last ${COLLECTION_HISTORY_LOOKBACK_DAYS} days · ${count} handoff${count === 1 ? "" : "s"}`;
   }
+  if (tab === "dine_in") {
+    return `${dateLabel} · ${count} dine-in reservation${count === 1 ? "" : "s"}`;
+  }
   return `${dateLabel} · ${count} ready pickup${count === 1 ? "" : "s"}`;
 }
 
@@ -66,27 +75,41 @@ function emptyCopy(tab: CollectionBoardTab): {
     return {
       title: "No completed handoffs yet.",
       description:
-        "Pickup orders marked Picked Up and Delivery orders marked Delivered for this date appear here.",
+        "Pickup orders marked Picked Up, Delivery orders marked Delivered, and completed dine-in visits for this date appear here.",
     };
   }
   if (tab === "history") {
     return {
-      title: "No collection or delivery history yet.",
+      title: "No pickup or delivery history yet.",
       description:
-        "Browse completed Picked Up and Delivered handoffs for the selected date window.",
+        "Browse completed Picked Up, Delivered, and dine-in handoffs for the selected date window.",
+    };
+  }
+  if (tab === "dine_in") {
+    return {
+      title: "No dine-in reservations for this date.",
+      description:
+        "Whole Cake dine-in reservations appear here. Pickup Ready stays pickup-only.",
     };
   }
   return {
-    title: "No orders ready for collection.",
+    title: "No orders ready for pickup.",
     description:
       "Pickup guest preorders marked Ready appear here until Mark Collected.",
   };
+}
+
+function venueChipClass(active: boolean): string {
+  return active
+    ? "bg-ink text-mist inline-flex min-h-10 items-center justify-center rounded-xl px-3 text-sm font-medium"
+    : "border-fog text-ink hover:border-skyline inline-flex min-h-10 items-center justify-center rounded-xl border bg-white px-3 text-sm font-medium transition";
 }
 
 export function CollectionLiveBoard({
   boardDate,
   tab,
   initialOrders,
+  venueFilter = "all",
 }: CollectionLiveBoardProps) {
   const [orders, setOrders] = useState(initialOrders);
 
@@ -154,7 +177,33 @@ export function CollectionLiveBoard({
   const now = new Date();
   const overdueCount =
     tab === "ready" ? countCollectionPickupOverdue(orders, now) : 0;
+
+  const visibleOrders = useMemo(() => {
+    if (tab !== "dine_in" || venueFilter === "all") return orders;
+    return orders.filter((order) => order.dineIn?.venue === venueFilter);
+  }, [orders, tab, venueFilter]);
+
+  const hyphenOrders = visibleOrders.filter(
+    (order) => order.dineIn?.venue === "hyphen",
+  );
+  const whitebirdOrders = visibleOrders.filter(
+    (order) => order.dineIn?.venue === "whitebird",
+  );
+  const ungrouped = visibleOrders.filter((order) => !order.dineIn?.venue);
+
   const empty = emptyCopy(tab);
+
+  function renderCards(list: CollectionBoardOrder[]) {
+    return list.map((order) => (
+      <CollectionOrderCard
+        key={order.id}
+        boardDate={boardDate}
+        now={now}
+        order={order}
+        tab={tab}
+      />
+    ));
+  }
 
   return (
     <main className="mx-auto w-full max-w-3xl px-5 py-7 pb-16 sm:px-8 sm:py-10">
@@ -164,7 +213,7 @@ export function CollectionLiveBoard({
             {boardTitle(tab)}
           </h1>
           <p className="text-skyline mt-2 text-sm sm:text-base">
-            {boardSubtitle(tab, boardDate, orders.length)}
+            {boardSubtitle(tab, boardDate, visibleOrders.length)}
           </p>
           {overdueCount > 0 ? (
             <p className="text-status-warning mt-1 text-sm font-semibold tracking-wide">
@@ -179,25 +228,66 @@ export function CollectionLiveBoard({
       </div>
 
       <div className="mt-4">
-        <CollectionDateNav selectedDate={boardDate} tab={tab} />
+        <CollectionDateNav
+          selectedDate={boardDate}
+          tab={tab}
+          venueFilter={venueFilter}
+        />
       </div>
 
-      {orders.length === 0 ? (
+      {tab === "dine_in" ? (
+        <div className="mt-4 flex flex-wrap gap-2" aria-label="Venue filter">
+          <a
+            className={venueChipClass(venueFilter === "all")}
+            href={collectionDateNavHref(boardDate, "dine_in", "all")}
+          >
+            All
+          </a>
+          <a
+            className={venueChipClass(venueFilter === "hyphen")}
+            href={collectionDateNavHref(boardDate, "dine_in", "hyphen")}
+          >
+            Hyphen
+          </a>
+          <a
+            className={venueChipClass(venueFilter === "whitebird")}
+            href={collectionDateNavHref(boardDate, "dine_in", "whitebird")}
+          >
+            Whitebird
+          </a>
+        </div>
+      ) : null}
+
+      {visibleOrders.length === 0 ? (
         <div className="mt-10">
           <EmptyState title={empty.title} description={empty.description} />
         </div>
-      ) : (
-        <div className="mt-6 space-y-2.5">
-          {orders.map((order) => (
-            <CollectionOrderCard
-              key={order.id}
-              boardDate={boardDate}
-              now={now}
-              order={order}
-              tab={tab}
-            />
-          ))}
+      ) : tab === "dine_in" ? (
+        <div className="mt-6 space-y-6">
+          {hyphenOrders.length > 0 ? (
+            <section>
+              <h2 className="text-ink text-sm font-semibold tracking-wide">
+                {dineInVenueLabel("hyphen")}
+              </h2>
+              <div className="mt-2 space-y-2.5">{renderCards(hyphenOrders)}</div>
+            </section>
+          ) : null}
+          {whitebirdOrders.length > 0 ? (
+            <section>
+              <h2 className="text-ink text-sm font-semibold tracking-wide">
+                {dineInVenueLabel("whitebird")}
+              </h2>
+              <div className="mt-2 space-y-2.5">
+                {renderCards(whitebirdOrders)}
+              </div>
+            </section>
+          ) : null}
+          {ungrouped.length > 0 ? (
+            <div className="space-y-2.5">{renderCards(ungrouped)}</div>
+          ) : null}
         </div>
+      ) : (
+        <div className="mt-6 space-y-2.5">{renderCards(visibleOrders)}</div>
       )}
     </main>
   );

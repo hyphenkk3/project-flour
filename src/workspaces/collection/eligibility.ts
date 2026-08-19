@@ -11,8 +11,14 @@ import type { StorefrontOrderFulfilmentMethod } from "@/types/storefront";
 import type { CollectionBoardTab } from "@/workspaces/collection/board-tab";
 import { collectionSingaporeWallClock } from "@/workspaces/collection/date";
 
-export type { CollectionBoardTab } from "@/workspaces/collection/board-tab";
-export { parseCollectionBoardTab } from "@/workspaces/collection/board-tab";
+export type {
+  CollectionBoardTab,
+  CollectionDineInVenueFilter,
+} from "@/workspaces/collection/board-tab";
+export {
+  parseCollectionBoardTab,
+  parseCollectionDineInVenueFilter,
+} from "@/workspaces/collection/board-tab";
 
 export const COLLECTION_ACTIVE_PREORDER_STATUSES: readonly GuestOrderStatus[] = [
   "submitted",
@@ -44,6 +50,12 @@ export function isCollectionDeliveryMethod(
   return normalizeFulfilmentMethod(fulfilmentMethod) === "delivery";
 }
 
+export function isCollectionDineInMethod(
+  fulfilmentMethod: string | null | undefined,
+): boolean {
+  return normalizeFulfilmentMethod(fulfilmentMethod) === "dine_in";
+}
+
 /** Active Collection queue: Ready pickup, not yet Collected. */
 export function isActiveOnCollectionBoard(input: {
   customerId: string | null;
@@ -59,6 +71,26 @@ export function isActiveOnCollectionBoard(input: {
   if (!isCollectionActiveStatus(input.status)) return false;
   if (!isCollectionPickupMethod(input.fulfilmentMethod)) return false;
   if (!input.readyAt) return false;
+  if (input.pickedUpAt) return false;
+  return true;
+}
+
+/**
+ * Active Collection Dine-in desk: today's dine-in guest preorders
+ * not yet completed. Ready is displayed, not required to appear.
+ */
+export function isActiveOnCollectionDineInBoard(input: {
+  customerId: string | null;
+  pickupDate: string;
+  selectedPickupDate: string;
+  status: GuestOrderStatus | string;
+  fulfilmentMethod: string | null | undefined;
+  pickedUpAt: string | null;
+}): boolean {
+  if (input.customerId != null) return false;
+  if (input.pickupDate !== input.selectedPickupDate) return false;
+  if (!isCollectionActiveStatus(input.status)) return false;
+  if (!isCollectionDineInMethod(input.fulfilmentMethod)) return false;
   if (input.pickedUpAt) return false;
   return true;
 }
@@ -81,6 +113,9 @@ export function isCompletedCollectionHandoff(input: {
   }
   if (isCollectionDeliveryMethod(input.fulfilmentMethod)) {
     return Boolean(input.deliveredAt);
+  }
+  if (isCollectionDineInMethod(input.fulfilmentMethod)) {
+    return Boolean(input.pickedUpAt);
   }
   return false;
 }
@@ -124,6 +159,9 @@ export function collectionHandoffCompletedAt(input: {
     return input.deliveredAt;
   }
   if (isCollectionPickupMethod(input.fulfilmentMethod)) {
+    return input.pickedUpAt;
+  }
+  if (isCollectionDineInMethod(input.fulfilmentMethod)) {
     return input.pickedUpAt;
   }
   return input.deliveredAt ?? input.pickedUpAt;
@@ -173,6 +211,9 @@ export function isVisibleOnCollectionDetail(input: {
   }
 
   if (input.pickupDate !== input.selectedPickupDate) return false;
+  if (isCollectionDineInMethod(input.fulfilmentMethod)) {
+    return !input.pickedUpAt;
+  }
   if (!isCollectionPickupMethod(input.fulfilmentMethod)) return false;
   // Active Ready queue
   if (input.readyAt && !input.pickedUpAt) return true;
@@ -185,7 +226,10 @@ export type CollectionDeskPresentation =
   | "ready"
   | "collected"
   | "picked_up"
-  | "delivered";
+  | "delivered"
+  | "dine_in_pending"
+  | "dine_in_ready"
+  | "dine_in_complete";
 
 export function collectionDeskPresentation(input: {
   readyAt: string | null;
@@ -198,6 +242,10 @@ export function collectionDeskPresentation(input: {
     input.deliveredAt
   ) {
     return "delivered";
+  }
+  if (isCollectionDineInMethod(input.fulfilmentMethod)) {
+    if (input.pickedUpAt) return "dine_in_complete";
+    return input.readyAt ? "dine_in_ready" : "dine_in_pending";
   }
   if (input.pickedUpAt) {
     return isCollectionPickupMethod(input.fulfilmentMethod ?? "pickup")
@@ -217,6 +265,12 @@ export function collectionDeskLabel(
       return "Picked Up";
     case "collected":
       return "Collected";
+    case "dine_in_complete":
+      return "Completed";
+    case "dine_in_ready":
+      return "Ready";
+    case "dine_in_pending":
+      return "Not ready";
     case "ready":
       return "Ready";
   }
@@ -225,7 +279,11 @@ export function collectionDeskLabel(
 export function collectionDeskBadgeTone(
   presentation: CollectionDeskPresentation,
 ): StatusTone {
-  return presentation === "ready" ? "info" : "success";
+  if (presentation === "dine_in_pending") return "neutral";
+  if (presentation === "ready" || presentation === "dine_in_ready") {
+    return "info";
+  }
+  return "success";
 }
 
 const PICKUP_TIME_RE = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/;
@@ -364,11 +422,33 @@ export function isCollectionMarkCollectedEligible(input: {
   return true;
 }
 
+/** Collection Complete Dine-in follows the same Ready-before-complete desk rule. */
+export function isCollectionCompleteDineInEligible(input: {
+  readyAt: string | null;
+  pickedUpAt: string | null;
+  fulfilmentMethod: string | null | undefined;
+  status: GuestOrderStatus | string;
+}): boolean {
+  if (!isCollectionDineInMethod(input.fulfilmentMethod)) return false;
+  if (!isCollectionActiveStatus(input.status)) return false;
+  if (!input.readyAt) return false;
+  if (input.pickedUpAt) return false;
+  return true;
+}
+
 export function isCollectionUndoCollectedEligible(input: {
   pickedUpAt: string | null;
   fulfilmentMethod: string | null | undefined;
 }): boolean {
   if (!isCollectionPickupMethod(input.fulfilmentMethod)) return false;
+  return Boolean(input.pickedUpAt);
+}
+
+export function isCollectionUndoDineInEligible(input: {
+  pickedUpAt: string | null;
+  fulfilmentMethod: string | null | undefined;
+}): boolean {
+  if (!isCollectionDineInMethod(input.fulfilmentMethod)) return false;
   return Boolean(input.pickedUpAt);
 }
 
@@ -382,20 +462,24 @@ export function collectionHandoffSurface(input: {
   canMarkCollected: boolean;
   canUndoCollected: boolean;
 } {
-  if (input.presentation !== "ready") {
+  if (
+    input.presentation === "dine_in_ready" ||
+    input.presentation === "ready"
+  ) {
     return {
-      canMarkCollected: false,
-      canUndoCollected:
-        input.presentation === "picked_up" ||
-        input.presentation === "collected"
-          ? input.canUndoCollected && input.undoCollectedEligible
-          : false,
+      canMarkCollected:
+        input.canMarkCollected && input.markCollectedEligible,
+      canUndoCollected: false,
     };
   }
   return {
-    canMarkCollected:
-      input.canMarkCollected && input.markCollectedEligible,
-    canUndoCollected: false,
+    canMarkCollected: false,
+    canUndoCollected:
+      input.presentation === "picked_up" ||
+      input.presentation === "collected" ||
+      input.presentation === "dine_in_complete"
+        ? input.canUndoCollected && input.undoCollectedEligible
+        : false,
   };
 }
 
@@ -403,6 +487,23 @@ export function sortCollectionBoardOrders<
   T extends { pickupTime: string; orderNumber: string },
 >(orders: T[]): T[] {
   return [...orders].sort((a, b) => {
+    const timeCmp = a.pickupTime.localeCompare(b.pickupTime, "en");
+    if (timeCmp !== 0) return timeCmp;
+    return a.orderNumber.localeCompare(b.orderNumber, "en");
+  });
+}
+
+export function sortCollectionDineInBoardOrders<
+  T extends {
+    dineIn: { reservationTime: string } | null;
+    pickupTime: string;
+    orderNumber: string;
+  },
+>(orders: T[]): T[] {
+  return [...orders].sort((a, b) => {
+    const aRes = a.dineIn?.reservationTime ?? "";
+    const bRes = b.dineIn?.reservationTime ?? "";
+    if (aRes !== bRes) return aRes.localeCompare(bRes, "en");
     const timeCmp = a.pickupTime.localeCompare(b.pickupTime, "en");
     if (timeCmp !== 0) return timeCmp;
     return a.orderNumber.localeCompare(b.orderNumber, "en");

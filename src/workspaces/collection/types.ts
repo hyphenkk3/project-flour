@@ -35,10 +35,19 @@ export type CollectionPaidAddonLine = {
   messages: CollectionPaidAddonMessage[];
 };
 
+export type CollectionDineInReservation = {
+  reservationDate: string;
+  reservationTime: string;
+  venue: "hyphen" | "whitebird";
+  guestCount: number;
+  reservationNote: string | null;
+};
+
 export type CollectionBoardOrder = {
   id: string;
   orderNumber: string;
   guestName: string;
+  guestPhone: string | null;
   pickupDate: string;
   pickupTime: string;
   fulfilmentMethod: StorefrontOrderFulfilmentMethod;
@@ -49,6 +58,7 @@ export type CollectionBoardOrder = {
   pickedUpAt: string | null;
   deliveredAt: string | null;
   includeReceipt: boolean;
+  dineIn: CollectionDineInReservation | null;
   cakeLines: CollectionCakeLine[];
   complimentaryItems: CollectionComplimentaryLine[];
   paidAddons: CollectionPaidAddonLine[];

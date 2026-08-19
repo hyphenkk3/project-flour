@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
 import { formatLongBusinessDate } from "@/lib/dates";
 import type { CollectionWorkspaceCapabilities } from "@/engines/collection/capabilities";
 import {
@@ -16,9 +17,12 @@ import {
   collectionDeskPresentation,
   collectionHandoffSurface,
   hasCollectionPaymentAttention,
+  isCollectionCompleteDineInEligible,
+  isCollectionDineInMethod,
   isCollectionMarkCollectedEligible,
   isCollectionOrderSecured,
   isCollectionUndoCollectedEligible,
+  isCollectionUndoDineInEligible,
   type CollectionBoardTab,
 } from "@/workspaces/collection/eligibility";
 import { deriveCollectionPackingReminders } from "@/workspaces/collection/packing";
@@ -58,20 +62,33 @@ export function CollectionOrderDetail({
     status: order.status,
   });
   const packing = deriveCollectionPackingReminders(order);
+  const dineIn = isCollectionDineInMethod(order.fulfilmentMethod);
   const surface = collectionHandoffSurface({
     presentation,
     canMarkCollected: capabilities.canMarkCollected,
     canUndoCollected: capabilities.canUndoCollected,
-    markCollectedEligible: isCollectionMarkCollectedEligible({
-      readyAt: order.readyAt,
-      pickedUpAt: order.pickedUpAt,
-      fulfilmentMethod: order.fulfilmentMethod,
-      status: order.status,
-    }),
-    undoCollectedEligible: isCollectionUndoCollectedEligible({
-      pickedUpAt: order.pickedUpAt,
-      fulfilmentMethod: order.fulfilmentMethod,
-    }),
+    markCollectedEligible: dineIn
+      ? isCollectionCompleteDineInEligible({
+          readyAt: order.readyAt,
+          pickedUpAt: order.pickedUpAt,
+          fulfilmentMethod: order.fulfilmentMethod,
+          status: order.status,
+        })
+      : isCollectionMarkCollectedEligible({
+          readyAt: order.readyAt,
+          pickedUpAt: order.pickedUpAt,
+          fulfilmentMethod: order.fulfilmentMethod,
+          status: order.status,
+        }),
+    undoCollectedEligible: dineIn
+      ? isCollectionUndoDineInEligible({
+          pickedUpAt: order.pickedUpAt,
+          fulfilmentMethod: order.fulfilmentMethod,
+        })
+      : isCollectionUndoCollectedEligible({
+          pickedUpAt: order.pickedUpAt,
+          fulfilmentMethod: order.fulfilmentMethod,
+        }),
   });
 
   return (
@@ -132,7 +149,13 @@ export function CollectionOrderDetail({
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <div>
               <dt className="text-skyline">Fulfilment</dt>
-              <dd className="text-ink mt-0.5 font-medium">Pickup</dd>
+              <dd className="text-ink mt-0.5 font-medium">
+                {dineIn
+                  ? "Dine-in"
+                  : order.fulfilmentMethod === "delivery"
+                    ? "Delivery"
+                    : "Pickup"}
+              </dd>
             </div>
             <div>
               <dt className="text-skyline">Date</dt>
@@ -140,12 +163,53 @@ export function CollectionOrderDetail({
                 {formatLongBusinessDate(order.pickupDate)}
               </dd>
             </div>
-            <div>
-              <dt className="text-skyline">Time</dt>
-              <dd className="text-ink mt-0.5 font-medium">
-                {formatPickupTime(order.pickupTime)}
-              </dd>
-            </div>
+            {dineIn ? (
+              <>
+                <div>
+                  <dt className="text-skyline">Reservation</dt>
+                  <dd className="text-ink mt-0.5 font-medium">
+                    {order.dineIn?.reservationTime
+                      ? formatPickupTime(order.dineIn.reservationTime)
+                      : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-skyline">Cake serving</dt>
+                  <dd className="text-ink mt-0.5 font-medium">
+                    {formatPickupTime(order.pickupTime)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-skyline">Venue</dt>
+                  <dd className="text-ink mt-0.5 font-medium">
+                    {order.dineIn
+                      ? dineInVenueLabel(order.dineIn.venue)
+                      : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-skyline">Guests</dt>
+                  <dd className="text-ink mt-0.5 font-medium">
+                    {order.dineIn?.guestCount ?? "—"}
+                  </dd>
+                </div>
+                {order.guestPhone ? (
+                  <div>
+                    <dt className="text-skyline">Phone</dt>
+                    <dd className="text-ink mt-0.5 font-medium">
+                      {order.guestPhone}
+                    </dd>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div>
+                <dt className="text-skyline">Time</dt>
+                <dd className="text-ink mt-0.5 font-medium">
+                  {formatPickupTime(order.pickupTime)}
+                </dd>
+              </div>
+            )}
             <div>
               <dt className="text-skyline">Desk</dt>
               <dd
@@ -178,6 +242,17 @@ export function CollectionOrderDetail({
           </ul>
         </section>
 
+        {order.dineIn?.reservationNote?.trim() ? (
+          <section className="border-fog rounded-2xl border bg-white px-4 py-3.5">
+            <h2 className="text-ink text-xs font-semibold tracking-wide uppercase">
+              Reservation note
+            </h2>
+            <p className="text-ink mt-1.5 text-sm leading-relaxed whitespace-pre-wrap">
+              {order.dineIn.reservationNote.trim()}
+            </p>
+          </section>
+        ) : null}
+
         {order.customerNotes?.trim() ? (
           <section className="border-fog rounded-2xl border bg-white px-4 py-3.5">
             <h2 className="text-ink text-xs font-semibold tracking-wide uppercase">
@@ -192,6 +267,8 @@ export function CollectionOrderDetail({
         <CollectionHandoffActions
           canMarkCollected={surface.canMarkCollected}
           canUndoCollected={surface.canUndoCollected}
+          completeLabel={dineIn ? "Complete Dine-in" : "Mark Collected"}
+          undoLabel={dineIn ? "Undo Complete" : "Undo Collected"}
           orderId={order.id}
         />
 

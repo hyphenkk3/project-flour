@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { CollectionBoardTab } from "@/workspaces/collection/eligibility";
 import { collectionDateNavHref } from "@/workspaces/collection/date";
 
@@ -18,27 +17,33 @@ export function CollectionWorkspaceNav({
 
   return (
     <nav
-      aria-label="Collection sections"
+      aria-label="Pickup sections"
       className="border-fog flex flex-wrap gap-1 border-b pb-3"
     >
-      <Link
+      <a
         className={active === "ready" ? on : idle}
         href={collectionDateNavHref(boardDate, "ready")}
       >
         Ready
-      </Link>
-      <Link
+      </a>
+      <a
+        className={active === "dine_in" ? on : idle}
+        href={collectionDateNavHref(boardDate, "dine_in")}
+      >
+        Dine-in
+      </a>
+      <a
         className={active === "completed" ? on : idle}
         href={collectionDateNavHref(boardDate, "completed")}
       >
         Picked Up / Delivered
-      </Link>
-      <Link
+      </a>
+      <a
         className={active === "history" ? on : idle}
         href={collectionDateNavHref(boardDate, "history")}
       >
         History
-      </Link>
+      </a>
     </nav>
   );
 }

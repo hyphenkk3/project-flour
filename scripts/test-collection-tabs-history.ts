@@ -193,9 +193,9 @@ const boardSrc = readFileSync(
   resolve("src/workspaces/collection/CollectionLiveBoard.tsx"),
   "utf8",
 );
-assert.match(boardSrc, /No orders ready for collection/);
+assert.match(boardSrc, /No orders ready for pickup/);
 assert.match(boardSrc, /No completed handoffs yet/);
-assert.match(boardSrc, /No collection or delivery history yet/);
+assert.match(boardSrc, /No pickup or delivery history yet/);
 
 const queriesSrc = readFileSync(
   resolve("src/workspaces/collection/queries.ts"),

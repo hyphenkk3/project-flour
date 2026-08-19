@@ -1,15 +1,16 @@
-import Link from "next/link";
 import {
   collectionPlusTwoYmd,
   collectionDateNavHref,
   collectionTodayYmd,
   collectionTomorrowYmd,
 } from "@/workspaces/collection/date";
+import type { CollectionDineInVenueFilter } from "@/workspaces/collection/board-tab";
 import type { CollectionBoardTab } from "@/workspaces/collection/eligibility";
 
 type CollectionDateNavProps = {
   selectedDate: string;
   tab?: CollectionBoardTab;
+  venueFilter?: CollectionDineInVenueFilter;
 };
 
 function chipClass(active: boolean): string {
@@ -21,6 +22,7 @@ function chipClass(active: boolean): string {
 export function CollectionDateNav({
   selectedDate,
   tab = "ready",
+  venueFilter = "all",
 }: CollectionDateNavProps) {
   const today = collectionTodayYmd();
   const tomorrow = collectionTomorrowYmd();
@@ -33,24 +35,24 @@ export function CollectionDateNav({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
       <div className="flex flex-wrap gap-2">
-        <Link
+        <a
           className={chipClass(selectedDate === today)}
-          href={collectionDateNavHref(today, tab)}
+          href={collectionDateNavHref(today, tab, venueFilter)}
         >
           Today
-        </Link>
-        <Link
+        </a>
+        <a
           className={chipClass(selectedDate === tomorrow)}
-          href={collectionDateNavHref(tomorrow, tab)}
+          href={collectionDateNavHref(tomorrow, tab, venueFilter)}
         >
           Tomorrow
-        </Link>
-        <Link
+        </a>
+        <a
           className={chipClass(selectedDate === plusTwo)}
-          href={collectionDateNavHref(plusTwo, tab)}
+          href={collectionDateNavHref(plusTwo, tab, venueFilter)}
         >
           +2
-        </Link>
+        </a>
       </div>
       <form
         action="/collection"
@@ -59,6 +61,9 @@ export function CollectionDateNav({
       >
         {tab !== "ready" ? (
           <input name="tab" type="hidden" value={tab} />
+        ) : null}
+        {tab === "dine_in" && venueFilter !== "all" ? (
+          <input name="venue" type="hidden" value={venueFilter} />
         ) : null}
         <label className="text-skyline text-sm" htmlFor="collection-date">
           Date

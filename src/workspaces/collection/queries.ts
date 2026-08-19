@@ -8,11 +8,13 @@ import {
   COLLECTION_ACTIVE_PREORDER_STATUSES,
   COLLECTION_HISTORY_LOOKBACK_DAYS,
   isActiveOnCollectionBoard,
+  isActiveOnCollectionDineInBoard,
   isCompletedInCollectionHistory,
   isCompletedOnCollectionBoard,
   isVisibleOnCollectionDetail,
   sortCollectionBoardOrders,
   sortCollectionCompletedOrdersDesc,
+  sortCollectionDineInBoardOrders,
   type CollectionBoardTab,
 } from "@/workspaces/collection/eligibility";
 import {
@@ -67,6 +69,20 @@ function rowPassesHistory(
     fulfilmentMethod: row.fulfilment_method,
     pickedUpAt: row.picked_up_at,
     deliveredAt: row.delivered_at,
+  });
+}
+
+function rowPassesDineIn(
+  row: CollectionOrderRow,
+  selectedPickupDate: string,
+): boolean {
+  return isActiveOnCollectionDineInBoard({
+    customerId: row.customer_id,
+    pickupDate: row.pickup_date,
+    selectedPickupDate,
+    status: row.status,
+    fulfilmentMethod: row.fulfilment_method,
+    pickedUpAt: row.picked_up_at,
   });
 }
 
@@ -166,6 +182,32 @@ export async function listCollectionHistoryOrders(
   return sortCollectionCompletedOrdersDesc(mapped);
 }
 
+/** Today's dine-in guest preorders not yet completed. Ready is optional. */
+export async function listCollectionDineInOrders(
+  selectedPickupDate: string,
+): Promise<CollectionBoardOrder[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("orders")
+    .select(COLLECTION_ORDER_SELECT)
+    .is("customer_id", null)
+    .eq("pickup_date", selectedPickupDate)
+    .eq("fulfilment_method", "dine_in")
+    .in("status", [...COLLECTION_ACTIVE_PREORDER_STATUSES])
+    .is("picked_up_at", null)
+    .order("pickup_time", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const mapped = ((data ?? []) as CollectionOrderRow[])
+    .filter((row) => rowPassesDineIn(row, selectedPickupDate))
+    .map(mapCollectionBoardOrder);
+
+  return sortCollectionDineInBoardOrders(mapped);
+}
+
 export async function listCollectionOrdersForTab(
   tab: CollectionBoardTab,
   selectedPickupDate: string,
@@ -175,6 +217,9 @@ export async function listCollectionOrdersForTab(
   }
   if (tab === "history") {
     return listCollectionHistoryOrders(selectedPickupDate);
+  }
+  if (tab === "dine_in") {
+    return listCollectionDineInOrders(selectedPickupDate);
   }
   return listCollectionBoardOrders(selectedPickupDate);
 }
@@ -200,6 +245,8 @@ export async function getCollectionBoardOrderById(
   const row = data as CollectionOrderRow;
   if (tab === "ready") {
     if (!rowPassesBoard(row, selectedPickupDate)) return null;
+  } else if (tab === "dine_in") {
+    if (!rowPassesDineIn(row, selectedPickupDate)) return null;
   } else if (tab === "completed") {
     if (!rowPassesCompleted(row, selectedPickupDate)) return null;
   } else {

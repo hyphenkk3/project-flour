@@ -10,6 +10,8 @@ type CollectionHandoffActionsProps = {
   orderId: string;
   canMarkCollected: boolean;
   canUndoCollected: boolean;
+  completeLabel?: string;
+  undoLabel?: string;
 };
 
 /**
@@ -21,6 +23,8 @@ export function CollectionHandoffActions({
   orderId,
   canMarkCollected,
   canUndoCollected,
+  completeLabel = "Mark Collected",
+  undoLabel = "Undo Collected",
 }: CollectionHandoffActionsProps) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +72,7 @@ export function CollectionHandoffActions({
               }
               type="button"
             >
-              {busy === "mark" ? "Working…" : "Mark Collected"}
+              {busy === "mark" ? "Working…" : completeLabel}
             </button>
           ) : null}
           {canUndoCollected ? (
@@ -80,7 +84,7 @@ export function CollectionHandoffActions({
               }
               type="button"
             >
-              {busy === "undo" ? "Working…" : "Undo Collected"}
+              {busy === "undo" ? "Working…" : undoLabel}
             </button>
           ) : null}
         </div>

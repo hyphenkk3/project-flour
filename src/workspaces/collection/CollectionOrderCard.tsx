@@ -7,6 +7,7 @@ import {
   guestOrderStatusLabel,
 } from "@/workspaces/owner/orders/labels";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
 import { formatLongBusinessDate } from "@/lib/dates";
 import { collectionOrderHref } from "@/workspaces/collection/date";
 import {
@@ -15,6 +16,7 @@ import {
   collectionPrimaryCakeSummary,
   hasCollectionPaymentAttention,
   isCollectionDeliveryMethod,
+  isCollectionDineInMethod,
   isCollectionOrderSecured,
   type CollectionBoardTab,
 } from "@/workspaces/collection/eligibility";
@@ -52,31 +54,67 @@ export function CollectionOrderCard({
   const notes = order.customerNotes?.trim() ?? "";
   const completedAt = collectionHandoffCompletedAt(order);
   const completedLabel = completedAt ? formatTimelineTime(completedAt) : null;
+  const dineIn = isCollectionDineInMethod(order.fulfilmentMethod);
   const methodLabel = isCollectionDeliveryMethod(order.fulfilmentMethod)
     ? "Delivery"
-    : "Pickup";
+    : dineIn
+      ? "Dine-in"
+      : "Pickup";
   const showCompletedMeta = tab === "completed" || tab === "history";
+  const reservationTime = order.dineIn?.reservationTime ?? "";
+  const guestCount = order.dineIn?.guestCount;
 
   return (
     <article className="border-fog rounded-xl border bg-white px-3.5 py-2.5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span
-              className={
-                desk.overdue
-                  ? "text-status-warning shrink-0 text-sm font-semibold tracking-tight"
-                  : "text-signal shrink-0 text-sm font-semibold tracking-tight"
-              }
-            >
-              {showCompletedMeta && completedLabel
-                ? completedLabel
-                : formatPickupTime(order.pickupTime)}
-            </span>
-            <h3 className="text-ink min-w-0 truncate text-sm font-semibold tracking-tight">
-              {order.guestName}
-            </h3>
+            {dineIn ? (
+              <h3 className="text-ink min-w-0 truncate text-sm font-semibold tracking-tight">
+                {order.guestName}
+              </h3>
+            ) : (
+              <>
+                <span
+                  className={
+                    desk.overdue
+                      ? "text-status-warning shrink-0 text-sm font-semibold tracking-tight"
+                      : "text-signal shrink-0 text-sm font-semibold tracking-tight"
+                  }
+                >
+                  {showCompletedMeta && completedLabel
+                    ? completedLabel
+                    : formatPickupTime(order.pickupTime)}
+                </span>
+                <h3 className="text-ink min-w-0 truncate text-sm font-semibold tracking-tight">
+                  {order.guestName}
+                </h3>
+              </>
+            )}
           </div>
+          {dineIn ? (
+            <div className="text-skyline mt-1 space-y-0.5 text-xs leading-snug">
+              <p>
+                <span className="text-ink font-medium">Reservation:</span>{" "}
+                {reservationTime
+                  ? formatPickupTime(reservationTime)
+                  : "—"}
+              </p>
+              <p>
+                <span className="text-ink font-medium">Cake serving:</span>{" "}
+                {formatPickupTime(order.pickupTime)}
+              </p>
+              {order.dineIn ? (
+                <p>
+                  {dineInVenueLabel(order.dineIn.venue)}
+                  {guestCount
+                    ? ` · ${guestCount} guest${guestCount === 1 ? "" : "s"}`
+                    : null}
+                </p>
+              ) : null}
+              {order.guestPhone ? <p>{order.guestPhone}</p> : null}
+            </div>
+          ) : null}
           <p className="text-ink mt-0.5 text-sm leading-snug">
             {cakeName}
             {sizeLabel ? (

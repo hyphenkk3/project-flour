@@ -2,12 +2,16 @@
  * Map Collection DB rows → desk DTO.
  */
 
-import { normalizeFulfilmentMethod } from "@/engines/orders/fulfilment";
+import {
+  mapOrderDineInReservation,
+  normalizeFulfilmentMethod,
+} from "@/engines/orders/fulfilment";
 import type { GuestOrderStatus } from "@/types/storefront";
 import type {
   CollectionBoardOrder,
   CollectionCakeLine,
   CollectionComplimentaryLine,
+  CollectionDineInReservation,
   CollectionPaidAddonLine,
 } from "@/workspaces/collection/types";
 
@@ -15,6 +19,7 @@ export type CollectionOrderRow = {
   id: string;
   order_number: string;
   guest_name: string | null;
+  guest_phone: string | null;
   customer_id: string | null;
   pickup_date: string;
   pickup_time: string;
@@ -26,6 +31,24 @@ export type CollectionOrderRow = {
   picked_up_at: string | null;
   delivered_at: string | null;
   include_receipt: boolean | null;
+  order_dine_in_reservations?:
+    | {
+        reservation_date: string | null;
+        reservation_time: string | null;
+        venue: string | null;
+        guest_count: number | string | null;
+        reservation_note: string | null;
+        status: string | null;
+      }
+    | {
+        reservation_date: string | null;
+        reservation_time: string | null;
+        venue: string | null;
+        guest_count: number | string | null;
+        reservation_note: string | null;
+        status: string | null;
+      }[]
+    | null;
   order_items?: Array<{
     id: string;
     cake_name: string | null;
@@ -101,11 +124,31 @@ function mapPaidAddons(row: CollectionOrderRow): CollectionPaidAddonLine[] {
     });
 }
 
+function firstDineInReservation(row: CollectionOrderRow) {
+  const value = row.order_dine_in_reservations;
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function mapDineIn(row: CollectionOrderRow): CollectionDineInReservation | null {
+  const mapped = mapOrderDineInReservation(firstDineInReservation(row));
+  if (!mapped) return null;
+  return {
+    reservationDate: mapped.reservationDate,
+    reservationTime: mapped.reservationTime,
+    venue: mapped.venue,
+    guestCount: mapped.guestCount,
+    reservationNote: mapped.reservationNote,
+  };
+}
+
 export function mapCollectionBoardOrder(row: CollectionOrderRow): CollectionBoardOrder {
+  const phone = row.guest_phone?.trim() ?? "";
   return {
     id: row.id,
     orderNumber: row.order_number,
     guestName: row.guest_name?.trim() || "Guest",
+    guestPhone: phone.length > 0 ? phone : null,
     pickupDate: row.pickup_date,
     pickupTime: row.pickup_time,
     fulfilmentMethod: normalizeFulfilmentMethod(row.fulfilment_method),
@@ -116,6 +159,7 @@ export function mapCollectionBoardOrder(row: CollectionOrderRow): CollectionBoar
     pickedUpAt: row.picked_up_at,
     deliveredAt: row.delivered_at,
     includeReceipt: Boolean(row.include_receipt),
+    dineIn: mapDineIn(row),
     cakeLines: mapCakeLines(row),
     complimentaryItems: mapComplimentary(row),
     paidAddons: mapPaidAddons(row),

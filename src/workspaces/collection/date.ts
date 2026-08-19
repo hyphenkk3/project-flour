@@ -2,7 +2,10 @@
  * Collection fulfilment-date helpers (Asia/Singapore) — same calendar as Bakery.
  */
 
-import type { CollectionBoardTab } from "@/workspaces/collection/board-tab";
+import type {
+  CollectionBoardTab,
+  CollectionDineInVenueFilter,
+} from "@/workspaces/collection/board-tab";
 
 const TIME_ZONE = "Asia/Singapore";
 
@@ -59,10 +62,14 @@ export function resolveCollectionBoardDate(
 export function collectionDateNavHref(
   ymd: string,
   tab: CollectionBoardTab = "ready",
+  venue?: CollectionDineInVenueFilter,
 ): string {
   const params = new URLSearchParams();
   params.set("date", ymd);
   if (tab !== "ready") params.set("tab", tab);
+  if (tab === "dine_in" && venue && venue !== "all") {
+    params.set("venue", venue);
+  }
   return `/collection?${params.toString()}`;
 }
 

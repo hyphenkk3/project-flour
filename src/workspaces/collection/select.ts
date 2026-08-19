@@ -4,6 +4,7 @@ export const COLLECTION_ORDER_SELECT = `
   id,
   order_number,
   guest_name,
+  guest_phone,
   customer_id,
   pickup_date,
   pickup_time,
@@ -15,6 +16,14 @@ export const COLLECTION_ORDER_SELECT = `
   picked_up_at,
   delivered_at,
   include_receipt,
+  order_dine_in_reservations (
+    reservation_date,
+    reservation_time,
+    venue,
+    guest_count,
+    reservation_note,
+    status
+  ),
   order_items (
     id,
     cake_name,
