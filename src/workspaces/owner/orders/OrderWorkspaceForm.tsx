@@ -20,6 +20,7 @@ import {
   FormSubmitButton,
   FormTextarea,
 } from "@/components/ui/form";
+import { OrderGuideCallout } from "@/components/ui/OrderGuideCallout";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatLongBusinessDate, formatBusinessMonthYear, isDifferentBusinessMonth } from "@/lib/dates";
 import { buildApprovalChangeSummary } from "@/engines/operations/approval-change-summary";
@@ -164,24 +165,6 @@ function ViewBlock({
       </h2>
       {children}
     </section>
-  );
-}
-
-/** Permanent staff guidance — not order-specific notes. */
-function OrderGuideCallout() {
-  return (
-    <aside
-      aria-label="Order guide"
-      className="border-fog bg-mist/50 mt-4 rounded-lg border px-3 py-2.5"
-    >
-      <p className="text-skyline text-[0.65rem] font-semibold tracking-[0.14em] uppercase">
-        Order guide
-      </p>
-      <ul className="text-ink mt-1.5 space-y-0.5 text-sm leading-snug">
-        <li>No wording on cakes or cake boards.</li>
-        <li>Customised cake decoration is not available.</li>
-      </ul>
-    </aside>
   );
 }
 
@@ -804,7 +787,7 @@ export function OrderWorkspaceForm({
           <p className="text-ink mt-3 text-sm font-semibold">
             Total · {formatRm(order.total)}
           </p>
-          <OrderGuideCallout />
+          <OrderGuideCallout className="mt-4" />
         </ViewBlock>
 
         <ViewBlock title="Add-ons">
@@ -1371,7 +1354,7 @@ export function OrderWorkspaceForm({
             );
           })}
         </ul>
-        <OrderGuideCallout />
+        <OrderGuideCallout className="mt-4" />
       </section>
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">

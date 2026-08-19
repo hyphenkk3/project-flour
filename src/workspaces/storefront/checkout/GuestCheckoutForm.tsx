@@ -13,6 +13,7 @@ import {
   FormSubmitButton,
   FormTextarea,
 } from "@/components/ui/form";
+import { OrderGuideCallout } from "@/components/ui/OrderGuideCallout";
 import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
 import {
   ORDERS_CLOSED_CUSTOMER_LABEL,
@@ -640,6 +641,8 @@ export function GuestCheckoutForm({
           ) : null}
         </section>
       ) : null}
+
+      <OrderGuideCallout />
 
       <section className="space-y-3">
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">

@@ -7,6 +7,7 @@ import {
   formatCollectionAvailabilityLabel,
   formatRm,
 } from "@/workspaces/storefront/catalog/pricing";
+import { OrderGuideCallout } from "@/components/ui/OrderGuideCallout";
 import {
   draftHasItems,
   emptyPreorderDraft,
@@ -95,6 +96,8 @@ export function CakeDetailPurchasePanel({
           </p>
         ) : null}
       </div>
+
+      <OrderGuideCallout />
 
       {cake.sharingGuide?.trim() ? (
         <section>
