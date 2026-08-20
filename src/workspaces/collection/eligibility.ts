@@ -1,6 +1,6 @@
 /**
- * Live Collection — pickup desk eligibility (Ready → Collected) plus
- * completed handoff views (Picked Up / Delivered + History).
+ * Live Collection — Ready / Pickup / Delivery / Dine-In desks plus
+ * Completed + History handoff views.
  * No Arrived / Verified persisted states.
  */
 
@@ -56,7 +56,7 @@ export function isCollectionDineInMethod(
   return normalizeFulfilmentMethod(fulfilmentMethod) === "dine_in";
 }
 
-/** Active Collection queue: Ready pickup, not yet Collected. */
+/** Pickup tab / legacy Ready board: pickup Ready, not yet Collected. */
 export function isActiveOnCollectionBoard(input: {
   customerId: string | null;
   pickupDate: string;
@@ -72,6 +72,35 @@ export function isActiveOnCollectionBoard(input: {
   if (!isCollectionPickupMethod(input.fulfilmentMethod)) return false;
   if (!input.readyAt) return false;
   if (input.pickedUpAt) return false;
+  return true;
+}
+
+/** Alias — Pickup focused queue (same predicate as legacy board). */
+export function isActiveOnCollectionPickupBoard(
+  input: Parameters<typeof isActiveOnCollectionBoard>[0],
+): boolean {
+  return isActiveOnCollectionBoard(input);
+}
+
+/**
+ * Delivery tab: delivery guest preorders marked Ready, not yet Delivered.
+ * Out-for-delivery remains visible until Delivered (handoff not complete).
+ */
+export function isActiveOnCollectionDeliveryBoard(input: {
+  customerId: string | null;
+  pickupDate: string;
+  selectedPickupDate: string;
+  status: GuestOrderStatus | string;
+  fulfilmentMethod: string | null | undefined;
+  readyAt: string | null;
+  deliveredAt: string | null;
+}): boolean {
+  if (input.customerId != null) return false;
+  if (input.pickupDate !== input.selectedPickupDate) return false;
+  if (!isCollectionActiveStatus(input.status)) return false;
+  if (!isCollectionDeliveryMethod(input.fulfilmentMethod)) return false;
+  if (!input.readyAt) return false;
+  if (input.deliveredAt) return false;
   return true;
 }
 
@@ -95,9 +124,74 @@ export function isActiveOnCollectionDineInBoard(input: {
   return true;
 }
 
+/** Ready tab dine-in subset: reservation is Ready, not yet completed. */
+export function isActiveOnCollectionDineInReadyBoard(input: {
+  customerId: string | null;
+  pickupDate: string;
+  selectedPickupDate: string;
+  status: GuestOrderStatus | string;
+  fulfilmentMethod: string | null | undefined;
+  readyAt: string | null;
+  pickedUpAt: string | null;
+}): boolean {
+  if (!input.readyAt) return false;
+  return isActiveOnCollectionDineInBoard(input);
+}
+
+/**
+ * General Ready tab: pickup-ready, delivery-ready, and dine-in-ready.
+ * Does not include dine-in reservations that are not yet Ready.
+ */
+export function isActiveOnCollectionReadyQueue(input: {
+  customerId: string | null;
+  pickupDate: string;
+  selectedPickupDate: string;
+  status: GuestOrderStatus | string;
+  fulfilmentMethod: string | null | undefined;
+  readyAt: string | null;
+  pickedUpAt: string | null;
+  deliveredAt: string | null;
+}): boolean {
+  if (
+    isActiveOnCollectionPickupBoard({
+      customerId: input.customerId,
+      pickupDate: input.pickupDate,
+      selectedPickupDate: input.selectedPickupDate,
+      status: input.status,
+      fulfilmentMethod: input.fulfilmentMethod,
+      readyAt: input.readyAt,
+      pickedUpAt: input.pickedUpAt,
+    })
+  ) {
+    return true;
+  }
+  if (
+    isActiveOnCollectionDeliveryBoard({
+      customerId: input.customerId,
+      pickupDate: input.pickupDate,
+      selectedPickupDate: input.selectedPickupDate,
+      status: input.status,
+      fulfilmentMethod: input.fulfilmentMethod,
+      readyAt: input.readyAt,
+      deliveredAt: input.deliveredAt,
+    })
+  ) {
+    return true;
+  }
+  return isActiveOnCollectionDineInReadyBoard({
+    customerId: input.customerId,
+    pickupDate: input.pickupDate,
+    selectedPickupDate: input.selectedPickupDate,
+    status: input.status,
+    fulfilmentMethod: input.fulfilmentMethod,
+    readyAt: input.readyAt,
+    pickedUpAt: input.pickedUpAt,
+  });
+}
+
 /**
  * Completed desk handoff: Pickup → Picked Up, Delivery → Delivered.
- * Guest preorders only; Ready queue stays pickup-only.
+ * Guest preorders only.
  */
 export function isCompletedCollectionHandoff(input: {
   customerId: string | null;
@@ -120,7 +214,7 @@ export function isCompletedCollectionHandoff(input: {
   return false;
 }
 
-/** Same-day / selected-date completed handoffs (Picked Up / Delivered tab). */
+/** Same-day / selected-date completed handoffs (Completed tab). */
 export function isCompletedOnCollectionBoard(input: {
   customerId: string | null;
   pickupDate: string;
@@ -214,8 +308,12 @@ export function isVisibleOnCollectionDetail(input: {
   if (isCollectionDineInMethod(input.fulfilmentMethod)) {
     return !input.pickedUpAt;
   }
+  if (isCollectionDeliveryMethod(input.fulfilmentMethod)) {
+    // Delivery Ready queue (and detail open while awaiting Delivered)
+    return Boolean(input.readyAt) && !input.deliveredAt;
+  }
   if (!isCollectionPickupMethod(input.fulfilmentMethod)) return false;
-  // Active Ready queue
+  // Active Pickup Ready queue
   if (input.readyAt && !input.pickedUpAt) return true;
   // Collected with Ready preserved — Undo path
   if (input.readyAt && input.pickedUpAt) return true;

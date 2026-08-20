@@ -39,13 +39,17 @@ type OrderRowPayload = {
 function boardTitle(tab: CollectionBoardTab): string {
   switch (tab) {
     case "completed":
-      return "Picked Up / Delivered";
+      return "Completed";
     case "history":
       return "Pickup History";
     case "dine_in":
-      return "Dine-in";
+      return "Dine-In";
+    case "pickup":
+      return "Pickup";
+    case "delivery":
+      return "Delivery";
     default:
-      return "Ready for Pickup";
+      return "Ready";
   }
 }
 
@@ -64,7 +68,13 @@ function boardSubtitle(
   if (tab === "dine_in") {
     return `${dateLabel} · ${count} dine-in reservation${count === 1 ? "" : "s"}`;
   }
-  return `${dateLabel} · ${count} ready pickup${count === 1 ? "" : "s"}`;
+  if (tab === "pickup") {
+    return `${dateLabel} · ${count} ready pickup${count === 1 ? "" : "s"}`;
+  }
+  if (tab === "delivery") {
+    return `${dateLabel} · ${count} ready delivery${count === 1 ? "" : "s"}`;
+  }
+  return `${dateLabel} · ${count} ready order${count === 1 ? "" : "s"}`;
 }
 
 function emptyCopy(tab: CollectionBoardTab): {
@@ -89,13 +99,27 @@ function emptyCopy(tab: CollectionBoardTab): {
     return {
       title: "No dine-in reservations for this date.",
       description:
-        "Whole Cake dine-in reservations appear here. Pickup Ready stays pickup-only.",
+        "Whole Cake dine-in reservations appear here. Pickup and Delivery have their own Ready queues.",
+    };
+  }
+  if (tab === "pickup") {
+    return {
+      title: "No orders ready for pickup.",
+      description:
+        "Pickup guest preorders marked Ready appear here until Mark Collected.",
+    };
+  }
+  if (tab === "delivery") {
+    return {
+      title: "No orders ready for delivery.",
+      description:
+        "Delivery guest preorders marked Ready appear here until Delivered.",
     };
   }
   return {
-    title: "No orders ready for pickup.",
+    title: "No orders ready yet.",
     description:
-      "Pickup guest preorders marked Ready appear here until Mark Collected.",
+      "Orders marked Ready appear here until their handoff is completed.",
   };
 }
 
@@ -176,7 +200,12 @@ export function CollectionLiveBoard({
 
   const now = new Date();
   const overdueCount =
-    tab === "ready" ? countCollectionPickupOverdue(orders, now) : 0;
+    tab === "ready" || tab === "pickup"
+      ? countCollectionPickupOverdue(
+          orders.filter((order) => order.fulfilmentMethod === "pickup"),
+          now,
+        )
+      : 0;
 
   const visibleOrders = useMemo(() => {
     if (tab !== "dine_in" || venueFilter === "all") return orders;

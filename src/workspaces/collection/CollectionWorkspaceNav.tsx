@@ -6,6 +6,15 @@ type CollectionWorkspaceNavProps = {
   boardDate: string;
 };
 
+const TABS: { id: CollectionBoardTab; label: string }[] = [
+  { id: "ready", label: "Ready" },
+  { id: "pickup", label: "Pickup" },
+  { id: "delivery", label: "Delivery" },
+  { id: "dine_in", label: "Dine-In" },
+  { id: "completed", label: "Completed" },
+  { id: "history", label: "History" },
+];
+
 export function CollectionWorkspaceNav({
   active,
   boardDate,
@@ -17,33 +26,18 @@ export function CollectionWorkspaceNav({
 
   return (
     <nav
-      aria-label="Pickup sections"
+      aria-label="Collection sections"
       className="border-fog flex flex-wrap gap-1 border-b pb-3"
     >
-      <a
-        className={active === "ready" ? on : idle}
-        href={collectionDateNavHref(boardDate, "ready")}
-      >
-        Ready
-      </a>
-      <a
-        className={active === "dine_in" ? on : idle}
-        href={collectionDateNavHref(boardDate, "dine_in")}
-      >
-        Dine-in
-      </a>
-      <a
-        className={active === "completed" ? on : idle}
-        href={collectionDateNavHref(boardDate, "completed")}
-      >
-        Picked Up / Delivered
-      </a>
-      <a
-        className={active === "history" ? on : idle}
-        href={collectionDateNavHref(boardDate, "history")}
-      >
-        History
-      </a>
+      {TABS.map((tab) => (
+        <a
+          className={active === tab.id ? on : idle}
+          href={collectionDateNavHref(boardDate, tab.id)}
+          key={tab.id}
+        >
+          {tab.label}
+        </a>
+      ))}
     </nav>
   );
 }

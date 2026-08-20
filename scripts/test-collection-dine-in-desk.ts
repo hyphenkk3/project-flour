@@ -225,7 +225,7 @@ const navSrc = readFileSync(
   resolve("src/workspaces/collection/CollectionWorkspaceNav.tsx"),
   "utf8",
 );
-assert.match(navSrc, /Dine-in/);
+assert.match(navSrc, /Dine-In/);
 assert.match(navSrc, /Ready/);
 
 const cardSrc = readFileSync(

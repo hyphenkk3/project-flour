@@ -466,6 +466,7 @@ assert.match(uiSrc, /View Operations/);
 assert.match(uiSrc, /View Pickup/);
 assert.match(uiSrc, /View Dine-in/);
 assert.match(uiSrc, /collectionDateNavHref\(model\.todayYmd, "dine_in"\)/);
+assert.match(uiSrc, /collectionDateNavHref\(model\.todayYmd, "pickup"\)/);
 assert.match(uiSrc, /canAccessCollection \?/);
 assert.match(uiSrc, /hasDineInHandoffs/);
 assert.doesNotMatch(uiSrc, /payment_overdue.*dine/i);

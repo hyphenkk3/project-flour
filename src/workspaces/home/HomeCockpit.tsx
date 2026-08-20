@@ -319,7 +319,7 @@ export function HomeCockpit({
                 label: "View Dine-in →",
               },
             ]}
-            href={collectionDateNavHref(model.todayYmd, "ready")}
+            href={collectionDateNavHref(model.todayYmd, "pickup")}
             linkLabel="View Pickup →"
             title="Today's Handoffs"
           />

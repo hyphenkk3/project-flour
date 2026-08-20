@@ -1,6 +1,7 @@
 /**
  * Live Collection board/detail queries.
- * Ready: pickup Ready queue. Completed / History: Picked Up + Delivered.
+ * Ready: combined ready queue. Pickup / Delivery: focused ready queues.
+ * Completed / History: Picked Up + Delivered (+ dine-in completed).
  */
 
 import { createClient } from "@/lib/supabase/server";
@@ -8,7 +9,9 @@ import {
   COLLECTION_ACTIVE_PREORDER_STATUSES,
   COLLECTION_HISTORY_LOOKBACK_DAYS,
   isActiveOnCollectionBoard,
+  isActiveOnCollectionDeliveryBoard,
   isActiveOnCollectionDineInBoard,
+  isActiveOnCollectionReadyQueue,
   isCompletedInCollectionHistory,
   isCompletedOnCollectionBoard,
   isVisibleOnCollectionDetail,
@@ -25,7 +28,7 @@ import { COLLECTION_ORDER_SELECT } from "@/workspaces/collection/select";
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
 import { addCalendarDaysYmd } from "@/workspaces/collection/date";
 
-function rowPassesBoard(
+function rowPassesPickupBoard(
   row: CollectionOrderRow,
   selectedPickupDate: string,
 ): boolean {
@@ -37,6 +40,37 @@ function rowPassesBoard(
     fulfilmentMethod: row.fulfilment_method,
     readyAt: row.ready_at,
     pickedUpAt: row.picked_up_at,
+  });
+}
+
+function rowPassesDeliveryBoard(
+  row: CollectionOrderRow,
+  selectedPickupDate: string,
+): boolean {
+  return isActiveOnCollectionDeliveryBoard({
+    customerId: row.customer_id,
+    pickupDate: row.pickup_date,
+    selectedPickupDate,
+    status: row.status,
+    fulfilmentMethod: row.fulfilment_method,
+    readyAt: row.ready_at,
+    deliveredAt: row.delivered_at,
+  });
+}
+
+function rowPassesReadyQueue(
+  row: CollectionOrderRow,
+  selectedPickupDate: string,
+): boolean {
+  return isActiveOnCollectionReadyQueue({
+    customerId: row.customer_id,
+    pickupDate: row.pickup_date,
+    selectedPickupDate,
+    status: row.status,
+    fulfilmentMethod: row.fulfilment_method,
+    readyAt: row.ready_at,
+    pickedUpAt: row.picked_up_at,
+    deliveredAt: row.delivered_at,
   });
 }
 
@@ -102,7 +136,14 @@ function rowPassesDetail(
   });
 }
 
+/** Pickup Ready queue (pickup-only). Also used by Home View Pickup. */
 export async function listCollectionBoardOrders(
+  selectedPickupDate: string,
+): Promise<CollectionBoardOrder[]> {
+  return listCollectionPickupReadyOrders(selectedPickupDate);
+}
+
+export async function listCollectionPickupReadyOrders(
   selectedPickupDate: string,
 ): Promise<CollectionBoardOrder[]> {
   const supabase = await createClient();
@@ -121,13 +162,64 @@ export async function listCollectionBoardOrders(
   }
 
   const mapped = ((data ?? []) as CollectionOrderRow[])
-    .filter((row) => rowPassesBoard(row, selectedPickupDate))
+    .filter((row) => rowPassesPickupBoard(row, selectedPickupDate))
     .map(mapCollectionBoardOrder);
 
   return sortCollectionBoardOrders(mapped);
 }
 
-/** Selected-date completed handoffs (Picked Up + Delivered). */
+export async function listCollectionDeliveryReadyOrders(
+  selectedPickupDate: string,
+): Promise<CollectionBoardOrder[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("orders")
+    .select(COLLECTION_ORDER_SELECT)
+    .is("customer_id", null)
+    .eq("pickup_date", selectedPickupDate)
+    .eq("fulfilment_method", "delivery")
+    .in("status", [...COLLECTION_ACTIVE_PREORDER_STATUSES])
+    .not("ready_at", "is", null)
+    .is("delivered_at", null)
+    .order("pickup_time", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const mapped = ((data ?? []) as CollectionOrderRow[])
+    .filter((row) => rowPassesDeliveryBoard(row, selectedPickupDate))
+    .map(mapCollectionBoardOrder);
+
+  return sortCollectionBoardOrders(mapped);
+}
+
+/** Combined Ready tab: pickup + delivery + dine-in ready. */
+export async function listCollectionReadyQueueOrders(
+  selectedPickupDate: string,
+): Promise<CollectionBoardOrder[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("orders")
+    .select(COLLECTION_ORDER_SELECT)
+    .is("customer_id", null)
+    .eq("pickup_date", selectedPickupDate)
+    .in("status", [...COLLECTION_ACTIVE_PREORDER_STATUSES])
+    .not("ready_at", "is", null)
+    .order("pickup_time", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const mapped = ((data ?? []) as CollectionOrderRow[])
+    .filter((row) => rowPassesReadyQueue(row, selectedPickupDate))
+    .map(mapCollectionBoardOrder);
+
+  return sortCollectionBoardOrders(mapped);
+}
+
+/** Selected-date completed handoffs (Picked Up + Delivered + dine-in). */
 export async function listCollectionCompletedOrders(
   selectedPickupDate: string,
 ): Promise<CollectionBoardOrder[]> {
@@ -221,7 +313,13 @@ export async function listCollectionOrdersForTab(
   if (tab === "dine_in") {
     return listCollectionDineInOrders(selectedPickupDate);
   }
-  return listCollectionBoardOrders(selectedPickupDate);
+  if (tab === "pickup") {
+    return listCollectionPickupReadyOrders(selectedPickupDate);
+  }
+  if (tab === "delivery") {
+    return listCollectionDeliveryReadyOrders(selectedPickupDate);
+  }
+  return listCollectionReadyQueueOrders(selectedPickupDate);
 }
 
 export async function getCollectionBoardOrderById(
@@ -244,7 +342,11 @@ export async function getCollectionBoardOrderById(
 
   const row = data as CollectionOrderRow;
   if (tab === "ready") {
-    if (!rowPassesBoard(row, selectedPickupDate)) return null;
+    if (!rowPassesReadyQueue(row, selectedPickupDate)) return null;
+  } else if (tab === "pickup") {
+    if (!rowPassesPickupBoard(row, selectedPickupDate)) return null;
+  } else if (tab === "delivery") {
+    if (!rowPassesDeliveryBoard(row, selectedPickupDate)) return null;
   } else if (tab === "dine_in") {
     if (!rowPassesDineIn(row, selectedPickupDate)) return null;
   } else if (tab === "completed") {

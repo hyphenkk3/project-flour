@@ -1,5 +1,5 @@
 /**
- * Collection tabs — Ready / Picked Up·Delivered / History.
+ * Collection tabs — Ready / Pickup / Delivery / Dine-In / Completed / History.
  * Run: npx tsx scripts/test-collection-tabs-history.ts
  */
 import assert from "node:assert/strict";
@@ -13,6 +13,8 @@ import { buildGuestOrderWorkspaceCapabilities } from "@/engines/orders/delivery-
 import {
   COLLECTION_HISTORY_LOOKBACK_DAYS,
   isActiveOnCollectionBoard,
+  isActiveOnCollectionDeliveryBoard,
+  isActiveOnCollectionReadyQueue,
   isCompletedCollectionHandoff,
   isCompletedInCollectionHistory,
   isCompletedOnCollectionBoard,
@@ -39,17 +41,47 @@ const readyPickup = {
 assert.equal(parseCollectionBoardTab(undefined), "ready");
 assert.equal(parseCollectionBoardTab("completed"), "completed");
 assert.equal(parseCollectionBoardTab("history"), "history");
+assert.equal(parseCollectionBoardTab("pickup"), "pickup");
+assert.equal(parseCollectionBoardTab("delivery"), "delivery");
+assert.equal(parseCollectionBoardTab("dine_in"), "dine_in");
 assert.equal(parseCollectionBoardTab("nope"), "ready");
 
-// 1. Ready view predicate
+// Pickup focused queue
 assert.equal(isActiveOnCollectionBoard(readyPickup), true);
+assert.equal(
+  isActiveOnCollectionReadyQueue(readyPickup),
+  true,
+  "Pickup-ready appears in Ready",
+);
 
-// 4. Completed must not appear as Ready
+const readyDelivery = {
+  ...readyPickup,
+  fulfilmentMethod: "delivery" as const,
+};
+assert.equal(isActiveOnCollectionDeliveryBoard(readyDelivery), true);
+assert.equal(
+  isActiveOnCollectionReadyQueue(readyDelivery),
+  true,
+  "Delivery-ready appears in Ready",
+);
+assert.equal(
+  isActiveOnCollectionBoard(readyDelivery),
+  false,
+  "Delivery-ready does not appear in Pickup",
+);
+assert.equal(
+  isActiveOnCollectionDeliveryBoard(readyPickup),
+  false,
+  "Pickup-ready does not appear in Delivery",
+);
+
+// Completed must not appear as Ready / Pickup
 const pickedUp = {
   ...readyPickup,
   pickedUpAt: "2026-10-23T04:00:00Z",
 };
 assert.equal(isActiveOnCollectionBoard(pickedUp), false);
+assert.equal(isActiveOnCollectionReadyQueue(pickedUp), false);
 assert.equal(
   isCompletedOnCollectionBoard({
     ...pickedUp,
@@ -69,6 +101,8 @@ const delivered = {
   deliveredAt: "2026-10-23T05:00:00Z",
 };
 assert.equal(isActiveOnCollectionBoard(delivered as typeof readyPickup), false);
+assert.equal(isActiveOnCollectionDeliveryBoard(delivered), false);
+assert.equal(isActiveOnCollectionReadyQueue(delivered), false);
 assert.equal(isCompletedOnCollectionBoard(delivered), true);
 assert.equal(
   isCompletedCollectionHandoff(delivered),
@@ -85,7 +119,7 @@ assert.equal(
   false,
 );
 
-// 5–6. History includes both; newest first; lookback window
+// History includes both; newest first; lookback window
 assert.equal(COLLECTION_HISTORY_LOOKBACK_DAYS, 30);
 assert.equal(
   isCompletedInCollectionHistory({
@@ -142,7 +176,7 @@ assert.deepEqual(
   "Newest completed handoffs first",
 );
 
-// 8–10. Manager / Vivian / Owner can view Collection
+// Manager / Vivian / Owner can view Collection
 for (const role of [
   "manager",
   "customer_operations",
@@ -158,7 +192,7 @@ for (const role of [
   assert.equal(caps.canMarkCollected, true, `${role} Mark Collected`);
 }
 
-// 11. Owner-only mutation controls remain protected (not Collection desk)
+// Owner-only mutation controls remain protected (not Collection desk)
 const managerOps = buildGuestOrderWorkspaceCapabilities({
   role: "manager",
   staffId: "mgr-1",
@@ -186,21 +220,35 @@ const navSrc = readFileSync(
   "utf8",
 );
 assert.match(navSrc, /Ready/);
-assert.match(navSrc, /Picked Up \/ Delivered/);
+assert.match(navSrc, /Pickup/);
+assert.match(navSrc, /Delivery/);
+assert.match(navSrc, /Dine-In/);
+assert.match(navSrc, /Completed/);
 assert.match(navSrc, /History/);
+assert.doesNotMatch(navSrc, /Ready for Pickup/);
+assert.doesNotMatch(navSrc, /Picked Up \/ Delivered/);
 
 const boardSrc = readFileSync(
   resolve("src/workspaces/collection/CollectionLiveBoard.tsx"),
   "utf8",
 );
+assert.match(
+  boardSrc,
+  /Orders marked Ready appear here until their handoff is completed/,
+);
 assert.match(boardSrc, /No orders ready for pickup/);
+assert.match(boardSrc, /No orders ready for delivery/);
 assert.match(boardSrc, /No completed handoffs yet/);
 assert.match(boardSrc, /No pickup or delivery history yet/);
+assert.doesNotMatch(boardSrc, /Ready for Pickup/);
 
 const queriesSrc = readFileSync(
   resolve("src/workspaces/collection/queries.ts"),
   "utf8",
 );
+assert.match(queriesSrc, /listCollectionReadyQueueOrders/);
+assert.match(queriesSrc, /listCollectionPickupReadyOrders/);
+assert.match(queriesSrc, /listCollectionDeliveryReadyOrders/);
 assert.match(queriesSrc, /listCollectionCompletedOrders/);
 assert.match(queriesSrc, /listCollectionHistoryOrders/);
 assert.match(queriesSrc, /delivered_at/);
@@ -215,6 +263,14 @@ assert.equal(
 assert.equal(
   collectionDateNavHref(historyBoardDate, "history"),
   "/collection?date=2026-10-23&tab=history",
+);
+assert.equal(
+  collectionDateNavHref(historyBoardDate, "pickup"),
+  "/collection?date=2026-10-23&tab=pickup",
+);
+assert.equal(
+  collectionDateNavHref(historyBoardDate, "delivery"),
+  "/collection?date=2026-10-23&tab=delivery",
 );
 assert.equal(
   collectionOrderHref("ready-1", historyPickupDate, "ready"),

@@ -2,6 +2,8 @@
 
 export type CollectionBoardTab =
   | "ready"
+  | "pickup"
+  | "delivery"
   | "dine_in"
   | "completed"
   | "history";
@@ -11,7 +13,13 @@ export type CollectionDineInVenueFilter = "all" | "hyphen" | "whitebird";
 export function parseCollectionBoardTab(
   raw: string | null | undefined,
 ): CollectionBoardTab {
-  if (raw === "completed" || raw === "history" || raw === "dine_in") {
+  if (
+    raw === "completed" ||
+    raw === "history" ||
+    raw === "dine_in" ||
+    raw === "pickup" ||
+    raw === "delivery"
+  ) {
     return raw;
   }
   return "ready";

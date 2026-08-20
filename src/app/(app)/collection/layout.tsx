@@ -22,7 +22,7 @@ export default async function CollectionLayout({
           Collection
         </p>
         <p className="text-skyline mt-0.5 text-sm leading-snug">
-          Pickup Ready, dine-in reservations, completed handoffs, and history.
+          Ready, Pickup, Delivery, Dine-In, completed handoffs, and history.
         </p>
       </div>
       {children}

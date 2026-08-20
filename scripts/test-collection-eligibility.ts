@@ -8,6 +8,9 @@ import {
   collectionHandoffSurface,
   hasCollectionPaymentAttention,
   isActiveOnCollectionBoard,
+  isActiveOnCollectionDeliveryBoard,
+  isActiveOnCollectionDineInReadyBoard,
+  isActiveOnCollectionReadyQueue,
   isCollectionMarkCollectedEligible,
   isCollectionUndoCollectedEligible,
   isVisibleOnCollectionDetail,
@@ -27,7 +30,7 @@ assert.equal(isActiveOnCollectionBoard(base), true);
 assert.equal(
   isActiveOnCollectionBoard({ ...base, fulfilmentMethod: "delivery" }),
   false,
-  "Delivery excluded",
+  "Delivery excluded from Pickup board",
 );
 assert.equal(
   isActiveOnCollectionBoard({ ...base, readyAt: null }),
@@ -51,6 +54,72 @@ assert.equal(
   false,
 );
 
+const deliveryReady = {
+  ...base,
+  fulfilmentMethod: "delivery" as const,
+  deliveredAt: null as string | null,
+};
+assert.equal(isActiveOnCollectionDeliveryBoard(deliveryReady), true);
+assert.equal(
+  isActiveOnCollectionDeliveryBoard({
+    ...deliveryReady,
+    deliveredAt: "2026-10-23T05:00:00Z",
+  }),
+  false,
+);
+assert.equal(
+  isActiveOnCollectionDeliveryBoard({ ...deliveryReady, readyAt: null }),
+  false,
+);
+assert.equal(
+  isActiveOnCollectionBoard(deliveryReady),
+  false,
+  "Delivery-ready must not appear on Pickup",
+);
+assert.equal(
+  isActiveOnCollectionReadyQueue({
+    ...deliveryReady,
+    pickedUpAt: null,
+  }),
+  true,
+  "Delivery-ready appears on Ready",
+);
+assert.equal(
+  isActiveOnCollectionReadyQueue({
+    ...base,
+    deliveredAt: null,
+  }),
+  true,
+  "Pickup-ready appears on Ready",
+);
+assert.equal(
+  isActiveOnCollectionReadyQueue({
+    ...base,
+    fulfilmentMethod: "dine_in",
+    deliveredAt: null,
+  }),
+  true,
+  "Dine-in-ready appears on Ready",
+);
+assert.equal(
+  isActiveOnCollectionDineInReadyBoard({
+    ...base,
+    fulfilmentMethod: "dine_in",
+    readyAt: null,
+  }),
+  false,
+  "Dine-in without Ready stays off Ready tab",
+);
+assert.equal(
+  isActiveOnCollectionDeliveryBoard({
+    ...base,
+    fulfilmentMethod: "pickup",
+    deliveredAt: null,
+  }),
+  false,
+  "Pickup-ready must not appear on Delivery",
+);
+
 assert.equal(
   isVisibleOnCollectionDetail({
     ...base,
@@ -67,6 +136,22 @@ assert.equal(
   }),
   true,
   "Completed Picked Up remains openable from Collection history",
+);
+assert.equal(
+  isVisibleOnCollectionDetail({
+    ...deliveryReady,
+    deliveredAt: null,
+  }),
+  true,
+  "Delivery-ready opens on Collection detail",
+);
+assert.equal(
+  isVisibleOnCollectionDetail({
+    ...deliveryReady,
+    deliveredAt: "2026-10-23T05:00:00Z",
+  }),
+  true,
+  "Delivered opens from Completed/History",
 );
 
 assert.equal(
