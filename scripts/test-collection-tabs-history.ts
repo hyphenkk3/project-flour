@@ -252,6 +252,24 @@ assert.match(queriesSrc, /listCollectionDeliveryReadyOrders/);
 assert.match(queriesSrc, /listCollectionCompletedOrders/);
 assert.match(queriesSrc, /listCollectionHistoryOrders/);
 assert.match(queriesSrc, /delivered_at/);
+assert.doesNotMatch(
+  queriesSrc,
+  /out_for_delivery_at\.is\.null/,
+  "Delivery queue must not filter out OFD via out_for_delivery_at",
+);
+assert.match(
+  readFileSync(resolve("src/workspaces/collection/select.ts"), "utf8"),
+  /out_for_delivery_at/,
+);
+assert.match(
+  readFileSync(resolve("src/workspaces/collection/map-order.ts"), "utf8"),
+  /outForDeliveryAt/,
+);
+assert.match(
+  readFileSync(resolve("src/workspaces/collection/eligibility.ts"), "utf8"),
+  /out_for_delivery/,
+);
+assert.match(boardSrc, /ready \$\{count === 1 \? "delivery" : "deliveries"\}/);
 
 const historyBoardDate = "2026-10-23";
 const historyPickupDate = "2026-10-10";

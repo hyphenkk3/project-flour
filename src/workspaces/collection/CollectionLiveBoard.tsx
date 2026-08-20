@@ -72,7 +72,7 @@ function boardSubtitle(
     return `${dateLabel} · ${count} ready pickup${count === 1 ? "" : "s"}`;
   }
   if (tab === "delivery") {
-    return `${dateLabel} · ${count} ready delivery${count === 1 ? "" : "s"}`;
+    return `${dateLabel} · ${count} ready ${count === 1 ? "delivery" : "deliveries"}`;
   }
   return `${dateLabel} · ${count} ready order${count === 1 ? "" : "s"}`;
 }
@@ -113,7 +113,7 @@ function emptyCopy(tab: CollectionBoardTab): {
     return {
       title: "No orders ready for delivery.",
       description:
-        "Delivery guest preorders marked Ready appear here until Delivered.",
+        "Delivery guest preorders marked Ready appear here until Delivered (including Out for Delivery).",
     };
   }
   return {

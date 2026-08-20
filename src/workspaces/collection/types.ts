@@ -56,6 +56,7 @@ export type CollectionBoardOrder = {
   productionStartedAt: string | null;
   readyAt: string | null;
   pickedUpAt: string | null;
+  outForDeliveryAt: string | null;
   deliveredAt: string | null;
   includeReceipt: boolean;
   dineIn: CollectionDineInReservation | null;

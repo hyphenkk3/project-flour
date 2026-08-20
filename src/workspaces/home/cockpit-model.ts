@@ -15,6 +15,7 @@ import { isFulfilmentTerminal } from "@/engines/orders/operational-state";
 import { bakeryProductionPresentation } from "@/workspaces/bakery/eligibility";
 import type { BakeryBoardOrder } from "@/workspaces/bakery/types";
 import {
+  isCollectionActiveStatus,
   isCollectionDeliveryMethod,
   isCollectionDineInMethod,
   isCollectionPickupMethod,
@@ -60,6 +61,7 @@ export type HomeDineInHandoffPreview = {
 
 export type HomeHandoffSummary = {
   ready: number;
+  deliveryReady: number;
   pickedUp: number;
   outForDelivery: number;
   delivered: number;
@@ -262,6 +264,14 @@ export function buildHomeCockpitModel(input: {
   const delivered = input.completedCollection.filter((order) =>
     isCollectionDeliveryMethod(order.fulfilmentMethod),
   ).length;
+  const deliveryReady = todayOrders.filter(
+    (order) =>
+      isCollectionDeliveryMethod(order.fulfilmentMethod) &&
+      isCollectionActiveStatus(order.status) &&
+      Boolean(order.readyAt) &&
+      !order.outForDeliveryAt &&
+      !order.deliveredAt,
+  ).length;
   const outForDelivery = todayOrders.filter(
     (order) =>
       isCollectionDeliveryMethod(order.fulfilmentMethod) &&
@@ -276,6 +286,7 @@ export function buildHomeCockpitModel(input: {
 
   const handoffs: HomeHandoffSummary = {
     ready: input.readyCollection.length,
+    deliveryReady,
     pickedUp,
     outForDelivery,
     delivered,

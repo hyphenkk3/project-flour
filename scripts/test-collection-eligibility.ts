@@ -195,6 +195,51 @@ assert.equal(
   }),
   "picked_up",
 );
+assert.equal(
+  collectionDeskPresentation({
+    readyAt: base.readyAt,
+    pickedUpAt: null,
+    fulfilmentMethod: "delivery",
+    outForDeliveryAt: null,
+    deliveredAt: null,
+  }),
+  "ready",
+  "Delivery ready (not yet OFD) shows Ready",
+);
+assert.equal(
+  collectionDeskPresentation({
+    readyAt: base.readyAt,
+    pickedUpAt: null,
+    fulfilmentMethod: "delivery",
+    outForDeliveryAt: "2026-10-23T03:00:00Z",
+    deliveredAt: null,
+  }),
+  "out_for_delivery",
+  "OFD shows Out for Delivery on Collection desk",
+);
+assert.equal(
+  collectionDeskPresentation({
+    readyAt: base.readyAt,
+    pickedUpAt: null,
+    fulfilmentMethod: "delivery",
+    outForDeliveryAt: "2026-10-23T03:00:00Z",
+    deliveredAt: "2026-10-23T05:00:00Z",
+  }),
+  "delivered",
+);
+assert.equal(
+  isActiveOnCollectionDeliveryBoard({
+    customerId: null,
+    pickupDate: base.pickupDate,
+    selectedPickupDate: base.selectedPickupDate,
+    status: "paid",
+    fulfilmentMethod: "delivery",
+    readyAt: "2026-10-23T01:00:00Z",
+    deliveredAt: null,
+  }),
+  true,
+  "Delivery-ready (and OFD with deliveredAt null) stays on Delivery tab",
+);
 
 const readySurface = collectionHandoffSurface({
   presentation: "ready",

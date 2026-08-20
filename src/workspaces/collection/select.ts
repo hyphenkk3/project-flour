@@ -14,6 +14,7 @@ export const COLLECTION_ORDER_SELECT = `
   production_started_at,
   ready_at,
   picked_up_at,
+  out_for_delivery_at,
   delivered_at,
   include_receipt,
   order_dine_in_reservations (

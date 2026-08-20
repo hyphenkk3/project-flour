@@ -39,6 +39,7 @@ export function CollectionOrderCard({
     readyAt: order.readyAt,
     pickedUpAt: order.pickedUpAt,
     deliveredAt: order.deliveredAt,
+    outForDeliveryAt: order.outForDeliveryAt,
     fulfilmentMethod: order.fulfilmentMethod,
     pickupDate: order.pickupDate,
     pickupTime: order.pickupTime,

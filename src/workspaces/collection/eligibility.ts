@@ -322,6 +322,7 @@ export function isVisibleOnCollectionDetail(input: {
 
 export type CollectionDeskPresentation =
   | "ready"
+  | "out_for_delivery"
   | "collected"
   | "picked_up"
   | "delivered"
@@ -333,6 +334,7 @@ export function collectionDeskPresentation(input: {
   readyAt: string | null;
   pickedUpAt: string | null;
   deliveredAt?: string | null;
+  outForDeliveryAt?: string | null;
   fulfilmentMethod?: string | null;
 }): CollectionDeskPresentation {
   if (
@@ -340,6 +342,13 @@ export function collectionDeskPresentation(input: {
     input.deliveredAt
   ) {
     return "delivered";
+  }
+  if (
+    isCollectionDeliveryMethod(input.fulfilmentMethod) &&
+    input.outForDeliveryAt &&
+    !input.deliveredAt
+  ) {
+    return "out_for_delivery";
   }
   if (isCollectionDineInMethod(input.fulfilmentMethod)) {
     if (input.pickedUpAt) return "dine_in_complete";
@@ -359,6 +368,8 @@ export function collectionDeskLabel(
   switch (presentation) {
     case "delivered":
       return "Delivered";
+    case "out_for_delivery":
+      return "Out for Delivery";
     case "picked_up":
       return "Picked Up";
     case "collected":
@@ -378,6 +389,7 @@ export function collectionDeskBadgeTone(
   presentation: CollectionDeskPresentation,
 ): StatusTone {
   if (presentation === "dine_in_pending") return "neutral";
+  if (presentation === "out_for_delivery") return "warning";
   if (presentation === "ready" || presentation === "dine_in_ready") {
     return "info";
   }
@@ -444,6 +456,7 @@ export function collectionDeskAttention(input: {
   readyAt: string | null;
   pickedUpAt: string | null;
   deliveredAt?: string | null;
+  outForDeliveryAt?: string | null;
   fulfilmentMethod?: string | null;
   pickupDate: string;
   pickupTime: string;
@@ -457,6 +470,7 @@ export function collectionDeskAttention(input: {
     readyAt: input.readyAt,
     pickedUpAt: input.pickedUpAt,
     deliveredAt: input.deliveredAt,
+    outForDeliveryAt: input.outForDeliveryAt,
     fulfilmentMethod: input.fulfilmentMethod,
   });
   if (presentation !== "ready") {

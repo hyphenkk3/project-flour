@@ -189,7 +189,9 @@ export function HomeCockpit({
     summary.ordersToday > 0 ||
     summary.pendingApprovals > 0 ||
     handoffs.ready > 0 ||
+    handoffs.deliveryReady > 0 ||
     handoffs.pickedUp > 0 ||
+    handoffs.outForDelivery > 0 ||
     handoffs.delivered > 0 ||
     handoffs.dineInPending > 0 ||
     handoffs.dineInCompleted > 0 ||
@@ -315,6 +317,10 @@ export function HomeCockpit({
           <SectionHeader
             extraLinks={[
               {
+                href: collectionDateNavHref(model.todayYmd, "delivery"),
+                label: "View Delivery →",
+              },
+              {
                 href: collectionDateNavHref(model.todayYmd, "dine_in"),
                 label: "View Dine-in →",
               },
@@ -326,6 +332,7 @@ export function HomeCockpit({
           {(() => {
             const hasPickupDeliveryHandoffs =
               handoffs.ready > 0 ||
+              handoffs.deliveryReady > 0 ||
               handoffs.pickedUp > 0 ||
               handoffs.outForDelivery > 0 ||
               handoffs.delivered > 0;
@@ -342,10 +349,11 @@ export function HomeCockpit({
               <div className="space-y-4">
                 {hasPickupDeliveryHandoffs ? (
                   <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                       {(
                         [
-                          ["Ready", handoffs.ready],
+                          ["Pickup Ready", handoffs.ready],
+                          ["Delivery Ready", handoffs.deliveryReady],
                           ["Picked Up", handoffs.pickedUp],
                           ["Out for Delivery", handoffs.outForDelivery],
                           ["Delivered", handoffs.delivered],
@@ -382,7 +390,11 @@ export function HomeCockpit({
                             </span>
                             <Link
                               className="text-signal hover:text-ink shrink-0 text-sm font-medium"
-                              href={`/collection/orders/${item.id}?date=${encodeURIComponent(model.todayYmd)}`}
+                              href={collectionOrderHref(
+                                item.id,
+                                model.todayYmd,
+                                "pickup",
+                              )}
                             >
                               Open →
                             </Link>

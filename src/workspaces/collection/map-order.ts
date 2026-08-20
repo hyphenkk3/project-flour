@@ -29,6 +29,7 @@ export type CollectionOrderRow = {
   production_started_at: string | null;
   ready_at: string | null;
   picked_up_at: string | null;
+  out_for_delivery_at: string | null;
   delivered_at: string | null;
   include_receipt: boolean | null;
   order_dine_in_reservations?:
@@ -157,6 +158,7 @@ export function mapCollectionBoardOrder(row: CollectionOrderRow): CollectionBoar
     productionStartedAt: row.production_started_at,
     readyAt: row.ready_at,
     pickedUpAt: row.picked_up_at,
+    outForDeliveryAt: row.out_for_delivery_at,
     deliveredAt: row.delivered_at,
     includeReceipt: Boolean(row.include_receipt),
     dineIn: mapDineIn(row),

@@ -97,6 +97,7 @@ const readyCollection: CollectionBoardOrder[] = [
     id: "c",
     orderNumber: "WB-3",
     guestName: "Amy",
+    guestPhone: null,
     pickupDate: "2026-08-15",
     pickupTime: "15:00:00",
     fulfilmentMethod: "pickup",
@@ -105,8 +106,10 @@ const readyCollection: CollectionBoardOrder[] = [
     productionStartedAt: null,
     readyAt: "2026-08-15T01:00:00.000Z",
     pickedUpAt: null,
+    outForDeliveryAt: null,
     deliveredAt: null,
     includeReceipt: false,
+    dineIn: null,
     cakeLines: [],
     complimentaryItems: [],
     paidAddons: [],
@@ -129,6 +132,7 @@ const completedCollection: CollectionBoardOrder[] = [
     guestName: "Dee",
     readyAt: "2026-08-15T01:00:00.000Z",
     pickedUpAt: null,
+    outForDeliveryAt: null,
     deliveredAt: "2026-08-15T05:00:00.000Z",
   },
 ];
@@ -176,6 +180,7 @@ assert.ok(model.summary.needAttention >= 2);
 assert.equal(model.summary.pendingApprovals, 1);
 assert.ok(model.attentionGroups.length > 0);
 assert.equal(model.handoffs.ready, 1);
+assert.equal(model.handoffs.deliveryReady, 0);
 assert.equal(model.handoffs.pickedUp, 1);
 assert.equal(model.handoffs.delivered, 1);
 assert.equal(model.handoffs.outForDelivery, 0);
@@ -374,6 +379,34 @@ const deliveryOutModel = buildHomeCockpitModel({
   now,
 });
 assert.equal(deliveryOutModel.handoffs.outForDelivery, 1);
+assert.equal(
+  deliveryOutModel.handoffs.deliveryReady,
+  0,
+  "OFD is Out for Delivery, not Delivery Ready",
+);
+
+const deliveryReadyOnly = listItem({
+  id: "delivery-ready-only",
+  pickupDate: "2026-08-15",
+  status: "paid",
+  fulfilmentMethod: "delivery",
+  orderNumber: "WB-DR",
+  customerName: "Fran",
+  readyAt: "2026-08-15T01:00:00.000Z",
+  outForDeliveryAt: null,
+  deliveredAt: null,
+});
+const deliveryReadyModel = buildHomeCockpitModel({
+  orders: [...orders, deliveryReadyOnly],
+  readyCollection,
+  completedCollection,
+  bakeryOrders,
+  pendingApprovals: [],
+  navigation: getNavigationForRole("manager"),
+  now,
+});
+assert.equal(deliveryReadyModel.handoffs.deliveryReady, 1);
+assert.equal(deliveryReadyModel.handoffs.outForDelivery, 0);
 assert.equal(deliveryOutModel.handoffs.delivered, 1);
 assert.equal(deliveryOutModel.handoffs.dineInPending, 0);
 assert.equal(deliveryOutModel.summary.dineInsToday, 0);
@@ -464,9 +497,14 @@ assert.match(uiSrc, /ownerOrderWorkspaceHref/);
 assert.match(uiSrc, /returnTo|HOME_RETURN|\/home/);
 assert.match(uiSrc, /View Operations/);
 assert.match(uiSrc, /View Pickup/);
+assert.match(uiSrc, /View Delivery/);
 assert.match(uiSrc, /View Dine-in/);
+assert.match(uiSrc, /Pickup Ready/);
+assert.match(uiSrc, /Delivery Ready/);
 assert.match(uiSrc, /collectionDateNavHref\(model\.todayYmd, "dine_in"\)/);
 assert.match(uiSrc, /collectionDateNavHref\(model\.todayYmd, "pickup"\)/);
+assert.match(uiSrc, /collectionDateNavHref\(model\.todayYmd, "delivery"\)/);
+assert.match(uiSrc, /collectionOrderHref\([\s\S]*?"pickup"[\s\S]*?\)/);
 assert.match(uiSrc, /canAccessCollection \?/);
 assert.match(uiSrc, /hasDineInHandoffs/);
 assert.doesNotMatch(uiSrc, /payment_overdue.*dine/i);
