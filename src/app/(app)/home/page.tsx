@@ -88,10 +88,12 @@ export default async function HomePage() {
       canAccessCalendar={canCalendar}
       canAccessCollection={canCollection}
       canAccessOperations={canOps}
+      knownGuestOrderIds={orders.map((order) => order.id)}
       model={model}
       preferCalendarScheduleCta={role === "owner"}
       roleName={staff.role.name}
       staffDisplayName={staff.displayName}
+      staffId={staff.id}
     />
   );
 }

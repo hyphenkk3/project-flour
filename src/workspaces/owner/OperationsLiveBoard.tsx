@@ -20,7 +20,6 @@ import {
   appendPrepareConfirmationInbox,
   partitionOwnerOperationsTodayOrders,
 } from "@/engines/operations/owner-attention";
-import { formatShortBusinessDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/client";
 import type { StorefrontOrderListItem } from "@/types/storefront";
 import {
@@ -35,12 +34,26 @@ import {
   OPERATIONS_APPROVALS_SECTION_ID,
   pendingOperationsApprovalCount,
 } from "@/engines/operations/approval-ux";
+import {
+  GUEST_ORDERS_LIVE_POLL_MS,
+  isGuestOrderLiveEvent,
+  type GuestOrderLiveRow,
+} from "@/workspaces/owner/orders/guest-orders-live";
+import {
+  buildGuestPreorderNotificationToast,
+  GUEST_PREORDER_NOTIFIED_IDS_KEY,
+  isGuestWholeCakeSubmittedPreorder,
+  markGuestPreorderNotificationsSeen,
+  readGuestPreorderNotificationPreference,
+  tryClaimGuestPreorderNotification,
+} from "@/workspaces/owner/orders/guest-preorder-notifications";
 import { scrollWorkspaceSectionIntoView } from "@/workspaces/owner/orders/scroll-workspace-section";
 
-const POLL_INTERVAL_MS = 30_000;
+const POLL_INTERVAL_MS = GUEST_ORDERS_LIVE_POLL_MS;
 const HIGHLIGHT_MS = 4500;
 
 type OperationsLiveBoardProps = {
+  staffId: string;
   initialOrders: StorefrontOrderListItem[];
   /** Owner-only board tools: Calendar, Propose EXTRA, + New Order. */
   showOwnerBoardTools?: boolean;
@@ -48,13 +61,10 @@ type OperationsLiveBoardProps = {
   initialQuery?: OperationsBoardQuery;
 };
 
-type OrderRowPayload = {
-  id?: string;
-  customer_id?: string | null;
-  status?: string;
-};
+type OrderRowPayload = GuestOrderLiveRow;
 
 export function OperationsLiveBoard({
+  staffId,
   initialOrders,
   showOwnerBoardTools = false,
   pendingApprovals = [],
@@ -100,15 +110,22 @@ export function OperationsLiveBoard({
   const notifyNewOrder = useCallback(
     (item: StorefrontOrderListItem) => {
       if (notifiedIdsRef.current.has(item.id)) return;
+      if (!isGuestWholeCakeSubmittedPreorder(item)) return;
+      if (!tryClaimGuestPreorderNotification(item.id)) return;
+
       notifiedIdsRef.current.add(item.id);
-      toast({
-        title: "New preorder received",
-        description: `${item.customerName} · ${item.cakeName} · ${formatShortBusinessDate(item.pickupDate)}`,
-        tone: "info",
-      });
+      const mode = readGuestPreorderNotificationPreference(staffId);
+      const payload = buildGuestPreorderNotificationToast(
+        item,
+        mode,
+        buildOperationsBoardPath(query),
+      );
+      if (payload) {
+        toast(payload);
+      }
       highlightOrder(item.id);
     },
-    [highlightOrder, toast],
+    [highlightOrder, query, staffId, toast],
   );
 
   const loadListItem = useCallback(async (id: string) => {
@@ -138,13 +155,9 @@ export function OperationsLiveBoard({
         removeOrder(id);
         return;
       }
-      const isNew = !knownIdsRef.current.has(id);
       upsertOrder(item);
-      if (isNew) {
-        notifyNewOrder(item);
-      }
     },
-    [loadListItem, notifyNewOrder, removeOrder, upsertOrder],
+    [loadListItem, removeOrder, upsertOrder],
   );
 
   const reconcileFromServer = useCallback(async () => {
@@ -172,11 +185,31 @@ export function OperationsLiveBoard({
 
   useEffect(() => {
     setOrders(initialOrders);
+    markGuestPreorderNotificationsSeen(initialOrders.map((order) => order.id));
     for (const order of initialOrders) {
       knownIdsRef.current.add(order.id);
       notifiedIdsRef.current.add(order.id);
     }
   }, [initialOrders]);
+
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== GUEST_PREORDER_NOTIFIED_IDS_KEY || !event.newValue) return;
+      try {
+        const ids = JSON.parse(event.newValue) as unknown;
+        if (!Array.isArray(ids)) return;
+        for (const id of ids) {
+          if (typeof id === "string") {
+            notifiedIdsRef.current.add(id);
+          }
+        }
+      } catch {
+        // ignore malformed cross-tab payload
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -195,7 +228,7 @@ export function OperationsLiveBoard({
         { event: "INSERT", schema: "public", table: "orders" },
         (payload) => {
           const row = payload.new as OrderRowPayload;
-          if (!row.id || row.customer_id != null) return;
+          if (!isGuestOrderLiveEvent(row)) return;
           void handleIncomingInsert(row.id);
         },
       )
@@ -204,7 +237,7 @@ export function OperationsLiveBoard({
         { event: "UPDATE", schema: "public", table: "orders" },
         (payload) => {
           const row = payload.new as OrderRowPayload;
-          if (!row.id || row.customer_id != null) return;
+          if (!isGuestOrderLiveEvent(row)) return;
           void handleIncomingUpdate(row.id);
         },
       )

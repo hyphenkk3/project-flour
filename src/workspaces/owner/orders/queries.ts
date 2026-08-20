@@ -48,6 +48,7 @@ type OrderRow = {
   created_at: string;
   confirmation_needs_resend: boolean | null;
   collection_id: string | null;
+  extra_stock_id: string | null;
   order_source: OrderSource | null;
   crew_order: boolean | null;
   include_receipt: boolean | null;
@@ -318,6 +319,7 @@ const orderSelect = `
   created_at,
   confirmation_needs_resend,
   collection_id,
+  extra_stock_id,
   order_source,
   crew_order,
   include_receipt,
@@ -488,6 +490,8 @@ function mapListItem(row: OrderRow): StorefrontOrderListItem {
     createdAt: order.createdAt,
     confirmationNeedsResend: order.confirmationNeedsResend,
     orderSource: order.orderSource,
+    crewOrder: order.crewOrder,
+    extraStockId: row.extra_stock_id ?? null,
     fulfilmentMethod: order.fulfilmentMethod,
     readyAt: order.readyAt,
     pickedUpAt: order.pickedUpAt,

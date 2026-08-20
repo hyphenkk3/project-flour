@@ -25,6 +25,7 @@ export async function OwnerDashboard({
       initialQuery={initialQuery}
       pendingApprovals={pendingApprovals}
       showOwnerBoardTools={capabilities.canUseOwnerBoardTools}
+      staffId={staff.id}
     />
   );
 }

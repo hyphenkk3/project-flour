@@ -318,6 +318,8 @@ export type StorefrontOrderListItem = {
   createdAt: string;
   confirmationNeedsResend: boolean;
   orderSource: OrderSource;
+  crewOrder: boolean;
+  extraStockId: string | null;
   fulfilmentMethod: StorefrontOrderFulfilmentMethod;
   readyAt: string | null;
   pickedUpAt: string | null;

@@ -18,16 +18,8 @@ export function TopHeader({ staff, title = "Home" }: TopHeaderProps) {
             {title}
           </h1>
         </div>
-        <div className="hidden md:block">
+        <div className="shrink-0">
           <UserMenu compact staff={staff} />
-        </div>
-        <div className="md:hidden">
-          <p className="text-ink max-w-[9rem] truncate text-right text-xs font-medium">
-            {staff.displayName}
-          </p>
-          <p className="text-skyline max-w-[9rem] truncate text-right text-[11px]">
-            {staff.role.name}
-          </p>
         </div>
       </div>
     </header>

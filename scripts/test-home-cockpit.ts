@@ -13,6 +13,10 @@ import {
   buildHomeCockpitModel,
   homeQuickLinksFromNavigation,
 } from "@/workspaces/home/cockpit-model";
+import {
+  GUEST_ORDERS_LIVE_POLL_MS,
+  isGuestOrderLiveEvent,
+} from "@/workspaces/owner/orders/guest-orders-live";
 import { homePendingApprovalsHref } from "@/engines/operations/approval-ux";
 import { canAccessOperationsApprovalsInbox } from "@/engines/operations/approvals";
 import type { StorefrontOrderListItem } from "@/types/storefront";
@@ -34,6 +38,8 @@ function listItem(
     createdAt: "2026-08-15T00:00:00.000Z",
     confirmationNeedsResend: false,
     orderSource: "walk_in",
+    crewOrder: false,
+    extraStockId: null,
     fulfilmentMethod: "pickup",
     readyAt: null,
     pickedUpAt: null,
@@ -563,5 +569,41 @@ assert.ok(
     ["future-sub-delivery", "future-sub-dine", "future-sub-pickup"],
   );
 }
+
+}
+
+assert.equal(GUEST_ORDERS_LIVE_POLL_MS, 30_000);
+assert.equal(
+  isGuestOrderLiveEvent({ id: "new-preorder", customer_id: null }),
+  true,
+);
+assert.equal(
+  isGuestOrderLiveEvent({ id: "member-order", customer_id: "cust-1" }),
+  false,
+);
+assert.equal(isGuestOrderLiveEvent({ customer_id: null }), false);
+
+assert.match(uiSrc, /HomeLiveRefresh/);
+const liveSrc = readFileSync(
+  resolve("src/workspaces/home/HomeLiveRefresh.tsx"),
+  "utf8",
+);
+assert.match(liveSrc, /postgres_changes/);
+assert.match(liveSrc, /router.refresh/);
+assert.match(liveSrc, /INSERT/);
+assert.match(liveSrc, /table: "orders"/);
+assert.match(liveSrc, /GUEST_ORDERS_LIVE_POLL_MS/);
+assert.match(liveSrc, /isGuestOrderLiveEvent/);
+assert.doesNotMatch(liveSrc, /buildHomeCockpitModel/);
+assert.doesNotMatch(liveSrc, /appendPrepareConfirmationInbox/);
+
+const operationsLiveSrc = readFileSync(
+  resolve("src/workspaces/owner/OperationsLiveBoard.tsx"),
+  "utf8",
+);
+assert.match(operationsLiveSrc, /postgres_changes/);
+assert.match(operationsLiveSrc, /listGuestOrdersAction/);
+assert.match(operationsLiveSrc, /GUEST_ORDERS_LIVE_POLL_MS/);
+assert.match(operationsLiveSrc, /isGuestOrderLiveEvent/);
 
 console.log("PASS Home cockpit");

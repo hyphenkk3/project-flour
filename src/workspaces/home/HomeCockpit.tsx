@@ -10,15 +10,19 @@ import {
 } from "@/workspaces/collection/date";
 import type { HomeCockpitModel } from "@/workspaces/home/cockpit-model";
 import type { HomeDineInHandoffPreview } from "@/workspaces/home/cockpit-model";
+import { HomeLiveRefresh } from "@/workspaces/home/HomeLiveRefresh";
+import { HomeGuestPreorderNotificationListener } from "@/workspaces/home/HomeGuestPreorderNotificationListener";
 import { homeGreetingTitle } from "@/workspaces/home/greeting";
 
 const HOME_RETURN = "/home";
 const OPERATIONS_TODAY_HREF = "/owner?pickup=today";
 
 type HomeCockpitProps = {
+  staffId: string;
   staffDisplayName: string;
   roleName: string;
   model: HomeCockpitModel;
+  knownGuestOrderIds: string[];
   canAccessOperations: boolean;
   canAccessCollection: boolean;
   canAccessBakery: boolean;
@@ -122,9 +126,11 @@ function dineInPreviewMeta(item: HomeDineInHandoffPreview): string {
 }
 
 export function HomeCockpit({
+  staffId,
   staffDisplayName,
   roleName,
   model,
+  knownGuestOrderIds,
   canAccessOperations,
   canAccessCollection,
   canAccessBakery,
@@ -191,6 +197,11 @@ export function HomeCockpit({
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-8 px-1 pb-10 sm:px-0">
+      <HomeLiveRefresh />
+      <HomeGuestPreorderNotificationListener
+        initialOrderIds={knownGuestOrderIds}
+        staffId={staffId}
+      />
       <div>
         <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
           Home
