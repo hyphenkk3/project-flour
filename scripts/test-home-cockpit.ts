@@ -570,6 +570,43 @@ assert.ok(
   );
 }
 
+{
+  const buriedNewest = buildHomeCockpitModel({
+    orders: [
+      ...Array.from({ length: 8 }, (_, index) =>
+        listItem({
+          id: `old-sub-${index}`,
+          pickupDate: "2026-08-15",
+          status: "submitted",
+          orderNumber: `WB-OLD-${index}`,
+          customerName: `Older ${index}`,
+          createdAt: `2026-01-0${index + 1}T00:00:00.000Z`,
+        }),
+      ),
+      listItem({
+        id: "newest-mangolicious",
+        pickupDate: "2026-09-18",
+        status: "submitted",
+        fulfilmentMethod: "pickup",
+        orderNumber: "WB-NEW-MANGO",
+        customerName: "Mangolicious Guest",
+        pickupTime: "15:30:00",
+        createdAt: "2026-08-15T12:00:00.000Z",
+      }),
+    ],
+    readyCollection: [],
+    completedCollection: [],
+    bakeryOrders: [],
+    pendingApprovals: [],
+    navigation: getNavigationForRole("manager"),
+    now,
+  });
+  assert.equal(buriedNewest.summary.needAttention, 9);
+  assert.equal(buriedNewest.attentionPreview[0]?.id, "newest-mangolicious");
+  assert.equal(
+    buriedNewest.attentionPreview[0]?.customerName,
+    "Mangolicious Guest",
+  );
 }
 
 assert.equal(GUEST_ORDERS_LIVE_POLL_MS, 30_000);

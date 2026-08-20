@@ -191,7 +191,7 @@ function base(partial: Partial<AttentionFixture> & Pick<AttentionFixture, "id" |
   assert.equal(keys.length, 4);
 }
 
-// Partition + sort by pickup time within Needs Attention
+// Partition: unprepared confirmations first (newest), other attention by pickup time
 {
   const buckets = partitionOwnerOperationsTodayOrders([
     base({
@@ -223,7 +223,7 @@ function base(partial: Partial<AttentionFixture> & Pick<AttentionFixture, "id" |
   ]);
   assert.deepEqual(
     buckets.needsAttention.map((o) => o.id),
-    ["early", "late"],
+    ["late", "early"],
   );
   assert.deepEqual(
     buckets.allClear.map((o) => o.id),
@@ -375,6 +375,7 @@ assert.equal(
     pickupTime: "14:00",
     orderNumber: "WB-P",
     customerName: "Pickup Guest",
+    createdAt: "2026-08-19T12:00:00.000Z",
   });
   const futureDelivery = base({
     id: "future-delivery",
@@ -384,6 +385,7 @@ assert.equal(
     pickupTime: "15:00",
     orderNumber: "WB-D",
     customerName: "Delivery Guest",
+    createdAt: "2026-08-19T11:00:00.000Z",
   });
   const futureDineIn = base({
     id: "future-dine-in",
@@ -393,6 +395,7 @@ assert.equal(
     pickupTime: "16:00",
     orderNumber: "WB-DI",
     customerName: "Dine-in Guest",
+    createdAt: "2026-08-19T10:00:00.000Z",
   });
   const futurePay = base({
     id: "future-pay",
@@ -491,6 +494,81 @@ assert.equal(
   assert.deepEqual(
     paidOnly.allClear.map((order) => order.id),
     ["today-paid"],
+  );
+}
+
+// Newest submitted (including future pickup) leads Needs Attention over older submitted
+{
+  const now = new Date("2026-08-19T04:00:00.000Z");
+  const todayYmd = operationsTodayYmd(now);
+  const oldTodaySubmitted = base({
+    id: "old-today",
+    status: "submitted",
+    pickupDate: "2026-08-19",
+    pickupTime: "09:00",
+    orderNumber: "WB-OLD",
+    customerName: "Coci",
+    createdAt: "2026-01-02T00:00:00.000Z",
+  });
+  const olderTodaySubmitted = base({
+    id: "older-today",
+    status: "submitted",
+    pickupDate: "2026-08-19",
+    pickupTime: "08:00",
+    orderNumber: "WB-OLDER",
+    customerName: "Alabin",
+    createdAt: "2025-12-01T00:00:00.000Z",
+  });
+  const newestFuture = base({
+    id: "newest-future",
+    status: "submitted",
+    fulfilmentMethod: "pickup",
+    pickupDate: "2026-09-18",
+    pickupTime: "15:30",
+    orderNumber: "WB-NEW",
+    customerName: "Mangolicious Guest",
+    createdAt: "2026-08-19T13:30:00.000Z",
+  });
+  const todayPayment = base({
+    id: "today-pay",
+    status: "awaiting_payment",
+    pickupDate: "2026-08-19",
+    pickupTime: "07:00",
+    orderNumber: "WB-PAY-TODAY",
+    createdAt: "2026-08-19T14:00:00.000Z",
+  });
+  const futurePending = base({
+    id: "future-pending",
+    status: "pending_confirmation",
+    pickupDate: "2026-09-18",
+    pickupTime: "10:00",
+    orderNumber: "WB-PEND",
+    createdAt: "2026-08-19T14:30:00.000Z",
+  });
+
+  const rows = [
+    oldTodaySubmitted,
+    olderTodaySubmitted,
+    newestFuture,
+    todayPayment,
+    futurePending,
+  ];
+  const buckets = appendPrepareConfirmationInbox(
+    partitionOwnerOperationsTodayOrders(
+      filterAndSortOperationsOrders(rows, DEFAULT_OPERATIONS_QUERY, now),
+      now,
+    ),
+    operationsSearchAndStatusMatches(rows, DEFAULT_OPERATIONS_QUERY),
+    todayYmd,
+    now,
+  );
+  assert.deepEqual(
+    buckets.needsAttention.map((order) => order.id),
+    ["newest-future", "old-today", "older-today", "today-pay"],
+  );
+  assert.equal(
+    buckets.needsAttention.some((order) => order.id === "future-pending"),
+    false,
   );
 }
 

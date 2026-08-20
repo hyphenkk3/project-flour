@@ -218,15 +218,21 @@ export function appendPrepareConfirmationInbox<
       order.pickupDate !== todayYmd &&
       hasPrepareConfirmationAttention(order, now),
   );
-  if (extras.length === 0) return buckets;
-  extras.sort((a, b) => {
-    const dateCmp = a.pickupDate.localeCompare(b.pickupDate);
-    if (dateCmp !== 0) return dateCmp;
-    return compareByPickupTimeAsc(a, b);
-  });
+  if (extras.length === 0) {
+    return {
+      ...buckets,
+      needsAttention: sortOwnerOperationsNeedsAttention(
+        buckets.needsAttention,
+        now,
+      ),
+    };
+  }
   return {
     ...buckets,
-    needsAttention: [...buckets.needsAttention, ...extras],
+    needsAttention: sortOwnerOperationsNeedsAttention(
+      [...buckets.needsAttention, ...extras],
+      now,
+    ),
   };
 }
 
@@ -264,6 +270,49 @@ export function compareByPickupTimeAsc<
     return a.createdAt.localeCompare(b.createdAt);
   }
   return 0;
+}
+
+/** Newest submission first — used for confirmation-not-prepared inbox rows. */
+export function compareByCreatedAtDesc<
+  T extends { createdAt?: string; orderNumber?: string },
+>(a: T, b: T): number {
+  if (a.createdAt && b.createdAt) {
+    const createdCmp = b.createdAt.localeCompare(a.createdAt);
+    if (createdCmp !== 0) return createdCmp;
+  } else if (a.createdAt && !b.createdAt) {
+    return -1;
+  } else if (!a.createdAt && b.createdAt) {
+    return 1;
+  }
+  if (a.orderNumber && b.orderNumber) {
+    return b.orderNumber.localeCompare(a.orderNumber, "en");
+  }
+  return 0;
+}
+
+/**
+ * Needs Attention: unprepared confirmations first (newest submitted first),
+ * then other attention rows by pickup time. Does not change All Clear / Completed.
+ */
+export function sortOwnerOperationsNeedsAttention<
+  T extends OwnerAttentionOrderInput & {
+    pickupTime: string;
+    orderNumber?: string;
+    createdAt?: string;
+  },
+>(orders: T[], now: Date = new Date()): T[] {
+  const prepareConfirmation: T[] = [];
+  const other: T[] = [];
+  for (const order of orders) {
+    if (hasPrepareConfirmationAttention(order, now)) {
+      prepareConfirmation.push(order);
+    } else {
+      other.push(order);
+    }
+  }
+  prepareConfirmation.sort(compareByCreatedAtDesc);
+  other.sort(compareByPickupTimeAsc);
+  return [...prepareConfirmation, ...other];
 }
 
 export function compareCompletedOrdersAsc<
@@ -307,9 +356,12 @@ export function partitionOwnerOperationsTodayOrders<
     else allClear.push(order);
   }
 
-  needsAttention.sort(compareByPickupTimeAsc);
+  const sortedNeedsAttention = sortOwnerOperationsNeedsAttention(
+    needsAttention,
+    now,
+  );
   allClear.sort(compareByPickupTimeAsc);
   completed.sort(compareCompletedOrdersAsc);
 
-  return { needsAttention, allClear, completed };
+  return { needsAttention: sortedNeedsAttention, allClear, completed };
 }

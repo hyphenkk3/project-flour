@@ -156,6 +156,7 @@ export function buildHomeCockpitModel(input: {
     pickupTime: string;
     pickupDate: string;
     orderNumber: string;
+    createdAt: string;
     id: string;
     customerName: string;
   };
@@ -166,6 +167,7 @@ export function buildHomeCockpitModel(input: {
       pickupTime: order.pickupTime,
       pickupDate: order.pickupDate,
       orderNumber: order.orderNumber,
+      createdAt: order.createdAt,
       id: order.id,
       customerName: order.customerName,
     };
