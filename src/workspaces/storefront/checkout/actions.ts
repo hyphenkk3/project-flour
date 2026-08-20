@@ -36,8 +36,17 @@ import {
 import type { StorefrontCake, StorefrontCollection } from "@/types/storefront";
 import { createClient } from "@/lib/supabase/server";
 import {
+  cakePickupDateBounds,
+  cartExcludedPickupDates,
+  cartPickupDateBounds,
+  latestOrderableCataloguePickupEnd,
+} from "@/engines/menu/customer-browse";
+import {
   getStorefrontCollectionForPickupDate,
+  getCustomerCakePickupMemberships,
   listAvailableCakes,
+  listCustomerSpecialCatalogues,
+  listOrderableMonthlyCatalogues,
   unpublishedCataloguePreorderMessage,
 } from "@/workspaces/storefront/catalog/queries";
 import { isPickupOrdersClosed } from "@/workspaces/storefront/checkout/order-availability";
@@ -469,5 +478,42 @@ export async function loadCheckoutPickupOffer(
     complimentaryOptions: options.complimentary,
     paidAddonOptions: options.paidAddons,
     optionsReady: options.ready,
+  };
+}
+
+export async function resolveCartPickupDateBounds(
+  cakeIds: readonly string[],
+): Promise<{ min: string; max: string; excludedDates: string[] } | null> {
+  const earliest = earliestPickupDateYmd();
+  const [catalogues, specials] = await Promise.all([
+    listOrderableMonthlyCatalogues(),
+    listCustomerSpecialCatalogues(),
+  ]);
+  const globalMax = latestOrderableCataloguePickupEnd(
+    catalogues.map((catalogue) => catalogue.month ?? ""),
+  );
+  const activeSpecialWindows = specials.map((special) => ({
+    from: special.startDate,
+    to: special.endDate,
+  }));
+  const memberships = await getCustomerCakePickupMemberships(cakeIds);
+  const perCake = memberships.map((membership) =>
+    cakePickupDateBounds(
+      membership.monthlyMonths,
+      membership.specialWindows,
+      earliest,
+    ),
+  );
+  const bounds = cartPickupDateBounds(perCake, earliest, globalMax);
+  if (!bounds) return null;
+  return {
+    ...bounds,
+    excludedDates: cartExcludedPickupDates(
+      memberships,
+      activeSpecialWindows,
+      bounds.min,
+      bounds.max,
+      earliest,
+    ),
   };
 }

@@ -13,7 +13,7 @@ import {
   FormSubmitButton,
   FormTextarea,
 } from "@/components/ui/form";
-import { OrderGuideCallout } from "@/components/ui/OrderGuideCallout";
+import { OPTIONAL_NOTES_CUSTOMER_WARNING } from "@/engines/orders/order-guide";
 import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
 import {
   ORDERS_CLOSED_CUSTOMER_LABEL,
@@ -63,9 +63,13 @@ import {
 } from "@/engines/orders/customer-preorder-options";
 import {
   loadCheckoutPickupOffer,
+  resolveCartPickupDateBounds,
   submitGuestPreorderAction,
   type CheckoutState,
 } from "@/workspaces/storefront/checkout/actions";
+import {
+  clampCustomerPickupWindow,
+} from "@/engines/menu/customer-browse";
 import {
   emptyPreorderFields,
   fieldsAfterFulfilmentChange,
@@ -109,8 +113,51 @@ type GuestCheckoutFormProps = {
   suggestedPickupDate?: string | null;
   minPickupDate?: string | null;
   maxPickupDate?: string | null;
+  pickupScopeFrom?: string | null;
+  pickupScopeTo?: string | null;
+  pickupScopeConstrainsBounds?: boolean;
+  /** Special-menu dates unavailable while browsing a monthly collection with an empty cart. */
+  entrySpecialUnavailableDates?: readonly string[];
   hoursSnapshot?: OperatingHoursSnapshot;
 };
+
+function combinePickupBounds(
+  baseMin: string,
+  baseMax: string | null,
+  cartBounds: { min: string; max: string } | null,
+  scopeConstrainsBounds: boolean,
+  scopeFrom: string | null,
+  scopeTo: string | null,
+  earliest: string,
+): { min: string; max: string | null } {
+  let min = baseMin;
+  let max = baseMax;
+
+  if (cartBounds) {
+    min = cartBounds.min > min ? cartBounds.min : min;
+    if (max) {
+      max = cartBounds.max < max ? cartBounds.max : max;
+    } else {
+      max = cartBounds.max;
+    }
+  }
+
+  if (scopeConstrainsBounds && scopeFrom && scopeTo) {
+    const scoped = clampCustomerPickupWindow(earliest, scopeFrom, scopeTo);
+    if (scoped) {
+      min = scoped.min > min ? scoped.min : min;
+      max = max ? (scoped.max < max ? scoped.max : max) : scoped.max;
+    }
+  }
+
+  if (max && min > max) {
+    min = max;
+  }
+  return { min, max };
+}
+
+const CAKE_REMOVED_FOR_DATE_MESSAGE =
+  "Some cakes are not available for this pickup date and were removed.";
 
 function persistDraft(
   items: PreorderDraftItem[],
@@ -128,6 +175,10 @@ export function GuestCheckoutForm({
   suggestedPickupDate = null,
   minPickupDate = null,
   maxPickupDate = null,
+  pickupScopeFrom = null,
+  pickupScopeTo = null,
+  pickupScopeConstrainsBounds = false,
+  entrySpecialUnavailableDates = [],
   hoursSnapshot = OPERATING_HOURS_SEED,
 }: GuestCheckoutFormProps) {
   const [state, formAction, pending] = useActionState(
@@ -159,15 +210,80 @@ export function GuestCheckoutForm({
   );
   const [addingCake, setAddingCake] = useState(false);
   const [changingDate, setChangingDate] = useState(false);
+  const [cartPickupBounds, setCartPickupBounds] = useState<{
+    min: string;
+    max: string;
+    excludedDates: string[];
+  } | null>(null);
+
+  const effectivePickupBounds = useMemo(
+    () =>
+      combinePickupBounds(
+        minPickupDate?.trim().slice(0, 10) || earliestPickupDateYmd(),
+        maxPickupDate?.trim().slice(0, 10) ?? null,
+        cartPickupBounds,
+        pickupScopeConstrainsBounds,
+        pickupScopeFrom?.trim().slice(0, 10) ?? null,
+        pickupScopeTo?.trim().slice(0, 10) ?? null,
+        earliestPickupDateYmd(),
+      ),
+    [
+      cartPickupBounds,
+      maxPickupDate,
+      minPickupDate,
+      pickupScopeConstrainsBounds,
+      pickupScopeFrom,
+      pickupScopeTo,
+    ],
+  );
+
+  const effectiveExcludedDates = useMemo(() => {
+    if (pickupScopeConstrainsBounds) return [];
+    if (cartPickupBounds && items.length > 0) {
+      return cartPickupBounds.excludedDates;
+    }
+    return [...entrySpecialUnavailableDates];
+  }, [
+    cartPickupBounds,
+    entrySpecialUnavailableDates,
+    items.length,
+    pickupScopeConstrainsBounds,
+  ]);
+
+  const rejectExcludedDates = items.length === 0;
+
+  useEffect(() => {
+    const cakeIds = [...new Set(items.map((item) => item.cakeId))];
+    if (cakeIds.length === 0) {
+      setCartPickupBounds(null);
+      return;
+    }
+    let cancelled = false;
+    void resolveCartPickupDateBounds(cakeIds).then((bounds) => {
+      if (!cancelled) {
+        setCartPickupBounds(bounds);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
 
   useEffect(() => {
     const draft = readPreorderDraft();
     const suggested = suggestedPickupDate?.trim().slice(0, 10) ?? "";
+    const scopeFrom = pickupScopeFrom?.trim().slice(0, 10) ?? "";
+    const scopeTo = pickupScopeTo?.trim().slice(0, 10) ?? "";
+    const hasEntryScope =
+      /^\d{4}-\d{2}-\d{2}$/.test(scopeFrom) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(scopeTo);
     const min = minPickupDate?.trim().slice(0, 10) ?? "";
     const max = maxPickupDate?.trim().slice(0, 10) ?? "";
     let pickupDate = /^\d{4}-\d{2}-\d{2}$/.test(suggested)
       ? suggested
-      : (draft?.pickupDate ?? "");
+      : hasEntryScope
+        ? ""
+        : (draft?.pickupDate ?? "");
     if (max && pickupDate > max) {
       pickupDate = "";
     }
@@ -180,7 +296,10 @@ export function GuestCheckoutForm({
           : min;
     }
     if (!pickupDate) {
-      pickupDate = min || earliestPickupDateYmd();
+      pickupDate =
+        (/^\d{4}-\d{2}-\d{2}$/.test(suggested) ? suggested : "") ||
+        min ||
+        earliestPickupDateYmd();
     }
     setItems(draft?.items ?? []);
     setFields({
@@ -192,6 +311,13 @@ export function GuestCheckoutForm({
         draft?.emailSubmissionReceiptRequested ?? false,
       includeReceiptChoice: draft?.includeReceiptChoice ?? "",
       pickupDate,
+      pickupScopeFrom: hasEntryScope
+        ? scopeFrom
+        : (draft?.pickupScopeFrom ?? ""),
+      pickupScopeTo: hasEntryScope ? scopeTo : (draft?.pickupScopeTo ?? ""),
+      pickupScopeConstrainsBounds: hasEntryScope
+        ? pickupScopeConstrainsBounds
+        : (draft?.pickupScopeConstrainsBounds ?? false),
       pickupTime: draft?.pickupTime ?? "",
       reservationTime: draft?.reservationTime ?? "",
       fulfilmentMethod: parseCustomerWebsiteFulfilmentMethod(
@@ -226,7 +352,30 @@ export function GuestCheckoutForm({
       paidAddonUnitPriceByCode: draft?.paidAddonUnitPriceByCode ?? {},
     });
     setHydrated(true);
-  }, [suggestedPickupDate, minPickupDate, maxPickupDate]);
+  }, [
+    suggestedPickupDate,
+    minPickupDate,
+    maxPickupDate,
+    pickupScopeFrom,
+    pickupScopeTo,
+    pickupScopeConstrainsBounds,
+    hoursSnapshot,
+  ]);
+
+  useEffect(() => {
+    if (!hydrated || !cartPickupBounds) return;
+    setFields((current) => {
+      let pickupDate = current.pickupDate;
+      if (pickupDate < cartPickupBounds.min) {
+        pickupDate = cartPickupBounds.min;
+      }
+      if (pickupDate > cartPickupBounds.max) {
+        pickupDate = cartPickupBounds.max;
+      }
+      if (pickupDate === current.pickupDate) return current;
+      return { ...current, pickupDate, pickupTime: "", reservationTime: "" };
+    });
+  }, [cartPickupBounds, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -269,9 +418,7 @@ export function GuestCheckoutForm({
       setItems((current) => {
         const filtered = filterDraftItemsToOfferedCakes(current, offer.cakes);
         if (filtered.dropped) {
-          setItemError(
-            "Some cakes are not available for this pickup date and were removed.",
-          );
+          setItemError(CAKE_REMOVED_FOR_DATE_MESSAGE);
         }
         return filtered.items;
       });
@@ -514,11 +661,14 @@ export function GuestCheckoutForm({
             dateLabel="Date"
             defaultDate={fields.pickupDate}
             defaultTime={fields.pickupTime}
+            excludedDateMessage="This date is reserved for the Special Menu."
+            excludedDates={effectiveExcludedDates}
             includeFieldNames={false}
-            key={`cake-date-${fields.pickupDate}`}
-            maxDate={maxPickupDate ?? undefined}
-            minDate={minPickupDate ?? undefined}
+            key="checkout-cake-date"
+            maxDate={effectivePickupBounds.max ?? undefined}
+            minDate={effectivePickupBounds.min}
             onDateChange={changeDate}
+            rejectExcludedDates={rejectExcludedDates}
             showTime={false}
           />
         ) : null}
@@ -696,13 +846,11 @@ export function GuestCheckoutForm({
           </div>
         ) : null}
         {itemError ? (
-          <p className="text-status-danger text-sm" role="alert">
+          <p className="text-status-danger text-sm font-bold" role="alert">
             {itemError}
           </p>
         ) : null}
       </section>
-
-      <OrderGuideCallout />
 
       <section className="space-y-3">
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
@@ -728,10 +876,12 @@ export function GuestCheckoutForm({
               dateLabel="Dine-in date"
               defaultDate={fields.pickupDate}
               defaultTime={fields.reservationTime}
-              key={`dine-in-reservation-${fields.pickupDate}`}
-              maxDate={maxPickupDate ?? undefined}
-              minDate={minPickupDate ?? undefined}
+              excludedDates={effectiveExcludedDates}
+              key="checkout-dine-in-reservation"
+              maxDate={effectivePickupBounds.max ?? undefined}
+              minDate={effectivePickupBounds.min}
               onDateChange={changeDate}
+              rejectExcludedDates={rejectExcludedDates}
               onTimeChange={(reservationTime) => {
                 const servingOptions = cakeServingSlotsForReservation(
                   fields.pickupDate,
@@ -771,7 +921,7 @@ export function GuestCheckoutForm({
                 defaultDate={fields.pickupDate}
                 defaultTime={fields.pickupTime}
                 includeFieldNames
-                key={`dine-in-serving-${fields.pickupDate}-${fields.reservationTime}`}
+                key={`checkout-dine-in-serving-${fields.reservationTime}`}
                 onTimeChange={(pickupTime) =>
                   patchFields({
                     pickupTime,
@@ -857,11 +1007,13 @@ export function GuestCheckoutForm({
             dateLabel={workspaceScheduleDateLabel(fields.fulfilmentMethod)}
             defaultDate={fields.pickupDate}
             defaultTime={fields.pickupTime}
-            key={`${fields.fulfilmentMethod}-${fields.pickupDate}`}
-            maxDate={maxPickupDate ?? undefined}
-            minDate={minPickupDate ?? undefined}
+            excludedDates={effectiveExcludedDates}
+            key={`checkout-${fields.fulfilmentMethod}-schedule`}
+            maxDate={effectivePickupBounds.max ?? undefined}
+            minDate={effectivePickupBounds.min}
             onDateChange={changeDate}
             onTimeChange={(pickupTime) => patchFields({ pickupTime })}
+            rejectExcludedDates={rejectExcludedDates}
             slotsForDate={
               fields.fulfilmentMethod === "delivery"
                 ? (date, closed) =>
@@ -1158,15 +1310,22 @@ export function GuestCheckoutForm({
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
           Notes
         </h2>
-        <FormField htmlFor="notes" label="Optional notes">
-          <FormTextarea
-            id="notes"
-            name="notes"
-            onChange={(event) => patchFields({ notes: event.target.value })}
-            rows={3}
-            value={fields.notes}
-          />
-        </FormField>
+        <p className="text-ink text-sm font-medium">Optional notes</p>
+        <p
+          className="text-status-danger text-sm leading-snug font-bold"
+          id="optional-notes-warning"
+        >
+          {OPTIONAL_NOTES_CUSTOMER_WARNING}
+        </p>
+        <FormTextarea
+          aria-describedby="optional-notes-warning"
+          aria-label="Optional notes"
+          id="notes"
+          name="notes"
+          onChange={(event) => patchFields({ notes: event.target.value })}
+          rows={3}
+          value={fields.notes}
+        />
       </section>
 
       <FormError message={state.error} />

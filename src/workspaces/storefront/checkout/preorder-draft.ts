@@ -26,6 +26,10 @@ export type PreorderDraftFields = {
   includeReceiptChoice: PhysicalReceiptChoice;
   pickupDate: string;
   pickupTime: string;
+  /** Collection entry window — initial month for monthly catalogues. */
+  pickupScopeFrom: string;
+  pickupScopeTo: string;
+  pickupScopeConstrainsBounds: boolean;
   /** Dine-in table-start time. Independent of cake serving (`pickupTime`). */
   reservationTime: string;
   fulfilmentMethod: CustomerWebsiteFulfilmentMethod;
@@ -75,6 +79,9 @@ export const emptyPreorderFields = (): PreorderDraftFields => ({
   emailSubmissionReceiptRequested: false,
   includeReceiptChoice: "",
   pickupDate: "",
+  pickupScopeFrom: "",
+  pickupScopeTo: "",
+  pickupScopeConstrainsBounds: false,
   pickupTime: "",
   reservationTime: "",
   fulfilmentMethod: "pickup",
@@ -126,6 +133,9 @@ export function readPreorderDraft(): PreorderDraft | null {
         parsed.includeReceiptChoice,
       ),
       pickupDate: String(parsed.pickupDate ?? ""),
+      pickupScopeFrom: String(parsed.pickupScopeFrom ?? ""),
+      pickupScopeTo: String(parsed.pickupScopeTo ?? ""),
+      pickupScopeConstrainsBounds: parsed.pickupScopeConstrainsBounds === true,
       pickupTime: String(parsed.pickupTime ?? ""),
       reservationTime: String(parsed.reservationTime ?? ""),
       fulfilmentMethod: parseCustomerWebsiteFulfilmentMethod(
@@ -200,6 +210,20 @@ export function mergeDraftItem(
 
 export function draftHasItems(draft: PreorderDraft | null): boolean {
   return Boolean(draft?.items?.length);
+}
+
+/** Resume checkout preserving collection entry scope when available. */
+export function preorderCheckoutHref(draft: PreorderDraft | null): string {
+  if (!draft?.pickupScopeFrom || !draft.pickupScopeTo) {
+    return "/order/checkout";
+  }
+  const params = new URLSearchParams();
+  params.set("from", draft.pickupScopeFrom);
+  params.set("to", draft.pickupScopeTo);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(draft.pickupDate)) {
+    params.set("pickup", draft.pickupDate);
+  }
+  return `/order/checkout?${params.toString()}`;
 }
 
 export function draftCakeCount(draft: PreorderDraft | null): number {

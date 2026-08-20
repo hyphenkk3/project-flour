@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { StorefrontCheckoutPage } from "@/workspaces/storefront/checkout/StorefrontCheckoutPage";
+import { StorefrontOrderCollectionsPage } from "@/workspaces/storefront/home/StorefrontOrderCollectionsPage";
 
 export const metadata: Metadata = {
-  title: "Your Preorder · Whitebird",
+  title: "Order",
+  description: "Choose a Whitebird collection to preorder for pickup.",
 };
 
-export default async function OrderPage() {
-  return <StorefrontCheckoutPage />;
+export default function OrderPage() {
+  return <StorefrontOrderCollectionsPage />;
 }

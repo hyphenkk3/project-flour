@@ -3,7 +3,7 @@ import { StorefrontHomePage } from "@/workspaces/storefront/home/StorefrontHomeP
 
 export const metadata: Metadata = {
   title: "Whitebird",
-  description: "Choose a cake for your celebration.",
+  description: "Preorder a cake for pickup.",
 };
 
 export default function HomePage() {

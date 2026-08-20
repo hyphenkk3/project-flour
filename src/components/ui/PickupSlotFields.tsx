@@ -30,6 +30,14 @@ type PickupSlotFieldsProps = {
   timeHelp?: string;
   /** Pickup dates closed for new customer preorders. Staff create omits this. */
   closedDates?: readonly string[];
+  /**
+   * Dates unavailable for the current cart / monthly collection entry
+   * (e.g. special-menu windows). Native date input cannot grey them out;
+   * selection is rejected when `rejectExcludedDates` is true.
+   */
+  excludedDates?: readonly string[];
+  rejectExcludedDates?: boolean;
+  excludedDateMessage?: string;
   /** First selectable pickup date. Defaults to the earliest legal pickup date. */
   minDate?: string;
   /** Last selectable pickup date (latest published monthly catalogue). */
@@ -60,6 +68,9 @@ export function PickupSlotFields({
   timeLabel = "Pickup time",
   timeHelp,
   closedDates = [],
+  excludedDates = [],
+  rejectExcludedDates = false,
+  excludedDateMessage = "This date is reserved for the Special Menu.",
   minDate: minDateProp,
   maxDate,
   slotsForDate,
@@ -75,6 +86,7 @@ export function PickupSlotFields({
   const [time, setTime] = useState(() =>
     defaultTime ? normalizePickupTimeValue(defaultTime) : "",
   );
+  const [excludedNotice, setExcludedNotice] = useState(false);
 
   const ordersClosed = date
     ? isPickupOrdersClosed(date, closedDates)
@@ -84,6 +96,19 @@ export function PickupSlotFields({
     ((dateYmd: string, closed: readonly string[]) =>
       customerPickupSlotsForDate(dateYmd, closed, hoursSnapshot));
   const slots = date ? resolveSlots(date, closedDates) : [];
+
+  useEffect(() => {
+    if (defaultDate === undefined) return;
+    setDate((current) => (current === defaultDate ? current : defaultDate));
+  }, [defaultDate]);
+
+  useEffect(() => {
+    if (defaultTime === undefined) return;
+    const normalized = defaultTime
+      ? normalizePickupTimeValue(defaultTime)
+      : "";
+    setTime((current) => (current === normalized ? current : normalized));
+  }, [defaultTime]);
 
   useEffect(() => {
     if (!date || !time) return;
@@ -107,6 +132,16 @@ export function PickupSlotFields({
             name={includeFieldNames ? dateName : undefined}
             onChange={(event) => {
               const next = event.target.value;
+              if (
+                rejectExcludedDates &&
+                next &&
+                excludedDates.includes(next)
+              ) {
+                setExcludedNotice(true);
+                event.target.value = date;
+                return;
+              }
+              setExcludedNotice(false);
               setDate(next);
               onDateChange?.(next);
             }}
@@ -144,6 +179,12 @@ export function PickupSlotFields({
             ))}
           </FormSelect>
         </FormField>
+      ) : null}
+      {excludedNotice ||
+      (date && excludedDates.includes(date) && !rejectExcludedDates) ? (
+        <p className="text-status-danger text-sm font-medium sm:col-span-2" role="status">
+          {excludedDateMessage}
+        </p>
       ) : null}
       {ordersClosed ? (
         <p className="text-sm font-medium text-red-800 sm:col-span-2" role="status">

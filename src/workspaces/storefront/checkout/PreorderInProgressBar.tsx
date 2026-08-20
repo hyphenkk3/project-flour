@@ -7,6 +7,7 @@ import {
   draftCakeCount,
   draftHasItems,
   draftTotal,
+  preorderCheckoutHref,
   readPreorderDraft,
 } from "@/workspaces/storefront/checkout/preorder-draft";
 
@@ -18,6 +19,7 @@ export function PreorderInProgressBar() {
   const [summary, setSummary] = useState<{
     cakeCount: number;
     total: number;
+    checkoutHref: string;
   } | null>(null);
 
   useEffect(() => {
@@ -30,6 +32,7 @@ export function PreorderInProgressBar() {
       setSummary({
         cakeCount: draftCakeCount(draft),
         total: draftTotal(draft),
+        checkoutHref: preorderCheckoutHref(draft),
       });
     }
 
@@ -50,7 +53,7 @@ export function PreorderInProgressBar() {
     <div className="border-fog mb-6 rounded-xl border bg-white px-4 py-3">
       <Link
         className="text-ink hover:text-signal flex flex-wrap items-center justify-between gap-2 text-sm"
-        href="/order/checkout"
+        href={summary.checkoutHref}
       >
         <span className="font-medium">Your Preorder · {cakeLabel}</span>
         <span className="text-skyline tabular-nums">

@@ -189,28 +189,26 @@ const checkoutPageSrc = readSrc(
 );
 assert.match(checkoutPageSrc, /latestOrderableCataloguePickupEnd/);
 assert.match(checkoutPageSrc, /listOrderableMonthlyCatalogues/);
-assert.match(checkoutPageSrc, /clampCustomerPickupWindow/);
-assert.match(checkoutPageSrc, /maxPickupDate/);
-assert.match(checkoutPageSrc, /minPickupDate/);
-assert.match(checkoutPageSrc, /fromQuery/);
-assert.match(checkoutPageSrc, /toQuery/);
+assert.match(checkoutPageSrc, /resolveCheckoutPickupScope/);
+assert.match(checkoutPageSrc, /pickupScopeFrom/);
+assert.match(checkoutPageSrc, /pickupScopeConstrainsBounds/);
 assert.doesNotMatch(checkoutPageSrc, /addBusinessCalendarDays\(fromDate, 120\)/);
 assert.doesNotMatch(checkoutPageSrc, /collection_id/);
 
 const formSrc = readSrc(
   "src/workspaces/storefront/checkout/GuestCheckoutForm.tsx",
 );
-assert.match(formSrc, /maxPickupDate/);
 assert.match(formSrc, /minPickupDate/);
-assert.match(formSrc, /maxDate=\{maxPickupDate/);
-assert.match(formSrc, /minDate=\{minPickupDate/);
+assert.match(formSrc, /effectivePickupBounds/);
+assert.match(formSrc, /resolveCartPickupDateBounds/);
 assert.match(
   formSrc,
-  /Please choose a pickup date in a published catalogue/,
+  /Please choose a date in a published catalogue/,
 );
 assert.match(formSrc, /loadCheckoutPickupOffer/);
 
 const actionsSrc = readSrc("src/workspaces/storefront/checkout/actions.ts");
+assert.match(actionsSrc, /resolveCartPickupDateBounds/);
 assert.match(actionsSrc, /getStorefrontCollectionForPickupDate/);
 assert.match(actionsSrc, /unpublishedCataloguePreorderMessage/);
 assert.doesNotMatch(actionsSrc, /rpcArgs\.p_collection_id/);

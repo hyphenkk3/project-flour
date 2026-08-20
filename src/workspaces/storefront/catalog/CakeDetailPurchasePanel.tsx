@@ -2,24 +2,27 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { StorefrontCake, StorefrontCollection } from "@/types/storefront";
+import type { StorefrontCake } from "@/types/storefront";
 import {
-  formatCollectionAvailabilityLabel,
   formatRm,
+  storefrontCategoryLabel,
 } from "@/workspaces/storefront/catalog/pricing";
-import { OrderGuideCallout } from "@/components/ui/OrderGuideCallout";
 import {
-  draftHasItems,
   emptyPreorderDraft,
   mergeDraftItem,
   readPreorderDraft,
   writePreorderDraft,
   type PreorderDraftItem,
 } from "@/workspaces/storefront/checkout/preorder-draft";
+import { isFullMonthPickupScope } from "@/engines/menu/customer-browse";
 
 type CakeDetailPurchasePanelProps = {
   cake: StorefrontCake;
-  collection: StorefrontCollection | null;
+  availabilityNote?: string | null;
+  pickupDateNotice?: string | null;
+  pickupScopeFrom?: string | null;
+  pickupScopeTo?: string | null;
+  pickupScopePickup?: string | null;
 };
 
 function existingQuantityForSize(
@@ -34,19 +37,22 @@ function existingQuantityForSize(
 
 export function CakeDetailPurchasePanel({
   cake,
-  collection,
+  availabilityNote,
+  pickupDateNotice,
+  pickupScopeFrom = null,
+  pickupScopeTo = null,
+  pickupScopePickup = null,
 }: CakeDetailPurchasePanelProps) {
   const router = useRouter();
   const [selectedSizeId, setSelectedSizeId] = useState(cake.sizes[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [draftItems, setDraftItems] = useState<PreorderDraftItem[]>([]);
-  const [hasActivePreorder, setHasActivePreorder] = useState(false);
 
   const selectedSize = cake.sizes.find((size) => size.id === selectedSizeId);
+  const category = storefrontCategoryLabel(cake.category);
 
   useEffect(() => {
     const draft = readPreorderDraft();
-    setHasActivePreorder(draftHasItems(draft));
     setDraftItems(draft?.items ?? []);
   }, []);
 
@@ -58,12 +64,6 @@ export function CakeDetailPurchasePanel({
     [draftItems, cake.id, selectedSizeId],
   );
 
-  const primaryLabel = !hasActivePreorder
-    ? "Preorder This Cake"
-    : existingQuantity > 0
-      ? `Add Another · Already ${existingQuantity} in Preorder`
-      : "Add to Preorder";
-
   function handlePrimaryAction() {
     if (!selectedSize) {
       setError("Please choose a size.");
@@ -71,8 +71,13 @@ export function CakeDetailPurchasePanel({
     }
     setError(null);
     const draft = readPreorderDraft() ?? emptyPreorderDraft();
-    writePreorderDraft(
-      mergeDraftItem(draft, {
+    const scopeFrom = pickupScopeFrom?.trim().slice(0, 10) ?? "";
+    const scopeTo = pickupScopeTo?.trim().slice(0, 10) ?? "";
+    const hasScope =
+      /^\d{4}-\d{2}-\d{2}$/.test(scopeFrom) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(scopeTo);
+    writePreorderDraft({
+      ...mergeDraftItem(draft, {
         cakeId: cake.id,
         sizeId: selectedSize.id,
         quantity: 1,
@@ -80,13 +85,34 @@ export function CakeDetailPurchasePanel({
         sizeLabel: selectedSize.size,
         unitPrice: selectedSize.price,
       }),
-    );
-    router.push("/order");
+      pickupScopeFrom: hasScope ? scopeFrom : draft.pickupScopeFrom,
+      pickupScopeTo: hasScope ? scopeTo : draft.pickupScopeTo,
+      pickupScopeConstrainsBounds: hasScope
+        ? !isFullMonthPickupScope(scopeFrom, scopeTo)
+        : draft.pickupScopeConstrainsBounds,
+    });
+    if (hasScope) {
+      const params = new URLSearchParams();
+      params.set("from", scopeFrom);
+      params.set("to", scopeTo);
+      const pickup = pickupScopePickup?.trim().slice(0, 10) ?? "";
+      if (/^\d{4}-\d{2}-\d{2}$/.test(pickup)) {
+        params.set("pickup", pickup);
+      }
+      router.push(`/order/checkout?${params.toString()}`);
+      return;
+    }
+    router.push("/order/checkout");
   }
 
   return (
     <div className="flex flex-col gap-5 lg:gap-6">
       <div>
+        {category ? (
+          <p className="text-signal text-[11px] font-semibold tracking-[0.14em] uppercase">
+            {category}
+          </p>
+        ) : null}
         <h1 className="font-display text-ink text-[2rem] leading-tight tracking-tight sm:text-4xl">
           {cake.name}
         </h1>
@@ -96,8 +122,6 @@ export function CakeDetailPurchasePanel({
           </p>
         ) : null}
       </div>
-
-      <OrderGuideCallout />
 
       {cake.sharingGuide?.trim() ? (
         <section>
@@ -162,18 +186,25 @@ export function CakeDetailPurchasePanel({
         ) : null}
       </section>
 
-      {collection ? (
-        <section className="border-fog rounded-2xl border bg-white px-4 py-4 sm:px-5">
-          <p className="text-status-success text-[11px] font-semibold tracking-[0.14em] uppercase">
-            Available this collection
-          </p>
-          <p className="text-ink mt-2 text-base font-semibold">
-            {formatCollectionAvailabilityLabel(collection)}
-          </p>
-          <p className="text-skyline mt-1 text-sm">
-            Available for preorder during this collection.
-          </p>
-        </section>
+      {availabilityNote ? (
+        <p className="text-status-danger text-sm">{availabilityNote}</p>
+      ) : null}
+
+      <section className="border-fog rounded-2xl border bg-white px-4 py-4 sm:px-5">
+        <p className="text-ink text-sm leading-relaxed">
+          {pickupDateNotice ??
+            "Your available cakes depend on your pickup date."}
+        </p>
+        <p className="text-skyline mt-1 text-sm">
+          We&apos;ll confirm your preorder after you submit. Payment is
+          arranged afterwards — not on this website.
+        </p>
+      </section>
+
+      {existingQuantity > 0 ? (
+        <p className="text-skyline text-sm">
+          {existingQuantity} already in your preorder for this size.
+        </p>
       ) : null}
 
       <button
@@ -182,7 +213,7 @@ export function CakeDetailPurchasePanel({
         onClick={handlePrimaryAction}
         type="button"
       >
-        {primaryLabel}
+        Add to preorder
       </button>
     </div>
   );

@@ -8,8 +8,10 @@ import { resolve } from "node:path";
 import {
   ORDER_GUIDE_LINES,
   ORDER_GUIDE_TITLE,
+  OPTIONAL_NOTES_CUSTOMER_WARNING,
 } from "@/engines/orders/order-guide";
 
+assert.equal(OPTIONAL_NOTES_CUSTOMER_WARNING, "Please note: wording on cakes or cake boards and customised cake decoration are not available.");
 const NO_WORDING = "No wording on cakes or cake boards.";
 const NO_CUSTOM = "Customised cake decoration is not available.";
 
@@ -41,16 +43,18 @@ assert.doesNotMatch(staffSrc, /Customised cake decoration is not available\./);
 const detailSrc = readSrc(
   "src/workspaces/storefront/catalog/CakeDetailPurchasePanel.tsx",
 );
-assert.match(detailSrc, /@\/components\/ui\/OrderGuideCallout/);
-assert.match(detailSrc, /<OrderGuideCallout/);
+assert.doesNotMatch(detailSrc, /@\/components\/ui\/OrderGuideCallout/);
 assert.doesNotMatch(detailSrc, /No wording on cakes or cake boards\./);
 
 const checkoutSrc = readSrc(
   "src/workspaces/storefront/checkout/GuestCheckoutForm.tsx",
 );
-assert.match(checkoutSrc, /@\/components\/ui\/OrderGuideCallout/);
-assert.match(checkoutSrc, /<OrderGuideCallout/);
+assert.doesNotMatch(checkoutSrc, /@\/components\/ui\/OrderGuideCallout/);
 assert.doesNotMatch(checkoutSrc, /No wording on cakes or cake boards\./);
+assert.match(checkoutSrc, /OPTIONAL_NOTES_CUSTOMER_WARNING/);
+assert.match(checkoutSrc, /text-status-danger/);
+assert.match(checkoutSrc, /font-bold/);
+assert.match(checkoutSrc, /optional-notes-warning/);
 
 const extraFormSrc = readSrc(
   "src/workspaces/storefront/extra/GuestExtraOrderForm.tsx",
