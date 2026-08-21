@@ -2,10 +2,11 @@
  * Live Collection workspace capability matrix.
  * Desk handoff only — not finance, not Bakery production, not Delivery.
  *
- * Customer Operations may operate Collection desk handoff (physical pickup).
+ * Customer Operations and Bakery may operate Collection desk handoff
+ * (physical pickup).
  * App-layer gates match DB RPCs after
- * 20260814140000_collection_customer_operations_picked_up.sql
- * (owner | manager | collection | customer_operations).
+ * 20260821130000_collection_bakery_picked_up.sql
+ * (owner | manager | collection | customer_operations | bakery).
  */
 
 import type { RoleCode } from "@/types/staff";
@@ -26,7 +27,8 @@ export function canAccessCollectionWorkspace(role: RoleCode): boolean {
     role === "collection" ||
     role === "manager" ||
     role === "owner" ||
-    role === "customer_operations"
+    role === "customer_operations" ||
+    role === "bakery"
   );
 }
 
