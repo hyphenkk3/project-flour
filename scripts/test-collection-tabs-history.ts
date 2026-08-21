@@ -269,7 +269,13 @@ assert.match(
   readFileSync(resolve("src/workspaces/collection/eligibility.ts"), "utf8"),
   /out_for_delivery/,
 );
-assert.match(boardSrc, /ready \$\{count === 1 \? "delivery" : "deliveries"\}/);
+assert.match(boardSrc, /count === 1 \? "delivery" : "deliveries"/);
+assert.doesNotMatch(
+  boardSrc,
+  /Pickup History/,
+  "History board heading must be History, not Pickup History",
+);
+assert.match(boardSrc, /case "history":\s*return "History"/);
 
 const historyBoardDate = "2026-10-23";
 const historyPickupDate = "2026-10-10";

@@ -385,6 +385,28 @@ assert.equal(
   "OFD is Out for Delivery, not Delivery Ready",
 );
 
+{
+  const inactiveOfd = {
+    ...deliveryOutOrder,
+    id: "inactive-ofd",
+    status: "cancelled",
+  } as typeof deliveryOutOrder;
+  const inactiveModel = buildHomeCockpitModel({
+    orders: [...orders, inactiveOfd],
+    readyCollection,
+    completedCollection,
+    bakeryOrders,
+    pendingApprovals: [],
+    navigation: getNavigationForRole("manager"),
+    now,
+  });
+  assert.equal(
+    inactiveModel.handoffs.outForDelivery,
+    0,
+    "Inactive/cancelled OFD must not count on Home",
+  );
+}
+
 const deliveryReadyOnly = listItem({
   id: "delivery-ready-only",
   pickupDate: "2026-08-15",

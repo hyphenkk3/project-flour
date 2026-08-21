@@ -41,7 +41,7 @@ function boardTitle(tab: CollectionBoardTab): string {
     case "completed":
       return "Completed";
     case "history":
-      return "Pickup History";
+      return "History";
     case "dine_in":
       return "Dine-In";
     case "pickup":
@@ -72,7 +72,7 @@ function boardSubtitle(
     return `${dateLabel} · ${count} ready pickup${count === 1 ? "" : "s"}`;
   }
   if (tab === "delivery") {
-    return `${dateLabel} · ${count} ready ${count === 1 ? "delivery" : "deliveries"}`;
+    return `${dateLabel} · ${count} ${count === 1 ? "delivery" : "deliveries"}`;
   }
   return `${dateLabel} · ${count} ready order${count === 1 ? "" : "s"}`;
 }

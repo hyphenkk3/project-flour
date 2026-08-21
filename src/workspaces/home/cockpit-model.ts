@@ -275,6 +275,7 @@ export function buildHomeCockpitModel(input: {
   const outForDelivery = todayOrders.filter(
     (order) =>
       isCollectionDeliveryMethod(order.fulfilmentMethod) &&
+      isCollectionActiveStatus(order.status) &&
       Boolean(order.outForDeliveryAt) &&
       !order.deliveredAt,
   ).length;
