@@ -384,6 +384,66 @@ assert.equal(
   0,
   "OFD is Out for Delivery, not Delivery Ready",
 );
+assert.equal(
+  deliveryOutModel.summary.ready,
+  1,
+  "OFD must not inflate Today Ready (base fixture still has one pickup Ready)",
+);
+
+{
+  const deliveredStillListed = listItem({
+    id: "delivered-still-listed",
+    pickupDate: "2026-08-15",
+    status: "paid",
+    fulfilmentMethod: "delivery",
+    orderNumber: "WB-DELIVERED",
+    customerName: "Finn",
+    readyAt: "2026-08-15T01:00:00.000Z",
+    outForDeliveryAt: "2026-08-15T02:00:00.000Z",
+    deliveredAt: "2026-08-15T04:00:00.000Z",
+  });
+  const deliveredModel = buildHomeCockpitModel({
+    orders: [...orders, deliveredStillListed],
+    readyCollection,
+    completedCollection,
+    bakeryOrders,
+    pendingApprovals: [],
+    navigation: getNavigationForRole("manager"),
+    now,
+  });
+  assert.equal(
+    deliveredModel.summary.ready,
+    1,
+    "Delivered delivery must not count as Today Ready",
+  );
+}
+
+{
+  const ofdWithoutReady = listItem({
+    id: "ofd-no-ready",
+    pickupDate: "2026-08-15",
+    status: "paid",
+    fulfilmentMethod: "delivery",
+    orderNumber: "WB-OFD-NR",
+    customerName: "Gale",
+    readyAt: null,
+    outForDeliveryAt: "2026-08-15T02:00:00.000Z",
+  });
+  const ofdNoReadyModel = buildHomeCockpitModel({
+    orders: [...orders, ofdWithoutReady],
+    readyCollection,
+    completedCollection,
+    bakeryOrders,
+    pendingApprovals: [],
+    navigation: getNavigationForRole("manager"),
+    now,
+  });
+  assert.equal(
+    ofdNoReadyModel.handoffs.outForDelivery,
+    0,
+    "OFD without ready_at must not count (matches Collection Delivery)",
+  );
+}
 
 {
   const inactiveOfd = {

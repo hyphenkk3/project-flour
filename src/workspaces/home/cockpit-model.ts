@@ -11,7 +11,7 @@ import {
   type OwnerAttentionReasonKey,
 } from "@/engines/operations/owner-attention";
 import { operationsTodayYmd } from "@/engines/operations/order-board";
-import { isFulfilmentTerminal } from "@/engines/orders/operational-state";
+import { deriveOperationalState } from "@/engines/orders/operational-state";
 import { bakeryProductionPresentation } from "@/workspaces/bakery/eligibility";
 import type { BakeryBoardOrder } from "@/workspaces/bakery/types";
 import {
@@ -199,13 +199,13 @@ export function buildHomeCockpitModel(input: {
   const ready = todayOrders.filter(
     (order) =>
       !isCollectionDineInMethod(order.fulfilmentMethod) &&
-      Boolean(order.readyAt) &&
-      !isFulfilmentTerminal({
+      deriveOperationalState({
         readyAt: order.readyAt,
         pickedUpAt: order.pickedUpAt,
         outForDeliveryAt: order.outForDeliveryAt,
         deliveredAt: order.deliveredAt,
-      }),
+        fulfilmentMethod: order.fulfilmentMethod,
+      }) === "ready",
   ).length;
 
   const summary: HomeTodaySummary = {
@@ -276,6 +276,7 @@ export function buildHomeCockpitModel(input: {
     (order) =>
       isCollectionDeliveryMethod(order.fulfilmentMethod) &&
       isCollectionActiveStatus(order.status) &&
+      Boolean(order.readyAt) &&
       Boolean(order.outForDeliveryAt) &&
       !order.deliveredAt,
   ).length;
