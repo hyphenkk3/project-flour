@@ -9,8 +9,8 @@ type TopHeaderProps = {
 export function TopHeader({ staff, title = "Home" }: TopHeaderProps) {
   return (
     <header className="border-fog bg-mist/90 sticky top-0 z-30 border-b backdrop-blur-md">
-      <div className="flex items-center justify-between gap-4 px-4 py-3 md:px-6">
-        <div className="min-w-0">
+      <div className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between md:gap-4 md:px-6">
+        <div className="min-w-0 shrink-0">
           <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
             Whitebird
           </p>
@@ -18,7 +18,7 @@ export function TopHeader({ staff, title = "Home" }: TopHeaderProps) {
             {title}
           </h1>
         </div>
-        <div className="shrink-0">
+        <div className="min-w-0 w-full md:w-auto md:shrink-0">
           <UserMenu compact staff={staff} />
         </div>
       </div>

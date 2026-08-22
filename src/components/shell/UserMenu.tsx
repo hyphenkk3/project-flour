@@ -101,7 +101,7 @@ export function UserMenu({ staff, compact = false }: UserMenuProps) {
     <div
       className={
         compact
-          ? "flex items-center gap-3"
+          ? "flex flex-wrap items-center gap-2 md:gap-3"
           : "border-fog flex flex-col gap-3 rounded-xl border bg-white p-3"
       }
     >
