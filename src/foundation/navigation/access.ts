@@ -34,3 +34,19 @@ export function canViewLibrary(role: RoleCode): boolean {
     role === "bakery"
   );
 }
+
+/**
+ * Settings access.
+ *
+ * All authenticated staff may manage their own settings.
+ */
+export function canAccessSettings(_role: RoleCode): boolean {
+  return true;
+}
+
+/**
+ * Staff account management is restricted to Owner.
+ */
+export function canManageStaff(role: RoleCode): boolean {
+  return role === "owner";
+}
