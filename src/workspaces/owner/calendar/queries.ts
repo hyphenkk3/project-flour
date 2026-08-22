@@ -98,7 +98,8 @@ export function normalizeCalendarFulfilmentMethod(
   if (
     value === "pickup" ||
     value === "delivery" ||
-    value === "drive_through"
+    value === "drive_through" ||
+    value === "dine_in"
   ) {
     return value;
   }
