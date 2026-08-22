@@ -3,6 +3,7 @@ import { canManageStaff } from "@/foundation/navigation/access";
 import { getNotificationDefinitionsForRole } from "@/foundation/staff/notification-preferences";
 import { loadStaffNotificationPreferences } from "@/foundation/staff/notification-preferences-queries";
 import { NotificationPreferences } from "@/components/settings/NotificationPreferences";
+import { StaffProfileForm } from "@/components/settings/StaffProfileForm";
 
 export default async function SettingsPage() {
   const staff = await requireStaff();
@@ -45,11 +46,8 @@ export default async function SettingsPage() {
             </p>
           </div>
 
-          <div>
-            <p className="text-skyline text-xs">Email</p>
-            <p className="text-ink mt-1 text-sm font-medium">
-              {staff.email ?? "Not set"}
-            </p>
+          <div className="md:col-span-2">
+            <StaffProfileForm initialEmail={staff.email ?? ""} />
           </div>
 
           <div>
