@@ -29,8 +29,6 @@ function GuestPreorderNotificationPreference({
   staffId: string;
   compact?: boolean;
 }) {
-  // Shared localStorage source of truth — no useState(default)+useEffect
-  // round-trip, so remounts never flash the "transient" fallback.
   const mode = useSyncExternalStore(
     (onStoreChange) =>
       subscribeGuestPreorderNotificationPreference(staffId, onStoreChange),
@@ -62,6 +60,7 @@ function GuestPreorderNotificationPreference({
       >
         Guest preorder alerts
       </legend>
+
       <div
         className={
           compact
@@ -73,6 +72,7 @@ function GuestPreorderNotificationPreference({
       >
         {MODES.map((entry) => {
           const selected = mode === entry.value;
+
           return (
             <button
               aria-checked={selected}
@@ -96,29 +96,64 @@ function GuestPreorderNotificationPreference({
   );
 }
 
-export function UserMenu({ staff, compact = false }: UserMenuProps) {
+function CompactSettings({ staffId }: { staffId: string }) {
   return (
-    <div
-      className={
-        compact
-          ? "flex flex-wrap items-center gap-2 md:gap-3"
-          : "border-fog flex flex-col gap-3 rounded-xl border bg-white p-3"
-      }
-    >
-      <div className={compact ? "min-w-0 text-right" : "min-w-0"}>
+    <details className="relative">
+      <summary className="border-fog text-ink hover:border-signal flex cursor-pointer list-none items-center rounded-lg border bg-white px-3 py-2 text-xs font-medium transition">
+        Settings
+      </summary>
+
+      <div className="border-fog bg-mist absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border p-3 shadow-lg">
+        <GuestPreorderNotificationPreference
+          compact
+          staffId={staffId}
+        />
+      </div>
+    </details>
+  );
+}
+
+export function UserMenu({ staff, compact = false }: UserMenuProps) {
+  if (compact) {
+    return (
+      <div className="flex items-center justify-end gap-2 md:gap-3">
+        <div className="min-w-0 text-right">
+          <p className="text-ink truncate text-sm font-medium">
+            {staff.displayName}
+          </p>
+          <p className="text-skyline truncate text-xs">{staff.role.name}</p>
+        </div>
+
+        <CompactSettings staffId={staff.id} />
+
+        <form action={logoutAction}>
+          <button
+            className="border-fog text-ink hover:border-signal rounded-lg border bg-white px-3 py-2 text-xs font-medium transition"
+            type="submit"
+          >
+            Sign out
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-fog flex flex-col gap-3 rounded-xl border bg-white p-3">
+      <div className="min-w-0">
         <p className="text-ink truncate text-sm font-medium">
           {staff.displayName}
         </p>
         <p className="text-skyline truncate text-xs">{staff.role.name}</p>
       </div>
-      <GuestPreorderNotificationPreference compact={compact} staffId={staff.id} />
+
+      <GuestPreorderNotificationPreference
+        staffId={staff.id}
+      />
+
       <form action={logoutAction}>
         <button
-          className={
-            compact
-              ? "border-fog text-ink hover:border-signal rounded-lg border bg-white px-3 py-2 text-xs font-medium transition"
-              : "border-fog bg-mist text-ink hover:border-signal w-full rounded-lg border px-3 py-2 text-sm font-medium transition"
-          }
+          className="border-fog bg-mist text-ink hover:border-signal w-full rounded-lg border px-3 py-2 text-sm font-medium transition"
           type="submit"
         >
           Sign out
