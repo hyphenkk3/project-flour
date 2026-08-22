@@ -117,6 +117,7 @@ export default async function LibraryCollectionsPage({
       ) : (
         <CollectionsDirectory
           collections={collections}
+          canManage={canManage}
           variant={archivedView ? "archived" : "active"}
         />
       )}

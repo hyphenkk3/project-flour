@@ -32,11 +32,13 @@ export type CollectionDirectoryItem = LibraryCollection & {
 type CollectionsDirectoryProps = {
   collections: CollectionDirectoryItem[];
   variant?: "active" | "archived";
+  canManage?: boolean;
 };
 
 export function CollectionsDirectory({
   collections,
   variant = "active",
+  canManage = false,
 }: CollectionsDirectoryProps) {
   const archivedView = variant === "archived";
   const [items, setItems] = useState(collections);
@@ -207,25 +209,29 @@ export function CollectionsDirectory({
                     />
                   ) : (
                     <>
-                      <Link
-                        className="text-skyline hover:text-ink inline-flex min-h-11 items-center text-sm font-medium"
-                        href={`/library/collections/${catalogue.id}/edit`}
-                      >
-                        Edit
-                      </Link>
-                      {catalogue.status === "draft" ? (
-                        <CatalogueArchiveButton
-                          collectionId={catalogue.id}
-                          compact
-                        />
-                      ) : null}
-                      {catalogue.purpose === "monthly" ? (
-                        <Link
-                          className="text-skyline hover:text-ink inline-flex min-h-11 items-center text-sm font-medium"
-                          href={`/library/collections/new?copyFrom=${catalogue.id}`}
-                        >
-                          Copy catalogue
-                        </Link>
+                      {canManage ? (
+                        <>
+                          <Link
+                            className="text-skyline hover:text-ink inline-flex min-h-11 items-center text-sm font-medium"
+                            href={`/library/collections/${catalogue.id}/edit`}
+                          >
+                            Edit
+                          </Link>
+                          {catalogue.status === "draft" ? (
+                            <CatalogueArchiveButton
+                              collectionId={catalogue.id}
+                              compact
+                            />
+                          ) : null}
+                          {catalogue.purpose === "monthly" ? (
+                            <Link
+                              className="text-skyline hover:text-ink inline-flex min-h-11 items-center text-sm font-medium"
+                              href={`/library/collections/new?copyFrom=${catalogue.id}`}
+                            >
+                              Copy catalogue
+                            </Link>
+                          ) : null}
+                        </>
                       ) : null}
                     </>
                   )}

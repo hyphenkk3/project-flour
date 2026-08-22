@@ -82,22 +82,24 @@ export default async function LibraryCollectionBuilderPage({
           >
             ← Catalogues
           </Link>
-          <div className="flex flex-wrap items-center gap-4">
-            <Link
-              className="text-signal hover:text-ink text-sm font-medium"
-              href={`/library/collections/${collection.id}/edit`}
-            >
-              Edit
-            </Link>
-            {collection.purpose === "monthly" ? (
+          {canManage ? (
+            <div className="flex flex-wrap items-center gap-4">
               <Link
                 className="text-signal hover:text-ink text-sm font-medium"
-                href={`/library/collections/new?copyFrom=${collection.id}`}
+                href={`/library/collections/${collection.id}/edit`}
               >
-                Copy catalogue
+                Edit
               </Link>
-            ) : null}
-          </div>
+              {collection.purpose === "monthly" ? (
+                <Link
+                  className="text-signal hover:text-ink text-sm font-medium"
+                  href={`/library/collections/new?copyFrom=${collection.id}`}
+                >
+                  Copy catalogue
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <StatusBadge
