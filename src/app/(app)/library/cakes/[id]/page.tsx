@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { requireStaff } from "@/foundation/auth/session";
+import { canManageLibrary } from "@/foundation/navigation/access";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { deleteCakeAction } from "@/workspaces/library/cakes/actions";
 import { getCakeById } from "@/workspaces/library/cakes/queries";
@@ -21,6 +23,8 @@ type CakeDetailPageProps = {
 export default async function LibraryCakeDetailPage({
   params,
 }: CakeDetailPageProps) {
+  const staff = await requireStaff();
+  const canManage = canManageLibrary(staff.role.code);
   const { id } = await params;
   const cake = await getCakeById(id);
 
@@ -31,7 +35,7 @@ export default async function LibraryCakeDetailPage({
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="min-w-0 flex-1">
           <Link
             className="text-skyline hover:text-ink text-sm font-medium"
             href="/library/cakes"
@@ -48,9 +52,14 @@ export default async function LibraryCakeDetailPage({
               tone="neutral"
             />
           </div>
-          <PageHeader title={cake.name} />
+          <div className="min-w-0 [&_h2]:break-words">
+            <PageHeader title={cake.name} />
+          </div>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex shrink-0 flex-wrap gap-3 sm:justify-end">
+          {canManage ? (
+            <>
+
           <Link
             className="bg-ink text-mist hover:bg-skyline inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-medium"
             href={`/library/cakes/${cake.id}/edit`}
@@ -60,6 +69,8 @@ export default async function LibraryCakeDetailPage({
           <DeleteLibraryItemButton
             action={deleteCakeAction.bind(null, cake.id)}
           />
+                    </>
+          ) : null}
         </div>
       </div>
 

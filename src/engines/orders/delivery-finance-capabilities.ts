@@ -107,7 +107,8 @@ export function canAccessGuestOrderWorkspace(role: RoleCode): boolean {
   return (
     role === "owner" ||
     role === "manager" ||
-    role === "customer_operations"
+    role === "customer_operations" ||
+    role === "bakery"
   );
 }
 
@@ -116,7 +117,8 @@ export function canViewWholeCakeCalendar(role: RoleCode): boolean {
   return (
     role === "owner" ||
     role === "manager" ||
-    role === "customer_operations"
+    role === "customer_operations" ||
+    role === "bakery"
   );
 }
 

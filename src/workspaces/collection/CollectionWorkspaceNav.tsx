@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { CollectionBoardTab } from "@/workspaces/collection/eligibility";
 import { collectionDateNavHref } from "@/workspaces/collection/date";
 
@@ -30,13 +31,14 @@ export function CollectionWorkspaceNav({
       className="border-fog flex flex-wrap gap-1 border-b pb-3"
     >
       {TABS.map((tab) => (
-        <a
+        <Link
           className={active === tab.id ? on : idle}
           href={collectionDateNavHref(boardDate, tab.id)}
           key={tab.id}
+          prefetch={false}
         >
           {tab.label}
-        </a>
+        </Link>
       ))}
     </nav>
   );

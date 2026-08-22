@@ -3,6 +3,8 @@
  * Do not truncate at pickup_through_at (order cutoff).
  */
 
+import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
+import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
   formatPickupClockLabel,
   getEffectivePickupSchedule,
@@ -34,10 +36,11 @@ export function extraPickupDates(input: ExtraPickupWindow): string[] {
 export function extraOrderablePickupDates(
   input: ExtraPickupWindow,
   now?: Date,
+  snapshot: OperatingHoursSnapshot = OPERATING_HOURS_SEED,
 ): string[] {
   const when = now ?? new Date();
   return extraPickupDates(input).filter(
-    (ymd) => extraCustomerPickupSlotsForDate(ymd, input, when).length > 0,
+    (ymd) => extraCustomerPickupSlotsForDate(ymd, input, when, snapshot).length > 0,
   );
 }
 
@@ -45,9 +48,10 @@ export function extraCustomerPickupSlotsForDate(
   dateYmd: string,
   input: ExtraPickupWindow,
   now?: Date,
+  snapshot: OperatingHoursSnapshot = OPERATING_HOURS_SEED,
 ): PickupSlot[] {
   if (!extraPickupDates(input).includes(dateYmd)) return [];
-  const schedule = getEffectivePickupSchedule(dateYmd);
+  const schedule = getEffectivePickupSchedule(dateYmd, snapshot);
   if (schedule.status !== "open") return [];
   const fromMs = Date.parse(input.pickupAvailableFromAt);
   const nowMs = (now ?? new Date()).getTime();

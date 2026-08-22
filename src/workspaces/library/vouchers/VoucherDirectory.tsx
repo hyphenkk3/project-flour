@@ -14,9 +14,10 @@ import {
 
 type VoucherDirectoryProps = {
   vouchers: LibraryVoucher[];
+  canManage: boolean;
 };
 
-export function VoucherDirectory({ vouchers }: VoucherDirectoryProps) {
+export function VoucherDirectory({ vouchers, canManage }: VoucherDirectoryProps) {
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
     const trimmed = query.trim().toLowerCase();
@@ -35,7 +36,7 @@ export function VoucherDirectory({ vouchers }: VoucherDirectoryProps) {
 
       {filtered.length === 0 ? (
         <EmptyState
-          description="Create reusable voucher codes for future Collections."
+          description="Create reusable voucher codes for future catalogues."
           title="No vouchers yet"
         />
       ) : (

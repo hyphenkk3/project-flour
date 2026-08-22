@@ -65,6 +65,47 @@ assert.equal(
   "wos:guest-preorder-notification:staff-abc",
 );
 
+{
+  // Shell remount regression: client snapshot must read persisted value
+  // immediately (no useState(default)+useEffect delay → Transient flash).
+  const preferenceSrc = readFileSync(
+    resolve("src/foundation/staff/guest-preorder-notification-preference.ts"),
+    "utf8",
+  );
+  assert.match(preferenceSrc, /subscribeGuestPreorderNotificationPreference/);
+  assert.match(preferenceSrc, /GUEST_PREORDER_NOTIFICATION_CHANGE_EVENT/);
+  assert.match(preferenceSrc, /dispatchEvent/);
+
+  const userMenuWiring = readFileSync(
+    resolve("src/components/shell/UserMenu.tsx"),
+    "utf8",
+  );
+  assert.match(userMenuWiring, /useSyncExternalStore/);
+  assert.match(
+    userMenuWiring,
+    /subscribeGuestPreorderNotificationPreference/,
+  );
+  assert.doesNotMatch(
+    userMenuWiring,
+    /useState<\s*GuestPreorderNotificationMode\s*>\s*\(\s*GUEST_PREORDER_NOTIFICATION_DEFAULT/,
+  );
+  assert.doesNotMatch(
+    userMenuWiring,
+    /useEffect\(\s*\(\)\s*=>\s*\{\s*setMode\(readGuestPreorderNotificationPreference/,
+  );
+}
+
+{
+  // Collection tab chips must soft-navigate so AppShell UserMenus do not remount.
+  const collectionNavSrc = readFileSync(
+    resolve("src/workspaces/collection/CollectionWorkspaceNav.tsx"),
+    "utf8",
+  );
+  assert.match(collectionNavSrc, /from \"next\/link\"/);
+  assert.match(collectionNavSrc, /<Link/);
+  assert.doesNotMatch(collectionNavSrc, /<a\s/);
+}
+
 assert.equal(guestPreorderNotificationDurationMs("transient"), 4500);
 assert.equal(guestPreorderNotificationDurationMs("persistent"), null);
 

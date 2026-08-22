@@ -9,6 +9,7 @@
  * Independent of monthly catalogues.
  */
 
+import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
   formatPickupClockLabel,
   getEffectivePickupSchedule,
@@ -82,8 +83,11 @@ export function extraThroughSlotLabel(hhmm: string): string {
 }
 
 /** Operating-hour 30-minute slots for a Singapore business date. */
-export function extraOperatingSlotsForDate(ymd: string): ExtraThroughSlot[] {
-  const schedule = getEffectivePickupSchedule(ymd);
+export function extraOperatingSlotsForDate(
+  ymd: string,
+  snapshot?: OperatingHoursSnapshot,
+): ExtraThroughSlot[] {
+  const schedule = getEffectivePickupSchedule(ymd, snapshot);
   if (schedule.status !== "open") return [];
   return schedule.selectableSlots.map((value) => ({
     value,

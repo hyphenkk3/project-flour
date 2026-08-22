@@ -225,6 +225,9 @@ assert.match(navSrc, /Delivery/);
 assert.match(navSrc, /Dine-In/);
 assert.match(navSrc, /Completed/);
 assert.match(navSrc, /History/);
+assert.match(navSrc, /from \"next\/link\"/);
+assert.match(navSrc, /<Link/);
+assert.doesNotMatch(navSrc, /<a\s/);
 assert.doesNotMatch(navSrc, /Ready for Pickup/);
 assert.doesNotMatch(navSrc, /Picked Up \/ Delivered/);
 

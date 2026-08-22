@@ -1,12 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { logoutAction } from "@/foundation/auth/actions";
 import {
   GUEST_PREORDER_NOTIFICATION_DEFAULT,
-  guestPreorderNotificationStorageKey,
-  parseGuestPreorderNotificationPreference,
   readGuestPreorderNotificationPreference,
+  subscribeGuestPreorderNotificationPreference,
   writeGuestPreorderNotificationPreference,
   type GuestPreorderNotificationMode,
 } from "@/foundation/staff/guest-preorder-notification-preference";
@@ -30,28 +29,18 @@ function GuestPreorderNotificationPreference({
   staffId: string;
   compact?: boolean;
 }) {
-  const [mode, setMode] = useState<GuestPreorderNotificationMode>(
-    GUEST_PREORDER_NOTIFICATION_DEFAULT,
+  // Shared localStorage source of truth — no useState(default)+useEffect
+  // round-trip, so remounts never flash the "transient" fallback.
+  const mode = useSyncExternalStore(
+    (onStoreChange) =>
+      subscribeGuestPreorderNotificationPreference(staffId, onStoreChange),
+    () => readGuestPreorderNotificationPreference(staffId),
+    () => GUEST_PREORDER_NOTIFICATION_DEFAULT,
   );
-
-  useEffect(() => {
-    setMode(readGuestPreorderNotificationPreference(staffId));
-  }, [staffId]);
-
-  useEffect(() => {
-    const storageKey = guestPreorderNotificationStorageKey(staffId);
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== storageKey) return;
-      setMode(parseGuestPreorderNotificationPreference(event.newValue));
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, [staffId]);
 
   const selectMode = useCallback(
     (next: GuestPreorderNotificationMode) => {
       writeGuestPreorderNotificationPreference(staffId, next);
-      setMode(next);
     },
     [staffId],
   );

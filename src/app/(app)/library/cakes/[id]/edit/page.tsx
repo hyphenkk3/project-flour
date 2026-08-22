@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { requireStaff } from "@/foundation/auth/session";
+import { canManageLibrary } from "@/foundation/navigation/access";
 import { CakeForm } from "@/workspaces/library/cakes/CakeForm";
 import { getCakeById } from "@/workspaces/library/cakes/queries";
 
@@ -13,6 +15,11 @@ type EditCakePageProps = {
 export default async function EditLibraryCakePage({
   params,
 }: EditCakePageProps) {
+  const staff = await requireStaff();
+  if (!canManageLibrary(staff.role.code)) {
+    redirect("/home");
+  }
+
   const { id } = await params;
   const cake = await getCakeById(id);
 

@@ -3,6 +3,7 @@ import {
   StorefrontHomeLink,
   StorefrontStaffSignIn,
 } from "@/workspaces/storefront/StorefrontBrand";
+import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import { GuestExtraOrderForm } from "@/workspaces/storefront/extra/GuestExtraOrderForm";
 import { getStorefrontExtraById } from "@/workspaces/storefront/extra/queries";
 import Link from "next/link";
@@ -17,6 +18,7 @@ export async function StorefrontExtraOrderPage({
   extraId,
 }: StorefrontExtraOrderPageProps) {
   const extra = await getStorefrontExtraById(extraId);
+  const hoursSnapshot = await loadOperatingHoursSnapshot();
 
   return (
     <main className="bg-mist min-h-screen">
@@ -56,7 +58,7 @@ export async function StorefrontExtraOrderPage({
               </div>
             ) : null}
             <div className="mt-8">
-              <GuestExtraOrderForm extra={extra} />
+              <GuestExtraOrderForm extra={extra} hoursSnapshot={hoursSnapshot} />
             </div>
           </>
         )}

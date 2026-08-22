@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { requireStaff } from "@/foundation/auth/session";
+import { canManageLibrary } from "@/foundation/navigation/access";
 import { AssetForm } from "@/workspaces/library/assets/AssetForm";
 import { getAssetById } from "@/workspaces/library/assets/queries";
 
@@ -13,6 +15,11 @@ type EditAssetPageProps = {
 export default async function EditLibraryAssetPage({
   params,
 }: EditAssetPageProps) {
+  const staff = await requireStaff();
+  if (!canManageLibrary(staff.role.code)) {
+    redirect("/home");
+  }
+
   const { id } = await params;
   const asset = await getAssetById(id);
 

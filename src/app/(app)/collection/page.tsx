@@ -21,6 +21,7 @@ export default async function CollectionPage({
 
   return (
     <CollectionLiveBoard
+      key={`${boardDate}:${tab}:${venueFilter}`}
       boardDate={boardDate}
       initialOrders={orders}
       tab={tab}

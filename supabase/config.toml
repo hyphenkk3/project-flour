@@ -1,6 +1,4 @@
-{
-  "project_id": "project-flour",
-  "db": {
-    "major_version": 15
-  }
-}
+project_id = "project-flour"
+
+[db]
+major_version = 15

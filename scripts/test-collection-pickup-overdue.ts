@@ -179,6 +179,7 @@ assert.equal(
   const attention = collectionDeskAttention({
     readyAt: READY,
     pickedUpAt: null,
+    fulfilmentMethod: "pickup",
     pickupDate: "2026-08-16",
     pickupTime: "15:00:00",
     now: now16at1500,
@@ -187,10 +188,62 @@ assert.equal(
   assert.equal(attention.tone, "warning");
   assert.equal(attention.overdue, true);
   assert.equal(
-    collectionDeskPresentation({ readyAt: READY, pickedUpAt: null }),
+    collectionDeskPresentation({
+      readyAt: READY,
+      pickedUpAt: null,
+      fulfilmentMethod: "pickup",
+    }),
     "ready",
     "desk presentation remains Ready — overdue is derived only",
   );
+}
+
+{
+  // Legacy callers omit fulfilmentMethod — treat as pickup.
+  const legacyPickup = collectionDeskAttention({
+    readyAt: READY,
+    pickedUpAt: null,
+    pickupDate: "2026-08-16",
+    pickupTime: "15:00:00",
+    now: now16at1500,
+  });
+  assert.equal(legacyPickup.label, COLLECTION_PICKUP_OVERDUE_LABEL);
+  assert.equal(legacyPickup.overdue, true);
+}
+
+{
+  const deliveryAttention = collectionDeskAttention({
+    readyAt: READY,
+    pickedUpAt: null,
+    fulfilmentMethod: "delivery",
+    pickupDate: "2026-08-16",
+    pickupTime: "15:00:00",
+    now: now16at1500,
+  });
+  assert.equal(deliveryAttention.label, "Ready");
+  assert.equal(deliveryAttention.overdue, false);
+  assert.notEqual(
+    deliveryAttention.label,
+    COLLECTION_PICKUP_OVERDUE_LABEL,
+    "Delivery ready must never show Pickup overdue",
+  );
+}
+
+{
+  const dineInAttention = collectionDeskAttention({
+    readyAt: READY,
+    pickedUpAt: null,
+    fulfilmentMethod: "dine_in",
+    pickupDate: "2026-08-16",
+    pickupTime: "15:00:00",
+    now: now16at1500,
+  });
+  assert.notEqual(
+    dineInAttention.label,
+    COLLECTION_PICKUP_OVERDUE_LABEL,
+    "Dine-In must never show Pickup overdue",
+  );
+  assert.equal(dineInAttention.overdue, false);
 }
 
 {

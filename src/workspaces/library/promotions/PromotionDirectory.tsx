@@ -13,9 +13,10 @@ import {
 
 type PromotionDirectoryProps = {
   promotions: LibraryPromotion[];
+  canManage: boolean;
 };
 
-export function PromotionDirectory({ promotions }: PromotionDirectoryProps) {
+export function PromotionDirectory({ promotions, canManage }: PromotionDirectoryProps) {
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
     const trimmed = query.trim().toLowerCase();
@@ -36,7 +37,7 @@ export function PromotionDirectory({ promotions }: PromotionDirectoryProps) {
 
       {filtered.length === 0 ? (
         <EmptyState
-          description="Create reusable promotion records for future Collections."
+          description="Create reusable promotion records for future catalogues."
           title="No promotions yet"
         />
       ) : (

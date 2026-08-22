@@ -13,6 +13,8 @@ import {
   FormSubmitButton,
   FormTextarea,
 } from "@/components/ui/form";
+import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
+import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
   extraCustomerPickupSlotsForDate,
   extraOrderablePickupDates,
@@ -35,9 +37,13 @@ const initialState: ExtraOrderState = { error: null };
 
 type GuestExtraOrderFormProps = {
   extra: StorefrontExtraPick;
+  hoursSnapshot?: OperatingHoursSnapshot;
 };
 
-export function GuestExtraOrderForm({ extra }: GuestExtraOrderFormProps) {
+export function GuestExtraOrderForm({
+  extra,
+  hoursSnapshot = OPERATING_HOURS_SEED,
+}: GuestExtraOrderFormProps) {
   const [state, formAction, pending] = useActionState(
     submitGuestExtraOrderAction,
     initialState,
@@ -46,7 +52,7 @@ export function GuestExtraOrderForm({ extra }: GuestExtraOrderFormProps) {
     pickupAvailableFromAt: extra.pickupAvailableFromAt ?? "",
     orderCutoffAt: extra.pickupThroughAt ?? "",
   };
-  const dates = extraOrderablePickupDates(window);
+  const dates = extraOrderablePickupDates(window, undefined, hoursSnapshot);
   const [pickupDate, setPickupDate] = useState(dates[0] ?? "");
   const [pickupTime, setPickupTime] = useState("");
   const [receiptRequested, setReceiptRequested] = useState(false);
@@ -57,7 +63,12 @@ export function GuestExtraOrderForm({ extra }: GuestExtraOrderFormProps) {
   >([]);
   const [complimentaryCodes, setComplimentaryCodes] = useState<string[]>([]);
 
-  const usableSlots = extraCustomerPickupSlotsForDate(pickupDate, window);
+  const usableSlots = extraCustomerPickupSlotsForDate(
+    pickupDate,
+    window,
+    undefined,
+    hoursSnapshot,
+  );
   const timeStillValid = usableSlots.some((slot) => slot.value === pickupTime);
 
   useEffect(() => {
@@ -113,7 +124,12 @@ export function GuestExtraOrderForm({ extra }: GuestExtraOrderFormProps) {
               onChange={(event) => {
                 const next = event.target.value;
                 setPickupDate(next);
-                const nextSlots = extraCustomerPickupSlotsForDate(next, window);
+                const nextSlots = extraCustomerPickupSlotsForDate(
+                  next,
+                  window,
+                  undefined,
+                  hoursSnapshot,
+                );
                 setPickupTime(nextSlots[0]?.value ?? "");
               }}
               required

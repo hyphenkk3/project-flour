@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { requireStaff } from "@/foundation/auth/session";
+import { canManageLibrary } from "@/foundation/navigation/access";
 import type { LibraryAsset } from "@/types/library-asset";
 import { listAssets } from "@/workspaces/library/assets/queries";
 import { VoucherForm } from "@/workspaces/library/vouchers/VoucherForm";
@@ -15,6 +17,11 @@ type EditVoucherPageProps = {
 export default async function EditLibraryVoucherPage({
   params,
 }: EditVoucherPageProps) {
+  const staff = await requireStaff();
+  if (!canManageLibrary(staff.role.code)) {
+    redirect("/home");
+  }
+
   const { id } = await params;
   const voucher = await getVoucherById(id);
 

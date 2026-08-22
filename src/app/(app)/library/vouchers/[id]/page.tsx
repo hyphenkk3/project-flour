@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { requireStaff } from "@/foundation/auth/session";
+import { canManageLibrary } from "@/foundation/navigation/access";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { DeleteLibraryItemButton } from "@/workspaces/library/DeleteLibraryItemButton";
 import {
@@ -20,6 +22,8 @@ type VoucherDetailPageProps = {
 export default async function LibraryVoucherDetailPage({
   params,
 }: VoucherDetailPageProps) {
+  const staff = await requireStaff();
+  const canManage = canManageLibrary(staff.role.code);
   const { id } = await params;
   const voucher = await getVoucherById(id);
 
@@ -46,6 +50,9 @@ export default async function LibraryVoucherDetailPage({
           <PageHeader title={voucher.code} />
         </div>
         <div className="flex flex-wrap gap-3">
+          {canManage ? (
+            <>
+
           <Link
             className="bg-ink text-mist hover:bg-skyline inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-medium"
             href={`/library/vouchers/${voucher.id}/edit`}
@@ -55,6 +62,8 @@ export default async function LibraryVoucherDetailPage({
           <DeleteLibraryItemButton
             action={deleteVoucherAction.bind(null, voucher.id)}
           />
+                    </>
+          ) : null}
         </div>
       </div>
 

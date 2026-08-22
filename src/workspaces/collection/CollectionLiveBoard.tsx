@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
@@ -137,10 +138,6 @@ export function CollectionLiveBoard({
 }: CollectionLiveBoardProps) {
   const [orders, setOrders] = useState(initialOrders);
 
-  useEffect(() => {
-    setOrders(initialOrders);
-  }, [initialOrders, boardDate, tab]);
-
   const reconcileList = useCallback(async () => {
     const next = await listCollectionOrdersForTabAction(tab, boardDate);
     setOrders(next);
@@ -166,26 +163,6 @@ export function CollectionLiveBoard({
     const supabase = createClient();
     const channel = supabase
       .channel(`collection-board-${tab}-${boardDate}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        (payload) => {
-          const row = (payload.new ?? payload.old) as OrderRowPayload | null;
-          if (!row?.id) return;
-          if (row.customer_id != null) return;
-          if (
-            tab !== "history" &&
-            row.pickup_date &&
-            row.pickup_date !== boardDate
-          ) {
-            setOrders((current) =>
-              current.filter((order) => order.id !== row.id),
-            );
-            return;
-          }
-          void handleIncoming(row.id);
-        },
-      )
       .subscribe();
 
     const pollId = window.setInterval(() => {
@@ -266,24 +243,27 @@ export function CollectionLiveBoard({
 
       {tab === "dine_in" ? (
         <div className="mt-4 flex flex-wrap gap-2" aria-label="Venue filter">
-          <a
+          <Link
             className={venueChipClass(venueFilter === "all")}
             href={collectionDateNavHref(boardDate, "dine_in", "all")}
+            prefetch={false}
           >
             All
-          </a>
-          <a
+          </Link>
+          <Link
             className={venueChipClass(venueFilter === "hyphen")}
             href={collectionDateNavHref(boardDate, "dine_in", "hyphen")}
+            prefetch={false}
           >
             Hyphen
-          </a>
-          <a
+          </Link>
+          <Link
             className={venueChipClass(venueFilter === "whitebird")}
             href={collectionDateNavHref(boardDate, "dine_in", "whitebird")}
+            prefetch={false}
           >
             Whitebird
-          </a>
+          </Link>
         </div>
       ) : null}
 

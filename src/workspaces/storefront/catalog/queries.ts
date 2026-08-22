@@ -1,9 +1,11 @@
 import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
 import {
   browseCakeAvailabilityNote,
+  catalogueValidThroughYmd,
   isCatalogueExpired,
   isCurrentlyCustomerOrderable,
   isCustomerOrderableMonthlyMonth,
+  isCustomerPastMenuVisible,
 } from "@/engines/menu/customer-browse";
 import {
   businessYearMonth,
@@ -229,11 +231,15 @@ type CurrentCollectionRpcRow = {
   month: string | null;
 };
 
-function mapCollection(row: CurrentCollectionRpcRow): StorefrontCollection {
+function mapCollection(
+  row: CurrentCollectionRpcRow & { display_order?: number | null },
+): StorefrontCollection {
   return {
     id: row.id,
     name: row.name,
     month: row.month ? String(row.month).slice(0, 10) : null,
+    displayOrder:
+      row.display_order == null ? null : Number(row.display_order),
   };
 }
 
@@ -437,6 +443,7 @@ type ActiveCollectionRow = {
   month: string | null;
   purpose: string | null;
   status: string;
+  display_order?: number | null;
 };
 
 /** Active monthly catalogues customers may currently preorder from. */
@@ -445,12 +452,21 @@ export async function listOrderableMonthlyCatalogues(
 ): Promise<StorefrontCollection[]> {
   const todayYm = businessYearMonth(todayYmd) ?? todayYmd.slice(0, 7);
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const withOrder = await supabase
     .from("collections")
-    .select("id, name, month, purpose, status")
+    .select("id, name, month, purpose, status, display_order")
     .eq("status", "active")
     .eq("purpose", "monthly")
+    .order("display_order", { ascending: true })
     .order("month", { ascending: true });
+  const { data, error } = withOrder.error?.message.includes("display_order")
+    ? await supabase
+        .from("collections")
+        .select("id, name, month, purpose, status")
+        .eq("status", "active")
+        .eq("purpose", "monthly")
+        .order("month", { ascending: true })
+    : withOrder;
 
   if (error) {
     throw new Error(error.message);
@@ -489,6 +505,7 @@ type SpecialCatalogueRow = {
   purpose: string | null;
   status: string;
   website_override: boolean | null;
+  display_order?: number | null;
 };
 
 function mapSpecialCatalogue(
@@ -504,7 +521,8 @@ function mapSpecialCatalogue(
     name: row.name,
     startDate,
     endDate,
-    displayOrder: null,
+    displayOrder:
+      row.display_order == null ? null : Number(row.display_order),
   };
 }
 
@@ -513,15 +531,27 @@ export async function listCustomerSpecialCatalogues(
   todayYmd: string = toBusinessDateKey(),
 ): Promise<StorefrontSpecialCatalogue[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const withOrder = await supabase
     .from("collections")
     .select(
-      "id, name, start_date, end_date, purpose, status, website_override",
+      "id, name, start_date, end_date, purpose, status, website_override, display_order",
     )
     .eq("status", "active")
     .eq("purpose", "special")
     .eq("website_override", true)
+    .order("display_order", { ascending: true })
     .order("start_date", { ascending: true });
+  const { data, error } = withOrder.error?.message.includes("display_order")
+    ? await supabase
+        .from("collections")
+        .select(
+          "id, name, start_date, end_date, purpose, status, website_override",
+        )
+        .eq("status", "active")
+        .eq("purpose", "special")
+        .eq("website_override", true)
+        .order("start_date", { ascending: true })
+    : withOrder;
 
   if (error) {
     throw new Error(error.message);
@@ -547,6 +577,110 @@ export async function getCustomerSpecialCatalogueById(
   id: string,
 ): Promise<StorefrontSpecialCatalogue | null> {
   const catalogues = await listCustomerSpecialCatalogues();
+  return catalogues.find((catalogue) => catalogue.id === id) ?? null;
+}
+
+export type StorefrontHistoryCatalogue = {
+  id: string;
+  name: string;
+  purpose: string;
+  month: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  status: string;
+  displayOrder: number | null;
+  showInPastMenu: boolean;
+};
+
+type HistoryCatalogueRow = {
+  id: string;
+  name: string;
+  purpose: string | null;
+  month: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  status: string;
+  display_order?: number | null;
+  show_in_past_menu?: boolean | null;
+};
+
+function mapHistoryCatalogue(row: HistoryCatalogueRow): StorefrontHistoryCatalogue {
+  return {
+    id: row.id,
+    name: row.name,
+    purpose: row.purpose === "special" ? "special" : "monthly",
+    month: row.month ? String(row.month).slice(0, 10) : null,
+    startDate: row.start_date ? String(row.start_date).slice(0, 10) : null,
+    endDate: row.end_date ? String(row.end_date).slice(0, 10) : null,
+    status: row.status,
+    displayOrder:
+      row.display_order == null ? null : Number(row.display_order),
+    showInPastMenu: row.show_in_past_menu === true,
+  };
+}
+
+function isMissingShowInPastMenuColumn(message: string): boolean {
+  return message.includes("show_in_past_menu");
+}
+
+/** Archived or date-expired catalogues opted into customer Browse history. */
+export async function listHistoricalCatalogues(
+  todayYmd: string = toBusinessDateKey(),
+): Promise<StorefrontHistoryCatalogue[]> {
+  const supabase = await createClient();
+  const withFlag = await supabase
+    .from("collections")
+    .select(
+      "id, name, purpose, month, start_date, end_date, status, display_order, show_in_past_menu",
+    )
+    .order("display_order", { ascending: true });
+  const withoutFlag = isMissingShowInPastMenuColumn(
+    withFlag.error?.message ?? "",
+  )
+    ? await supabase
+        .from("collections")
+        .select(
+          "id, name, purpose, month, start_date, end_date, status, display_order",
+        )
+        .order("display_order", { ascending: true })
+    : withFlag;
+  const { data, error } = withoutFlag.error?.message.includes("display_order")
+    ? await supabase
+        .from("collections")
+        .select("id, name, purpose, month, start_date, end_date, status")
+        .order("end_date", { ascending: false, nullsFirst: false })
+        .order("month", { ascending: false, nullsFirst: false })
+    : withoutFlag;
+  if (error) {
+    throw new Error(error.message);
+  }
+  return ((data ?? []) as HistoryCatalogueRow[])
+    .map(mapHistoryCatalogue)
+    .filter((row) =>
+      isCustomerPastMenuVisible(
+        {
+          purpose: row.purpose,
+          status: row.status,
+          month: row.month,
+          endDate: row.endDate,
+          showInPastMenu: row.showInPastMenu,
+        },
+        todayYmd,
+      ),
+    )
+    .sort((a, b) => {
+      const throughA = catalogueValidThroughYmd(a) ?? "";
+      const throughB = catalogueValidThroughYmd(b) ?? "";
+      if (throughA !== throughB) return throughB.localeCompare(throughA);
+      return a.id.localeCompare(b.id);
+    });
+}
+
+export async function getHistoricalCatalogueById(
+  id: string,
+  todayYmd: string = toBusinessDateKey(),
+): Promise<StorefrontHistoryCatalogue | null> {
+  const catalogues = await listHistoricalCatalogues(todayYmd);
   return catalogues.find((catalogue) => catalogue.id === id) ?? null;
 }
 

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { LibraryNav } from "@/workspaces/library/LibraryNav";
 import { requireStaff } from "@/foundation/auth/session";
-import { canAccessWorkspace } from "@/foundation/navigation/access";
+import { canViewLibrary } from "@/foundation/navigation/access";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export default async function LibraryLayout({
 }>) {
   const staff = await requireStaff();
 
-  if (!canAccessWorkspace(staff.role.code, "library")) {
+  if (!canViewLibrary(staff.role.code)) {
     redirect("/home");
   }
 
@@ -23,7 +23,9 @@ export default async function LibraryLayout({
           Master Library
         </p>
         <p className="text-skyline mt-1 text-sm">
-          Reusable business assets for future Studio. Not a Collection Builder.
+          Reusable cakes, catalogues, promotions, vouchers, and assets. Order
+          availability closes pickup dates. Operating hours set weekly and
+          special-date schedules. Pickup stays in the Pickup workspace.
         </p>
       </div>
       <LibraryNav />

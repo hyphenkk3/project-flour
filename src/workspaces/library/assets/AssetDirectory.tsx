@@ -14,9 +14,10 @@ import {
 
 type AssetDirectoryProps = {
   assets: LibraryAsset[];
+  canManage: boolean;
 };
 
-export function AssetDirectory({ assets }: AssetDirectoryProps) {
+export function AssetDirectory({ assets, canManage }: AssetDirectoryProps) {
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
     const trimmed = query.trim().toLowerCase();

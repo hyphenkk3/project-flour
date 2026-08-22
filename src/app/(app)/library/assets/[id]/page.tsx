@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { requireStaff } from "@/foundation/auth/session";
+import { canManageLibrary } from "@/foundation/navigation/access";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { deleteAssetAction } from "@/workspaces/library/assets/actions";
 import { getAssetById } from "@/workspaces/library/assets/queries";
@@ -20,6 +22,8 @@ type AssetDetailPageProps = {
 export default async function LibraryAssetDetailPage({
   params,
 }: AssetDetailPageProps) {
+  const staff = await requireStaff();
+  const canManage = canManageLibrary(staff.role.code);
   const { id } = await params;
   const asset = await getAssetById(id);
 
@@ -47,6 +51,9 @@ export default async function LibraryAssetDetailPage({
           <PageHeader title={asset.title} />
         </div>
         <div className="flex flex-wrap gap-3">
+          {canManage ? (
+            <>
+
           <Link
             className="bg-ink text-mist hover:bg-skyline inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-medium"
             href={`/library/assets/${asset.id}/edit`}
@@ -56,6 +63,8 @@ export default async function LibraryAssetDetailPage({
           <DeleteLibraryItemButton
             action={deleteAssetAction.bind(null, asset.id)}
           />
+                    </>
+          ) : null}
         </div>
       </div>
 

@@ -1,3 +1,5 @@
+import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
+import { formatBusinessMonthYear } from "@/lib/dates";
 import type { StatusTone } from "@/lib/design-tokens";
 import type {
   LibraryCakeCategory,
@@ -64,6 +66,15 @@ export const LIBRARY_ASSET_STATUSES: readonly LibraryAssetStatus[] = [
   "active",
   "retired",
 ] as const;
+
+export const LIBRARY_COLLECTION_STATUSES = [
+  "draft",
+  "active",
+  "archived",
+] as const;
+
+export type LibraryCollectionStatus =
+  (typeof LIBRARY_COLLECTION_STATUSES)[number];
 
 export function cakeStatusLabel(status: LibraryCakeStatus): string {
   switch (status) {
@@ -162,12 +173,34 @@ export function libraryStatusTone(status: string): StatusTone {
     case "draft":
       return "neutral";
     case "expired":
+    case "archived":
       return "warning";
     case "retired":
       return "danger";
     default:
       return "neutral";
   }
+}
+
+export function collectionStatusLabel(status: string): string {
+  switch (status) {
+    case "draft":
+      return "Draft";
+    case "active":
+      return "Active";
+    case "archived":
+      return "Archived";
+    default:
+      return status;
+  }
+}
+
+export function formatLibraryCollectionMonth(month: string): string {
+  const key = month.slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(key)) {
+    return month;
+  }
+  return formatBusinessMonthYear(`${key}-01`);
 }
 
 export function formatLibraryMoney(amount: number): string {
@@ -180,7 +213,7 @@ export function formatCakeSizePrices(
   if (sizes.length === 0) {
     return "No sizes";
   }
-  return sizes
+  return sortCakeSizesByNumericLabel(sizes, (size) => size.label)
     .map((size) => `${size.label} — ${formatLibraryMoney(size.price)}`)
     .join(" · ");
 }

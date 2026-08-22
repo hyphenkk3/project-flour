@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { requireStaff } from "@/foundation/auth/session";
+import { canManageLibrary } from "@/foundation/navigation/access";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { LibraryAsset } from "@/types/library-asset";
 import { AssetDirectory } from "@/workspaces/library/assets/AssetDirectory";
@@ -8,6 +10,8 @@ import { listAssets } from "@/workspaces/library/assets/queries";
 export const dynamic = "force-dynamic";
 
 export default async function LibraryAssetsPage() {
+  const staff = await requireStaff();
+  const canManage = canManageLibrary(staff.role.code);
   let assets: LibraryAsset[] = [];
   let loadError: string | null = null;
 
@@ -27,18 +31,20 @@ export default async function LibraryAssetsPage() {
           description="Reusable images for heroes, covers, and banners."
           title="Asset Library"
         />
-        <Link
-          className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium transition"
-          href="/library/assets/new"
-        >
-          Add asset
-        </Link>
+        {canManage ? (
+          <Link
+            className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium transition"
+            href="/library/assets/new"
+          >
+            Add asset
+          </Link>
+        ) : null}
       </div>
 
       {loadError ? (
         <EmptyState description={loadError} title="Asset Library unavailable" />
       ) : (
-        <AssetDirectory assets={assets} />
+        <AssetDirectory assets={assets} canManage={canManage} />
       )}
     </div>
   );

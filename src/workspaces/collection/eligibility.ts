@@ -480,6 +480,15 @@ export function collectionDeskAttention(input: {
       overdue: false,
     };
   }
+  // Pickup-overdue attention is pickup-desk only — never label Delivery as
+  // "Pickup overdue" when the row is still in the Ready presentation.
+  if (!isCollectionPickupMethod(input.fulfilmentMethod ?? "pickup")) {
+    return {
+      label: collectionDeskLabel(presentation),
+      tone: collectionDeskBadgeTone(presentation),
+      overdue: false,
+    };
+  }
   const overdue = isCollectionPickupOverdue({
     pickupDate: input.pickupDate,
     pickupTime: input.pickupTime,

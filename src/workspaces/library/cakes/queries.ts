@@ -1,3 +1,4 @@
+import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
 import { createClient } from "@/lib/supabase/server";
 import type {
   LibraryCake,
@@ -61,9 +62,10 @@ export function mapPhoto(row: PhotoRow): LibraryCakePhoto {
 }
 
 export function mapCake(row: CakeRow): LibraryCake {
-  const sizes = (row.library_cake_sizes ?? [])
-    .map(mapSize)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+  const sizes = sortCakeSizesByNumericLabel(
+    (row.library_cake_sizes ?? []).map(mapSize),
+    (size) => size.label,
+  );
 
   return {
     id: row.id,

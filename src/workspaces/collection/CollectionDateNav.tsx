@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   collectionPlusTwoYmd,
   collectionDateNavHref,
@@ -35,24 +36,27 @@ export function CollectionDateNav({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
       <div className="flex flex-wrap gap-2">
-        <a
+        <Link
           className={chipClass(selectedDate === today)}
           href={collectionDateNavHref(today, tab, venueFilter)}
+          prefetch={false}
         >
           Today
-        </a>
-        <a
+        </Link>
+        <Link
           className={chipClass(selectedDate === tomorrow)}
           href={collectionDateNavHref(tomorrow, tab, venueFilter)}
+          prefetch={false}
         >
           Tomorrow
-        </a>
-        <a
+        </Link>
+        <Link
           className={chipClass(selectedDate === plusTwo)}
           href={collectionDateNavHref(plusTwo, tab, venueFilter)}
+          prefetch={false}
         >
           +2
-        </a>
+        </Link>
       </div>
       <form
         action="/collection"

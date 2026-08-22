@@ -105,7 +105,7 @@ export const ROLE_NAVIGATION: Record<RoleCode, readonly WorkspaceId[]> = {
     "owner_calendar",
     "collection",
   ],
-  bakery: ["home", "bakery", "collection"],
+  bakery: ["home", "bakery", "owner_calendar", "collection", "library"],
   collection: ["home", "collection"],
 };
 

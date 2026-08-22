@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { requireStaff } from "@/foundation/auth/session";
+import { canManageLibrary } from "@/foundation/navigation/access";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { DeleteLibraryItemButton } from "@/workspaces/library/DeleteLibraryItemButton";
 import {
@@ -19,6 +21,8 @@ type PromotionDetailPageProps = {
 export default async function LibraryPromotionDetailPage({
   params,
 }: PromotionDetailPageProps) {
+  const staff = await requireStaff();
+  const canManage = canManageLibrary(staff.role.code);
   const { id } = await params;
   const promotion = await getPromotionById(id);
 
@@ -45,6 +49,9 @@ export default async function LibraryPromotionDetailPage({
           <PageHeader title={promotion.name} />
         </div>
         <div className="flex flex-wrap gap-3">
+          {canManage ? (
+            <>
+
           <Link
             className="bg-ink text-mist hover:bg-skyline inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-medium"
             href={`/library/promotions/${promotion.id}/edit`}
@@ -54,6 +61,8 @@ export default async function LibraryPromotionDetailPage({
           <DeleteLibraryItemButton
             action={deletePromotionAction.bind(null, promotion.id)}
           />
+                    </>
+          ) : null}
         </div>
       </div>
 

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/foundation/auth/session";
-import { canAccessWorkspace } from "@/foundation/navigation/access";
+import { canManageLibrary } from "@/foundation/navigation/access";
 import { createClient } from "@/lib/supabase/server";
 import type {
   LibraryCakeCategory,
@@ -22,7 +22,7 @@ import {
 
 async function requireLibraryStaff() {
   const staff = await requireStaff();
-  if (!canAccessWorkspace(staff.role.code, "library")) {
+  if (!canManageLibrary(staff.role.code)) {
     redirect("/home");
   }
   return staff;

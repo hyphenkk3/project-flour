@@ -152,6 +152,7 @@ const coExtra = buildExtraWorkspaceCapabilities({
 });
 assert.equal(coExtra.canProposeExtra, false);
 assert.equal(coExtra.canConfirmExtra, false);
+assert.equal(coExtra.canUnconfirmExtra, false);
 assert.equal(coExtra.canAccessExtraSurface, false);
 
 // Attention — single helper
