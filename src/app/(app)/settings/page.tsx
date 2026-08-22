@@ -1,8 +1,14 @@
 import { requireStaff } from "@/foundation/auth/session";
 import { canManageStaff } from "@/foundation/navigation/access";
+import { getNotificationDefinitionsForRole } from "@/foundation/staff/notification-preferences";
+import { loadStaffNotificationPreferences } from "@/foundation/staff/notification-preferences-queries";
+import { NotificationPreferences } from "@/components/settings/NotificationPreferences";
 
 export default async function SettingsPage() {
   const staff = await requireStaff();
+
+  const definitions = getNotificationDefinitionsForRole(staff.role.code);
+  const preferences = await loadStaffNotificationPreferences(staff.id);
 
   return (
     <main className="space-y-6">
@@ -58,18 +64,13 @@ export default async function SettingsPage() {
       <section className="border-fog rounded-xl border bg-white p-5">
         <h3 className="text-ink text-sm font-semibold">Notifications</h3>
         <p className="text-skyline mt-1 text-sm">
-          Choose which operational updates you want to receive.
+          Choose which operational updates you want to receive by email.
         </p>
 
-        <div className="border-fog bg-mist mt-4 rounded-lg border p-4">
-          <p className="text-ink text-sm font-medium">
-            Notification preferences
-          </p>
-          <p className="text-skyline mt-1 text-xs">
-            Email notifications and individual alert preferences will be
-            available here.
-          </p>
-        </div>
+        <NotificationPreferences
+          definitions={definitions}
+          initialPreferences={preferences}
+        />
       </section>
 
       {canManageStaff(staff.role.code) && (
@@ -80,9 +81,7 @@ export default async function SettingsPage() {
           </p>
 
           <div className="border-fog bg-mist mt-4 rounded-lg border p-4">
-            <p className="text-ink text-sm font-medium">
-              Staff accounts
-            </p>
+            <p className="text-ink text-sm font-medium">Staff accounts</p>
             <p className="text-skyline mt-1 text-xs">
               Staff creation, role assignment, and account management will be
               available here.
