@@ -22,6 +22,7 @@ import {
 } from "@/engines/operations/owner-attention";
 import { createClient } from "@/lib/supabase/client";
 import type { StorefrontOrderListItem } from "@/types/storefront";
+import type { StaffNotificationPreference } from "@/foundation/staff/notification-preferences";
 import {
   getGuestOrderListItemAction,
   listGuestOrdersAction,
@@ -44,7 +45,6 @@ import {
   GUEST_PREORDER_NOTIFIED_IDS_KEY,
   isGuestWholeCakeSubmittedPreorder,
   markGuestPreorderNotificationsSeen,
-  readGuestPreorderNotificationPreference,
   tryClaimGuestPreorderNotification,
 } from "@/workspaces/owner/orders/guest-preorder-notifications";
 import { scrollWorkspaceSectionIntoView } from "@/workspaces/owner/orders/scroll-workspace-section";
@@ -53,8 +53,8 @@ const POLL_INTERVAL_MS = GUEST_ORDERS_LIVE_POLL_MS;
 const HIGHLIGHT_MS = 4500;
 
 type OperationsLiveBoardProps = {
-  staffId: string;
   initialOrders: StorefrontOrderListItem[];
+  notificationPreference: StaffNotificationPreference;
   /** Owner-only board tools: Calendar, Propose EXTRA, + New Order. */
   showOwnerBoardTools?: boolean;
   pendingApprovals?: OperationsApprovalRecord[];
@@ -64,8 +64,8 @@ type OperationsLiveBoardProps = {
 type OrderRowPayload = GuestOrderLiveRow;
 
 export function OperationsLiveBoard({
-  staffId,
   initialOrders,
+  notificationPreference,
   showOwnerBoardTools = false,
   pendingApprovals = [],
   initialQuery = DEFAULT_OPERATIONS_QUERY,
@@ -114,10 +114,11 @@ export function OperationsLiveBoard({
       if (!tryClaimGuestPreorderNotification(item.id)) return;
 
       notifiedIdsRef.current.add(item.id);
-      const mode = readGuestPreorderNotificationPreference(staffId);
+      if (!notificationPreference.webEnabled) return;
+
       const payload = buildGuestPreorderNotificationToast(
         item,
-        mode,
+        notificationPreference.webMode,
         buildOperationsBoardPath(query),
       );
       if (payload) {
@@ -125,7 +126,13 @@ export function OperationsLiveBoard({
       }
       highlightOrder(item.id);
     },
-    [highlightOrder, query, staffId, toast],
+    [
+      highlightOrder,
+      notificationPreference.webEnabled,
+      notificationPreference.webMode,
+      query,
+      toast,
+    ],
   );
 
   const loadListItem = useCallback(async (id: string) => {

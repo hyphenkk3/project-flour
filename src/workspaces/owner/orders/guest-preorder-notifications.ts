@@ -5,12 +5,8 @@
 
 import { formatShortBusinessDate } from "@/lib/dates";
 import type { ToastInput } from "@/components/ui/Toast";
-import {
-  parseGuestPreorderNotificationPreference,
-  readGuestPreorderNotificationPreference,
-  type GuestPreorderNotificationMode,
-} from "@/foundation/staff/guest-preorder-notification-preference";
 import type { StorefrontOrderListItem } from "@/types/storefront";
+import type { StaffNotificationWebMode } from "@/foundation/staff/notification-preferences";
 import { ownerOrderWorkspaceHref } from "@/workspaces/owner/navigation/return-to";
 import { isStaffGuestOrderSource } from "@/workspaces/owner/orders/labels";
 import type { GuestOrderLiveRow } from "@/workspaces/owner/orders/guest-orders-live";
@@ -122,7 +118,7 @@ export function isGuestWholeCakeSubmittedPreorderLiveRow(
 }
 
 export function guestPreorderNotificationDurationMs(
-  mode: GuestPreorderNotificationMode,
+  mode: StaffNotificationWebMode,
 ): number | null {
   if (mode === "persistent") return null;
   return 4500;
@@ -130,10 +126,9 @@ export function guestPreorderNotificationDurationMs(
 
 export function buildGuestPreorderNotificationToast(
   order: GuestPreorderNotificationOrder,
-  mode: GuestPreorderNotificationMode,
+  mode: StaffNotificationWebMode,
   returnTo?: string | null,
 ): ToastInput | null {
-  if (mode === "off") return null;
   if (!isGuestWholeCakeSubmittedPreorder(order)) return null;
 
   const durationMs = guestPreorderNotificationDurationMs(mode);
@@ -149,17 +144,3 @@ export function buildGuestPreorderNotificationToast(
   };
 }
 
-export function resolveGuestPreorderNotificationMode(
-  staffId: string,
-  rawPreference?: string | null,
-): GuestPreorderNotificationMode {
-  if (rawPreference !== undefined) {
-    return parseGuestPreorderNotificationPreference(rawPreference);
-  }
-  return readGuestPreorderNotificationPreference(staffId);
-}
-
-export {
-  parseGuestPreorderNotificationPreference,
-  readGuestPreorderNotificationPreference,
-};

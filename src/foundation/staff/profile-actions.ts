@@ -54,29 +54,16 @@ export async function updateStaffEmailAction(
     };
   }
 
-  const { error: authError } = await supabase.auth.updateUser({
-    email,
-  });
+  const { error: authError } = await supabase.auth.updateUser(
+    { email },
+    {
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+    },
+  );
 
   if (authError) {
     return {
       error: authError.message,
-      success: false,
-    };
-  }
-
-  const { error: profileError } = await supabase
-    .from("staff_profiles")
-    .update({
-      email,
-    })
-    .eq("id", staff.id)
-    .eq("auth_user_id", staff.authUserId);
-
-  if (profileError) {
-    return {
-      error:
-        "Your authentication email was updated, but your staff profile could not be synchronized. Please contact the owner.",
       success: false,
     };
   }

@@ -9,8 +9,12 @@ export type StaffNotificationCode =
   | "approval_required"
   | "guest_preorder";
 
+export type StaffNotificationWebMode = "transient" | "persistent";
+
 export type StaffNotificationPreference = {
   code: StaffNotificationCode;
+  webEnabled: boolean;
+  webMode: StaffNotificationWebMode;
   emailEnabled: boolean;
 };
 
@@ -59,6 +63,9 @@ export const STAFF_NOTIFICATION_DEFINITIONS: readonly StaffNotificationDefinitio
 ];
 
 export const STAFF_NOTIFICATION_DEFAULT_ENABLED = true;
+
+export const STAFF_NOTIFICATION_DEFAULT_WEB_MODE: StaffNotificationWebMode =
+  "transient";
 
 /**
  * Future role-aware filtering can be added here without changing

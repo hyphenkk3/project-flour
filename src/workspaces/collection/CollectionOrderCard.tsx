@@ -64,9 +64,18 @@ export function CollectionOrderCard({
   const showCompletedMeta = tab === "completed" || tab === "history";
   const reservationTime = order.dineIn?.reservationTime ?? "";
   const guestCount = order.dineIn?.guestCount;
+  const complimentaryItems = order.complimentaryItems ?? [];
+  const paidAddons = order.paidAddons ?? [];
+  const hasOptions = complimentaryItems.length > 0 || paidAddons.length > 0;
 
   return (
-    <article className="border-fog rounded-xl border bg-white px-3.5 py-2.5">
+    <article
+      className={
+        dineIn
+          ? "border-skyline/30 rounded-xl border bg-skyline/5 px-3.5 py-2.5"
+          : "border-fog rounded-xl border bg-white px-3.5 py-2.5"
+      }
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
@@ -139,6 +148,43 @@ export function CollectionOrderCard({
             <p className="text-ink mt-0.5 line-clamp-1 text-xs font-medium">
               {notes}
             </p>
+          ) : null}
+
+          {hasOptions ? (
+            <div className="mt-2 space-y-1 border-t border-fog pt-2">
+              {complimentaryItems.map((item) => (
+                <p
+                  key={item.id}
+                  className="text-skyline text-xs leading-snug"
+                >
+                  <span className="text-ink font-medium">
+                    {item.name}
+                  </span>
+                  {item.quantity > 1 ? ` × ${item.quantity}` : ""}
+                </p>
+              ))}
+
+              {paidAddons.map((addon) => (
+                <div key={addon.id} className="text-xs leading-snug">
+                  <p className="text-ink font-medium">
+                    {addon.name}
+                    {addon.quantity > 1 ? ` × ${addon.quantity}` : ""}
+                  </p>
+
+                  {addon.messages.map((message) =>
+                    message.writtenMessage?.trim() ? (
+                      <p
+                        key={`${addon.id}-${message.cardIndex}`}
+                        className="text-skyline mt-0.5"
+                      >
+                        Card {message.cardIndex}:{" "}
+                        {message.writtenMessage.trim()}
+                      </p>
+                    ) : null,
+                  )}
+                </div>
+              ))}
+            </div>
           ) : null}
         </div>
         <StatusBadge label={desk.label} tone={desk.tone} />

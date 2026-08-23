@@ -9,6 +9,7 @@ const PUBLIC_PATHS = new Set([
   "/extra",
   "/order",
   "/order/success",
+  "/auth/callback",
 ]);
 
 function isPublicPath(pathname: string) {

@@ -62,9 +62,14 @@ function rowPassesReadyQueue(
   row: CollectionOrderRow,
   selectedPickupDate: string,
 ): boolean {
+  const reservation = Array.isArray(row.order_dine_in_reservations)
+    ? row.order_dine_in_reservations[0] ?? null
+    : row.order_dine_in_reservations ?? null;
+
   return isActiveOnCollectionReadyQueue({
     customerId: row.customer_id,
     pickupDate: row.pickup_date,
+    reservationDate: reservation?.reservation_date ?? null,
     selectedPickupDate,
     status: row.status,
     fulfilmentMethod: row.fulfilment_method,
@@ -110,9 +115,14 @@ function rowPassesDineIn(
   row: CollectionOrderRow,
   selectedPickupDate: string,
 ): boolean {
+  const reservation = Array.isArray(row.order_dine_in_reservations)
+    ? row.order_dine_in_reservations[0] ?? null
+    : row.order_dine_in_reservations ?? null;
+
   return isActiveOnCollectionDineInBoard({
     customerId: row.customer_id,
     pickupDate: row.pickup_date,
+    reservationDate: reservation?.reservation_date ?? null,
     selectedPickupDate,
     status: row.status,
     fulfilmentMethod: row.fulfilment_method,
@@ -283,8 +293,8 @@ export async function listCollectionDineInOrders(
     .from("orders")
     .select(COLLECTION_ORDER_SELECT)
     .is("customer_id", null)
-    .eq("pickup_date", selectedPickupDate)
     .eq("fulfilment_method", "dine_in")
+    .eq("order_dine_in_reservations.reservation_date", selectedPickupDate)
     .in("status", [...COLLECTION_ACTIVE_PREORDER_STATUSES])
     .is("picked_up_at", null)
     .order("pickup_time", { ascending: true });

@@ -13,12 +13,14 @@ import type { HomeDineInHandoffPreview } from "@/workspaces/home/cockpit-model";
 import { HomeLiveRefresh } from "@/workspaces/home/HomeLiveRefresh";
 import { HomeGuestPreorderNotificationListener } from "@/workspaces/home/HomeGuestPreorderNotificationListener";
 import { homeGreetingTitle } from "@/workspaces/home/greeting";
+import type { StaffNotificationPreference } from "@/foundation/staff/notification-preferences";
 
 const HOME_RETURN = "/home";
 const OPERATIONS_TODAY_HREF = "/owner?pickup=today";
 
 type HomeCockpitProps = {
   staffId: string;
+  notificationPreference: StaffNotificationPreference;
   staffDisplayName: string;
   roleName: string;
   model: HomeCockpitModel;
@@ -127,6 +129,7 @@ function dineInPreviewMeta(item: HomeDineInHandoffPreview): string {
 
 export function HomeCockpit({
   staffId,
+  notificationPreference,
   staffDisplayName,
   roleName,
   model,
@@ -202,6 +205,7 @@ export function HomeCockpit({
       <HomeLiveRefresh />
       <HomeGuestPreorderNotificationListener
         initialOrderIds={knownGuestOrderIds}
+        notificationPreference={notificationPreference}
         staffId={staffId}
       />
       <div>

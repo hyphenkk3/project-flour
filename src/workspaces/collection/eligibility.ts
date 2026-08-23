@@ -111,13 +111,14 @@ export function isActiveOnCollectionDeliveryBoard(input: {
 export function isActiveOnCollectionDineInBoard(input: {
   customerId: string | null;
   pickupDate: string;
+  reservationDate: string | null | undefined;
   selectedPickupDate: string;
   status: GuestOrderStatus | string;
   fulfilmentMethod: string | null | undefined;
   pickedUpAt: string | null;
 }): boolean {
   if (input.customerId != null) return false;
-  if (input.pickupDate !== input.selectedPickupDate) return false;
+  if (input.reservationDate !== input.selectedPickupDate) return false;
   if (!isCollectionActiveStatus(input.status)) return false;
   if (!isCollectionDineInMethod(input.fulfilmentMethod)) return false;
   if (input.pickedUpAt) return false;
@@ -128,6 +129,7 @@ export function isActiveOnCollectionDineInBoard(input: {
 export function isActiveOnCollectionDineInReadyBoard(input: {
   customerId: string | null;
   pickupDate: string;
+  reservationDate: string | null | undefined;
   selectedPickupDate: string;
   status: GuestOrderStatus | string;
   fulfilmentMethod: string | null | undefined;
@@ -145,6 +147,7 @@ export function isActiveOnCollectionDineInReadyBoard(input: {
 export function isActiveOnCollectionReadyQueue(input: {
   customerId: string | null;
   pickupDate: string;
+  reservationDate: string | null | undefined;
   selectedPickupDate: string;
   status: GuestOrderStatus | string;
   fulfilmentMethod: string | null | undefined;
@@ -181,6 +184,7 @@ export function isActiveOnCollectionReadyQueue(input: {
   return isActiveOnCollectionDineInReadyBoard({
     customerId: input.customerId,
     pickupDate: input.pickupDate,
+    reservationDate: input.reservationDate,
     selectedPickupDate: input.selectedPickupDate,
     status: input.status,
     fulfilmentMethod: input.fulfilmentMethod,

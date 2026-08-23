@@ -8,10 +8,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
-  GUEST_PREORDER_NOTIFICATION_DEFAULT,
-  guestPreorderNotificationStorageKey,
-  parseGuestPreorderNotificationPreference,
-} from "../src/foundation/staff/guest-preorder-notification-preference";
+  STAFF_NOTIFICATION_DEFAULT_ENABLED,
+  STAFF_NOTIFICATION_DEFAULT_WEB_MODE,
+  STAFF_NOTIFICATION_DEFINITIONS,
+  type StaffNotificationPreference,
+} from "../src/foundation/staff/notification-preferences";
 import {
   buildGuestPreorderNotificationToast,
   guestPreorderNotificationAlreadyNotified,
@@ -56,65 +57,102 @@ function sampleOrder(
 
 // --- Preference ---
 
-assert.equal(GUEST_PREORDER_NOTIFICATION_DEFAULT, "transient");
-assert.equal(parseGuestPreorderNotificationPreference(null), "transient");
-assert.equal(parseGuestPreorderNotificationPreference("off"), "off");
-assert.equal(parseGuestPreorderNotificationPreference("persistent"), "persistent");
-assert.equal(
-  guestPreorderNotificationStorageKey("staff-abc"),
-  "wos:guest-preorder-notification:staff-abc",
+assert.equal(STAFF_NOTIFICATION_DEFAULT_ENABLED, true);
+assert.equal(STAFF_NOTIFICATION_DEFAULT_WEB_MODE, "transient");
+
+const guestPreorderDefinition = STAFF_NOTIFICATION_DEFINITIONS.find(
+  (definition) => definition.code === "guest_preorder",
 );
 
-{
-  // Shell remount regression: client snapshot must read persisted value
-  // immediately (no useState(default)+useEffect delay → Transient flash).
-  const preferenceSrc = readFileSync(
-    resolve("src/foundation/staff/guest-preorder-notification-preference.ts"),
-    "utf8",
-  );
-  assert.match(preferenceSrc, /subscribeGuestPreorderNotificationPreference/);
-  assert.match(preferenceSrc, /GUEST_PREORDER_NOTIFICATION_CHANGE_EVENT/);
-  assert.match(preferenceSrc, /dispatchEvent/);
+assert.ok(guestPreorderDefinition);
+assert.equal(guestPreorderDefinition.label, "Guest preorder");
+assert.equal(
+  guestPreorderDefinition.description,
+  "When a guest preorder is submitted.",
+);
 
-  const userMenuWiring = readFileSync(
-    resolve("src/components/shell/UserMenu.tsx"),
+const transientPreference: StaffNotificationPreference = {
+  code: "guest_preorder",
+  webEnabled: true,
+  webMode: "transient",
+  emailEnabled: false,
+};
+
+const persistentPreference: StaffNotificationPreference = {
+  ...transientPreference,
+  webMode: "persistent",
+};
+
+const disabledPreference: StaffNotificationPreference = {
+  ...transientPreference,
+  webEnabled: false,
+};
+
+assert.equal(transientPreference.webEnabled, true);
+assert.equal(transientPreference.webMode, "transient");
+assert.equal(persistentPreference.webMode, "persistent");
+assert.equal(disabledPreference.webEnabled, false);
+
+{
+  // Notification preference is now supplied server-side rather than
+  // persisted/read from browser localStorage.
+  const homePageSrc = readFileSync(
+    resolve("src/app/(app)/home/page.tsx"),
     "utf8",
   );
-  assert.match(userMenuWiring, /useSyncExternalStore/);
+  assert.match(homePageSrc, /loadStaffNotificationPreferences/);
+  assert.match(homePageSrc, /code === "guest_preorder"/);
+  assert.match(homePageSrc, /notificationPreference=\{notificationPreference\}/);
+
+  const homeCockpitSrc = readFileSync(
+    resolve("src/workspaces/home/HomeCockpit.tsx"),
+    "utf8",
+  );
+  assert.match(homeCockpitSrc, /StaffNotificationPreference/);
+  assert.match(homeCockpitSrc, /notificationPreference/);
   assert.match(
-    userMenuWiring,
-    /subscribeGuestPreorderNotificationPreference/,
+    homeCockpitSrc,
+    /HomeGuestPreorderNotificationListener/,
   );
-  assert.doesNotMatch(
-    userMenuWiring,
-    /useState<\s*GuestPreorderNotificationMode\s*>\s*\(\s*GUEST_PREORDER_NOTIFICATION_DEFAULT/,
+
+  const homeListenerSrc = readFileSync(
+    resolve("src/workspaces/home/HomeGuestPreorderNotificationListener.tsx"),
+    "utf8",
   );
+  assert.match(homeListenerSrc, /StaffNotificationPreference/);
+  assert.match(homeListenerSrc, /notificationPreference\.webEnabled/);
+  assert.match(homeListenerSrc, /notificationPreference\.webMode/);
   assert.doesNotMatch(
-    userMenuWiring,
-    /useEffect\(\s*\(\)\s*=>\s*\{\s*setMode\(readGuestPreorderNotificationPreference/,
+    homeListenerSrc,
+    /readGuestPreorderNotificationPreference/,
   );
 }
 
 {
-  // Collection tab chips must soft-navigate so AppShell UserMenus do not remount.
-  const collectionNavSrc = readFileSync(
-    resolve("src/workspaces/collection/CollectionWorkspaceNav.tsx"),
+  // Operations board receives the same server-loaded preference.
+  const ownerDashboardSrc = readFileSync(
+    resolve("src/workspaces/owner/OwnerDashboard.tsx"),
     "utf8",
   );
-  assert.match(collectionNavSrc, /from \"next\/link\"/);
-  assert.match(collectionNavSrc, /<Link/);
-  assert.doesNotMatch(collectionNavSrc, /<a\s/);
+  assert.match(ownerDashboardSrc, /loadStaffNotificationPreferences/);
+  assert.match(ownerDashboardSrc, /code === "guest_preorder"/);
+  assert.match(ownerDashboardSrc, /notificationPreference=\{notificationPreference\}/);
+
+  const operationsSrc = readFileSync(
+    resolve("src/workspaces/owner/OperationsLiveBoard.tsx"),
+    "utf8",
+  );
+  assert.match(operationsSrc, /StaffNotificationPreference/);
+  assert.match(operationsSrc, /notificationPreference\.webEnabled/);
+  assert.match(operationsSrc, /notificationPreference\.webMode/);
+  assert.doesNotMatch(
+    operationsSrc,
+    /readGuestPreorderNotificationPreference/,
+  );
 }
 
 assert.equal(guestPreorderNotificationDurationMs("transient"), 4500);
 assert.equal(guestPreorderNotificationDurationMs("persistent"), null);
-
-const offToast = buildGuestPreorderNotificationToast(
-  sampleOrder(),
-  "off",
-  "/owner",
-);
-assert.equal(offToast, null);
 
 const transientToast = buildGuestPreorderNotificationToast(
   sampleOrder(),
@@ -200,13 +238,10 @@ assert.equal(
   false,
 );
 
-// --- Browser-local dedup (jsdom-less: exercise storage when available) ---
+// --- Browser-local notification dedup (jsdom-less) ---
 
 if (typeof globalThis.localStorage !== "undefined") {
   const priorNotified = localStorage.getItem(GUEST_PREORDER_NOTIFIED_IDS_KEY);
-  const priorPref = localStorage.getItem(
-    guestPreorderNotificationStorageKey("staff-test"),
-  );
 
   try {
     localStorage.removeItem(GUEST_PREORDER_NOTIFIED_IDS_KEY);
@@ -215,30 +250,11 @@ if (typeof globalThis.localStorage !== "undefined") {
     assert.equal(tryClaimGuestPreorderNotification("seed-a"), false);
     assert.equal(tryClaimGuestPreorderNotification("seed-c"), true);
     assert.equal(tryClaimGuestPreorderNotification("seed-c"), false);
-
-    localStorage.setItem(
-      guestPreorderNotificationStorageKey("staff-test"),
-      "persistent",
-    );
-    assert.equal(
-      parseGuestPreorderNotificationPreference(
-        localStorage.getItem(guestPreorderNotificationStorageKey("staff-test")),
-      ),
-      "persistent",
-    );
   } finally {
     if (priorNotified == null) {
       localStorage.removeItem(GUEST_PREORDER_NOTIFIED_IDS_KEY);
     } else {
       localStorage.setItem(GUEST_PREORDER_NOTIFIED_IDS_KEY, priorNotified);
-    }
-    if (priorPref == null) {
-      localStorage.removeItem(guestPreorderNotificationStorageKey("staff-test"));
-    } else {
-      localStorage.setItem(
-        guestPreorderNotificationStorageKey("staff-test"),
-        priorPref,
-      );
     }
   }
 }
@@ -268,7 +284,7 @@ const operationsSrc = readFileSync(
 );
 assert.match(operationsSrc, /postgres_changes/);
 assert.match(operationsSrc, /GUEST_ORDERS_LIVE_POLL_MS/);
-assert.match(operationsSrc, /readGuestPreorderNotificationPreference/);
+assert.doesNotMatch(operationsSrc, /readGuestPreorderNotificationPreference/);
 assert.match(operationsSrc, /isGuestWholeCakeSubmittedPreorder/);
 assert.doesNotMatch(
   operationsSrc,
@@ -283,7 +299,10 @@ const userMenuSrc = readFileSync(
   resolve("src/components/shell/UserMenu.tsx"),
   "utf8",
 );
-assert.match(userMenuSrc, /guest-preorder-notification/);
-assert.match(userMenuSrc, /Persistent/);
+
+// UserMenu no longer owns guest-preorder notification preferences.
+// Preferences are loaded server-side and passed to the relevant workspace.
+assert.doesNotMatch(userMenuSrc, /guest-preorder-notification/);
+assert.doesNotMatch(userMenuSrc, /Persistent/);
 
 console.log("PASS guest preorder notification preference");
