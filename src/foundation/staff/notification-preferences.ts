@@ -7,7 +7,7 @@ export type StaffNotificationCode =
   | "order_cancelled"
   | "order_edited"
   | "approval_required"
-  | "guest_preorder";
+  | "last_minute";
 
 export type StaffNotificationWebMode = "transient" | "persistent";
 
@@ -56,9 +56,9 @@ export const STAFF_NOTIFICATION_DEFINITIONS: readonly StaffNotificationDefinitio
     description: "When an action requires your approval.",
   },
   {
-    code: "guest_preorder",
-    label: "Guest preorder",
-    description: "When a guest preorder is submitted.",
+    code: "last_minute",
+    label: "Last Minute",
+    description: "Urgent last-minute order activity requiring quick action.",
   },
 ];
 
@@ -67,10 +67,6 @@ export const STAFF_NOTIFICATION_DEFAULT_ENABLED = true;
 export const STAFF_NOTIFICATION_DEFAULT_WEB_MODE: StaffNotificationWebMode =
   "transient";
 
-/**
- * Future role-aware filtering can be added here without changing
- * the stored preference model.
- */
 export function getNotificationDefinitionsForRole(
   _role: RoleCode,
 ): readonly StaffNotificationDefinition[] {

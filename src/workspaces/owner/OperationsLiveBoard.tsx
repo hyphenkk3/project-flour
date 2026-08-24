@@ -41,12 +41,12 @@ import {
   type GuestOrderLiveRow,
 } from "@/workspaces/owner/orders/guest-orders-live";
 import {
-  buildGuestPreorderNotificationToast,
-  GUEST_PREORDER_NOTIFIED_IDS_KEY,
-  isGuestWholeCakeSubmittedPreorder,
-  markGuestPreorderNotificationsSeen,
-  tryClaimGuestPreorderNotification,
-} from "@/workspaces/owner/orders/guest-preorder-notifications";
+  buildNewOrderNotificationToast,
+  isNewOrderNotificationLiveRow,
+  NEW_ORDER_NOTIFIED_IDS_KEY,
+  isNewOrderNotificationEligible,
+  tryClaimNewOrderNotification,
+} from "@/workspaces/owner/orders/new-order-notifications";
 import { scrollWorkspaceSectionIntoView } from "@/workspaces/owner/orders/scroll-workspace-section";
 
 const POLL_INTERVAL_MS = GUEST_ORDERS_LIVE_POLL_MS;
@@ -110,13 +110,13 @@ export function OperationsLiveBoard({
   const notifyNewOrder = useCallback(
     (item: StorefrontOrderListItem) => {
       if (notifiedIdsRef.current.has(item.id)) return;
-      if (!isGuestWholeCakeSubmittedPreorder(item)) return;
-      if (!tryClaimGuestPreorderNotification(item.id)) return;
+      if (!isNewOrderNotificationEligible(item)) return;
+      if (!tryClaimNewOrderNotification(item.id)) return;
 
       notifiedIdsRef.current.add(item.id);
       if (!notificationPreference.webEnabled) return;
 
-      const payload = buildGuestPreorderNotificationToast(
+      const payload = buildNewOrderNotificationToast(
         item,
         notificationPreference.webMode,
         buildOperationsBoardPath(query),
@@ -192,7 +192,6 @@ export function OperationsLiveBoard({
 
   useEffect(() => {
     setOrders(initialOrders);
-    markGuestPreorderNotificationsSeen(initialOrders.map((order) => order.id));
     for (const order of initialOrders) {
       knownIdsRef.current.add(order.id);
       notifiedIdsRef.current.add(order.id);
@@ -201,7 +200,7 @@ export function OperationsLiveBoard({
 
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
-      if (event.key !== GUEST_PREORDER_NOTIFIED_IDS_KEY || !event.newValue) return;
+      if (event.key !== NEW_ORDER_NOTIFIED_IDS_KEY || !event.newValue) return;
       try {
         const ids = JSON.parse(event.newValue) as unknown;
         if (!Array.isArray(ids)) return;

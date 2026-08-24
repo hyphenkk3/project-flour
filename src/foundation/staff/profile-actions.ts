@@ -1,7 +1,7 @@
 "use server";
 
 import { requireStaff } from "@/foundation/auth/session";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/admin";
 
 function normalizeEmail(value: FormDataEntryValue | null): string {
   return String(value ?? "").trim().toLowerCase();
@@ -15,6 +15,7 @@ export async function updateStaffEmailAction(
   formData: FormData,
 ): Promise<{ error: string | null; success: boolean }> {
   const staff = await requireStaff();
+
   const email = normalizeEmail(formData.get("email"));
 
   if (!email) {
@@ -31,21 +32,7 @@ export async function updateStaffEmailAction(
     };
   }
 
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user || user.id !== staff.authUserId) {
-    return {
-      error: "Your staff session could not be verified. Please sign in again.",
-      success: false,
-    };
-  }
-
-  const currentEmail = user.email?.trim().toLowerCase() ?? "";
+  const currentEmail = staff.email?.trim().toLowerCase() ?? "";
 
   if (currentEmail === email) {
     return {
@@ -54,16 +41,38 @@ export async function updateStaffEmailAction(
     };
   }
 
-  const { error: authError } = await supabase.auth.updateUser(
-    { email },
+  const admin = createServiceClient();
+
+  // Update the Supabase Auth account directly.
+  // This intentionally bypasses email-change confirmation because
+  // staff emails are managed internally and may be dummy addresses.
+  const { error: authError } = await admin.auth.admin.updateUserById(
+    staff.authUserId,
     {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      email,
+      email_confirm: true,
     },
   );
 
   if (authError) {
     return {
       error: authError.message,
+      success: false,
+    };
+  }
+
+  // Keep the staff profile email in sync so operational
+  // notifications stop going to the old address.
+  const { error: profileError } = await admin
+    .from("staff_profiles")
+    .update({
+      email,
+    })
+    .eq("auth_user_id", staff.authUserId);
+
+  if (profileError) {
+    return {
+      error: profileError.message,
       success: false,
     };
   }

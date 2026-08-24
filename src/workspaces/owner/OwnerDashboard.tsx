@@ -19,11 +19,11 @@ export async function OwnerDashboard({
     await loadStaffNotificationPreferences(staff.id);
 
   const notificationPreference = notificationPreferences.find(
-    (preference) => preference.code === "guest_preorder",
+    (preference) => preference.code === "new_order",
   );
 
   if (!notificationPreference) {
-    throw new Error("Guest preorder notification preference is unavailable.");
+    throw new Error("New order notification preference is unavailable.");
   }
   const capabilities = buildGuestOrderWorkspaceCapabilities({
     role: staff.role.code,
