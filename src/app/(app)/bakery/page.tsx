@@ -1,3 +1,6 @@
+import { redirect } from "next/navigation";
+import { requireStaff } from "@/foundation/auth/session";
+import { canAccessBakeryWorkspace } from "@/engines/bakery/capabilities";
 import { BakeryExtraAwaitingReviewCallout } from "@/workspaces/bakery/BakeryExtraAwaitingReviewCallout";
 import { BakeryLiveBoard } from "@/workspaces/bakery/BakeryLiveBoard";
 import { BakeryWorkspaceNav } from "@/workspaces/bakery/BakeryWorkspaceNav";
@@ -12,6 +15,11 @@ type BakeryPageProps = {
 };
 
 export default async function BakeryPage({ searchParams }: BakeryPageProps) {
+  const staff = await requireStaff();
+  if (!canAccessBakeryWorkspace(staff.role.code)) {
+    redirect("/bakery/availability");
+  }
+
   const params = await searchParams;
   const boardDate = resolveBakeryBoardDate(params.date);
   const [orders, proposedCount] = await Promise.all([

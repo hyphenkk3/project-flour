@@ -5,6 +5,7 @@ import {
   OPERATIONS_PICKUP_FILTERS,
   OPERATIONS_SORT_OPTIONS,
   OPERATIONS_STATUS_FILTERS,
+  OPERATIONS_LIFECYCLE_FILTERS,
   OPERATIONS_SEARCH_ALL_DATES_CUE,
   isOperationsQueryDefault,
   operationsBoardSummary,
@@ -14,6 +15,7 @@ import {
   type OperationsPickupFilter,
   type OperationsSortOption,
   type OperationsStatusFilter,
+  type OperationsLifecycleFilter,
 } from "@/engines/operations/order-board";
 import { formStyles } from "@/components/ui/form/FormControls";
 import {
@@ -258,6 +260,27 @@ export function OperationsBoardToolbar({
             value={query.statusFilter}
           >
             {OPERATIONS_STATUS_FILTERS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+
+          <label className="sr-only" htmlFor="operations-lifecycle">
+            Lifecycle
+          </label>
+          <select
+            aria-label="Lifecycle"
+            className={`${compactSelectClass} sm:min-w-[12rem] sm:flex-none`}
+            id="operations-lifecycle"
+            onChange={(event) =>
+              patch({
+                lifecycleFilter: event.target.value as OperationsLifecycleFilter,
+              })
+            }
+            value={query.lifecycleFilter}
+          >
+            {OPERATIONS_LIFECYCLE_FILTERS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

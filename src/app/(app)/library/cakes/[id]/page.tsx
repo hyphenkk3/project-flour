@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { requireStaff } from "@/foundation/auth/session";
 import { canManageLibrary } from "@/foundation/navigation/access";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { CakePhotoManager } from "@/workspaces/library/cakes/CakePhotoManager";
 import { deleteCakeAction } from "@/workspaces/library/cakes/actions";
 import { getCakeById } from "@/workspaces/library/cakes/queries";
 import { DeleteLibraryItemButton } from "@/workspaces/library/DeleteLibraryItemButton";
@@ -111,7 +112,14 @@ export default async function LibraryCakeDetailPage({
           <ul className="mt-3 space-y-2 text-sm">
             {cake.sizes.map((size) => (
               <li className="text-ink flex justify-between gap-3" key={size.id}>
-                <span>{size.label}</span>
+                <span>
+                  {size.label}
+                  <span className="text-skyline">
+                    {" "}
+                    · Preorder: {size.preorderDays}{" "}
+                    {size.preorderDays === 1 ? "day" : "days"}
+                  </span>
+                </span>
                 <span className="font-medium">
                   {formatLibraryMoney(size.price)}
                 </span>
@@ -121,32 +129,7 @@ export default async function LibraryCakeDetailPage({
         )}
       </section>
 
-      <section className="border-fog rounded-xl border bg-white p-5">
-        <h2 className="text-ink text-sm font-semibold tracking-wide uppercase">
-          Photos
-        </h2>
-        {cake.photos.length === 0 ? (
-          <p className="text-skyline mt-3 text-sm">No photos yet.</p>
-        ) : (
-          <ul className="mt-3 space-y-2 text-sm">
-            {cake.photos.map((photo) => (
-              <li key={photo.id}>
-                <a
-                  className="text-signal hover:text-ink font-medium break-all"
-                  href={photo.imageUrl}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  {photo.imageUrl}
-                </a>
-                {photo.altText ? (
-                  <p className="text-skyline mt-0.5">{photo.altText}</p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <CakePhotoManager cake={cake} canManage={false} />
     </div>
   );
 }

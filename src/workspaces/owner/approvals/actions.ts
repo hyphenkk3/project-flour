@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/foundation/auth/session";
+import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import {
   STALE_APPROVAL_MESSAGE,
   canCancelOperationsApproval,
@@ -120,6 +121,7 @@ export async function createOperationsApprovalAction(input: {
   if (error) {
     return { error: rpcErrorMessage(error), success: false };
   }
+  scheduleStaffNotificationDispatch();
   await revalidateApprovalPaths(input.orderId);
   return { error: null, success: true };
 }

@@ -29,10 +29,10 @@ assert.equal(canAccessOperationsBoard("bakery"), false);
 assert.equal(canViewWholeCakeCalendar("owner"), true);
 assert.equal(canViewWholeCakeCalendar("customer_operations"), true);
 assert.equal(canViewWholeCakeCalendar("manager"), true);
-assert.equal(canViewWholeCakeCalendar("bakery"), false);
+assert.equal(canViewWholeCakeCalendar("bakery"), true);
 
 assert.equal(canAccessCollectionWorkspace("customer_operations"), true);
-assert.equal(canAccessCollectionWorkspace("bakery"), false);
+assert.equal(canAccessCollectionWorkspace("bakery"), true);
 assert.equal(canAccessCollectionWorkspace("collection"), true);
 
 assert.equal(canAccessGuestOrderWorkspace("customer_operations"), true);
@@ -51,7 +51,7 @@ assert.equal(canAccessWorkspace("customer_operations", "owner"), true);
 assert.equal(canAccessWorkspace("customer_operations", "owner_calendar"), true);
 assert.equal(canAccessWorkspace("customer_operations", "collection"), true);
 assert.equal(canAccessWorkspace("bakery", "owner"), false);
-assert.equal(canAccessWorkspace("bakery", "collection"), false);
+assert.equal(canAccessWorkspace("bakery", "collection"), true);
 
 const owner = buildGuestOrderWorkspaceCapabilities({
   role: "owner",
@@ -92,6 +92,9 @@ assert.equal(co.canManageOrderMessages, true);
 assert.equal(co.canOperateCollectionControls, true);
 assert.equal(co.canViewWholeCakeCalendar, true);
 assert.equal(co.canEnableDeliveryFinance, false);
+assert.equal(co.canCancelGuestOrder, true);
+assert.equal(co.canDuplicateGuestOrder, true);
+assert.equal(co.canOverrideUnpaidReady, false);
 
 const manager = buildGuestOrderWorkspaceCapabilities({
   role: "manager",
@@ -131,6 +134,8 @@ const bakery = buildGuestOrderWorkspaceCapabilities({
 });
 assert.equal(bakery.canAccessOperationsBoard, false);
 assert.equal(bakery.canRecordPayment, false);
+assert.equal(bakery.canCancelGuestOrder, false);
+assert.equal(bakery.canDuplicateGuestOrder, false);
 
 const coCollection = buildCollectionWorkspaceCapabilities({
   role: "customer_operations",
@@ -144,7 +149,7 @@ const bakeryCollection = buildCollectionWorkspaceCapabilities({
   role: "bakery",
   staffId: "bakery-1",
 });
-assert.equal(bakeryCollection.canAccessCollectionWorkspace, false);
+assert.equal(bakeryCollection.canAccessCollectionWorkspace, true);
 
 const coExtra = buildExtraWorkspaceCapabilities({
   role: "customer_operations",

@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { requireStaff } from "@/foundation/auth/session";
 import { canManageLibrary } from "@/foundation/navigation/access";
 import { CakeForm } from "@/workspaces/library/cakes/CakeForm";
+import { CakePhotoManager } from "@/workspaces/library/cakes/CakePhotoManager";
 import { getCakeById } from "@/workspaces/library/cakes/queries";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +42,7 @@ export default async function EditLibraryCakePage({
           title="Edit cake"
         />
       </div>
+      <CakePhotoManager cake={cake} />
       <CakeForm
         cake={cake}
         cancelHref={`/library/cakes/${cake.id}`}

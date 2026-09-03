@@ -13,6 +13,8 @@ export function guestOrderStatusLabel(
       return "Awaiting Payment";
     case "paid":
       return "Paid · Preorder Secured";
+    case "cancelled":
+      return "Cancelled";
   }
 }
 
@@ -48,6 +50,8 @@ export function guestOrderStatusTone(
       return "progress";
     case "paid":
       return "success";
+    case "cancelled":
+      return "danger";
   }
 }
 
@@ -88,6 +92,8 @@ export function guestOrderStatusTextClass(
       return "text-status-progress";
     case "paid":
       return "text-ink";
+    case "cancelled":
+      return "text-status-danger";
   }
 }
 

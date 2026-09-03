@@ -15,6 +15,20 @@ import {
   isValidPickupSlot,
 } from "@/engines/business-calendar/pickup-slots";
 import {
+  preorderCartLineId,
+  readPreorderDays,
+} from "@/engines/preorder/lead";
+import {
+  loadLivePreorderDaysBySizeId,
+  loadMalaysiaPreorderBusinessDate,
+} from "@/engines/preorder/server";
+import { loadCustomerCartDateCapacity } from "@/workspaces/storefront/checkout/capacity-availability";
+import {
+  customerCollectionDateMessage,
+  customerSelectedDateInvalidatedMessage,
+  evaluateCollectionDate,
+} from "@/engines/preorder/validate";
+import {
   OWNER_DELIVERY_CITY,
   OWNER_DELIVERY_STATE,
   buildCreateStaffFulfilmentRpcParams,
@@ -35,6 +49,7 @@ import {
 } from "@/engines/orders/customer-preorder-options";
 import type { StorefrontCake, StorefrontCollection } from "@/types/storefront";
 import { createClient } from "@/lib/supabase/server";
+import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import {
   cakePickupDateBounds,
   cartExcludedPickupDates,
@@ -220,14 +235,6 @@ export async function submitGuestPreorderAction(
           : "Please choose a date and time.",
     };
   }
-  if (pickupDate < earliestPickupDateYmd()) {
-    return {
-      error:
-        fulfilmentMethod === "pickup"
-          ? "Please choose a valid pickup time for that date."
-          : "Please choose a valid time for that date.",
-    };
-  }
   if (await isPickupOrdersClosed(pickupDate)) {
     return { error: ORDERS_CLOSED_RPC_MESSAGE };
   }
@@ -336,6 +343,73 @@ export async function submitGuestPreorderAction(
   }
 
   const supabase = await createClient();
+  const liveDays = await loadLivePreorderDaysBySizeId(
+    items.map((item) => item.cake_size_id),
+    supabase,
+  );
+  for (const item of items) {
+    if (!liveDays.has(item.cake_size_id)) {
+      return { error: "Cake size is not available" };
+    }
+  }
+  const businessDate = await loadMalaysiaPreorderBusinessDate(supabase);
+  const lines = items.map((item) => {
+    const cake = offered.find((entry) => entry.id === item.cake_id);
+    const size = cake?.sizes.find((entry) => entry.id === item.cake_size_id);
+    return {
+      lineId: preorderCartLineId(item.cake_id, item.cake_size_id),
+      cakeId: item.cake_id,
+      cakeSizeId: item.cake_size_id,
+      cakeName: cake?.name ?? "",
+      sizeLabel: size?.size ?? "",
+      quantity: item.quantity,
+      preorderDays: liveDays.get(item.cake_size_id) ?? readPreorderDays(null),
+    };
+  });
+  const capacitySnapshot = await loadCustomerCartDateCapacity({
+    fromYmd: pickupDate,
+    toYmd: pickupDate,
+    collectionId: collection.id,
+    cart: lines.map((line) => ({
+      cakeId: line.cakeId,
+      cakeSizeId: line.cakeSizeId,
+      cakeName: line.cakeName,
+      quantity: line.quantity,
+    })),
+  });
+  const waitingListOffered =
+    capacitySnapshot.waitingListDates?.includes(pickupDate) ?? false;
+  const capacity = capacitySnapshot.fullyBookedDates.includes(pickupDate)
+    ? {
+        fullyBooked: true,
+        waitingListEnabled: waitingListOffered,
+        blockingCakeNames:
+          capacitySnapshot.blockingCakeNamesByDate[pickupDate] ?? [],
+        selectedYmd: pickupDate,
+        nextAvailableYmd: null,
+      }
+    : null;
+  const evaluation = evaluateCollectionDate({
+    selectedYmd: pickupDate,
+    businessDate,
+    lines,
+    operatingOpen: true,
+    closed: false,
+    inCatalogue: true,
+    capacity,
+  });
+  if (!evaluation.valid) {
+    const detail =
+      customerCollectionDateMessage(evaluation, lines) ??
+      "Please choose a valid date and time.";
+    return {
+      error:
+        evaluation.reason.code === "fully_booked"
+          ? customerSelectedDateInvalidatedMessage(detail)
+          : detail,
+    };
+  }
+
   const optionCatalog = persistOptions
     ? await loadCustomerPreorderOptions(supabase, collection.id)
     : { complimentary: [], paidAddons: [], ready: false };
@@ -385,6 +459,13 @@ export async function submitGuestPreorderAction(
   const { data, error } = await supabase.rpc("submit_guest_preorder", rpcArgs);
 
   if (error) {
+    if (/fully booked/i.test(error.message)) {
+      return {
+        error: customerSelectedDateInvalidatedMessage(
+          "Fully Booked for your current order.",
+        ),
+      };
+    }
     return { error: error.message };
   }
 
@@ -398,6 +479,7 @@ export async function submitGuestPreorderAction(
   }
 
   await setGuestPreorderReceiptCookie(orderId);
+  scheduleStaffNotificationDispatch();
   redirect(`/order/success?order=${orderId}`);
 }
 
@@ -430,11 +512,40 @@ async function loadCustomerPreorderOptions(
       "storefront_customer_preorder_options",
       { p_collection_id: collectionId },
     );
+
+    console.error("[CHECKOUT OPTION DEBUG] RPC result", {
+      collectionId,
+      error: error
+        ? {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+          }
+        : null,
+      data,
+      dataType: typeof data,
+      isArray: Array.isArray(data),
+    });
+
     if (error || data == null) return empty;
+
     const payload = data as Record<string, unknown>;
+    const complimentary = parseComplimentaryOptions(payload.complimentary);
+    const paidAddons = parsePaidAddonOptions(payload.paidAddons);
+
+    console.error("[CHECKOUT OPTION DEBUG] Parsed result", {
+      collectionId,
+      complimentaryCount: complimentary.length,
+      complimentary,
+      paidAddonCount: paidAddons.length,
+      paidAddons,
+      ready: true,
+    });
+
     return {
-      complimentary: parseComplimentaryOptions(payload.complimentary),
-      paidAddons: parsePaidAddonOptions(payload.paidAddons),
+      complimentary,
+      paidAddons,
       ready: true,
     };
   } catch {
@@ -479,6 +590,34 @@ export async function loadCheckoutPickupOffer(
     paidAddonOptions: options.paidAddons,
     optionsReady: options.ready,
   };
+}
+
+export async function loadCartDateCapacityAvailability(input: {
+  fromYmd: string;
+  toYmd: string;
+  collectionId: string | null;
+  cart: Array<{
+    cakeId: string;
+    cakeSizeId: string;
+    cakeName: string;
+    quantity: number;
+  }>;
+}): Promise<{
+  fullyBookedDates: string[];
+  waitingListDates: string[];
+  blockingCakeNamesByDate: Record<string, string[]>;
+  waitingListLineKeysByDate: Record<string, string[]>;
+}> {
+  try {
+    return await loadCustomerCartDateCapacity(input);
+  } catch {
+    return {
+      fullyBookedDates: [],
+      waitingListDates: [],
+      blockingCakeNamesByDate: {},
+      waitingListLineKeysByDate: {},
+    };
+  }
 }
 
 export async function resolveCartPickupDateBounds(

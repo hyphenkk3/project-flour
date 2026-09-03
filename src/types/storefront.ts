@@ -1,7 +1,11 @@
 import type { LibraryCakeCategory } from "@/types/library-cake";
 
 export type GuestOrderStatus =
-  "submitted" | "pending_confirmation" | "awaiting_payment" | "paid";
+  | "submitted"
+  | "pending_confirmation"
+  | "awaiting_payment"
+  | "paid"
+  | "cancelled";
 
 /** Guest Owner fulfilment methods (DB also has drive_through). */
 export type StorefrontOrderFulfilmentMethod =
@@ -162,11 +166,17 @@ export type StorefrontCakeSize = {
   size: string;
   price: number;
   sortOrder: number;
+  /** UX estimate. Server reloads live `library_cake_sizes.preorder_days`. */
+  preorderDays: number;
 };
 
 export type StorefrontCakePhoto = {
+  id: string;
   url: string;
   altText: string | null;
+  sortOrder: number;
+  cakeSizeId: string | null;
+  isDefault: boolean;
 };
 
 export type StorefrontCake = {
@@ -277,6 +287,7 @@ export type StorefrontOrder = {
   includeReceipt: boolean;
   needsBakeryAttention: boolean;
   bakeryAttentionNote: string | null;
+  productionStartedAt: string | null;
   readyAt: string | null;
   readyBy: string | null;
   pickedUpAt: string | null;
@@ -321,6 +332,7 @@ export type StorefrontOrderListItem = {
   crewOrder: boolean;
   extraStockId: string | null;
   fulfilmentMethod: StorefrontOrderFulfilmentMethod;
+  productionStartedAt: string | null;
   readyAt: string | null;
   pickedUpAt: string | null;
   outForDeliveryAt: string | null;
@@ -356,6 +368,8 @@ export type OrderTimelineEventType =
   | "order_ready_undone"
   | "order_picked_up"
   | "order_picked_up_undone"
+  | "order_cancelled"
+  | "order_duplicated"
   | "order_out_for_delivery"
   | "order_out_for_delivery_undone"
   | "order_delivered"

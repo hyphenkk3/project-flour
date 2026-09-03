@@ -207,7 +207,7 @@ export function OrderOperationalControls({
                     }
                     type="button"
                   >
-                    {workingLabel("ready", "Mark Ready")}
+                    {workingLabel("ready", "Mark Ready for Collection")}
                   </button>
                 ) : null}
                 <button
@@ -318,7 +318,7 @@ export function OrderOperationalControls({
                 }
                 type="button"
               >
-                {workingLabel("ready", "Mark Ready")}
+                {workingLabel("ready", "Mark Ready for Collection")}
               </button>
             ) : null}
             {state === "ready" && canMarkReady ? (
@@ -347,7 +347,7 @@ export function OrderOperationalControls({
                     }
                     type="button"
                   >
-                    {workingLabel("ready", "Mark Ready")}
+                    {workingLabel("ready", "Mark Ready for Collection")}
                   </button>
                 ) : null}
                 <button

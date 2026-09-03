@@ -10,11 +10,13 @@ import {
 } from "@/engines/orders/operational-state";
 import {
   formatPickupTime,
-  guestOrderStatusBadgeClassName,
-  guestOrderStatusBadgeTone,
-  guestOrderStatusLabel,
   orderSourceLabel,
 } from "@/workspaces/owner/orders/labels";
+import {
+  deriveOrderLifecycleStage,
+  orderLifecycleBadgeTone,
+  orderLifecycleLabel,
+} from "@/engines/orders/lifecycle";
 import type { StorefrontOrderListItem } from "@/types/storefront";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ownerOrderWorkspaceHref } from "@/workspaces/owner/navigation/return-to";
@@ -92,6 +94,7 @@ export function OwnerOrderCard({
           </p>
           <p className="text-skyline truncate text-sm">
             {orderSourceLabel(order.orderSource)}
+            {order.extraStockId ? " · Fresh Picks" : ""}
           </p>
           <p className={completed ? "text-skyline text-sm" : "text-ink text-sm"}>
             {cakeLine}
@@ -114,9 +117,22 @@ export function OwnerOrderCard({
           ) : null}
         </div>
         <StatusBadge
-          className={guestOrderStatusBadgeClassName(order.status)}
-          label={guestOrderStatusLabel(order.status)}
-          tone={guestOrderStatusBadgeTone(order.status)}
+          label={orderLifecycleLabel({
+            status: order.status,
+            productionStartedAt: order.productionStartedAt,
+            readyAt: order.readyAt,
+            pickedUpAt: order.pickedUpAt,
+            deliveredAt: order.deliveredAt,
+          })}
+          tone={orderLifecycleBadgeTone(
+            deriveOrderLifecycleStage({
+              status: order.status,
+              productionStartedAt: order.productionStartedAt,
+              readyAt: order.readyAt,
+              pickedUpAt: order.pickedUpAt,
+              deliveredAt: order.deliveredAt,
+            }),
+          )}
         />
       </div>
     </Link>

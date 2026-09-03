@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { useToast } from "@/components/ui/Toast";
 import {
   DEFAULT_OPERATIONS_QUERY,
   buildOperationsBoardPath,
@@ -22,7 +21,6 @@ import {
 } from "@/engines/operations/owner-attention";
 import { createClient } from "@/lib/supabase/client";
 import type { StorefrontOrderListItem } from "@/types/storefront";
-import type { StaffNotificationPreference } from "@/foundation/staff/notification-preferences";
 import {
   getGuestOrderListItemAction,
   listGuestOrdersAction,
@@ -40,13 +38,7 @@ import {
   isGuestOrderLiveEvent,
   type GuestOrderLiveRow,
 } from "@/workspaces/owner/orders/guest-orders-live";
-import {
-  buildNewOrderNotificationToast,
-  isNewOrderNotificationLiveRow,
-  NEW_ORDER_NOTIFIED_IDS_KEY,
-  isNewOrderNotificationEligible,
-  tryClaimNewOrderNotification,
-} from "@/workspaces/owner/orders/new-order-notifications";
+import { isNewOrderNotificationEligible } from "@/workspaces/owner/orders/new-order-notifications";
 import { scrollWorkspaceSectionIntoView } from "@/workspaces/owner/orders/scroll-workspace-section";
 
 const POLL_INTERVAL_MS = GUEST_ORDERS_LIVE_POLL_MS;
@@ -54,7 +46,6 @@ const HIGHLIGHT_MS = 4500;
 
 type OperationsLiveBoardProps = {
   initialOrders: StorefrontOrderListItem[];
-  notificationPreference: StaffNotificationPreference;
   /** Owner-only board tools: Calendar, Propose EXTRA, + New Order. */
   showOwnerBoardTools?: boolean;
   pendingApprovals?: OperationsApprovalRecord[];
@@ -65,12 +56,10 @@ type OrderRowPayload = GuestOrderLiveRow;
 
 export function OperationsLiveBoard({
   initialOrders,
-  notificationPreference,
   showOwnerBoardTools = false,
   pendingApprovals = [],
   initialQuery = DEFAULT_OPERATIONS_QUERY,
 }: OperationsLiveBoardProps) {
-  const { toast } = useToast();
   const [orders, setOrders] = useState(initialOrders);
   const [query, setQuery] = useState<OperationsBoardQuery>(initialQuery);
   const [highlightedIds, setHighlightedIds] = useState<Set<string>>(
@@ -107,32 +96,14 @@ export function OperationsLiveBoard({
     }, HIGHLIGHT_MS);
   }, []);
 
-  const notifyNewOrder = useCallback(
+  const highlightArrivedOrder = useCallback(
     (item: StorefrontOrderListItem) => {
       if (notifiedIdsRef.current.has(item.id)) return;
       if (!isNewOrderNotificationEligible(item)) return;
-      if (!tryClaimNewOrderNotification(item.id)) return;
-
       notifiedIdsRef.current.add(item.id);
-      if (!notificationPreference.webEnabled) return;
-
-      const payload = buildNewOrderNotificationToast(
-        item,
-        notificationPreference.webMode,
-        buildOperationsBoardPath(query),
-      );
-      if (payload) {
-        toast(payload);
-      }
       highlightOrder(item.id);
     },
-    [
-      highlightOrder,
-      notificationPreference.webEnabled,
-      notificationPreference.webMode,
-      query,
-      toast,
-    ],
+    [highlightOrder],
   );
 
   const loadListItem = useCallback(async (id: string) => {
@@ -150,9 +121,9 @@ export function OperationsLiveBoard({
       const item = await loadListItem(id);
       if (!item) return;
       upsertOrder(item);
-      notifyNewOrder(item);
+      highlightArrivedOrder(item);
     },
-    [loadListItem, notifyNewOrder, upsertOrder],
+    [loadListItem, highlightArrivedOrder, upsertOrder],
   );
 
   const handleIncomingUpdate = useCallback(
@@ -183,12 +154,12 @@ export function OperationsLiveBoard({
       setOrders(latest);
 
       for (const item of arrived) {
-        notifyNewOrder(item);
+        highlightArrivedOrder(item);
       }
     } catch {
       // Keep showing the last successful board state.
     }
-  }, [notifyNewOrder]);
+  }, [highlightArrivedOrder]);
 
   useEffect(() => {
     setOrders(initialOrders);
@@ -197,25 +168,6 @@ export function OperationsLiveBoard({
       notifiedIdsRef.current.add(order.id);
     }
   }, [initialOrders]);
-
-  useEffect(() => {
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== NEW_ORDER_NOTIFIED_IDS_KEY || !event.newValue) return;
-      try {
-        const ids = JSON.parse(event.newValue) as unknown;
-        if (!Array.isArray(ids)) return;
-        for (const id of ids) {
-          if (typeof id === "string") {
-            notifiedIdsRef.current.add(id);
-          }
-        }
-      } catch {
-        // ignore malformed cross-tab payload
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

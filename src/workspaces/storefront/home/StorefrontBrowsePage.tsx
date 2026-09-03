@@ -5,7 +5,7 @@ import {
   catalogueHistoryPeriodLabel,
   orderCollectionHeadline,
 } from "@/engines/menu/customer-browse";
-import { StorefrontCakeCard } from "@/workspaces/storefront/catalog/StorefrontCakeCard";
+import { BrowseCakeCatalogue } from "@/workspaces/storefront/catalog/BrowseCakeCatalogue";
 import {
   listBrowsePublishedCakes,
   listHistoricalCatalogues,
@@ -35,6 +35,14 @@ export async function StorefrontBrowsePage() {
         order still depends on the pickup date you choose. Past menus can be
         browsed below, but cannot be ordered.
       </p>
+      <p className="mt-3">
+        <Link
+          className="text-ink hover:text-skyline text-sm font-medium"
+          href="/order"
+        >
+          Prefer a monthly collection or Special Menu? Choose a collection →
+        </Link>
+      </p>
 
       <PreorderInProgressBar />
 
@@ -42,22 +50,7 @@ export async function StorefrontBrowsePage() {
         <h2 className="sr-only" id="browse-cakes-heading">
           Published cakes
         </h2>
-        {cakes.length === 0 ? (
-          <p className="text-skyline text-sm">
-            No cakes are published to browse right now. Please check back soon.
-          </p>
-        ) : (
-          <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {cakes.map((cake) => (
-              <li className="h-full" key={cake.id}>
-                <StorefrontCakeCard
-                  availabilityNote={cake.availabilityNote}
-                  cake={cake}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
+        <BrowseCakeCatalogue cakes={cakes} />
       </section>
 
       {pastMenus.length > 0 ? (

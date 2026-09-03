@@ -146,8 +146,8 @@ export function bakeryProductionPresentation(input: {
 export function bakeryProductionLabel(
   presentation: BakeryProductionPresentation,
 ): string {
-  if (presentation === "ready") return "Ready";
-  if (presentation === "in_production") return "In Production";
+  if (presentation === "ready") return "Ready for Collection";
+  if (presentation === "in_production") return "Preparing";
   return "Not started";
 }
 
@@ -241,7 +241,8 @@ export function isBakeryMarkReadyEligible(input: {
   if (input.pickedUpAt || input.outForDeliveryAt || input.deliveredAt) {
     return false;
   }
-  return isBakeryStartEligibleStatus(input.status);
+  if (input.status === "cancelled") return false;
+  return input.status === "paid";
 }
 
 export function bakeryFulfilmentCue(
@@ -336,4 +337,42 @@ export function sortBakeryBoardOrders<T extends { pickupTime: string; orderNumbe
     if (timeCmp !== 0) return timeCmp;
     return a.orderNumber.localeCompare(b.orderNumber, "en");
   });
+}
+
+export type BakeryQueueFilter =
+  | "all"
+  | "not_ready"
+  | "awaiting_prep"
+  | "preparing"
+  | "ready";
+
+export const BAKERY_QUEUE_FILTERS: Array<{
+  value: BakeryQueueFilter;
+  label: string;
+}> = [
+  { value: "all", label: "All" },
+  { value: "not_ready", label: "Payment Pending" },
+  { value: "awaiting_prep", label: "Paid / Confirmed" },
+  { value: "preparing", label: "Preparing" },
+  { value: "ready", label: "Ready for Collection" },
+];
+
+export function matchesBakeryQueueFilter(
+  order: {
+    status: GuestOrderStatus | string;
+    productionStartedAt: string | null;
+    readyAt: string | null;
+  },
+  filter: BakeryQueueFilter,
+): boolean {
+  if (filter === "all") return true;
+  const presentation = bakeryProductionPresentation({
+    productionStartedAt: order.productionStartedAt,
+    readyAt: order.readyAt,
+  });
+  if (filter === "preparing") return presentation === "in_production";
+  if (filter === "ready") return presentation === "ready";
+  if (presentation !== "not_started") return false;
+  if (filter === "awaiting_prep") return order.status === "paid";
+  return order.status !== "paid";
 }

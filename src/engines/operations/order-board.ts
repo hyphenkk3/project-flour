@@ -5,6 +5,10 @@
  */
 
 import type { GuestOrderStatus } from "@/types/storefront";
+import {
+  deriveOrderLifecycleStage,
+  type OrderLifecycleStage,
+} from "@/engines/orders/lifecycle";
 
 export type OperationsBoardOrder = {
   id: string;
@@ -15,6 +19,10 @@ export type OperationsBoardOrder = {
   pickupTime: string;
   status: GuestOrderStatus;
   createdAt: string;
+  productionStartedAt?: string | null;
+  readyAt?: string | null;
+  pickedUpAt?: string | null;
+  deliveredAt?: string | null;
 };
 
 export type OperationsPickupFilter =
@@ -25,6 +33,8 @@ export type OperationsPickupFilter =
   | "custom";
 
 export type OperationsStatusFilter = "all" | GuestOrderStatus;
+
+export type OperationsLifecycleFilter = "all" | OrderLifecycleStage;
 
 export type OperationsSortOption =
   | "pickup_asc"
@@ -53,6 +63,7 @@ export type OperationsBoardQuery = {
   pickupFilter: OperationsPickupFilter;
   customPickupDate: string | null;
   statusFilter: OperationsStatusFilter;
+  lifecycleFilter: OperationsLifecycleFilter;
   sort: OperationsSortOption;
 };
 
@@ -61,6 +72,7 @@ export const DEFAULT_OPERATIONS_QUERY: OperationsBoardQuery = {
   pickupFilter: "today",
   customPickupDate: null,
   statusFilter: "all",
+  lifecycleFilter: "all",
   sort: DEFAULT_OPERATIONS_SORT,
 };
 
@@ -157,6 +169,22 @@ export function matchesOperationsStatusFilter(
   return order.status === statusFilter;
 }
 
+export function matchesOperationsLifecycleFilter(
+  order: OperationsBoardOrder,
+  lifecycleFilter: OperationsLifecycleFilter,
+): boolean {
+  if (lifecycleFilter === "all") return true;
+  return (
+    deriveOrderLifecycleStage({
+      status: order.status,
+      productionStartedAt: order.productionStartedAt,
+      readyAt: order.readyAt,
+      pickedUpAt: order.pickedUpAt,
+      deliveredAt: order.deliveredAt,
+    }) === lifecycleFilter
+  );
+}
+
 /** Non-empty search finds guest preorders across pickup dates. */
 export function operationsSearchSpansPickupDates(
   query: Pick<OperationsBoardQuery, "search">,
@@ -233,7 +261,8 @@ export function filterAndSortOperationsOrders<T extends OperationsBoardOrder>(
           query.customPickupDate,
           now,
         )) &&
-      matchesOperationsStatusFilter(order, query.statusFilter),
+      matchesOperationsStatusFilter(order, query.statusFilter) &&
+      matchesOperationsLifecycleFilter(order, query.lifecycleFilter),
   );
   return sortOperationsOrders(filtered, query.sort);
 }
@@ -256,6 +285,7 @@ export function isOperationsQueryDefault(query: OperationsBoardQuery): boolean {
     query.pickupFilter === "today" &&
     !query.customPickupDate &&
     query.statusFilter === "all" &&
+    query.lifecycleFilter === "all" &&
     query.sort === DEFAULT_OPERATIONS_SORT
   );
 }
@@ -271,7 +301,7 @@ export const OPERATIONS_PICKUP_FILTERS: Array<{
   { value: "custom", label: "Choose Date" },
 ];
 
-/** Status chips for Operations — real GuestOrderStatus values only. */
+/** Commercial status chips for Operations. */
 export const OPERATIONS_STATUS_FILTERS: Array<{
   value: OperationsStatusFilter;
   label: string;
@@ -279,8 +309,22 @@ export const OPERATIONS_STATUS_FILTERS: Array<{
   { value: "all", label: "All Statuses" },
   { value: "submitted", label: "Submitted" },
   { value: "pending_confirmation", label: "Pending Confirmation" },
-  { value: "awaiting_payment", label: "Awaiting Payment" },
-  { value: "paid", label: "Paid" },
+  { value: "awaiting_payment", label: "Payment Pending" },
+  { value: "paid", label: "Paid / Confirmed" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+export const OPERATIONS_LIFECYCLE_FILTERS: Array<{
+  value: OperationsLifecycleFilter;
+  label: string;
+}> = [
+  { value: "all", label: "All lifecycle" },
+  { value: "payment_pending", label: "Payment Pending" },
+  { value: "paid_confirmed", label: "Paid / Confirmed" },
+  { value: "preparing", label: "Preparing" },
+  { value: "ready_for_collection", label: "Ready for Collection" },
+  { value: "completed", label: "Completed / Collected" },
+  { value: "cancelled", label: "Cancelled" },
 ];
 
 export function operationsBoardSummary(
@@ -349,10 +393,17 @@ export function isOperationsSortOption(
   return OPERATIONS_SORT_OPTIONS.some((option) => option.value === value);
 }
 
+export function isOperationsLifecycleFilter(
+  value: string,
+): value is OperationsLifecycleFilter {
+  return OPERATIONS_LIFECYCLE_FILTERS.some((option) => option.value === value);
+}
+
 export type OperationsBoardSearchParams = {
   pickup?: string;
   date?: string;
   status?: string;
+  lifecycle?: string;
   sort?: string;
   search?: string;
 };
@@ -371,12 +422,16 @@ export function parseOperationsBoardSearchParams(
   const dateRaw = input.date?.trim() ?? "";
   const date = isOperationsBoardDate(dateRaw) ? dateRaw : null;
   const statusRaw = input.status?.trim() ?? "";
+  const lifecycleRaw = input.lifecycle?.trim() ?? "";
   const sortRaw = input.sort?.trim() ?? "";
   const search = input.search?.trim() ?? "";
 
   const statusFilter = isOperationsStatusFilter(statusRaw)
     ? statusRaw
     : DEFAULT_OPERATIONS_QUERY.statusFilter;
+  const lifecycleFilter = isOperationsLifecycleFilter(lifecycleRaw)
+    ? lifecycleRaw
+    : DEFAULT_OPERATIONS_QUERY.lifecycleFilter;
   const sort = isOperationsSortOption(sortRaw)
     ? sortRaw
     : DEFAULT_OPERATIONS_QUERY.sort;
@@ -387,6 +442,7 @@ export function parseOperationsBoardSearchParams(
       pickupFilter: "custom",
       customPickupDate: date,
       statusFilter,
+      lifecycleFilter,
       sort,
     };
   }
@@ -397,6 +453,7 @@ export function parseOperationsBoardSearchParams(
       pickupFilter: "custom",
       customPickupDate: date,
       statusFilter,
+      lifecycleFilter,
       sort,
     };
   }
@@ -407,6 +464,7 @@ export function parseOperationsBoardSearchParams(
       pickupFilter: pickup,
       customPickupDate: null,
       statusFilter,
+      lifecycleFilter,
       sort,
     };
   }
@@ -415,6 +473,7 @@ export function parseOperationsBoardSearchParams(
     ...DEFAULT_OPERATIONS_QUERY,
     search,
     statusFilter,
+    lifecycleFilter,
     sort,
   };
 }
@@ -436,6 +495,9 @@ export function buildOperationsBoardPath(query: OperationsBoardQuery): string {
   if (query.statusFilter !== "all") {
     params.set("status", query.statusFilter);
   }
+  if (query.lifecycleFilter !== "all") {
+    params.set("lifecycle", query.lifecycleFilter);
+  }
   if (query.sort !== DEFAULT_OPERATIONS_SORT) {
     params.set("sort", query.sort);
   }
@@ -444,3 +506,4 @@ export function buildOperationsBoardPath(query: OperationsBoardQuery): string {
     ? `${OPERATIONS_BOARD_PATH}?${encoded}`
     : OPERATIONS_BOARD_PATH;
 }
+

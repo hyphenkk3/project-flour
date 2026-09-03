@@ -83,7 +83,16 @@ export async function StorefrontOrderCollectionsPage() {
         Choose your collection
       </h1>
       <p className="text-skyline mt-3 text-[0.95rem] leading-relaxed">
-        Your pickup date decides which cakes you can order.
+        Monthly collections and Special Menus for Whole Cake orders. Your
+        pickup date still decides which cakes you can order.
+      </p>
+      <p className="mt-3">
+        <Link
+          className="text-ink hover:text-skyline text-sm font-medium"
+          href="/browse"
+        >
+          Browse all published cakes →
+        </Link>
       </p>
 
       <PreorderInProgressBar />

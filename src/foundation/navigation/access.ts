@@ -50,3 +50,33 @@ export function canAccessSettings(_role: RoleCode): boolean {
 export function canManageStaff(role: RoleCode): boolean {
   return role === "owner";
 }
+
+/**
+ * Pickup-date closure overlay (order availability).
+ *
+ * Separate from Library configuration authority (`canManageLibrary`).
+ * Bakery may close/reopen dates; Customer Operations is view-only.
+ */
+export function canViewOrderAvailability(role: RoleCode): boolean {
+  return (
+    role === "owner" ||
+    role === "manager" ||
+    role === "bakery" ||
+    role === "customer_operations"
+  );
+}
+
+/**
+ * Close / reopen pickup dates for new customer preorders.
+ *
+ * Owner, Manager, and Bakery. Customer Operations must not mutate.
+ */
+export function canMutateOrderAvailability(role: RoleCode): boolean {
+  return role === "owner" || role === "manager" || role === "bakery";
+}
+
+export {
+  canConfigureWaitingList,
+  canManageWaitingList,
+  canViewWaitingList,
+} from "@/engines/waiting-list/capabilities";

@@ -1,21 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { requireStaff } from "@/foundation/auth/session";
-import { canManageLibrary } from "@/foundation/navigation/access";
+import { canMutateOrderAvailability } from "@/foundation/navigation/access";
 import { parseBusinessDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import type { LibraryActionState } from "@/workspaces/library/action-state";
 import { emptyToNull } from "@/workspaces/library/labels";
-
-async function requireLibraryStaff() {
-  const staff = await requireStaff();
-  if (!canManageLibrary(staff.role.code)) {
-    redirect("/home");
-  }
-  return staff;
-}
 
 function parsePickupDate(formData: FormData): string | null {
   const raw = String(formData.get("pickup_date") ?? "").trim();
@@ -25,6 +16,7 @@ function parsePickupDate(formData: FormData): string | null {
 
 function revalidateOrderAvailability() {
   revalidatePath("/library/order-availability");
+  revalidatePath("/bakery/availability");
   revalidatePath("/");
   revalidatePath("/order");
 }
@@ -33,7 +25,11 @@ export async function updateOrderAvailabilityAction(
   _prev: LibraryActionState,
   formData: FormData,
 ): Promise<LibraryActionState> {
-  await requireLibraryStaff();
+  const staff = await requireStaff();
+  if (!canMutateOrderAvailability(staff.role.code)) {
+    return { error: "Not authorized to close or reopen pickup dates." };
+  }
+
   const pickupDate = parsePickupDate(formData);
   if (!pickupDate) {
     return { error: "Choose a valid pickup date." };

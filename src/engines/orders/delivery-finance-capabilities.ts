@@ -92,6 +92,15 @@ export type GuestOrderWorkspaceCapabilities = {
    * (Owner and Manager). Independent of Operations board VIEW access.
    */
   canReviewOperationsApprovals: boolean;
+  /** Cancel a guest Whole Cake order (Owner + Manager + Customer Operations). */
+  canCancelGuestOrder: boolean;
+  /**
+   * Duplicate a guest order into a new unpaid/submitted order
+   * (Owner + Manager + Customer Operations).
+   */
+  canDuplicateGuestOrder: boolean;
+  /** Owner/Manager may mark Ready while payment is still pending. */
+  canOverrideUnpaidReady: boolean;
 };
 
 /** Roles that may open/view the shared Operations board. */
@@ -168,6 +177,9 @@ export function buildGuestOrderWorkspaceCapabilities(input: {
     canRequestOperationsApproval: isCounter,
     canRequestCrossMonthPickupApproval: isManager || isCounter,
     canReviewOperationsApprovals: isOwner || isManager,
+    canCancelGuestOrder: isRoutineOrderOperator,
+    canDuplicateGuestOrder: isRoutineOrderOperator,
+    canOverrideUnpaidReady: isOwner || isManager,
   };
 }
 

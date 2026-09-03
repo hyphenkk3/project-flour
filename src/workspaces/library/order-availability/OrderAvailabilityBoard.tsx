@@ -21,6 +21,7 @@ type OrderAvailabilityBoardProps = {
   monthLabel: string;
   prevHref: string;
   nextHref: string;
+  canMutate: boolean;
 };
 
 export function OrderAvailabilityBoard({
@@ -28,6 +29,7 @@ export function OrderAvailabilityBoard({
   monthLabel,
   prevHref,
   nextHref,
+  canMutate,
 }: OrderAvailabilityBoardProps) {
   const [state, formAction, pending] = useActionState(
     updateOrderAvailabilityAction,
@@ -50,7 +52,7 @@ export function OrderAvailabilityBoard({
         </div>
       </div>
 
-      <FormError message={state.error} />
+      {canMutate ? <FormError message={state.error} /> : null}
 
       <ul className="divide-fog border-fog divide-y overflow-hidden rounded-xl border">
         {days.map((day) => (
@@ -77,48 +79,50 @@ export function OrderAvailabilityBoard({
               ) : null}
             </div>
 
-            {day.closed ? (
-              <form action={formAction} className="shrink-0">
-                <input name="intent" type="hidden" value="reopen" />
-                <input
-                  name="pickup_date"
-                  type="hidden"
-                  value={day.pickupDate}
-                />
-                <button
-                  className={ghostButtonClass}
-                  disabled={pending}
-                  type="submit"
+            {canMutate ? (
+              day.closed ? (
+                <form action={formAction} className="shrink-0">
+                  <input name="intent" type="hidden" value="reopen" />
+                  <input
+                    name="pickup_date"
+                    type="hidden"
+                    value={day.pickupDate}
+                  />
+                  <button
+                    className={ghostButtonClass}
+                    disabled={pending}
+                    type="submit"
+                  >
+                    Reopen orders
+                  </button>
+                </form>
+              ) : (
+                <form
+                  action={formAction}
+                  className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center"
                 >
-                  Reopen orders
-                </button>
-              </form>
-            ) : (
-              <form
-                action={formAction}
-                className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center"
-              >
-                <input name="intent" type="hidden" value="close" />
-                <input
-                  name="pickup_date"
-                  type="hidden"
-                  value={day.pickupDate}
-                />
-                <input
-                  className="border-fog text-ink h-11 w-full rounded-lg border bg-white px-3 text-sm sm:w-56"
-                  maxLength={200}
-                  name="note"
-                  placeholder="Owner note (optional)"
-                />
-                <button
-                  className={inkButtonClass}
-                  disabled={pending}
-                  type="submit"
-                >
-                  Close orders
-                </button>
-              </form>
-            )}
+                  <input name="intent" type="hidden" value="close" />
+                  <input
+                    name="pickup_date"
+                    type="hidden"
+                    value={day.pickupDate}
+                  />
+                  <input
+                    className="border-fog text-ink h-11 w-full rounded-lg border bg-white px-3 text-sm sm:w-56"
+                    maxLength={200}
+                    name="note"
+                    placeholder="Owner note (optional)"
+                  />
+                  <button
+                    className={inkButtonClass}
+                    disabled={pending}
+                    type="submit"
+                  >
+                    Close orders
+                  </button>
+                </form>
+              )
+            ) : null}
           </li>
         ))}
       </ul>

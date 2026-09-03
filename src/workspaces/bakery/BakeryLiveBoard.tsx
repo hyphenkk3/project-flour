@@ -10,7 +10,12 @@ import {
 } from "@/workspaces/bakery/actions";
 import { BakeryDateNav } from "@/workspaces/bakery/BakeryDateNav";
 import { BakeryOrderCard } from "@/workspaces/bakery/BakeryOrderCard";
-import { bakeryProductionPresentation } from "@/workspaces/bakery/eligibility";
+import {
+  bakeryProductionPresentation,
+  BAKERY_QUEUE_FILTERS,
+  matchesBakeryQueueFilter,
+  type BakeryQueueFilter,
+} from "@/workspaces/bakery/eligibility";
 import type { BakeryBoardOrder } from "@/workspaces/bakery/types";
 
 const POLL_INTERVAL_MS = 30_000;
@@ -31,6 +36,7 @@ export function BakeryLiveBoard({
   initialOrders,
 }: BakeryLiveBoardProps) {
   const [orders, setOrders] = useState(initialOrders);
+  const [queueFilter, setQueueFilter] = useState<BakeryQueueFilter>("all");
 
   useEffect(() => {
     setOrders(initialOrders);
@@ -92,21 +98,25 @@ export function BakeryLiveBoard({
     };
   }, [boardDate, handleIncoming, reconcileList]);
 
-  const notStarted = orders.filter(
+  const visibleOrders = orders.filter((order) =>
+    matchesBakeryQueueFilter(order, queueFilter),
+  );
+
+  const notStarted = visibleOrders.filter(
     (order) =>
       bakeryProductionPresentation({
         productionStartedAt: order.productionStartedAt,
         readyAt: order.readyAt,
       }) === "not_started",
   );
-  const inProduction = orders.filter(
+  const inProduction = visibleOrders.filter(
     (order) =>
       bakeryProductionPresentation({
         productionStartedAt: order.productionStartedAt,
         readyAt: order.readyAt,
       }) === "in_production",
   );
-  const ready = orders.filter(
+  const ready = visibleOrders.filter(
     (order) =>
       bakeryProductionPresentation({
         productionStartedAt: order.productionStartedAt,
@@ -122,10 +132,28 @@ export function BakeryLiveBoard({
             What we make
           </h1>
           <p className="text-skyline mt-2 text-sm sm:text-base">
-            {formatLongBusinessDate(boardDate)} · {orders.length} order
-            {orders.length === 1 ? "" : "s"}
+            {formatLongBusinessDate(boardDate)} · {visibleOrders.length} order
+            {visibleOrders.length === 1 ? "" : "s"}
+            {queueFilter !== "all" ? ` of ${orders.length}` : ""}
           </p>
         </div>
+        <label className="sr-only" htmlFor="bakery-queue-filter">
+          Queue filter
+        </label>
+        <select
+          className="border-fog text-ink min-h-10 rounded-lg border bg-white px-3 text-sm sm:w-56"
+          id="bakery-queue-filter"
+          onChange={(event) =>
+            setQueueFilter(event.target.value as BakeryQueueFilter)
+          }
+          value={queueFilter}
+        >
+          {BAKERY_QUEUE_FILTERS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="mt-6">
@@ -163,7 +191,7 @@ export function BakeryLiveBoard({
           </section>
           <section>
             <h2 className="text-ink text-sm font-semibold tracking-wide uppercase">
-              In Production
+              Preparing
               <span className="text-skyline ml-2 font-normal normal-case">
                 {inProduction.length}
               </span>
@@ -183,7 +211,7 @@ export function BakeryLiveBoard({
           </section>
           <section>
             <h2 className="text-ink text-sm font-semibold tracking-wide uppercase">
-              Ready
+              Ready for Collection
               <span className="text-skyline ml-2 font-normal normal-case">
                 {ready.length}
               </span>

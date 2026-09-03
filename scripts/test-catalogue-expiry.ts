@@ -61,6 +61,31 @@ assert.equal(isCatalogueExpired(special, "2026-09-17"), false);
 assert.equal(isCatalogueExpired(special, "2026-09-18"), true);
 assert.equal(isCurrentlyCustomerOrderable(special, "2026-09-17"), true);
 assert.equal(isCurrentlyCustomerOrderable(special, "2026-09-18"), false);
+assert.equal(
+  isCurrentlyCustomerOrderable(
+    { ...special, websiteOverride: false },
+    "2026-09-17",
+  ),
+  false,
+  "special without website_override is not customer-orderable",
+);
+assert.equal(
+  isCurrentlyCustomerOrderable(
+    {
+      purpose: "special",
+      status: "active",
+      endDate: "2026-09-17",
+    },
+    "2026-09-17",
+  ),
+  false,
+  "special with omitted websiteOverride is not customer-orderable",
+);
+assert.equal(
+  isCurrentlyCustomerOrderable(september, "2026-08-15"),
+  true,
+  "future monthly catalogues remain customer-orderable for discovery",
+);
 assert.equal(isEffectivelyArchived(special, "2026-09-17"), false);
 assert.equal(isEffectivelyArchived(special, "2026-09-18"), true);
 
@@ -160,8 +185,14 @@ assert.deepEqual(
 const queriesSrc = readSrc("src/workspaces/storefront/catalog/queries.ts");
 assert.match(queriesSrc, /isCurrentlyCustomerOrderable/);
 assert.match(queriesSrc, /isCustomerPastMenuVisible/);
-assert.match(queriesSrc, /isCatalogueExpired/);
 assert.match(queriesSrc, /listHistoricalCatalogues/);
+const browsePublishedFn = queriesSrc.slice(
+  queriesSrc.indexOf("export async function listBrowsePublishedCakes"),
+  queriesSrc.indexOf("export async function getBrowsePublishedCakeById"),
+);
+assert.match(browsePublishedFn, /isCurrentlyCustomerOrderable/);
+assert.match(browsePublishedFn, /website_override/);
+assert.doesNotMatch(browsePublishedFn, /isCatalogueExpired/);
 assert.match(queriesSrc, /show_in_past_menu/);
 assert.match(queriesSrc, /eq\("status", "active"\)/);
 assert.doesNotMatch(

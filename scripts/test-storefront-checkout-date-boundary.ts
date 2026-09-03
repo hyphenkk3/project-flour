@@ -1,6 +1,6 @@
 /**
  * Checkout pickup calendar is bounded by the latest published monthly catalogue
- * and Whole Cake earliest date (Singapore today + 2 calendar days).
+ * and Whole Cake empty-cart earliest date (Malaysia DAY 0 + 2 calendar days).
  * Run: npx tsx scripts/test-storefront-checkout-date-boundary.ts
  *
  * Does not mutate live catalogues, cakes, or orders.
@@ -39,12 +39,12 @@ assert.equal(maySelectWholeCakeDate("2026-08-22", sg20AugNoon), true);
 assert.equal(
   earliestPickupDateYmd(new Date("2026-08-19T15:59:59.000Z")),
   "2026-08-21",
-  "still 19 Aug Singapore just before midnight",
+  "still 19 Aug Malaysia just before midnight",
 );
 assert.equal(
   earliestPickupDateYmd(new Date("2026-08-19T16:00:00.000Z")),
   "2026-08-22",
-  "rolls to 22 Aug after Singapore midnight 20 Aug",
+  "rolls to 22 Aug after Malaysia midnight 20 Aug",
 );
 
 assert.equal(
@@ -61,7 +61,7 @@ const pickupSlotsSrc = readSrc(
 );
 assert.match(
   pickupSlotsSrc,
-  /addBusinessCalendarDays\(todaySg, WHOLE_CAKE_MIN_LEAD_CALENDAR_DAYS\)/,
+  /emptyCartEarliestCollectionDate/,
 );
 assert.doesNotMatch(
   pickupSlotsSrc,
@@ -69,15 +69,15 @@ assert.doesNotMatch(
 );
 
 const rpcSrc = readSrc(
-  "supabase/migrations/20260818210000_whole_cake_customer_fulfilment.sql",
+  "supabase/migrations/20260902230000_phase3_preorder_date_engine.sql",
 );
 assert.match(
   rpcSrc,
-  /timezone\('Asia\/Singapore', now\(\)\)::date \+ 2/,
+  /malaysia_preorder_business_date/,
 );
 assert.doesNotMatch(
   rpcSrc,
-  /timezone\('Asia\/Singapore', now\(\)\)::date \+ 1/,
+  /timezone\('Asia\/Singapore', now\(\)\)::date \+ 2/,
 );
 
 const slotFieldsSrc = readSrc("src/components/ui/PickupSlotFields.tsx");
@@ -86,7 +86,8 @@ assert.match(slotFieldsSrc, /earliestPickupDateYmd/);
 const checkoutFormSrc = readSrc(
   "src/workspaces/storefront/checkout/GuestCheckoutForm.tsx",
 );
-assert.match(checkoutFormSrc, /earliestPickupDateYmd/);
+assert.match(checkoutFormSrc, /evaluateCollectionDate/);
+assert.match(checkoutFormSrc, /emptyCartEarliestCollectionDate/);
 
 const checkoutActionsSrc = readSrc(
   "src/workspaces/storefront/checkout/actions.ts",

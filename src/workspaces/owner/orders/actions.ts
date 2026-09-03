@@ -23,6 +23,7 @@ import {
 import {
   buildCreateStaffFulfilmentRpcParams,
   defaultDeliveryCreateDraft,
+  deliveryDraftFromPersistedOrder,
   fulfilmentMateriallyDiffer,
   fulfilmentTimelineSummary,
   normalizeOwnerCreateFulfilmentMethod,
@@ -30,6 +31,13 @@ import {
   type DeliveryCreateDraft,
 } from "@/engines/orders/fulfilment";
 import { isWithinTwoDayChangeCutoff } from "@/engines/operations/approvals";
+import {
+  canCancelGuestOrder,
+  canCompleteGuestOrder,
+  canConfirmGuestPayment,
+  canDuplicateGuestOrderRole,
+  canMarkGuestOrderReady,
+} from "@/engines/orders/lifecycle";
 import { reconcilePaymentLifecycleStatus } from "@/engines/orders/payment-status";
 import {
   isValidDineInReservationPair,
@@ -38,6 +46,7 @@ import {
 } from "@/engines/business-calendar/dine-in-hours";
 import { isValidClockPickupTime, isValidPickupSlot } from "@/engines/business-calendar/pickup-slots";
 import { requireStaff } from "@/foundation/auth/session";
+import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import {
   formatBusinessMonthYear,
@@ -59,6 +68,7 @@ import {
   getGuestOrderListItem,
   listGuestOrders,
 } from "@/workspaces/owner/orders/queries";
+import { assertStaffCollectionDateAllowed } from "@/workspaces/owner/orders/collection-date-guard";
 import {
   getAvailableCakeById,
   listOfferableLibraryCakes,
@@ -124,6 +134,7 @@ async function insertTimelineEvent(input: {
   if (error) {
     throw new Error(error.message);
   }
+  scheduleStaffNotificationDispatch();
 }
 
 /**
@@ -505,6 +516,7 @@ export async function createStaffGuestOrderAction(
     return { error: "Order was created but could not be opened." };
   }
 
+  scheduleStaffNotificationDispatch();
   revalidatePath("/owner");
   revalidatePath(`/owner/orders/${orderId}`);
   redirect(`/owner/orders/${orderId}`);
@@ -552,6 +564,17 @@ export async function saveOrderWorkspaceAction(
       error: "This order can no longer be edited.",
       success: false,
     };
+  }
+  if (pickupDate !== before.pickupDate) {
+    const dateGuard = await assertStaffCollectionDateAllowed({
+      pickupDate,
+      fulfilmentMethod,
+      items: draftItems,
+      collectionId: before.collectionId,
+    });
+    if (dateGuard.error) {
+      return { error: dateGuard.error, success: false };
+    }
   }
   const preserveDineIn =
     before.fulfilmentMethod === "dine_in" &&
@@ -1363,11 +1386,18 @@ export async function recordAndVerifyPaymentAction(
   if (!order) {
     return { error: "Order not found.", success: false };
   }
-  if (order.status !== "awaiting_payment") {
-    return {
-      error: "Payments can only be recorded while awaiting payment.",
-      success: false,
-    };
+  const paymentGate = canConfirmGuestPayment(
+    {
+      status: order.status,
+      productionStartedAt: order.productionStartedAt,
+      readyAt: order.readyAt,
+      pickedUpAt: order.pickedUpAt,
+      deliveredAt: order.deliveredAt,
+    },
+    staff.role.code,
+  );
+  if (!paymentGate.ok) {
+    return { error: paymentGate.error, success: false };
   }
 
   const amountRaw = String(formData.get("amount") ?? "").trim();
@@ -1421,6 +1451,7 @@ export async function recordAndVerifyPaymentAction(
     return { error: error.message, success: false };
   }
 
+  scheduleStaffNotificationDispatch();
   revalidatePath("/owner");
   revalidatePath(`/owner/orders/${orderId}`);
   return { error: null, success: true };
@@ -1657,6 +1688,21 @@ export async function markOrderReadyAction(
   if (!order) {
     return { error: "Order not found." };
   }
+  const readyGate = canMarkGuestOrderReady({
+    snapshot: {
+      status: order.status,
+      productionStartedAt: order.productionStartedAt,
+      readyAt: order.readyAt,
+      pickedUpAt: order.pickedUpAt,
+      outForDeliveryAt: order.outForDeliveryAt,
+      deliveredAt: order.deliveredAt,
+    },
+    role: staff.role.code,
+    surface: "owner",
+  });
+  if (!readyGate.ok) {
+    return { error: readyGate.error };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("mark_guest_order_ready", {
@@ -1711,6 +1757,20 @@ export async function markOrderPickedUpAction(
     return {
       error: "Delivery orders use Out for Delivery / Delivered, not Picked Up.",
     };
+  }
+  const completeGate = canCompleteGuestOrder({
+    snapshot: {
+      status: order.status,
+      productionStartedAt: order.productionStartedAt,
+      readyAt: order.readyAt,
+      pickedUpAt: order.pickedUpAt,
+      deliveredAt: order.deliveredAt,
+    },
+    role: staff.role.code,
+    surface: "ops",
+  });
+  if (!completeGate.ok) {
+    return { error: completeGate.error };
   }
 
   const supabase = await createClient();
@@ -1820,6 +1880,20 @@ export async function markOrderDeliveredAction(
   }
   if (order.fulfilmentMethod !== "delivery") {
     return { error: "Delivered is only for Delivery orders." };
+  }
+  const completeGate = canCompleteGuestOrder({
+    snapshot: {
+      status: order.status,
+      productionStartedAt: order.productionStartedAt,
+      readyAt: order.readyAt,
+      pickedUpAt: order.pickedUpAt,
+      deliveredAt: order.deliveredAt,
+    },
+    role: staff.role.code,
+    surface: "ops",
+  });
+  if (!completeGate.ok) {
+    return { error: completeGate.error };
   }
 
   const supabase = await createClient();
@@ -2339,3 +2413,188 @@ export async function resolveGuestOrderProcessingFeeRequestAction(
   revalidatePath("/owner");
   return { error: null };
 }
+
+export async function cancelGuestOrderAction(
+  orderId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireOwnerOrCustomerOperations();
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found." };
+  }
+  const gate = canCancelGuestOrder({
+    snapshot: {
+      status: order.status,
+      productionStartedAt: order.productionStartedAt,
+      readyAt: order.readyAt,
+      pickedUpAt: order.pickedUpAt,
+      deliveredAt: order.deliveredAt,
+    },
+    role: staff.role.code,
+  });
+  if (!gate.ok) {
+    return { error: gate.error };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("cancel_guest_order", {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+  });
+  if (error) {
+    return { error: error.message };
+  }
+
+  scheduleStaffNotificationDispatch();
+  revalidatePath("/owner");
+  revalidatePath("/owner/calendar");
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath("/bakery");
+  revalidatePath("/collection");
+  return { error: null };
+}
+
+export async function duplicateGuestOrderAction(
+  orderId: string,
+  formData: FormData,
+): Promise<{ error: string | null }> {
+  const staff = await requireOwnerOrCustomerOperations();
+  if (!canDuplicateGuestOrderRole(staff.role.code)) {
+    return { error: "Not authorized to duplicate this order." };
+  }
+
+  const source = await getGuestOrderById(orderId);
+  if (!source) {
+    return { error: "Order not found." };
+  }
+
+  const pickupDate =
+    String(formData.get("pickup_date") ?? "").trim() || source.pickupDate;
+  const pickupTime =
+    String(formData.get("pickup_time") ?? "").trim() || source.pickupTime;
+  const fulfilmentMethod = normalizeOwnerCreateFulfilmentMethod(
+    source.fulfilmentMethod === "dine_in" ? "pickup" : source.fulfilmentMethod,
+  );
+  const deliveryDraft =
+    fulfilmentMethod === "delivery"
+      ? deliveryDraftFromPersistedOrder({
+          customerName: source.customerName,
+          customerPhone: source.phone,
+          fulfilmentMethod: source.fulfilmentMethod,
+          delivery: source.delivery,
+        })
+      : defaultDeliveryCreateDraft();
+
+  const dateGuard = await assertStaffCollectionDateAllowed({
+    pickupDate,
+    fulfilmentMethod,
+    collectionId: source.collectionId,
+    items: source.items.map((item) => ({
+      cakeId: item.cakeId,
+      cakeSizeId: item.cakeSizeId,
+      quantity: item.quantity,
+      cakeName: item.cakeName,
+      sizeLabel: item.sizeLabel,
+    })),
+  });
+  if (dateGuard.error) {
+    return { error: dateGuard.error };
+  }
+
+  const fulfilmentError = validateOwnerCreateFulfilment({
+    method: fulfilmentMethod,
+    pickupDate,
+    pickupTime,
+    delivery: deliveryDraft,
+  });
+  if (fulfilmentError) {
+    return { error: fulfilmentError };
+  }
+
+  const orderSource = isStaffGuestOrderSource(source.orderSource)
+    ? source.orderSource
+    : "other";
+
+  let fulfilmentRpc: ReturnType<typeof buildCreateStaffFulfilmentRpcParams>;
+  try {
+    fulfilmentRpc = buildCreateStaffFulfilmentRpcParams({
+      method: fulfilmentMethod,
+      delivery: deliveryDraft,
+    });
+  } catch (error) {
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Could not copy fulfilment details.",
+    };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("create_staff_guest_preorder", {
+    p_actor_staff_id: staff.id,
+    p_customer_name: source.customerName,
+    p_phone: source.phone || null,
+    p_email: source.email || null,
+    p_order_source: orderSource,
+    p_crew_order: source.crewOrder,
+    p_pickup_date: pickupDate,
+    p_pickup_time: pickupTime,
+    p_pickup_instruction: null,
+    p_items: source.items.map((item) => ({
+      cake_id: item.cakeId,
+      cake_size_id: item.cakeSizeId,
+      quantity: item.quantity,
+    })),
+    p_complimentary: source.complimentaryItems
+      .filter((item) => item.quantity > 0 && item.complimentaryItemTypeId)
+      .map((item) => ({
+        type_id: item.complimentaryItemTypeId,
+        name: item.name,
+        quantity: item.quantity,
+        sort_order: item.sortOrder,
+      })),
+    p_paid_addons: source.paidAddons
+      .filter((item) => item.quantity > 0)
+      .map((item) => ({
+        code: item.code,
+        quantity: item.quantity,
+        messages: item.messages.map((message) => message.writtenMessage),
+      })),
+    p_include_receipt: source.includeReceipt,
+    p_needs_bakery_attention: false,
+    p_bakery_attention_note: null,
+    p_customer_notes: source.notes,
+    p_internal_notes: null,
+    p_fulfilment_method: fulfilmentRpc.p_fulfilment_method,
+    p_delivery: fulfilmentRpc.p_delivery,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  const newOrderId =
+    data && typeof data === "object" && "id" in data
+      ? String((data as { id: string }).id)
+      : null;
+  if (!newOrderId) {
+    return { error: "Order was created but could not be opened." };
+  }
+
+  scheduleStaffNotificationDispatch();
+  await insertTimelineEvent({
+    orderId: newOrderId,
+    eventType: "order_duplicated",
+    actorStaffId: staff.id,
+    metadata: {
+      source_order_id: source.id,
+      source_order_number: source.orderNumber,
+    },
+  });
+
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${newOrderId}`);
+  redirect(`/owner/orders/${newOrderId}`);
+}
+

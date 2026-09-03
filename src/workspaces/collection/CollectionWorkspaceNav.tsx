@@ -8,7 +8,7 @@ type CollectionWorkspaceNavProps = {
 };
 
 const TABS: { id: CollectionBoardTab; label: string }[] = [
-  { id: "ready", label: "Ready" },
+  { id: "ready", label: "Ready for Collection" },
   { id: "pickup", label: "Pickup" },
   { id: "delivery", label: "Delivery" },
   { id: "dine_in", label: "Dine-In" },

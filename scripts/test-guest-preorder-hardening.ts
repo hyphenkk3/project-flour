@@ -134,7 +134,7 @@ function nextWednesdayYmd(from = new Date()): string {
 assert.equal(
   earliestPickupDateYmd(new Date("2026-08-15T16:00:00.000Z")),
   "2026-08-18",
-  "earliest pickup is 2 Singapore calendar days ahead",
+  "earliest pickup is 2 Malaysia calendar days ahead",
 );
 const valid = nextValidPublicPickup();
 assert.equal(isValidPickupSlot(valid.date, valid.time), true);

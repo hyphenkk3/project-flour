@@ -10,6 +10,7 @@ export type LibraryCakeSize = {
   label: string;
   price: number;
   sortOrder: number;
+  preorderDays: number;
 };
 
 export type LibraryCakePhoto = {
@@ -19,6 +20,9 @@ export type LibraryCakePhoto = {
   imageUrl: string;
   altText: string | null;
   sortOrder: number;
+  cakeSizeId: string | null;
+  isDefault: boolean;
+  storagePath: string | null;
 };
 
 export type LibraryCake = {
@@ -45,6 +49,7 @@ export type LibraryCakeSizeInput = {
   label: string;
   price: number;
   sortOrder: number;
+  preorderDays: number;
 };
 
 export type LibraryCakePhotoInput = {
@@ -52,6 +57,8 @@ export type LibraryCakePhotoInput = {
   altText: string | null;
   assetId: string | null;
   sortOrder: number;
+  cakeSizeId?: string | null;
+  isDefault?: boolean;
 };
 
 export type LibraryCakeInput = {

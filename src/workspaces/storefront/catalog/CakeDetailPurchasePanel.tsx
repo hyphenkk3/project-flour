@@ -1,20 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo } from "react";
 import type { StorefrontCake } from "@/types/storefront";
+import { AddToOrderButton } from "@/workspaces/storefront/cart/AddToOrderSheet";
+import { usePreorderDraft } from "@/workspaces/storefront/cart/usePreorderDraft";
 import {
+  formatPreorderRequirement,
   formatRm,
   storefrontCategoryLabel,
 } from "@/workspaces/storefront/catalog/pricing";
-import {
-  emptyPreorderDraft,
-  mergeDraftItem,
-  readPreorderDraft,
-  writePreorderDraft,
-  type PreorderDraftItem,
-} from "@/workspaces/storefront/checkout/preorder-draft";
-import { isFullMonthPickupScope } from "@/engines/menu/customer-browse";
 
 type CakeDetailPurchasePanelProps = {
   cake: StorefrontCake;
@@ -23,12 +17,14 @@ type CakeDetailPurchasePanelProps = {
   pickupScopeFrom?: string | null;
   pickupScopeTo?: string | null;
   pickupScopePickup?: string | null;
+  selectedSizeId: string;
+  onSelectedSizeIdChange: (sizeId: string) => void;
 };
 
 function existingQuantityForSize(
-  items: PreorderDraftItem[],
   cakeId: string,
   sizeId: string,
+  items: Array<{ cakeId: string; sizeId: string; quantity: number }>,
 ): number {
   return items
     .filter((item) => item.cakeId === cakeId && item.sizeId === sizeId)
@@ -42,68 +38,30 @@ export function CakeDetailPurchasePanel({
   pickupScopeFrom = null,
   pickupScopeTo = null,
   pickupScopePickup = null,
+  selectedSizeId,
+  onSelectedSizeIdChange,
 }: CakeDetailPurchasePanelProps) {
-  const router = useRouter();
-  const [selectedSizeId, setSelectedSizeId] = useState(cake.sizes[0]?.id ?? "");
-  const [error, setError] = useState<string | null>(null);
-  const [draftItems, setDraftItems] = useState<PreorderDraftItem[]>([]);
-
+  const draft = usePreorderDraft();
   const selectedSize = cake.sizes.find((size) => size.id === selectedSizeId);
   const category = storefrontCategoryLabel(cake.category);
-
-  useEffect(() => {
-    const draft = readPreorderDraft();
-    setDraftItems(draft?.items ?? []);
-  }, []);
+  const from = pickupScopeFrom?.trim().slice(0, 10) ?? "";
+  const to = pickupScopeTo?.trim().slice(0, 10) ?? "";
+  const pickupScope =
+    /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to)
+      ? { from, to, pickup: pickupScopePickup }
+      : null;
 
   const existingQuantity = useMemo(
     () =>
       selectedSizeId
-        ? existingQuantityForSize(draftItems, cake.id, selectedSizeId)
+        ? existingQuantityForSize(
+            cake.id,
+            selectedSizeId,
+            draft?.items ?? [],
+          )
         : 0,
-    [draftItems, cake.id, selectedSizeId],
+    [cake.id, draft?.items, selectedSizeId],
   );
-
-  function handlePrimaryAction() {
-    if (!selectedSize) {
-      setError("Please choose a size.");
-      return;
-    }
-    setError(null);
-    const draft = readPreorderDraft() ?? emptyPreorderDraft();
-    const scopeFrom = pickupScopeFrom?.trim().slice(0, 10) ?? "";
-    const scopeTo = pickupScopeTo?.trim().slice(0, 10) ?? "";
-    const hasScope =
-      /^\d{4}-\d{2}-\d{2}$/.test(scopeFrom) &&
-      /^\d{4}-\d{2}-\d{2}$/.test(scopeTo);
-    writePreorderDraft({
-      ...mergeDraftItem(draft, {
-        cakeId: cake.id,
-        sizeId: selectedSize.id,
-        quantity: 1,
-        cakeName: cake.name,
-        sizeLabel: selectedSize.size,
-        unitPrice: selectedSize.price,
-      }),
-      pickupScopeFrom: hasScope ? scopeFrom : draft.pickupScopeFrom,
-      pickupScopeTo: hasScope ? scopeTo : draft.pickupScopeTo,
-      pickupScopeConstrainsBounds: hasScope
-        ? !isFullMonthPickupScope(scopeFrom, scopeTo)
-        : draft.pickupScopeConstrainsBounds,
-    });
-    if (hasScope) {
-      const params = new URLSearchParams();
-      params.set("from", scopeFrom);
-      params.set("to", scopeTo);
-      const pickup = pickupScopePickup?.trim().slice(0, 10) ?? "";
-      if (/^\d{4}-\d{2}-\d{2}$/.test(pickup)) {
-        params.set("pickup", pickup);
-      }
-      router.push(`/order/checkout?${params.toString()}`);
-      return;
-    }
-    router.push("/order/checkout");
-  }
 
   return (
     <div className="flex flex-col gap-5 lg:gap-6">
@@ -163,16 +121,18 @@ export function CakeDetailPurchasePanel({
                   aria-pressed={selected}
                   className={
                     selected
-                      ? "border-ink bg-mist text-ink flex min-h-12 w-full items-center justify-between rounded-xl border-2 px-4 text-left"
-                      : "border-fog text-ink hover:border-skyline flex min-h-12 w-full items-center justify-between rounded-xl border bg-white px-4 text-left"
+                      ? "border-ink bg-mist text-ink flex min-h-12 w-full items-center justify-between rounded-xl border-2 px-4 py-2 text-left"
+                      : "border-fog text-ink hover:border-skyline flex min-h-12 w-full items-center justify-between rounded-xl border bg-white px-4 py-2 text-left"
                   }
-                  onClick={() => {
-                    setSelectedSizeId(size.id);
-                    setError(null);
-                  }}
+                  onClick={() => onSelectedSizeIdChange(size.id)}
                   type="button"
                 >
-                  <span className="text-sm font-medium">{size.size}</span>
+                  <span>
+                    <span className="block text-sm font-medium">{size.size}</span>
+                    <span className="text-skyline mt-0.5 block text-sm">
+                      {formatPreorderRequirement(size.preorderDays)}
+                    </span>
+                  </span>
                   <span className="text-sm font-semibold tabular-nums">
                     {formatRm(size.price)}
                   </span>
@@ -181,9 +141,6 @@ export function CakeDetailPurchasePanel({
             );
           })}
         </ul>
-        {error ? (
-          <p className="text-status-danger mt-2 text-sm">{error}</p>
-        ) : null}
       </section>
 
       {availabilityNote ? (
@@ -203,18 +160,15 @@ export function CakeDetailPurchasePanel({
 
       {existingQuantity > 0 ? (
         <p className="text-skyline text-sm">
-          {existingQuantity} already in your preorder for this size.
+          {existingQuantity} already in your order for this size.
         </p>
       ) : null}
 
-      <button
-        className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full items-center justify-center rounded-xl px-5 text-sm font-medium disabled:opacity-50"
-        disabled={cake.sizes.length === 0}
-        onClick={handlePrimaryAction}
-        type="button"
-      >
-        Add to preorder
-      </button>
+      <AddToOrderButton
+        cake={cake}
+        initialSizeId={selectedSizeId}
+        pickupScope={pickupScope}
+      />
     </div>
   );
 }

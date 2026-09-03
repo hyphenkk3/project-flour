@@ -1,5 +1,4 @@
 import { requireStaff } from "@/foundation/auth/session";
-import { loadStaffNotificationPreferences } from "@/foundation/staff/notification-preferences-queries";
 import { getNavigationForRole } from "@/foundation/navigation/workspaces";
 import {
   buildGuestOrderWorkspaceCapabilities,
@@ -25,17 +24,6 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const staff = await requireStaff();
-
-  const notificationPreferences =
-    await loadStaffNotificationPreferences(staff.id);
-
-  const notificationPreference = notificationPreferences.find(
-    (preference) => preference.code === "new_order",
-  );
-
-  if (!notificationPreference) {
-    throw new Error("New order notification preference is unavailable.");
-  }
   const role = staff.role.code;
   const navigation = getNavigationForRole(role);
   const capabilities = buildGuestOrderWorkspaceCapabilities({
@@ -100,12 +88,10 @@ export default async function HomePage() {
       canAccessCalendar={canCalendar}
       canAccessCollection={canCollection}
       canAccessOperations={canOps}
-      notificationPreference={notificationPreference}
       model={model}
       preferCalendarScheduleCta={role === "owner"}
       roleName={staff.role.name}
       staffDisplayName={staff.displayName}
-      staffId={staff.id}
     />
   );
 }

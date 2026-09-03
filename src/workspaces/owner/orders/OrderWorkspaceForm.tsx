@@ -100,6 +100,13 @@ import { EnableDeliveryChargesControl } from "@/workspaces/owner/orders/EnableDe
 import { OrderFulfilmentCreateFields } from "@/workspaces/owner/orders/OrderFulfilmentCreateFields";
 import { OrderMessagesSection } from "@/workspaces/owner/orders/OrderMessagesSection";
 import { operationalSectionTitle } from "@/engines/orders/operational-state";
+import {
+  deriveOrderLifecycleStage,
+  isGuestOrderCancelled,
+  orderLifecycleBadgeTone,
+  orderLifecycleLabel,
+} from "@/engines/orders/lifecycle";
+import { OrderLifecycleActions } from "@/workspaces/owner/orders/OrderLifecycleActions";
 import { OrderOperationalControls } from "@/workspaces/owner/orders/OrderOperationalControls";
 import { OrderPaidAddonsEditor } from "@/workspaces/owner/orders/OrderPaidAddonsEditor";
 import { PaymentSection } from "@/workspaces/owner/orders/PaymentSection";
@@ -668,12 +675,35 @@ export function OrderWorkspaceForm({
       <div className="space-y-6">
         <div className="flex flex-wrap items-center gap-3">
           <StatusBadge
+            label={orderLifecycleLabel({
+              status: order.status,
+              productionStartedAt: order.productionStartedAt,
+              readyAt: order.readyAt,
+              pickedUpAt: order.pickedUpAt,
+              deliveredAt: order.deliveredAt,
+            })}
+            tone={orderLifecycleBadgeTone(
+              deriveOrderLifecycleStage({
+                status: order.status,
+                productionStartedAt: order.productionStartedAt,
+                readyAt: order.readyAt,
+                pickedUpAt: order.pickedUpAt,
+                deliveredAt: order.deliveredAt,
+              }),
+            )}
+          />
+          <StatusBadge
             className={guestOrderStatusBadgeClassName(order.status)}
             label={guestOrderStatusLabel(order.status)}
             tone={guestOrderStatusBadgeTone(order.status)}
           />
           <p className="text-skyline text-sm">{order.orderNumber}</p>
         </div>
+
+        <OrderLifecycleActions
+          capabilities={capabilities}
+          order={order}
+        />
 
         {showSaved ? (
           <p className="border-status-success/30 bg-status-success-soft text-status-success rounded-lg border px-4 py-3 text-sm">
@@ -926,7 +956,8 @@ export function OrderWorkspaceForm({
           />
         ) : null}
 
-        {capabilities.canOperateCollectionControls ? (
+        {capabilities.canOperateCollectionControls &&
+        !isGuestOrderCancelled(order.status) ? (
           <ViewBlock title={operationalSectionTitle(order.fulfilmentMethod)}>
             <OrderOperationalControls
               canMarkReady={capabilities.role === "owner"}
@@ -1093,6 +1124,24 @@ export function OrderWorkspaceForm({
       <input name="delivery_json" type="hidden" value={deliveryJson} />
 
       <div className="flex flex-wrap items-center gap-3">
+        <StatusBadge
+          label={orderLifecycleLabel({
+            status: order.status,
+            productionStartedAt: order.productionStartedAt,
+            readyAt: order.readyAt,
+            pickedUpAt: order.pickedUpAt,
+            deliveredAt: order.deliveredAt,
+          })}
+          tone={orderLifecycleBadgeTone(
+            deriveOrderLifecycleStage({
+              status: order.status,
+              productionStartedAt: order.productionStartedAt,
+              readyAt: order.readyAt,
+              pickedUpAt: order.pickedUpAt,
+              deliveredAt: order.deliveredAt,
+            }),
+          )}
+        />
         <StatusBadge
           className={guestOrderStatusBadgeClassName(order.status)}
           label={guestOrderStatusLabel(order.status)}
@@ -1524,7 +1573,8 @@ export function OrderWorkspaceForm({
         />
       </section>
 
-      {capabilities.canOperateCollectionControls ? (
+      {capabilities.canOperateCollectionControls &&
+      !isGuestOrderCancelled(order.status) ? (
         <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
           <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
             {operationalSectionTitle(order.fulfilmentMethod)}

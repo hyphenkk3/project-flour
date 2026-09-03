@@ -56,6 +56,48 @@ export function freshPickAvailabilityLabel(day: FreshPickDay): string {
   return day === "today" ? "Available today" : "Available tomorrow";
 }
 
+export const FRESH_PICKS_ORDER_CTA = "Order this Fresh Pick";
+
+export const FRESH_PICKS_NAME_HELP = "Nickname / English name and surname";
+
+export const FRESH_PICKS_WHATSAPP_NOTE =
+  "Please ensure the WhatsApp number is correct as we will contact you regarding your order.";
+
+export const FRESH_PICKS_FIXED_DATES_NOTE =
+  "Pickup dates are fixed for this Fresh Pick.";
+
+export const FRESH_PICKS_SOLD_OUT = "Sold Out";
+
+export const FRESH_PICKS_SOLD_OUT_MESSAGE =
+  "Sold Out. This Fresh Pick is no longer available to order.";
+
+export const FRESH_PICKS_UNAVAILABLE_BODY =
+  "This Fresh Pick is no longer available to order.";
+
+export const FRESH_PICKS_SUCCESS_TITLE = "Order Received";
+
+export const FRESH_PICKS_SUCCESS_PAYMENT = "Payment Pending";
+
+export const FRESH_PICKS_SUCCESS_CONTACT =
+  "Whitebird will contact you via WhatsApp.";
+
+export const FRESH_PICKS_SUCCESS_FLOW = "fresh-picks";
+
+/** Map Extra RPC / action inventory errors to customer-facing Sold Out copy. */
+export function extraSubmitCustomerError(message: string): string {
+  const text = message.trim();
+  const lower = text.toLowerCase();
+  if (
+    lower.includes("already been sold") ||
+    lower.includes("no longer available to order") ||
+    lower === "extra is not available" ||
+    lower === "extra cake unavailable"
+  ) {
+    return FRESH_PICKS_SOLD_OUT_MESSAGE;
+  }
+  return text;
+}
+
 /**
  * Customer card day from remaining bakery pickup hours (Malaysia time),
  * not prepared_on / pickup-from calendar date alone.

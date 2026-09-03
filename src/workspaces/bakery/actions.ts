@@ -6,6 +6,10 @@ import {
   buildBakeryWorkspaceCapabilities,
   canAccessBakeryWorkspace,
 } from "@/engines/bakery/capabilities";
+import {
+  canMarkGuestOrderReady,
+  canStartGuestProduction,
+} from "@/engines/orders/lifecycle";
 import { createClient } from "@/lib/supabase/server";
 import {
   getBakeryBoardOrderById,
@@ -49,6 +53,35 @@ export async function startBakeryProductionAction(
   }
 
   const supabase = await createClient();
+  const { data: row, error: loadError } = await supabase
+    .from("orders")
+    .select(
+      "id, customer_id, status, production_started_at, ready_at, picked_up_at, out_for_delivery_at, delivered_at",
+    )
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (loadError) {
+    return { error: loadError.message };
+  }
+  if (!row || row.customer_id != null) {
+    return { error: "Order not found." };
+  }
+  const startGate = canStartGuestProduction(
+    {
+      status: row.status,
+      productionStartedAt: row.production_started_at,
+      readyAt: row.ready_at,
+      pickedUpAt: row.picked_up_at,
+      outForDeliveryAt: row.out_for_delivery_at,
+      deliveredAt: row.delivered_at,
+    },
+    staff.role.code,
+  );
+  if (!startGate.ok) {
+    return { error: startGate.error };
+  }
+
   const { error } = await supabase.rpc("mark_guest_order_production_started", {
     p_order_id: orderId,
     p_actor_staff_id: staff.id,
@@ -122,6 +155,21 @@ export async function markBakeryOrderReadyAction(
   }
   if (row.ready_at) {
     return { error: "Order is already marked ready." };
+  }
+  const readyGate = canMarkGuestOrderReady({
+    snapshot: {
+      status: row.status,
+      productionStartedAt: row.production_started_at,
+      readyAt: row.ready_at,
+      pickedUpAt: row.picked_up_at,
+      outForDeliveryAt: row.out_for_delivery_at,
+      deliveredAt: row.delivered_at,
+    },
+    role: staff.role.code,
+    surface: "bakery",
+  });
+  if (!readyGate.ok) {
+    return { error: readyGate.error };
   }
 
   const { error } = await supabase.rpc("mark_guest_order_ready", {

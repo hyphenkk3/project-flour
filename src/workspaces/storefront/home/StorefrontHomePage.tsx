@@ -65,13 +65,13 @@ export async function StorefrontHomePage() {
           <div className="grid gap-4 md:grid-cols-3 md:gap-5">
             <ActionCard
               actionLabel="Start Ordering"
-              description="Ready to place an order? We'll guide you step by step."
+              description="Choose a monthly collection or Special Menu."
               href="/order"
               title="Order a Cake"
             />
             <ActionCard
               actionLabel="Browse Cakes"
-              description="Discover our current collection and explore some of our favourite creations."
+              description="All cakes currently published for Whitebird."
               href="/browse"
               title="Browse Cakes"
             />

@@ -1,6 +1,9 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireStaff } from "@/foundation/auth/session";
-import { buildBakeryWorkspaceCapabilities } from "@/engines/bakery/capabilities";
+import {
+  buildBakeryWorkspaceCapabilities,
+  canAccessBakeryWorkspace,
+} from "@/engines/bakery/capabilities";
 import { BakeryOrderDetail } from "@/workspaces/bakery/BakeryOrderDetail";
 import { resolveBakeryBoardDate } from "@/workspaces/bakery/date";
 import { getBakeryOrderDetail } from "@/workspaces/bakery/queries";
@@ -17,6 +20,9 @@ export default async function BakeryOrderPage({
   searchParams,
 }: BakeryOrderPageProps) {
   const staff = await requireStaff();
+  if (!canAccessBakeryWorkspace(staff.role.code)) {
+    redirect("/bakery/availability");
+  }
   const capabilities = buildBakeryWorkspaceCapabilities({
     role: staff.role.code,
     staffId: staff.id,

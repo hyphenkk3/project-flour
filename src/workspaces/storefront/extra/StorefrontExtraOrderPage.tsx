@@ -1,4 +1,9 @@
-import { freshPickAvailabilityLabel } from "@/engines/extra/customer-fresh-picks";
+import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
+import {
+  FRESH_PICKS_SOLD_OUT,
+  FRESH_PICKS_UNAVAILABLE_BODY,
+  freshPickAvailabilityLabel,
+} from "@/engines/extra/customer-fresh-picks";
 import {
   StorefrontHomeLink,
   StorefrontStaffSignIn,
@@ -27,10 +32,10 @@ export async function StorefrontExtraOrderPage({
         {!extra ? (
           <section className="border-fog mt-10 rounded-3xl border bg-white px-6 py-10">
             <h1 className="font-display text-ink text-3xl tracking-tight">
-              Extra cake unavailable
+              {FRESH_PICKS_SOLD_OUT}
             </h1>
             <p className="text-skyline mt-3 text-sm leading-relaxed">
-              This Extra cake is no longer available to order.
+              {FRESH_PICKS_UNAVAILABLE_BODY}
             </p>
             <p className="mt-6">
               <Link className="text-signal text-sm font-medium" href="/extra">
@@ -48,11 +53,11 @@ export async function StorefrontExtraOrderPage({
             </h1>
             <p className="text-skyline mt-1 text-sm">{extra.sizeLabel}</p>
             {extra.imageUrl ? (
-              <div className="border-fog mt-6 overflow-hidden rounded-3xl border">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+              <div className="border-fog mt-6 aspect-[4/3] overflow-hidden rounded-3xl border">
+                <CakePhotoImage
                   alt={extra.imageAlt || extra.cakeName}
-                  className="h-full w-full object-cover"
+                  priority
+                  sizes="(min-width: 768px) 48rem, 100vw"
                   src={extra.imageUrl}
                 />
               </div>

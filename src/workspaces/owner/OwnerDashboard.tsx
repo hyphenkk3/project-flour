@@ -1,5 +1,4 @@
 import { requireStaff } from "@/foundation/auth/session";
-import { loadStaffNotificationPreferences } from "@/foundation/staff/notification-preferences-queries";
 import { buildGuestOrderWorkspaceCapabilities } from "@/engines/orders/delivery-finance-capabilities";
 import type { OperationsBoardQuery } from "@/engines/operations/order-board";
 import { OperationsLiveBoard } from "@/workspaces/owner/OperationsLiveBoard";
@@ -14,17 +13,6 @@ export async function OwnerDashboard({
   initialQuery?: OperationsBoardQuery;
 }) {
   const staff = await requireStaff();
-
-  const notificationPreferences =
-    await loadStaffNotificationPreferences(staff.id);
-
-  const notificationPreference = notificationPreferences.find(
-    (preference) => preference.code === "new_order",
-  );
-
-  if (!notificationPreference) {
-    throw new Error("New order notification preference is unavailable.");
-  }
   const capabilities = buildGuestOrderWorkspaceCapabilities({
     role: staff.role.code,
     staffId: staff.id,
@@ -34,7 +22,6 @@ export async function OwnerDashboard({
   return (
     <OperationsLiveBoard
       initialOrders={orders}
-      notificationPreference={notificationPreference}
       initialQuery={initialQuery}
       pendingApprovals={pendingApprovals}
       showOwnerBoardTools={capabilities.canUseOwnerBoardTools}

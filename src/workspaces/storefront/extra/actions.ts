@@ -1,6 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import {
+  extraSubmitCustomerError,
+  FRESH_PICKS_SUCCESS_FLOW,
+} from "@/engines/extra/customer-fresh-picks";
 import { isValidExtraCustomerPickup } from "@/engines/extra/extra-pickup";
 import {
   customerComplimentaryMutationPayload,
@@ -8,6 +12,7 @@ import {
   type CustomerComplimentaryOption,
 } from "@/engines/orders/customer-preorder-options";
 import { createClient } from "@/lib/supabase/server";
+import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import { getStorefrontCollectionForPickupDate } from "@/workspaces/storefront/catalog/queries";
 import { parseRequiredPhysicalReceipt } from "@/workspaces/storefront/checkout/preorder-draft";
 import { getStorefrontExtraById } from "@/workspaces/storefront/extra/queries";
@@ -97,8 +102,7 @@ export async function submitGuestExtraOrderAction(
   }
   if (receiptRequested && !email) {
     return {
-      error:
-        "Please enter your email to receive a copy of your preorder submission.",
+      error: "Please enter your email to receive a copy of your order.",
     };
   }
   if (email && !isPlausibleEmail(email)) {
@@ -107,7 +111,7 @@ export async function submitGuestExtraOrderAction(
 
   const extra = await getStorefrontExtraById(extraStockId);
   if (!extra || !extra.pickupAvailableFromAt || !extra.pickupThroughAt) {
-    return { error: "Extra is not available" };
+    return { error: extraSubmitCustomerError("Extra is not available") };
   }
   if (
     !pickupDate ||
@@ -148,7 +152,7 @@ export async function submitGuestExtraOrderAction(
   });
 
   if (error) {
-    return { error: error.message };
+    return { error: extraSubmitCustomerError(error.message) };
   }
 
   const orderId =
@@ -160,5 +164,8 @@ export async function submitGuestExtraOrderAction(
   }
 
   await setGuestPreorderReceiptCookie(orderId);
-  redirect(`/order/success?order=${orderId}`);
+  scheduleStaffNotificationDispatch();
+  redirect(
+    `/order/success?order=${orderId}&flow=${FRESH_PICKS_SUCCESS_FLOW}`,
+  );
 }

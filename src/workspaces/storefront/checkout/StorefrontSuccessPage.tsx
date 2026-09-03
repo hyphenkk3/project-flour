@@ -2,6 +2,12 @@ import Link from "next/link";
 import { formatDdMmYyyy } from "@/lib/dates";
 import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
 import {
+  FRESH_PICKS_SUCCESS_CONTACT,
+  FRESH_PICKS_SUCCESS_FLOW,
+  FRESH_PICKS_SUCCESS_PAYMENT,
+  FRESH_PICKS_SUCCESS_TITLE,
+} from "@/engines/extra/customer-fresh-picks";
+import {
   workspaceFulfilmentSectionTitle,
   workspaceScheduleDateLabel,
   workspaceScheduleTimeLabel,
@@ -13,24 +19,39 @@ import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 
 type StorefrontSuccessPageProps = {
   orderId?: string;
+  flow?: string;
 };
 
 export async function StorefrontSuccessPage({
   orderId,
+  flow,
 }: StorefrontSuccessPageProps) {
   const receipt = orderId ? await getGuestPreorderReceipt(orderId) : null;
+  const isFreshPick =
+    flow === FRESH_PICKS_SUCCESS_FLOW || Boolean(receipt?.isFreshPick);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-16 sm:px-6">
-      <ClearPreorderDraftOnSuccess />
+      {isFreshPick ? null : <ClearPreorderDraftOnSuccess />}
       <div className="text-center">
         <h1 className="font-display text-ink text-3xl tracking-tight">
-          Thank you.
+          {isFreshPick ? FRESH_PICKS_SUCCESS_TITLE : "Thank you."}
         </h1>
         <p className="text-skyline mt-4 text-base leading-relaxed">
-          Your preorder has been received.
-          <br />
-          We&apos;ll be in touch to confirm your order details before payment.
+          {isFreshPick ? (
+            <>
+              {FRESH_PICKS_SUCCESS_PAYMENT}
+              <br />
+              {FRESH_PICKS_SUCCESS_CONTACT}
+            </>
+          ) : (
+            <>
+              Your preorder has been received.
+              <br />
+              We&apos;ll be in touch to confirm your order details before
+              payment.
+            </>
+          )}
         </p>
       </div>
 
@@ -114,22 +135,52 @@ export async function StorefrontSuccessPage({
       ) : null}
 
       <section className="mt-8 space-y-2 text-left text-sm">
-        <p className="text-ink flex items-start gap-2 font-medium">
-          <span aria-hidden className="text-status-success">
-            ✓
-          </span>
-          Preorder submitted
-        </p>
-        <p className="text-skyline flex items-start gap-2 pl-5">
-          Confirmation next
-        </p>
-        <p className="text-skyline flex items-start gap-2 pl-5">Payment later</p>
+        {isFreshPick ? (
+          <>
+            <p className="text-ink flex items-start gap-2 font-medium">
+              <span aria-hidden className="text-status-success">
+                ✓
+              </span>
+              {FRESH_PICKS_SUCCESS_TITLE}
+            </p>
+            <p className="text-skyline flex items-start gap-2 pl-5">
+              {FRESH_PICKS_SUCCESS_PAYMENT}
+            </p>
+            <p className="text-skyline flex items-start gap-2 pl-5">
+              {FRESH_PICKS_SUCCESS_CONTACT}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-ink flex items-start gap-2 font-medium">
+              <span aria-hidden className="text-status-success">
+                ✓
+              </span>
+              Preorder submitted
+            </p>
+            <p className="text-skyline flex items-start gap-2 pl-5">
+              Confirmation next
+            </p>
+            <p className="text-skyline flex items-start gap-2 pl-5">
+              Payment later
+            </p>
+          </>
+        )}
       </section>
 
       <div className="mt-10 text-center">
-        <Link className="text-signal text-sm font-medium underline" href="/">
-          Back to collection
-        </Link>
+        {isFreshPick ? (
+          <Link
+            className="text-signal text-sm font-medium underline"
+            href="/extra"
+          >
+            Back to Fresh Picks
+          </Link>
+        ) : (
+          <Link className="text-signal text-sm font-medium underline" href="/">
+            Back to collection
+          </Link>
+        )}
       </div>
     </main>
   );

@@ -8,12 +8,14 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 type OrderSuccessPageProps = {
-  searchParams: Promise<{ order?: string }>;
+  searchParams: Promise<{ order?: string; flow?: string }>;
 };
 
 export default async function OrderSuccessPage({
   searchParams,
 }: OrderSuccessPageProps) {
   const params = await searchParams;
-  return <StorefrontSuccessPage orderId={params.order} />;
+  return (
+    <StorefrontSuccessPage flow={params.flow} orderId={params.order} />
+  );
 }

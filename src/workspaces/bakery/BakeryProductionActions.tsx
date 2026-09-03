@@ -157,7 +157,7 @@ export function BakeryProductionActions({
                   }
                   type="button"
                 >
-                  {workingLabel("mark_ready", "Mark Ready")}
+                  {workingLabel("mark_ready", "Mark Ready for Collection")}
                 </button>
               ) : null}
               {surface.canUndoStart ? (

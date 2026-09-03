@@ -18,6 +18,7 @@ import { collectionDateNavHref } from "@/workspaces/collection/date";
 import {
   COLLECTION_HISTORY_LOOKBACK_DAYS,
   countCollectionPickupOverdue,
+  matchesCollectionQueueSearch,
   type CollectionBoardTab,
 } from "@/workspaces/collection/eligibility";
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
@@ -50,7 +51,7 @@ function boardTitle(tab: CollectionBoardTab): string {
     case "delivery":
       return "Delivery";
     default:
-      return "Ready";
+      return "Ready for Collection";
   }
 }
 
@@ -137,6 +138,7 @@ export function CollectionLiveBoard({
   venueFilter = "all",
 }: CollectionLiveBoardProps) {
   const [orders, setOrders] = useState(initialOrders);
+  const [search, setSearch] = useState("");
 
   const reconcileList = useCallback(async () => {
     const next = await listCollectionOrdersForTabAction(tab, boardDate);
@@ -185,9 +187,14 @@ export function CollectionLiveBoard({
       : 0;
 
   const visibleOrders = useMemo(() => {
-    if (tab !== "dine_in" || venueFilter === "all") return orders;
-    return orders.filter((order) => order.dineIn?.venue === venueFilter);
-  }, [orders, tab, venueFilter]);
+    const scoped =
+      tab !== "dine_in" || venueFilter === "all"
+        ? orders
+        : orders.filter((order) => order.dineIn?.venue === venueFilter);
+    return scoped.filter((order) =>
+      matchesCollectionQueueSearch(order, search),
+    );
+  }, [orders, search, tab, venueFilter]);
 
   const hyphenOrders = visibleOrders.filter(
     (order) => order.dineIn?.venue === "hyphen",
@@ -238,6 +245,20 @@ export function CollectionLiveBoard({
           selectedDate={boardDate}
           tab={tab}
           venueFilter={venueFilter}
+        />
+      </div>
+
+      <div className="mt-4">
+        <label className="sr-only" htmlFor="collection-search">
+          Search collection orders
+        </label>
+        <input
+          className="border-fog text-ink min-h-10 w-full rounded-lg border bg-white px-3 text-sm"
+          id="collection-search"
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search name, order number, or WhatsApp…"
+          type="search"
+          value={search}
         />
       </div>
 

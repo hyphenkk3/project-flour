@@ -41,6 +41,7 @@ function listItem(
     crewOrder: false,
     extraStockId: null,
     fulfilmentMethod: "pickup",
+    productionStartedAt: null,
     readyAt: null,
     pickedUpAt: null,
     outForDeliveryAt: null,
@@ -274,7 +275,7 @@ assert.equal(empty.handoffs.ready, 0);
 assert.equal(empty.handoffs.dineInPending, 0);
 assert.equal(empty.handoffs.dineInCompleted, 0);
 
-assert.equal(canAccessCollectionWorkspace("bakery"), false);
+assert.equal(canAccessCollectionWorkspace("bakery"), true);
 assert.equal(canAccessCollectionWorkspace("collection"), true);
 assert.equal(canAccessCollectionWorkspace("owner"), true);
 assert.equal(canAccessCollectionWorkspace("manager"), true);

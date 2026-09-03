@@ -67,7 +67,7 @@ export function operationalStateLabel(
     case "not_ready":
       return "Not Ready";
     case "ready":
-      return "Ready";
+      return "Ready for Collection";
     case "out_for_delivery":
       return "Out for Delivery";
     case "delivered":

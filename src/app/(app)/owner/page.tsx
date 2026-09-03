@@ -11,6 +11,7 @@ type PageProps = {
     pickup?: string;
     date?: string;
     status?: string;
+    lifecycle?: string;
     sort?: string;
     search?: string;
   }>;

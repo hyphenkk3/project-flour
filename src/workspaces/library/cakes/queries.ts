@@ -1,4 +1,5 @@
 import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
+import { readPreorderDays } from "@/engines/preorder/lead";
 import { createClient } from "@/lib/supabase/server";
 import type {
   LibraryCake,
@@ -15,6 +16,7 @@ type SizeRow = {
   label: string;
   price: number | string;
   sort_order: number;
+  preorder_days?: number | string | null;
 };
 
 type PhotoRow = {
@@ -24,6 +26,9 @@ type PhotoRow = {
   image_url: string;
   alt_text: string | null;
   sort_order: number;
+  cake_size_id?: string | null;
+  is_default?: boolean | null;
+  storage_path?: string | null;
 };
 
 type CakeRow = {
@@ -47,6 +52,7 @@ export function mapSize(row: SizeRow): LibraryCakeSize {
     label: row.label,
     price: Number(row.price),
     sortOrder: row.sort_order,
+    preorderDays: readPreorderDays(row.preorder_days),
   };
 }
 
@@ -58,6 +64,9 @@ export function mapPhoto(row: PhotoRow): LibraryCakePhoto {
     imageUrl: row.image_url,
     altText: row.alt_text,
     sortOrder: row.sort_order,
+    cakeSizeId: row.cake_size_id ?? null,
+    isDefault: Boolean(row.is_default),
+    storagePath: row.storage_path ?? null,
   };
 }
 
@@ -98,7 +107,8 @@ const cakeListSelect = `
     cake_id,
     label,
     price,
-    sort_order
+    sort_order,
+    preorder_days
   )
 `;
 

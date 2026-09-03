@@ -19,6 +19,8 @@ export type GuestPreorderReceipt = {
   dineInVenue: "hyphen" | "whitebird" | null;
   reservationTime: string | null;
   total: number;
+  /** True when this recap is a Fresh Picks Extra order, not a Whole Cake preorder. */
+  isFreshPick: boolean;
 };
 
 /** httpOnly cookie bound to the just-submitted guest order. Path-scoped to /order. */
@@ -88,6 +90,7 @@ export async function loadGuestPreorderReceipt(
         pickup_date,
         pickup_time,
         fulfilment_method,
+        extra_stock_id,
         customer_id,
         order_dine_in_reservations ( guest_count, venue, reservation_time ),
         order_items (
@@ -182,6 +185,9 @@ export async function loadGuestPreorderReceipt(
           unitPrice: item.unitPrice ?? 0,
           quantity: item.quantity,
         })),
+      ),
+      isFreshPick: Boolean(
+        (data as { extra_stock_id?: string | null }).extra_stock_id,
       ),
     };
   } catch {

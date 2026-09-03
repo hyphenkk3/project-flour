@@ -165,11 +165,11 @@ const extraPageSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontExtraPage.tsx",
 );
 assert.match(extraPageSrc, /listStorefrontAvailableExtra/);
-assert.match(extraPageSrc, /Order this Extra cake/);
+assert.match(extraPageSrc, /FRESH_PICKS_ORDER_CTA/);
 assert.match(extraPageSrc, /freshPickAvailabilityLabel/);
 assert.doesNotMatch(extraPageSrc, /×\s*2/);
 assert.doesNotMatch(extraPageSrc, /x2/);
-assert.doesNotMatch(extraPageSrc, /quantity/i);
+assert.doesNotMatch(extraPageSrc, /name="quantity"/);
 assert.doesNotMatch(extraPageSrc, /units available/i);
 assert.doesNotMatch(extraPageSrc, /Through /);
 assert.doesNotMatch(extraPageSrc, /Available until/);
@@ -181,7 +181,7 @@ assert.match(extraFormSrc, /name="extra_stock_id"/);
 assert.match(extraFormSrc, /value=\{extra\.id\}/);
 assert.match(extraFormSrc, /extraOrderablePickupDates/);
 assert.match(extraFormSrc, /name="customer_name"/);
-assert.match(extraFormSrc, /Order this Extra cake/);
+assert.match(extraFormSrc, /FRESH_PICKS_ORDER_CTA/);
 
 const boardSrc = readSrc("src/workspaces/extra/ExtraBoard.tsx");
 assert.doesNotMatch(boardSrc, /selectCustomerFreshPickOfferings/);

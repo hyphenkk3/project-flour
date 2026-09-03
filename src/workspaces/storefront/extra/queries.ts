@@ -5,9 +5,17 @@ import {
   freshPickAvailabilityLabel,
   type FreshPickDay,
 } from "@/engines/extra/customer-fresh-picks";
+import { resolveCakePhoto } from "@/engines/menu/cake-photos";
 import { extraOrderablePickupDates } from "@/engines/extra/extra-pickup";
 import { toBusinessDateKey } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
+import { isMissingCakePhotoSchema } from "@/workspaces/library/cakes/photo-storage";
+import {
+  mapStorefrontCakePhoto,
+  STOREFRONT_CAKE_PHOTO_SELECT,
+  STOREFRONT_CAKE_PHOTO_SELECT_LEGACY,
+  type StorefrontCakePhotoRow,
+} from "@/workspaces/storefront/catalog/cake-photo-map";
 
 export type StorefrontExtraPick = {
   id: string;
@@ -41,11 +49,8 @@ type ExtraRow = {
   sold_at: string | null;
 };
 
-type PhotoRow = {
+type PhotoRow = StorefrontCakePhotoRow & {
   cake_id: string;
-  image_url: string;
-  alt_text: string | null;
-  sort_order: number;
 };
 
 type SizePriceRow = {
@@ -77,32 +82,43 @@ function dayFromRemainingPickup(
   });
 }
 
-async function extraImages(
+async function extraPhotosByCake(
   supabase: Awaited<ReturnType<typeof createClient>>,
   cakeIds: string[],
-): Promise<Map<string, { url: string; alt: string | null }>> {
-  const imageByCake = new Map<string, { url: string; alt: string | null }>();
-  if (cakeIds.length === 0) return imageByCake;
-  const { data: photos } = await supabase
-    .from("library_cake_photos")
-    .select("cake_id, image_url, alt_text, sort_order")
-    .in("cake_id", cakeIds)
-    .order("sort_order", { ascending: true });
-  for (const photo of (photos ?? []) as PhotoRow[]) {
-    if (!photo.image_url || imageByCake.has(photo.cake_id)) continue;
-    imageByCake.set(photo.cake_id, {
-      url: photo.image_url,
-      alt: photo.alt_text,
-    });
+): Promise<Map<string, ReturnType<typeof mapStorefrontCakePhoto>[]>> {
+  const photosByCake = new Map<
+    string,
+    ReturnType<typeof mapStorefrontCakePhoto>[]
+  >();
+  if (cakeIds.length === 0) return photosByCake;
+
+  const run = (photoSelect: string) =>
+    supabase
+      .from("library_cake_photos")
+      .select(`cake_id, ${photoSelect}`)
+      .in("cake_id", cakeIds)
+      .order("sort_order", { ascending: true });
+
+  let result = await run(STOREFRONT_CAKE_PHOTO_SELECT);
+  if (result.error && isMissingCakePhotoSchema(result.error.message)) {
+    result = await run(STOREFRONT_CAKE_PHOTO_SELECT_LEGACY);
   }
-  return imageByCake;
+  if (result.error) return photosByCake;
+
+  for (const photo of (result.data ?? []) as unknown as PhotoRow[]) {
+    if (!photo.image_url) continue;
+    const list = photosByCake.get(photo.cake_id) ?? [];
+    list.push(mapStorefrontCakePhoto(photo, list.length));
+    photosByCake.set(photo.cake_id, list);
+  }
+  return photosByCake;
 }
 
 function mapPick(
   row: ExtraRow,
   todayYmd: string,
   now: Date,
-  imageByCake: Map<string, { url: string; alt: string | null }>,
+  photosByCake: Map<string, ReturnType<typeof mapStorefrontCakePhoto>[]>,
   unitPrice: number | null,
 ): StorefrontExtraPick | null {
   const day = dayFromRemainingPickup(
@@ -112,9 +128,10 @@ function mapPick(
     now,
   );
   if (!day) return null;
-  const image = row.library_cake_id
-    ? imageByCake.get(row.library_cake_id)
-    : undefined;
+  const photos = row.library_cake_id
+    ? (photosByCake.get(row.library_cake_id) ?? [])
+    : [];
+  const image = resolveCakePhoto(photos, row.library_cake_size_id);
   return {
     id: row.id,
     cakeName: row.cake_name,
@@ -129,7 +146,7 @@ function mapPick(
     day,
     availabilityLabel: freshPickAvailabilityLabel(day),
     imageUrl: image?.url ?? null,
-    imageAlt: image?.alt ?? null,
+    imageAlt: image?.altText ?? null,
     unitPrice,
   };
 }
@@ -167,9 +184,9 @@ export async function listStorefrontAvailableExtra(): Promise<
           .filter((id): id is string => Boolean(id)),
       ),
     ];
-    const imageByCake = await extraImages(supabase, cakeIds);
+    const photosByCake = await extraPhotosByCake(supabase, cakeIds);
     const picks = live
-      .map((row) => mapPick(row, todayYmd, now, imageByCake, null))
+      .map((row) => mapPick(row, todayYmd, now, photosByCake, null))
       .filter((pick): pick is StorefrontExtraPick => pick != null);
     return selectCustomerFreshPickOfferings(picks);
   } catch {
@@ -206,7 +223,7 @@ export async function getStorefrontExtraById(
       return null;
     }
 
-    const imageByCake = await extraImages(
+    const photosByCake = await extraPhotosByCake(
       supabase,
       row.library_cake_id ? [row.library_cake_id] : [],
     );
@@ -220,7 +237,7 @@ export async function getStorefrontExtraById(
       const price = (size as SizePriceRow | null)?.price;
       if (price != null) unitPrice = Number(price);
     }
-    return mapPick(row, todayYmd, now, imageByCake, unitPrice);
+    return mapPick(row, todayYmd, now, photosByCake, unitPrice);
   } catch {
     return null;
   }

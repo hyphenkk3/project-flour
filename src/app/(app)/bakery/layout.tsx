@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/foundation/auth/session";
 import { canAccessBakeryWorkspace } from "@/engines/bakery/capabilities";
+import { canViewOrderAvailability } from "@/foundation/navigation/access";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,10 @@ export default async function BakeryLayout({
 }>) {
   const staff = await requireStaff();
 
-  if (!canAccessBakeryWorkspace(staff.role.code)) {
+  if (
+    !canAccessBakeryWorkspace(staff.role.code) &&
+    !canViewOrderAvailability(staff.role.code)
+  ) {
     redirect("/home");
   }
 

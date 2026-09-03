@@ -218,8 +218,8 @@ assert.equal(
   "Ready wins over Start",
 );
 assert.equal(bakeryProductionLabel("not_started"), "Not started");
-assert.equal(bakeryProductionLabel("in_production"), "In Production");
-assert.equal(bakeryProductionLabel("ready"), "Ready");
+assert.equal(bakeryProductionLabel("in_production"), "Preparing");
+assert.equal(bakeryProductionLabel("ready"), "Ready for Collection");
 assert.equal(
   hasPaymentAttention({
     productionStartedAt: "2026-09-15T07:00:00Z",
@@ -414,8 +414,8 @@ assert.equal(
     readyAt: null,
     status: "awaiting_payment",
   }),
-  true,
-  "In Production AP may Mark Ready",
+  false,
+  "In Production AP cannot Mark Ready on Bakery",
 );
 assert.equal(
   isBakeryMarkReadyEligible({

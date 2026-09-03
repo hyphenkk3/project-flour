@@ -41,10 +41,6 @@ export function CakeForm({ mode, cake, cancelHref }: CakeFormProps) {
     libraryActionInitialState,
   );
 
-  const photoUrls =
-    cake?.photos.map((photo) => photo.imageUrl).join("\n") ?? "";
-  const photoAlts =
-    cake?.photos.map((photo) => photo.altText ?? "").join("\n") ?? "";
   const allergens = cake?.allergens.join("\n") ?? "";
 
   return (
@@ -103,33 +99,16 @@ export function CakeForm({ mode, cake, cancelHref }: CakeFormProps) {
           id: size.id,
           label: size.label,
           price: size.price,
+          preorderDays: size.preorderDays,
         }))}
       />
 
-      <section className="border-fog space-y-4 rounded-xl border bg-white p-4">
-        <h2 className="text-ink text-sm font-semibold tracking-wide uppercase">
-          Photos
-        </h2>
+      {mode === "create" ? (
         <p className="text-skyline text-sm">
-          One image URL per line. Alt text lines are optional and aligned by
-          order.
+          Add photos after you save this cake. You can upload size-specific
+          product photos and extra gallery photos on the next screen.
         </p>
-        <FormField htmlFor="photo_urls" label="Photo URLs">
-          <FormTextarea
-            defaultValue={photoUrls}
-            id="photo_urls"
-            name="photo_urls"
-            placeholder="https://..."
-          />
-        </FormField>
-        <FormField htmlFor="photo_alts" label="Photo alt text">
-          <FormTextarea
-            defaultValue={photoAlts}
-            id="photo_alts"
-            name="photo_alts"
-          />
-        </FormField>
-      </section>
+      ) : null}
 
       <FormField htmlFor="bakery_notes" label="Bakery notes">
         <FormTextarea

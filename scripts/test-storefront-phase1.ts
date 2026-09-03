@@ -59,15 +59,24 @@ assert.match(
   /const cakes = await listAvailableCakes\(collection\.id\)/,
 );
 
-assert.match(panelSrc, /Add to preorder/);
-assert.match(panelSrc, /writePreorderDraft/);
-assert.match(panelSrc, /mergeDraftItem/);
-assert.match(panelSrc, /cake\.sizes\[0\]\?\.id/);
-assert.match(panelSrc, /sizeId: selectedSize\.id/);
-assert.match(panelSrc, /quantity: 1/);
+assert.match(panelSrc, /AddToOrderButton/);
+assert.doesNotMatch(panelSrc, /router\.push/);
+assert.doesNotMatch(panelSrc, /quantity: 1/);
 assert.doesNotMatch(panelSrc, /submit_guest_preorder/);
 
+const addSheetSrc = readSrc(
+  "src/workspaces/storefront/cart/AddToOrderSheet.tsx",
+);
+assert.match(addSheetSrc, /Add to Order/);
+assert.match(addSheetSrc, /Added to your order/);
+assert.match(addSheetSrc, /formatPreorderRequirement/);
+assert.match(addSheetSrc, /mergeDraftItem/);
+assert.doesNotMatch(addSheetSrc, /router\.push/);
+assert.doesNotMatch(addSheetSrc, /engines\/preorder/);
+
 assert.match(cardSrc, /startingPrice/);
+assert.match(cardSrc, /cakeCardPreorderLabel/);
+assert.match(cardSrc, /AddToOrderButton/);
 assert.match(cardSrc, /View cake/);
 assert.match(pricingSrc, /Math\.min/);
 
@@ -144,7 +153,7 @@ assert.equal(eight?.price, 165);
 const merged = mergeDraftItem(emptyPreorderDraft(), {
   cakeId: mapped.id,
   sizeId: eight!.id,
-  quantity: 1,
+  quantity: 2,
   cakeName: mapped.name,
   sizeLabel: eight!.size,
   unitPrice: eight!.price,
@@ -152,7 +161,17 @@ const merged = mergeDraftItem(emptyPreorderDraft(), {
 assert.equal(merged.items.length, 1);
 assert.equal(merged.items[0]?.cakeId, "cake-1");
 assert.equal(merged.items[0]?.sizeId, "size-8");
-assert.equal(merged.items[0]?.quantity, 1);
+assert.equal(merged.items[0]?.quantity, 2);
+
+const addedAgain = mergeDraftItem(merged, {
+  cakeId: mapped.id,
+  sizeId: eight!.id,
+  quantity: 1,
+  cakeName: mapped.name,
+  sizeLabel: eight!.size,
+  unitPrice: eight!.price,
+});
+assert.equal(addedAgain.items[0]?.quantity, 3);
 assert.equal(PREORDER_DRAFT_KEY, "whitebird-preorder-draft-v1");
 
 console.log("PASS storefront phase 1 (static)");

@@ -32,6 +32,21 @@ export function extraPickupDates(input: ExtraPickupWindow): string[] {
   return dates;
 }
 
+/**
+ * Fresh Picks dates are window-specific. Two Extras may only share a
+ * collection date when their configured windows actually overlap.
+ * Callers must not silently merge mismatched windows into one order.
+ */
+export function extraPickupWindowsShareDate(
+  a: ExtraPickupWindow,
+  b: ExtraPickupWindow,
+): boolean {
+  const other = extraPickupDates(b);
+  if (other.length === 0) return false;
+  const allowed = new Set(other);
+  return extraPickupDates(a).some((ymd) => allowed.has(ymd));
+}
+
 /** Pickup dates that still have remaining bakery operating-hour slots (Malaysia time). */
 export function extraOrderablePickupDates(
   input: ExtraPickupWindow,

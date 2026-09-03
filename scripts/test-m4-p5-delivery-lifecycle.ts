@@ -111,10 +111,10 @@ assert.equal(operationalSectionTitle("drive_through"), "Collection");
 assert.equal(operationalSectionTitle("delivery"), "Delivery");
 
 assert.equal(operationalStateLabel("not_ready", "pickup"), "Not Ready");
-assert.equal(operationalStateLabel("ready", "pickup"), "Ready");
+assert.equal(operationalStateLabel("ready", "pickup"), "Ready for Collection");
 assert.equal(operationalStateLabel("picked_up", "pickup"), "Picked Up");
 assert.equal(operationalStateLabel("not_ready", "delivery"), "Not Ready");
-assert.equal(operationalStateLabel("ready", "delivery"), "Ready");
+assert.equal(operationalStateLabel("ready", "delivery"), "Ready for Collection");
 assert.equal(operationalStateLabel("out_for_delivery", "delivery"), "Out for Delivery");
 assert.equal(operationalStateLabel("delivered", "delivery"), "Delivered");
 assert.equal(operationalStateLabel("picked_up", "delivery"), "Picked Up");
@@ -216,7 +216,7 @@ const controlsSrc = readFileSync(
   resolve("src/workspaces/owner/orders/OrderOperationalControls.tsx"),
   "utf8",
 );
-assert.ok(controlsSrc.includes("Mark Ready"));
+assert.ok(controlsSrc.includes("Mark Ready for Collection"));
 assert.ok(controlsSrc.includes("MARK_OUT_FOR_DELIVERY_LABEL"));
 assert.ok(controlsSrc.includes("UNDO_OUT_FOR_DELIVERY_LABEL"));
 assert.ok(controlsSrc.includes("Undo Ready"));

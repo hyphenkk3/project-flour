@@ -14,6 +14,8 @@ export type PreorderDraftItem = {
   cakeName: string;
   sizeLabel: string;
   unitPrice: number;
+  /** Display/UX only. Final validation reloads live size preorder_days. */
+  preorderDays?: number;
 };
 
 export type PhysicalReceiptChoice = "" | "yes" | "no";
@@ -58,6 +60,14 @@ export type PreorderDraft = PreorderDraftFields & {
 };
 
 export const PREORDER_DRAFT_KEY = "whitebird-preorder-draft-v1";
+
+/** Same-tab signal so the cart shell refreshes after Add / edit. */
+export const PREORDER_DRAFT_CHANGED_EVENT = "whitebird-preorder-draft-changed";
+
+function emitPreorderDraftChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(PREORDER_DRAFT_CHANGED_EVENT));
+}
 
 export function parsePhysicalReceiptChoice(
   value: unknown,
@@ -122,7 +132,6 @@ export function readPreorderDraft(): PreorderDraft | null {
     return {
       ...emptyPreorderFields(),
       ...parsed,
-      items: parsed.items,
       customerName: String(parsed.customerName ?? ""),
       phone: String(parsed.phone ?? ""),
       email: String(parsed.email ?? ""),
@@ -173,6 +182,20 @@ export function readPreorderDraft(): PreorderDraft | null {
               ),
             )
           : {},
+      items: parsed.items.map((item) => ({
+        cakeId: String(item.cakeId ?? ""),
+        sizeId: String(item.sizeId ?? ""),
+        quantity: Number(item.quantity) || 1,
+        cakeName: String(item.cakeName ?? ""),
+        sizeLabel: String(item.sizeLabel ?? ""),
+        unitPrice: Number(item.unitPrice) || 0,
+        preorderDays:
+          typeof item.preorderDays === "number" && item.preorderDays >= 1
+            ? item.preorderDays
+            : Number(item.preorderDays) >= 1
+              ? Number(item.preorderDays)
+              : undefined,
+      })),
     };
   } catch {
     return null;
@@ -182,11 +205,13 @@ export function readPreorderDraft(): PreorderDraft | null {
 export function writePreorderDraft(draft: PreorderDraft): void {
   if (typeof window === "undefined") return;
   window.sessionStorage.setItem(PREORDER_DRAFT_KEY, JSON.stringify(draft));
+  emitPreorderDraftChanged();
 }
 
 export function clearPreorderDraft(): void {
   if (typeof window === "undefined") return;
   window.sessionStorage.removeItem(PREORDER_DRAFT_KEY);
+  emitPreorderDraftChanged();
 }
 
 export function mergeDraftItem(
@@ -206,6 +231,42 @@ export function mergeDraftItem(
     quantity: existing.quantity + item.quantity,
   };
   return { ...draft, items: next };
+}
+
+/** Quantity only. Does not change collection date. */
+export function setDraftLineQuantity(
+  cakeId: string,
+  sizeId: string,
+  quantity: number,
+): PreorderDraft {
+  const current = readPreorderDraft() ?? emptyPreorderDraft();
+  const qty = Math.max(1, Math.trunc(quantity) || 1);
+  const next = {
+    ...current,
+    items: current.items.map((item) =>
+      item.cakeId === cakeId && item.sizeId === sizeId
+        ? { ...item, quantity: qty }
+        : item,
+    ),
+  };
+  writePreorderDraft(next);
+  return next;
+}
+
+/** Remove one cake+size line. Does not change collection date. */
+export function removeDraftLine(
+  cakeId: string,
+  sizeId: string,
+): PreorderDraft {
+  const current = readPreorderDraft() ?? emptyPreorderDraft();
+  const next = {
+    ...current,
+    items: current.items.filter(
+      (item) => !(item.cakeId === cakeId && item.sizeId === sizeId),
+    ),
+  };
+  writePreorderDraft(next);
+  return next;
 }
 
 export function draftHasItems(draft: PreorderDraft | null): boolean {
@@ -261,7 +322,12 @@ export function filterDraftItemsToOfferedCakes(
   cakes: Array<{
     id: string;
     name: string;
-    sizes: Array<{ id: string; size: string; price: number }>;
+    sizes: Array<{
+      id: string;
+      size: string;
+      price: number;
+      preorderDays?: number;
+    }>;
   }>,
 ): { items: PreorderDraftItem[]; dropped: boolean } {
   const cakesById = new Map(cakes.map((cake) => [cake.id, cake]));
@@ -280,6 +346,7 @@ export function filterDraftItemsToOfferedCakes(
       sizeLabel: size.size,
       unitPrice: size.price,
       quantity: Math.max(1, Number(item.quantity) || 1),
+      preorderDays: size.preorderDays ?? item.preorderDays,
     });
   }
   return { items: consolidateDraftLines(next), dropped };

@@ -220,7 +220,7 @@ assert.equal(
     pickupTime: "15:00:00",
     now: now16at1500,
   });
-  assert.equal(deliveryAttention.label, "Ready");
+  assert.equal(deliveryAttention.label, "Ready for Collection");
   assert.equal(deliveryAttention.overdue, false);
   assert.notEqual(
     deliveryAttention.label,

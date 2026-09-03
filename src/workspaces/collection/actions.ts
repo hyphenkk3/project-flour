@@ -14,6 +14,7 @@ import {
   isCollectionUndoCollectedEligible,
   isCollectionUndoDineInEligible,
 } from "@/workspaces/collection/eligibility";
+import { canCompleteGuestOrder } from "@/engines/orders/lifecycle";
 import {
   getCollectionBoardOrderById,
   getCollectionOrderDetail,
@@ -71,7 +72,7 @@ export async function markCollectionOrderCollectedAction(
   const { data: row, error: loadError } = await supabase
     .from("orders")
     .select(
-      "id, ready_at, picked_up_at, fulfilment_method, status, customer_id",
+      "id, ready_at, picked_up_at, fulfilment_method, status, customer_id, production_started_at, delivered_at",
     )
     .eq("id", orderId)
     .is("customer_id", null)
@@ -104,6 +105,20 @@ export async function markCollectionOrderCollectedAction(
         ? "Only Ready dine-in orders can be completed in Collection."
         : "Only Ready pickup orders can be marked collected in Pickup.",
     };
+  }
+  const completeGate = canCompleteGuestOrder({
+    snapshot: {
+      status: row.status,
+      productionStartedAt: row.production_started_at,
+      readyAt: row.ready_at,
+      pickedUpAt: row.picked_up_at,
+      deliveredAt: row.delivered_at,
+    },
+    role: staff.role.code,
+    surface: "collection",
+  });
+  if (!completeGate.ok) {
+    return { error: completeGate.error };
   }
 
   const { error } = await supabase.rpc("mark_guest_order_picked_up", {

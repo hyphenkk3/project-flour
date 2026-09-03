@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import type { StorefrontCake } from "@/types/storefront";
+import { AddToOrderButton, type AddToOrderPickupScope } from "@/workspaces/storefront/cart/AddToOrderSheet";
+import { storefrontDefaultPhoto } from "@/workspaces/storefront/catalog/cake-photo-map";
 import {
+  cakeCardPreorderLabel,
   formatAvailableSizes,
   formatRm,
   startingPrice,
@@ -13,6 +17,7 @@ type StorefrontCakeCardProps = {
   hideOrderCta?: boolean;
   /** Collection entry scope forwarded to cake detail. */
   detailHref?: string;
+  pickupScope?: AddToOrderPickupScope | null;
 };
 
 export function StorefrontCakeCard({
@@ -20,20 +25,24 @@ export function StorefrontCakeCard({
   availabilityNote,
   hideOrderCta = false,
   detailHref,
+  pickupScope = null,
 }: StorefrontCakeCardProps) {
   const from = startingPrice(cake);
   const sizes = formatAvailableSizes(cake);
   const category = storefrontCategoryLabel(cake.category);
+  const preorder = cakeCardPreorderLabel(cake);
+  const hero = storefrontDefaultPhoto(cake.photos);
+  const imageUrl = cake.image ?? hero?.url ?? null;
+  const imageAlt = hero?.altText || cake.name;
 
   return (
     <article className="border-fog flex h-full flex-col overflow-hidden rounded-2xl border bg-white">
       <div className="bg-fog aspect-[4/3] overflow-hidden">
-        {cake.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            alt={cake.photos[0]?.altText || cake.name}
-            className="h-full w-full object-cover"
-            src={cake.image}
+        {imageUrl ? (
+          <CakePhotoImage
+            alt={imageAlt}
+            sizes="(min-width: 1024px) 33vw, 100vw"
+            src={imageUrl}
           />
         ) : (
           <div className="text-skyline flex h-full items-center justify-center px-4 text-center text-sm">
@@ -51,6 +60,11 @@ export function StorefrontCakeCard({
           <h2 className="font-display text-ink mt-1 text-xl tracking-tight">
             {cake.name}
           </h2>
+          {preorder ? (
+            <p className="text-signal mt-1.5 text-[11px] font-semibold tracking-[0.16em] uppercase">
+              {preorder}
+            </p>
+          ) : null}
           {from !== null ? (
             <p className="text-ink mt-1 text-sm font-medium tabular-nums">
               From {formatRm(from)}
@@ -64,12 +78,15 @@ export function StorefrontCakeCard({
           ) : null}
         </div>
         {hideOrderCta ? null : (
-          <Link
-            className="bg-ink text-mist hover:bg-skyline mt-auto inline-flex min-h-11 w-full items-center justify-center rounded-lg px-4 text-sm font-medium"
-            href={detailHref ?? `/cakes/${cake.id}`}
-          >
-            View cake
-          </Link>
+          <div className="mt-auto grid gap-2">
+            <AddToOrderButton cake={cake} pickupScope={pickupScope} />
+            <Link
+              className="text-ink inline-flex min-h-11 w-full items-center justify-center text-sm font-medium"
+              href={detailHref ?? `/cakes/${cake.id}`}
+            >
+              View cake
+            </Link>
+          </div>
         )}
       </div>
     </article>

@@ -18,7 +18,7 @@ import type { StorefrontOrder } from "@/types/storefront";
 const PRODUCT_ORDER_ID = "7e9779ac-152b-42e0-8002-34ba8e9b11b5";
 const SIG = "WB-FIX-ADDON-20260818";
 const PHONE = "0190000182";
-const PICKUP_DATE = "2026-08-19";
+const PICKUP_DATE = "2026-08-29";
 const PICKUP_TIME = "15:00";
 
 function loadEnvLocal() {

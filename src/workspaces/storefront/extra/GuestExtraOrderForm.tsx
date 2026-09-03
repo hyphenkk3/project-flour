@@ -20,6 +20,12 @@ import {
   extraOrderablePickupDates,
 } from "@/engines/extra/extra-pickup";
 import {
+  FRESH_PICKS_FIXED_DATES_NOTE,
+  FRESH_PICKS_NAME_HELP,
+  FRESH_PICKS_ORDER_CTA,
+  FRESH_PICKS_WHATSAPP_NOTE,
+} from "@/engines/extra/customer-fresh-picks";
+import {
   formatCustomerPreorderOptionLabel,
   type CustomerComplimentaryOption,
 } from "@/engines/orders/customer-preorder-options";
@@ -110,6 +116,9 @@ export function GuestExtraOrderForm({
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
           Pickup
         </h2>
+        <p className="text-skyline text-sm leading-relaxed">
+          {FRESH_PICKS_FIXED_DATES_NOTE}
+        </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <label
@@ -200,19 +209,23 @@ export function GuestExtraOrderForm({
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
           Customer
         </h2>
-        <FormField htmlFor="customer_name" label="Name">
+        <FormField
+          help={FRESH_PICKS_NAME_HELP}
+          htmlFor="customer_name"
+          label="Name"
+        >
           <FormInput id="customer_name" name="customer_name" required />
         </FormField>
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField
-            help="Primary contact for WhatsApp updates"
+            help={FRESH_PICKS_WHATSAPP_NOTE}
             htmlFor="phone"
             label="WhatsApp phone"
           >
             <FormInput id="phone" name="phone" required type="tel" />
           </FormField>
           <FormField
-            help="For a copy of your preorder submission"
+            help="For a copy of your order"
             htmlFor="email"
             label="Email (optional)"
           >
@@ -226,7 +239,7 @@ export function GuestExtraOrderForm({
         </div>
         <FormCheckbox
           checked={receiptRequested}
-          label="Email me a copy of my preorder submission"
+          label="Email me a copy of my order"
           name="email_submission_receipt_requested"
           onChange={(event) => setReceiptRequested(event.target.checked)}
         />
@@ -260,7 +273,7 @@ export function GuestExtraOrderForm({
 
       <FormActions>
         <FormSubmitButton disabled={usableSlots.length === 0} pending={pending}>
-          Order this Extra cake
+          {FRESH_PICKS_ORDER_CTA}
         </FormSubmitButton>
         <Link
           className="border-fog text-ink inline-flex min-h-12 items-center justify-center rounded-lg border px-5 text-sm font-medium"

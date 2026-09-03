@@ -54,6 +54,7 @@ type OrderRow = {
   include_receipt: boolean | null;
   needs_bakery_attention: boolean | null;
   bakery_attention_note: string | null;
+  production_started_at: string | null;
   ready_at: string | null;
   ready_by: string | null;
   picked_up_at: string | null;
@@ -279,6 +280,7 @@ function mapOrder(
     includeReceipt: Boolean(row.include_receipt),
     needsBakeryAttention: Boolean(row.needs_bakery_attention),
     bakeryAttentionNote: row.bakery_attention_note,
+    productionStartedAt: row.production_started_at ?? null,
     readyAt: row.ready_at,
     readyBy: row.ready_by,
     pickedUpAt: row.picked_up_at,
@@ -325,6 +327,7 @@ const orderSelect = `
   include_receipt,
   needs_bakery_attention,
   bakery_attention_note,
+  production_started_at,
   ready_at,
   ready_by,
   picked_up_at,
@@ -432,6 +435,7 @@ const GUEST_STATUSES: GuestOrderStatus[] = [
   "pending_confirmation",
   "awaiting_payment",
   "paid",
+  "cancelled",
 ];
 
 /** Guest website orders only (customer_id is null). */
@@ -493,6 +497,7 @@ function mapListItem(row: OrderRow): StorefrontOrderListItem {
     crewOrder: order.crewOrder,
     extraStockId: row.extra_stock_id ?? null,
     fulfilmentMethod: order.fulfilmentMethod,
+    productionStartedAt: order.productionStartedAt,
     readyAt: order.readyAt,
     pickedUpAt: order.pickedUpAt,
     outForDeliveryAt: order.outForDeliveryAt,

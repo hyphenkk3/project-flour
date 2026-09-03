@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireStaff } from "@/foundation/auth/session";
 import { canAccessWorkspace } from "@/foundation/navigation/access";
 import { createClient } from "@/lib/supabase/server";
+import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import type {
   FulfilmentMethod,
   OrderInput,
@@ -133,6 +134,7 @@ async function applyOrderUpdate(
     return { error: "Unable to update order." };
   }
 
+  scheduleStaffNotificationDispatch();
   revalidateOrderPaths(orderId);
   return emptyState;
 }
@@ -172,6 +174,7 @@ export async function createOrderAction(
     return { error: "Unable to create order." };
   }
 
+  scheduleStaffNotificationDispatch();
   revalidateOrderPaths(data.id);
   redirect(`/customer-operations/orders/${data.id}`);
 }

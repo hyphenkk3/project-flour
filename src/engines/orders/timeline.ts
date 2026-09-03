@@ -25,6 +25,8 @@ export const TIMELINE_EVENT_LABELS: Record<string, string> = {
   order_ready_undone: "Ready undone",
   order_picked_up: "Marked picked up",
   order_picked_up_undone: "Picked up undone",
+  order_cancelled: "Order cancelled",
+  order_duplicated: "Order duplicated",
   order_out_for_delivery: "Marked out for delivery",
   order_out_for_delivery_undone: "Out for delivery undone",
   order_delivered: "Marked delivered",

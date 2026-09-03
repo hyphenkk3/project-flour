@@ -296,7 +296,8 @@ assert.match(middlewareSrc, /startsWith\("\/extra\/"\)/);
 
 const browseSrc = readSrc("src/workspaces/storefront/home/StorefrontBrowsePage.tsx");
 assert.match(browseSrc, /listBrowsePublishedCakes/);
-assert.match(browseSrc, /availabilityNote/);
+assert.match(browseSrc, /BrowseCakeCatalogue/);
+assert.match(browseSrc, /href="\/order"/);
 assert.match(browseSrc, /listHistoricalCatalogues/);
 assert.match(browseSrc, /Past menus/);
 assert.doesNotMatch(browseSrc, /getCurrentCollection/);
@@ -308,6 +309,7 @@ assert.match(cardSrc, /text-status-danger/);
 
 const queriesSrc = readSrc("src/workspaces/storefront/catalog/queries.ts");
 assert.match(queriesSrc, /listBrowsePublishedCakes/);
+assert.match(queriesSrc, /isCurrentlyCustomerOrderable/);
 assert.match(queriesSrc, /eq\("status", "active"\)/);
 assert.match(queriesSrc, /eq\("purpose", "monthly"\)/);
 assert.match(queriesSrc, /getStorefrontCollectionForPickupDate/);
@@ -318,6 +320,7 @@ const orderSrc = readSrc(
 );
 assert.match(browseSrc, /StorefrontHomeLink/);
 assert.match(orderSrc, /Choose your collection/);
+assert.match(orderSrc, /href="\/browse"/);
 assert.match(orderSrc, /listOrderableMonthlyCatalogues/);
 assert.match(orderSrc, /listCustomerSpecialCatalogues/);
 assert.match(orderSrc, /SPECIAL_MENU_HEADING/);
@@ -340,6 +343,7 @@ assert.match(collectionPageSrc, /customerSpecialMenuPeriodLabel/);
 assert.match(collectionPageSrc, /SPECIAL_PERIOD_CAKES_NOTE/);
 assert.doesNotMatch(collectionPageSrc, /collection_id=/);
 assert.match(collectionPageSrc, /suggestedPickupDateForCatalogueMonth/);
+assert.match(collectionPageSrc, /href="\/browse"/);
 assert.match(collectionPageSrc, /listAvailableCakes/);
 
 const checkoutPageSrc = readSrc(
@@ -389,13 +393,20 @@ assert.match(detailSrc, /CUSTOMER_PICKUP_DATE_CAKE_NOTICE/);
 const panelSrc = readSrc(
   "src/workspaces/storefront/catalog/CakeDetailPurchasePanel.tsx",
 );
-assert.match(panelSrc, /\/order\/checkout/);
 assert.match(panelSrc, /pickupScopeFrom/);
+assert.match(panelSrc, /AddToOrderButton/);
 assert.doesNotMatch(panelSrc, /formatCollectionAvailabilityLabel/);
 
 const progressSrc = readSrc(
-  "src/workspaces/storefront/checkout/PreorderInProgressBar.tsx",
+  "src/workspaces/storefront/cart/StorefrontCartShell.tsx",
 );
 assert.match(progressSrc, /preorderCheckoutHref/);
+assert.match(progressSrc, /View Order/);
+
+const extraPageSrc = readSrc(
+  "src/workspaces/storefront/home/StorefrontExtraPage.tsx",
+);
+assert.doesNotMatch(extraPageSrc, /PreorderInProgressBar/);
+assert.doesNotMatch(extraPageSrc, /StorefrontCartShell/);
 
 console.log("PASS storefront landing (25 Aug 2026 / September-before-August safety)");

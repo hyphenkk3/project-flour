@@ -12,14 +12,11 @@ import type { HomeCockpitModel } from "@/workspaces/home/cockpit-model";
 import type { HomeDineInHandoffPreview } from "@/workspaces/home/cockpit-model";
 import { HomeLiveRefresh } from "@/workspaces/home/HomeLiveRefresh";
 import { homeGreetingTitle } from "@/workspaces/home/greeting";
-import type { StaffNotificationPreference } from "@/foundation/staff/notification-preferences";
 
 const HOME_RETURN = "/home";
 const OPERATIONS_TODAY_HREF = "/owner?pickup=today";
 
 type HomeCockpitProps = {
-  staffId: string;
-  notificationPreference: StaffNotificationPreference;
   staffDisplayName: string;
   roleName: string;
   model: HomeCockpitModel;
@@ -126,8 +123,6 @@ function dineInPreviewMeta(item: HomeDineInHandoffPreview): string {
 }
 
 export function HomeCockpit({
-  staffId,
-  notificationPreference,
   staffDisplayName,
   roleName,
   model,

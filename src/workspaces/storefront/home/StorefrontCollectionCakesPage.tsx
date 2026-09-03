@@ -167,6 +167,15 @@ export async function StorefrontCollectionCakesPage({
                         })
                       : undefined
                   }
+                  pickupScope={
+                    collectionScope
+                      ? {
+                          from: collectionScope.from,
+                          to: collectionScope.to,
+                          pickup: collectionScope.pickup,
+                        }
+                      : null
+                  }
                 />
               </li>
             ))}
@@ -180,6 +189,12 @@ export async function StorefrontCollectionCakesPage({
           href={checkoutHref}
         >
           Continue to preorder
+        </Link>
+        <Link
+          className="text-ink hover:text-skyline inline-flex min-h-11 items-center text-sm font-medium"
+          href="/browse"
+        >
+          Browse all published cakes
         </Link>
         <StorefrontHomeLink />
       </div>

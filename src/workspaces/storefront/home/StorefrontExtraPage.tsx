@@ -1,10 +1,13 @@
-import { freshPickAvailabilityLabel } from "@/engines/extra/customer-fresh-picks";
+import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
+import {
+  FRESH_PICKS_ORDER_CTA,
+  freshPickAvailabilityLabel,
+} from "@/engines/extra/customer-fresh-picks";
 import {
   StorefrontHomeLink,
   StorefrontStaffSignIn,
 } from "@/workspaces/storefront/StorefrontBrand";
 import { listStorefrontAvailableExtra } from "@/workspaces/storefront/extra/queries";
-import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -23,8 +26,6 @@ export async function StorefrontExtraPage() {
           Extra cakes available today or tomorrow.
           Limited quantities, available for pickup during the stated window.
         </p>
-
-        <PreorderInProgressBar />
 
         {picks.length === 0 ? (
           <section className="border-fog mt-10 rounded-3xl border bg-white px-6 py-10">
@@ -52,15 +53,14 @@ export async function StorefrontExtraPage() {
                       className="bg-ink text-mist hover:bg-skyline mt-6 inline-flex min-h-11 w-fit items-center justify-center rounded-full px-5 text-sm font-medium"
                       href={`/extra/${pick.id}`}
                     >
-                      Order this Extra cake
+                      {FRESH_PICKS_ORDER_CTA}
                     </Link>
                   </div>
                   <div className="bg-fog order-1 aspect-[4/3] md:order-2 md:aspect-auto md:min-h-[12rem]">
                     {pick.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <CakePhotoImage
                         alt={pick.imageAlt || pick.cakeName}
-                        className="h-full w-full object-cover"
+                        sizes="(min-width: 768px) 13rem, 100vw"
                         src={pick.imageUrl}
                       />
                     ) : (

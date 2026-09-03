@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { requireStaff } from "@/foundation/auth/session";
+import { canAccessBakeryWorkspace } from "@/engines/bakery/capabilities";
 import { buildExtraWorkspaceCapabilities } from "@/engines/extra/capabilities";
 import { toBusinessDateKey } from "@/lib/dates";
 import { BakeryWorkspaceNav } from "@/workspaces/bakery/BakeryWorkspaceNav";
@@ -19,6 +21,9 @@ export default async function BakeryExtraPage({
   searchParams,
 }: BakeryExtraPageProps) {
   const staff = await requireStaff();
+  if (!canAccessBakeryWorkspace(staff.role.code)) {
+    redirect("/bakery/availability");
+  }
   const params = await searchParams;
   const initialMode = params.mode === "propose" ? "propose" : "create";
   const capabilities = buildExtraWorkspaceCapabilities({

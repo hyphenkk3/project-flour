@@ -12,9 +12,9 @@ import {
   getEffectivePickupSchedule,
 } from "@/engines/business-calendar/pickup-schedule";
 import {
-  addBusinessCalendarDays,
-  toBusinessDateKey,
-} from "@/lib/dates";
+  DEFAULT_CUSTOMER_PREORDER_DAYS,
+  emptyCartEarliestCollectionDate,
+} from "@/engines/preorder/lead";
 
 export type PickupSlot = {
   /** 24-hour time, e.g. "12:00" or "17:30" */
@@ -72,15 +72,12 @@ export function isValidClockPickupTime(timeValue: string): boolean {
 }
 
 /**
- * Whole Cake customer orders: at least 2 calendar days after Singapore today.
- * Same earliest date as website checkout HTML min (Pickup, Dine-in, Delivery).
+ * Empty-cart Whole Cake floor only (default 2 Malaysia preorder days).
+ * Per-size / cart earliest dates live in `src/engines/preorder`.
  */
-export const WHOLE_CAKE_MIN_LEAD_CALENDAR_DAYS = 2;
+export const WHOLE_CAKE_MIN_LEAD_CALENDAR_DAYS = DEFAULT_CUSTOMER_PREORDER_DAYS;
 
+/** Compatibility wrapper: empty-cart Malaysia 2-day floor. Not per-size authority. */
 export function earliestPickupDateYmd(from = new Date()): string {
-  const todaySg = toBusinessDateKey(from);
-  return (
-    addBusinessCalendarDays(todaySg, WHOLE_CAKE_MIN_LEAD_CALENDAR_DAYS) ??
-    todaySg
-  );
+  return emptyCartEarliestCollectionDate(from);
 }

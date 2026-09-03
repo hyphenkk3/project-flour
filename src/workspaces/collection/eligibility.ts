@@ -381,11 +381,11 @@ export function collectionDeskLabel(
     case "dine_in_complete":
       return "Completed";
     case "dine_in_ready":
-      return "Ready";
+      return "Ready for Collection";
     case "dine_in_pending":
       return "Not ready";
     case "ready":
-      return "Ready";
+      return "Ready for Collection";
   }
 }
 
@@ -639,6 +639,25 @@ export function isCollectionOrderSecured(
   status: GuestOrderStatus | string,
 ): boolean {
   return status === "paid";
+}
+
+export function matchesCollectionQueueSearch(
+  order: {
+    orderNumber: string;
+    guestName: string;
+    guestPhone?: string | null;
+  },
+  search: string,
+): boolean {
+  const raw = search.trim();
+  if (!raw) return true;
+  const needle = raw.toLowerCase();
+  const digits = raw.replace(/\D/g, "");
+  const phone = String(order.guestPhone ?? "").replace(/\D/g, "");
+  if (order.orderNumber.toLowerCase().includes(needle)) return true;
+  if (order.guestName.toLowerCase().includes(needle)) return true;
+  if (digits && phone.includes(digits)) return true;
+  return false;
 }
 
 export function hasCollectionPaymentAttention(input: {

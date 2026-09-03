@@ -8,7 +8,6 @@ import { createClient } from "@/lib/supabase/server";
 import type {
   LibraryCakeCategory,
   LibraryCakeInput,
-  LibraryCakePhotoInput,
   LibraryCakeSizeInput,
   LibraryCakeStatus,
 } from "@/types/library-cake";
@@ -19,6 +18,7 @@ import {
   LIBRARY_CAKE_STATUSES,
   parseNonNegativeNumber,
 } from "@/workspaces/library/labels";
+import { parsePreorderDays } from "@/engines/preorder/lead";
 
 async function requireLibraryStaff() {
   const staff = await requireStaff();
@@ -41,6 +41,7 @@ function parseSizes(formData: FormData): LibraryCakeSizeInput[] | string {
     .getAll("size_label")
     .map((value) => String(value).trim());
   const prices = formData.getAll("size_price");
+  const preorderDaysRaw = formData.getAll("size_preorder_days");
 
   const sizes: LibraryCakeSizeInput[] = [];
 
@@ -48,8 +49,9 @@ function parseSizes(formData: FormData): LibraryCakeSizeInput[] | string {
     const label = labels[index] ?? "";
     const priceRaw = String(prices[index] ?? "").trim();
     const id = ids[index] ? ids[index] : null;
+    const daysRaw = String(preorderDaysRaw[index] ?? "").trim();
 
-    if (!label && !priceRaw) {
+    if (!label && !priceRaw && !daysRaw) {
       continue;
     }
     if (!label) {
@@ -59,12 +61,18 @@ function parseSizes(formData: FormData): LibraryCakeSizeInput[] | string {
       return `Enter a price for size “${label}”.`;
     }
 
+    const preorderDays = parsePreorderDays(daysRaw || "2");
+    if (preorderDays == null) {
+      return `Preorder days for size “${label}” must be a whole number of at least 1.`;
+    }
+
     const price = parseNonNegativeNumber(priceRaw);
     sizes.push({
       id,
       label,
       price,
       sortOrder: sizes.length,
+      preorderDays,
     });
   }
 
@@ -73,18 +81,6 @@ function parseSizes(formData: FormData): LibraryCakeSizeInput[] | string {
   }
 
   return sizes;
-}
-
-function parsePhotos(formData: FormData): LibraryCakePhotoInput[] {
-  const urls = parseLines(formData.get("photo_urls"));
-  const alts = parseLines(formData.get("photo_alts"));
-
-  return urls.map((imageUrl, index) => ({
-    imageUrl,
-    altText: alts[index]?.trim() || null,
-    assetId: null,
-    sortOrder: index,
-  }));
 }
 
 function parseCakeInput(formData: FormData): LibraryCakeInput | string {
@@ -103,7 +99,6 @@ function parseCakeInput(formData: FormData): LibraryCakeInput | string {
   if (typeof sizes === "string") {
     return sizes;
   }
-  const photos = parsePhotos(formData);
 
   if (!name) return "Name is required.";
   if (!LIBRARY_CAKE_CATEGORIES.includes(category)) {
@@ -122,7 +117,7 @@ function parseCakeInput(formData: FormData): LibraryCakeInput | string {
     bakeryNotes,
     status,
     sizes,
-    photos,
+    photos: [],
   };
 }
 
@@ -164,6 +159,7 @@ async function reconcileCakeSizes(
           label: size.label,
           price: size.price,
           sort_order: size.sortOrder,
+          preorder_days: size.preorderDays,
         })
         .eq("id", sizeId)
         .eq("cake_id", cakeId);
@@ -180,6 +176,7 @@ async function reconcileCakeSizes(
       serves: null,
       price: size.price,
       sort_order: size.sortOrder,
+      preorder_days: size.preorderDays,
     });
     if (error) {
       throw new Error(error.message);
@@ -218,43 +215,11 @@ async function reconcileCakeSizes(
   }
 }
 
-async function replaceCakePhotos(
-  cakeId: string,
-  photos: LibraryCakePhotoInput[],
-) {
-  const supabase = await createClient();
-
-  const { error: deletePhotosError } = await supabase
-    .from("library_cake_photos")
-    .delete()
-    .eq("cake_id", cakeId);
-  if (deletePhotosError) {
-    throw new Error(deletePhotosError.message);
-  }
-
-  if (photos.length > 0) {
-    const { error } = await supabase.from("library_cake_photos").insert(
-      photos.map((photo) => ({
-        cake_id: cakeId,
-        image_url: photo.imageUrl,
-        alt_text: photo.altText,
-        asset_id: photo.assetId,
-        sort_order: photo.sortOrder,
-      })),
-    );
-    if (error) {
-      throw new Error(error.message);
-    }
-  }
-}
-
 async function saveCakeChildren(
   cakeId: string,
   sizes: LibraryCakeSizeInput[],
-  photos: LibraryCakePhotoInput[],
 ) {
   await reconcileCakeSizes(cakeId, sizes);
-  await replaceCakePhotos(cakeId, photos);
 }
 
 export async function createCakeAction(
@@ -289,13 +254,13 @@ export async function createCakeAction(
   }
 
   try {
-    await saveCakeChildren(data.id, parsed.sizes, parsed.photos);
+    await saveCakeChildren(data.id, parsed.sizes);
   } catch (childError) {
     return {
       error:
         childError instanceof Error
           ? childError.message
-          : "Could not save sizes or photos.",
+          : "Could not save sizes.",
     };
   }
 
@@ -334,13 +299,13 @@ export async function updateCakeAction(
   }
 
   try {
-    await saveCakeChildren(id, parsed.sizes, parsed.photos);
+    await saveCakeChildren(id, parsed.sizes);
   } catch (childError) {
     return {
       error:
         childError instanceof Error
           ? childError.message
-          : "Could not save sizes or photos.",
+          : "Could not save sizes.",
     };
   }
 

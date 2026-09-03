@@ -12,11 +12,7 @@ import {
 import { calculateCommercialSubtotal } from "@/engines/orders/totals";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 
-export const CUSTOMER_COMPLIMENTARY_CODES = [
-  "birthday_topper",
-  "candle",
-  "knife",
-] as const;
+
 
 export const CUSTOMER_PAID_ADDON_CODES = [
   "birthday_card",
@@ -24,10 +20,8 @@ export const CUSTOMER_PAID_ADDON_CODES = [
 ] as const;
 
 export const CUSTOMER_PAID_ADDON_QUANTITY = 1;
-
-export type CustomerComplimentaryCode =
-  (typeof CUSTOMER_COMPLIMENTARY_CODES)[number];
-export type CustomerPaidAddonCode = (typeof CUSTOMER_PAID_ADDON_CODES)[number];
+export type CustomerPaidAddonCode =
+  (typeof CUSTOMER_PAID_ADDON_CODES)[number];
 
 export type CustomerComplimentaryOption = {
   typeId: string;
@@ -68,11 +62,6 @@ export function emptyCustomerPreorderSelections(): CustomerPreorderSelections {
   };
 }
 
-export function isCustomerComplimentaryCode(
-  code: string,
-): code is CustomerComplimentaryCode {
-  return (CUSTOMER_COMPLIMENTARY_CODES as readonly string[]).includes(code);
-}
 
 export function isCustomerPaidAddonCode(
   code: string,
@@ -105,17 +94,9 @@ export function customerPaidAddonMessageRequired(
 export function selectCustomerComplimentaryOptions(
   options: readonly CustomerComplimentaryOption[],
 ): CustomerComplimentaryOption[] {
-  const rank = new Map(
-    CUSTOMER_COMPLIMENTARY_CODES.map((code, index) => [code, index]),
-  );
   return options
-    .filter((option) => isCustomerComplimentaryCode(option.code) && option.typeId)
-    .sort(
-      (a, b) =>
-        (rank.get(a.code as CustomerComplimentaryCode) ?? 99) -
-          (rank.get(b.code as CustomerComplimentaryCode) ?? 99) ||
-        a.sortOrder - b.sortOrder,
-    );
+    .filter((option) => option.typeId)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
 }
 
 export function selectCustomerPaidAddonOptions(
