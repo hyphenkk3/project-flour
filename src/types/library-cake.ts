@@ -37,6 +37,8 @@ export type LibraryCake = {
   createdAt: string;
   updatedAt: string;
   sizes: LibraryCakeSize[];
+  /** Present when the list/detail query loaded library_cake_photos. */
+  photos?: LibraryCakePhoto[];
 };
 
 export type LibraryCakeDetail = LibraryCake & {

@@ -11,6 +11,8 @@ import {
   cakePhotoGallery,
   customerPhotoForEachSize,
   fallbackDefaultPhotoId,
+  formatCakePhotoCoverageLabel,
+  libraryPhotosHaveCoverage,
   resolveCakePhoto,
   shouldAutoDefaultNewPhoto,
   suggestedDefaultPhotoId,
@@ -178,6 +180,37 @@ assert.equal(previews[1]?.exact, true);
 assert.equal(previews[2]?.exact, false);
 assert.equal(previews[2]?.photo?.id, "p6");
 
+assert.equal(formatCakePhotoCoverageLabel([], sizes468), "No photos");
+assert.equal(
+  formatCakePhotoCoverageLabel([photo4], sizes468),
+  '✓ 4" photo',
+);
+assert.equal(
+  formatCakePhotoCoverageLabel([{ ...photo6, isDefault: false }], sizes468),
+  '✓ 6" photo',
+);
+assert.equal(
+  formatCakePhotoCoverageLabel(
+    [photo({ id: "lifestyle", url: "https://example.test/g.jpg", isDefault: true })],
+    sizes468,
+  ),
+  "✓ Default photo",
+);
+assert.equal(
+  formatCakePhotoCoverageLabel([photo4, photo6], sizes468),
+  '✓ 2 photos · 4", 6" · Default: 6"',
+);
+assert.equal(
+  formatCakePhotoCoverageLabel(
+    [photo4, { ...photo6, isDefault: false }],
+    sizes468,
+  ),
+  '✓ 2 photos · 4", 6"',
+);
+assert.equal(libraryPhotosHaveCoverage([]), false);
+assert.equal(libraryPhotosHaveCoverage([photo4]), true);
+assert.equal(libraryPhotosHaveCoverage([photo({ id: "empty", url: "  " })]), false);
+
 const mapped = mapStorefrontCake({
   id: "cake-1",
   name: "Pandan",
@@ -281,6 +314,7 @@ assert.match(sheetSrc, /storefrontPhotoForSize/);
 assert.match(extraQuerySrc, /resolveCakePhoto/);
 assert.match(managerSrc, /customerPhotoForEachSize/);
 assert.match(engineSrc, /STANDARD_PRESENTATION_SIZE_INCHES = 6/);
+assert.match(engineSrc, /formatCakePhotoCoverageLabel/);
 assert.doesNotMatch(engineSrc, /is_default.*6"/);
 assert.doesNotMatch(migrationSrc, /6-inch photo is always primary/i);
 
@@ -319,5 +353,15 @@ assert.doesNotMatch(draftSrc, /imageUrl/);
 assert.doesNotMatch(cartSrc, /storefrontPhotoForSize/);
 assert.match(sheetSrc, /mergeDraftItem/);
 assert.doesNotMatch(sheetSrc, /imageUrl:/);
+
+const queriesSrc = readSrc("src/workspaces/library/cakes/queries.ts");
+const directorySrc = readSrc("src/workspaces/library/cakes/CakeDirectory.tsx");
+assert.match(queriesSrc, /library_cake_photos \(/);
+assert.doesNotMatch(queriesSrc, /\.from\("library_cake_photos"\)/);
+assert.match(directorySrc, /Photo status/);
+assert.match(directorySrc, /missing_photos/);
+assert.match(directorySrc, /resolveCakePhoto/);
+assert.match(directorySrc, /formatCakePhotoCoverageLabel/);
+assert.match(directorySrc, /h-14 w-14/);
 
 console.log("PASS library cake photos");

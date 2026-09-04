@@ -338,4 +338,34 @@ assert.deepEqual(
   ["Apple", "Banana"],
 );
 
+const bananaWithPhoto: LibraryCake = {
+  ...banana,
+  photos: [
+    {
+      id: "banana-photo",
+      cakeId: banana.id,
+      assetId: null,
+      imageUrl: "https://example.test/banana.jpg",
+      altText: null,
+      sortOrder: 0,
+      cakeSizeId: banana.sizes[0]?.id ?? null,
+      isDefault: true,
+      storagePath: null,
+    },
+  ],
+};
+const catalogueWithPhotos = catalogue.map((item) =>
+  item.id === "banana" ? bananaWithPhoto : { ...item, photos: [] },
+);
+assert.deepEqual(
+  names(filterLibraryCakes(catalogueWithPhotos, { photos: "has_photos" })),
+  ["Banana"],
+);
+assert.deepEqual(
+  names(
+    filterLibraryCakes(catalogueWithPhotos, { photos: "missing_photos" }),
+  ).sort((a, b) => a.localeCompare(b, "en")),
+  ["Apple", "Cherry", "Durian", "Elderflower", "Fig"],
+);
+
 console.log("PASS cake library list sorting and filtering");

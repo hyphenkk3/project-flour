@@ -1,3 +1,4 @@
+import { sortCakePhotos } from "@/engines/menu/cake-photos";
 import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
 import { readPreorderDays } from "@/engines/preorder/lead";
 import { createClient } from "@/lib/supabase/server";
@@ -43,6 +44,7 @@ type CakeRow = {
   created_at: string;
   updated_at: string;
   library_cake_sizes?: SizeRow[] | null;
+  library_cake_photos?: PhotoRow[] | null;
 };
 
 export function mapSize(row: SizeRow): LibraryCakeSize {
@@ -88,6 +90,7 @@ export function mapCake(row: CakeRow): LibraryCake {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     sizes,
+    photos: sortCakePhotos((row.library_cake_photos ?? []).map(mapPhoto)),
   };
 }
 
@@ -109,6 +112,17 @@ const cakeListSelect = `
     price,
     sort_order,
     preorder_days
+  ),
+  library_cake_photos (
+    id,
+    cake_id,
+    asset_id,
+    image_url,
+    alt_text,
+    sort_order,
+    cake_size_id,
+    is_default,
+    storage_path
   )
 `;
 
@@ -158,18 +172,9 @@ export async function getCakeById(
     return null;
   }
 
-  const { data: photos, error: photosError } = await supabase
-    .from("library_cake_photos")
-    .select("*")
-    .eq("cake_id", id)
-    .order("sort_order", { ascending: true });
-
-  if (photosError) {
-    throw new Error(photosError.message);
-  }
-
+  const mapped = mapCake(data as CakeRow);
   return {
-    ...mapCake(data as CakeRow),
-    photos: (photos as PhotoRow[]).map(mapPhoto),
+    ...mapped,
+    photos: mapped.photos ?? [],
   };
 }

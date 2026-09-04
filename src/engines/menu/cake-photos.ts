@@ -1,4 +1,7 @@
-import { cakeSizeNumericValue } from "@/engines/menu/cake-size-order";
+import {
+  cakeSizeNumericValue,
+  compareCakeSizeLabels,
+} from "@/engines/menu/cake-size-order";
 
 /** Conventional presentation size when that size exists on the cake. Not a schema constraint. */
 export const STANDARD_PRESENTATION_SIZE_INCHES = 6;
@@ -148,6 +151,58 @@ export function sizeLabelForPhoto(
 ): string | null {
   if (!photo.cakeSizeId) return null;
   return sizes.find((size) => size.id === photo.cakeSizeId)?.label ?? null;
+}
+
+function coveredSizeLabels(
+  photos: readonly ResolvableCakePhoto[],
+  sizes: readonly CakePhotoSizeRef[],
+): string[] {
+  const labels = new Set<string>();
+  for (const photo of photos) {
+    const label = sizeLabelForPhoto(photo, sizes);
+    if (label) labels.add(label);
+  }
+  return [...labels].sort(compareCakeSizeLabels);
+}
+
+export function libraryPhotosHaveCoverage(
+  photos: readonly Pick<ResolvableCakePhoto, "url">[],
+): boolean {
+  return photos.some((photo) => Boolean(photo.url?.trim()));
+}
+
+/**
+ * Compact Cake Library listing copy. Reads actual photo records only.
+ * Thumbnail resolution stays on resolveCakePhoto.
+ */
+export function formatCakePhotoCoverageLabel(
+  photos: readonly ResolvableCakePhoto[],
+  sizes: readonly CakePhotoSizeRef[],
+): string {
+  const usable = usablePhotos(photos);
+  if (usable.length === 0) return "No photos";
+
+  const sizeLabels = coveredSizeLabels(usable, sizes);
+  const configuredDefault = usable.find((photo) => photo.isDefault) ?? null;
+  const defaultSizeLabel = configuredDefault
+    ? sizeLabelForPhoto(configuredDefault, sizes)
+    : null;
+
+  if (usable.length === 1) {
+    if (sizeLabels.length === 1) {
+      return `✓ ${sizeLabels[0]} photo`;
+    }
+    return "✓ Default photo";
+  }
+
+  const count =
+    sizeLabels.length > 0
+      ? `✓ ${usable.length} photos · ${sizeLabels.join(", ")}`
+      : `✓ ${usable.length} photos`;
+
+  if (!configuredDefault) return count;
+  if (defaultSizeLabel) return `${count} · Default: ${defaultSizeLabel}`;
+  return `${count} · Default`;
 }
 
 export type CustomerSizePhotoPreview<T extends ResolvableCakePhoto> = {
