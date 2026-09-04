@@ -7,6 +7,7 @@ import {
 } from "@/foundation/staff/notification-preferences";
 import type { StaffNotificationEventKey } from "@/foundation/staff/notification-event-identity";
 import { buildStaffNotificationEmail } from "@/foundation/staff/staff-notification-email";
+import { parseNewOrderNotificationPayload } from "@/foundation/staff/staff-notification-new-order";
 import {
   STAFF_NOTIFICATION_EMAIL_LEASE_SECONDS,
   STAFF_NOTIFICATION_EMAIL_SWEEP_LIMIT,
@@ -65,7 +66,6 @@ type OrderContentRow = {
   id: string;
   order_number: string | null;
   guest_name: string | null;
-  cake_name: string | null;
   pickup_date: string | null;
 };
 
@@ -272,7 +272,7 @@ async function loadOrderContent(
   const admin = createServiceClient();
   const { data, error } = await admin
     .from("orders")
-    .select("id, order_number, guest_name, cake_name, pickup_date")
+    .select("id, order_number, guest_name, pickup_date")
     .eq("id", orderId)
     .maybeSingle();
 
@@ -320,6 +320,10 @@ async function deliverClaimedStaffNotificationEmails(input: {
       const claimedUntilByStaffId = new Map(
         rows.map((row) => [row.staffId, row.claimedUntil] as const),
       );
+      const newOrder =
+        first.code === "new_order"
+          ? parseNewOrderNotificationPayload(payload)
+          : null;
 
       const delivered = await deliverStaffNotificationEmailsToRecipients({
         eventId,
@@ -333,10 +337,11 @@ async function deliverClaimedStaffNotificationEmails(input: {
             order?.order_number ?? payloadString(payload, "orderNumber"),
           customerName:
             order?.guest_name ?? payloadString(payload, "guestName"),
-          cakeName: order?.cake_name ?? payloadString(payload, "cakeName"),
+          cakeName: payloadString(payload, "cakeName"),
           pickupDate:
             order?.pickup_date ?? payloadString(payload, "pickupDate"),
           approvalRequestType: payloadString(payload, "requestType"),
+          newOrder,
         },
         recipients: rows.map((row) => ({
           staffId: row.staffId,

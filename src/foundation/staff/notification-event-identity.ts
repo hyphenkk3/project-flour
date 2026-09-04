@@ -14,6 +14,7 @@ import {
  * emit duplicate notifications.
  */
 export const STAFF_NOTIFICATION_AUTHORITATIVE_SOURCES = {
+  /** Deferred to the end of the orders INSERT transaction so order_items exist. */
   new_order: "orders.insert",
   order_paid: "orders.update.paid",
   order_cancelled: "orders.update.cancelled",

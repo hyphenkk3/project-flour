@@ -129,6 +129,21 @@ assert.match(sql, /staff_notification_request_dispatch/);
 assert.match(sql, /net\.http_post/);
 assert.match(sql, /exception/);
 
+const newOrderContentSql = read(
+  "supabase/migrations/20260905010000_staff_notification_new_order_content.sql",
+);
+assert.match(newOrderContentSql, /constraint trigger/i);
+assert.match(newOrderContentSql, /initially deferred/i);
+assert.match(newOrderContentSql, /staff_notification_emit_new_order/);
+assert.doesNotMatch(
+  newOrderContentSql.split("if tg_op = 'INSERT'")[1]?.split("if tg_op = 'UPDATE'")[0] ?? "",
+  /'new_order:'/,
+);
+assert.doesNotMatch(newOrderContentSql, /from public\.waiting_list/);
+assert.match(newOrderContentSql, /extra_stock_id is not null/);
+assert.match(newOrderContentSql, /from public\.order_items/);
+assert.match(newOrderContentSql, /_staff_notification_cake_display/);
+
 const order = {
   id: "11111111-1111-4111-8111-111111111111",
   status: "submitted",

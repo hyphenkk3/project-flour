@@ -1,5 +1,11 @@
 import { formatShortBusinessDate } from "@/lib/dates";
 import type { StaffNotificationCode } from "@/foundation/staff/notification-preferences";
+import {
+  formatNewOrderRm,
+  newOrderEmailOrderLines,
+  newOrderEmailSections,
+  type NewOrderNotificationSummary,
+} from "@/foundation/staff/staff-notification-new-order";
 
 export type StaffNotificationEmailContent = {
   code: StaffNotificationCode;
@@ -11,6 +17,7 @@ export type StaffNotificationEmailContent = {
   cakeName?: string | null;
   pickupDate?: string | null;
   approvalRequestType?: string | null;
+  newOrder?: NewOrderNotificationSummary | null;
 };
 
 function escapeHtml(value: unknown): string {
@@ -27,10 +34,72 @@ function fulfilmentIndependentDateLabel(pickupDate?: string | null): string | nu
   return formatShortBusinessDate(pickupDate);
 }
 
+function absoluteHref(href?: string | null): string | null {
+  if (!href) return null;
+  if (/^https?:\/\//i.test(href)) return href;
+  const base = (process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/$/, "");
+  if (!base) return href;
+  return `${base}${href.startsWith("/") ? href : `/${href}`}`;
+}
+
+function buildNewOrderEmailHtml(
+  summary: NewOrderNotificationSummary,
+  href?: string | null,
+): string {
+  const sections = newOrderEmailSections(summary)
+    .map(
+      (section) =>
+        `<p><strong>${escapeHtml(section.label)}:</strong> ${escapeHtml(section.value)}</p>`,
+    )
+    .join("");
+  const lines = newOrderEmailOrderLines(summary);
+  const orderBlock = lines.length
+    ? `<p><strong>Order:</strong></p><p>${lines
+        .map((line) => escapeHtml(line))
+        .join("<br />")}</p>`
+    : "";
+  const total = `<p><strong>Total:</strong> ${escapeHtml(formatNewOrderRm(summary.total))}</p>`;
+  const notes = summary.notes
+    ? `<p><strong>Notes:</strong><br />${escapeHtml(summary.notes)}</p>`
+    : "";
+  const viewHref = absoluteHref(href);
+
+  return `
+          <div
+            style="
+              font-family: Arial, sans-serif;
+              line-height: 1.6;
+            "
+          >
+            <h2>New order received</h2>
+            ${sections}
+            ${orderBlock}
+            ${total}
+            ${notes}
+            ${
+              viewHref
+                ? `<p><a href="${escapeHtml(viewHref)}">View in Whitebird →</a></p>`
+                : ""
+            }
+          </div>
+        `;
+}
+
 export function buildStaffNotificationEmail(input: StaffNotificationEmailContent): {
   subject: string;
   html: string;
 } {
+  if (input.code === "new_order" && input.newOrder) {
+    const orderNumber =
+      input.newOrder.orderNumber ?? input.orderNumber ?? null;
+    return {
+      subject: orderNumber
+        ? `New order received — ${orderNumber}`
+        : "New order received",
+      html: buildNewOrderEmailHtml(input.newOrder, input.href),
+    };
+  }
+
   const dateLabel = fulfilmentIndependentDateLabel(input.pickupDate);
   const subjectSuffix = input.orderNumber
     ? ` — ${input.orderNumber}`

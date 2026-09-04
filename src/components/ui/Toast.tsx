@@ -130,7 +130,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <div className="min-w-0 flex-1 px-4 py-3">
               <p className="text-ink text-sm font-semibold">{item.title}</p>
               {item.description ? (
-                <p className="text-skyline mt-1 text-sm">{item.description}</p>
+                <p className="text-skyline mt-1 text-sm whitespace-pre-line">
+                  {item.description}
+                </p>
               ) : null}
             </div>
             {item.actionHref ? (
