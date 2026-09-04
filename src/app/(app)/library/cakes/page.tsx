@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { requireStaff } from "@/foundation/auth/session";
-import { canManageLibrary } from "@/foundation/navigation/access";
+import { canManageCakePhotos, canManageLibrary } from "@/foundation/navigation/access";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { LibraryCake } from "@/types/library-cake";
 import { CakeDirectory } from "@/workspaces/library/cakes/CakeDirectory";
@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function LibraryCakesPage() {
   const staff = await requireStaff();
   const canManage = canManageLibrary(staff.role.code);
+  const canManagePhotos = canManageCakePhotos(staff.role.code);
   let cakes: LibraryCake[] = [];
   let loadError: string | null = null;
 
@@ -28,7 +29,13 @@ export default async function LibraryCakesPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <PageHeader
-          description="Reusable cakes to offer in catalogues."
+          description={
+            canManage
+              ? "Reusable cakes to offer in catalogues."
+              : canManagePhotos
+                ? "Open a cake to upload, preview, and manage photos. Cake records stay under Owner and Manager."
+                : "Reusable cakes to offer in catalogues."
+          }
           title="Cake Library"
         />
         {canManage ? (

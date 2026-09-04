@@ -22,6 +22,7 @@ import {
   libraryCakePhotoObjectPath,
   LIBRARY_CAKE_PHOTO_BUCKET,
 } from "@/workspaces/library/cakes/photo-storage";
+import { canManageCakePhotos, canManageLibrary } from "@/foundation/navigation/access";
 import { PREORDER_DRAFT_KEY } from "@/workspaces/storefront/checkout/preorder-draft";
 
 function readSrc(rel: string): string {
@@ -250,6 +251,9 @@ assert.doesNotMatch(
   /pandan/i,
 );
 assert.equal(LIBRARY_CAKE_PHOTO_BUCKET, "library-cake-photos");
+assert.equal(canManageCakePhotos("bakery"), true);
+assert.equal(canManageCakePhotos("owner"), true);
+assert.equal(canManageLibrary("bakery"), false);
 
 assert.equal(PREORDER_DRAFT_KEY, "whitebird-preorder-draft-v1");
 
@@ -280,13 +284,19 @@ assert.match(engineSrc, /STANDARD_PRESENTATION_SIZE_INCHES = 6/);
 assert.doesNotMatch(engineSrc, /is_default.*6"/);
 assert.doesNotMatch(migrationSrc, /6-inch photo is always primary/i);
 
-assert.match(photoActionsSrc, /canManageLibrary/);
+assert.match(photoActionsSrc, /canManageCakePhotos/);
+assert.doesNotMatch(photoActionsSrc, /canManageLibrary/);
 assert.match(photoActionsSrc, /requireStaff/);
 assert.match(photoActionsSrc, /LIBRARY_CAKE_PHOTO_BUCKET/);
 assert.match(cakeActionsSrc, /saveCakeChildren/);
 assert.doesNotMatch(cakeActionsSrc, /library_cake_photos/);
 assert.doesNotMatch(cakeActionsSrc, /photo_urls/);
 assert.doesNotMatch(cakeActionsSrc, /replaceCakePhotos/);
+
+const detailPageSrc = readSrc("src/app/(app)/library/cakes/[id]/page.tsx");
+assert.match(detailPageSrc, /canManageCakePhotos/);
+assert.match(detailPageSrc, /canManage=\{canManagePhotos\}/);
+assert.doesNotMatch(detailPageSrc, /canManage=\{false\}/);
 
 assert.match(migrationSrc, /add column if not exists cake_size_id/);
 assert.match(migrationSrc, /add column if not exists is_default/);
@@ -296,6 +306,13 @@ assert.match(migrationSrc, /r.code in \('owner', 'manager'\)/);
 assert.doesNotMatch(migrationSrc, /'bakery'/);
 assert.doesNotMatch(migrationSrc, /create policy[\s\S]*to anon/i);
 assert.doesNotMatch(migrationSrc, /bytea/);
+
+const bakeryStorageSrc = readSrc(
+  "supabase/migrations/20260904200000_library_cake_photo_bakery_storage.sql",
+);
+assert.match(bakeryStorageSrc, /'owner', 'manager', 'bakery'/);
+assert.doesNotMatch(bakeryStorageSrc, /create table/);
+assert.doesNotMatch(bakeryStorageSrc, /create bucket/i);
 
 assert.match(draftSrc, /whitebird-preorder-draft-v1/);
 assert.doesNotMatch(draftSrc, /imageUrl/);

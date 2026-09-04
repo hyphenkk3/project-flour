@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireStaff } from "@/foundation/auth/session";
-import { canManageLibrary } from "@/foundation/navigation/access";
+import { canManageCakePhotos } from "@/foundation/navigation/access";
 import { createClient } from "@/lib/supabase/server";
 import {
   fallbackDefaultPhotoId,
@@ -32,9 +32,9 @@ function photoError(message: string): LibraryActionState {
   return { error: message };
 }
 
-async function requireLibraryStaff() {
+async function requireCakePhotoStaff() {
   const staff = await requireStaff();
-  if (!canManageLibrary(staff.role.code)) {
+  if (!canManageCakePhotos(staff.role.code)) {
     redirect("/home");
   }
   return staff;
@@ -108,7 +108,7 @@ export async function uploadCakePhotoAction(
   _prev: LibraryActionState,
   formData: FormData,
 ): Promise<LibraryActionState> {
-  await requireLibraryStaff();
+  await requireCakePhotoStaff();
   const loaded = await loadCakeOrError(cakeId);
   if (loaded.error || !loaded.cake) return { error: loaded.error ?? "Cake not found." };
 
@@ -192,7 +192,7 @@ export async function replaceCakePhotoAction(
   _prev: LibraryActionState,
   formData: FormData,
 ): Promise<LibraryActionState> {
-  await requireLibraryStaff();
+  await requireCakePhotoStaff();
   const loaded = await loadCakeOrError(cakeId);
   if (loaded.error || !loaded.cake) return { error: loaded.error ?? "Cake not found." };
   const existing = loaded.cake.photos.find((photo) => photo.id === photoId);
@@ -242,7 +242,7 @@ export async function assignCakePhotoSizeAction(
   photoId: string,
   formData: FormData,
 ): Promise<LibraryActionState> {
-  await requireLibraryStaff();
+  await requireCakePhotoStaff();
   const loaded = await loadCakeOrError(cakeId);
   if (loaded.error || !loaded.cake) return { error: loaded.error ?? "Cake not found." };
   const photo = loaded.cake.photos.find((item) => item.id === photoId);
@@ -289,7 +289,7 @@ export async function setCakePhotoDefaultAction(
   cakeId: string,
   photoId: string,
 ): Promise<LibraryActionState> {
-  await requireLibraryStaff();
+  await requireCakePhotoStaff();
   const loaded = await loadCakeOrError(cakeId);
   if (loaded.error || !loaded.cake) return { error: loaded.error ?? "Cake not found." };
   if (!loaded.cake.photos.some((photo) => photo.id === photoId)) {
@@ -311,7 +311,7 @@ export async function moveCakePhotoAction(
   photoId: string,
   direction: "up" | "down",
 ): Promise<LibraryActionState> {
-  await requireLibraryStaff();
+  await requireCakePhotoStaff();
   const loaded = await loadCakeOrError(cakeId);
   if (loaded.error || !loaded.cake) return { error: loaded.error ?? "Cake not found." };
   const ordered = [...loaded.cake.photos].sort(
@@ -344,7 +344,7 @@ export async function deleteCakePhotoAction(
   cakeId: string,
   photoId: string,
 ): Promise<LibraryActionState> {
-  await requireLibraryStaff();
+  await requireCakePhotoStaff();
   const loaded = await loadCakeOrError(cakeId);
   if (loaded.error || !loaded.cake) return { error: loaded.error ?? "Cake not found." };
   const existing = loaded.cake.photos.find((photo) => photo.id === photoId);

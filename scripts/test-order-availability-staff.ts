@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { RoleCode } from "@/types/staff";
 import {
+  canManageCakePhotos,
   canManageLibrary,
   canMutateOrderAvailability,
   canViewOrderAvailability,
@@ -46,6 +47,10 @@ assert.equal(canMutateOrderAvailability("customer_operations"), false);
 assert.equal(canMutateOrderAvailability("collection"), false);
 
 assert.equal(canManageLibrary("bakery"), false);
+assert.equal(canManageCakePhotos("bakery"), true);
+assert.equal(canManageCakePhotos("owner"), true);
+assert.equal(canManageCakePhotos("manager"), true);
+assert.equal(canManageCakePhotos("customer_operations"), false);
 assert.equal(canMutateOrderAvailability("bakery"), true);
 assert.equal(canManageLibrary("customer_operations"), false);
 assert.equal(canViewOrderAvailability("customer_operations"), true);

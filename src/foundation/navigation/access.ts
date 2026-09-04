@@ -22,6 +22,16 @@ export function canManageLibrary(role: RoleCode): boolean {
 }
 
 /**
+ * Cake photo media (upload, default, size assignment, replace, delete, reorder).
+ *
+ * Separate from Library cake-record configuration (`canManageLibrary`).
+ * Owner, Manager, and Bakery may manage photos. Customer Operations may not.
+ */
+export function canManageCakePhotos(role: RoleCode): boolean {
+  return role === "owner" || role === "manager" || role === "bakery";
+}
+
+/**
  * Library read access.
  *
  * Bakery may view the Library, but does not receive Library mutation rights.

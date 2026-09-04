@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { requireStaff } from "@/foundation/auth/session";
-import { canManageLibrary } from "@/foundation/navigation/access";
+import { canManageCakePhotos, canManageLibrary } from "@/foundation/navigation/access";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { CakePhotoManager } from "@/workspaces/library/cakes/CakePhotoManager";
 import { deleteCakeAction } from "@/workspaces/library/cakes/actions";
@@ -26,6 +26,7 @@ export default async function LibraryCakeDetailPage({
 }: CakeDetailPageProps) {
   const staff = await requireStaff();
   const canManage = canManageLibrary(staff.role.code);
+  const canManagePhotos = canManageCakePhotos(staff.role.code);
   const { id } = await params;
   const cake = await getCakeById(id);
 
@@ -129,7 +130,7 @@ export default async function LibraryCakeDetailPage({
         )}
       </section>
 
-      <CakePhotoManager cake={cake} canManage={false} />
+      <CakePhotoManager cake={cake} canManage={canManagePhotos} />
     </div>
   );
 }
