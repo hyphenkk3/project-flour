@@ -23,8 +23,21 @@ import {
   selectStaffEmailRecipients,
   staffNotificationEventKey,
 } from "../src/foundation/staff/notification-event-identity";
-import { deliverStaffNotificationEmailsToRecipients } from "../src/foundation/staff/staff-notification-dispatch";
+import {
+  deliverStaffNotificationEmailsToRecipients,
+  deliverPendingStaffNotificationEmails,
+} from "../src/foundation/staff/staff-notification-dispatch";
 import { authorizeStaffNotificationDispatch } from "../src/foundation/staff/staff-notification-dispatch-auth";
+import {
+  STAFF_NOTIFICATION_EMAIL_MAX_ATTEMPTS,
+  STAFF_NOTIFICATION_EMAIL_SWEEP_LIMIT,
+  eventHasPendingStaffNotificationEmail,
+  isStaffNotificationEmailDeliveryClaimable,
+  selectPendingStaffNotificationEventIds,
+  staffNotificationEmailNextAttemptAt,
+  staffNotificationEmailRetryDelayMs,
+  tryClaimStaffNotificationEmailDelivery,
+} from "../src/foundation/staff/staff-notification-dispatch-queue";
 import { isNewOrderNotificationEligible } from "../src/workspaces/owner/orders/new-order-notifications";
 import type { StorefrontOrderListItem } from "../src/types/storefront";
 
@@ -245,7 +258,12 @@ assert.equal(
 
 const laterCancelledUpdate = classifyOrderUpdate(
   { ...order, status: "cancelled", paymentStatus: "unpaid" },
-  { ...order, status: "cancelled", paymentStatus: "unpaid", orderSource: "walk_in" },
+  {
+    ...order,
+    status: "cancelled",
+    paymentStatus: "unpaid",
+    orderSource: "walk_in",
+  },
 );
 assert.equal(laterCancelledUpdate.length, 0);
 assert.equal(
@@ -314,10 +332,10 @@ const lastMinuteInsert = classifyOrderInsert({
   orderSource: "last_minute",
 });
 assert.equal(lastMinuteInsert.length, 2);
-assert.deepEqual(
-  lastMinuteInsert.map((item) => item.code).sort(),
-  ["last_minute", "new_order"],
-);
+assert.deepEqual(lastMinuteInsert.map((item) => item.code).sort(), [
+  "last_minute",
+  "new_order",
+]);
 
 const lastMinuteUpdate = classifyOrderUpdate(
   { ...order, orderSource: "walk_in" },
@@ -384,10 +402,10 @@ const emailRecipients = selectStaffEmailRecipients({
     ["c", { new_order: { emailEnabled: false } }],
   ]),
 });
-assert.deepEqual(
-  emailRecipients.map((item) => item.staffId).sort(),
-  ["a", "b"],
-);
+assert.deepEqual(emailRecipients.map((item) => item.staffId).sort(), [
+  "a",
+  "b",
+]);
 
 const defaultOn = selectStaffEmailRecipients({
   code: "order_paid",
@@ -397,209 +415,536 @@ const defaultOn = selectStaffEmailRecipients({
 assert.equal(STAFF_NOTIFICATION_DEFAULT_ENABLED, true);
 assert.equal(defaultOn.length, 1);
 
-async function testEmailDelivery() {
-  const sent: string[] = [];
-const fakeMailer = {
-  async send(input: { to: string; idempotencyKey: string }) {
-    sent.push(`${input.to}:${input.idempotencyKey}`);
-    return { id: "resend-1" };
-  },
+const now = new Date("2026-09-03T14:00:00.000Z");
+const sentDelivery = {
+  staffId: "a",
+  status: "sent" as const,
+  attemptCount: 1,
+  nextAttemptAt: null,
+  claimedUntil: null,
 };
+const undeliveredRecipient = { staffId: "b" };
 
-const bothOn = await deliverStaffNotificationEmailsToRecipients({
-  eventId: "evt-1",
-  eventKey: "new_order:order-1",
-  content: {
-    code: "new_order",
-    title: "New order received",
-    description: "Guest · Mangolicious",
-  },
-  recipients: emailRecipients,
-  mailer: fakeMailer,
-});
-assert.equal(bothOn.sent, 2);
-assert.equal(bothOn.failed, 0);
-assert.equal(sent.length, 2);
-
-const duplicateSend = await deliverStaffNotificationEmailsToRecipients({
-  eventId: "evt-1",
-  eventKey: "new_order:order-1",
-  content: {
-    code: "new_order",
-    title: "New order received",
-    description: "Guest · Mangolicious",
-  },
-  recipients: emailRecipients,
-  alreadyDeliveredStaffIds: new Set(emailRecipients.map((item) => item.staffId)),
-  mailer: fakeMailer,
-});
-assert.equal(duplicateSend.sent, 0);
-assert.equal(duplicateSend.skipped, 2);
-assert.equal(sent.length, 2);
-
-const failingMailer = {
-  async send() {
-    throw new Error("Resend unavailable");
-  },
-};
-const paymentSucceeded = true;
-const failedEmail = await deliverStaffNotificationEmailsToRecipients({
-  eventId: "evt-paid",
-  eventKey: "order_paid:order-1",
-  content: {
-    code: "order_paid",
-    title: "Order paid",
-    description: "Guest · Mangolicious",
-  },
-  recipients: [{ staffId: "a", email: "a@whitebird.test" }],
-  mailer: failingMailer,
-});
-assert.equal(paymentSucceeded, true);
-assert.equal(failedEmail.failed, 1);
-assert.equal(failedEmail.sent, 0);
-
-const unauthorized = authorizeStaffNotificationDispatch(
-  new Request("http://localhost/api/staff/notifications/dispatch", {
-    method: "POST",
-  }),
-);
-assert.equal(unauthorized.ok, false);
-assert.ok(unauthorized.ok === false && unauthorized.status >= 401);
-
-const previous = process.env.STAFF_NOTIFICATION_DISPATCH_SECRET;
-process.env.STAFF_NOTIFICATION_DISPATCH_SECRET = "test-dispatch-secret";
-const stillUnauthorized = authorizeStaffNotificationDispatch(
-  new Request("http://localhost/api/staff/notifications/dispatch", {
-    method: "POST",
-  }),
-);
-assert.equal(stillUnauthorized.ok, false);
-const authorized = authorizeStaffNotificationDispatch(
-  new Request("http://localhost/api/staff/notifications/dispatch", {
-    method: "POST",
-    headers: { authorization: "Bearer test-dispatch-secret" },
-  }),
-);
-assert.equal(authorized.ok, true);
-if (previous == null) {
-  delete process.env.STAFF_NOTIFICATION_DISPATCH_SECRET;
-} else {
-  process.env.STAFF_NOTIFICATION_DISPATCH_SECRET = previous;
-}
-
-const listenerSrc = read("src/components/shell/StaffNotificationListener.tsx");
-assert.match(listenerSrc, /staff_notification_events/);
-assert.doesNotMatch(listenerSrc, /\/api\/staff\/notifications\/email/);
-assert.doesNotMatch(listenerSrc, /localStorage/);
-assert.doesNotMatch(listenerSrc, /order_timeline_events/);
-assert.doesNotMatch(listenerSrc, /operations_approval_requests/);
-
-const dispatchSrc = read(
-  "src/foundation/staff/staff-notification-dispatch.ts",
-);
-assert.match(dispatchSrc, /createServiceClient/);
-assert.match(dispatchSrc, /RESEND_API_KEY/);
-assert.doesNotMatch(dispatchSrc, /StaffNotificationListener/);
-assert.match(dispatchSrc, /idempotencyKey/);
-
-const emailRouteSrc = read(
-  "src/app/api/staff/notifications/email/route.ts",
-);
-assert.match(emailRouteSrc, /403/);
-assert.doesNotMatch(emailRouteSrc, /RESEND_API_KEY/);
-assert.doesNotMatch(emailRouteSrc, /from "resend"/);
-
-const dispatchRouteSrc = read(
-  "src/app/api/staff/notifications/dispatch/route.ts",
-);
-assert.match(dispatchRouteSrc, /authorizeStaffNotificationDispatch/);
-assert.doesNotMatch(dispatchRouteSrc, /requireStaff/);
-
-const engineSrc = read(
-  "src/foundation/staff/staff-notification-engine.ts",
-);
-assert.doesNotMatch(engineSrc, /localStorage/);
-assert.match(engineSrc, /BroadcastChannel/);
-
-const operationsSrc = read(
-  "src/workspaces/owner/OperationsLiveBoard.tsx",
-);
-assert.doesNotMatch(operationsSrc, /toast\(/);
-assert.doesNotMatch(operationsSrc, /tryClaimNewOrderNotification/);
-assert.doesNotMatch(operationsSrc, /NEW_ORDER_NOTIFIED_IDS_KEY/);
-assert.doesNotMatch(operationsSrc, /Guest Preorder/);
-assert.doesNotMatch(operationsSrc, /localStorage/);
-
-const homeCockpitSrc = read("src/workspaces/home/HomeCockpit.tsx");
-assert.doesNotMatch(homeCockpitSrc, /notificationPreference/);
-assert.doesNotMatch(homeCockpitSrc, /HomeGuestPreorderNotificationListener/);
 assert.equal(
-  existsSync(
-    resolve("src/workspaces/home/HomeGuestPreorderNotificationListener.tsx"),
+  eventHasPendingStaffNotificationEmail({
+    recipients: [{ staffId: "a" }, { staffId: "b" }],
+    deliveries: [
+      sentDelivery,
+      {
+        staffId: "b",
+        status: "sent",
+        attemptCount: 1,
+        nextAttemptAt: null,
+        claimedUntil: null,
+      },
+    ],
+    now,
+  }),
+  false,
+);
+
+assert.equal(
+  eventHasPendingStaffNotificationEmail({
+    recipients: [{ staffId: "a" }, undeliveredRecipient],
+    deliveries: [sentDelivery],
+    now,
+  }),
+  true,
+);
+
+const failedRetryable = {
+  staffId: "a",
+  status: "failed" as const,
+  attemptCount: 1,
+  nextAttemptAt: new Date("2026-09-03T13:59:00.000Z"),
+  claimedUntil: null,
+};
+assert.equal(
+  isStaffNotificationEmailDeliveryClaimable(failedRetryable, now),
+  true,
+);
+
+assert.equal(
+  isStaffNotificationEmailDeliveryClaimable(sentDelivery, now),
+  false,
+);
+assert.equal(
+  isStaffNotificationEmailDeliveryClaimable(
+    {
+      ...sentDelivery,
+      nextAttemptAt: new Date("2026-09-03T13:00:00.000Z"),
+    },
+    now,
   ),
   false,
 );
 
-const userMenuSrc = read("src/components/shell/UserMenu.tsx");
-assert.doesNotMatch(userMenuSrc, /Guest Preorder/);
-assert.doesNotMatch(userMenuSrc, /guest-preorder-notification/);
-assert.doesNotMatch(userMenuSrc, /localStorage/);
-
-const settingsSrc = read("src/components/settings/NotificationPreferences.tsx");
-assert.match(settingsSrc, /web_enabled/);
-assert.match(settingsSrc, /email_enabled/);
-assert.match(settingsSrc, /notification_code/);
-
-const settingsPageSrc = read("src/app/(app)/settings/page.tsx");
-assert.match(settingsPageSrc, /NotificationPreferences/);
-assert.match(settingsPageSrc, /getNotificationDefinitionsForRole/);
-
-assert.doesNotMatch(
-  read("src/components/shell/AppShellFrame.tsx"),
-  /staffEmail/,
+assert.equal(staffNotificationEmailRetryDelayMs(1), 60 * 1000);
+assert.equal(staffNotificationEmailRetryDelayMs(2), 5 * 60 * 1000);
+assert.equal(staffNotificationEmailRetryDelayMs(3), 15 * 60 * 1000);
+assert.equal(staffNotificationEmailRetryDelayMs(4), 60 * 60 * 1000);
+assert.equal(staffNotificationEmailRetryDelayMs(5), null);
+assert.equal(
+  staffNotificationEmailNextAttemptAt(1, now)?.toISOString(),
+  "2026-09-03T14:01:00.000Z",
+);
+assert.equal(
+  isStaffNotificationEmailDeliveryClaimable(
+    {
+      staffId: "a",
+      status: "failed",
+      attemptCount: 1,
+      nextAttemptAt: new Date("2026-09-03T14:01:00.000Z"),
+      claimedUntil: null,
+    },
+    now,
+  ),
+  false,
 );
 
-const clientFiles = [
-  "src/components/shell/StaffNotificationListener.tsx",
-  "src/components/shell/AppShellFrame.tsx",
-  "src/components/settings/NotificationPreferences.tsx",
-  "src/workspaces/owner/OperationsLiveBoard.tsx",
-];
-for (const file of clientFiles) {
-  const source = read(file);
-  assert.doesNotMatch(source, /RESEND_API_KEY/);
-  assert.doesNotMatch(source, /NEXT_PUBLIC_RESEND/);
-}
-
-assert.match(read(".env.example"), /RESEND_API_KEY/);
-assert.doesNotMatch(read(".env.example"), /NEXT_PUBLIC_RESEND/);
-assert.match(read("vercel.json"), /\/api\/staff\/notifications\/dispatch/);
-
-assert.match(
-  read("src/workspaces/storefront/checkout/actions.ts"),
-  /scheduleStaffNotificationDispatch/,
+assert.equal(
+  isStaffNotificationEmailDeliveryClaimable(
+    {
+      staffId: "a",
+      status: "failed",
+      attemptCount: STAFF_NOTIFICATION_EMAIL_MAX_ATTEMPTS,
+      nextAttemptAt: new Date("2026-09-03T13:00:00.000Z"),
+      claimedUntil: null,
+    },
+    now,
+  ),
+  false,
 );
-assert.match(
-  read("src/workspaces/owner/orders/actions.ts"),
-  /scheduleStaffNotificationDispatch/,
-);
-assert.match(
-  read("src/foundation/staff/schedule-staff-notification-dispatch.ts"),
-  /after/,
+assert.equal(
+  isStaffNotificationEmailDeliveryClaimable(
+    {
+      staffId: "a",
+      status: "failed",
+      attemptCount: STAFF_NOTIFICATION_EMAIL_MAX_ATTEMPTS - 1,
+      nextAttemptAt: new Date("2026-09-03T13:00:00.000Z"),
+      claimedUntil: null,
+    },
+    now,
+  ),
+  true,
 );
 
-assert.doesNotMatch(
-  read("src/workspaces/waiting-list/actions.ts").split(
-    "export async function submitGuestWaitingListAction",
-  )[0] ?? "",
-  /new_order/,
+assert.deepEqual(
+  selectPendingStaffNotificationEventIds({
+    events: [
+      { id: "delivered", createdAt: new Date("2026-09-01T00:00:00.000Z") },
+      { id: "pending-older", createdAt: new Date("2026-09-02T00:00:00.000Z") },
+      { id: "pending-newer", createdAt: new Date("2026-09-03T00:00:00.000Z") },
+    ],
+    pendingByEventId: new Map([
+      ["delivered", false],
+      ["pending-older", true],
+      ["pending-newer", true],
+    ]),
+    limit: STAFF_NOTIFICATION_EMAIL_SWEEP_LIMIT,
+  }),
+  ["pending-older", "pending-newer"],
 );
 
-const phase8Sql = read(
-  "supabase/migrations/20260903140000_phase8_guest_order_cancel.sql",
-);
-assert.match(phase8Sql, /status = 'cancelled'/);
-assert.match(phase8Sql, /order_cancelled/);
+const firstClaim = tryClaimStaffNotificationEmailDelivery({
+  existing: null,
+  now,
+});
+assert.equal(firstClaim.ok, true);
+const secondClaim = tryClaimStaffNotificationEmailDelivery({
+  existing: firstClaim.ok
+    ? {
+        staffId: "a",
+        status: "claimed",
+        attemptCount: 0,
+        nextAttemptAt: null,
+        claimedUntil: firstClaim.claimedUntil,
+      }
+    : null,
+  now,
+});
+assert.equal(secondClaim.ok, false);
+const expiredClaim = tryClaimStaffNotificationEmailDelivery({
+  existing: firstClaim.ok
+    ? {
+        staffId: "a",
+        status: "claimed",
+        attemptCount: 0,
+        nextAttemptAt: null,
+        claimedUntil: firstClaim.claimedUntil,
+      }
+    : null,
+  now: new Date(
+    firstClaim.ok ? firstClaim.claimedUntil.getTime() + 1 : now.getTime(),
+  ),
+});
+assert.equal(expiredClaim.ok, true);
+
+async function testEmailDelivery() {
+  const sent: string[] = [];
+  const fakeMailer = {
+    async send(input: { to: string; idempotencyKey: string }) {
+      sent.push(`${input.to}:${input.idempotencyKey}`);
+      return { id: "resend-1" };
+    },
+  };
+
+  const bothOn = await deliverStaffNotificationEmailsToRecipients({
+    eventId: "evt-1",
+    eventKey: "new_order:order-1",
+    content: {
+      code: "new_order",
+      title: "New order received",
+      description: "Guest · Mangolicious",
+    },
+    recipients: emailRecipients,
+    mailer: fakeMailer,
+  });
+  assert.equal(bothOn.sent, 2);
+  assert.equal(bothOn.failed, 0);
+  assert.equal(sent.length, 2);
+
+  const duplicateSend = await deliverStaffNotificationEmailsToRecipients({
+    eventId: "evt-1",
+    eventKey: "new_order:order-1",
+    content: {
+      code: "new_order",
+      title: "New order received",
+      description: "Guest · Mangolicious",
+    },
+    recipients: emailRecipients,
+    alreadyDeliveredStaffIds: new Set(
+      emailRecipients.map((item) => item.staffId),
+    ),
+    mailer: fakeMailer,
+  });
+  assert.equal(duplicateSend.sent, 0);
+  assert.equal(duplicateSend.skipped, 2);
+  assert.equal(sent.length, 2);
+
+  const failingMailer = {
+    async send() {
+      throw new Error("Resend unavailable");
+    },
+  };
+  const paymentSucceeded = true;
+  const failedEmail = await deliverStaffNotificationEmailsToRecipients({
+    eventId: "evt-paid",
+    eventKey: "order_paid:order-1",
+    content: {
+      code: "order_paid",
+      title: "Order paid",
+      description: "Guest · Mangolicious",
+    },
+    recipients: [{ staffId: "a", email: "a@whitebird.test" }],
+    mailer: failingMailer,
+  });
+  assert.equal(paymentSucceeded, true);
+  assert.equal(failedEmail.failed, 1);
+  assert.equal(failedEmail.sent, 0);
+
+  const memoryDeliveries = new Map<
+    string,
+    {
+      staffId: string;
+      status: "sent" | "failed" | "claimed";
+      attemptCount: number;
+      nextAttemptAt: Date | null;
+      claimedUntil: Date | null;
+    }
+  >();
+  const claimedEvent = {
+    eventId: "evt-concurrent",
+    eventKey: "new_order:order-concurrent",
+    code: "new_order" as const,
+    title: "New order received",
+    description: "Guest · Mangolicious",
+    href: "/owner/orders/order-concurrent",
+    payload: {},
+    orderId: null,
+  };
+  const concurrentRecipients = [
+    { staffId: "a", email: "a@whitebird.test" },
+    { staffId: "b", email: "b@whitebird.test" },
+  ];
+
+  const memoryClaimer = async () => {
+    const claimNow = new Date();
+    const claimed = [];
+    for (const recipient of concurrentRecipients) {
+      const existing = memoryDeliveries.get(recipient.staffId) ?? null;
+      const claim = tryClaimStaffNotificationEmailDelivery({
+        existing,
+        now: claimNow,
+      });
+      if (!claim.ok) continue;
+      memoryDeliveries.set(recipient.staffId, {
+        staffId: recipient.staffId,
+        status: "claimed",
+        attemptCount: existing?.attemptCount ?? 0,
+        nextAttemptAt: existing?.nextAttemptAt ?? null,
+        claimedUntil: claim.claimedUntil,
+      });
+      claimed.push({
+        deliveryId: `delivery-${recipient.staffId}`,
+        eventId: claimedEvent.eventId,
+        staffId: recipient.staffId,
+        staffEmail: recipient.email,
+        claimedUntil: claim.claimedUntil.toISOString(),
+        eventKey: claimedEvent.eventKey,
+        code: claimedEvent.code,
+        title: claimedEvent.title,
+        description: claimedEvent.description,
+        href: claimedEvent.href,
+        payload: claimedEvent.payload,
+        orderId: claimedEvent.orderId,
+      });
+    }
+    return claimed;
+  };
+
+  const memoryComplete = async (input: {
+    staffId: string;
+    status: "sent" | "failed";
+    claimedUntil: string;
+  }) => {
+    const existing = memoryDeliveries.get(input.staffId);
+    if (!existing || existing.status !== "claimed") return;
+    if (existing.claimedUntil?.toISOString() !== input.claimedUntil) return;
+    memoryDeliveries.set(input.staffId, {
+      staffId: input.staffId,
+      status: input.status,
+      attemptCount: existing.attemptCount + 1,
+      nextAttemptAt:
+        input.status === "sent"
+          ? null
+          : staffNotificationEmailNextAttemptAt(
+              existing.attemptCount + 1,
+              new Date(),
+            ),
+      claimedUntil: null,
+    });
+  };
+
+  const concurrentSent: string[] = [];
+  const concurrentMailer = {
+    async send(input: { to: string }) {
+      concurrentSent.push(input.to);
+      return { id: "resend-concurrent" };
+    },
+  };
+
+  const firstDispatch = await deliverPendingStaffNotificationEmails({
+    mailer: concurrentMailer,
+    claimer: memoryClaimer,
+    completeDelivery: async (input) => {
+      await memoryComplete(input);
+    },
+  });
+  const secondDispatch = await deliverPendingStaffNotificationEmails({
+    mailer: concurrentMailer,
+    claimer: memoryClaimer,
+    completeDelivery: async (input) => {
+      await memoryComplete(input);
+    },
+  });
+
+  assert.equal(firstDispatch[0]?.sent, 2);
+  assert.equal(secondDispatch.length, 0);
+  assert.equal(concurrentSent.length, 2);
+  assert.equal(
+    [...memoryDeliveries.values()].every((row) => row.status === "sent"),
+    true,
+  );
+  assert.equal(
+    eventHasPendingStaffNotificationEmail({
+      recipients: concurrentRecipients,
+      deliveries: [...memoryDeliveries.values()],
+      now: new Date(),
+    }),
+    false,
+  );
+
+  const unauthorized = authorizeStaffNotificationDispatch(
+    new Request("http://localhost/api/staff/notifications/dispatch", {
+      method: "POST",
+    }),
+  );
+  assert.equal(unauthorized.ok, false);
+  assert.ok(unauthorized.ok === false && unauthorized.status >= 401);
+
+  const previous = process.env.STAFF_NOTIFICATION_DISPATCH_SECRET;
+  process.env.STAFF_NOTIFICATION_DISPATCH_SECRET = "test-dispatch-secret";
+  const stillUnauthorized = authorizeStaffNotificationDispatch(
+    new Request("http://localhost/api/staff/notifications/dispatch", {
+      method: "POST",
+    }),
+  );
+  assert.equal(stillUnauthorized.ok, false);
+  const authorized = authorizeStaffNotificationDispatch(
+    new Request("http://localhost/api/staff/notifications/dispatch", {
+      method: "POST",
+      headers: { authorization: "Bearer test-dispatch-secret" },
+    }),
+  );
+  assert.equal(authorized.ok, true);
+  if (previous == null) {
+    delete process.env.STAFF_NOTIFICATION_DISPATCH_SECRET;
+  } else {
+    process.env.STAFF_NOTIFICATION_DISPATCH_SECRET = previous;
+  }
+
+  const listenerSrc = read(
+    "src/components/shell/StaffNotificationListener.tsx",
+  );
+  assert.match(listenerSrc, /staff_notification_events/);
+  assert.doesNotMatch(listenerSrc, /\/api\/staff\/notifications\/email/);
+  assert.doesNotMatch(listenerSrc, /localStorage/);
+  assert.doesNotMatch(listenerSrc, /order_timeline_events/);
+  assert.doesNotMatch(listenerSrc, /operations_approval_requests/);
+
+  const dispatchSrc = read(
+    "src/foundation/staff/staff-notification-dispatch.ts",
+  );
+  assert.match(dispatchSrc, /createServiceClient/);
+  assert.match(dispatchSrc, /RESEND_API_KEY/);
+  assert.doesNotMatch(dispatchSrc, /StaffNotificationListener/);
+  assert.match(dispatchSrc, /idempotencyKey/);
+  assert.match(dispatchSrc, /claim_staff_notification_email_deliveries/);
+  assert.match(dispatchSrc, /complete_staff_notification_email_delivery/);
+  assert.doesNotMatch(
+    dispatchSrc,
+    /\.from\("staff_notification_events"\)[\s\S]*\.order\("created_at"/,
+  );
+
+  const queueSql = read(
+    "supabase/migrations/20260903220000_staff_notification_email_dispatch_queue.sql",
+  );
+  assert.match(queueSql, /for update skip locked/i);
+  assert.match(queueSql, /on conflict \(event_id, staff_id\)/);
+  assert.match(queueSql, /status is distinct from 'sent'/);
+  assert.match(queueSql, /coalesce\(pref\.email_enabled, true\)/);
+  assert.match(queueSql, /sp\.is_active = true/);
+  assert.match(queueSql, /staff_notification_email_retry_delay/);
+  assert.match(queueSql, /claimed_until is not distinct from p_claimed_until/);
+  assert.doesNotMatch(queueSql, /create extension/i);
+  assert.doesNotMatch(queueSql, /net\.http_post/);
+
+  const emailRouteSrc = read("src/app/api/staff/notifications/email/route.ts");
+  assert.match(emailRouteSrc, /403/);
+  assert.doesNotMatch(emailRouteSrc, /RESEND_API_KEY/);
+  assert.doesNotMatch(emailRouteSrc, /from "resend"/);
+
+  const dispatchRouteSrc = read(
+    "src/app/api/staff/notifications/dispatch/route.ts",
+  );
+  assert.match(dispatchRouteSrc, /authorizeStaffNotificationDispatch/);
+  assert.doesNotMatch(dispatchRouteSrc, /requireStaff/);
+
+  const engineSrc = read("src/foundation/staff/staff-notification-engine.ts");
+  assert.doesNotMatch(engineSrc, /localStorage/);
+  assert.match(engineSrc, /BroadcastChannel/);
+
+  const operationsSrc = read("src/workspaces/owner/OperationsLiveBoard.tsx");
+  assert.doesNotMatch(operationsSrc, /toast\(/);
+  assert.doesNotMatch(operationsSrc, /tryClaimNewOrderNotification/);
+  assert.doesNotMatch(operationsSrc, /NEW_ORDER_NOTIFIED_IDS_KEY/);
+  assert.doesNotMatch(operationsSrc, /Guest Preorder/);
+  assert.doesNotMatch(operationsSrc, /localStorage/);
+
+  const homeCockpitSrc = read("src/workspaces/home/HomeCockpit.tsx");
+  assert.doesNotMatch(homeCockpitSrc, /notificationPreference/);
+  assert.doesNotMatch(homeCockpitSrc, /HomeGuestPreorderNotificationListener/);
+  assert.equal(
+    existsSync(
+      resolve("src/workspaces/home/HomeGuestPreorderNotificationListener.tsx"),
+    ),
+    false,
+  );
+
+  const userMenuSrc = read("src/components/shell/UserMenu.tsx");
+  assert.doesNotMatch(userMenuSrc, /Guest Preorder/);
+  assert.doesNotMatch(userMenuSrc, /guest-preorder-notification/);
+  assert.doesNotMatch(userMenuSrc, /localStorage/);
+
+  const settingsSrc = read(
+    "src/components/settings/NotificationPreferences.tsx",
+  );
+  assert.match(settingsSrc, /web_enabled/);
+  assert.match(settingsSrc, /email_enabled/);
+  assert.match(settingsSrc, /notification_code/);
+
+  const settingsPageSrc = read("src/app/(app)/settings/page.tsx");
+  assert.match(settingsPageSrc, /NotificationPreferences/);
+  assert.match(settingsPageSrc, /getNotificationDefinitionsForRole/);
+
+  assert.doesNotMatch(
+    read("src/components/shell/AppShellFrame.tsx"),
+    /staffEmail/,
+  );
+
+  const clientFiles = [
+    "src/components/shell/StaffNotificationListener.tsx",
+    "src/components/shell/AppShellFrame.tsx",
+    "src/components/settings/NotificationPreferences.tsx",
+    "src/workspaces/owner/OperationsLiveBoard.tsx",
+  ];
+  for (const file of clientFiles) {
+    const source = read(file);
+    assert.doesNotMatch(source, /RESEND_API_KEY/);
+    assert.doesNotMatch(source, /NEXT_PUBLIC_RESEND/);
+  }
+
+  assert.match(read(".env.example"), /RESEND_API_KEY/);
+  assert.doesNotMatch(read(".env.example"), /NEXT_PUBLIC_RESEND/);
+  const vercelJson = read("vercel.json");
+  assert.doesNotMatch(vercelJson, /"crons"/);
+  assert.doesNotMatch(vercelJson, /\* \* \* \* \*/);
+  assert.doesNotMatch(vercelJson, /\/api\/staff\/notifications\/dispatch/);
+
+  const cronSql = read(
+    "supabase/migrations/20260904120000_staff_notification_pg_cron_sweep.sql",
+  );
+  assert.match(cronSql, /create extension if not exists pg_cron/);
+  assert.doesNotMatch(cronSql, /create extension if not exists pg_net/);
+  assert.match(cronSql, /staff-notification-email-dispatch-sweep/);
+  assert.match(cronSql, /\*\/15 \* \* \* \*/);
+  assert.match(cronSql, /staff_notification_cron_sweep/);
+  assert.match(cronSql, /net\.http_get/);
+  assert.match(cronSql, /Authorization/);
+  assert.match(cronSql, /Bearer /);
+  assert.match(cronSql, /app\.settings\.staff_notification_dispatch_url/);
+  assert.match(cronSql, /app\.settings\.staff_notification_dispatch_secret/);
+  assert.match(cronSql, /staff_notification_pg_net_per_event/);
+  assert.doesNotMatch(cronSql, /ALTER DATABASE/i);
+  assert.doesNotMatch(cronSql, /STAFF_NOTIFICATION_DISPATCH_SECRET\s*=/);
+  assert.doesNotMatch(cronSql, /https:\/\//);
+
+  assert.match(
+    read("src/workspaces/storefront/checkout/actions.ts"),
+    /scheduleStaffNotificationDispatch/,
+  );
+  assert.match(
+    read("src/workspaces/owner/orders/actions.ts"),
+    /scheduleStaffNotificationDispatch/,
+  );
+  assert.match(
+    read("src/foundation/staff/schedule-staff-notification-dispatch.ts"),
+    /after/,
+  );
+
+  assert.doesNotMatch(
+    read("src/workspaces/waiting-list/actions.ts").split(
+      "export async function submitGuestWaitingListAction",
+    )[0] ?? "",
+    /new_order/,
+  );
+
+  const phase8Sql = read(
+    "supabase/migrations/20260903140000_phase8_guest_order_cancel.sql",
+  );
+  assert.match(phase8Sql, /status = 'cancelled'/);
+  assert.match(phase8Sql, /order_cancelled/);
 
   console.log("PASS staff notifications");
 }

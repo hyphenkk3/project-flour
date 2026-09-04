@@ -5,11 +5,12 @@ import {
   STAFF_NOTIFICATION_DEFINITIONS,
   type StaffNotificationCode,
 } from "@/foundation/staff/notification-preferences";
-import {
-  selectStaffEmailRecipients,
-  type StaffNotificationEventKey,
-} from "@/foundation/staff/notification-event-identity";
+import type { StaffNotificationEventKey } from "@/foundation/staff/notification-event-identity";
 import { buildStaffNotificationEmail } from "@/foundation/staff/staff-notification-email";
+import {
+  STAFF_NOTIFICATION_EMAIL_LEASE_SECONDS,
+  STAFF_NOTIFICATION_EMAIL_SWEEP_LIMIT,
+} from "@/foundation/staff/staff-notification-dispatch-queue";
 
 export type StaffNotificationMailer = {
   send(input: {
@@ -31,17 +32,34 @@ export type StaffNotificationDeliveryResult = {
   errors: string[];
 };
 
-type NotificationEventRow = {
-  id: string;
-  event_key: string;
+export type ClaimedStaffNotificationEmail = {
+  deliveryId: string;
+  eventId: string;
+  staffId: string;
+  staffEmail: string;
+  claimedUntil: string;
+  eventKey: string;
   code: string;
-  order_id: string | null;
-  approval_id: string | null;
   title: string;
   description: string;
   href: string | null;
   payload: Record<string, unknown> | null;
+  orderId: string | null;
 };
+
+export type StaffNotificationEmailClaimer = (input: {
+  eventId?: string;
+  limit: number;
+}) => Promise<ClaimedStaffNotificationEmail[]>;
+
+export type StaffNotificationEmailCompleter = (input: {
+  eventId: string;
+  staffId: string;
+  status: "sent" | "failed";
+  error?: string;
+  resendId?: string | null;
+  claimedUntil: string;
+}) => Promise<void>;
 
 type OrderContentRow = {
   id: string;
@@ -51,6 +69,21 @@ type OrderContentRow = {
   pickup_date: string | null;
 };
 
+type ClaimRpcRow = {
+  delivery_id: string;
+  event_id: string;
+  staff_id: string;
+  staff_email: string;
+  claimed_until: string;
+  event_key: string;
+  code: string;
+  title: string;
+  description: string;
+  href: string | null;
+  payload: Record<string, unknown> | null;
+  order_id: string | null;
+};
+
 function isNotificationCode(value: string): value is StaffNotificationCode {
   return STAFF_NOTIFICATION_DEFINITIONS.some(
     (definition) => definition.code === value,
@@ -58,7 +91,7 @@ function isNotificationCode(value: string): value is StaffNotificationCode {
 }
 
 function isMissingRelation(message: string): boolean {
-  return /does not exist|schema cache|could not find/i.test(message);
+  return /does not exist|schema cache|could not find|42883/i.test(message);
 }
 
 function payloadString(
@@ -109,7 +142,9 @@ export async function deliverStaffNotificationEmailsToRecipients(input: {
     status: "sent" | "failed",
     detail: { error?: string; resendId?: string | null },
   ) => Promise<void>;
-}): Promise<Omit<StaffNotificationDeliveryResult, "eventId" | "eventKey" | "code">> {
+}): Promise<
+  Omit<StaffNotificationDeliveryResult, "eventId" | "eventKey" | "code">
+> {
   const already = input.alreadyDeliveredStaffIds ?? new Set<string>();
   const email = buildStaffNotificationEmail(input.content);
   const result = {
@@ -157,47 +192,72 @@ export async function deliverStaffNotificationEmailsToRecipients(input: {
   return result;
 }
 
-async function loadRecordedDeliveryStaffIds(
-  eventId: string,
-): Promise<Set<string>> {
+function mapClaimedRow(row: ClaimRpcRow): ClaimedStaffNotificationEmail {
+  return {
+    deliveryId: row.delivery_id,
+    eventId: row.event_id,
+    staffId: row.staff_id,
+    staffEmail: row.staff_email,
+    claimedUntil: row.claimed_until,
+    eventKey: row.event_key,
+    code: row.code,
+    title: row.title,
+    description: row.description,
+    href: row.href,
+    payload: row.payload,
+    orderId: row.order_id,
+  };
+}
+
+export async function claimStaffNotificationEmailDeliveries(input: {
+  eventId?: string;
+  limit?: number;
+}): Promise<ClaimedStaffNotificationEmail[]> {
   const admin = createServiceClient();
-  const { data, error } = await admin
-    .from("staff_notification_email_deliveries")
-    .select("staff_id")
-    .eq("event_id", eventId);
+  const { data, error } = await admin.rpc(
+    "claim_staff_notification_email_deliveries",
+    {
+      p_limit: input.limit ?? STAFF_NOTIFICATION_EMAIL_SWEEP_LIMIT,
+      p_event_id: input.eventId ?? null,
+      p_lease_seconds: STAFF_NOTIFICATION_EMAIL_LEASE_SECONDS,
+    },
+  );
 
   if (error) {
     if (error.code === "42P01" || isMissingRelation(error.message)) {
-      return new Set();
+      return [];
     }
     throw new Error(error.message);
   }
 
-  return new Set(
-    ((data ?? []) as Array<{ staff_id: string }>).map((row) => row.staff_id),
-  );
+  return ((data ?? []) as ClaimRpcRow[]).map(mapClaimedRow);
 }
 
-async function recordEmailDelivery(
-  eventId: string,
-  staffId: string,
-  status: "sent" | "failed",
-  detail: { error?: string; resendId?: string | null },
-): Promise<void> {
+export async function completeStaffNotificationEmailDelivery(input: {
+  eventId: string;
+  staffId: string;
+  status: "sent" | "failed";
+  error?: string;
+  resendId?: string | null;
+  claimedUntil: string;
+}): Promise<void> {
   const admin = createServiceClient();
-  const { error } = await admin.from("staff_notification_email_deliveries").upsert(
+  const { error } = await admin.rpc(
+    "complete_staff_notification_email_delivery",
     {
-      event_id: eventId,
-      staff_id: staffId,
-      status,
-      error: detail.error ?? null,
-      resend_id: detail.resendId ?? null,
-      updated_at: new Date().toISOString(),
+      p_event_id: input.eventId,
+      p_staff_id: input.staffId,
+      p_status: input.status,
+      p_error: input.error ?? null,
+      p_resend_id: input.resendId ?? null,
+      p_claimed_until: input.claimedUntil,
     },
-    { onConflict: "event_id,staff_id" },
   );
 
   if (error) {
+    if (error.code === "42P01" || isMissingRelation(error.message)) {
+      return;
+    }
     console.error(
       "[staff-notifications] Failed to record email delivery:",
       error,
@@ -205,25 +265,9 @@ async function recordEmailDelivery(
   }
 }
 
-async function loadEventRow(eventId: string): Promise<NotificationEventRow | null> {
-  const admin = createServiceClient();
-  const { data, error } = await admin
-    .from("staff_notification_events")
-    .select(
-      "id, event_key, code, order_id, approval_id, title, description, href, payload",
-    )
-    .eq("id", eventId)
-    .maybeSingle();
-
-  if (error) {
-    if (isMissingRelation(error.message)) return null;
-    throw new Error(error.message);
-  }
-
-  return (data as NotificationEventRow | null) ?? null;
-}
-
-async function loadOrderContent(orderId: string | null): Promise<OrderContentRow | null> {
+async function loadOrderContent(
+  orderId: string | null,
+): Promise<OrderContentRow | null> {
   if (!orderId) return null;
   const admin = createServiceClient();
   const { data, error } = await admin
@@ -240,168 +284,140 @@ async function loadOrderContent(orderId: string | null): Promise<OrderContentRow
   return (data as OrderContentRow | null) ?? null;
 }
 
+async function deliverClaimedStaffNotificationEmails(input: {
+  claimed: ClaimedStaffNotificationEmail[];
+  mailer: StaffNotificationMailer;
+  completeDelivery: StaffNotificationEmailCompleter;
+}): Promise<StaffNotificationDeliveryResult[]> {
+  const byEvent = new Map<string, ClaimedStaffNotificationEmail[]>();
+  for (const row of input.claimed) {
+    if (!isNotificationCode(row.code) || !row.staffEmail.trim()) continue;
+    const current = byEvent.get(row.eventId) ?? [];
+    current.push(row);
+    byEvent.set(row.eventId, current);
+  }
+
+  const results: StaffNotificationDeliveryResult[] = [];
+
+  for (const [eventId, rows] of byEvent) {
+    const first = rows[0];
+    if (!first || !isNotificationCode(first.code)) continue;
+
+    const empty: StaffNotificationDeliveryResult = {
+      eventId,
+      eventKey: first.eventKey,
+      code: first.code,
+      attempted: 0,
+      sent: 0,
+      skipped: 0,
+      failed: 0,
+      errors: [],
+    };
+
+    try {
+      const order = await loadOrderContent(first.orderId);
+      const payload = first.payload ?? {};
+      const claimedUntilByStaffId = new Map(
+        rows.map((row) => [row.staffId, row.claimedUntil] as const),
+      );
+
+      const delivered = await deliverStaffNotificationEmailsToRecipients({
+        eventId,
+        eventKey: first.eventKey,
+        content: {
+          code: first.code,
+          title: first.title,
+          description: first.description,
+          href: first.href,
+          orderNumber:
+            order?.order_number ?? payloadString(payload, "orderNumber"),
+          customerName:
+            order?.guest_name ?? payloadString(payload, "guestName"),
+          cakeName: order?.cake_name ?? payloadString(payload, "cakeName"),
+          pickupDate:
+            order?.pickup_date ?? payloadString(payload, "pickupDate"),
+          approvalRequestType: payloadString(payload, "requestType"),
+        },
+        recipients: rows.map((row) => ({
+          staffId: row.staffId,
+          email: row.staffEmail,
+        })),
+        mailer: input.mailer,
+        recordDelivery: (staffId, status, detail) =>
+          input.completeDelivery({
+            eventId,
+            staffId,
+            status,
+            error: detail.error,
+            resendId: detail.resendId,
+            claimedUntil:
+              claimedUntilByStaffId.get(staffId) ?? first.claimedUntil,
+          }),
+      });
+
+      results.push({
+        ...empty,
+        ...delivered,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown dispatch error.";
+      if (isMissingRelation(message)) {
+        console.warn(
+          "[staff-notifications] Dispatch skipped; notification tables are not applied yet.",
+        );
+        results.push(empty);
+        continue;
+      }
+      console.error("[staff-notifications] Dispatch failed:", message);
+      results.push({
+        ...empty,
+        failed: 1,
+        errors: [message],
+      });
+    }
+  }
+
+  return results;
+}
+
 export async function deliverStaffNotificationEvent(input: {
   eventId: string;
   mailer?: StaffNotificationMailer;
+  claimer?: StaffNotificationEmailClaimer;
+  completeDelivery?: StaffNotificationEmailCompleter;
 }): Promise<StaffNotificationDeliveryResult | null> {
-  const event = await loadEventRow(input.eventId);
-  if (!event || !isNotificationCode(event.code)) return null;
-
-  const empty: StaffNotificationDeliveryResult = {
-    eventId: event.id,
-    eventKey: event.event_key,
-    code: event.code,
-    attempted: 0,
-    sent: 0,
-    skipped: 0,
-    failed: 0,
-    errors: [],
-  };
-
-  try {
-    const admin = createServiceClient();
-    const { data: staffRows, error: staffError } = await admin
-      .from("staff_profiles")
-      .select("id, email, is_active")
-      .eq("is_active", true);
-
-    if (staffError) {
-      throw new Error(staffError.message);
-    }
-
-    const staff = (staffRows ?? []) as Array<{
-      id: string;
-      email: string | null;
-      is_active: boolean;
-    }>;
-    const staffIds = staff.map((row) => row.id);
-
-    const preferencesByStaffId = new Map<
-      string,
-      Partial<Record<StaffNotificationCode, { emailEnabled: boolean }>>
-    >();
-
-    if (staffIds.length > 0) {
-      const { data: preferenceRows, error: preferenceError } = await admin
-        .from("staff_notification_preferences")
-        .select("staff_id, notification_code, email_enabled")
-        .eq("notification_code", event.code)
-        .in("staff_id", staffIds);
-
-      if (preferenceError) {
-        throw new Error(preferenceError.message);
-      }
-
-      for (const row of (preferenceRows ?? []) as Array<{
-        staff_id: string;
-        notification_code: string;
-        email_enabled: boolean;
-      }>) {
-        if (!isNotificationCode(row.notification_code)) continue;
-        const current = preferencesByStaffId.get(row.staff_id) ?? {};
-        current[row.notification_code] = {
-          emailEnabled: Boolean(row.email_enabled),
-        };
-        preferencesByStaffId.set(row.staff_id, current);
-      }
-    }
-
-    const recipients = selectStaffEmailRecipients({
-      code: event.code,
-      staff: staff.map((row) => ({
-        id: row.id,
-        email: row.email,
-        isActive: row.is_active,
-      })),
-      preferencesByStaffId,
-    });
-
-    if (recipients.length === 0) {
-      return empty;
-    }
-
-    const order = await loadOrderContent(event.order_id);
-    const payload = event.payload ?? {};
-    const delivered = await deliverStaffNotificationEmailsToRecipients({
-      eventId: event.id,
-      eventKey: event.event_key,
-      content: {
-        code: event.code,
-        title: event.title,
-        description: event.description,
-        href: event.href,
-        orderNumber:
-          order?.order_number ?? payloadString(payload, "orderNumber"),
-        customerName:
-          order?.guest_name ?? payloadString(payload, "guestName"),
-        cakeName: order?.cake_name ?? payloadString(payload, "cakeName"),
-        pickupDate:
-          order?.pickup_date ?? payloadString(payload, "pickupDate"),
-        approvalRequestType: payloadString(payload, "requestType"),
-      },
-      recipients,
-      alreadyDeliveredStaffIds: await loadRecordedDeliveryStaffIds(event.id),
-      mailer: input.mailer ?? createResendStaffNotificationMailer(),
-      recordDelivery: (staffId, status, detail) =>
-        recordEmailDelivery(event.id, staffId, status, detail),
-    });
-
-    return {
-      ...empty,
-      ...delivered,
-    };
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown dispatch error.";
-    if (isMissingRelation(message)) {
-      console.warn(
-        "[staff-notifications] Dispatch skipped; notification tables are not applied yet.",
-      );
-      return empty;
-    }
-    console.error("[staff-notifications] Dispatch failed:", message);
-    return {
-      ...empty,
-      failed: 1,
-      errors: [message],
-    };
-  }
+  const results = await deliverPendingStaffNotificationEmails({
+    eventId: input.eventId,
+    mailer: input.mailer,
+    claimer: input.claimer,
+    completeDelivery: input.completeDelivery,
+  });
+  return results[0] ?? null;
 }
 
 export async function deliverPendingStaffNotificationEmails(input?: {
   mailer?: StaffNotificationMailer;
   eventId?: string;
+  claimer?: StaffNotificationEmailClaimer;
+  completeDelivery?: StaffNotificationEmailCompleter;
 }): Promise<StaffNotificationDeliveryResult[]> {
-  if (input?.eventId) {
-    const result = await deliverStaffNotificationEvent({
-      eventId: input.eventId,
-      mailer: input.mailer,
-    });
-    return result ? [result] : [];
-  }
-
   try {
-    const admin = createServiceClient();
-    const { data, error } = await admin
-      .from("staff_notification_events")
-      .select("id")
-      .order("created_at", { ascending: true })
-      .limit(50);
+    const claimed = await (
+      input?.claimer ?? claimStaffNotificationEmailDeliveries
+    )({
+      eventId: input?.eventId,
+      limit: STAFF_NOTIFICATION_EMAIL_SWEEP_LIMIT,
+    });
 
-    if (error) {
-      if (isMissingRelation(error.message)) return [];
-      throw new Error(error.message);
-    }
+    if (claimed.length === 0) return [];
 
-    const results: StaffNotificationDeliveryResult[] = [];
-    for (const row of (data ?? []) as Array<{ id: string }>) {
-      const result = await deliverStaffNotificationEvent({
-        eventId: row.id,
-        mailer: input?.mailer,
-      });
-      if (result) results.push(result);
-    }
-    return results;
+    return deliverClaimedStaffNotificationEmails({
+      claimed,
+      mailer: input?.mailer ?? createResendStaffNotificationMailer(),
+      completeDelivery:
+        input?.completeDelivery ?? completeStaffNotificationEmailDelivery,
+    });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unknown dispatch error.";
