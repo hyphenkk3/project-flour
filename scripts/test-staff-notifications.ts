@@ -841,6 +841,17 @@ async function testEmailDelivery() {
   assert.match(dispatchRouteSrc, /authorizeStaffNotificationDispatch/);
   assert.doesNotMatch(dispatchRouteSrc, /requireStaff/);
 
+  const middlewareSrc = read("src/middleware.ts");
+  assert.match(middlewareSrc, /isMachineDispatchPath/);
+  assert.match(
+    middlewareSrc,
+    /pathname === "\/api\/staff\/notifications\/dispatch"/,
+  );
+  assert.doesNotMatch(
+    middlewareSrc.split("function isPublicPath")[1]?.split("function ")[0] ?? "",
+    /\/api\/staff\/notifications\/dispatch/,
+  );
+
   const engineSrc = read("src/foundation/staff/staff-notification-engine.ts");
   assert.doesNotMatch(engineSrc, /localStorage/);
   assert.match(engineSrc, /BroadcastChannel/);
@@ -919,6 +930,22 @@ async function testEmailDelivery() {
   assert.doesNotMatch(cronSql, /ALTER DATABASE/i);
   assert.doesNotMatch(cronSql, /STAFF_NOTIFICATION_DISPATCH_SECRET\s*=/);
   assert.doesNotMatch(cronSql, /https:\/\//);
+
+  const vaultSql = read(
+    "supabase/migrations/20260904190000_staff_notification_dispatch_vault.sql",
+  );
+  assert.match(vaultSql, /staff_notification_dispatch_config/);
+  assert.match(vaultSql, /per_event_enabled boolean not null default false/);
+  assert.match(vaultSql, /vault\.decrypted_secrets/);
+  assert.match(vaultSql, /staff_notification_dispatch_secret/);
+  assert.match(vaultSql, /net\.http_post/);
+  assert.match(vaultSql, /net\.http_get/);
+  assert.doesNotMatch(vaultSql, /create extension if not exists pg_net/);
+  assert.doesNotMatch(vaultSql, /ALTER DATABASE/i);
+  assert.doesNotMatch(vaultSql, /STAFF_NOTIFICATION_DISPATCH_SECRET\s*=/);
+  assert.doesNotMatch(vaultSql, /https:\/\//);
+  assert.doesNotMatch(vaultSql, /vault\.create_secret/);
+  assert.match(vaultSql, /#variable_conflict use_column/);
 
   assert.match(
     read("src/workspaces/storefront/checkout/actions.ts"),

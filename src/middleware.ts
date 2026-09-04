@@ -23,11 +23,16 @@ function isPublicPath(pathname: string) {
   );
 }
 
+function isMachineDispatchPath(pathname: string) {
+  // Skip staff-session middleware only. Bearer auth is enforced by the route.
+  return pathname === "/api/staff/notifications/dispatch";
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes must never wait on Supabase.
-  if (isPublicPath(pathname)) {
+  if (isPublicPath(pathname) || isMachineDispatchPath(pathname)) {
     return NextResponse.next();
   }
 
