@@ -16,6 +16,7 @@ import {
   EMPTY_BROWSE_FILTERS,
   browseFilterGridClass,
   browseFilterOptionsFromCatalogue,
+  browseToolbarClass,
   cakeMatchesBrowseFilters,
   countActiveBrowseFilters,
   filterBrowseCatalogue,
@@ -282,7 +283,8 @@ assert.equal(
 );
 
 const filterSrc = readSrc("src/workspaces/storefront/catalog/browse-filters.ts");
-assert.doesNotMatch(filterSrc, /LIBRARY_CAKE_CATEGORIES/);
+assert.match(filterSrc, /lg:grid-rows-1/);
+assert.match(filterSrc, /browseToolbarClass/);
 assert.doesNotMatch(filterSrc, /preorder-draft/);
 assert.doesNotMatch(filterSrc, /sessionStorage/);
 assert.doesNotMatch(filterSrc, /writePreorderDraft/);
@@ -312,13 +314,40 @@ assert.match(
 );
 assert.doesNotMatch(browseFilterGridClass(twoDayOnly), /lg:grid-cols-4/);
 
+const threeFilterToolbar = browseToolbarClass(twoDayOnly);
+assert.match(threeFilterToolbar, /lg:grid-rows-1/);
+assert.match(
+  threeFilterToolbar,
+  /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(7rem,8\.5rem\)_minmax\(7rem,8\.5rem\)_minmax\(7rem,8\.5rem\)_minmax\(12\.5rem,14rem\)\]/,
+  "O. three desktop filters share one 5-column row with Search and Sort",
+);
+assert.doesNotMatch(threeFilterToolbar, /flex-nowrap/);
+
+const fourFilterToolbar = browseToolbarClass(options);
+assert.match(fourFilterToolbar, /lg:grid-rows-1/);
+assert.match(
+  fourFilterToolbar,
+  /lg:grid-cols-\[minmax\(0,1fr\).*minmax\(12\.5rem,14rem\)\]/,
+);
+assert.equal(
+  (fourFilterToolbar.match(/minmax\(/g) ?? []).length,
+  6,
+  "O. Search 1fr + four filters + Sort is one 6-column desktop row",
+);
+
 const catalogueSrc = readSrc(
   "src/workspaces/storefront/catalog/BrowseCakeCatalogue.tsx",
 );
 assert.match(catalogueSrc, /browseFilterGridClass/);
+assert.match(catalogueSrc, /browseToolbarClass/);
 assert.match(catalogueSrc, /viewBrowseCatalogue/);
+assert.match(catalogueSrc, /layout="toolbar"/);
+assert.match(catalogueSrc, /max-md:hidden/);
+assert.match(catalogueSrc, /return fields/);
 assert.match(catalogueSrc, /Clear filters/);
 assert.match(catalogueSrc, /Try adjusting your search or filters/);
+assert.doesNotMatch(catalogueSrc, /md:contents/);
+assert.doesNotMatch(catalogueSrc, /lg:flex-nowrap/);
 assert.doesNotMatch(catalogueSrc, /writePreorderDraft/);
 assert.doesNotMatch(catalogueSrc, /sessionStorage/);
 assert.doesNotMatch(catalogueSrc, /searchParams/);
@@ -326,8 +355,10 @@ assert.doesNotMatch(catalogueSrc, /searchParams/);
 const collectionSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontCollectionCakesPage.tsx",
 );
+assert.match(collectionSrc, /BrowseCakeCatalogue/);
+assert.match(collectionSrc, /listAvailableCakes/);
+assert.doesNotMatch(collectionSrc, /listBrowsePublishedCakes/);
 assert.doesNotMatch(collectionSrc, /browse-filters/);
-assert.doesNotMatch(collectionSrc, /BrowseCakeCatalogue/);
 
 const orderSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontOrderCollectionsPage.tsx",

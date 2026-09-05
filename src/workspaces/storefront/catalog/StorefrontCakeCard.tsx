@@ -4,11 +4,13 @@ import type { StorefrontCake } from "@/types/storefront";
 import { AddToOrderButton, type AddToOrderPickupScope } from "@/workspaces/storefront/cart/AddToOrderSheet";
 import { storefrontDefaultPhoto } from "@/workspaces/storefront/catalog/cake-photo-map";
 import {
+  cakeCardPreorderBadgeTone,
   cakeCardPreorderLabel,
   formatAvailableSizes,
   formatRm,
   startingPrice,
   storefrontCategoryLabel,
+  type CakeCardPreorderBadgeTone,
 } from "@/workspaces/storefront/catalog/pricing";
 
 type StorefrontCakeCardProps = {
@@ -19,6 +21,18 @@ type StorefrontCakeCardProps = {
   detailHref?: string;
   pickupScope?: AddToOrderPickupScope | null;
 };
+
+function preorderBadgeClass(tone: CakeCardPreorderBadgeTone): string {
+  const base =
+    "pointer-events-none absolute top-3 left-3 z-10 max-w-[calc(100%-1.5rem)] rounded-full px-2.5 py-1 text-left text-[10px] leading-tight font-semibold tracking-[0.14em] uppercase sm:text-[11px]";
+  if (tone === "longer") {
+    return `${base} bg-ink/85 text-mist shadow-sm backdrop-blur-sm`;
+  }
+  if (tone === "varies") {
+    return `${base} bg-mist/95 text-skyline shadow-sm ring-1 ring-ink/10 backdrop-blur-sm`;
+  }
+  return `${base} bg-mist/95 text-ink shadow-sm ring-1 ring-ink/10 backdrop-blur-sm`;
+}
 
 export function StorefrontCakeCard({
   cake,
@@ -31,13 +45,14 @@ export function StorefrontCakeCard({
   const sizes = formatAvailableSizes(cake);
   const category = storefrontCategoryLabel(cake.categoryName);
   const preorder = cakeCardPreorderLabel(cake);
+  const preorderTone = cakeCardPreorderBadgeTone(cake);
   const hero = storefrontDefaultPhoto(cake.photos);
   const imageUrl = cake.image ?? hero?.url ?? null;
   const imageAlt = hero?.altText || cake.name;
 
   return (
     <article className="border-fog flex h-full flex-col overflow-hidden rounded-2xl border bg-white">
-      <div className="bg-fog aspect-[4/3] overflow-hidden">
+      <div className="bg-fog relative aspect-[4/3] overflow-hidden">
         {imageUrl ? (
           <CakePhotoImage
             alt={imageAlt}
@@ -49,6 +64,11 @@ export function StorefrontCakeCard({
             Photo coming soon
           </div>
         )}
+        {preorder && preorderTone ? (
+          <p aria-hidden="true" className={preorderBadgeClass(preorderTone)}>
+            {preorder}
+          </p>
+        ) : null}
       </div>
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="min-w-0">

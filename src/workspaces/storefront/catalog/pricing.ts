@@ -29,6 +29,17 @@ export function formatPreorderRequirement(days: number): string {
 
 export const PREORDER_VARIES_BY_SIZE_LABEL = "Preorder varies by size";
 
+export type CakeCardPreorderBadgeTone = "standard" | "longer" | "varies";
+
+function uniqueCakePreorderDays(
+  cake: Pick<StorefrontCake, "sizes">,
+): number | "varies" | null {
+  if (cake.sizes.length === 0) return null;
+  const unique = new Set(cake.sizes.map((size) => size.preorderDays));
+  if (unique.size !== 1) return "varies";
+  return cake.sizes[0]?.preorderDays ?? null;
+}
+
 /**
  * Cake-card preorder summary. Display only.
  * Same requirement across sizes → formatPreorderRequirement.
@@ -37,14 +48,24 @@ export const PREORDER_VARIES_BY_SIZE_LABEL = "Preorder varies by size";
 export function cakeCardPreorderLabel(
   cake: Pick<StorefrontCake, "sizes">,
 ): string | null {
-  if (cake.sizes.length === 0) return null;
-  const unique = new Set(cake.sizes.map((size) => size.preorderDays));
-  if (unique.size !== 1) {
-    return PREORDER_VARIES_BY_SIZE_LABEL;
-  }
-  const days = cake.sizes[0]?.preorderDays;
+  const days = uniqueCakePreorderDays(cake);
   if (days == null) return null;
+  if (days === "varies") return PREORDER_VARIES_BY_SIZE_LABEL;
   return formatPreorderRequirement(days);
+}
+
+/**
+ * Scan-badge emphasis from configured size lead times. Display only.
+ * Same days across sizes: 1–2 → standard, 3+ → longer. Mixed → varies.
+ */
+export function cakeCardPreorderBadgeTone(
+  cake: Pick<StorefrontCake, "sizes">,
+): CakeCardPreorderBadgeTone | null {
+  const days = uniqueCakePreorderDays(cake);
+  if (days == null) return null;
+  if (days === "varies") return "varies";
+  if (!Number.isInteger(days) || days < 1) return "standard";
+  return days >= 3 ? "longer" : "standard";
 }
 
 export function formatCollectionAvailabilityLabel(

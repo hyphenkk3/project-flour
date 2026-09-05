@@ -46,7 +46,8 @@ const collectionSrc = readSrc(
 assert.match(collectionSrc, /listAvailableCakes/);
 assert.match(collectionSrc, /href="\/order"/);
 assert.match(collectionSrc, /href="\/browse"/);
-assert.doesNotMatch(collectionSrc, /BrowseCakeCatalogue/);
+assert.match(collectionSrc, /BrowseCakeCatalogue/);
+assert.doesNotMatch(collectionSrc, /listBrowsePublishedCakes/);
 assert.doesNotMatch(collectionSrc, /filterBrowseCatalogue/);
 assert.doesNotMatch(collectionSrc, /viewBrowseCatalogue/);
 
@@ -87,6 +88,7 @@ assert.match(extraRouteSrc, /StorefrontExtraPage/);
 const cardSrc = readSrc("src/workspaces/storefront/catalog/StorefrontCakeCard.tsx");
 assert.match(cardSrc, /cakeCardPreorderLabel/);
 assert.match(cardSrc, /AddToOrderButton/);
+assert.match(cardSrc, /cakeCardPreorderBadgeTone/);
 
 const catalogueSrc = readSrc(
   "src/workspaces/storefront/catalog/BrowseCakeCatalogue.tsx",

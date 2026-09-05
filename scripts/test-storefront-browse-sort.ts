@@ -260,16 +260,20 @@ const catalogueSrc = readSrc(
 );
 assert.match(catalogueSrc, /viewBrowseCatalogue/);
 assert.match(catalogueSrc, /BROWSE_SORT_OPTIONS/);
-assert.match(catalogueSrc, /max-w-\[18rem\]/);
+assert.match(catalogueSrc, /browseToolbarClass/);
 assert.match(catalogueSrc, /Try adjusting your search or filters/);
+assert.doesNotMatch(catalogueSrc, /lg:flex-nowrap/);
+assert.doesNotMatch(catalogueSrc, /md:contents/);
 assert.doesNotMatch(catalogueSrc, /writePreorderDraft/);
 assert.doesNotMatch(catalogueSrc, /sessionStorage/);
 
 const collectionSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontCollectionCakesPage.tsx",
 );
+assert.match(collectionSrc, /BrowseCakeCatalogue/);
+assert.match(collectionSrc, /listAvailableCakes/);
+assert.doesNotMatch(collectionSrc, /listBrowsePublishedCakes/);
 assert.doesNotMatch(collectionSrc, /browse-sort/);
-assert.doesNotMatch(collectionSrc, /viewBrowseCatalogue/);
 
 const orderSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontOrderCollectionsPage.tsx",

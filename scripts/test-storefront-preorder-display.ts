@@ -10,6 +10,7 @@ import { resolve } from "node:path";
 import type { StorefrontCake, StorefrontCakeSize } from "@/types/storefront";
 import {
   PREORDER_VARIES_BY_SIZE_LABEL,
+  cakeCardPreorderBadgeTone,
   cakeCardPreorderLabel,
   formatPreorderRequirement,
 } from "@/workspaces/storefront/catalog/pricing";
@@ -70,9 +71,37 @@ assert.equal(
   "2 days preorder",
 );
 
+assert.equal(
+  cakeCardPreorderBadgeTone(cakeWithSizes([size("a", 2)])),
+  "standard",
+  "D. 2-day cakes use the standard scan badge",
+);
+assert.equal(
+  cakeCardPreorderBadgeTone(cakeWithSizes([size("a", 3)])),
+  "longer",
+  "E. 3-day cakes use the stronger scan badge",
+);
+assert.equal(
+  cakeCardPreorderBadgeTone(cakeWithSizes([size("a", 4)])),
+  "longer",
+  "E. longer lead times stay on the stronger badge without hardcoding 3",
+);
+assert.equal(
+  cakeCardPreorderBadgeTone(
+    cakeWithSizes([size("a", 2), size("b", 3, '8"')]),
+  ),
+  "varies",
+  "F. mixed-size cakes do not imply a single badge number",
+);
+assert.equal(cakeCardPreorderBadgeTone(cakeWithSizes([])), null);
+
 const cardSrc = readSrc("src/workspaces/storefront/catalog/StorefrontCakeCard.tsx");
 assert.match(cardSrc, /cakeCardPreorderLabel/);
+assert.match(cardSrc, /cakeCardPreorderBadgeTone/);
+assert.match(cardSrc, /absolute top-3 left-3/);
 assert.match(cardSrc, /uppercase/);
+assert.doesNotMatch(cardSrc, /2 DAYS PREORDER/);
+assert.doesNotMatch(cardSrc, /3 DAYS PREORDER/);
 assert.doesNotMatch(cardSrc, /evaluateCollectionDate/);
 assert.doesNotMatch(cardSrc, /earliestCollectionDateForDays/);
 assert.doesNotMatch(cardSrc, /engines\/preorder/);
@@ -80,7 +109,7 @@ assert.doesNotMatch(cardSrc, /engines\/preorder/);
 const collectionSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontCollectionCakesPage.tsx",
 );
-assert.match(collectionSrc, /StorefrontCakeCard/);
+assert.match(collectionSrc, /BrowseCakeCatalogue/);
 assert.doesNotMatch(collectionSrc, /formatPreorderRequirement/);
 assert.doesNotMatch(collectionSrc, /cakeCardPreorderLabel/);
 
@@ -97,6 +126,7 @@ assert.doesNotMatch(panelSrc, /evaluateCollectionDate/);
 
 const pricingSrc = readSrc("src/workspaces/storefront/catalog/pricing.ts");
 assert.match(pricingSrc, /Display-only/);
+assert.match(pricingSrc, /cakeCardPreorderBadgeTone/);
 assert.doesNotMatch(pricingSrc, /evaluateCollectionDate/);
 assert.doesNotMatch(pricingSrc, /engines\/preorder/);
 

@@ -2,10 +2,12 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { StorefrontCake } from "@/types/storefront";
+import type { AddToOrderPickupScope } from "@/workspaces/storefront/cart/AddToOrderSheet";
 import {
   EMPTY_BROWSE_FILTERS,
   browseFilterGridClass,
   browseFilterOptionsFromCatalogue,
+  browseToolbarClass,
   countActiveBrowseFilters,
   hasActiveBrowseFilters,
   preorderFilterLabel,
@@ -21,8 +23,20 @@ import { StorefrontCakeCard } from "@/workspaces/storefront/catalog/StorefrontCa
 
 type BrowseCake = StorefrontCake & { availabilityNote?: string | null };
 
+const CATALOGUE_SEARCH_CLASS =
+  "min-w-0 w-full max-w-sm md:max-w-none md:min-w-[10rem] md:flex-1 lg:w-auto lg:min-w-0 lg:max-w-none lg:flex-none";
+const CATALOGUE_FILTER_CLASS =
+  "max-md:hidden min-w-0 w-full md:w-[7.75rem] md:shrink-0 lg:w-auto lg:min-w-0";
+const CATALOGUE_SORT_CLASS =
+  "min-w-0 w-full md:w-[12.5rem] md:shrink-0 lg:w-auto lg:min-w-0";
+const DEFAULT_EMPTY_MESSAGE =
+  "No cakes are published to browse right now. Please check back soon.";
+
 type BrowseCakeCatalogueProps = {
   cakes: BrowseCake[];
+  emptyMessage?: string;
+  pickupScope?: AddToOrderPickupScope | null;
+  detailHrefs?: Readonly<Record<string, string>>;
 };
 
 type FilterFieldsProps = {
@@ -33,6 +47,7 @@ type FilterFieldsProps = {
   sizeId: string;
   priceId: string;
   preorderId: string;
+  layout?: "sheet" | "toolbar";
 };
 
 function FilterFields({
@@ -43,14 +58,16 @@ function FilterFields({
   sizeId,
   priceId,
   preorderId,
+  layout = "sheet",
 }: FilterFieldsProps) {
   const selectClass =
-    "border-fog text-ink focus:border-ink min-h-11 w-full border-0 border-b bg-transparent py-2 text-sm outline-none";
+    "border-fog text-ink focus:border-ink mt-2 min-h-11 w-full border-0 border-b bg-transparent py-2 text-sm outline-none";
+  const itemClass = layout === "toolbar" ? CATALOGUE_FILTER_CLASS : undefined;
 
-  return (
-    <div className={browseFilterGridClass(options)}>
+  const fields = (
+    <>
       {options.categories.length > 1 ? (
-        <div>
+        <div className={itemClass}>
           <label
             className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase"
             htmlFor={categoryId}
@@ -79,7 +96,7 @@ function FilterFields({
         </div>
       ) : null}
       {options.sizes.length > 1 ? (
-        <div>
+        <div className={itemClass}>
           <label
             className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase"
             htmlFor={sizeId}
@@ -104,7 +121,7 @@ function FilterFields({
         </div>
       ) : null}
       {options.priceRanges.length > 0 ? (
-        <div>
+        <div className={itemClass}>
           <label
             className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase"
             htmlFor={priceId}
@@ -129,7 +146,7 @@ function FilterFields({
         </div>
       ) : null}
       {options.preorderDays.length > 1 ? (
-        <div>
+        <div className={itemClass}>
           <label
             className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase"
             htmlFor={preorderId}
@@ -158,8 +175,14 @@ function FilterFields({
           </select>
         </div>
       ) : null}
-    </div>
+    </>
   );
+
+  if (layout === "toolbar") {
+    return fields;
+  }
+
+  return <div className={browseFilterGridClass(options)}>{fields}</div>;
 }
 
 function FilterSheet({
@@ -241,7 +264,12 @@ function FilterSheet({
   );
 }
 
-export function BrowseCakeCatalogue({ cakes }: BrowseCakeCatalogueProps) {
+export function BrowseCakeCatalogue({
+  cakes,
+  emptyMessage = DEFAULT_EMPTY_MESSAGE,
+  pickupScope = null,
+  detailHrefs,
+}: BrowseCakeCatalogueProps) {
   const searchId = useId();
   const sortId = useId();
   const categoryId = useId();
@@ -270,18 +298,14 @@ export function BrowseCakeCatalogue({ cakes }: BrowseCakeCatalogueProps) {
   const cakeCountLabel = visible.length === 1 ? "1 cake" : `${visible.length} cakes`;
 
   if (cakes.length === 0) {
-    return (
-      <p className="text-skyline text-sm">
-        No cakes are published to browse right now. Please check back soon.
-      </p>
-    );
+    return <p className="text-skyline text-sm">{emptyMessage}</p>;
   }
 
   return (
     <div>
-      <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between md:gap-8">
+      <div className={browseToolbarClass(options)}>
         <form
-          className="w-full max-w-sm"
+          className={CATALOGUE_SEARCH_CLASS}
           onSubmit={(event) => {
             event.preventDefault();
           }}
@@ -318,7 +342,20 @@ export function BrowseCakeCatalogue({ cakes }: BrowseCakeCatalogueProps) {
           </div>
         </form>
 
-        <div className="w-full max-w-[18rem]">
+        {canFilter ? (
+          <FilterFields
+            categoryId={categoryId}
+            filters={filters}
+            layout="toolbar"
+            onChange={setFilters}
+            options={options}
+            preorderId={preorderId}
+            priceId={priceId}
+            sizeId={sizeId}
+          />
+        ) : null}
+
+        <div className={CATALOGUE_SORT_CLASS}>
           <label
             className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase"
             htmlFor={sortId}
@@ -341,7 +378,7 @@ export function BrowseCakeCatalogue({ cakes }: BrowseCakeCatalogueProps) {
       </div>
 
       {canFilter ? (
-        <div className="mt-5 flex items-center justify-between gap-4 md:hidden">
+        <div className="mt-4 flex items-center justify-between gap-4 md:hidden">
           <button
             className="text-ink inline-flex min-h-11 items-center text-sm font-medium"
             onClick={() => setSheetOpen(true)}
@@ -361,27 +398,14 @@ export function BrowseCakeCatalogue({ cakes }: BrowseCakeCatalogueProps) {
         </div>
       ) : null}
 
-      {canFilter ? (
-        <div className="mt-6 hidden md:block">
-          <FilterFields
-            categoryId={categoryId}
-            filters={filters}
-            onChange={setFilters}
-            options={options}
-            preorderId={preorderId}
-            priceId={priceId}
-            sizeId={sizeId}
-          />
-          {hasFilters ? (
-            <button
-              className="text-skyline hover:text-ink mt-3 text-sm font-medium"
-              onClick={() => setFilters(EMPTY_BROWSE_FILTERS)}
-              type="button"
-            >
-              Clear filters
-            </button>
-          ) : null}
-        </div>
+      {canFilter && hasFilters ? (
+        <button
+          className="text-skyline hover:text-ink mt-3 hidden text-sm font-medium md:inline-flex"
+          onClick={() => setFilters(EMPTY_BROWSE_FILTERS)}
+          type="button"
+        >
+          Clear filters
+        </button>
       ) : null}
 
       {sheetOpen ? (
@@ -411,6 +435,8 @@ export function BrowseCakeCatalogue({ cakes }: BrowseCakeCatalogueProps) {
               <StorefrontCakeCard
                 availabilityNote={cake.availabilityNote}
                 cake={cake}
+                detailHref={detailHrefs?.[cake.id]}
+                pickupScope={pickupScope}
               />
             </li>
           ))}

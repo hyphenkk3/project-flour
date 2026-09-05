@@ -145,6 +145,7 @@ assert.match(catalogueSrc, /viewBrowseCatalogue/);
 assert.match(catalogueSrc, /StorefrontCakeCard/);
 assert.match(catalogueSrc, /cakeCardPreorderLabel|availabilityNote/);
 assert.match(catalogueSrc, /htmlFor=\{searchId\}/);
+assert.match(catalogueSrc, /browseToolbarClass/);
 assert.match(catalogueSrc, /Clear search/);
 assert.match(catalogueSrc, /No cakes found/);
 assert.doesNotMatch(catalogueSrc, /writePreorderDraft/);
@@ -162,7 +163,9 @@ assert.doesNotMatch(browseSrc, /writePreorderDraft/);
 const collectionSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontCollectionCakesPage.tsx",
 );
-assert.doesNotMatch(collectionSrc, /BrowseCakeCatalogue/);
+assert.match(collectionSrc, /BrowseCakeCatalogue/);
+assert.match(collectionSrc, /listAvailableCakes/);
+assert.doesNotMatch(collectionSrc, /listBrowsePublishedCakes/);
 assert.doesNotMatch(collectionSrc, /filterBrowseCakesBySearch/);
 
 const orderSrc = readSrc(

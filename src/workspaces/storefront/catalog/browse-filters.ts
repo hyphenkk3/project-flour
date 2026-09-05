@@ -157,6 +157,30 @@ export function browseFilterGridClass(options: BrowseFilterOptions): string {
   return "grid gap-4 sm:grid-cols-2";
 }
 
+const TOOLBAR_BASE =
+  "flex flex-col gap-4 md:flex-row md:flex-wrap md:items-end md:gap-x-4 md:gap-y-4 lg:grid lg:grid-rows-1 lg:items-end lg:gap-3";
+
+/**
+ * One explicit desktop row: Search | filters… | Sort.
+ * Column templates are complete static class names for Tailwind.
+ */
+export function browseToolbarClass(options: BrowseFilterOptions): string {
+  const count = visibleBrowseFilterCount(options);
+  if (count >= 4) {
+    return `${TOOLBAR_BASE} lg:grid-cols-[minmax(0,1fr)_minmax(6.75rem,8rem)_minmax(6.75rem,8rem)_minmax(6.75rem,8rem)_minmax(6.75rem,8rem)_minmax(12.5rem,14rem)]`;
+  }
+  if (count === 3) {
+    return `${TOOLBAR_BASE} lg:grid-cols-[minmax(0,1fr)_minmax(7rem,8.5rem)_minmax(7rem,8.5rem)_minmax(7rem,8.5rem)_minmax(12.5rem,14rem)]`;
+  }
+  if (count === 2) {
+    return `${TOOLBAR_BASE} lg:grid-cols-[minmax(0,1fr)_minmax(7.5rem,9rem)_minmax(7.5rem,9rem)_minmax(12.5rem,14rem)]`;
+  }
+  if (count === 1) {
+    return `${TOOLBAR_BASE} lg:grid-cols-[minmax(0,1fr)_minmax(8rem,10rem)_minmax(12.5rem,14rem)]`;
+  }
+  return `${TOOLBAR_BASE} lg:grid-cols-[minmax(0,1fr)_minmax(12.5rem,14rem)]`;
+}
+
 export function cakeMatchesBrowseFilters(
   cake: BrowseFilterCake,
   filters: BrowseFilterState,
