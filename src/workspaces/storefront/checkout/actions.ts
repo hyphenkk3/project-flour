@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { ORDERS_CLOSED_RPC_MESSAGE } from "@/engines/business-calendar/order-availability";
 import { isValidDeliverySlot } from "@/engines/business-calendar/delivery-hours";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
@@ -70,6 +69,7 @@ import { setGuestPreorderReceiptCookie } from "@/workspaces/storefront/checkout/
 
 export type CheckoutState = {
   error: string | null;
+  orderId?: string;
 };
 
 type SubmitItem = {
@@ -480,7 +480,7 @@ export async function submitGuestPreorderAction(
 
   await setGuestPreorderReceiptCookie(orderId);
   scheduleStaffNotificationDispatch();
-  redirect(`/order/success?order=${orderId}`);
+  return { error: null, orderId };
 }
 
 export type CheckoutPickupOffer = {

@@ -256,6 +256,12 @@ export function GuestCheckoutForm({
     }
   }, [state.error]);
 
+  useEffect(() => {
+    const orderId = state.orderId;
+    if (!orderId || state.error) return;
+    window.location.assign(`/order/success?order=${orderId}`);
+  }, [state.error, state.orderId]);
+
   const [items, setItems] = useState<PreorderDraftItem[]>([]);
   const [fields, setFields] = useState<PreorderDraftFields>(() =>
     emptyPreorderFields(),
@@ -849,14 +855,14 @@ export function GuestCheckoutForm({
   }
 
   function confirmOrder() {
-    if (pending) return;
+    if (pending || state.orderId) return;
     const formData = pendingSubmitRef.current;
     if (!formData) return;
     formAction(formData);
   }
 
   function goBackFromConfirm() {
-    if (pending) return;
+    if (pending || state.orderId) return;
     setConfirmOpen(false);
   }
 
@@ -1571,7 +1577,7 @@ export function GuestCheckoutForm({
       onConfirm={confirmOrder}
       onGoBack={goBackFromConfirm}
       open={confirmOpen}
-      pending={pending}
+      pending={pending || Boolean(state.orderId)}
       snapshot={confirmSnapshot}
     />
     </div>

@@ -95,10 +95,36 @@ assert.doesNotMatch(goBackSrc, /writePreorderDraft/);
 assert.doesNotMatch(goBackSrc, /redirect/);
 
 assert.match(confirmOrderSrc, /formAction\(formData\)/);
-assert.match(confirmOrderSrc, /if \(pending\) return/);
+assert.match(confirmOrderSrc, /if \(pending \|\| state\.orderId\) return/);
+assert.doesNotMatch(handleSubmitSrc, /formAction\(/);
+assert.equal(
+  (formSrc.match(/formAction\(formData\)/g) ?? []).length,
+  1,
+  "Confirm Order is the only formAction submission path",
+);
 assert.match(promptSrc, /disabled=\{pending\}/);
+assert.match(formSrc, /pending=\{pending \|\| Boolean\(state\.orderId\)\}/);
 assert.doesNotMatch(formSrc, /submitGuestPreorderAction\(/);
 assert.match(formSrc, /useActionState\(\s*submitGuestPreorderAction/);
+assert.doesNotMatch(formSrc, /router\.refresh/);
+assert.doesNotMatch(formSrc, /router\.replace/);
+assert.doesNotMatch(formSrc, /router\.push/);
+assert.match(
+  formSrc,
+  /window\.location\.assign\(`\/order\/success\?order=\$\{orderId\}`\)/,
+);
+assert.match(formSrc, /if \(!orderId \|\| state\.error\) return/);
+assert.match(goBackSrc, /if \(pending \|\| state\.orderId\) return/);
+assert.equal(
+  (actionsSrc.match(/return \{ error: null, orderId \}/g) ?? []).length,
+  1,
+);
+const errorEffectSrc = formSrc.slice(
+  formSrc.indexOf("if (state.error) {"),
+  formSrc.indexOf("}, [state.error]);"),
+);
+assert.doesNotMatch(errorEffectSrc, /location\.assign/);
+assert.doesNotMatch(handleSubmitSrc, /location\.assign/);
 
 assert.doesNotMatch(formSrc, /Review Order/);
 assert.doesNotMatch(pageSrc, /Review Order/);
@@ -114,7 +140,12 @@ assert.equal(
   "no Review Order route",
 );
 
-assert.match(actionsSrc, /redirect\(`\/order\/success\?order=\$\{orderId\}`\)/);
+assert.match(actionsSrc, /return \{ error: null, orderId \}/);
+assert.doesNotMatch(
+  actionsSrc,
+  /redirect\(`\/order\/success\?order=\$\{orderId\}`\)/,
+);
+assert.doesNotMatch(actionsSrc, /from "next\/navigation"/);
 assert.match(successRouteSrc, /StorefrontSuccessPage/);
 assert.match(successSrc, /Order Received/);
 assert.doesNotMatch(successSrc, /Proceed to Payment/);
