@@ -257,8 +257,11 @@ export function newOrderEmailSections(
       value: formatPickupTime(summary.pickupTime),
     });
   }
-  if (summary.fulfilmentLabel) {
-    sections.push({ label: "Fulfilment", value: summary.fulfilmentLabel });
+  const fulfilment =
+    summary.fulfilmentLabel.trim() ||
+    fulfilmentLabelForMethod(summary.fulfilmentMethod);
+  if (fulfilment) {
+    sections.push({ label: "Fulfilment", value: fulfilment });
   }
   if (summary.fulfilmentMethod === "dine_in" && summary.dineIn) {
     const venue = dineInVenueLabel(summary.dineIn.venue);

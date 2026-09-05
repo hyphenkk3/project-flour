@@ -16,6 +16,7 @@ import {
   formatNewOrderCakeDisplay,
   formatNewOrderItemLine,
   fulfilmentLabelForMethod,
+  newOrderEmailSections,
   parseNewOrderNotificationPayload,
   type NewOrderNotificationSummary,
 } from "@/foundation/staff/staff-notification-new-order";
@@ -158,21 +159,86 @@ assert.equal(
 assert.match(buildNewOrderToastDescription(dineIn), /Dine-in/);
 assert.match(buildNewOrderToastDescription(delivery), /Delivery/);
 
+function assertFulfilmentAfterCollection(
+  html: string,
+  fulfilment: "Pickup" | "Dine-in" | "Delivery",
+) {
+  assert.match(
+    html,
+    new RegExp(
+      `<strong>Collection:</strong>[\\s\\S]*<strong>Fulfilment:</strong> ${fulfilment}`,
+    ),
+  );
+  assert.doesNotMatch(
+    html,
+    new RegExp(
+      `<strong>Fulfilment:</strong>[\\s\\S]*<strong>Collection:</strong>`,
+    ),
+  );
+}
+
+const pickupSectionLabels = newOrderEmailSections(pickupOne).map(
+  (section) => section.label,
+);
+assert.equal(
+  pickupSectionLabels.indexOf("Collection") <
+    pickupSectionLabels.indexOf("Fulfilment"),
+  true,
+);
+assert.equal(
+  newOrderEmailSections(pickupOne).find(
+    (section) => section.label === "Fulfilment",
+  )?.value,
+  "Pickup",
+);
+assert.equal(
+  newOrderEmailSections(dineIn).find((section) => section.label === "Fulfilment")
+    ?.value,
+  "Dine-in",
+);
+assert.ok(
+  newOrderEmailSections(dineIn)
+    .map((section) => section.label)
+    .indexOf("Fulfilment") <
+    newOrderEmailSections(dineIn)
+      .map((section) => section.label)
+      .indexOf("Venue"),
+);
+assert.equal(
+  newOrderEmailSections(delivery).find(
+    (section) => section.label === "Fulfilment",
+  )?.value,
+  "Delivery",
+);
+assert.ok(
+  newOrderEmailSections(delivery)
+    .map((section) => section.label)
+    .indexOf("Fulfilment") <
+    newOrderEmailSections(delivery)
+      .map((section) => section.label)
+      .indexOf("Recipient"),
+);
+
 const pickupEmail = buildStaffNotificationEmail({
   code: "new_order",
   title: "New order received",
-  description: "unused",
+  description: buildNewOrderToastDescription(pickupOne),
   href: "/owner/orders/order-1",
   newOrder: pickupOne,
 });
 assert.equal(pickupEmail.subject, "New order received — ORD-20260906-0001");
 assert.match(pickupEmail.html, /<h2>New order received<\/h2>/);
+assert.match(
+  pickupEmail.html,
+  /Aisha · Avocado 6&quot; × 1 · 2026-09-06 · Pickup/,
+);
 assert.match(pickupEmail.html, /<strong>Order:<\/strong> ORD-20260906-0001/);
 assert.match(pickupEmail.html, /<strong>Customer:<\/strong> Aisha/);
 assert.match(pickupEmail.html, /<strong>WhatsApp:<\/strong> 01900001111/);
 assert.match(pickupEmail.html, /<strong>Collection:<\/strong>/);
 assert.match(pickupEmail.html, /<strong>Collection time:<\/strong> 1:00 PM/);
 assert.match(pickupEmail.html, /<strong>Fulfilment:<\/strong> Pickup/);
+assertFulfilmentAfterCollection(pickupEmail.html, "Pickup");
 assert.match(pickupEmail.html, /Avocado 6&quot; × 1 — RM135/);
 assert.doesNotMatch(pickupEmail.html, /Avocado 6&quot; 6&quot;/);
 assert.match(pickupEmail.html, /<strong>Total:<\/strong> RM135/);
@@ -194,22 +260,67 @@ assert.match(noNotesEmail.html, /<strong>Total:<\/strong> RM385/);
 const dineEmail = buildStaffNotificationEmail({
   code: "new_order",
   title: "New order received",
-  description: "",
+  description: buildNewOrderToastDescription(dineIn),
   newOrder: dineIn,
 });
 assert.match(dineEmail.html, /<strong>Fulfilment:<\/strong> Dine-in/);
+assertFulfilmentAfterCollection(dineEmail.html, "Dine-in");
 assert.match(dineEmail.html, /<strong>Venue:<\/strong> Whitebird/);
+assert.match(
+  dineEmail.html,
+  /<strong>Fulfilment:<\/strong> Dine-in[\s\S]*<strong>Venue:<\/strong>/,
+);
 
 const deliveryEmail = buildStaffNotificationEmail({
   code: "new_order",
   title: "New order received",
-  description: "",
+  description: buildNewOrderToastDescription(delivery),
   newOrder: delivery,
 });
 assert.match(deliveryEmail.html, /<strong>Fulfilment:<\/strong> Delivery/);
+assertFulfilmentAfterCollection(deliveryEmail.html, "Delivery");
 assert.match(deliveryEmail.html, /<strong>Address:<\/strong>/);
 assert.match(deliveryEmail.html, /1 Jalan Test/);
 assert.match(deliveryEmail.html, /Kota Kinabalu/);
+assert.match(
+  deliveryEmail.html,
+  /<strong>Fulfilment:<\/strong> Delivery[\s\S]*<strong>Recipient:<\/strong>/,
+);
+
+const unlabeledPickupEmail = buildStaffNotificationEmail({
+  code: "new_order",
+  title: "New order received",
+  description: "",
+  newOrder: { ...pickupOne, fulfilmentLabel: "" },
+});
+assert.match(unlabeledPickupEmail.html, /<strong>Fulfilment:<\/strong> Pickup/);
+
+const fallbackPickupEmail = buildStaffNotificationEmail({
+  code: "new_order",
+  title: "New order received",
+  description: buildNewOrderToastDescription(pickupOne),
+  orderNumber: pickupOne.orderNumber,
+  customerName: pickupOne.guestName,
+  pickupDate: pickupOne.pickupDate,
+});
+assert.match(fallbackPickupEmail.html, /<strong>Fulfilment:<\/strong> Pickup/);
+assertFulfilmentAfterCollection(fallbackPickupEmail.html, "Pickup");
+
+const fallbackDineEmail = buildStaffNotificationEmail({
+  code: "new_order",
+  title: "New order received",
+  description: buildNewOrderToastDescription(dineIn),
+  pickupDate: dineIn.pickupDate,
+});
+assert.match(fallbackDineEmail.html, /<strong>Fulfilment:<\/strong> Dine-in/);
+
+const fallbackDeliveryEmail = buildStaffNotificationEmail({
+  code: "new_order",
+  title: "New order received",
+  description: buildNewOrderToastDescription(delivery),
+  pickupDate: delivery.pickupDate,
+});
+assert.match(fallbackDeliveryEmail.html, /<strong>Fulfilment:<\/strong> Delivery/);
 
 const paidEmail = buildStaffNotificationEmail({
   code: "order_paid",
@@ -220,6 +331,7 @@ const paidEmail = buildStaffNotificationEmail({
 });
 assert.match(paidEmail.html, /<h2>Order paid<\/h2>/);
 assert.doesNotMatch(paidEmail.html, /<strong>WhatsApp:<\/strong>/);
+assert.doesNotMatch(paidEmail.html, /<strong>Fulfilment:<\/strong>/);
 
 const edited = classifyTimelineInsert({
   id: "timeline-1",
@@ -413,6 +525,18 @@ async function runLive() {
       buildNewOrderToastDescription(singlePayload as NewOrderNotificationSummary),
     "single cake toast description matches payload formatter",
   );
+  if (singlePayload) {
+    const email = buildStaffNotificationEmail({
+      code: "new_order",
+      title: "New order received",
+      description: String(single.events[0]?.description ?? ""),
+      newOrder: singlePayload,
+    });
+    check(
+      email.html.includes("<strong>Fulfilment:</strong> Pickup"),
+      "single cake email has Fulfilment: Pickup",
+    );
+  }
 
   if (two.length >= 2) {
     const multi = await submitAndLoad({
@@ -462,6 +586,18 @@ async function runLive() {
   );
   check(dinePayload?.fulfilmentLabel === "Dine-in", "dine-in fulfilment label");
   check(dinePayload?.dineIn?.venue === "whitebird", "dine-in venue in payload");
+  if (dinePayload) {
+    const email = buildStaffNotificationEmail({
+      code: "new_order",
+      title: "New order received",
+      description: String(dine.events[0]?.description ?? ""),
+      newOrder: dinePayload,
+    });
+    check(
+      email.html.includes("<strong>Fulfilment:</strong> Dine-in"),
+      "dine-in email has Fulfilment: Dine-in",
+    );
+  }
 
   const delivered = await submitAndLoad({
     p_customer_name: "WB-NOTIF-CONTENT-DELIV",
@@ -494,6 +630,18 @@ async function runLive() {
     deliveryPayload?.delivery?.addressLine1 === "1 Jalan Notif Test",
     "delivery address in payload",
   );
+  if (deliveryPayload) {
+    const email = buildStaffNotificationEmail({
+      code: "new_order",
+      title: "New order received",
+      description: String(delivered.events[0]?.description ?? ""),
+      newOrder: deliveryPayload,
+    });
+    check(
+      email.html.includes("<strong>Fulfilment:</strong> Delivery"),
+      "delivery email has Fulfilment: Delivery",
+    );
+  }
 
   if (single.orderId) {
     const { data: allCodes } = await admin

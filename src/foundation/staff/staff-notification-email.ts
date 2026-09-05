@@ -42,10 +42,24 @@ function absoluteHref(href?: string | null): string | null {
   return `${base}${href.startsWith("/") ? href : `/${href}`}`;
 }
 
+function fulfilmentFromPreviewLine(description?: string | null): string | null {
+  const line = (description ?? "").split("\n")[0]?.trim() ?? "";
+  const parts = line.split(" · ");
+  const last = parts[parts.length - 1]?.trim() ?? "";
+  if (last === "Pickup" || last === "Dine-in" || last === "Delivery") {
+    return last;
+  }
+  return null;
+}
+
 function buildNewOrderEmailHtml(
   summary: NewOrderNotificationSummary,
   href?: string | null,
+  description?: string | null,
 ): string {
+  const preview = description?.trim()
+    ? `<p style="white-space: pre-line">${escapeHtml(description)}</p>`
+    : "";
   const sections = newOrderEmailSections(summary)
     .map(
       (section) =>
@@ -72,6 +86,7 @@ function buildNewOrderEmailHtml(
             "
           >
             <h2>New order received</h2>
+            ${preview}
             ${sections}
             ${orderBlock}
             ${total}
@@ -96,7 +111,11 @@ export function buildStaffNotificationEmail(input: StaffNotificationEmailContent
       subject: orderNumber
         ? `New order received — ${orderNumber}`
         : "New order received",
-      html: buildNewOrderEmailHtml(input.newOrder, input.href),
+      html: buildNewOrderEmailHtml(
+        input.newOrder,
+        input.href,
+        input.description,
+      ),
     };
   }
 
@@ -106,6 +125,10 @@ export function buildStaffNotificationEmail(input: StaffNotificationEmailContent
     : input.customerName
       ? ` — ${input.customerName}`
       : "";
+  const newOrderFulfilment =
+    input.code === "new_order"
+      ? fulfilmentFromPreviewLine(input.description)
+      : null;
 
   const details = [
     input.orderNumber
@@ -119,6 +142,9 @@ export function buildStaffNotificationEmail(input: StaffNotificationEmailContent
       : "",
     dateLabel
       ? `<p><strong>Collection:</strong> ${escapeHtml(dateLabel)}</p>`
+      : "",
+    newOrderFulfilment
+      ? `<p><strong>Fulfilment:</strong> ${escapeHtml(newOrderFulfilment)}</p>`
       : "",
     input.approvalRequestType
       ? `<p><strong>Approval:</strong> ${escapeHtml(input.approvalRequestType)}</p>`
