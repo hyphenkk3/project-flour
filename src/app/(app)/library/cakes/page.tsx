@@ -5,7 +5,7 @@ import { canManageCakePhotos, canManageLibrary } from "@/foundation/navigation/a
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { LibraryCake } from "@/types/library-cake";
 import { CakeDirectory } from "@/workspaces/library/cakes/CakeDirectory";
-import { listCakes } from "@/workspaces/library/cakes/queries";
+import { listCakeCategories, listCakes } from "@/workspaces/library/cakes/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +14,11 @@ export default async function LibraryCakesPage() {
   const canManage = canManageLibrary(staff.role.code);
   const canManagePhotos = canManageCakePhotos(staff.role.code);
   let cakes: LibraryCake[] = [];
+  let categories: Awaited<ReturnType<typeof listCakeCategories>> = [];
   let loadError: string | null = null;
 
   try {
-    cakes = await listCakes();
+    [cakes, categories] = await Promise.all([listCakes(), listCakeCategories()]);
   } catch (error) {
     loadError =
       error instanceof Error
@@ -39,19 +40,31 @@ export default async function LibraryCakesPage() {
           title="Cake Library"
         />
         {canManage ? (
-          <Link
-            className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium transition"
-            href="/library/cakes/new"
-          >
-            Add cake
-          </Link>
+          <div className="flex shrink-0 flex-wrap gap-3">
+            <Link
+              className="border-fog text-ink hover:border-skyline inline-flex min-h-12 items-center justify-center rounded-lg border bg-white px-5 text-sm font-medium transition"
+              href="/library/cakes/categories"
+            >
+              Manage categories
+            </Link>
+            <Link
+              className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium transition"
+              href="/library/cakes/new"
+            >
+              Add cake
+            </Link>
+          </div>
         ) : null}
       </div>
 
       {loadError ? (
         <EmptyState description={loadError} title="Cake Library unavailable" />
       ) : (
-        <CakeDirectory cakes={cakes} canManage={canManage} />
+        <CakeDirectory
+          cakes={cakes}
+          canManage={canManage}
+          categories={categories}
+        />
       )}
     </div>
   );

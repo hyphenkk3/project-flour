@@ -1,5 +1,3 @@
-import type { LibraryCakeCategory } from "@/types/library-cake";
-
 export type GuestOrderStatus =
   | "submitted"
   | "pending_confirmation"
@@ -183,7 +181,10 @@ export type StorefrontCake = {
   id: string;
   name: string;
   description: string | null;
-  category: LibraryCakeCategory | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  categoryActive: boolean;
+  categorySortOrder: number;
   image: string | null;
   photos: StorefrontCakePhoto[];
   sharingGuide: string | null;

@@ -4,14 +4,9 @@ import {
   type LibraryCakeSortId,
 } from "@/engines/menu/cake-library-list";
 import { libraryPhotosHaveCoverage } from "@/engines/menu/cake-photos";
-import type {
-  LibraryCake,
-  LibraryCakeCategory,
-  LibraryCakeStatus,
-} from "@/types/library-cake";
-import { cakeCategoryLabel } from "@/workspaces/library/labels";
+import type { LibraryCake, LibraryCakeStatus } from "@/types/library-cake";
 
-export type LibraryCakeCategoryFilter = LibraryCakeCategory | "all";
+export type LibraryCakeCategoryFilter = string;
 export type LibraryCakeStatusFilter = LibraryCakeStatus | "all";
 export type LibraryCakePhotoFilter = "all" | "has_photos" | "missing_photos";
 
@@ -39,7 +34,7 @@ export function filterLibraryCakes(
   const photos = options.photos ?? "all";
 
   return cakes.filter((cake) => {
-    if (category !== "all" && cake.category !== category) {
+    if (category !== "all" && cake.categoryId !== category) {
       return false;
     }
     if (status !== "all" && cake.status !== status) {
@@ -56,7 +51,7 @@ export function filterLibraryCakes(
     }
     return (
       cake.name.toLowerCase().includes(query) ||
-      cakeCategoryLabel(cake.category).toLowerCase().includes(query)
+      cake.categoryName.toLowerCase().includes(query)
     );
   });
 }

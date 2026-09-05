@@ -318,7 +318,7 @@ export async function listCollectionCakeRows(
       library_cakes (
         id,
         name,
-        category,
+        category_id,
         description,
         sharing_guide,
         allergens,
@@ -326,6 +326,12 @@ export async function listCollectionCakeRows(
         status,
         created_at,
         updated_at,
+        library_cake_categories (
+          id,
+          name,
+          is_active,
+          sort_order
+        ),
         library_cake_sizes (
           id,
           cake_id,

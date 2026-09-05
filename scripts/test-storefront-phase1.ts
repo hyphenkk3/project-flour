@@ -13,6 +13,7 @@ import {
   startingPrice,
 } from "@/workspaces/storefront/catalog/pricing";
 import { mapStorefrontCake } from "@/workspaces/storefront/catalog/queries";
+import { legacyCakeCategoryEmbed } from "@/engines/menu/cake-categories";
 import {
   PREORDER_DRAFT_KEY,
   emptyPreorderDraft,
@@ -86,7 +87,7 @@ const mapped = mapStorefrontCake({
   id: "cake-1",
   name: "Celebration Cake",
   description: "For sharing",
-  category: "celebration",
+  ...legacyCakeCategoryEmbed("celebration"),
   status: "active",
   sharing_guide: "Serves 6–8",
   allergens: ["eggs"],
@@ -274,7 +275,7 @@ async function runLiveReadOnly() {
       id: sample.id,
       name: "Live",
       description: null,
-      category: "classic",
+      ...legacyCakeCategoryEmbed("classic"),
       status: sample.status,
       sharing_guide: null,
       allergens: [],

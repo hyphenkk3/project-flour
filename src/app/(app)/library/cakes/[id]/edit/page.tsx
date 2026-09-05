@@ -5,7 +5,7 @@ import { requireStaff } from "@/foundation/auth/session";
 import { canManageLibrary } from "@/foundation/navigation/access";
 import { CakeForm } from "@/workspaces/library/cakes/CakeForm";
 import { CakePhotoManager } from "@/workspaces/library/cakes/CakePhotoManager";
-import { getCakeById } from "@/workspaces/library/cakes/queries";
+import { getCakeById, listCakeCategories } from "@/workspaces/library/cakes/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,10 @@ export default async function EditLibraryCakePage({
   }
 
   const { id } = await params;
-  const cake = await getCakeById(id);
+  const [cake, categories] = await Promise.all([
+    getCakeById(id),
+    listCakeCategories(),
+  ]);
 
   if (!cake) {
     notFound();
@@ -46,6 +49,7 @@ export default async function EditLibraryCakePage({
       <CakeForm
         cake={cake}
         cancelHref={`/library/cakes/${cake.id}`}
+        categories={categories}
         mode="edit"
       />
     </div>

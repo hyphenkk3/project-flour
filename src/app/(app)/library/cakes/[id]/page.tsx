@@ -50,9 +50,12 @@ export default async function LibraryCakeDetailPage({
               tone={libraryStatusTone(cake.status)}
             />
             <StatusBadge
-              label={cakeCategoryLabel(cake.category)}
+              label={cakeCategoryLabel(cake.categoryName)}
               tone="neutral"
             />
+            {cake.categoryActive ? null : (
+              <StatusBadge label="Category inactive" tone="warning" />
+            )}
           </div>
           <div className="min-w-0 [&_h2]:break-words">
             <PageHeader title={cake.name} />

@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { StorefrontCake } from "@/types/storefront";
 import {
   EMPTY_BROWSE_FILTERS,
+  browseFilterGridClass,
   browseFilterOptionsFromCatalogue,
   countActiveBrowseFilters,
   hasActiveBrowseFilters,
@@ -47,7 +48,7 @@ function FilterFields({
     "border-fog text-ink focus:border-ink min-h-11 w-full border-0 border-b bg-transparent py-2 text-sm outline-none";
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className={browseFilterGridClass(options)}>
       {options.categories.length > 1 ? (
         <div>
           <label
@@ -317,7 +318,7 @@ export function BrowseCakeCatalogue({ cakes }: BrowseCakeCatalogueProps) {
           </div>
         </form>
 
-        <div className="w-full max-w-[14rem]">
+        <div className="w-full max-w-[18rem]">
           <label
             className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase"
             htmlFor={sortId}

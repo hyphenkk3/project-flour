@@ -43,7 +43,7 @@ export function CakeDetailPurchasePanel({
 }: CakeDetailPurchasePanelProps) {
   const draft = usePreorderDraft();
   const selectedSize = cake.sizes.find((size) => size.id === selectedSizeId);
-  const category = storefrontCategoryLabel(cake.category);
+  const category = storefrontCategoryLabel(cake.categoryName);
   const from = pickupScopeFrom?.trim().slice(0, 10) ?? "";
   const to = pickupScopeTo?.trim().slice(0, 10) ?? "";
   const pickupScope =

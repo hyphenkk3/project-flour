@@ -3,6 +3,10 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import {
+  cakeCategoryOptionLabel,
+  cakeEditorCategoryOptions,
+} from "@/engines/menu/cake-categories";
+import {
   FormActions,
   FormError,
   FormField,
@@ -11,7 +15,10 @@ import {
   FormSubmitButton,
   FormTextarea,
 } from "@/components/ui/form";
-import type { LibraryCakeDetail } from "@/types/library-cake";
+import type {
+  LibraryCakeCategoryRecord,
+  LibraryCakeDetail,
+} from "@/types/library-cake";
 import { libraryActionInitialState } from "@/workspaces/library/action-state";
 import {
   createCakeAction,
@@ -19,19 +26,23 @@ import {
 } from "@/workspaces/library/cakes/actions";
 import { CakeSizeFields } from "@/workspaces/library/cakes/CakeSizeFields";
 import {
-  cakeCategoryLabel,
   cakeStatusLabel,
-  LIBRARY_CAKE_CATEGORIES,
   LIBRARY_CAKE_STATUSES,
 } from "@/workspaces/library/labels";
 
 type CakeFormProps = {
   mode: "create" | "edit";
   cake?: LibraryCakeDetail;
+  categories: LibraryCakeCategoryRecord[];
   cancelHref: string;
 };
 
-export function CakeForm({ mode, cake, cancelHref }: CakeFormProps) {
+export function CakeForm({
+  mode,
+  cake,
+  categories,
+  cancelHref,
+}: CakeFormProps) {
   const action =
     mode === "create"
       ? createCakeAction
@@ -42,6 +53,10 @@ export function CakeForm({ mode, cake, cancelHref }: CakeFormProps) {
   );
 
   const allergens = cake?.allergens.join("\n") ?? "";
+  const options = cakeEditorCategoryOptions(categories, cake?.categoryId);
+  const defaultCategoryId = cake?.categoryId ?? options[0]?.id ?? "";
+  const currentInactive =
+    cake != null && cake.categoryId !== "" && !cake.categoryActive;
 
   return (
     <form action={formAction} className="flex max-w-2xl flex-col gap-5">
@@ -54,24 +69,39 @@ export function CakeForm({ mode, cake, cancelHref }: CakeFormProps) {
         />
       </FormField>
 
-      <FormField
-        help="Temporary grouping until Cake Family is introduced."
-        htmlFor="category"
-        label="Category"
-      >
-        <FormSelect
-          defaultValue={cake?.category ?? "celebration"}
-          id="category"
-          name="category"
-          required
+      <div className="flex flex-col gap-1.5">
+        <FormField
+          help={
+            currentInactive
+              ? "This cake keeps its inactive category until you choose an active one. Owner and Manager can reactivate it under Manage categories."
+              : "Used in the Cake Library and customer Browse."
+          }
+          htmlFor="category"
+          label="Category"
         >
-          {LIBRARY_CAKE_CATEGORIES.map((category) => (
-            <option key={category} value={category}>
-              {cakeCategoryLabel(category)}
-            </option>
-          ))}
-        </FormSelect>
-      </FormField>
+          <FormSelect
+            defaultValue={defaultCategoryId}
+            id="category"
+            name="category"
+            required
+          >
+            {options.length === 0 ? (
+              <option value="">No categories yet</option>
+            ) : null}
+            {options.map((category) => (
+              <option key={category.id} value={category.id}>
+                {cakeCategoryOptionLabel(category)}
+              </option>
+            ))}
+          </FormSelect>
+        </FormField>
+        <Link
+          className="text-signal hover:text-ink inline-flex min-h-11 items-center text-sm font-medium"
+          href="/library/cakes/categories"
+        >
+          Manage categories
+        </Link>
+      </div>
 
       <FormField htmlFor="description" label="Description">
         <FormTextarea

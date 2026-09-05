@@ -7,9 +7,12 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type {
   LibraryCake,
-  LibraryCakeCategory,
   LibraryCakeStatus,
 } from "@/types/library-cake";
+import {
+  legacyCakeCategoryFields,
+  type LegacyLibraryCakeCategorySlug,
+} from "@/engines/menu/cake-categories";
 import {
   addCollectionMembership,
   cakesNotInCollection,
@@ -48,13 +51,13 @@ function cake(input: {
   id: string;
   name: string;
   status: LibraryCakeStatus;
-  category?: LibraryCakeCategory;
+  category?: LegacyLibraryCakeCategorySlug;
   price?: number;
 }): LibraryCake {
   return {
     id: input.id,
     name: input.name,
-    category: input.category ?? "classic",
+    ...legacyCakeCategoryFields(input.category ?? "classic"),
     description: null,
     sharingGuide: null,
     allergens: [],
@@ -69,6 +72,7 @@ function cake(input: {
         label: '4"',
         price: input.price ?? 75,
         sortOrder: 0,
+        preorderDays: 2,
       },
     ],
   };
@@ -348,9 +352,9 @@ assert.deepEqual(
   "Library cake prices stay unchanged after collection sort",
 );
 assert.equal(apple.name, "Apple");
-assert.equal(bananaCake.category, "specialty");
+assert.equal(bananaCake.categoryName, "Specialty");
 
-assert.equal(WORKSPACE_CATALOG.collection.label, "Pickup");
+assert.equal(WORKSPACE_CATALOG.collection.label, "Collection");
 assert.equal(WORKSPACE_CATALOG.collection.href, "/collection");
 assert.deepEqual(CATALOGUE_PURPOSES, ["monthly", "special"]);
 assert.equal(parseCatalogueMonthDate("2026-09"), "2026-09-01");

@@ -140,13 +140,13 @@ export function sortLibraryCakes(
         );
       case "category_asc":
         return compareThenName(
-          a.category.localeCompare(b.category, "en"),
+          a.categoryName.localeCompare(b.categoryName, "en"),
           a,
           b,
         );
       case "category_desc":
         return compareThenName(
-          b.category.localeCompare(a.category, "en"),
+          b.categoryName.localeCompare(a.categoryName, "en"),
           a,
           b,
         );

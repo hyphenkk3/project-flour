@@ -1,5 +1,4 @@
 import type { StorefrontCake, StorefrontCollection } from "@/types/storefront";
-import { cakeCategoryLabel } from "@/workspaces/library/labels";
 
 export function startingPrice(cake: Pick<StorefrontCake, "sizes">): number | null {
   if (cake.sizes.length === 0) return null;
@@ -12,10 +11,10 @@ export function formatAvailableSizes(cake: StorefrontCake): string | null {
 }
 
 export function storefrontCategoryLabel(
-  category: StorefrontCake["category"],
+  categoryName: string | null | undefined,
 ): string | null {
-  if (!category) return null;
-  return cakeCategoryLabel(category);
+  const name = categoryName?.trim();
+  return name ? name : null;
 }
 
 export function formatRm(amount: number): string {

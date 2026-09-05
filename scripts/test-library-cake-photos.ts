@@ -19,6 +19,7 @@ import {
   type ResolvableCakePhoto,
 } from "@/engines/menu/cake-photos";
 import { mapStorefrontCake } from "@/workspaces/storefront/catalog/queries";
+import { legacyCakeCategoryEmbed } from "@/engines/menu/cake-categories";
 import { storefrontPhotoForSize } from "@/workspaces/storefront/catalog/cake-photo-map";
 import {
   libraryCakePhotoObjectPath,
@@ -215,7 +216,7 @@ const mapped = mapStorefrontCake({
   id: "cake-1",
   name: "Pandan",
   description: null,
-  category: "classic",
+  ...legacyCakeCategoryEmbed("classic"),
   status: "active",
   sharing_guide: null,
   allergens: [],
@@ -250,7 +251,7 @@ const mappedLegacy = mapStorefrontCake({
   id: "cake-legacy",
   name: "Legacy",
   description: null,
-  category: "classic",
+  ...legacyCakeCategoryEmbed("classic"),
   status: "active",
   sharing_guide: null,
   allergens: [],

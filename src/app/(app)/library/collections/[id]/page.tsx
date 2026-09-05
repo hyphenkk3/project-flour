@@ -29,7 +29,7 @@ import {
   getStorefrontCurrentCollectionId,
   listCollectionCakeRows,
 } from "@/workspaces/library/collections/queries";
-import { listCakes } from "@/workspaces/library/cakes/queries";
+import { listCakes, listCakeCategories } from "@/workspaces/library/cakes/queries";
 import {
   collectionStatusLabel,
   formatLibraryCollectionMonth,
@@ -65,9 +65,10 @@ export default async function LibraryCollectionBuilderPage({
     notFound();
   }
 
-  const [members, libraryCakes, currentId] = await Promise.all([
+  const [members, libraryCakes, categories, currentId] = await Promise.all([
     listCollectionCakeRows(collection.id),
     listCakes(),
+    listCakeCategories(),
     getStorefrontCurrentCollectionId(),
   ]);
   const isWebsiteCatalogue = currentId === collection.id;
@@ -251,6 +252,7 @@ export default async function LibraryCollectionBuilderPage({
       <CataloguePastMenuVisibilityPanel collection={collection} />
 
       <CollectionBuilder
+        categories={categories}
         collection={collection}
         isWebsiteCatalogue={isWebsiteCatalogue}
         libraryCakes={libraryCakes}

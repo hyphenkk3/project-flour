@@ -11,7 +11,11 @@ import {
   FormSelect,
 } from "@/components/ui/form";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import type { LibraryCake, LibraryCakeStatus } from "@/types/library-cake";
+import type {
+  LibraryCake,
+  LibraryCakeCategoryRecord,
+  LibraryCakeStatus,
+} from "@/types/library-cake";
 import {
   applyLibraryCakeDirectory,
   type LibraryCakeCategoryFilter,
@@ -41,8 +45,8 @@ import type {
   CollectionCakeRow,
   LibraryCollection,
 } from "@/workspaces/library/collections/queries";
+import { cakeCategoryOptionLabel, sortCakeCategories } from "@/engines/menu/cake-categories";
 import {
-  LIBRARY_CAKE_CATEGORIES,
   LIBRARY_CAKE_STATUSES,
   cakeCategoryLabel,
   cakeStatusLabel,
@@ -59,6 +63,7 @@ type CollectionBuilderProps = {
   collection: LibraryCollection;
   members: CollectionCakeRow[];
   libraryCakes: LibraryCake[];
+  categories: LibraryCakeCategoryRecord[];
   isWebsiteCatalogue: boolean;
 };
 
@@ -66,6 +71,7 @@ export function CollectionBuilder({
   collection,
   members,
   libraryCakes,
+  categories,
   isWebsiteCatalogue,
 }: CollectionBuilderProps) {
   const [pending, startTransition] = useTransition();
@@ -326,9 +332,9 @@ export function CollectionBuilder({
               value={category}
             >
               <option value="all">All categories</option>
-              {LIBRARY_CAKE_CATEGORIES.map((value) => (
-                <option key={value} value={value}>
-                  {cakeCategoryLabel(value)}
+              {sortCakeCategories(categories).map((value) => (
+                <option key={value.id} value={value.id}>
+                  {cakeCategoryOptionLabel(value)}
                 </option>
               ))}
             </FormSelect>
@@ -355,7 +361,7 @@ export function CollectionBuilder({
                 <div className="min-w-0">
                   <p className="text-ink font-medium">{cake.name}</p>
                   <p className="text-skyline mt-1 text-sm">
-                    {cakeCategoryLabel(cake.category)} ·{" "}
+                    {cakeCategoryLabel(cake.categoryName)} ·{" "}
                     {formatCakeSizePrices(cake.sizes)}
                   </p>
                   <p className="text-skyline mt-1 text-sm">
@@ -503,7 +509,7 @@ function CollectionMemberCard({
             <div className="min-w-0">
               <p className="text-ink font-medium">{member.cake.name}</p>
               <p className="text-skyline mt-1 text-sm">
-                {cakeCategoryLabel(member.cake.category)} ·{" "}
+                {cakeCategoryLabel(member.cake.categoryName)} ·{" "}
                 {formatCakeSizePrices(member.cake.sizes)}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">

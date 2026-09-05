@@ -13,7 +13,6 @@ import {
   toBusinessDateKey,
 } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
-import type { LibraryCakeCategory } from "@/types/library-cake";
 import type {
   StorefrontCake,
   StorefrontCakePhoto,
@@ -35,14 +34,22 @@ import {
 
 export { formatRm, startingPrice };
 
+type CategoryEmbed = {
+  id: string;
+  name: string;
+  is_active: boolean;
+  sort_order: number;
+};
+
 type LibraryCakeEmbed = {
   id: string;
   name: string;
   description: string | null;
-  category: LibraryCakeCategory | null;
+  category_id?: string | null;
   status: string;
   sharing_guide: string | null;
   allergens: string[] | null;
+  library_cake_categories?: CategoryEmbed | CategoryEmbed[] | null;
   library_cake_sizes: Array<{
     id: string;
     cake_id: string;
@@ -207,10 +214,16 @@ function libraryCakeEmbedSelect(photoSelect: string): string {
       id,
       name,
       description,
-      category,
+      category_id,
       status,
       sharing_guide,
       allergens,
+      library_cake_categories (
+        id,
+        name,
+        is_active,
+        sort_order
+      ),
       library_cake_sizes (
         id,
         cake_id,
@@ -253,12 +266,16 @@ export function mapStorefrontCake(row: LibraryCakeEmbed): StorefrontCake {
     .sort((a, b) => a.sort_order - b.sort_order)
     .filter((photo) => Boolean(photo.image_url))
     .map((photo, index) => mapStorefrontCakePhoto(photo, index));
+  const category = unwrapOne(row.library_cake_categories);
 
   return {
     id: row.id,
     name: row.name,
     description: row.description,
-    category: row.category,
+    categoryId: category?.id ?? row.category_id ?? null,
+    categoryName: category?.name ?? null,
+    categoryActive: category?.is_active ?? true,
+    categorySortOrder: category?.sort_order ?? 0,
     image: storefrontDefaultPhoto(photos)?.url ?? null,
     photos,
     sharingGuide: row.sharing_guide,

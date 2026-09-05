@@ -98,12 +98,24 @@ async function ensureLibraryCake(seed) {
     return existing.id;
   }
 
+  const { data: celebration, error: categoryError } = await admin
+    .from("library_cake_categories")
+    .select("id")
+    .eq("name", "Celebration")
+    .maybeSingle();
+  if (categoryError) {
+    throw categoryError;
+  }
+  if (!celebration?.id) {
+    throw new Error("Celebration cake category is missing.");
+  }
+
   const { data: created, error } = await admin
     .from("library_cakes")
     .insert({
       name: seed.name,
       description: seed.description,
-      category: "celebration",
+      category_id: celebration.id,
       status: "active",
       allergens: [],
     })

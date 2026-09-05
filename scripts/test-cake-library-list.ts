@@ -11,11 +11,12 @@ import {
   sortLibraryCakes,
 } from "@/engines/menu/cake-library-list";
 import { cakeSizeNumericValue } from "@/engines/menu/cake-size-order";
-import type {
-  LibraryCake,
-  LibraryCakeCategory,
-  LibraryCakeStatus,
-} from "@/types/library-cake";
+import {
+  legacyCakeCategoryEmbed,
+  legacyCakeCategoryId,
+  type LegacyLibraryCakeCategorySlug,
+} from "@/engines/menu/cake-categories";
+import type { LibraryCake, LibraryCakeStatus } from "@/types/library-cake";
 import { mapCake } from "@/workspaces/library/cakes/queries";
 import {
   applyLibraryCakeDirectory,
@@ -35,7 +36,7 @@ type SizeInput = { label: string; price: number; sort_order?: number };
 function cake(input: {
   id: string;
   name: string;
-  category: LibraryCakeCategory;
+  category: LegacyLibraryCakeCategorySlug;
   status: LibraryCakeStatus;
   updated_at: string;
   sizes: SizeInput[];
@@ -43,7 +44,7 @@ function cake(input: {
   return mapCake({
     id: input.id,
     name: input.name,
-    category: input.category,
+    ...legacyCakeCategoryEmbed(input.category),
     description: null,
     sharing_guide: null,
     allergens: [],
@@ -306,13 +307,13 @@ assert.deepEqual(
 );
 
 assert.deepEqual(
-  names(filterLibraryCakes(catalogue, { category: "classic" })),
+  names(filterLibraryCakes(catalogue, { category: legacyCakeCategoryId("classic") })),
   ["Banana", "Apple"],
 );
 assert.deepEqual(
   names(
     applyLibraryCakeDirectory(catalogue, {
-      category: "classic",
+      category: legacyCakeCategoryId("classic"),
       sort: "name_asc",
     }),
   ),

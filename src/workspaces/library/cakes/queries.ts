@@ -1,10 +1,11 @@
 import { sortCakePhotos } from "@/engines/menu/cake-photos";
 import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
+import { sortCakeCategories } from "@/engines/menu/cake-categories";
 import { readPreorderDays } from "@/engines/preorder/lead";
 import { createClient } from "@/lib/supabase/server";
 import type {
   LibraryCake,
-  LibraryCakeCategory,
+  LibraryCakeCategoryRecord,
   LibraryCakeDetail,
   LibraryCakePhoto,
   LibraryCakeSize,
@@ -32,10 +33,19 @@ type PhotoRow = {
   storage_path?: string | null;
 };
 
+type CategoryEmbed = {
+  id: string;
+  name: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
 type CakeRow = {
   id: string;
   name: string;
-  category: LibraryCakeCategory;
+  category_id: string;
   description: string | null;
   sharing_guide: string | null;
   allergens: string[] | null;
@@ -43,9 +53,24 @@ type CakeRow = {
   status: LibraryCakeStatus;
   created_at: string;
   updated_at: string;
+  library_cake_categories?: CategoryEmbed | CategoryEmbed[] | null;
   library_cake_sizes?: SizeRow[] | null;
   library_cake_photos?: PhotoRow[] | null;
 };
+
+type CategoryRow = {
+  id: string;
+  name: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+function unwrapOne<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
 
 export function mapSize(row: SizeRow): LibraryCakeSize {
   return {
@@ -72,16 +97,31 @@ export function mapPhoto(row: PhotoRow): LibraryCakePhoto {
   };
 }
 
+export function mapCakeCategory(row: CategoryRow): LibraryCakeCategoryRecord {
+  return {
+    id: row.id,
+    name: row.name,
+    isActive: row.is_active,
+    sortOrder: row.sort_order,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export function mapCake(row: CakeRow): LibraryCake {
   const sizes = sortCakeSizesByNumericLabel(
     (row.library_cake_sizes ?? []).map(mapSize),
     (size) => size.label,
   );
+  const category = unwrapOne(row.library_cake_categories);
 
   return {
     id: row.id,
     name: row.name,
-    category: row.category,
+    categoryId: row.category_id,
+    categoryName: category?.name ?? "",
+    categoryActive: category?.is_active ?? true,
+    categorySortOrder: category?.sort_order ?? 0,
     description: row.description,
     sharingGuide: row.sharing_guide,
     allergens: row.allergens ?? [],
@@ -97,7 +137,7 @@ export function mapCake(row: CakeRow): LibraryCake {
 const cakeListSelect = `
   id,
   name,
-  category,
+  category_id,
   description,
   sharing_guide,
   allergens,
@@ -105,6 +145,12 @@ const cakeListSelect = `
   status,
   created_at,
   updated_at,
+  library_cake_categories (
+    id,
+    name,
+    is_active,
+    sort_order
+  ),
   library_cake_sizes (
     id,
     cake_id,
@@ -177,4 +223,38 @@ export async function getCakeById(
     ...mapped,
     photos: mapped.photos ?? [],
   };
+}
+
+export async function listCakeCategories(): Promise<LibraryCakeCategoryRecord[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("library_cake_categories")
+    .select("id, name, is_active, sort_order, created_at, updated_at")
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return sortCakeCategories((data as CategoryRow[]).map(mapCakeCategory));
+}
+
+export async function countCakesByCategoryId(): Promise<Map<string, number>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("library_cakes")
+    .select("category_id");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const counts = new Map<string, number>();
+  for (const row of (data ?? []) as Array<{ category_id: string | null }>) {
+    const id = row.category_id?.trim() ?? "";
+    if (!id) continue;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
 }

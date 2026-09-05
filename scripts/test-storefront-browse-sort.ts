@@ -9,11 +9,17 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { StorefrontCake } from "@/types/storefront";
 import {
+  legacyCakeCategoryFields,
+  legacyCakeCategoryId,
+  type LegacyLibraryCakeCategorySlug,
+} from "@/engines/menu/cake-categories";
+import {
   EMPTY_BROWSE_FILTERS,
   browseFilterOptionsFromCatalogue,
 } from "@/workspaces/storefront/catalog/browse-filters";
 import {
   DEFAULT_BROWSE_SORT,
+  browseSortPreorderDays,
   browseSortPrice,
   sortBrowseCakes,
   viewBrowseCatalogue,
@@ -43,7 +49,7 @@ function size(
 function cake(
   id: string,
   name: string,
-  category: StorefrontCake["category"],
+  category: LegacyLibraryCakeCategorySlug,
   sizes: StorefrontCake["sizes"],
   description: string | null = `${name} cake`,
 ): StorefrontCake {
@@ -51,7 +57,7 @@ function cake(
     id,
     name,
     description,
-    category,
+    ...legacyCakeCategoryFields(category),
     image: null,
     photos: [],
     sharingGuide: null,
@@ -61,17 +67,21 @@ function cake(
 }
 
 const zebra = cake("zebra", "Zebra Walnut", "classic", [
-  size("z6", '6"', 150),
+  size("z6", '6"', 150, 3),
 ]);
 const apple = cake("apple", "apple Crumble", "specialty", [
-  size("a6", '6"', 120),
-  size("a8", '8"', 180),
+  size("a6", '6"', 120, 2),
+  size("a8", '8"', 180, 2),
 ]);
 const banana = cake("banana", "Banana Cream", "specialty", [
-  size("b6", '6"', 140),
+  size("b6", '6"', 140, 3),
 ]);
 const equalLater = cake("equal-later", "Equal Price Later", "classic", [
-  size("e6", '6"', 120),
+  size("e6", '6"', 120, 2),
+]);
+const mixedLead = cake("mixed-lead", "Mixed Lead Cake", "classic", [
+  size("m6", '6"', 110, 2),
+  size("m8", '8"', 160, 3),
 ]);
 const published = [zebra, apple, banana, equalLater];
 const excluded = cake("staff-only", "Zebra Hidden", "classic", [
@@ -140,7 +150,7 @@ assert.deepEqual(
   viewBrowseCatalogue(
     published,
     "",
-    { ...EMPTY_BROWSE_FILTERS, category: "specialty" },
+    { ...EMPTY_BROWSE_FILTERS, category: legacyCakeCategoryId("specialty") },
     ranges,
     "price_desc",
   ).map((row) => row.id),
@@ -152,7 +162,7 @@ assert.deepEqual(
   viewBrowseCatalogue(
     published,
     "a",
-    { ...EMPTY_BROWSE_FILTERS, category: "specialty" },
+    { ...EMPTY_BROWSE_FILTERS, category: legacyCakeCategoryId("specialty") },
     ranges,
     "price_asc",
   ).map((row) => row.id),
@@ -181,13 +191,45 @@ assert.equal(
   "J. sort does not change preorder labels",
 );
 
+assert.equal(browseSortPreorderDays(apple), 2);
+assert.equal(browseSortPreorderDays(zebra), 3);
+assert.equal(browseSortPreorderDays(mixedLead), 2);
+assert.deepEqual(
+  sortBrowseCakes(published, "preorder_asc", published).map((row) => row.id),
+  ["apple", "equal-later", "zebra", "banana"],
+  "N. Preorder Days low → high uses configured size lead time",
+);
+assert.deepEqual(
+  sortBrowseCakes(published, "preorder_desc", published).map((row) => row.id),
+  ["zebra", "banana", "apple", "equal-later"],
+  "O. Preorder Days high → low",
+);
+assert.deepEqual(
+  sortBrowseCakes([equalLater, apple], "preorder_asc", published).map(
+    (row) => row.id,
+  ),
+  ["apple", "equal-later"],
+  "P. equal preorder days keep publication order",
+);
+assert.deepEqual(
+  sortBrowseCakes(
+    [zebra, mixedLead, apple],
+    "preorder_asc",
+    [zebra, apple, banana, equalLater, mixedLead],
+  ).map((row) => row.id),
+  ["apple", "mixed-lead", "zebra"],
+  "Q. mixed-size cake sorts by its soonest configured lead time",
+);
+
 const sortSrc = readSrc("src/workspaces/storefront/catalog/browse-sort.ts");
 assert.doesNotMatch(sortSrc, /preorder-draft/);
 assert.doesNotMatch(sortSrc, /sessionStorage/);
 assert.doesNotMatch(sortSrc, /writePreorderDraft/);
 assert.doesNotMatch(sortSrc, /evaluateCollectionDate/);
-assert.doesNotMatch(sortSrc, /preorderDays/);
+assert.doesNotMatch(sortSrc, /pickupDate/);
 assert.doesNotMatch(sortSrc, /localStorage/);
+assert.match(sortSrc, /preorderDays/);
+assert.match(sortSrc, /preorder_asc/);
 
 assert.deepEqual(
   viewBrowseCatalogue(
@@ -205,7 +247,7 @@ assert.deepEqual(
   viewBrowseCatalogue(
     published,
     "",
-    { ...EMPTY_BROWSE_FILTERS, category: "specialty" },
+    { ...EMPTY_BROWSE_FILTERS, category: legacyCakeCategoryId("specialty") },
     ranges,
     "recommended",
   ).map((row) => row.id),
@@ -218,6 +260,7 @@ const catalogueSrc = readSrc(
 );
 assert.match(catalogueSrc, /viewBrowseCatalogue/);
 assert.match(catalogueSrc, /BROWSE_SORT_OPTIONS/);
+assert.match(catalogueSrc, /max-w-\[18rem\]/);
 assert.match(catalogueSrc, /Try adjusting your search or filters/);
 assert.doesNotMatch(catalogueSrc, /writePreorderDraft/);
 assert.doesNotMatch(catalogueSrc, /sessionStorage/);

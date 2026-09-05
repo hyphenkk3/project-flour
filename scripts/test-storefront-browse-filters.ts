@@ -9,13 +9,19 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { StorefrontCake } from "@/types/storefront";
 import {
+  legacyCakeCategoryFields,
+  legacyCakeCategoryId,
+} from "@/engines/menu/cake-categories";
+import {
   EMPTY_BROWSE_FILTERS,
+  browseFilterGridClass,
   browseFilterOptionsFromCatalogue,
   cakeMatchesBrowseFilters,
   countActiveBrowseFilters,
   filterBrowseCatalogue,
   filterBrowseCakes,
   hasActiveBrowseFilters,
+  visibleBrowseFilterCount,
 } from "@/workspaces/storefront/catalog/browse-filters";
 import { cakeCardPreorderLabel } from "@/workspaces/storefront/catalog/pricing";
 
@@ -43,7 +49,7 @@ const matcha: StorefrontCake = {
   id: "matcha",
   name: "Matcha Yuzu Cake",
   description: "Soft sponge with yuzu cream.",
-  category: "seasonal",
+  ...legacyCakeCategoryFields("seasonal"),
   image: null,
   photos: [],
   sharingGuide: null,
@@ -54,7 +60,7 @@ const pandan: StorefrontCake = {
   id: "pandan",
   name: "Pandan Mango Cake",
   description: "Fragrant pandan with mango.",
-  category: "classic",
+  ...legacyCakeCategoryFields("classic"),
   image: null,
   photos: [],
   sharingGuide: null,
@@ -65,7 +71,7 @@ const chocolate: StorefrontCake = {
   id: "choco",
   name: "Classic Chocolate",
   description: null,
-  category: "classic",
+  ...legacyCakeCategoryFields("classic"),
   image: null,
   photos: [],
   sharingGuide: null,
@@ -77,7 +83,7 @@ const excluded: StorefrontCake = {
   id: "staff-only",
   name: "Matcha Hidden",
   description: "Staff-only special cake.",
-  category: "classic",
+  ...legacyCakeCategoryFields("classic"),
   image: null,
   photos: [],
   sharingGuide: null,
@@ -98,7 +104,7 @@ assert.equal(hasActiveBrowseFilters(EMPTY_BROWSE_FILTERS), false);
 assert.deepEqual(
   filterBrowseCakes(
     published,
-    { ...EMPTY_BROWSE_FILTERS, category: "seasonal" },
+    { ...EMPTY_BROWSE_FILTERS, category: legacyCakeCategoryId("seasonal") },
     ranges,
   ).map((cake) => cake.id),
   ["matcha"],
@@ -107,7 +113,7 @@ assert.deepEqual(
 assert.deepEqual(
   filterBrowseCakes(
     published,
-    { ...EMPTY_BROWSE_FILTERS, category: "classic" },
+    { ...EMPTY_BROWSE_FILTERS, category: legacyCakeCategoryId("classic") },
     ranges,
   ).map((cake) => cake.id),
   ["pandan", "choco"],
@@ -193,7 +199,7 @@ assert.equal(cakeCardPreorderLabel(pandan), "Preorder varies by size");
 assert.deepEqual(
   filterBrowseCakes(
     published,
-    { ...EMPTY_BROWSE_FILTERS, category: "classic", size: '6"' },
+    { ...EMPTY_BROWSE_FILTERS, category: legacyCakeCategoryId("classic"), size: '6"' },
     ranges,
   ).map((cake) => cake.id),
   ["pandan"],
@@ -204,7 +210,7 @@ assert.deepEqual(
   filterBrowseCatalogue(
     published,
     "matcha",
-    { ...EMPTY_BROWSE_FILTERS, category: "seasonal" },
+    { ...EMPTY_BROWSE_FILTERS, category: legacyCakeCategoryId("seasonal") },
     ranges,
   ).map((cake) => cake.id),
   ["matcha"],
@@ -214,7 +220,7 @@ assert.deepEqual(
   filterBrowseCatalogue(
     published,
     "matcha",
-    { ...EMPTY_BROWSE_FILTERS, category: "classic" },
+    { ...EMPTY_BROWSE_FILTERS, category: legacyCakeCategoryId("classic") },
     ranges,
   ).map((cake) => cake.id),
   [],
@@ -234,7 +240,7 @@ assert.deepEqual(
 
 const classicOnly = {
   ...EMPTY_BROWSE_FILTERS,
-  category: "classic" as const,
+  category: legacyCakeCategoryId("classic"),
 };
 assert.deepEqual(
   filterBrowseCatalogue(published, "", classicOnly, ranges).map(
@@ -248,7 +254,7 @@ assert.equal(countActiveBrowseFilters(classicOnly), 1);
 assert.equal(
   filterBrowseCakes(
     published,
-    { ...EMPTY_BROWSE_FILTERS, category: "classic", size: '6"' },
+    { ...EMPTY_BROWSE_FILTERS, category: legacyCakeCategoryId("classic"), size: '6"' },
     ranges,
   ).some((cake) => cake.id === excluded.id),
   false,
@@ -276,15 +282,40 @@ assert.equal(
 );
 
 const filterSrc = readSrc("src/workspaces/storefront/catalog/browse-filters.ts");
+assert.doesNotMatch(filterSrc, /LIBRARY_CAKE_CATEGORIES/);
 assert.doesNotMatch(filterSrc, /preorder-draft/);
 assert.doesNotMatch(filterSrc, /sessionStorage/);
 assert.doesNotMatch(filterSrc, /writePreorderDraft/);
 assert.doesNotMatch(filterSrc, /evaluateCollectionDate/);
 assert.doesNotMatch(filterSrc, /localStorage/);
 
+assert.equal(visibleBrowseFilterCount(options) >= 4, true);
+assert.match(browseFilterGridClass(options), /lg:grid-cols-4/);
+
+const twoDayOnly = browseFilterOptionsFromCatalogue([
+  matcha,
+  {
+    ...pandan,
+    sizes: [size("p6", '6"', 120, 2), size("p8", '8"', 180, 2)],
+  },
+  {
+    ...chocolate,
+    sizes: [size("c8", '8"', 220, 2)],
+  },
+]);
+assert.equal(twoDayOnly.preorderDays.length, 1);
+assert.equal(visibleBrowseFilterCount(twoDayOnly), 3);
+assert.match(
+  browseFilterGridClass(twoDayOnly),
+  /lg:grid-cols-3/,
+  "N. three visible filters use three columns, not a 4-col hole",
+);
+assert.doesNotMatch(browseFilterGridClass(twoDayOnly), /lg:grid-cols-4/);
+
 const catalogueSrc = readSrc(
   "src/workspaces/storefront/catalog/BrowseCakeCatalogue.tsx",
 );
+assert.match(catalogueSrc, /browseFilterGridClass/);
 assert.match(catalogueSrc, /viewBrowseCatalogue/);
 assert.match(catalogueSrc, /Clear filters/);
 assert.match(catalogueSrc, /Try adjusting your search or filters/);

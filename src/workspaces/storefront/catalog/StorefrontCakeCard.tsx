@@ -29,7 +29,7 @@ export function StorefrontCakeCard({
 }: StorefrontCakeCardProps) {
   const from = startingPrice(cake);
   const sizes = formatAvailableSizes(cake);
-  const category = storefrontCategoryLabel(cake.category);
+  const category = storefrontCategoryLabel(cake.categoryName);
   const preorder = cakeCardPreorderLabel(cake);
   const hero = storefrontDefaultPhoto(cake.photos);
   const imageUrl = cake.image ?? hero?.url ?? null;

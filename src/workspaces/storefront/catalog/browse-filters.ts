@@ -1,15 +1,20 @@
-import type { LibraryCakeCategory } from "@/types/library-cake";
 import type { StorefrontCake } from "@/types/storefront";
 import { compareCakeSizeLabels } from "@/engines/menu/cake-size-order";
-import { LIBRARY_CAKE_CATEGORIES } from "@/workspaces/library/labels";
+import { browseCategoryOptionsFromCakes } from "@/engines/menu/cake-categories";
 import { filterBrowseCakesBySearch } from "@/workspaces/storefront/catalog/browse-search";
 import {
   formatPreorderRequirement,
   formatRm,
-  storefrontCategoryLabel,
 } from "@/workspaces/storefront/catalog/pricing";
 
-export type BrowseFilterCake = Pick<StorefrontCake, "category" | "sizes">;
+export type BrowseFilterCake = Pick<
+  StorefrontCake,
+  | "categoryId"
+  | "categoryName"
+  | "categoryActive"
+  | "categorySortOrder"
+  | "sizes"
+>;
 
 export type BrowsePriceRange = {
   id: string;
@@ -19,7 +24,7 @@ export type BrowsePriceRange = {
 };
 
 export type BrowseFilterState = {
-  category: LibraryCakeCategory | "";
+  category: string;
   size: string;
   priceRangeId: string;
   preorderDays: number | null;
@@ -102,22 +107,12 @@ export function browsePriceRangesFromCatalogue(
 export function browseFilterOptionsFromCatalogue(
   cakes: readonly BrowseFilterCake[],
 ): {
-  categories: Array<{ value: LibraryCakeCategory; label: string }>;
+  categories: Array<{ value: string; label: string }>;
   sizes: string[];
   priceRanges: BrowsePriceRange[];
   preorderDays: number[];
 } {
-  const present = new Set(
-    cakes
-      .map((cake) => cake.category)
-      .filter((value): value is LibraryCakeCategory => Boolean(value)),
-  );
-  const categories = LIBRARY_CAKE_CATEGORIES.filter((category) =>
-    present.has(category),
-  ).map((value) => ({
-    value,
-    label: storefrontCategoryLabel(value) ?? value,
-  }));
+  const categories = browseCategoryOptionsFromCakes(cakes);
 
   const sizeSet = new Set<string>();
   const daySet = new Set<number>();
@@ -138,12 +133,36 @@ export function browseFilterOptionsFromCatalogue(
   };
 }
 
+export type BrowseFilterOptions = ReturnType<
+  typeof browseFilterOptionsFromCatalogue
+>;
+
+/** Same visibility rules as the Browse filter controls. */
+export function visibleBrowseFilterCount(options: BrowseFilterOptions): number {
+  return (
+    Number(options.categories.length > 1) +
+    Number(options.sizes.length > 1) +
+    Number(options.priceRanges.length > 0) +
+    Number(options.preorderDays.length > 1)
+  );
+}
+
+/**
+ * Avoid a 4-column grid with a hole when Preorder (or another filter) is hidden.
+ */
+export function browseFilterGridClass(options: BrowseFilterOptions): string {
+  const count = visibleBrowseFilterCount(options);
+  if (count >= 4) return "grid gap-4 sm:grid-cols-2 lg:grid-cols-4";
+  if (count === 3) return "grid gap-4 sm:grid-cols-2 lg:grid-cols-3";
+  return "grid gap-4 sm:grid-cols-2";
+}
+
 export function cakeMatchesBrowseFilters(
   cake: BrowseFilterCake,
   filters: BrowseFilterState,
   priceRanges: readonly BrowsePriceRange[] = [],
 ): boolean {
-  if (filters.category && cake.category !== filters.category) {
+  if (filters.category && cake.categoryId !== filters.category) {
     return false;
   }
   if (filters.size && !cake.sizes.some((size) => size.size === filters.size)) {

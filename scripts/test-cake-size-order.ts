@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { legacyCakeCategoryEmbed } from "@/engines/menu/cake-categories";
 import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
 import { formatCakeSizePrices } from "@/workspaces/library/labels";
 import { mapCake } from "@/workspaces/library/cakes/queries";
@@ -45,7 +46,7 @@ assert.notDeepEqual(
 const mapped = mapCake({
   id: "cake-1",
   name: "Scrambled",
-  category: "classic",
+  ...legacyCakeCategoryEmbed("classic"),
   description: null,
   sharing_guide: null,
   allergens: [],

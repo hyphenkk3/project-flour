@@ -14,7 +14,11 @@ import {
   DEFAULT_LIBRARY_CAKE_SORT,
   type LibraryCakeSortId,
 } from "@/engines/menu/cake-library-list";
-import type { LibraryCake, LibraryCakePhoto } from "@/types/library-cake";
+import type {
+  LibraryCake,
+  LibraryCakeCategoryRecord,
+  LibraryCakePhoto,
+} from "@/types/library-cake";
 import {
   applyLibraryCakeDirectory,
   type LibraryCakeCategoryFilter,
@@ -22,7 +26,10 @@ import {
   type LibraryCakeStatusFilter,
 } from "@/workspaces/library/cakes/directory-view";
 import {
-  LIBRARY_CAKE_CATEGORIES,
+  cakeCategoryOptionLabel,
+  sortCakeCategories,
+} from "@/engines/menu/cake-categories";
+import {
   LIBRARY_CAKE_STATUSES,
   cakeCategoryLabel,
   cakeStatusLabel,
@@ -47,6 +54,7 @@ const SORT_OPTIONS: Array<{ id: LibraryCakeSortId; label: string }> = [
 
 type CakeDirectoryProps = {
   cakes: LibraryCake[];
+  categories: LibraryCakeCategoryRecord[];
   canManage: boolean;
 };
 
@@ -112,7 +120,7 @@ function CakeDirectoryThumb({
   );
 }
 
-export function CakeDirectory({ cakes }: CakeDirectoryProps) {
+export function CakeDirectory({ cakes, categories }: CakeDirectoryProps) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<LibraryCakeSortId>(DEFAULT_LIBRARY_CAKE_SORT);
   const [category, setCategory] = useState<LibraryCakeCategoryFilter>("all");
@@ -165,9 +173,9 @@ export function CakeDirectory({ cakes }: CakeDirectoryProps) {
               value={category}
             >
               <option value="all">All categories</option>
-              {LIBRARY_CAKE_CATEGORIES.map((value) => (
-                <option key={value} value={value}>
-                  {cakeCategoryLabel(value)}
+              {sortCakeCategories(categories).map((value) => (
+                <option key={value.id} value={value.id}>
+                  {cakeCategoryOptionLabel(value)}
                 </option>
               ))}
             </FormSelect>
@@ -235,7 +243,8 @@ export function CakeDirectory({ cakes }: CakeDirectoryProps) {
                           {cake.name}
                         </p>
                         <p className="text-skyline mt-1 text-sm">
-                          {cakeCategoryLabel(cake.category)}
+                          {cakeCategoryLabel(cake.categoryName)}
+                          {!cake.categoryActive ? " (inactive)" : ""}
                         </p>
                         <p className="text-ink mt-1 text-sm">
                           {formatCakeSizePrices(cake.sizes)}

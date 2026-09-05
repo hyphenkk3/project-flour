@@ -6,15 +6,14 @@ import { requireStaff } from "@/foundation/auth/session";
 import { canManageLibrary } from "@/foundation/navigation/access";
 import { createClient } from "@/lib/supabase/server";
 import type {
-  LibraryCakeCategory,
   LibraryCakeInput,
   LibraryCakeSizeInput,
   LibraryCakeStatus,
 } from "@/types/library-cake";
 import type { LibraryActionState } from "@/workspaces/library/action-state";
+import { getCakeById, listCakeCategories } from "@/workspaces/library/cakes/queries";
 import {
   emptyToNull,
-  LIBRARY_CAKE_CATEGORIES,
   LIBRARY_CAKE_STATUSES,
   parseNonNegativeNumber,
 } from "@/workspaces/library/labels";
@@ -83,11 +82,12 @@ function parseSizes(formData: FormData): LibraryCakeSizeInput[] | string {
   return sizes;
 }
 
-function parseCakeInput(formData: FormData): LibraryCakeInput | string {
+async function parseCakeInput(
+  formData: FormData,
+  options: { currentCategoryId?: string } = {},
+): Promise<LibraryCakeInput | string> {
   const name = String(formData.get("name") ?? "").trim();
-  const category = String(
-    formData.get("category") ?? "",
-  ).trim() as LibraryCakeCategory;
+  const categoryId = String(formData.get("category") ?? "").trim();
   const description = emptyToNull(formData.get("description"));
   const sharingGuide = emptyToNull(formData.get("sharing_guide"));
   const bakeryNotes = emptyToNull(formData.get("bakery_notes"));
@@ -101,8 +101,15 @@ function parseCakeInput(formData: FormData): LibraryCakeInput | string {
   }
 
   if (!name) return "Name is required.";
-  if (!LIBRARY_CAKE_CATEGORIES.includes(category)) {
+  if (!categoryId) return "Choose a valid category.";
+
+  const categories = await listCakeCategories();
+  const match = categories.find((row) => row.id === categoryId);
+  if (!match) {
     return "Choose a valid category.";
+  }
+  if (!match.isActive && match.id !== options.currentCategoryId) {
+    return "Choose an active category.";
   }
   if (!LIBRARY_CAKE_STATUSES.includes(status)) {
     return "Choose a valid status.";
@@ -110,7 +117,7 @@ function parseCakeInput(formData: FormData): LibraryCakeInput | string {
 
   return {
     name,
-    category,
+    categoryId,
     description,
     sharingGuide,
     allergens,
@@ -227,7 +234,7 @@ export async function createCakeAction(
   formData: FormData,
 ): Promise<LibraryActionState> {
   const staff = await requireLibraryStaff();
-  const parsed = parseCakeInput(formData);
+  const parsed = await parseCakeInput(formData);
   if (typeof parsed === "string") {
     return { error: parsed };
   }
@@ -237,7 +244,7 @@ export async function createCakeAction(
     .from("library_cakes")
     .insert({
       name: parsed.name,
-      category: parsed.category,
+      category_id: parsed.categoryId,
       description: parsed.description,
       sharing_guide: parsed.sharingGuide,
       allergens: parsed.allergens,
@@ -274,7 +281,10 @@ export async function updateCakeAction(
   formData: FormData,
 ): Promise<LibraryActionState> {
   const staff = await requireLibraryStaff();
-  const parsed = parseCakeInput(formData);
+  const current = await getCakeById(id);
+  const parsed = await parseCakeInput(formData, {
+    currentCategoryId: current?.categoryId,
+  });
   if (typeof parsed === "string") {
     return { error: parsed };
   }
@@ -284,7 +294,7 @@ export async function updateCakeAction(
     .from("library_cakes")
     .update({
       name: parsed.name,
-      category: parsed.category,
+      category_id: parsed.categoryId,
       description: parsed.description,
       sharing_guide: parsed.sharingGuide,
       allergens: parsed.allergens,

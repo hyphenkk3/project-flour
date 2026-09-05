@@ -1,10 +1,7 @@
 import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
 import { formatBusinessMonthYear } from "@/lib/dates";
 import type { StatusTone } from "@/lib/design-tokens";
-import type {
-  LibraryCakeCategory,
-  LibraryCakeStatus,
-} from "@/types/library-cake";
+import type { LibraryCakeStatus } from "@/types/library-cake";
 import type {
   LibraryAssetKind,
   LibraryAssetStatus,
@@ -21,14 +18,6 @@ export const LIBRARY_CAKE_STATUSES: readonly LibraryCakeStatus[] = [
   "active",
   "seasonal",
   "retired",
-] as const;
-
-export const LIBRARY_CAKE_CATEGORIES: readonly LibraryCakeCategory[] = [
-  "celebration",
-  "classic",
-  "seasonal",
-  "specialty",
-  "other",
 ] as const;
 
 export const LIBRARY_PROMOTION_STATUSES: readonly LibraryPromotionStatus[] = [
@@ -91,19 +80,8 @@ export function cakeStatusLabel(status: LibraryCakeStatus): string {
   }
 }
 
-export function cakeCategoryLabel(category: LibraryCakeCategory): string {
-  switch (category) {
-    case "celebration":
-      return "Celebration";
-    case "classic":
-      return "Classic";
-    case "seasonal":
-      return "Seasonal";
-    case "specialty":
-      return "Specialty";
-    case "other":
-      return "Other";
-  }
+export function cakeCategoryLabel(name: string | null | undefined): string {
+  return name?.trim() ?? "";
 }
 
 export function promotionStatusLabel(status: LibraryPromotionStatus): string {
