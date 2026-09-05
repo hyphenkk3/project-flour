@@ -64,7 +64,10 @@ import {
   WAITING_LIST_NAME_HELP,
   WAITING_LIST_WHATSAPP_NOTE,
 } from "@/engines/waiting-list/phone";
-import { CheckoutConfirmPrompt } from "@/workspaces/storefront/checkout/CheckoutConfirmPrompt";
+import {
+  buildCheckoutConfirmSnapshot,
+  CheckoutConfirmPrompt,
+} from "@/workspaces/storefront/checkout/CheckoutConfirmPrompt";
 import { CheckoutOrderSummary } from "@/workspaces/storefront/checkout/CheckoutOrderSummary";
 import { CheckoutSection } from "@/workspaces/storefront/checkout/CheckoutSection";
 import { FulfilmentMethodChooser } from "@/workspaces/storefront/checkout/FulfilmentMethodChooser";
@@ -904,6 +907,13 @@ export function GuestCheckoutForm({
     !catalogueReady ||
     Boolean(unavailableMessage) ||
     (items.length > 0 && collectionDateInvalid);
+  const confirmSnapshot = buildCheckoutConfirmSnapshot({
+    fields,
+    items,
+    paidAddonOptions,
+    pickupDateLabel,
+    total,
+  });
 
   return (
     <div className="flex flex-col gap-10">
@@ -1562,6 +1572,7 @@ export function GuestCheckoutForm({
       onGoBack={goBackFromConfirm}
       open={confirmOpen}
       pending={pending}
+      snapshot={confirmSnapshot}
     />
     </div>
   );
