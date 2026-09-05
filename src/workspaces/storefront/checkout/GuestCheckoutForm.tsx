@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   FormActions,
@@ -64,6 +64,7 @@ import {
   WAITING_LIST_NAME_HELP,
   WAITING_LIST_WHATSAPP_NOTE,
 } from "@/engines/waiting-list/phone";
+import { CheckoutConfirmPrompt } from "@/workspaces/storefront/checkout/CheckoutConfirmPrompt";
 import { CheckoutOrderSummary } from "@/workspaces/storefront/checkout/CheckoutOrderSummary";
 import { CheckoutSection } from "@/workspaces/storefront/checkout/CheckoutSection";
 import { FulfilmentMethodChooser } from "@/workspaces/storefront/checkout/FulfilmentMethodChooser";
@@ -243,6 +244,14 @@ export function GuestCheckoutForm({
     submitGuestPreorderAction,
     initialState,
   );
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const pendingSubmitRef = useRef<FormData | null>(null);
+
+  useEffect(() => {
+    if (state.error) {
+      setConfirmOpen(false);
+    }
+  }, [state.error]);
 
   const [items, setItems] = useState<PreorderDraftItem[]>([]);
   const [fields, setFields] = useState<PreorderDraftFields>(() =>
@@ -832,7 +841,20 @@ export function GuestCheckoutForm({
     }
     setItemError(null);
     persistDraft(items, fields);
+    pendingSubmitRef.current = formData;
+    setConfirmOpen(true);
+  }
+
+  function confirmOrder() {
+    if (pending) return;
+    const formData = pendingSubmitRef.current;
+    if (!formData) return;
     formAction(formData);
+  }
+
+  function goBackFromConfirm() {
+    if (pending) return;
+    setConfirmOpen(false);
   }
 
   const upcomingClosed = closedDates
@@ -1483,7 +1505,7 @@ export function GuestCheckoutForm({
       <FormActions className="border-fog border-t pt-8 sm:items-center">
         <FormSubmitButton
           className="w-full rounded-full sm:w-auto"
-          disabled={submitBlocked}
+          disabled={submitBlocked || confirmOpen}
           pending={pending}
           pendingLabel="Submitting…"
         >
@@ -1535,6 +1557,12 @@ export function GuestCheckoutForm({
         pickupDate={fields.pickupDate}
       />
     ) : null}
+    <CheckoutConfirmPrompt
+      onConfirm={confirmOrder}
+      onGoBack={goBackFromConfirm}
+      open={confirmOpen}
+      pending={pending}
+    />
     </div>
   );
 }

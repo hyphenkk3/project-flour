@@ -35,7 +35,7 @@ export async function StorefrontSuccessPage({
       {isFreshPick ? null : <ClearPreorderDraftOnSuccess />}
       <div className="text-center">
         <h1 className="font-display text-ink text-3xl tracking-tight">
-          {isFreshPick ? FRESH_PICKS_SUCCESS_TITLE : "Thank you."}
+          {isFreshPick ? FRESH_PICKS_SUCCESS_TITLE : "Order Received"}
         </h1>
         <p className="text-skyline mt-4 text-base leading-relaxed">
           {isFreshPick ? (
@@ -46,10 +46,9 @@ export async function StorefrontSuccessPage({
             </>
           ) : (
             <>
-              Your preorder has been received.
+              Payment Pending
               <br />
-              We&apos;ll be in touch to confirm your order details before
-              payment.
+              Whitebird will contact you via WhatsApp.
             </>
           )}
         </p>
@@ -156,13 +155,13 @@ export async function StorefrontSuccessPage({
               <span aria-hidden className="text-status-success">
                 ✓
               </span>
-              Preorder submitted
+              Order Received
             </p>
             <p className="text-skyline flex items-start gap-2 pl-5">
-              Confirmation next
+              Payment Pending
             </p>
             <p className="text-skyline flex items-start gap-2 pl-5">
-              Payment later
+              Whitebird will contact you via WhatsApp.
             </p>
           </>
         )}

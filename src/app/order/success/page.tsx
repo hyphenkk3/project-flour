@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { StorefrontSuccessPage } from "@/workspaces/storefront/checkout/StorefrontSuccessPage";
 
 export const metadata: Metadata = {
-  title: "Thank you · Whitebird",
+  title: "Order Received · Whitebird",
 };
 
 export const dynamic = "force-dynamic";

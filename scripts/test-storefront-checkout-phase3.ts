@@ -63,7 +63,7 @@ assert.match(formSrc, /font-display text-ink text-4xl/);
 assert.match(formSrc, /Change date/);
 assert.match(formSrc, /evaluateCollectionDate/);
 assert.match(formSrc, /!collectionDateEvaluation\.valid/);
-assert.match(formSrc, /disabled=\{submitBlocked\}/);
+assert.match(formSrc, /disabled=\{submitBlocked \|\| confirmOpen\}/);
 assert.match(
   formSrc,
   /items\.length > 0 && collectionDateInvalid/,
@@ -88,6 +88,8 @@ assert.doesNotMatch(formSrc, /Pay Now/);
 assert.doesNotMatch(formSrc, /Review & Pay/);
 assert.doesNotMatch(pageSrc, /Proceed to Payment/);
 assert.doesNotMatch(summarySrc, /Proceed to Payment/);
+assert.match(formSrc, /CheckoutConfirmPrompt/);
+assert.doesNotMatch(formSrc, /window\.confirm/);
 
 assert.match(formSrc, /Continue Ordering/);
 assert.match(formSrc, /href="\/browse"/);
