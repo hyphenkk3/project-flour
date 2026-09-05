@@ -7,6 +7,14 @@ import {
 } from "@/engines/orders/fulfilment";
 import { calculateOrderTotal } from "@/engines/orders/totals";
 
+export type PreorderDraftSizeChoice = {
+  id: string;
+  size: string;
+  price: number;
+  preorderDays: number;
+  imageUrl?: string;
+};
+
 export type PreorderDraftItem = {
   cakeId: string;
   sizeId: string;
@@ -16,6 +24,10 @@ export type PreorderDraftItem = {
   unitPrice: number;
   /** Display/UX only. Final validation reloads live size preorder_days. */
   preorderDays?: number;
+  /** Display-only thumbnail captured at add-to-order. */
+  imageUrl?: string;
+  /** Display/edit snapshot of offered sizes. Live catalogue still wins when loaded. */
+  sizeChoices?: PreorderDraftSizeChoice[];
 };
 
 export type PhysicalReceiptChoice = "" | "yes" | "no";
@@ -195,6 +207,11 @@ export function readPreorderDraft(): PreorderDraft | null {
             : Number(item.preorderDays) >= 1
               ? Number(item.preorderDays)
               : undefined,
+        imageUrl:
+          typeof item.imageUrl === "string" && item.imageUrl.trim()
+            ? item.imageUrl.trim()
+            : undefined,
+        sizeChoices: parseDraftSizeChoices(item.sizeChoices),
       })),
     };
   } catch {
@@ -229,8 +246,86 @@ export function mergeDraftItem(
   next[existingIndex] = {
     ...existing,
     quantity: existing.quantity + item.quantity,
+    imageUrl: existing.imageUrl ?? item.imageUrl,
+    sizeChoices: item.sizeChoices ?? existing.sizeChoices,
   };
   return { ...draft, items: next };
+}
+
+function parseDraftSizeChoices(
+  value: unknown,
+): PreorderDraftSizeChoice[] | undefined {
+  if (!Array.isArray(value) || value.length === 0) return undefined;
+  const choices: PreorderDraftSizeChoice[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") continue;
+    const row = entry as Partial<PreorderDraftSizeChoice>;
+    const id = String(row.id ?? "").trim();
+    const size = String(row.size ?? "").trim();
+    const price = Number(row.price);
+    const preorderDays = Number(row.preorderDays);
+    if (!id || !size || !Number.isFinite(price) || preorderDays < 1) continue;
+    const imageUrl =
+      typeof row.imageUrl === "string" && row.imageUrl.trim()
+        ? row.imageUrl.trim()
+        : undefined;
+    choices.push({
+      id,
+      size,
+      price,
+      preorderDays,
+      imageUrl,
+    });
+  }
+  return choices.length > 0 ? choices : undefined;
+}
+
+/** Size/price/preorder/image only. Does not change collection date. */
+export function setDraftLineSize(
+  cakeId: string,
+  currentSizeId: string,
+  nextSize: PreorderDraftSizeChoice,
+): PreorderDraft {
+  const current = readPreorderDraft() ?? emptyPreorderDraft();
+  if (!nextSize.id || nextSize.id === currentSizeId) return current;
+  const source = current.items.find(
+    (item) => item.cakeId === cakeId && item.sizeId === currentSizeId,
+  );
+  if (!source) return current;
+  const updated: PreorderDraftItem = {
+    ...source,
+    sizeId: nextSize.id,
+    sizeLabel: nextSize.size,
+    unitPrice: nextSize.price,
+    preorderDays: nextSize.preorderDays,
+    imageUrl: nextSize.imageUrl ?? source.imageUrl,
+  };
+  const withoutSource = current.items.filter(
+    (item) => !(item.cakeId === cakeId && item.sizeId === currentSizeId),
+  );
+  const mergeIndex = withoutSource.findIndex(
+    (item) => item.cakeId === cakeId && item.sizeId === nextSize.id,
+  );
+  const items =
+    mergeIndex === -1
+      ? current.items.map((item) =>
+          item.cakeId === cakeId && item.sizeId === currentSizeId
+            ? updated
+            : item,
+        )
+      : withoutSource.map((item, index) =>
+          index === mergeIndex
+            ? {
+                ...item,
+                quantity: item.quantity + source.quantity,
+                imageUrl: item.imageUrl ?? updated.imageUrl,
+                sizeChoices: item.sizeChoices ?? updated.sizeChoices,
+              }
+            : item,
+        );
+  const next = { ...current, items };
+  writePreorderDraft(next);
+  return next;
 }
 
 /** Quantity only. Does not change collection date. */

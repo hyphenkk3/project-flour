@@ -169,6 +169,7 @@ export function CakeDetailPurchasePanel({
         initialSizeId={selectedSizeId}
         pickupScope={pickupScope}
       />
+      <div aria-hidden className="h-20 md:hidden" />
     </div>
   );
 }

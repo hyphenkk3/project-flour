@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { createPortal } from "react-dom";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import type { StorefrontCake } from "@/types/storefront";
 import { isFullMonthPickupScope } from "@/engines/menu/customer-browse";
@@ -43,7 +44,6 @@ export function AddToOrderSheet({
   pickupScope = null,
   initialSizeId,
 }: AddToOrderSheetProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [sizeId, setSizeId] = useState(
     initialSizeId || cake.sizes[0]?.id || "",
@@ -52,13 +52,13 @@ export function AddToOrderSheet({
 
   const selected = cake.sizes.find((size) => size.id === sizeId);
   const photo = storefrontPhotoForSize(cake.photos, sizeId);
+  const defaultSizeId = initialSizeId || cake.sizes[0]?.id || "";
 
   useEffect(() => {
-    const node = dialogRef.current;
-    if (!node) return;
-    if (open && !node.open) node.showModal();
-    if (!open && node.open) node.close();
-  }, [open]);
+    if (!open) return;
+    setSizeId(defaultSizeId);
+    setQuantity(1);
+  }, [open, defaultSizeId]);
 
   function addToOrder() {
     if (!selected) return;
@@ -71,6 +71,17 @@ export function AddToOrderSheet({
       sizeLabel: selected.size,
       unitPrice: selected.price,
       preorderDays: selected.preorderDays,
+      imageUrl: photo?.url ?? cake.image ?? undefined,
+      sizeChoices: cake.sizes.map((size) => ({
+        id: size.id,
+        size: size.size,
+        price: size.price,
+        preorderDays: size.preorderDays,
+        imageUrl:
+          storefrontPhotoForSize(cake.photos, size.id)?.url ??
+          cake.image ??
+          undefined,
+      })),
     });
     const from = pickupScope?.from?.trim().slice(0, 10) ?? "";
     const to = pickupScope?.to?.trim().slice(0, 10) ?? "";
@@ -83,19 +94,17 @@ export function AddToOrderSheet({
     onAdded();
   }
 
-  return (
-    <dialog
-      aria-labelledby={titleId}
-      className="border-fog bg-mist text-ink w-full max-w-none rounded-t-2xl border p-0 shadow-lg backdrop:bg-ink/40 open:fixed open:inset-x-0 open:bottom-0 open:mt-auto open:mb-0 md:open:inset-auto md:open:top-1/2 md:open:left-1/2 md:open:bottom-auto md:open:max-w-md md:open:-translate-x-1/2 md:open:-translate-y-1/2 md:rounded-2xl"
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-      onClick={(event) => {
-        if (event.target === dialogRef.current) onClose();
-      }}
-      ref={dialogRef}
-    >
+  if (!open) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-50">
+      <div aria-hidden className="bg-ink/40 absolute inset-0" />
+      <div
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="border-fog bg-mist text-ink absolute inset-x-0 bottom-0 z-[60] max-h-[100dvh] w-full overflow-y-auto rounded-t-2xl border shadow-lg md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:max-w-md md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl"
+        role="dialog"
+      >
       <form
         className="flex flex-col gap-5 px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:px-6 md:pt-5 md:pb-6"
         onSubmit={(event) => {
@@ -226,15 +235,21 @@ export function AddToOrderSheet({
           Add
         </button>
       </form>
-    </dialog>
+      </div>
+    </div>,
+    document.body,
   );
 }
+
+const defaultAddToOrderButtonClassName =
+  "bg-ink text-mist hover:bg-skyline inline-flex min-h-11 w-full items-center justify-center rounded-full px-4 text-sm font-medium disabled:opacity-50";
 
 type AddToOrderButtonProps = {
   cake: StorefrontCake;
   pickupScope?: AddToOrderPickupScope | null;
   initialSizeId?: string;
   className?: string;
+  buttonClassName?: string;
 };
 
 export function AddToOrderButton({
@@ -242,6 +257,7 @@ export function AddToOrderButton({
   pickupScope = null,
   initialSizeId,
   className = "",
+  buttonClassName = defaultAddToOrderButtonClassName,
 }: AddToOrderButtonProps) {
   const [open, setOpen] = useState(false);
   const [added, setAdded] = useState(false);
@@ -255,7 +271,7 @@ export function AddToOrderButton({
   return (
     <div className={className}>
       <button
-        className="bg-ink text-mist hover:bg-skyline inline-flex min-h-11 w-full items-center justify-center rounded-full px-4 text-sm font-medium disabled:opacity-50"
+        className={buttonClassName}
         disabled={cake.sizes.length === 0}
         onClick={() => setOpen(true)}
         type="button"
@@ -270,20 +286,17 @@ export function AddToOrderButton({
           Added to your order
         </p>
       ) : null}
-      {open ? (
-        <AddToOrderSheet
-          cake={cake}
-          initialSizeId={initialSizeId}
-          key={`${cake.id}:${initialSizeId ?? ""}`}
-          onAdded={() => {
-            setOpen(false);
-            setAdded(true);
-          }}
-          onClose={() => setOpen(false)}
-          open
-          pickupScope={pickupScope}
-        />
-      ) : null}
+      <AddToOrderSheet
+        cake={cake}
+        initialSizeId={initialSizeId}
+        onAdded={() => {
+          setOpen(false);
+          setAdded(true);
+        }}
+        onClose={() => setOpen(false)}
+        open={open}
+        pickupScope={pickupScope}
+      />
     </div>
   );
 }

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { earliestPickupDateYmd } from "@/engines/business-calendar/pickup-slots";
 import {
   CUSTOMER_PICKUP_DATE_CAKE_NOTICE,
@@ -88,22 +87,14 @@ export async function StorefrontCheckoutPage({
       : [];
 
   return (
-    <main className="mx-auto min-h-screen max-w-2xl px-5 py-8 sm:px-6 sm:py-10">
+    <main className="mx-auto min-h-screen max-w-5xl px-5 py-10 sm:px-6">
       <StorefrontHomeLink />
-      <Link
-        className="text-skyline hover:text-ink mt-5 inline-block text-sm font-medium"
-        href="/order"
-      >
-        ← Choose your collection
-      </Link>
-      <h1 className="font-display text-ink mt-4 text-3xl tracking-tight">
-        Your Preorder
-      </h1>
-      <p className="text-skyline mt-2 text-sm leading-relaxed">
+      <h1 className="sr-only">Your Order</h1>
+      <p className="text-skyline mt-8 max-w-xl text-[0.95rem] leading-relaxed">
         No payment is required yet. We&apos;ll confirm your preorder details
         with you after submission. {CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
       </p>
-      <div className="mt-6">
+      <div className="mt-10">
         <GuestCheckoutForm
           closedDates={closedDates}
           entrySpecialUnavailableDates={entrySpecialUnavailableDates}
@@ -116,9 +107,6 @@ export async function StorefrontCheckoutPage({
           suggestedPickupDate={suggestedPickupDate}
         />
       </div>
-      <p className="mt-8">
-        <StorefrontHomeLink />
-      </p>
     </main>
   );
 }

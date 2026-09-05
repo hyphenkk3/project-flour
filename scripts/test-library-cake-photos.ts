@@ -350,10 +350,11 @@ assert.doesNotMatch(bakeryStorageSrc, /create table/);
 assert.doesNotMatch(bakeryStorageSrc, /create bucket/i);
 
 assert.match(draftSrc, /whitebird-preorder-draft-v1/);
-assert.doesNotMatch(draftSrc, /imageUrl/);
+assert.match(draftSrc, /Display-only thumbnail captured at add-to-order/);
+assert.match(draftSrc, /imageUrl\?: string/);
 assert.doesNotMatch(cartSrc, /storefrontPhotoForSize/);
 assert.match(sheetSrc, /mergeDraftItem/);
-assert.doesNotMatch(sheetSrc, /imageUrl:/);
+assert.match(sheetSrc, /imageUrl:/);
 
 const queriesSrc = readSrc("src/workspaces/library/cakes/queries.ts");
 const directorySrc = readSrc("src/workspaces/library/cakes/CakeDirectory.tsx");

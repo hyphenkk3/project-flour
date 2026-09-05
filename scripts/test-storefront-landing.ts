@@ -402,6 +402,8 @@ const progressSrc = readSrc(
 );
 assert.match(progressSrc, /preorderCheckoutHref/);
 assert.match(progressSrc, /View Order/);
+assert.match(progressSrc, /View My Order/);
+assert.match(progressSrc, /Continue Ordering/);
 
 const extraPageSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontExtraPage.tsx",

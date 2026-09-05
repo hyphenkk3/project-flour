@@ -25,17 +25,22 @@ export async function StorefrontBrowsePage() {
   ]);
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-5 py-10 sm:px-6">
+    <main className="mx-auto min-h-screen max-w-5xl px-5 py-5 sm:px-6 sm:py-10">
       <StorefrontHomeLink />
-      <h1 className="font-display text-ink mt-8 text-3xl tracking-tight">
+      <h1 className="font-display text-ink mt-4 text-2xl tracking-tight sm:mt-8 sm:text-3xl">
         Browse Cakes
       </h1>
-      <p className="text-skyline mt-3 max-w-xl text-[0.95rem] leading-relaxed">
-        Discover cakes currently published for Whitebird. Availability for your
-        order still depends on the pickup date you choose. Past menus can be
-        browsed below, but cannot be ordered.
+      <p className="text-skyline mt-1.5 max-w-xl text-sm leading-snug sm:mt-3 sm:text-[0.95rem] sm:leading-relaxed">
+        <span className="sm:hidden">
+          Currently published cakes for Whitebird.
+        </span>
+        <span className="hidden sm:inline">
+          Discover cakes currently published for Whitebird. Availability for your
+          order still depends on the pickup date you choose. Past menus can be
+          browsed below, but cannot be ordered.
+        </span>
       </p>
-      <p className="mt-3">
+      <p className="mt-2 sm:mt-3">
         <Link
           className="text-ink hover:text-skyline text-sm font-medium"
           href="/order"
@@ -46,7 +51,7 @@ export async function StorefrontBrowsePage() {
 
       <PreorderInProgressBar />
 
-      <section aria-labelledby="browse-cakes-heading" className="mt-8">
+      <section aria-labelledby="browse-cakes-heading" className="mt-4 sm:mt-8">
         <h2 className="sr-only" id="browse-cakes-heading">
           Published cakes
         </h2>

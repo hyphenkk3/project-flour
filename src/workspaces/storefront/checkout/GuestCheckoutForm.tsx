@@ -9,7 +9,6 @@ import {
   FormField,
   FormInput,
   FormRadioGroup,
-  FormSelect,
   FormSubmitButton,
   FormTextarea,
 } from "@/components/ui/form";
@@ -61,13 +60,19 @@ import {
   workspaceScheduleTimeLabel,
 } from "@/engines/orders/fulfilment";
 import { formatShortBusinessDate } from "@/lib/dates";
+import {
+  WAITING_LIST_NAME_HELP,
+  WAITING_LIST_WHATSAPP_NOTE,
+} from "@/engines/waiting-list/phone";
+import { CheckoutOrderSummary } from "@/workspaces/storefront/checkout/CheckoutOrderSummary";
+import { CheckoutSection } from "@/workspaces/storefront/checkout/CheckoutSection";
 import { FulfilmentMethodChooser } from "@/workspaces/storefront/checkout/FulfilmentMethodChooser";
 import type { StorefrontCake } from "@/types/storefront";
+import { formatCollectionAvailabilityLabel } from "@/workspaces/storefront/catalog/pricing";
 import {
-  formatCollectionAvailabilityLabel,
-  formatRm,
-  startingPrice,
-} from "@/workspaces/storefront/catalog/pricing";
+  draftEarliestCollectionYmd,
+  draftStrongestPreorder,
+} from "@/workspaces/storefront/cart/cart-order-summary";
 import {
   customerPaidAddonMessageRequired,
   customerPaidAddonMessageVisible,
@@ -262,7 +267,7 @@ export function GuestCheckoutForm({
     {},
   );
   const [addingCake, setAddingCake] = useState(false);
-  const [changingDate, setChangingDate] = useState(false);
+  const [changingDate, setChangingDate] = useState(true);
   const [cartPickupBounds, setCartPickupBounds] = useState<{
     min: string;
     max: string;
@@ -794,6 +799,11 @@ export function GuestCheckoutForm({
         ],
         cakes,
       );
+      if (filtered.dropped) {
+        setItemError(
+          "Some cakes are not available for this pickup date and were removed.",
+        );
+      }
       return filtered.items;
     });
   }
@@ -855,10 +865,30 @@ export function GuestCheckoutForm({
     collectionDateEvaluation?.reason.code === "fully_booked" &&
     collectionDateEvaluation.reason.waitingListOffered &&
     waitingListLines.length > 0;
+  const pickupDateLabel = fields.pickupDate
+    ? formatCheckoutCakeDate(fields.pickupDate)
+    : null;
+  const earliestYmd =
+    collectionDateEvaluation?.earliestYmd ??
+    draftEarliestCollectionYmd(items);
+  const earliestLabel = earliestYmd
+    ? formatCheckoutCakeDate(earliestYmd)
+    : null;
+  const preorderLabel = draftStrongestPreorder(items).label;
+  const collectionDateInvalid = Boolean(
+    collectionDateEvaluation && !collectionDateEvaluation.valid,
+  );
+  const submitBlocked =
+    !catalogueReady ||
+    Boolean(unavailableMessage) ||
+    (items.length > 0 && collectionDateInvalid);
 
   return (
-    <div className="flex flex-col gap-5">
-    <form action={handleSubmit} className="flex flex-col gap-5">
+    <div className="flex flex-col gap-10">
+    <form
+      action={handleSubmit}
+      className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_20.5rem] lg:items-start lg:gap-x-16 lg:gap-y-0"
+    >
       <input name="items_json" type="hidden" value={itemsJson} />
       <input name="preorder_options_json" type="hidden" value={optionsJson} />
       <input
@@ -867,18 +897,25 @@ export function GuestCheckoutForm({
         value={optionsReady ? "1" : "0"}
       />
 
-      <section className="border-fog space-y-3 rounded-xl border bg-white px-4 py-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-              Your cakes
-            </h2>
-            {fields.pickupDate ? (
-              <p className="text-skyline mt-1 text-sm">
-                For {formatCheckoutCakeDate(fields.pickupDate)}
-              </p>
-            ) : null}
-          </div>
+      <div className="order-2 flex min-w-0 flex-col gap-12 lg:order-1">
+      <CheckoutSection title="Collection Date">
+        <p className="font-display text-ink text-4xl tracking-tight sm:text-[2.75rem]">
+          {pickupDateLabel ?? "Select a date"}
+        </p>
+        {earliestLabel ? (
+          <p className="text-skyline mt-3 text-sm leading-relaxed">
+            Earliest collection {earliestLabel}
+            {preorderLabel ? ` · ${preorderLabel}` : ""}
+          </p>
+        ) : preorderLabel ? (
+          <p className="text-skyline mt-3 text-sm leading-relaxed">
+            {preorderLabel}
+          </p>
+        ) : null}
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-signal text-[11px] font-semibold tracking-[0.18em] uppercase">
+            Selected date
+          </p>
           <button
             className="text-signal text-sm font-medium"
             onClick={() => setChangingDate((open) => !open)}
@@ -888,32 +925,44 @@ export function GuestCheckoutForm({
           </button>
         </div>
         {changingDate ? (
-          <PickupSlotFields
-            closedDates={closedDates}
-            dateLabel="Date"
-            defaultDate={fields.pickupDate}
-            defaultTime={fields.pickupTime}
-            excludedDateMessage="This date is reserved for the Special Menu."
-            excludedDates={effectiveExcludedDates}
-            includeFieldNames={false}
-            key="checkout-cake-date"
-            maxDate={effectivePickupBounds.max ?? undefined}
-            minDate={effectivePickupBounds.min}
-            onDateChange={changeDate}
-            rejectExcludedDates={rejectExcludedDates}
-            unavailableDateMessageFor={(ymd) =>
-              customerFullyBookedDateMessage({
-                selectedYmd: ymd,
-                blockingCakeNames:
-                  activeCartCapacity.blockingCakeNamesByDate[ymd] ?? [],
-              })
-            }
-            unavailableDates={fullyBookedWithoutWaitingList}
-            showTime={false}
-          />
+          <div className="mt-3 max-w-sm">
+            <PickupSlotFields
+              closedDates={closedDates}
+              dateLabel="Date"
+              defaultDate={fields.pickupDate}
+              defaultTime={fields.pickupTime}
+              excludedDateMessage="This date is reserved for the Special Menu."
+              excludedDates={effectiveExcludedDates}
+              includeFieldNames={false}
+              key="checkout-cake-date"
+              maxDate={effectivePickupBounds.max ?? undefined}
+              minDate={effectivePickupBounds.min}
+              onDateChange={changeDate}
+              rejectExcludedDates={rejectExcludedDates}
+              unavailableDateMessageFor={(ymd) =>
+                customerFullyBookedDateMessage({
+                  selectedYmd: ymd,
+                  blockingCakeNames:
+                    activeCartCapacity.blockingCakeNamesByDate[ymd] ?? [],
+                })
+              }
+              unavailableDates={fullyBookedWithoutWaitingList}
+              showTime={false}
+            />
+          </div>
+        ) : null}
+        {unavailableMessage ? (
+          <div className="mt-4" role="status">
+            <p className="text-ink text-sm leading-relaxed">
+              {unavailableMessage}
+            </p>
+            <p className="text-skyline mt-2 text-sm leading-relaxed">
+              Please choose a date in a published catalogue.
+            </p>
+          </div>
         ) : null}
         {upcomingClosed.length > 0 ? (
-          <p className="text-skyline text-sm">
+          <p className="text-skyline mt-4 text-sm leading-relaxed">
             {upcomingClosed.length === 1
               ? `${formatShortBusinessDate(upcomingClosed[0] ?? "")} — ${ORDERS_CLOSED_CUSTOMER_LABEL}.`
               : `Pickup dates with ${ORDERS_CLOSED_CUSTOMER_LABEL.toLowerCase()}: ${upcomingClosed
@@ -921,198 +970,26 @@ export function GuestCheckoutForm({
                   .join(", ")}.`}
           </p>
         ) : null}
-        {loadingOffer ? (
-          <p className="text-skyline text-sm" aria-live="polite">
-            Loading cakes for that date…
-          </p>
-        ) : unavailableMessage ? (
-          <div role="status">
-            <p className="text-ink text-sm font-medium leading-relaxed">
-              {unavailableMessage}
-            </p>
-            <p className="text-skyline mt-2 text-sm leading-relaxed">
-              Please choose a date in a published catalogue.
-            </p>
-          </div>
-        ) : (
-          <>
-            {offerLabel ? (
-              <p className="text-skyline text-sm">{offerLabel}</p>
-            ) : null}
-            {items.length === 0 ? (
-              <p className="text-skyline text-sm">No cakes added yet.</p>
-            ) : (
-              <ul className="space-y-3">
-                {items.map((item, index) => {
-                  const cake = cakes.find((entry) => entry.id === item.cakeId);
-                  return (
-                    <li
-                      className="border-fog space-y-2 rounded-lg border px-3 py-3"
-                      key={`${item.cakeId}-${item.sizeId}-${index}`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-ink font-medium">{item.cakeName}</p>
-                          <p className="text-skyline mt-0.5 text-sm">
-                            {item.sizeLabel} × {item.quantity} ·{" "}
-                            {formatRm(item.unitPrice * item.quantity)}
-                          </p>
-                        </div>
-                        <button
-                          className="text-skyline hover:text-ink text-xs font-medium"
-                          onClick={() => removeItem(index)}
-                          type="button"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <FormField htmlFor={`size-${index}`} label="Size">
-                          <FormSelect
-                            id={`size-${index}`}
-                            onChange={(event) =>
-                              changeSize(index, event.target.value)
-                            }
-                            value={item.sizeId}
-                          >
-                            {(cake?.sizes ?? []).map((size) => (
-                              <option key={size.id} value={size.id}>
-                                {size.size} — {formatRm(size.price)}
-                              </option>
-                            ))}
-                          </FormSelect>
-                        </FormField>
-                        <FormField htmlFor={`qty-${index}`} label="Quantity">
-                          <FormInput
-                            id={`qty-${index}`}
-                            min={1}
-                            onChange={(event) =>
-                              updateItem(index, {
-                                quantity: Math.max(
-                                  1,
-                                  Number(event.target.value) || 1,
-                                ),
-                              })
-                            }
-                            step={1}
-                            type="number"
-                            value={item.quantity}
-                          />
-                        </FormField>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-
-            {addingCake ? (
-              cakes.length > 0 ? (
-                <div className="border-fog space-y-2 border-t pt-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-ink text-sm font-medium">
-                      Available cakes for this date
-                    </p>
-                    <button
-                      className="text-skyline text-sm font-medium"
-                      onClick={() => setAddingCake(false)}
-                      type="button"
-                    >
-                      Close
-                    </button>
-                  </div>
-                  <ul className="space-y-2">
-                    {cakes.map((cake) => (
-                      <li
-                        className="flex flex-wrap items-center gap-2"
-                        key={cake.id}
-                      >
-                        <span className="text-ink min-w-0 flex-1 text-sm">
-                          {cake.name}
-                          {startingPrice(cake) != null
-                            ? ` · from ${formatRm(startingPrice(cake) ?? 0)}`
-                            : ""}
-                        </span>
-                        <FormSelect
-                          aria-label={`Size for ${cake.name}`}
-                          className="w-36"
-                          onChange={(event) =>
-                            setAddSizeByCake((current) => ({
-                              ...current,
-                              [cake.id]: event.target.value,
-                            }))
-                          }
-                          value={addSizeByCake[cake.id] ?? cake.sizes[0]?.id ?? ""}
-                        >
-                          {cake.sizes.map((size) => (
-                            <option key={size.id} value={size.id}>
-                              {size.size}
-                            </option>
-                          ))}
-                        </FormSelect>
-                        <button
-                          className="text-signal text-sm font-medium"
-                          onClick={() => addOfferedCakeAndClosePicker(cake)}
-                          type="button"
-                        >
-                          Add
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <p className="text-skyline text-sm">
-                  No cakes are offered for this date.
-                </p>
-              )
-            ) : catalogueReady ? (
-              <button
-                className="text-signal text-sm font-medium"
-                onClick={() => setAddingCake(true)}
-                type="button"
-              >
-                + Add another cake
-              </button>
-            ) : null}
-          </>
-        )}
-
-        {!unavailableMessage && fields.pickupDate ? (
-          <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
-            <p className="text-ink text-sm font-semibold">
-              Total · {formatRm(total)}
-            </p>
-          </div>
-        ) : null}
-        {itemError ? (
-          <p className="text-status-danger text-sm font-bold" role="alert">
-            {itemError}
-          </p>
-        ) : null}
         {collectionDateMessage &&
         collectionDateEvaluation &&
-        !collectionDateEvaluation.valid &&
-        collectionDateMessage !== itemError ? (
-          <p className="text-ink text-sm leading-relaxed" role="status">
+        !collectionDateEvaluation.valid ? (
+          <p className="text-status-danger mt-4 text-sm leading-relaxed" role="status">
             {collectionDateMessage}
           </p>
         ) : null}
         {showJoinWaitingList ? (
-          <p className="text-ink text-sm leading-relaxed">
+          <p className="text-ink mt-4 text-sm leading-relaxed">
             Join Waiting List is below. This is a waiting-list request, not a
             confirmed order.
           </p>
         ) : null}
-      </section>
+      </CheckoutSection>
 
-      <section className="space-y-3">
-        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-          Fulfilment
-        </h2>
-        <p className="text-skyline text-sm leading-relaxed">
-          {customerFulfilmentHoursNotice(hoursSnapshot)}
-        </p>
+      <CheckoutSection
+        className="border-fog border-t pt-10"
+        description={customerFulfilmentHoursNotice(hoursSnapshot)}
+        title="Fulfilment"
+      >
         <FulfilmentMethodChooser
           closedDates={closedDates}
           dateYmd={fields.pickupDate}
@@ -1409,14 +1286,11 @@ export function GuestCheckoutForm({
             ) : null}
           </div>
         ) : null}
-      </section>
+      </CheckoutSection>
 
       {optionsReady &&
       (complimentaryOptions.length > 0 || paidAddonOptions.length > 0) ? (
-        <section className="space-y-4">
-          <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-            Options
-          </h2>
+        <CheckoutSection className="border-fog border-t pt-10" title="Options">
           {complimentaryOptions.length > 0 ? (
             <div className="space-y-2">
               <p className="text-ink text-sm font-medium">Complimentary</p>
@@ -1501,14 +1375,18 @@ export function GuestCheckoutForm({
               })}
             </div>
           ) : null}
-        </section>
+        </CheckoutSection>
       ) : null}
 
-      <section className="space-y-3">
-        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-          Customer
-        </h2>
-        <FormField htmlFor="customer_name" label="Name">
+      <CheckoutSection
+        className="border-fog border-t pt-10"
+        title="Customer Details"
+      >
+        <FormField
+          help={WAITING_LIST_NAME_HELP}
+          htmlFor="customer_name"
+          label="Name"
+        >
           <FormInput
             id="customer_name"
             name="customer_name"
@@ -1521,7 +1399,7 @@ export function GuestCheckoutForm({
         </FormField>
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField
-            help="Primary contact for WhatsApp updates"
+            help={WAITING_LIST_WHATSAPP_NOTE}
             htmlFor="phone"
             label="WhatsApp phone"
           >
@@ -1574,12 +1452,9 @@ export function GuestCheckoutForm({
           required
           value={fields.includeReceiptChoice}
         />
-      </section>
+      </CheckoutSection>
 
-      <section className="space-y-3">
-        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-          Notes
-        </h2>
+      <CheckoutSection className="border-fog border-t pt-10" title="Order Notes">
         <p className="text-ink text-sm font-medium">Optional notes</p>
         <p
           className="text-status-danger text-sm leading-snug font-bold"
@@ -1596,30 +1471,62 @@ export function GuestCheckoutForm({
           rows={3}
           value={fields.notes}
         />
-      </section>
+      </CheckoutSection>
 
+      {itemError && itemError !== collectionDateMessage ? (
+        <p className="text-status-danger text-sm leading-relaxed" role="alert">
+          {itemError}
+        </p>
+      ) : null}
       <FormError message={state.error} />
 
-      <FormActions>
+      <FormActions className="border-fog border-t pt-8 sm:items-center">
         <FormSubmitButton
-          disabled={
-            !catalogueReady ||
-            Boolean(unavailableMessage) ||
-            (items.length > 0 &&
-              collectionDateEvaluation != null &&
-              !collectionDateEvaluation.valid)
-          }
+          className="w-full rounded-full sm:w-auto"
+          disabled={submitBlocked}
           pending={pending}
+          pendingLabel="Submitting…"
         >
-          Submit Preorder
+          Submit Order
         </FormSubmitButton>
         <Link
-          className="border-fog text-ink inline-flex min-h-12 items-center justify-center rounded-lg border px-5 text-sm font-medium"
-          href="/order"
+          className="text-ink hover:text-skyline inline-flex min-h-11 items-center justify-center px-2 text-sm font-medium"
+          href="/browse"
         >
-          Back
+          Continue Ordering
         </Link>
       </FormActions>
+      </div>
+
+      <div className="order-1 min-w-0 lg:order-2">
+        <CheckoutOrderSummary
+          addSizeByCake={addSizeByCake}
+          addingCake={addingCake}
+          cakes={cakes}
+          catalogueReady={catalogueReady}
+          earliestLabel={earliestLabel}
+          items={items}
+          loadingOffer={loadingOffer}
+          offerLabel={offerLabel}
+          onAddCake={addOfferedCakeAndClosePicker}
+          onAddSize={(cakeId, sizeId) =>
+            setAddSizeByCake((current) => ({
+              ...current,
+              [cakeId]: sizeId,
+            }))
+          }
+          onChangeQuantity={(index, quantity) =>
+            updateItem(index, { quantity })
+          }
+          onChangeSize={changeSize}
+          onRemove={removeItem}
+          onToggleAdding={setAddingCake}
+          pickupDateLabel={pickupDateLabel}
+          preorderLabel={preorderLabel}
+          total={total}
+          unavailableMessage={unavailableMessage}
+        />
+      </div>
     </form>
     {showJoinWaitingList ? (
       <JoinWaitingListForm

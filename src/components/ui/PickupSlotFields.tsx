@@ -132,7 +132,11 @@ export function PickupSlotFields({
   }, [closedDates, date, hoursSnapshot, onTimeChange, slotsForDate, time]);
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div
+      className={
+        showDate && showTime ? "grid gap-4 sm:grid-cols-2" : "grid gap-4"
+      }
+    >
       {showDate ? (
         <FormField htmlFor={dateId} label={dateLabel}>
           <FormInput

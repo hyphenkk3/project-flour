@@ -81,7 +81,7 @@ export async function StorefrontPastMenuPage({
             No cakes are listed in this menu.
           </p>
         ) : (
-          <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="grid grid-cols-2 gap-x-3 gap-y-6 sm:gap-5 lg:grid-cols-3">
             {cakes.map((cake) => (
               <li className="h-full" key={cake.id}>
                 <StorefrontCakeCard cake={cake} hideOrderCta />

@@ -24,7 +24,7 @@ import { StorefrontCakeCard } from "@/workspaces/storefront/catalog/StorefrontCa
 type BrowseCake = StorefrontCake & { availabilityNote?: string | null };
 
 const CATALOGUE_SEARCH_CLASS =
-  "min-w-0 w-full max-w-sm md:max-w-none md:min-w-[10rem] md:flex-1 lg:w-auto lg:min-w-0 lg:max-w-none lg:flex-none";
+  "min-w-0 w-full max-w-sm max-md:col-span-2 md:max-w-none md:min-w-[10rem] md:flex-1 lg:w-auto lg:min-w-0 lg:max-w-none lg:flex-none";
 const CATALOGUE_FILTER_CLASS =
   "max-md:hidden min-w-0 w-full md:w-[7.75rem] md:shrink-0 lg:w-auto lg:min-w-0";
 const CATALOGUE_SORT_CLASS =
@@ -355,7 +355,7 @@ export function BrowseCakeCatalogue({
           />
         ) : null}
 
-        <div className={CATALOGUE_SORT_CLASS}>
+        <div className={`${CATALOGUE_SORT_CLASS}${canFilter ? "" : " max-md:col-span-2"}`}>
           <label
             className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase"
             htmlFor={sortId}
@@ -375,28 +375,27 @@ export function BrowseCakeCatalogue({
             ))}
           </select>
         </div>
-      </div>
-
-      {canFilter ? (
-        <div className="mt-4 flex items-center justify-between gap-4 md:hidden">
-          <button
-            className="text-ink inline-flex min-h-11 items-center text-sm font-medium"
-            onClick={() => setSheetOpen(true)}
-            type="button"
-          >
-            Filters{activeCount > 0 ? ` · ${activeCount}` : ""}
-          </button>
-          {hasFilters ? (
+        {canFilter ? (
+          <div className="flex min-h-11 items-center gap-3 md:hidden">
             <button
-              className="text-skyline hover:text-ink text-sm font-medium"
-              onClick={() => setFilters(EMPTY_BROWSE_FILTERS)}
+              className="text-ink inline-flex min-h-11 items-center text-sm font-medium"
+              onClick={() => setSheetOpen(true)}
               type="button"
             >
-              Clear filters
+              Filters{activeCount > 0 ? ` · ${activeCount}` : ""}
             </button>
-          ) : null}
-        </div>
-      ) : null}
+            {hasFilters ? (
+              <button
+                className="text-skyline hover:text-ink text-sm font-medium"
+                onClick={() => setFilters(EMPTY_BROWSE_FILTERS)}
+                type="button"
+              >
+                Clear filters
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
       {canFilter && hasFilters ? (
         <button
@@ -422,14 +421,14 @@ export function BrowseCakeCatalogue({
         />
       ) : null}
 
-      <p className="text-skyline mt-6 text-sm">{cakeCountLabel}</p>
+      <p className="text-skyline mt-3 text-sm md:mt-6">{cakeCountLabel}</p>
 
       {visible.length === 0 ? (
         <p className="text-skyline mt-4 text-sm">
           No cakes found. Try adjusting your search or filters.
         </p>
       ) : (
-        <ul className="mt-4 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 sm:gap-5 lg:grid-cols-3">
           {visible.map((cake) => (
             <li className="h-full" key={cake.id}>
               <StorefrontCakeCard

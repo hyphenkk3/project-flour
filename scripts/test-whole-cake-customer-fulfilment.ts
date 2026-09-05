@@ -86,7 +86,6 @@ assert.match(checkoutSrc, /address_line_1/);
 assert.match(checkoutSrc, /include_receipt/);
 assert.match(checkoutSrc, /email_submission_receipt_requested/);
 assert.match(checkoutSrc, /addingCake/);
-assert.match(checkoutSrc, /\+ Add another cake/);
 assert.match(checkoutSrc, /Change date/);
 assert.match(checkoutSrc, /customerFulfilmentHoursNotice/);
 assert.match(checkoutSrc, /DINE_IN_RESERVATION_INCLUDED_NOTICE/);
@@ -95,12 +94,17 @@ assert.match(availabilitySrc, /Dine-in reservation included/);
 assert.match(availabilitySrc, /Unavailable Wednesday/);
 assert.match(availabilitySrc, /No delivery Wednesday/);
 assert.match(chooserSrc, /disabled=\{!state\.available\}/);
-assert.match(checkoutSrc, /\{addingCake \?/);
+const summarySrc = readFileSync(
+  resolve("src/workspaces/storefront/checkout/CheckoutOrderSummary.tsx"),
+  "utf8",
+);
+assert.match(summarySrc, /\+ Add another cake/);
+assert.match(summarySrc, /\{addingCake \?/);
 assert.doesNotMatch(
-  checkoutSrc.split("{addingCake ?")[0] ?? "",
+  summarySrc.split("{addingCake ?")[0] ?? "",
   /\{cakes\.map\(/,
 );
-assert.match(checkoutSrc, /\{cakes\.map\(/);
+assert.match(summarySrc, /\{cakes\.map\(/);
 assert.doesNotMatch(extraSrc, /fulfilment_method/);
 assert.doesNotMatch(extraSrc, /Dine-in/);
 assert.match(extraActionsSrc, /submit_guest_extra_order/);
