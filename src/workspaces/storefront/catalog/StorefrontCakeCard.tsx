@@ -10,6 +10,7 @@ import {
   formatRm,
   startingPrice,
   storefrontCategoryLabel,
+  type CakeCardPreorderBadgeTone,
 } from "@/workspaces/storefront/catalog/pricing";
 
 type StorefrontCakeCardProps = {
@@ -21,8 +22,14 @@ type StorefrontCakeCardProps = {
   pickupScope?: AddToOrderPickupScope | null;
 };
 
-const PREORDER_BADGE_CLASS =
-  "pointer-events-none absolute top-3 left-3 z-10 max-w-[calc(100%-1.5rem)] text-left text-[10px] leading-tight font-medium tracking-[0.16em] text-mist uppercase drop-shadow-[0_1px_8px_rgba(28,25,22,0.55)] sm:text-[11px]";
+const PREORDER_BADGE_BASE =
+  "pointer-events-none absolute top-3 left-3 z-10 max-w-[calc(100%-1.5rem)] rounded-full px-2.5 py-1 text-left text-[10px] leading-tight font-medium tracking-[0.16em] uppercase sm:text-[11px]";
+
+const PREORDER_BADGE_TONE: Record<CakeCardPreorderBadgeTone, string> = {
+  standard: "bg-ink/40 text-mist",
+  longer: "bg-ink text-paper",
+  varies: "bg-ink/70 text-paper",
+};
 
 export function StorefrontCakeCard({
   cake,
@@ -78,7 +85,10 @@ export function StorefrontCakeCard({
           </Link>
         )}
         {preorder && preorderTone ? (
-          <p aria-hidden="true" className={PREORDER_BADGE_CLASS}>
+          <p
+            aria-hidden="true"
+            className={`${PREORDER_BADGE_BASE} ${PREORDER_BADGE_TONE[preorderTone]}`}
+          >
             {preorder}
           </p>
         ) : null}
