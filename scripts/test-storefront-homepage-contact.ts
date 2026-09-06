@@ -55,12 +55,24 @@ assert.match(footerSrc, /Chat with us on WhatsApp|WhatsApp Us/);
 assert.match(footerSrc, /Get Directions/);
 assert.doesNotMatch(footerSrc, /wa\.me\/\d+/);
 
-assert.equal(STOREFRONT_WHATSAPP_PHONE, "");
-assert.equal(STOREFRONT_MAPS_URL, "");
-assert.equal(STOREFRONT_ADDRESS_LINES.length, 0);
-assert.equal(storefrontWhatsAppHref(), null);
-assert.equal(storefrontMapsHref(), null);
-assert.equal(normalizeMalaysiaWhatsAppPhone(""), null);
+assert.equal(STOREFRONT_WHATSAPP_PHONE, "+60128730060");
+assert.equal(normalizeMalaysiaWhatsAppPhone(STOREFRONT_WHATSAPP_PHONE), "60128730060");
+assert.equal(storefrontWhatsAppHref(), "https://wa.me/60128730060");
+assert.deepEqual(STOREFRONT_ADDRESS_LINES, [
+  "Lot 36, 2nd floor, Block D",
+  "Damai Plaza, PH1",
+  "Luyang Commercial Centre",
+  "88300 Kota Kinabalu, Sabah",
+]);
+assert.equal(
+  STOREFRONT_MAPS_URL,
+  "https://maps.app.goo.gl/q2R4E6PiSKZTDgBZ8?hl=en",
+);
+assert.equal(
+  storefrontMapsHref(),
+  "https://maps.app.goo.gl/q2R4E6PiSKZTDgBZ8?hl=en",
+);
+assert.match(STOREFRONT_MAPS_URL, /^https:\/\/maps\.app\.goo\.gl\/q2R4E6PiSKZTDgBZ8/);
 
 const faqQuestions = STOREFRONT_FAQ_ITEMS.map((item) => item.question);
 assert.ok(faqQuestions.includes("How many days in advance should I order?"));

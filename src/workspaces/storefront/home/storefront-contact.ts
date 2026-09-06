@@ -2,24 +2,28 @@ import { normalizeMalaysiaWhatsAppPhone } from "@/engines/orders/whatsapp";
 
 /**
  * Official customer WhatsApp for the storefront.
- * Leave empty until the bakery supplies the number — do not guess.
  */
-export const STOREFRONT_WHATSAPP_PHONE = "";
+export const STOREFRONT_WHATSAPP_PHONE = "+60128730060";
 
 /** Display name for the Find Us block. */
 export const STOREFRONT_LOCATION_NAME = "Whitebird";
 
 /**
  * Official street address lines.
- * Leave empty until the bakery supplies the location — do not guess.
  */
-export const STOREFRONT_ADDRESS_LINES: readonly string[] = [];
+export const STOREFRONT_ADDRESS_LINES: readonly string[] = [
+  "Lot 36, 2nd floor, Block D",
+  "Damai Plaza, PH1",
+  "Luyang Commercial Centre",
+  "88300 Kota Kinabalu, Sabah",
+];
 
 /**
  * Official Google Maps / directions URL.
- * Leave empty until the bakery supplies it — do not guess.
+ * `hl=en` requests English UI without changing the destination.
  */
-export const STOREFRONT_MAPS_URL = "";
+export const STOREFRONT_MAPS_URL =
+  "https://maps.app.goo.gl/q2R4E6PiSKZTDgBZ8?hl=en";
 
 export function storefrontWhatsAppHref(): string | null {
   const phone = normalizeMalaysiaWhatsAppPhone(STOREFRONT_WHATSAPP_PHONE);
