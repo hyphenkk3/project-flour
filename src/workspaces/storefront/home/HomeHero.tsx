@@ -40,41 +40,47 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
       {header ? <div className="relative z-20">{header}</div> : null}
 
       {orderPanel ? (
-        <div className="pointer-events-auto absolute top-[3.35rem] right-6 z-20 hidden md:block lg:right-10">
-          {orderPanel}
+        <div className="pointer-events-auto absolute inset-x-0 top-[3.35rem] z-20 hidden md:block">
+          <div className="px-6 sm:px-10">
+            <div className="mx-auto flex w-full max-w-6xl justify-end">
+              {orderPanel}
+            </div>
+          </div>
         </div>
       ) : null}
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-6 pt-3 pb-2 sm:px-10 sm:pt-4 sm:pb-3 lg:pt-4 lg:pb-3">
-        <div className="max-w-[17.5rem] sm:max-w-[20rem] lg:max-w-[23.5rem]">
-          <p className="text-skyline text-[11px] font-medium tracking-[0.18em] uppercase">
-            Cakes made with heart
-          </p>
-          <h1 className="font-display text-ink mt-1.5 text-[1.85rem] leading-[1.12] tracking-tight sm:mt-2 sm:text-[2.4rem] lg:text-[2.7rem]">
-            Every celebration
-            <span className="hidden md:inline">
-              <br />
-            </span>{" "}
-            begins here.
-          </h1>
-          <p className="text-skyline mt-2 max-w-sm text-[0.95rem] leading-relaxed">
-            From everyday moments to once-in-a-lifetime celebrations,
-            we&apos;re here to make it sweeter.
-          </p>
-          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 sm:mt-3.5 sm:gap-x-5 lg:gap-x-7">
-            {VALUE_CUES.map((cue) => (
-              <li className="flex items-center gap-2.5" key={cue.label.join(" ")}>
-                <span className="bg-ink/[0.045] text-ink/65 flex h-8 w-8 shrink-0 items-center justify-center rounded-full sm:h-9 sm:w-9">
-                  <cue.Icon className="h-4 w-4" />
-                </span>
-                <span className="text-skyline text-[11px] leading-[1.25]">
-                  {cue.label[0]}
-                  <br />
-                  {cue.label[1]}
-                </span>
-              </li>
-            ))}
-          </ul>
+      <div className="relative z-10 px-6 pt-3 pb-2 sm:px-10 sm:pt-4 sm:pb-3 lg:pt-4 lg:pb-3">
+        <div className="mx-auto w-full max-w-6xl">
+          <div className="max-w-[17.5rem] sm:max-w-[20rem] lg:max-w-[23.5rem]">
+            <p className="text-skyline text-[11px] font-medium tracking-[0.18em] uppercase">
+              Cakes made with heart
+            </p>
+            <h1 className="font-display text-ink mt-1.5 text-[1.85rem] leading-[1.12] tracking-tight sm:mt-2 sm:text-[2.4rem] lg:text-[2.7rem]">
+              Every celebration
+              <span className="hidden md:inline">
+                <br />
+              </span>{" "}
+              begins here.
+            </h1>
+            <p className="text-skyline mt-2 max-w-sm text-[0.95rem] leading-relaxed">
+              From everyday moments to once-in-a-lifetime celebrations,
+              we&apos;re here to make it sweeter.
+            </p>
+            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 sm:mt-3.5 sm:gap-x-5 lg:gap-x-7">
+              {VALUE_CUES.map((cue) => (
+                <li className="flex items-center gap-2.5" key={cue.label.join(" ")}>
+                  <span className="bg-ink/[0.045] text-ink/65 flex h-8 w-8 shrink-0 items-center justify-center rounded-full sm:h-9 sm:w-9">
+                    <cue.Icon className="h-4 w-4" />
+                  </span>
+                  <span className="text-skyline text-[11px] leading-[1.25]">
+                    {cue.label[0]}
+                    <br />
+                    {cue.label[1]}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
 
