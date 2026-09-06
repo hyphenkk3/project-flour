@@ -260,6 +260,11 @@ const catalogueSrc = readSrc(
 );
 assert.match(catalogueSrc, /viewBrowseCatalogue/);
 assert.match(catalogueSrc, /BROWSE_SORT_OPTIONS/);
+assert.doesNotMatch(catalogueSrc, /label: "Size"/);
+assert.doesNotMatch(
+  readSrc("src/workspaces/storefront/catalog/browse-sort.ts"),
+  /Size/,
+);
 assert.match(catalogueSrc, /browseToolbarClass/);
 assert.match(catalogueSrc, /Try adjusting your search or filters/);
 assert.doesNotMatch(catalogueSrc, /lg:flex-nowrap/);

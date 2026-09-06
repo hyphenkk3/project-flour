@@ -66,6 +66,7 @@ import {
 import { isPickupOrdersClosed } from "@/workspaces/storefront/checkout/order-availability";
 import { parseRequiredPhysicalReceipt } from "@/workspaces/storefront/checkout/preorder-draft";
 import { setGuestPreorderReceiptCookie } from "@/workspaces/storefront/checkout/receipt";
+import { customerNameValidationError } from "@/engines/orders/customer-name";
 
 export type CheckoutState = {
   error: string | null;
@@ -212,6 +213,10 @@ export async function submitGuestPreorderAction(
 
   if (!customerName || !phone) {
     return { error: "Please fill in your name and WhatsApp phone number." };
+  }
+  const nameError = customerNameValidationError(customerName);
+  if (nameError) {
+    return { error: nameError };
   }
   if (includeReceipt === null) {
     return {

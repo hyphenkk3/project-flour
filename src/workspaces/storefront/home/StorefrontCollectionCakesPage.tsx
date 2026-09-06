@@ -137,18 +137,18 @@ export async function StorefrontCollectionCakesPage({
         );
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-5 py-10 sm:px-6">
+    <main className="mx-auto min-h-screen max-w-5xl px-5 py-4 sm:px-6 sm:py-10">
       <StorefrontHomeLink />
       <Link
-        className="text-skyline hover:text-ink mt-6 inline-block text-sm font-medium"
+        className="text-skyline hover:text-ink mt-3 inline-block text-sm font-medium sm:mt-6"
         href="/order"
       >
         ← Choose your collection
       </Link>
-      <h1 className="font-display text-ink mt-4 text-4xl tracking-tight">
+      <h1 className="font-display text-ink mt-3 text-3xl tracking-tight sm:mt-4 sm:text-4xl">
         {headline}
       </h1>
-      <p className="text-skyline mt-3 max-w-xl text-[0.95rem] leading-relaxed">
+      <p className="text-skyline mt-2 max-w-xl text-[0.95rem] leading-relaxed sm:mt-3">
         {description}
       </p>
       {note ? (
@@ -157,9 +157,7 @@ export async function StorefrontCollectionCakesPage({
         </p>
       ) : null}
 
-      <PreorderInProgressBar />
-
-      <section aria-labelledby="collection-cakes-heading" className="mt-8">
+      <section aria-labelledby="collection-cakes-heading" className="mt-6 sm:mt-8">
         <h2 className="sr-only" id="collection-cakes-heading">
           Cakes in this collection
         </h2>
@@ -194,6 +192,7 @@ export async function StorefrontCollectionCakesPage({
         </Link>
         <StorefrontHomeLink />
       </div>
+      <PreorderInProgressBar />
     </main>
   );
 }

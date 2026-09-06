@@ -32,8 +32,22 @@ assert.match(browseSrc, /sm:hidden/);
 assert.match(browseSrc, /hidden sm:inline/);
 assert.match(browseSrc, /Discover cakes currently published for Whitebird/);
 assert.match(browseSrc, /sm:mt-8 sm:text-3xl/);
-assert.match(browseSrc, /py-5 sm:px-6 sm:py-10/);
+assert.match(browseSrc, /py-4 sm:px-6 sm:py-10/);
 assert.match(browseSrc, /Prefer a monthly collection or Special Menu/);
+assert.match(browseSrc, /className="mt-8 sm:mt-8"/);
+assert.doesNotMatch(browseSrc, /className="mt-4 sm:mt-8"/);
+const linkToSearch = browseSrc.slice(
+  browseSrc.indexOf("Prefer a monthly collection or Special Menu"),
+  browseSrc.indexOf("BrowseCakeCatalogue"),
+);
+assert.doesNotMatch(linkToSearch, /PreorderInProgressBar/);
+assert.match(browseSrc, /PreorderInProgressBar/);
+assert.match(catalogueSrc, /showMobileSize/);
+assert.match(catalogueSrc, /sizeId\}-mobile/);
+assert.match(catalogueSrc, /setFilters\(\{ \.\.\.filters, size: event\.target\.value \}\)/);
+assert.match(catalogueSrc, /options\.sizes\.map/);
+assert.match(catalogueSrc, /min-w-0 md:hidden/);
+assert.doesNotMatch(catalogueSrc, /id: "size"/);
 assert.match(catalogueSrc, /gap-x-3/);
 assert.match(catalogueSrc, /StorefrontCakeCard/);
 assert.match(catalogueSrc, /md:hidden/);
@@ -94,6 +108,18 @@ assert.doesNotMatch(cartSrc, /<dialog/);
 assert.doesNotMatch(cartSrc, /85dvh/);
 assert.doesNotMatch(cartSrc, /writePreorderDraft/);
 assert.match(draftSrc, /whitebird-preorder-draft-v1/);
+
+const collectionSrc = readSrc(
+  "src/workspaces/storefront/home/StorefrontCollectionCakesPage.tsx",
+);
+const collectionIntro = collectionSrc.slice(
+  collectionSrc.indexOf("← Choose your collection"),
+  collectionSrc.indexOf("BrowseCakeCatalogue"),
+);
+assert.doesNotMatch(collectionIntro, /PreorderInProgressBar/);
+assert.match(collectionSrc, /PreorderInProgressBar/);
+assert.match(collectionSrc, /py-4 sm:px-6 sm:py-10/);
+assert.match(collectionSrc, /mt-6 sm:mt-8/);
 
 const extraPageSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontExtraPage.tsx",

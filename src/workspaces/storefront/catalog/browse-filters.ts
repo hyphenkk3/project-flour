@@ -158,7 +158,7 @@ export function browseFilterGridClass(options: BrowseFilterOptions): string {
 }
 
 const TOOLBAR_BASE =
-  "grid grid-cols-[1fr_auto] items-end gap-x-3 gap-y-3 md:flex md:flex-row md:flex-wrap md:gap-x-4 md:gap-y-4 lg:grid lg:grid-rows-1 lg:items-end lg:gap-3";
+  "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-x-3 gap-y-2 md:flex md:flex-row md:flex-wrap md:gap-x-4 md:gap-y-4 lg:grid lg:grid-rows-1 lg:items-end lg:gap-3";
 
 /**
  * One explicit desktop row: Search | filters… | Sort.

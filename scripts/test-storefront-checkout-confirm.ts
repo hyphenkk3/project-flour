@@ -56,6 +56,9 @@ assert.match(handleSubmitSrc, /unavailableMessage/);
 assert.match(handleSubmitSrc, /items\.length === 0/);
 assert.match(handleSubmitSrc, /!collectionDateEvaluation\.valid/);
 assert.match(handleSubmitSrc, /isPickupOrdersClosed/);
+assert.match(handleSubmitSrc, /customerNameValidationError/);
+assert.match(handleSubmitSrc, /setNameError\(nameErrorMessage\)/);
+assert.match(handleSubmitSrc, /setConfirmOpen\(true\)/);
 
 assert.match(promptSrc, /Confirm Your Order/);
 assert.match(promptSrc, /Would you like to confirm this order\?/);

@@ -137,6 +137,20 @@ assert.deepEqual(
   ).map((cake) => cake.id),
   ["pandan", "choco"],
 );
+const fourInch = {
+  ...matcha,
+  id: "four",
+  sizes: [size("f4", '4"', 50, 2)],
+};
+assert.deepEqual(
+  filterBrowseCakes(
+    [fourInch, ...published],
+    { ...EMPTY_BROWSE_FILTERS, size: '4"' },
+    ranges,
+  ).map((cake) => cake.id),
+  ["four"],
+  "C. size filter uses the selected catalogue size including 4\"",
+);
 assert.equal(
   cakeMatchesBrowseFilters(
     pandan,
@@ -329,8 +343,10 @@ assert.match(
   fourFilterToolbar,
   /lg:grid-cols-\[minmax\(0,1fr\).*minmax\(12\.5rem,14rem\)\]/,
 );
+const fourFilterDesktopCols =
+  fourFilterToolbar.match(/lg:grid-cols-\[[^\]]+\]/)?.[0] ?? "";
 assert.equal(
-  (fourFilterToolbar.match(/minmax\(/g) ?? []).length,
+  (fourFilterDesktopCols.match(/minmax\(/g) ?? []).length,
   6,
   "O. Search 1fr + four filters + Sort is one 6-column desktop row",
 );
@@ -343,6 +359,10 @@ assert.match(catalogueSrc, /browseToolbarClass/);
 assert.match(catalogueSrc, /viewBrowseCatalogue/);
 assert.match(catalogueSrc, /layout="toolbar"/);
 assert.match(catalogueSrc, /max-md:hidden/);
+assert.match(catalogueSrc, /showMobileSize/);
+assert.match(catalogueSrc, /sizeId\}-mobile/);
+assert.match(catalogueSrc, /setFilters\(\{ \.\.\.filters, size: event\.target\.value \}\)/);
+assert.match(catalogueSrc, /options\.sizes\.map/);
 assert.match(catalogueSrc, /return fields/);
 assert.match(catalogueSrc, /Clear filters/);
 assert.match(catalogueSrc, /Try adjusting your search or filters/);

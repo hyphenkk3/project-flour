@@ -64,6 +64,7 @@ import {
   WAITING_LIST_NAME_HELP,
   WAITING_LIST_WHATSAPP_NOTE,
 } from "@/engines/waiting-list/phone";
+import { customerNameValidationError } from "@/engines/orders/customer-name";
 import {
   buildCheckoutConfirmSnapshot,
   CheckoutConfirmPrompt,
@@ -268,6 +269,7 @@ export function GuestCheckoutForm({
   );
   const [hydrated, setHydrated] = useState(false);
   const [itemError, setItemError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
   const [cakes, setCakes] = useState<StorefrontCake[]>([]);
   const [unavailableMessage, setUnavailableMessage] = useState<string | null>(
     null,
@@ -848,6 +850,15 @@ export function GuestCheckoutForm({
       setItemError(ORDERS_CLOSED_RPC_MESSAGE);
       return;
     }
+    const nameErrorMessage = customerNameValidationError(
+      String(formData.get("customer_name") ?? ""),
+    );
+    if (nameErrorMessage) {
+      setNameError(nameErrorMessage);
+      setItemError(nameErrorMessage);
+      return;
+    }
+    setNameError(null);
     setItemError(null);
     persistDraft(items, fields);
     pendingSubmitRef.current = formData;
@@ -1428,13 +1439,19 @@ export function GuestCheckoutForm({
           <FormInput
             id="customer_name"
             name="customer_name"
-            onChange={(event) =>
-              patchFields({ customerName: event.target.value })
-            }
+            onChange={(event) => {
+              setNameError(null);
+              patchFields({ customerName: event.target.value });
+            }}
             required
             value={fields.customerName}
           />
         </FormField>
+        {nameError ? (
+          <p className="text-status-danger text-sm leading-relaxed" role="alert">
+            {nameError}
+          </p>
+        ) : null}
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField
             help={WAITING_LIST_WHATSAPP_NOTE}

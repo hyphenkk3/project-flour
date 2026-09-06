@@ -24,11 +24,13 @@ import { StorefrontCakeCard } from "@/workspaces/storefront/catalog/StorefrontCa
 type BrowseCake = StorefrontCake & { availabilityNote?: string | null };
 
 const CATALOGUE_SEARCH_CLASS =
-  "min-w-0 w-full max-w-sm max-md:col-span-2 md:max-w-none md:min-w-[10rem] md:flex-1 lg:w-auto lg:min-w-0 lg:max-w-none lg:flex-none";
+  "min-w-0 w-full max-w-sm max-md:col-span-3 md:max-w-none md:min-w-[10rem] md:flex-1 lg:w-auto lg:min-w-0 lg:max-w-none lg:flex-none";
 const CATALOGUE_FILTER_CLASS =
   "max-md:hidden min-w-0 w-full md:w-[7.75rem] md:shrink-0 lg:w-auto lg:min-w-0";
 const CATALOGUE_SORT_CLASS =
   "min-w-0 w-full md:w-[12.5rem] md:shrink-0 lg:w-auto lg:min-w-0";
+const CATALOGUE_SELECT_CLASS =
+  "border-fog text-ink focus:border-ink mt-1.5 min-h-11 w-full border-0 border-b bg-transparent py-2 text-sm outline-none md:mt-2";
 const DEFAULT_EMPTY_MESSAGE =
   "No cakes are published to browse right now. Please check back soon.";
 
@@ -61,7 +63,7 @@ function FilterFields({
   layout = "sheet",
 }: FilterFieldsProps) {
   const selectClass =
-    "border-fog text-ink focus:border-ink mt-2 min-h-11 w-full border-0 border-b bg-transparent py-2 text-sm outline-none";
+    "border-fog text-ink focus:border-ink mt-1.5 min-h-11 w-full border-0 border-b bg-transparent py-2 text-sm outline-none md:mt-2";
   const itemClass = layout === "toolbar" ? CATALOGUE_FILTER_CLASS : undefined;
 
   const fields = (
@@ -295,6 +297,7 @@ export function BrowseCakeCatalogue({
     options.sizes.length > 1 ||
     options.priceRanges.length > 0 ||
     options.preorderDays.length > 1;
+  const showMobileSize = options.sizes.length > 1;
   const cakeCountLabel = visible.length === 1 ? "1 cake" : `${visible.length} cakes`;
 
   if (cakes.length === 0) {
@@ -317,7 +320,7 @@ export function BrowseCakeCatalogue({
           >
             Search
           </label>
-          <div className="relative mt-2">
+          <div className="relative mt-1.5 md:mt-2">
             <input
               autoComplete="off"
               autoCorrect="off"
@@ -355,7 +358,15 @@ export function BrowseCakeCatalogue({
           />
         ) : null}
 
-        <div className={`${CATALOGUE_SORT_CLASS}${canFilter ? "" : " max-md:col-span-2"}`}>
+        <div
+          className={`${CATALOGUE_SORT_CLASS}${
+            !canFilter
+              ? " max-md:col-span-3"
+              : showMobileSize
+                ? ""
+                : " max-md:col-span-2"
+          }`}
+        >
           <label
             className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase"
             htmlFor={sortId}
@@ -363,7 +374,7 @@ export function BrowseCakeCatalogue({
             Sort
           </label>
           <select
-            className="border-fog text-ink focus:border-ink mt-2 min-h-11 w-full border-0 border-b bg-transparent py-2 text-sm outline-none"
+            className={CATALOGUE_SELECT_CLASS}
             id={sortId}
             onChange={(event) => setSort(event.target.value as BrowseSortId)}
             value={sort}
@@ -375,8 +386,33 @@ export function BrowseCakeCatalogue({
             ))}
           </select>
         </div>
+        {showMobileSize ? (
+          <div className="min-w-0 md:hidden">
+            <label
+              className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase"
+              htmlFor={`${sizeId}-mobile`}
+            >
+              Size
+            </label>
+            <select
+              className={CATALOGUE_SELECT_CLASS}
+              id={`${sizeId}-mobile`}
+              onChange={(event) =>
+                setFilters({ ...filters, size: event.target.value })
+              }
+              value={filters.size}
+            >
+              <option value="">Any</option>
+              {options.sizes.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
         {canFilter ? (
-          <div className="flex min-h-11 items-center gap-3 md:hidden">
+          <div className="flex min-h-11 items-end gap-3 pb-2 md:hidden">
             <button
               className="text-ink inline-flex min-h-11 items-center text-sm font-medium"
               onClick={() => setSheetOpen(true)}
@@ -421,14 +457,14 @@ export function BrowseCakeCatalogue({
         />
       ) : null}
 
-      <p className="text-skyline mt-3 text-sm md:mt-6">{cakeCountLabel}</p>
+      <p className="text-skyline mt-2 text-sm md:mt-6">{cakeCountLabel}</p>
 
       {visible.length === 0 ? (
         <p className="text-skyline mt-4 text-sm">
           No cakes found. Try adjusting your search or filters.
         </p>
       ) : (
-        <ul className="mt-4 grid grid-cols-2 gap-x-3 gap-y-6 sm:gap-5 lg:grid-cols-3">
+        <ul className="mt-3 grid grid-cols-2 gap-x-3 gap-y-6 sm:mt-4 sm:gap-5 lg:grid-cols-3">
           {visible.map((cake) => (
             <li className="h-full" key={cake.id}>
               <StorefrontCakeCard
