@@ -60,6 +60,8 @@ assert.doesNotMatch(
 );
 
 const mobileNavSrc = readSrc("src/workspaces/storefront/home/HomeMobileNav.tsx");
+assert.match(mobileNavSrc, /"\/order"/);
+assert.match(mobileNavSrc, /Order/);
 assert.match(mobileNavSrc, /"\/browse"/);
 assert.match(mobileNavSrc, /Browse Cakes/);
 assert.match(mobileNavSrc, /"\/extra"/);
@@ -67,7 +69,10 @@ assert.match(mobileNavSrc, /Fresh Picks/);
 assert.match(mobileNavSrc, /"\/faq"/);
 assert.match(mobileNavSrc, /FAQ/);
 assert.match(mobileNavSrc, /min-h-11/);
-assert.doesNotMatch(mobileNavSrc, /"\/order"/);
+assert.match(
+  mobileNavSrc,
+  /href: "\/order", label: "Order"[\s\S]*href: "\/browse", label: "Browse Cakes"[\s\S]*href: "\/extra", label: "Fresh Picks"[\s\S]*href: "\/faq", label: "FAQ"/,
+);
 
 const footerSrc = readSrc("src/workspaces/storefront/home/HomeVisitFooter.tsx");
 assert.doesNotMatch(footerSrc, /href="\/faq"/);

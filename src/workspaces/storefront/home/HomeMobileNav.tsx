@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 
 const MENU_ITEMS = [
+  { href: "/order", label: "Order" },
   { href: "/browse", label: "Browse Cakes" },
   { href: "/extra", label: "Fresh Picks" },
   { href: "/faq", label: "FAQ" },
