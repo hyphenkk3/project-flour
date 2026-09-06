@@ -54,6 +54,10 @@ assert.match(
   /href="\/extra"[\s\S]*Fresh Picks[\s\S]*href="\/faq"[\s\S]*FAQ/,
 );
 assert.match(homeSrc, /hidden[\s\S]*md:flex/);
+assert.doesNotMatch(
+  homeSrc,
+  /md:hidden">\s*<Link[\s\S]*href="\/order"/,
+);
 
 const mobileNavSrc = readSrc("src/workspaces/storefront/home/HomeMobileNav.tsx");
 assert.match(mobileNavSrc, /"\/browse"/);

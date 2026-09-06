@@ -45,13 +45,7 @@ export async function StorefrontHomePage() {
           <header className="px-6 pt-2 sm:px-10 md:pt-5">
             <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 md:grid md:grid-cols-[1fr_auto_1fr] md:items-baseline">
               <p className={storefrontKickerClass}>Whitebird</p>
-              <div className="flex items-center md:hidden">
-                <Link
-                  className="text-skyline hover:text-ink inline-flex min-h-11 items-center px-2.5 text-sm transition-colors duration-200"
-                  href="/order"
-                >
-                  Order
-                </Link>
+              <div className="md:hidden">
                 <HomeMobileNav />
               </div>
               <nav className="text-skyline hidden flex-wrap items-center justify-center gap-x-5 gap-y-1 text-sm md:flex">

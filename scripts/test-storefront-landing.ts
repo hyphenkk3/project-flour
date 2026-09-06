@@ -269,6 +269,7 @@ assert.match(homeHeroSrc, /md:max-w-\[20rem\] lg:max-w-\[23\.5rem\]/);
 assert.match(homeHeroSrc, /h-\[18\.5rem\]/);
 assert.match(homeHeroSrc, /backgroundPosition: "30% 20%"/);
 assert.match(homeHeroSrc, /backgroundSize: "auto 178%"/);
+assert.match(homeHeroSrc, /w-\[13\.75rem\] grid-cols-3 gap-x-1/);
 assert.doesNotMatch(homeHeroSrc, /h-\[21\.5rem\]/);
 assert.doesNotMatch(homeHeroSrc, /min-h-\[34rem\]/);
 assert.doesNotMatch(homeHeroSrc, /object-\[64%_52%\]/);
