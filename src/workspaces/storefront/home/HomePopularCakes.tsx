@@ -19,10 +19,10 @@ export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
   if (cakes.length === 0) return null;
 
   return (
-    <section className="px-6 pb-16 sm:px-10 sm:pb-20">
+    <section className="px-6 pb-12 sm:px-10 sm:pb-16">
       <div className="mx-auto w-full max-w-6xl">
-        <div className="mb-4 flex items-baseline justify-between gap-3 sm:mb-6">
-          <h2 className="font-display text-ink text-2xl tracking-tight sm:text-3xl">
+        <div className="mb-3 flex items-baseline justify-between gap-3 sm:mb-4">
+          <h2 className="font-display text-ink text-xl tracking-tight sm:text-2xl">
             Popular Cakes
           </h2>
           <Link
@@ -32,7 +32,7 @@ export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
             View all →
           </Link>
         </div>
-        <ul className="flex gap-3 overflow-x-auto pb-2 sm:gap-4">
+        <ul className="flex gap-3 overflow-x-auto pb-1 sm:gap-3.5">
           {cakes.map((cake) => {
             const size = cake.sizes[0] ?? null;
             const photo =
@@ -41,9 +41,9 @@ export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
             const from = startingPrice(cake);
             const preorder = cakeCardPreorderLabel(cake);
             return (
-              <li className="w-[9.75rem] shrink-0 sm:w-[11.5rem]" key={cake.id}>
+              <li className="w-[9.5rem] shrink-0 sm:w-[12rem]" key={cake.id}>
                 <Link className="group block" href={`/cakes/${cake.id}`}>
-                  <div className="bg-fog relative aspect-[4/5] overflow-hidden">
+                  <div className="relative aspect-[4/5] overflow-hidden">
                     {photo?.url ? (
                       <CakePhotoImage
                         alt={photo.altText || cake.name}

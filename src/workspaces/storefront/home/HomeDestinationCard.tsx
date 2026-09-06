@@ -9,16 +9,16 @@ const TONE_CLASS: Record<
   { surface: string; fade: string }
 > = {
   cream: {
-    surface: "bg-[#f3dfd0]",
-    fade: "from-[#f3dfd0]",
+    surface: "bg-[#efe6d8]",
+    fade: "from-[#efe6d8]",
   },
   sage: {
-    surface: "bg-[#dce5db]",
-    fade: "from-[#dce5db]",
+    surface: "bg-[#e5ebe4]",
+    fade: "from-[#e5ebe4]",
   },
   linen: {
-    surface: "bg-[#e7e4d4]",
-    fade: "from-[#e7e4d4]",
+    surface: "bg-[#ebe6da]",
+    fade: "from-[#ebe6da]",
   },
 };
 
@@ -47,51 +47,41 @@ export function HomeDestinationCard({
   const hasImage = Boolean(imageUrl);
 
   return (
-    <article className="h-[10.25rem] md:h-[11.75rem]">
+    <article className="h-[10.25rem] md:h-[11.5rem]">
       <Link
-        className={`group border-ink/10 relative flex h-full overflow-hidden rounded-[10px] border shadow-[0_1px_8px_rgba(28,25,22,0.04)] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink/30 ${colors.surface}`}
+        className={`group border-ink/10 relative flex h-full overflow-hidden rounded-lg border transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink/30 ${colors.surface}`}
         href={href}
       >
         {hasImage && imageUrl ? (
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-[40%]">
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-[48%] [&_img]:object-[70%_center]">
             <CakePhotoImage
               alt={imageAlt || ""}
-              sizes="160px"
+              sizes="180px"
               src={imageUrl}
             />
             <div
-              className={`absolute inset-0 bg-gradient-to-r to-transparent ${colors.fade} from-[18%]`}
+              className={`absolute inset-0 bg-gradient-to-r to-transparent ${colors.fade} from-[12%]`}
             />
           </div>
-        ) : (
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-[38%] bg-gradient-to-l from-ink/[0.045] to-transparent" />
-        )}
+        ) : null}
 
         <div
           className={[
-            "relative z-10 flex h-full min-w-0 flex-col justify-between px-4 py-4 sm:px-5 sm:py-[1.15rem]",
-            hasImage ? "w-[62%] pr-4" : "w-full",
+            "relative z-10 flex h-full min-w-0 flex-col justify-between px-4 py-4 sm:px-5",
+            hasImage ? "w-[58%] pr-3" : "w-full",
           ].join(" ")}
         >
           <div className="min-w-0">
-            <h3 className="font-display text-ink text-[1.22rem] leading-tight tracking-tight sm:text-[1.35rem]">
+            <h3 className="font-display text-ink text-[1.2rem] leading-tight tracking-tight sm:text-[1.32rem]">
               {title}
             </h3>
-            <p className="text-skyline mt-1.5 line-clamp-2 text-[13px] leading-relaxed sm:text-sm">
+            <p className="text-skyline mt-1.5 line-clamp-2 text-[13px] leading-relaxed">
               {description}
             </p>
             {extra}
           </div>
-          <span className="text-ink mt-3 flex items-center justify-between gap-3 text-[13px] font-medium sm:text-sm">
-            <span className="group-hover:text-skyline truncate transition-colors duration-200">
-              {actionLabel}
-            </span>
-            <span
-              aria-hidden="true"
-              className="border-ink/15 group-hover:border-ink/30 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[13px] transition-colors duration-200"
-            >
-              →
-            </span>
+          <span className="text-ink group-hover:text-skyline mt-3 inline-flex min-h-11 items-center text-[13px] font-medium transition-colors duration-200">
+            {actionLabel} →
           </span>
         </div>
       </Link>

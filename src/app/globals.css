@@ -61,10 +61,14 @@ html.storefront-canvas {
   --color-skyline: #5a534c;
 }
 
-html.storefront-canvas,
-html.storefront-canvas body {
-  background: var(--color-mist);
-  color: var(--color-ink);
+html.storefront-canvas .storefront-hero-photo {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    #000 26%,
+    #000 100%
+  );
+  mask-image: linear-gradient(to right, transparent 0%, #000 26%, #000 100%);
 }
 
 @keyframes fade-in {

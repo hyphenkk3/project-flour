@@ -47,9 +47,9 @@ export async function StorefrontHomePage() {
     null;
 
   return (
-    <main className="bg-paper min-h-dvh">
+    <main className="bg-paper min-h-dvh overflow-x-clip">
       <StorefrontTheme />
-      <header className="px-6 pt-6 sm:px-10 sm:pt-8">
+      <header className="px-6 pt-5 sm:px-10 sm:pt-6">
         <div className="mx-auto flex w-full max-w-6xl items-baseline justify-between gap-4">
           <p className={storefrontKickerClass}>Whitebird</p>
           <nav className="text-skyline flex flex-wrap items-center justify-end gap-x-5 gap-y-1 text-sm">
@@ -82,9 +82,9 @@ export async function StorefrontHomePage() {
         orderPanel={<HomeOrderSummary />}
       />
 
-      <section className="px-6 pb-10 sm:px-10 sm:pb-12">
+      <section className="px-6 pb-8 sm:px-10 sm:pb-9">
         <div className="mx-auto w-full max-w-6xl">
-          <div className="grid gap-3 md:grid-cols-3 md:gap-4">
+          <div className="grid gap-3 md:grid-cols-3 md:gap-3.5">
             <HomeDestinationCard
               actionLabel="Start Ordering"
               description="Choose a monthly collection or Special Menu."

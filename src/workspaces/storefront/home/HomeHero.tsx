@@ -19,57 +19,52 @@ export function HomeHero({
   orderPanel = null,
 }: HomeHeroProps) {
   return (
-    <section className="px-6 pt-7 pb-4 sm:px-10 sm:pt-12 sm:pb-8">
-      <div className="mx-auto grid w-full max-w-6xl items-center gap-6 md:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] md:gap-10 lg:gap-16">
-        <div>
+    <section className="relative md:min-h-[20.5rem] md:overflow-x-clip lg:min-h-[22.5rem]">
+      {imageUrl ? (
+        <div className="storefront-hero-photo pointer-events-none absolute inset-y-0 right-0 hidden w-[46%] md:block lg:w-[min(58vw,48rem)]">
+          <div className="relative h-full [&_img]:object-cover [&_img]:object-[72%_center]">
+            <CakePhotoImage
+              alt={imageAlt || "Whitebird cake"}
+              priority
+              sizes="(min-width: 1024px) 48vw, 46vw"
+              src={imageUrl}
+            />
+            <div className="from-paper via-paper/70 absolute inset-0 bg-gradient-to-r from-[6%] via-[30%] to-transparent to-[58%]" />
+            <div className="from-paper absolute inset-x-0 top-0 h-10 bg-gradient-to-b to-transparent" />
+            <div className="from-paper absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t to-transparent" />
+          </div>
+        </div>
+      ) : null}
+
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-6 pt-6 pb-4 sm:px-10 sm:pt-8 sm:pb-5">
+        <div className="max-w-[20.5rem] sm:max-w-md lg:max-w-[28rem]">
           <p className="text-skyline text-[11px] font-medium tracking-[0.18em] uppercase">
             Cakes made with heart
           </p>
-          <h1 className="font-display text-ink mt-3 max-w-xl text-[1.85rem] leading-[1.15] tracking-tight sm:text-5xl">
+          <h1 className="font-display text-ink mt-2.5 text-[1.85rem] leading-[1.12] tracking-tight sm:mt-3 sm:text-[2.75rem]">
             Every celebration
             <span className="hidden md:inline">
               <br />
             </span>{" "}
             begins here.
           </h1>
-          <p className="text-skyline mt-3 max-w-lg text-[0.95rem] leading-relaxed sm:mt-5 sm:text-base">
+          <p className="text-skyline mt-3 max-w-md text-[0.95rem] leading-relaxed sm:mt-4">
             From everyday moments to once-in-a-lifetime celebrations,
             we&apos;re here to make it sweeter.
           </p>
-          <ul className="text-skyline mt-5 hidden gap-x-6 gap-y-2 text-[12px] tracking-[0.04em] md:flex md:flex-wrap">
-            {VALUE_CUES.map((cue) => (
-              <li className="flex items-center gap-2" key={cue}>
-                <span
-                  aria-hidden="true"
-                  className="border-ink/25 inline-block h-2 w-2 rounded-full border"
-                />
-                {cue}
-              </li>
-            ))}
-          </ul>
-          <p className="text-skyline mt-4 text-[11px] font-medium tracking-[0.18em] uppercase md:hidden">
+          <p className="text-skyline mt-5 hidden text-[12px] tracking-[0.06em] md:block">
+            {VALUE_CUES.join("  ·  ")}
+          </p>
+          <p className="text-skyline mt-4 text-[11px] font-medium tracking-[0.16em] uppercase md:hidden">
             2–3 Days Preorder · Made with Care
           </p>
         </div>
 
-        <div className="relative min-h-0 md:min-h-[16rem]">
-          {imageUrl ? (
-            <div className="relative hidden overflow-hidden md:block md:h-72 lg:h-[22rem]">
-              <CakePhotoImage
-                alt={imageAlt || "Whitebird cake"}
-                priority
-                sizes="(min-width: 1024px) 40vw, 50vw"
-                src={imageUrl}
-              />
-              <div className="from-paper/70 absolute inset-0 bg-gradient-to-r to-transparent to-40%" />
-            </div>
-          ) : null}
-          {orderPanel ? (
-            <div className="pointer-events-auto md:absolute md:right-0 md:bottom-6 md:z-10">
-              {orderPanel}
-            </div>
-          ) : null}
-        </div>
+        {orderPanel ? (
+          <div className="pointer-events-auto mt-5 md:absolute md:right-10 md:bottom-5 md:mt-0 lg:right-6">
+            {orderPanel}
+          </div>
+        ) : null}
       </div>
     </section>
   );

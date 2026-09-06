@@ -28,10 +28,10 @@ export function HomeOrderSummary() {
   return (
     <aside
       aria-label="Your order"
-      className="border-ink/10 bg-paper/92 hidden w-[19.5rem] rounded-[10px] border p-5 shadow-[0_10px_40px_rgba(28,25,22,0.08)] backdrop-blur-sm md:block"
+      className="border-ink/10 bg-paper/80 hidden w-[18.25rem] rounded-lg border p-4 shadow-[0_6px_28px_rgba(28,25,22,0.07)] backdrop-blur-md md:block"
     >
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-ink text-xl tracking-tight">
+        <h2 className="font-display text-ink text-lg tracking-tight">
           Your Order
         </h2>
         <button
@@ -42,7 +42,7 @@ export function HomeOrderSummary() {
           Edit
         </button>
       </div>
-      <ul className="mt-4 space-y-3">
+      <ul className="mt-3 space-y-2.5">
         {draft.items.map((item) => {
           const preorder = draftLinePreorderLabel(item);
           return (
@@ -70,17 +70,17 @@ export function HomeOrderSummary() {
           );
         })}
       </ul>
-      <div className="border-ink/10 mt-4 flex items-baseline justify-between gap-3 border-t pt-3">
-        <p className="text-skyline text-xs tracking-[0.12em] uppercase">
+      <div className="border-ink/10 mt-3 flex items-baseline justify-between gap-3 border-t pt-2.5">
+        <p className="text-skyline text-[11px] tracking-[0.12em] uppercase">
           Earliest collection
         </p>
-        <p className="text-ink text-sm font-medium">{earliest ?? "—"}</p>
+        <p className="text-ink text-sm">{earliest ?? "—"}</p>
       </div>
       <p className="text-skyline mt-1 text-right text-sm tabular-nums">
         {formatRm(total)}
       </p>
       <Link
-        className="text-ink hover:text-skyline mt-4 inline-flex min-h-11 w-full items-center justify-center text-sm font-medium"
+        className="text-ink hover:text-skyline mt-3 inline-flex min-h-11 w-full items-center justify-center text-sm font-medium"
         href={continueHref}
       >
         Continue Ordering →
