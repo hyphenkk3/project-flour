@@ -1,30 +1,56 @@
 import Link from "next/link";
-import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import {
   StorefrontStaffSignIn,
   storefrontKickerClass,
 } from "@/workspaces/storefront/StorefrontBrand";
 import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
-import { listStorefrontAvailableExtra } from "@/workspaces/storefront/extra/queries";
-import { HomeDestinationCard } from "@/workspaces/storefront/home/HomeDestinationCard";
-import { StorefrontFreshPicksCard } from "@/workspaces/storefront/home/StorefrontFreshPicksCard";
+import { listHomepagePopularCakes } from "@/workspaces/storefront/catalog/queries";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
+import {
+  getStorefrontExtraById,
+  listStorefrontAvailableExtra,
+} from "@/workspaces/storefront/extra/queries";
+import { HomeDestinationCard } from "@/workspaces/storefront/home/HomeDestinationCard";
+import { HomeFeaturedFreshPick } from "@/workspaces/storefront/home/HomeFeaturedFreshPick";
+import { HomeHero } from "@/workspaces/storefront/home/HomeHero";
+import { HomeOrderSummary } from "@/workspaces/storefront/home/HomeOrderSummary";
+import { HomePopularCakes } from "@/workspaces/storefront/home/HomePopularCakes";
+import { StorefrontFreshPicksCard } from "@/workspaces/storefront/home/StorefrontFreshPicksCard";
 
 export const dynamic = "force-dynamic";
 
 export async function StorefrontHomePage() {
-  const picks = await listStorefrontAvailableExtra();
-  const photos = picks.filter((pick) => pick.imageUrl);
-  const hero = photos[0] ?? null;
-  const orderPhoto = photos[1] ?? null;
-  const browsePhoto = photos[2] ?? null;
-  const freshPhoto = photos[0] ?? null;
+  const [picks, popular] = await Promise.all([
+    listStorefrontAvailableExtra(),
+    listHomepagePopularCakes(),
+  ]);
+  const featuredSeed =
+    picks.find((pick) => pick.day === "today") ?? picks[0] ?? null;
+  const featured = featuredSeed
+    ? ((await getStorefrontExtraById(featuredSeed.id)) ?? featuredSeed)
+    : null;
+  const extraPhotos = picks.filter((pick) => pick.imageUrl);
+  const popularWithPhotos = popular.filter((cake) => cake.image);
+  const heroImage =
+    featured?.imageUrl ?? extraPhotos[0]?.imageUrl ?? popularWithPhotos[0]?.image ?? null;
+  const heroAlt =
+    featured?.imageAlt ||
+    featured?.cakeName ||
+    extraPhotos[0]?.imageAlt ||
+    popularWithPhotos[0]?.name ||
+    null;
+  const orderPhoto =
+    extraPhotos.find((pick) => pick.imageUrl !== heroImage) ?? extraPhotos[0] ?? null;
+  const browseCake =
+    popularWithPhotos.find((cake) => cake.image !== heroImage) ??
+    popularWithPhotos[0] ??
+    null;
 
   return (
     <main className="bg-paper min-h-dvh">
       <StorefrontTheme />
       <header className="px-6 pt-6 sm:px-10 sm:pt-8">
-        <div className="mx-auto flex w-full max-w-5xl items-baseline justify-between gap-4">
+        <div className="mx-auto flex w-full max-w-6xl items-baseline justify-between gap-4">
           <p className={storefrontKickerClass}>Whitebird</p>
           <nav className="text-skyline flex flex-wrap items-center justify-end gap-x-5 gap-y-1 text-sm">
             <Link
@@ -37,7 +63,8 @@ export async function StorefrontHomePage() {
               className="hover:text-ink transition-colors duration-200"
               href="/browse"
             >
-              Browse
+              <span className="md:hidden">Browse</span>
+              <span className="hidden md:inline">Browse Cakes</span>
             </Link>
             <Link
               className="hover:text-ink transition-colors duration-200"
@@ -49,37 +76,14 @@ export async function StorefrontHomePage() {
         </div>
       </header>
 
-      <section className="px-6 pt-7 pb-4 sm:px-10 sm:pt-12 sm:pb-8">
-        <div className="mx-auto grid w-full max-w-5xl items-center gap-5 sm:gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.7fr)] lg:gap-14">
-          <div>
-            <h1 className="font-display text-ink max-w-xl text-[1.85rem] leading-[1.15] tracking-tight sm:text-5xl">
-              Every celebration begins here.
-            </h1>
-            <p className="text-skyline mt-3 max-w-lg text-[0.95rem] leading-relaxed sm:mt-5 sm:text-base">
-              Whether you&apos;re planning ahead or looking for a cake today,
-              we&apos;ll help you find the perfect cake for your celebration.
-            </p>
-          </div>
-          {hero?.imageUrl ? (
-            <div className="relative h-28 overflow-hidden sm:h-40 lg:h-52">
-              <CakePhotoImage
-                alt={hero.imageAlt || hero.cakeName}
-                priority
-                sizes="(min-width: 1024px) 28vw, 50vw"
-                src={hero.imageUrl}
-              />
-              <div className="from-paper absolute inset-0 bg-gradient-to-r from-10% to-transparent lg:from-paper lg:via-transparent" />
-            </div>
-          ) : null}
-        </div>
-      </section>
+      <HomeHero
+        imageAlt={heroAlt}
+        imageUrl={heroImage}
+        orderPanel={<HomeOrderSummary />}
+      />
 
-      <section className="px-6 pb-14 sm:px-10 sm:pb-20">
-        <div className="mx-auto w-full max-w-5xl">
-          <p className="text-skyline mb-3 text-[11px] font-medium tracking-[0.18em] uppercase sm:mb-5">
-            Preorder · Pickup · WhatsApp
-          </p>
-          <PreorderInProgressBar />
+      <section className="px-6 pb-10 sm:px-10 sm:pb-12">
+        <div className="mx-auto w-full max-w-6xl">
           <div className="grid gap-3 md:grid-cols-3 md:gap-4">
             <HomeDestinationCard
               actionLabel="Start Ordering"
@@ -94,20 +98,30 @@ export async function StorefrontHomePage() {
               actionLabel="Browse Cakes"
               description="All cakes currently published for Whitebird."
               href="/browse"
-              imageAlt={browsePhoto?.imageAlt}
-              imageUrl={browsePhoto?.imageUrl}
+              imageAlt={browseCake?.name}
+              imageUrl={browseCake?.image}
               title="Browse Cakes"
               tone="sage"
             />
             <StorefrontFreshPicksCard
               days={picks.map((pick) => pick.day)}
-              imageAlt={freshPhoto?.imageAlt}
-              imageUrl={freshPhoto?.imageUrl}
+              imageAlt={featured?.imageAlt ?? extraPhotos[0]?.imageAlt}
+              imageUrl={featured?.imageUrl ?? extraPhotos[0]?.imageUrl}
             />
           </div>
-          <StorefrontStaffSignIn />
         </div>
       </section>
+
+      <HomeFeaturedFreshPick pick={featured} />
+      <HomePopularCakes cakes={popular} />
+
+      <div className="px-6 sm:px-10">
+        <div className="mx-auto w-full max-w-6xl">
+          <StorefrontStaffSignIn />
+        </div>
+      </div>
+
+      <PreorderInProgressBar desktopRail={false} />
     </main>
   );
 }

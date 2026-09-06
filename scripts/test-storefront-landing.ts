@@ -246,11 +246,17 @@ assert.match(homeSrc, /href="\/browse"/);
 assert.match(homeSrc, /StorefrontFreshPicksCard/);
 assert.match(homeSrc, /days=\{picks\.map\(\(pick\) => pick\.day\)\}/);
 assert.match(homeSrc, /listStorefrontAvailableExtra/);
+assert.match(homeSrc, /listHomepagePopularCakes/);
 assert.doesNotMatch(homeSrc, /listAvailableCakes/);
+assert.doesNotMatch(homeSrc, /listBrowsePublishedCakes/);
 assert.doesNotMatch(homeSrc, /getCurrentCollection/);
 assert.doesNotMatch(homeSrc, /submit_guest_preorder/);
 assert.doesNotMatch(homeSrc, /collection_id/);
 assert.doesNotMatch(homeSrc, /Only 3 cakes remaining today/);
+assert.match(homeSrc, /desktopRail=\{false\}/);
+assert.match(homeSrc, /HomeHero/);
+assert.match(homeSrc, /HomeFeaturedFreshPick/);
+assert.match(homeSrc, /HomePopularCakes/);
 
 const freshCardSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontFreshPicksCard.tsx",
@@ -309,6 +315,9 @@ assert.match(cardSrc, /text-status-danger/);
 
 const queriesSrc = readSrc("src/workspaces/storefront/catalog/queries.ts");
 assert.match(queriesSrc, /listBrowsePublishedCakes/);
+assert.match(queriesSrc, /listHomepagePopularCakes/);
+assert.match(queriesSrc, /HOMEPAGE_POPULAR_CAKE_LIMIT/);
+assert.match(queriesSrc, /HOMEPAGE_POPULAR_SCAN_LIMIT/);
 assert.match(queriesSrc, /isCurrentlyCustomerOrderable/);
 assert.match(queriesSrc, /eq\("status", "active"\)/);
 assert.match(queriesSrc, /eq\("purpose", "monthly"\)/);

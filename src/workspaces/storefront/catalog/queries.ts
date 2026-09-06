@@ -784,3 +784,97 @@ export async function getBrowsePublishedCakeById(
   const cakes = await listBrowsePublishedCakes();
   return cakes.find((cake) => cake.id === id) ?? null;
 }
+
+/** Homepage merchandising only. Never used as Browse or checkout authority. */
+export const HOMEPAGE_POPULAR_CAKE_LIMIT = 5;
+const HOMEPAGE_POPULAR_SCAN_LIMIT = 32;
+
+/**
+ * Limited published-cake snapshot for the customer homepage.
+ * Does not load the Browse catalogue and does not change Browse ordering.
+ */
+export async function listHomepagePopularCakes(
+  limit: number = HOMEPAGE_POPULAR_CAKE_LIMIT,
+  todayYmd: string = toBusinessDateKey(),
+): Promise<StorefrontCake[]> {
+  const cap = Math.min(Math.max(Math.trunc(limit), 1), HOMEPAGE_POPULAR_CAKE_LIMIT);
+  try {
+    const supabase = await createClient();
+    const { data: catalogues, error: catalogueError } = await supabase
+      .from("collections")
+      .select("id, month, purpose, status, end_date, website_override")
+      .eq("status", "active");
+
+    if (catalogueError) return [];
+
+    const active = (
+      (catalogues ?? []) as Array<{
+        id: string;
+        month: string | null;
+        purpose: string | null;
+        status: string;
+        end_date: string | null;
+        website_override: boolean | null;
+      }>
+    ).filter((row) =>
+      isCurrentlyCustomerOrderable(
+        {
+          purpose: row.purpose ?? "monthly",
+          status: row.status,
+          month: row.month ? String(row.month).slice(0, 10) : null,
+          endDate: row.end_date ? String(row.end_date).slice(0, 10) : null,
+          websiteOverride: row.website_override === true,
+        },
+        todayYmd,
+      ),
+    );
+    if (active.length === 0) return [];
+
+    const data = await withCakePhotoSelectFallback((photoSelect) =>
+      supabase
+        .from("collection_cakes")
+        .select(
+          `
+      collection_id,
+      sort_order,
+      library_cakes (
+        ${libraryCakeEmbedSelect(photoSelect)}
+      )
+    `,
+        )
+        .eq("available", true)
+        .in(
+          "collection_id",
+          active.map((row) => row.id),
+        )
+        .order("sort_order", { ascending: true })
+        .limit(HOMEPAGE_POPULAR_SCAN_LIMIT),
+    );
+
+    const byId = new Map<string, StorefrontCake>();
+    for (const row of (data ?? []) as unknown as CatalogRow[]) {
+      const embed = unwrapOne(row.library_cakes);
+      if (!embed || !isOfferableStatus(embed.status)) continue;
+      const cake = mapStorefrontCake(embed);
+      if (cake.sizes.length === 0) continue;
+      const existing = byId.get(cake.id);
+      if (!existing) {
+        byId.set(cake.id, cake);
+        continue;
+      }
+      if (!existing.image && cake.image) {
+        byId.set(cake.id, cake);
+      }
+    }
+
+    return [...byId.values()]
+      .sort((a, b) => {
+        const photoDelta = Number(Boolean(b.image)) - Number(Boolean(a.image));
+        if (photoDelta !== 0) return photoDelta;
+        return a.name.localeCompare(b.name, "en");
+      })
+      .slice(0, cap);
+  } catch {
+    return [];
+  }
+}

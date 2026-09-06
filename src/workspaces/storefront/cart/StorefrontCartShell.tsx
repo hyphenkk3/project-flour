@@ -33,6 +33,8 @@ import {
   type PreorderDraftItem,
 } from "@/workspaces/storefront/checkout/preorder-draft";
 
+import { STOREFRONT_OPEN_ORDER_EVENT } from "@/workspaces/storefront/cart/open-order";
+
 const DESKTOP_ORDER_RAIL_WIDTH = "20.5rem";
 
 function OrderLines({
@@ -303,7 +305,11 @@ function OrderSummary({
   );
 }
 
-export function StorefrontCartShell() {
+export function StorefrontCartShell({
+  desktopRail = true,
+}: {
+  desktopRail?: boolean;
+} = {}) {
   const draft = usePreorderDraft();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -359,11 +365,11 @@ export function StorefrontCartShell() {
   useEffect(() => {
     const media = window.matchMedia("(min-width: 768px)");
     function syncDesktop() {
-      if (media.matches) setOpen(false);
+      if (desktopRail && media.matches) setOpen(false);
       // Margin, not padding: Safari treats body padding as the containing
       // block for position:fixed, which inset the rail from the viewport.
       document.body.style.marginRight =
-        hasItems && media.matches ? DESKTOP_ORDER_RAIL_WIDTH : "";
+        desktopRail && hasItems && media.matches ? DESKTOP_ORDER_RAIL_WIDTH : "";
     }
     syncDesktop();
     media.addEventListener("change", syncDesktop);
@@ -371,7 +377,17 @@ export function StorefrontCartShell() {
       document.body.style.marginRight = "";
       media.removeEventListener("change", syncDesktop);
     };
-  }, [hasItems]);
+  }, [desktopRail, hasItems]);
+
+  useEffect(() => {
+    function onOpenOrder() {
+      setOpen(true);
+    }
+    window.addEventListener(STOREFRONT_OPEN_ORDER_EVENT, onOpenOrder);
+    return () => {
+      window.removeEventListener(STOREFRONT_OPEN_ORDER_EVENT, onOpenOrder);
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -391,9 +407,15 @@ export function StorefrontCartShell() {
     return null;
   }
 
+  const selectedDate = formatCartCollectionDate(draft.pickupDate);
+  const earliestDate = formatCartCollectionDate(
+    draftEarliestCollectionYmd(draft.items),
+  );
+
   return (
     <>
       <div aria-hidden className="h-16 md:hidden" />
+      {!desktopRail ? <div aria-hidden className="hidden h-24 md:block" /> : null}
 
       <button
         aria-label={`${itemLabel}, ${formatRm(total)}. View order.`}
@@ -408,10 +430,44 @@ export function StorefrontCartShell() {
         <span className="font-medium">View Order →</span>
       </button>
 
+      {!desktopRail ? (
+        <button
+          aria-label={`Collection ${selectedDate ?? "not selected"}, earliest ${earliestDate ?? "unavailable"}. View order, ${count} ${count === 1 ? "item" : "items"}.`}
+          className="border-ink/10 bg-paper/95 text-ink fixed inset-x-6 bottom-5 z-40 hidden min-h-16 items-center justify-between gap-6 rounded-[10px] border px-6 shadow-[0_8px_30px_rgba(28,25,22,0.08)] backdrop-blur-sm md:flex"
+          onClick={() => setOpen(true)}
+          type="button"
+        >
+          <span className="flex min-w-0 flex-1 items-center gap-8 text-left">
+            <span>
+              <span className="text-skyline block text-[11px] font-medium tracking-[0.16em] uppercase">
+                Collection date
+              </span>
+              <span className="mt-0.5 block text-sm font-medium">
+                {selectedDate ?? "Not selected yet"}
+              </span>
+            </span>
+            <span>
+              <span className="text-skyline block text-[11px] font-medium tracking-[0.16em] uppercase">
+                Earliest collection
+              </span>
+              <span className="mt-0.5 block text-sm font-medium">
+                {earliestDate ?? "—"}
+              </span>
+            </span>
+          </span>
+          <span className="inline-flex shrink-0 items-center gap-3 text-sm font-medium">
+            View Order
+            <span className="border-ink/15 inline-flex h-8 min-w-8 items-center justify-center rounded-full border text-xs tabular-nums">
+              {count}
+            </span>
+          </span>
+        </button>
+      ) : null}
+
       {createPortal(
         <>
           {open ? (
-            <div className="md:hidden">
+            <div className={desktopRail ? "md:hidden" : ""}>
               <div
                 aria-hidden
                 className="bg-ink/40 animate-storefront-fade fixed inset-0 z-50"
@@ -420,7 +476,11 @@ export function StorefrontCartShell() {
               <div
                 aria-labelledby={titleId}
                 aria-modal="true"
-                className="bg-mist text-ink fixed inset-0 z-[60] flex h-dvh flex-col"
+                className={
+                  desktopRail
+                    ? "bg-mist text-ink fixed inset-0 z-[60] flex h-dvh flex-col"
+                    : "bg-mist text-ink fixed inset-0 z-[60] flex h-dvh flex-col md:inset-y-8 md:right-8 md:left-auto md:h-auto md:max-h-[calc(100dvh-4rem)] md:w-[24rem] md:rounded-lg md:border md:border-fog md:shadow-[0_8px_40px_rgba(28,25,22,0.12)]"
+                }
                 role="dialog"
               >
                 <div className="flex min-h-0 flex-1 flex-col">
@@ -461,6 +521,7 @@ export function StorefrontCartShell() {
               </div>
             </div>
           ) : null}
+        {desktopRail ? (
         <aside
           aria-labelledby={`${titleId}-desktop`}
           className="border-fog bg-mist hidden md:fixed md:inset-y-0 md:right-0 md:left-auto md:z-30 md:flex md:w-[20.5rem] md:flex-col md:border-l"
@@ -492,6 +553,7 @@ export function StorefrontCartShell() {
             />
           </div>
         </aside>
+        ) : null}
         </>,
         document.body,
       )}
