@@ -83,7 +83,7 @@ export async function StorefrontHomePage() {
 
       <section className="px-6 pb-3 sm:px-10 sm:pb-4 md:pt-2.5">
         <div className="mx-auto w-full max-w-6xl">
-          <div className="grid gap-3 md:grid-cols-3 md:gap-3.5">
+          <div className="grid gap-4 md:grid-cols-3 md:gap-3.5">
             <HomeDestinationCard
               actionLabel="Start Ordering"
               ctaVariant="ink"

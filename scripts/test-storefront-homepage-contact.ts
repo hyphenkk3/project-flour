@@ -32,6 +32,16 @@ assert.match(cardSrc, /currently unavailable/);
 assert.match(cardSrc, /cursor-default/);
 assert.match(cardSrc, /role="group"/);
 assert.match(cardSrc, /<Link className=\{cardClass\} href=\{href\}>/);
+assert.match(cardSrc, /h-\[11\.25rem\]/);
+assert.match(cardSrc, /rounded-\[14px\]/);
+assert.match(cardSrc, /md:rounded-\[10px\]/);
+assert.match(cardSrc, /px-\[18px\] pt-\[18px\] pb-4/);
+assert.match(cardSrc, /md:px-5 md:py-4/);
+assert.match(cardSrc, /md:shadow-\[0_1px_8px_rgba\(28,25,22,0\.045\)\]/);
+assert.doesNotMatch(cardSrc, /shadow-\[0_1px_8px_rgba\(28,25,22,0\.045\)\] sm:/);
+assert.match(cardSrc, /min-h-11/);
+assert.match(cardSrc, /text-\[13px\]/);
+assert.match(cardSrc, /md:min-h-0 md:py-2 md:text-\[12px\]/);
 
 const freshCardSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontFreshPicksCard.tsx",
@@ -53,6 +63,7 @@ assert.match(
   homeSrc,
   /href="\/extra"[\s\S]*Fresh Picks[\s\S]*href="\/faq"[\s\S]*FAQ/,
 );
+assert.match(homeSrc, /grid gap-4 md:grid-cols-3 md:gap-3\.5/);
 assert.match(homeSrc, /hidden[\s\S]*md:flex/);
 assert.doesNotMatch(
   homeSrc,

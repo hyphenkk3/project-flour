@@ -39,7 +39,7 @@ export function HomeDestinationCard({
   ctaVariant = "soft",
   unavailable = false,
 }: HomeDestinationCardProps) {
-  const cardClass = `relative flex h-full flex-col overflow-hidden rounded-[10px] border px-4 py-4 shadow-[0_1px_8px_rgba(28,25,22,0.045)] sm:px-5 ${TONE_CLASS[tone]} ${
+  const cardClass = `relative flex h-full flex-col overflow-hidden rounded-[14px] border px-[18px] pt-[18px] pb-4 md:rounded-[10px] md:px-5 md:py-4 md:shadow-[0_1px_8px_rgba(28,25,22,0.045)] ${TONE_CLASS[tone]} ${
     unavailable
       ? "border-ink/10 cursor-default"
       : "group border-ink/10 transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink/30"
@@ -67,7 +67,7 @@ export function HomeDestinationCard({
         {extra}
       </div>
       <span
-        className={`mt-auto inline-flex w-full items-center justify-between rounded-full px-3.5 py-2 text-[12px] font-medium ${ctaClass}`}
+        className={`mt-auto inline-flex min-h-11 w-full items-center justify-between rounded-full px-3.5 text-[13px] font-medium md:min-h-0 md:py-2 md:text-[12px] ${ctaClass}`}
       >
         {actionLabel}
         <span aria-hidden="true">→</span>
