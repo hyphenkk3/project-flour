@@ -49,27 +49,43 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
         </div>
       ) : null}
 
-      <div className="relative z-10 px-6 pt-3 pb-2 sm:px-10 sm:pt-4 sm:pb-3 md:pb-6 lg:pt-4">
+      <div className="relative z-10 md:hidden">
+        <div className="storefront-hero-photo-mobile relative aspect-[3/2] overflow-hidden">
+          <Image
+            alt="Whitebird pistachio cake in the studio"
+            className="object-cover object-[50%_58%]"
+            fill
+            priority
+            sizes="100vw"
+            src={STOREFRONT_HOMEPAGE_HERO_SRC}
+          />
+          <div className="from-paper absolute inset-x-0 top-0 h-10 bg-gradient-to-b to-transparent" />
+          <div className="from-paper absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t to-transparent" />
+        </div>
+      </div>
+
+      <div className="relative z-10 px-6 pt-4 pb-5 sm:px-10 md:pt-4 md:pb-6 lg:pt-4">
         <div className="mx-auto w-full max-w-6xl">
-          <div className="max-w-[17.5rem] sm:max-w-[20rem] lg:max-w-[23.5rem]">
+          <div className="max-w-none md:max-w-[20rem] lg:max-w-[23.5rem]">
             <p className="text-skyline text-[11px] font-medium tracking-[0.18em] uppercase">
               Cakes made with heart
             </p>
             <h1 className="font-display text-ink mt-1.5 text-[1.85rem] leading-[1.12] tracking-tight sm:mt-2 sm:text-[2.4rem] lg:text-[2.7rem]">
               Every celebration
-              <span className="hidden md:inline">
-                <br />
-              </span>{" "}
+              <br />
               begins here.
             </h1>
-            <p className="text-skyline mt-2 max-w-sm text-[0.95rem] leading-relaxed">
+            <p className="text-skyline mt-2 max-w-md text-[0.95rem] leading-relaxed md:max-w-sm">
               From everyday moments to once-in-a-lifetime celebrations,
               we&apos;re here to make it sweeter.
             </p>
-            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 sm:mt-3.5 sm:gap-x-5 md:mt-6.5 lg:gap-x-7">
+            <ul className="mt-4 grid grid-cols-3 gap-x-3 md:mt-6.5 md:flex md:flex-wrap md:gap-x-5 md:gap-y-2 lg:gap-x-7">
               {VALUE_CUES.map((cue) => (
-                <li className="flex items-center gap-2.5" key={cue.label.join(" ")}>
-                  <span className="bg-ink/[0.045] text-ink/65 flex h-8 w-8 shrink-0 items-center justify-center rounded-full sm:h-9 sm:w-9">
+                <li
+                  className="flex min-w-0 flex-col items-center gap-1.5 text-center md:flex-row md:items-center md:gap-2.5 md:text-left"
+                  key={cue.label.join(" ")}
+                >
+                  <span className="bg-ink/[0.045] text-ink/65 flex h-8 w-8 shrink-0 items-center justify-center rounded-full md:h-9 md:w-9">
                     <cue.Icon className="h-4 w-4" />
                   </span>
                   <span className="text-skyline text-[11px] leading-[1.25]">
@@ -81,21 +97,6 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
               ))}
             </ul>
           </div>
-        </div>
-      </div>
-
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-6 pb-3 sm:px-10 md:hidden">
-        <div className="storefront-hero-photo-mobile relative h-32 overflow-hidden">
-          <Image
-            alt="Whitebird pistachio cake in the studio"
-            className="object-cover object-[64%_46%]"
-            fill
-            priority
-            sizes="100vw"
-            src={STOREFRONT_HOMEPAGE_HERO_SRC}
-          />
-          <div className="from-paper absolute inset-x-0 top-0 h-8 bg-gradient-to-b to-transparent" />
-          <div className="from-paper absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t to-transparent" />
         </div>
       </div>
     </section>

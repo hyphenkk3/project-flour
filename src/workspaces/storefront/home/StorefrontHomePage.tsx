@@ -13,6 +13,7 @@ import {
 import { HomeDestinationCard } from "@/workspaces/storefront/home/HomeDestinationCard";
 import { HomeFeaturedFreshPick } from "@/workspaces/storefront/home/HomeFeaturedFreshPick";
 import { HomeHero } from "@/workspaces/storefront/home/HomeHero";
+import { HomeMobileNav } from "@/workspaces/storefront/home/HomeMobileNav";
 import {
   BrowseMark,
   CakeMark,
@@ -41,10 +42,19 @@ export async function StorefrontHomePage() {
       <StorefrontTheme />
       <HomeHero
         header={
-          <header className="px-6 pt-4 sm:px-10 sm:pt-5">
-            <div className="mx-auto flex w-full max-w-6xl items-baseline justify-between gap-4 md:grid md:grid-cols-[1fr_auto_1fr]">
+          <header className="px-6 pt-2 sm:px-10 md:pt-5">
+            <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 md:grid md:grid-cols-[1fr_auto_1fr] md:items-baseline">
               <p className={storefrontKickerClass}>Whitebird</p>
-              <nav className="text-skyline flex flex-wrap items-center justify-end gap-x-5 gap-y-1 text-sm md:justify-center">
+              <div className="flex items-center md:hidden">
+                <Link
+                  className="text-skyline hover:text-ink inline-flex min-h-11 items-center px-2.5 text-sm transition-colors duration-200"
+                  href="/order"
+                >
+                  Order
+                </Link>
+                <HomeMobileNav />
+              </div>
+              <nav className="text-skyline hidden flex-wrap items-center justify-center gap-x-5 gap-y-1 text-sm md:flex">
                 <Link
                   className="hover:text-ink transition-colors duration-200"
                   href="/order"
@@ -55,8 +65,7 @@ export async function StorefrontHomePage() {
                   className="hover:text-ink transition-colors duration-200"
                   href="/browse"
                 >
-                  <span className="md:hidden">Browse</span>
-                  <span className="hidden md:inline">Browse Cakes</span>
+                  Browse Cakes
                 </Link>
                 <Link
                   className="hover:text-ink transition-colors duration-200"

@@ -48,10 +48,22 @@ assert.match(homeSrc, /StorefrontFreshPicksCard/);
 assert.match(homeSrc, /HomeVisitFooter/);
 assert.match(homeSrc, /days=\{picks\.map\(\(pick\) => pick\.day\)\}/);
 assert.match(homeSrc, /href="\/faq"/);
+assert.match(homeSrc, /HomeMobileNav/);
 assert.match(
   homeSrc,
   /href="\/extra"[\s\S]*Fresh Picks[\s\S]*href="\/faq"[\s\S]*FAQ/,
 );
+assert.match(homeSrc, /hidden[\s\S]*md:flex/);
+
+const mobileNavSrc = readSrc("src/workspaces/storefront/home/HomeMobileNav.tsx");
+assert.match(mobileNavSrc, /"\/browse"/);
+assert.match(mobileNavSrc, /Browse Cakes/);
+assert.match(mobileNavSrc, /"\/extra"/);
+assert.match(mobileNavSrc, /Fresh Picks/);
+assert.match(mobileNavSrc, /"\/faq"/);
+assert.match(mobileNavSrc, /FAQ/);
+assert.match(mobileNavSrc, /min-h-11/);
+assert.doesNotMatch(mobileNavSrc, /"\/order"/);
 
 const footerSrc = readSrc("src/workspaces/storefront/home/HomeVisitFooter.tsx");
 assert.doesNotMatch(footerSrc, /href="\/faq"/);
