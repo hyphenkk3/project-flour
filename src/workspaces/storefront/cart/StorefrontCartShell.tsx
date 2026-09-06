@@ -431,37 +431,43 @@ export function StorefrontCartShell({
       </button>
 
       {!desktopRail ? (
-        <button
-          aria-label={`Collection ${selectedDate ?? "not selected"}, earliest ${earliestDate ?? "unavailable"}. View order, ${count} ${count === 1 ? "item" : "items"}.`}
-          className="border-ink/10 bg-paper/95 text-ink fixed inset-x-6 bottom-5 z-40 hidden min-h-16 items-center justify-between gap-6 rounded-[10px] border px-6 shadow-[0_8px_30px_rgba(28,25,22,0.08)] backdrop-blur-sm md:flex"
-          onClick={() => setOpen(true)}
-          type="button"
-        >
-          <span className="flex min-w-0 flex-1 items-center gap-8 text-left">
-            <span>
-              <span className="text-skyline block text-[11px] font-medium tracking-[0.16em] uppercase">
-                Collection date
-              </span>
-              <span className="mt-0.5 block text-sm font-medium">
-                {selectedDate ?? "Not selected yet"}
-              </span>
-            </span>
-            <span>
-              <span className="text-skyline block text-[11px] font-medium tracking-[0.16em] uppercase">
-                Earliest collection
-              </span>
-              <span className="mt-0.5 block text-sm font-medium">
-                {earliestDate ?? "—"}
-              </span>
-            </span>
-          </span>
-          <span className="inline-flex shrink-0 items-center gap-3 text-sm font-medium">
-            View Order
-            <span className="border-ink/15 inline-flex h-8 min-w-8 items-center justify-center rounded-full border text-xs tabular-nums">
-              {count}
-            </span>
-          </span>
-        </button>
+        <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 hidden md:block">
+          <div className="px-6 sm:px-10">
+            <div className="mx-auto w-full max-w-6xl">
+              <button
+                aria-label={`Collection ${selectedDate ?? "not selected"}, earliest ${earliestDate ?? "unavailable"}. View order, ${count} ${count === 1 ? "item" : "items"}.`}
+                className="border-ink/10 bg-paper/95 text-ink pointer-events-auto flex min-h-16 w-full items-center justify-between gap-6 rounded-[10px] border px-6 shadow-[0_8px_30px_rgba(28,25,22,0.08)] backdrop-blur-sm"
+                onClick={() => setOpen(true)}
+                type="button"
+              >
+                <span className="flex min-w-0 flex-1 items-center gap-8 text-left">
+                  <span>
+                    <span className="text-skyline block text-[11px] font-medium tracking-[0.16em] uppercase">
+                      Collection date
+                    </span>
+                    <span className="mt-0.5 block text-sm font-medium">
+                      {selectedDate ?? "Not selected yet"}
+                    </span>
+                  </span>
+                  <span>
+                    <span className="text-skyline block text-[11px] font-medium tracking-[0.16em] uppercase">
+                      Earliest collection
+                    </span>
+                    <span className="mt-0.5 block text-sm font-medium">
+                      {earliestDate ?? "—"}
+                    </span>
+                  </span>
+                </span>
+                <span className="inline-flex shrink-0 items-center gap-3 text-sm font-medium">
+                  View Order
+                  <span className="border-ink/15 inline-flex h-8 min-w-8 items-center justify-center rounded-full border text-xs tabular-nums">
+                    {count}
+                  </span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {createPortal(
