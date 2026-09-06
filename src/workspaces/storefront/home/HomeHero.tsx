@@ -16,46 +16,50 @@ const VALUE_CUES = [
 ] as const;
 
 type HomeHeroProps = {
+  header?: ReactNode;
   orderPanel?: ReactNode;
 };
 
-export function HomeHero({ orderPanel = null }: HomeHeroProps) {
+export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
   return (
     <section className="relative overflow-x-clip">
-      <div className="storefront-hero-photo pointer-events-none absolute inset-y-0 right-0 hidden w-[54%] md:block lg:w-[62%] xl:w-[68%] min-[1440px]:w-[70%]">
+      <div className="storefront-hero-photo pointer-events-none absolute top-0 -bottom-8 right-[9%] hidden w-[51%] md:block lg:right-[10%] lg:w-[54%] xl:w-[52%]">
         <Image
           alt=""
-          className="object-cover object-[58%_52%]"
+          className="object-cover object-[58%_50%]"
           fill
           priority
-          sizes="(min-width: 1440px) 70vw, (min-width: 1280px) 68vw, (min-width: 1024px) 62vw, 54vw"
+          sizes="(min-width: 1280px) 52vw, (min-width: 1024px) 54vw, 51vw"
           src={STOREFRONT_HOMEPAGE_HERO_SRC}
         />
-        <div className="from-paper absolute inset-y-0 left-0 w-[38%] bg-gradient-to-r via-paper/55 to-transparent" />
-        <div className="from-paper absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t to-transparent" />
+        <div className="from-paper absolute inset-y-0 left-0 w-[42%] bg-gradient-to-r via-paper/50 to-transparent" />
+        <div className="from-paper absolute inset-x-0 top-0 h-28 bg-gradient-to-b via-paper/40 to-transparent" />
+        <div className="from-paper absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t via-paper/50 to-transparent" />
       </div>
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-6 pt-5 pb-3 sm:px-10 sm:pt-6 sm:pb-4 md:min-h-[19.5rem] md:pb-5 lg:min-h-[22rem] lg:pt-7 lg:pb-6 xl:min-h-[23.5rem]">
+      {header ? <div className="relative z-20">{header}</div> : null}
+
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-6 pt-4 pb-4 sm:px-10 sm:pt-5 sm:pb-5 lg:pt-6 lg:pb-5">
         <div className="max-w-[17.5rem] sm:max-w-[20rem] lg:max-w-[23.5rem]">
           <p className="text-skyline text-[11px] font-medium tracking-[0.18em] uppercase">
             Cakes made with heart
           </p>
-          <h1 className="font-display text-ink mt-2.5 text-[1.85rem] leading-[1.12] tracking-tight sm:mt-3 sm:text-[2.4rem] lg:text-[2.7rem]">
+          <h1 className="font-display text-ink mt-2 text-[1.85rem] leading-[1.12] tracking-tight sm:mt-2.5 sm:text-[2.4rem] lg:text-[2.7rem]">
             Every celebration
             <span className="hidden md:inline">
               <br />
             </span>{" "}
             begins here.
           </h1>
-          <p className="text-skyline mt-3 max-w-sm text-[0.95rem] leading-relaxed sm:mt-3.5">
+          <p className="text-skyline mt-2.5 max-w-sm text-[0.95rem] leading-relaxed sm:mt-3">
             From everyday moments to once-in-a-lifetime celebrations,
             we&apos;re here to make it sweeter.
           </p>
-          <ul className="mt-5 flex gap-4 sm:mt-6 sm:gap-5 lg:gap-7">
+          <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-2.5 sm:mt-5 sm:gap-x-5 lg:gap-x-7">
             {VALUE_CUES.map((cue) => (
               <li className="flex items-center gap-2.5" key={cue.label.join(" ")}>
-                <span className="bg-ink/[0.06] text-ink/70 flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
-                  <cue.Icon className="h-[17px] w-[17px]" />
+                <span className="bg-ink/[0.045] text-ink/65 flex h-8 w-8 shrink-0 items-center justify-center rounded-full sm:h-9 sm:w-9">
+                  <cue.Icon className="h-4 w-4" />
                 </span>
                 <span className="text-skyline text-[11px] leading-[1.25]">
                   {cue.label[0]}
@@ -68,14 +72,14 @@ export function HomeHero({ orderPanel = null }: HomeHeroProps) {
         </div>
 
         {orderPanel ? (
-          <div className="pointer-events-auto mt-5 md:absolute md:bottom-5 md:left-10 md:mt-0">
+          <div className="pointer-events-auto mt-4 md:absolute md:bottom-4 md:left-10 md:mt-0">
             {orderPanel}
           </div>
         ) : null}
       </div>
 
-      <div className="relative mx-auto w-full max-w-6xl px-6 pb-3 sm:px-10 md:hidden">
-        <div className="storefront-hero-photo-mobile relative h-36 overflow-hidden">
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-6 pb-3 sm:px-10 md:hidden">
+        <div className="storefront-hero-photo-mobile relative h-32 overflow-hidden">
           <Image
             alt="Whitebird pistachio cake in the studio"
             className="object-cover object-[60%_50%]"

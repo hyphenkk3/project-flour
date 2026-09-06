@@ -10,15 +10,11 @@ import { HomeDestinationCard } from "@/workspaces/storefront/home/HomeDestinatio
 type StorefrontFreshPicksCardProps = {
   days: readonly FreshPickDay[];
   icon: ReactNode;
-  imageUrl?: string | null;
-  imageAlt?: string | null;
 };
 
 export function StorefrontFreshPicksCard({
   days,
   icon,
-  imageUrl = null,
-  imageAlt = null,
 }: StorefrontFreshPicksCardProps) {
   const horizon = homepageFreshPicksHorizon(days);
   const count = days.length;
@@ -29,6 +25,7 @@ export function StorefrontFreshPicksCard({
   return (
     <HomeDestinationCard
       actionLabel="View Fresh Picks"
+      ctaVariant="soft"
       description={description}
       extra={
         <p
@@ -42,8 +39,6 @@ export function StorefrontFreshPicksCard({
       }
       href="/extra"
       icon={icon}
-      imageAlt={imageAlt}
-      imageUrl={imageUrl}
       title="Fresh Picks"
       tone="linen"
     />

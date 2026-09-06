@@ -20,18 +20,18 @@ export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
 
   return (
     <div className="min-w-0">
-      <div className="mb-3 flex items-baseline justify-between gap-3">
+      <div className="mb-2.5 flex items-baseline justify-between gap-3">
         <h2 className="font-display text-ink text-xl tracking-tight sm:text-2xl">
           Popular Cakes
         </h2>
         <Link
-          className="text-ink hover:text-skyline inline-flex min-h-11 items-center text-sm font-medium"
+          className="text-ink hover:text-skyline inline-flex items-center text-sm font-medium"
           href="/browse"
         >
           View all →
         </Link>
       </div>
-      <ul className="flex gap-2.5 overflow-x-auto pb-1 sm:gap-3">
+      <ul className="flex gap-3 overflow-x-auto pb-1">
         {cakes.map((cake) => {
           const size = cake.sizes[0] ?? null;
           const photo =
@@ -40,13 +40,13 @@ export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
           const from = startingPrice(cake);
           const preorder = cakeCardPreorderLabel(cake);
           return (
-            <li className="w-[6.75rem] shrink-0 sm:w-[7.25rem]" key={cake.id}>
+            <li className="w-[7rem] shrink-0" key={cake.id}>
               <Link className="group block" href={`/cakes/${cake.id}`}>
-                <div className="relative aspect-[4/5] overflow-hidden">
+                <div className="relative aspect-square overflow-hidden">
                   {photo?.url ? (
                     <CakePhotoImage
                       alt={photo.altText || cake.name}
-                      sizes="120px"
+                      sizes="112px"
                       src={photo.url}
                     />
                   ) : (
@@ -55,12 +55,9 @@ export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
                     </div>
                   )}
                 </div>
-                <h3 className="font-display text-ink mt-1.5 line-clamp-2 text-[0.92rem] leading-snug tracking-tight group-hover:text-skyline">
+                <h3 className="font-display text-ink mt-1.5 line-clamp-2 text-[0.88rem] leading-snug tracking-tight group-hover:text-skyline">
                   {cake.name}
                 </h3>
-                {size ? (
-                  <p className="text-skyline mt-0.5 text-[11px]">{size.size}</p>
-                ) : null}
                 {from != null ? (
                   <p className="text-ink mt-0.5 text-xs tabular-nums">
                     {formatRm(from)}
