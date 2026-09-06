@@ -65,10 +65,10 @@ html.storefront-canvas .storefront-hero-photo {
   -webkit-mask-image: linear-gradient(
     to right,
     transparent 0%,
-    #000 16%,
+    #000 22%,
     #000 100%
   );
-  mask-image: linear-gradient(to right, transparent 0%, #000 16%, #000 100%);
+  mask-image: linear-gradient(to right, transparent 0%, #000 22%, #000 100%);
 }
 
 html.storefront-canvas .storefront-hero-photo-mobile {

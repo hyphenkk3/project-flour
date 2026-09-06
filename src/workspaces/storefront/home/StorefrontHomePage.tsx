@@ -13,6 +13,11 @@ import {
 import { HomeDestinationCard } from "@/workspaces/storefront/home/HomeDestinationCard";
 import { HomeFeaturedFreshPick } from "@/workspaces/storefront/home/HomeFeaturedFreshPick";
 import { HomeHero } from "@/workspaces/storefront/home/HomeHero";
+import {
+  BrowseMark,
+  CakeMark,
+  SparkMark,
+} from "@/workspaces/storefront/home/HomeMarks";
 import { HomeOrderSummary } from "@/workspaces/storefront/home/HomeOrderSummary";
 import { HomePopularCakes } from "@/workspaces/storefront/home/HomePopularCakes";
 import { StorefrontFreshPicksCard } from "@/workspaces/storefront/home/StorefrontFreshPicksCard";
@@ -66,22 +71,25 @@ export async function StorefrontHomePage() {
 
       <HomeHero orderPanel={<HomeOrderSummary />} />
 
-      <section className="px-6 pb-8 sm:px-10 sm:pb-9">
+      <section className="px-6 pb-5 sm:px-10 sm:pb-6">
         <div className="mx-auto w-full max-w-6xl">
           <div className="grid gap-3 md:grid-cols-3 md:gap-3.5">
             <HomeDestinationCard
               actionLabel="Start Ordering"
+              ctaVariant="solid"
               description="Choose a monthly collection or Special Menu."
               href="/order"
+              icon={<CakeMark className="h-3.5 w-3.5" />}
               imageAlt={orderPhoto?.imageAlt}
               imageUrl={orderPhoto?.imageUrl}
               title="Order a Cake"
-              tone="cream"
+              tone="blush"
             />
             <HomeDestinationCard
               actionLabel="Browse Cakes"
               description="All cakes currently published for Whitebird."
               href="/browse"
+              icon={<BrowseMark className="h-3.5 w-3.5" />}
               imageAlt={browseCake?.name}
               imageUrl={browseCake?.image}
               title="Browse Cakes"
@@ -89,6 +97,7 @@ export async function StorefrontHomePage() {
             />
             <StorefrontFreshPicksCard
               days={picks.map((pick) => pick.day)}
+              icon={<SparkMark className="h-3.5 w-3.5" />}
               imageAlt={featured?.imageAlt ?? extraPhotos[0]?.imageAlt}
               imageUrl={featured?.imageUrl ?? extraPhotos[0]?.imageUrl}
             />
@@ -96,8 +105,8 @@ export async function StorefrontHomePage() {
         </div>
       </section>
 
-      <section className="px-6 pb-14 sm:px-10 sm:pb-16">
-        <div className="border-fog/80 mx-auto grid w-full max-w-6xl gap-8 border-t pt-6 md:grid-cols-[minmax(0,0.38fr)_minmax(0,0.62fr)] md:gap-10 lg:gap-12">
+      <section className="px-6 pb-10 sm:px-10 sm:pb-12">
+        <div className="border-fog/80 mx-auto grid w-full max-w-6xl gap-7 border-t pt-5 md:grid-cols-[minmax(0,0.38fr)_minmax(0,0.62fr)] md:gap-8 lg:gap-10">
           <HomeFeaturedFreshPick pick={featured} />
           <HomePopularCakes cakes={popular} />
         </div>

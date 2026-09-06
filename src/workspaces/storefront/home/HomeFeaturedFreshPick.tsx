@@ -30,7 +30,7 @@ export function HomeFeaturedFreshPick({ pick }: HomeFeaturedFreshPickProps) {
           Today&apos;s Fresh Pick
         </h2>
         {isToday ? (
-          <p className="text-skyline text-[11px] font-medium tracking-[0.18em] uppercase">
+          <p className="border-ink/15 text-skyline rounded-full border px-2 py-0.5 text-[10px] font-medium tracking-[0.16em] uppercase">
             New
           </p>
         ) : (

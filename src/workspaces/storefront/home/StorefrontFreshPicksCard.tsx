@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   homepageFreshPicksCountCopy,
   homepageFreshPicksDescription,
@@ -8,12 +9,14 @@ import { HomeDestinationCard } from "@/workspaces/storefront/home/HomeDestinatio
 
 type StorefrontFreshPicksCardProps = {
   days: readonly FreshPickDay[];
+  icon: ReactNode;
   imageUrl?: string | null;
   imageAlt?: string | null;
 };
 
 export function StorefrontFreshPicksCard({
   days,
+  icon,
   imageUrl = null,
   imageAlt = null,
 }: StorefrontFreshPicksCardProps) {
@@ -38,6 +41,7 @@ export function StorefrontFreshPicksCard({
         </p>
       }
       href="/extra"
+      icon={icon}
       imageAlt={imageAlt}
       imageUrl={imageUrl}
       title="Fresh Picks"
