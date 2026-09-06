@@ -23,18 +23,18 @@ type HomeHeroProps = {
 export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
   return (
     <section className="relative overflow-x-clip">
-      <div className="storefront-hero-photo pointer-events-none absolute top-0 -bottom-8 right-[9%] hidden w-[51%] md:block lg:right-[10%] lg:w-[54%] xl:w-[52%]">
+      <div className="storefront-hero-photo pointer-events-none absolute top-0 right-0 -bottom-8 hidden w-[56%] overflow-hidden md:block lg:w-[60%] xl:w-[62%]">
         <Image
           alt=""
-          className="object-cover object-[58%_50%]"
+          className="origin-[52%_48%] object-cover object-[52%_48%] scale-[1.06]"
           fill
           priority
-          sizes="(min-width: 1280px) 52vw, (min-width: 1024px) 54vw, 51vw"
+          sizes="(min-width: 1280px) 62vw, (min-width: 1024px) 60vw, 56vw"
           src={STOREFRONT_HOMEPAGE_HERO_SRC}
         />
-        <div className="from-paper absolute inset-y-0 left-0 w-[42%] bg-gradient-to-r via-paper/50 to-transparent" />
-        <div className="from-paper absolute inset-x-0 top-0 h-28 bg-gradient-to-b via-paper/40 to-transparent" />
-        <div className="from-paper absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t via-paper/50 to-transparent" />
+        <div className="from-paper absolute inset-y-0 left-0 w-[44%] bg-gradient-to-r via-paper/40 to-transparent" />
+        <div className="from-paper absolute inset-x-0 top-0 h-32 bg-gradient-to-b via-paper/30 to-transparent" />
+        <div className="from-paper absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t via-paper/35 to-transparent" />
       </div>
 
       {header ? <div className="relative z-20">{header}</div> : null}
@@ -82,7 +82,7 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
         <div className="storefront-hero-photo-mobile relative h-32 overflow-hidden">
           <Image
             alt="Whitebird pistachio cake in the studio"
-            className="object-cover object-[60%_50%]"
+            className="object-cover object-[64%_46%]"
             fill
             priority
             sizes="100vw"

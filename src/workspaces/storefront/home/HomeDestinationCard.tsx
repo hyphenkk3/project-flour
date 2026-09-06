@@ -5,14 +5,14 @@ export type HomeDestinationTone = "blush" | "sage" | "linen";
 export type HomeDestinationCta = "ink" | "soft";
 
 const TONE_CLASS: Record<HomeDestinationTone, string> = {
-  blush: "bg-[#f3dfd0]",
-  sage: "bg-[#dce5db]",
-  linen: "bg-[#e7e4d4]",
+  blush: "bg-[#F2DED0]",
+  sage: "bg-[#E1E6DC]",
+  linen: "bg-[#E9E5DA]",
 };
 
 const CTA_CLASS: Record<HomeDestinationCta, string> = {
   ink: "bg-ink text-paper",
-  soft: "border-ink/10 bg-paper/80 text-ink",
+  soft: "border-ink/10 bg-[#F6F1E8] text-ink",
 };
 
 type HomeDestinationCardProps = {
