@@ -257,6 +257,12 @@ assert.match(homeSrc, /desktopRail=\{false\}/);
 assert.match(homeSrc, /HomeHero/);
 assert.match(homeSrc, /HomeFeaturedFreshPick/);
 assert.match(homeSrc, /HomePopularCakes/);
+assert.doesNotMatch(homeSrc, /whitebird-homepage-hero/);
+
+const homeHeroSrc = readSrc("src/workspaces/storefront/home/HomeHero.tsx");
+assert.match(homeHeroSrc, /\/storefront\/whitebird-homepage-hero\.jpg/);
+assert.doesNotMatch(homeHeroSrc, /listHomepagePopularCakes/);
+assert.doesNotMatch(homeHeroSrc, /listStorefrontAvailableExtra/);
 
 const freshCardSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontFreshPicksCard.tsx",

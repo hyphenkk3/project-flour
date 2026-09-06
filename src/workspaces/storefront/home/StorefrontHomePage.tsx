@@ -31,20 +31,8 @@ export async function StorefrontHomePage() {
     : null;
   const extraPhotos = picks.filter((pick) => pick.imageUrl);
   const popularWithPhotos = popular.filter((cake) => cake.image);
-  const heroImage =
-    featured?.imageUrl ?? extraPhotos[0]?.imageUrl ?? popularWithPhotos[0]?.image ?? null;
-  const heroAlt =
-    featured?.imageAlt ||
-    featured?.cakeName ||
-    extraPhotos[0]?.imageAlt ||
-    popularWithPhotos[0]?.name ||
-    null;
-  const orderPhoto =
-    extraPhotos.find((pick) => pick.imageUrl !== heroImage) ?? extraPhotos[0] ?? null;
-  const browseCake =
-    popularWithPhotos.find((cake) => cake.image !== heroImage) ??
-    popularWithPhotos[0] ??
-    null;
+  const orderPhoto = extraPhotos[0] ?? null;
+  const browseCake = popularWithPhotos[0] ?? null;
 
   return (
     <main className="bg-paper min-h-dvh overflow-x-clip">
@@ -76,11 +64,7 @@ export async function StorefrontHomePage() {
         </div>
       </header>
 
-      <HomeHero
-        imageAlt={heroAlt}
-        imageUrl={heroImage}
-        orderPanel={<HomeOrderSummary />}
-      />
+      <HomeHero orderPanel={<HomeOrderSummary />} />
 
       <section className="px-6 pb-8 sm:px-10 sm:pb-9">
         <div className="mx-auto w-full max-w-6xl">
