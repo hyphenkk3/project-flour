@@ -6,43 +6,19 @@ import {
 } from "@/workspaces/storefront/StorefrontBrand";
 import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
 import { listStorefrontAvailableExtra } from "@/workspaces/storefront/extra/queries";
+import { HomeDestinationCard } from "@/workspaces/storefront/home/HomeDestinationCard";
 import { StorefrontFreshPicksCard } from "@/workspaces/storefront/home/StorefrontFreshPicksCard";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
 
 export const dynamic = "force-dynamic";
 
-type ActionCardProps = {
-  title: string;
-  description: string;
-  actionLabel: string;
-  href: string;
-};
-
-function ActionCard({
-  title,
-  description,
-  actionLabel,
-  href,
-}: ActionCardProps) {
-  return (
-    <article className="border-fog flex h-full flex-col border-t pt-6">
-      <h3 className="font-display text-ink text-2xl tracking-tight">{title}</h3>
-      <p className="text-skyline mt-3 flex-1 text-sm leading-relaxed">
-        {description}
-      </p>
-      <Link
-        className="text-ink hover:text-skyline mt-8 inline-flex min-h-11 items-center text-sm font-medium transition-colors duration-200"
-        href={href}
-      >
-        {actionLabel} →
-      </Link>
-    </article>
-  );
-}
-
 export async function StorefrontHomePage() {
   const picks = await listStorefrontAvailableExtra();
-  const hero = picks.find((pick) => pick.imageUrl) ?? null;
+  const photos = picks.filter((pick) => pick.imageUrl);
+  const hero = photos[0] ?? null;
+  const orderPhoto = photos[1] ?? null;
+  const browsePhoto = photos[2] ?? null;
+  const freshPhoto = photos[0] ?? null;
 
   return (
     <main className="bg-paper min-h-dvh">
@@ -73,47 +49,61 @@ export async function StorefrontHomePage() {
         </div>
       </header>
 
-      <section className="px-6 pt-10 pb-10 sm:px-10 sm:pt-16 sm:pb-14">
-        <div className="mx-auto grid w-full max-w-5xl items-end gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-16">
+      <section className="px-6 pt-7 pb-6 sm:px-10 sm:pt-12 sm:pb-10">
+        <div className="mx-auto grid w-full max-w-5xl items-center gap-5 sm:gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.7fr)] lg:gap-14">
           <div>
             <h1 className="font-display text-ink max-w-xl text-[1.85rem] leading-[1.15] tracking-tight sm:text-5xl">
               Every celebration begins here.
             </h1>
-            <p className="text-skyline mt-4 max-w-lg text-[0.95rem] leading-relaxed sm:mt-6 sm:text-base">
+            <p className="text-skyline mt-3 max-w-lg text-[0.95rem] leading-relaxed sm:mt-5 sm:text-base">
               Whether you&apos;re planning ahead or looking for a cake today,
               we&apos;ll help you find the perfect cake for your celebration.
             </p>
           </div>
           {hero?.imageUrl ? (
-            <div className="bg-fog relative aspect-[4/3] overflow-hidden sm:aspect-[5/4]">
+            <div className="relative h-28 overflow-hidden sm:h-40 lg:h-52">
               <CakePhotoImage
                 alt={hero.imageAlt || hero.cakeName}
                 priority
-                sizes="(min-width: 1024px) 40vw, 100vw"
+                sizes="(min-width: 1024px) 28vw, 50vw"
                 src={hero.imageUrl}
               />
+              <div className="from-paper absolute inset-0 bg-gradient-to-r from-10% to-transparent lg:from-paper lg:via-transparent" />
             </div>
           ) : null}
         </div>
       </section>
 
-      <section className="px-6 pb-16 sm:px-10 sm:pb-20">
+      <section className="px-6 pb-14 sm:px-10 sm:pb-20">
         <div className="mx-auto w-full max-w-5xl">
+          <p className="text-skyline mb-4 text-[11px] font-medium tracking-[0.18em] uppercase sm:mb-6">
+            Preorder · Pickup · WhatsApp
+          </p>
           <PreorderInProgressBar />
-          <div className="grid gap-8 md:grid-cols-3 md:gap-10">
-            <ActionCard
+          <div className="grid gap-3.5 md:grid-cols-3 md:gap-5">
+            <HomeDestinationCard
               actionLabel="Start Ordering"
               description="Choose a monthly collection or Special Menu."
               href="/order"
+              imageAlt={orderPhoto?.imageAlt}
+              imageUrl={orderPhoto?.imageUrl}
               title="Order a Cake"
+              tone="cream"
             />
-            <ActionCard
+            <HomeDestinationCard
               actionLabel="Browse Cakes"
               description="All cakes currently published for Whitebird."
               href="/browse"
+              imageAlt={browsePhoto?.imageAlt}
+              imageUrl={browsePhoto?.imageUrl}
               title="Browse Cakes"
+              tone="blush"
             />
-            <StorefrontFreshPicksCard days={picks.map((pick) => pick.day)} />
+            <StorefrontFreshPicksCard
+              days={picks.map((pick) => pick.day)}
+              imageAlt={freshPhoto?.imageAlt}
+              imageUrl={freshPhoto?.imageUrl}
+            />
           </div>
           <StorefrontStaffSignIn />
         </div>
