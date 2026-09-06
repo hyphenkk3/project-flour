@@ -42,7 +42,7 @@ export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
           return (
             <li className="w-24 shrink-0" key={cake.id}>
               <Link className="group block" href={`/cakes/${cake.id}`}>
-                <div className="relative h-24 w-24 overflow-hidden">
+                <div className="relative h-24 w-24 overflow-hidden rounded-[10px]">
                   {photo?.url ? (
                     <CakePhotoImage
                       alt={photo.altText || cake.name}

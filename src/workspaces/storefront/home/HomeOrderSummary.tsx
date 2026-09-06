@@ -28,7 +28,7 @@ export function HomeOrderSummary() {
   return (
     <aside
       aria-label="Your order"
-      className="border-ink/10 bg-paper/70 hidden w-[12.75rem] rounded-lg border p-4 shadow-[0_6px_28px_rgba(28,25,22,0.06)] md:block lg:w-[14rem] xl:w-[15rem]"
+      className="border-ink/10 bg-paper hidden w-[12.75rem] rounded-lg border p-4 shadow-[0_6px_28px_rgba(28,25,22,0.06)] md:block lg:w-[14rem] xl:w-[15rem]"
     >
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="font-display text-ink text-lg tracking-tight">
