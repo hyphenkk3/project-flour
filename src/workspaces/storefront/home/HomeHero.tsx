@@ -102,29 +102,38 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
       ) : null}
 
       <div className="relative z-10 md:hidden">
-        <div className="relative min-h-[34rem] overflow-hidden">
+        <div className="relative h-[21.5rem] overflow-hidden">
+          <div
+            aria-hidden
+            className="absolute inset-0 bg-no-repeat"
+            style={{
+              backgroundImage: `url(${STOREFRONT_HOMEPAGE_HERO_SRC})`,
+              backgroundPosition: "30% 12%",
+              backgroundSize: "auto 178%",
+            }}
+          />
           <Image
             alt="Whitebird pistachio cake in the studio"
-            className="object-cover object-[64%_52%]"
-            fill
+            className="sr-only"
+            height={887}
             priority
-            sizes="100vw"
             src={STOREFRONT_HOMEPAGE_HERO_SRC}
+            width={1774}
           />
           <div
             aria-hidden
-            className="from-paper/85 absolute inset-y-0 left-0 w-[70%] bg-gradient-to-r via-paper/28 to-transparent"
+            className="from-paper/75 absolute inset-y-0 left-0 z-[1] w-[58%] bg-gradient-to-r via-paper/18 to-transparent"
           />
           <div
             aria-hidden
-            className="from-paper absolute inset-x-0 top-0 h-10 bg-gradient-to-b to-transparent"
+            className="from-paper absolute inset-x-0 top-0 z-[1] h-8 bg-gradient-to-b to-transparent"
           />
           <div
             aria-hidden
-            className="from-paper absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t to-transparent"
+            className="from-paper absolute inset-x-0 bottom-0 z-[1] h-6 bg-gradient-to-t to-transparent"
           />
-          <div className="relative flex min-h-[34rem] px-6 pt-5 pb-5">
-            <div className="flex w-full max-w-[16.5rem] flex-col justify-between">
+          <div className="relative z-[2] flex h-[21.5rem] flex-col px-6 pt-3 pb-4">
+            <div className="w-full max-w-[16.5rem]">
               <HeroCopy
                 headingClass="font-display text-ink mt-1.5 text-[1.85rem] leading-[1.12] tracking-tight"
                 supportingClass="text-skyline mt-2 text-[0.95rem] leading-relaxed"
@@ -132,7 +141,7 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
               <HeroValueCues
                 iconClass="bg-paper/80 text-ink/65 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
                 itemClass="flex min-w-0 flex-col items-center gap-1.5 text-center"
-                listClass="grid grid-cols-3 gap-x-2"
+                listClass="mt-4 grid grid-cols-3 gap-x-2"
               />
             </div>
           </div>
