@@ -23,21 +23,27 @@ type HomeHeroProps = {
 export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
   return (
     <section className="relative overflow-x-clip">
-      <div className="storefront-hero-photo pointer-events-none absolute top-0 right-0 -bottom-6 hidden w-[58%] overflow-hidden md:block lg:w-[64%] xl:w-[68%]">
-        <Image
-          alt=""
-          className="origin-[48%_54%] object-cover object-[48%_54%] scale-[1.04]"
-          fill
-          priority
-          sizes="(min-width: 1280px) 68vw, (min-width: 1024px) 64vw, 58vw"
-          src={STOREFRONT_HOMEPAGE_HERO_SRC}
-        />
-        <div className="from-paper absolute inset-y-0 left-0 w-[46%] bg-gradient-to-r via-paper/40 to-transparent" />
-        <div className="from-paper absolute inset-x-0 top-0 h-52 bg-gradient-to-b to-transparent" />
+      <div
+        aria-hidden
+        className="storefront-hero-photo pointer-events-none absolute top-0 right-0 -bottom-10 hidden bg-paper bg-cover bg-no-repeat md:block w-[90%] lg:w-[84%] xl:w-[80%]"
+        style={{
+          backgroundImage: `url(${STOREFRONT_HOMEPAGE_HERO_SRC})`,
+          backgroundPosition: "48% 52%",
+        }}
+      >
+        <div className="from-paper absolute inset-y-0 left-0 w-[28%] bg-gradient-to-r via-paper/50 to-transparent" />
+        <div className="from-paper absolute inset-y-0 right-0 w-[10%] bg-gradient-to-l to-transparent" />
+        <div className="from-paper absolute inset-x-0 top-0 h-36 bg-gradient-to-b to-transparent" />
         <div className="from-paper absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t to-transparent" />
       </div>
 
       {header ? <div className="relative z-20">{header}</div> : null}
+
+      {orderPanel ? (
+        <div className="pointer-events-auto absolute top-[3.35rem] right-6 z-20 hidden md:block lg:right-10">
+          {orderPanel}
+        </div>
+      ) : null}
 
       <div className="relative z-10 mx-auto w-full max-w-6xl px-6 pt-3 pb-2 sm:px-10 sm:pt-4 sm:pb-3 lg:pt-4 lg:pb-3">
         <div className="max-w-[17.5rem] sm:max-w-[20rem] lg:max-w-[23.5rem]">
@@ -70,14 +76,6 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
             ))}
           </ul>
         </div>
-
-        {orderPanel ? (
-          <div className="pointer-events-auto hidden md:absolute md:inset-x-0 md:top-0 md:z-30 md:block">
-            <div className="mx-auto flex w-full max-w-6xl justify-end px-6 sm:px-10">
-              {orderPanel}
-            </div>
-          </div>
-        ) : null}
       </div>
 
       <div className="relative z-10 mx-auto w-full max-w-6xl px-6 pb-3 sm:px-10 md:hidden">

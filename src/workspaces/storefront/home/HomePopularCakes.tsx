@@ -40,9 +40,9 @@ export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
           const from = startingPrice(cake);
           const preorder = cakeCardPreorderLabel(cake);
           return (
-            <li className="w-[6rem] shrink-0" key={cake.id}>
+            <li className="w-24 shrink-0" key={cake.id}>
               <Link className="group block" href={`/cakes/${cake.id}`}>
-                <div className="relative aspect-square overflow-hidden">
+                <div className="relative h-24 w-24 overflow-hidden">
                   {photo?.url ? (
                     <CakePhotoImage
                       alt={photo.altText || cake.name}

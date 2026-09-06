@@ -62,44 +62,8 @@ html.storefront-canvas {
 }
 
 html.storefront-canvas .storefront-hero-photo {
-  -webkit-mask-image:
-    linear-gradient(
-      to right,
-      transparent 0%,
-      #000 20%,
-      #000 84%,
-      rgba(0, 0, 0, 0.45) 95%,
-      transparent 100%
-    ),
-    linear-gradient(
-      to bottom,
-      transparent 0%,
-      rgba(0, 0, 0, 0.08) 14%,
-      rgba(0, 0, 0, 0.45) 28%,
-      #000 48%,
-      #000 78%,
-      transparent 100%
-    );
-  -webkit-mask-composite: source-in;
-  mask-image:
-    linear-gradient(
-      to right,
-      transparent 0%,
-      #000 20%,
-      #000 84%,
-      rgba(0, 0, 0, 0.45) 95%,
-      transparent 100%
-    ),
-    linear-gradient(
-      to bottom,
-      transparent 0%,
-      rgba(0, 0, 0, 0.08) 14%,
-      rgba(0, 0, 0, 0.45) 28%,
-      #000 48%,
-      #000 78%,
-      transparent 100%
-    );
-  mask-composite: intersect;
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 html.storefront-canvas .storefront-hero-photo-mobile {
