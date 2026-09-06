@@ -23,39 +23,39 @@ type HomeHeroProps = {
 export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
   return (
     <section className="relative overflow-x-clip">
-      <div className="storefront-hero-photo pointer-events-none absolute top-0 right-0 -bottom-8 hidden w-[56%] overflow-hidden md:block lg:w-[60%] xl:w-[62%]">
+      <div className="storefront-hero-photo pointer-events-none absolute top-0 right-0 -bottom-6 hidden w-[58%] overflow-hidden md:block lg:w-[64%] xl:w-[68%]">
         <Image
           alt=""
-          className="origin-[52%_48%] object-cover object-[52%_48%] scale-[1.06]"
+          className="origin-[48%_54%] object-cover object-[48%_54%] scale-[1.04]"
           fill
           priority
-          sizes="(min-width: 1280px) 62vw, (min-width: 1024px) 60vw, 56vw"
+          sizes="(min-width: 1280px) 68vw, (min-width: 1024px) 64vw, 58vw"
           src={STOREFRONT_HOMEPAGE_HERO_SRC}
         />
-        <div className="from-paper absolute inset-y-0 left-0 w-[44%] bg-gradient-to-r via-paper/40 to-transparent" />
-        <div className="from-paper absolute inset-x-0 top-0 h-32 bg-gradient-to-b via-paper/30 to-transparent" />
-        <div className="from-paper absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t via-paper/35 to-transparent" />
+        <div className="from-paper absolute inset-y-0 left-0 w-[46%] bg-gradient-to-r via-paper/40 to-transparent" />
+        <div className="from-paper absolute inset-x-0 top-0 h-52 bg-gradient-to-b to-transparent" />
+        <div className="from-paper absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t to-transparent" />
       </div>
 
       {header ? <div className="relative z-20">{header}</div> : null}
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-6 pt-4 pb-4 sm:px-10 sm:pt-5 sm:pb-5 lg:pt-6 lg:pb-5">
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-6 pt-3 pb-2 sm:px-10 sm:pt-4 sm:pb-3 lg:pt-4 lg:pb-3">
         <div className="max-w-[17.5rem] sm:max-w-[20rem] lg:max-w-[23.5rem]">
           <p className="text-skyline text-[11px] font-medium tracking-[0.18em] uppercase">
             Cakes made with heart
           </p>
-          <h1 className="font-display text-ink mt-2 text-[1.85rem] leading-[1.12] tracking-tight sm:mt-2.5 sm:text-[2.4rem] lg:text-[2.7rem]">
+          <h1 className="font-display text-ink mt-1.5 text-[1.85rem] leading-[1.12] tracking-tight sm:mt-2 sm:text-[2.4rem] lg:text-[2.7rem]">
             Every celebration
             <span className="hidden md:inline">
               <br />
             </span>{" "}
             begins here.
           </h1>
-          <p className="text-skyline mt-2.5 max-w-sm text-[0.95rem] leading-relaxed sm:mt-3">
+          <p className="text-skyline mt-2 max-w-sm text-[0.95rem] leading-relaxed">
             From everyday moments to once-in-a-lifetime celebrations,
             we&apos;re here to make it sweeter.
           </p>
-          <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-2.5 sm:mt-5 sm:gap-x-5 lg:gap-x-7">
+          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 sm:mt-3.5 sm:gap-x-5 lg:gap-x-7">
             {VALUE_CUES.map((cue) => (
               <li className="flex items-center gap-2.5" key={cue.label.join(" ")}>
                 <span className="bg-ink/[0.045] text-ink/65 flex h-8 w-8 shrink-0 items-center justify-center rounded-full sm:h-9 sm:w-9">
@@ -72,8 +72,10 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
         </div>
 
         {orderPanel ? (
-          <div className="pointer-events-auto mt-4 md:absolute md:bottom-4 md:left-10 md:mt-0">
-            {orderPanel}
+          <div className="pointer-events-auto hidden md:absolute md:inset-x-0 md:top-0 md:z-30 md:block">
+            <div className="mx-auto flex w-full max-w-6xl justify-end px-6 sm:px-10">
+              {orderPanel}
+            </div>
           </div>
         ) : null}
       </div>

@@ -31,7 +31,7 @@ export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
           View all →
         </Link>
       </div>
-      <ul className="flex gap-3 overflow-x-auto pb-1">
+      <ul className="flex gap-2.5 overflow-x-auto pb-1">
         {cakes.map((cake) => {
           const size = cake.sizes[0] ?? null;
           const photo =
@@ -40,13 +40,13 @@ export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
           const from = startingPrice(cake);
           const preorder = cakeCardPreorderLabel(cake);
           return (
-            <li className="w-[7rem] shrink-0" key={cake.id}>
+            <li className="w-[6rem] shrink-0" key={cake.id}>
               <Link className="group block" href={`/cakes/${cake.id}`}>
                 <div className="relative aspect-square overflow-hidden">
                   {photo?.url ? (
                     <CakePhotoImage
                       alt={photo.altText || cake.name}
-                      sizes="112px"
+                      sizes="96px"
                       src={photo.url}
                     />
                   ) : (

@@ -40,10 +40,10 @@ export async function StorefrontHomePage() {
       <StorefrontTheme />
       <HomeHero
         header={
-          <header className="px-6 pt-5 sm:px-10 sm:pt-6">
-            <div className="mx-auto flex w-full max-w-6xl items-baseline justify-between gap-4">
+          <header className="px-6 pt-4 sm:px-10 sm:pt-5">
+            <div className="mx-auto flex w-full max-w-6xl items-baseline justify-between gap-4 md:grid md:grid-cols-[1fr_auto_1fr]">
               <p className={storefrontKickerClass}>Whitebird</p>
-              <nav className="text-skyline flex flex-wrap items-center justify-end gap-x-5 gap-y-1 text-sm">
+              <nav className="text-skyline flex flex-wrap items-center justify-end gap-x-5 gap-y-1 text-sm md:justify-center">
                 <Link
                   className="hover:text-ink transition-colors duration-200"
                   href="/order"
@@ -64,13 +64,14 @@ export async function StorefrontHomePage() {
                   Fresh Picks
                 </Link>
               </nav>
+              <span aria-hidden="true" className="hidden md:block" />
             </div>
           </header>
         }
         orderPanel={<HomeOrderSummary />}
       />
 
-      <section className="px-6 pb-4 sm:px-10 sm:pb-5">
+      <section className="px-6 pb-3 sm:px-10 sm:pb-4">
         <div className="mx-auto w-full max-w-6xl">
           <div className="grid gap-3 md:grid-cols-3 md:gap-3.5">
             <HomeDestinationCard
@@ -99,8 +100,8 @@ export async function StorefrontHomePage() {
         </div>
       </section>
 
-      <section className="px-6 pb-10 sm:px-10 sm:pb-11">
-        <div className="border-fog/70 mx-auto grid w-full max-w-6xl gap-6 border-t pt-4 md:grid-cols-[minmax(0,0.37fr)_minmax(0,0.63fr)] md:gap-8">
+      <section className="px-6 pb-9 sm:px-10 sm:pb-10">
+        <div className="border-fog/70 mx-auto grid w-full max-w-6xl gap-5 border-t pt-3 md:grid-cols-[minmax(0,0.37fr)_minmax(0,0.63fr)] md:gap-8">
           <HomeFeaturedFreshPick pick={featured} />
           <HomePopularCakes cakes={popular} />
         </div>

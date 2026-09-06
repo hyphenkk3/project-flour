@@ -5,9 +5,9 @@ export type HomeDestinationTone = "blush" | "sage" | "linen";
 export type HomeDestinationCta = "ink" | "soft";
 
 const TONE_CLASS: Record<HomeDestinationTone, string> = {
-  blush: "bg-[#F2DED0]",
-  sage: "bg-[#E1E6DC]",
-  linen: "bg-[#E9E5DA]",
+  blush: "bg-[#EFD8C6]",
+  sage: "bg-[#D8D6CC]",
+  linen: "bg-[#EBE6D8]",
 };
 
 const CTA_CLASS: Record<HomeDestinationCta, string> = {
