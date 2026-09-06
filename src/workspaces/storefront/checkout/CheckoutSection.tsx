@@ -16,7 +16,7 @@ export function CheckoutSection({
   return (
     <section className={`space-y-5 ${className}`.trim()}>
       <div className="space-y-2">
-        <h2 className="font-display text-ink text-2xl tracking-tight">
+        <h2 className="font-display text-ink text-2xl tracking-tight sm:text-[1.75rem]">
           {title}
         </h2>
         {description ? (

@@ -7,6 +7,7 @@ import {
 } from "@/engines/waiting-list/phone";
 import { cancelGuestWaitingListAction } from "@/workspaces/storefront/waiting-list/actions";
 import { getGuestWaitingListAck } from "@/workspaces/storefront/waiting-list/queries";
+import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
 
 type StorefrontWaitingListAckPageProps = {
   requestId?: string;
@@ -18,7 +19,8 @@ export async function StorefrontWaitingListAckPage({
   const ack = requestId ? await getGuestWaitingListAck(requestId) : null;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-16 sm:px-6">
+    <main className="bg-paper mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-16 sm:px-6">
+      <StorefrontTheme />
       <div className="text-center">
         <h1 className="font-display text-ink text-3xl tracking-tight">
           {WAITING_LIST_ACK_TITLE}
@@ -31,8 +33,8 @@ export async function StorefrontWaitingListAckPage({
       </div>
 
       {ack ? (
-        <section className="border-fog mt-8 rounded-xl border bg-white px-5 py-4 text-left">
-          <p className="text-skyline text-[11px] font-semibold tracking-[0.14em] uppercase">
+        <section className="border-fog mt-8 border-t pt-6 text-left">
+          <p className="text-skyline text-[11px] font-medium tracking-[0.18em] uppercase">
             Waiting-list request
           </p>
           <ul className="mt-3 space-y-2">

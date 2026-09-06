@@ -29,6 +29,8 @@ const CATALOGUE_FILTER_CLASS =
   "max-md:hidden min-w-0 w-full md:w-[7.75rem] md:shrink-0 lg:w-auto lg:min-w-0";
 const CATALOGUE_SORT_CLASS =
   "min-w-0 w-full md:w-[12.5rem] md:shrink-0 lg:w-auto lg:min-w-0";
+const CATALOGUE_LABEL_CLASS =
+  "text-skyline text-[10px] font-medium tracking-[0.18em] uppercase md:text-[11px]";
 const CATALOGUE_SELECT_CLASS =
   "border-fog text-ink focus:border-ink mt-1.5 min-h-11 w-full border-0 border-b bg-transparent py-2 text-sm outline-none md:mt-2";
 const DEFAULT_EMPTY_MESSAGE =
@@ -62,8 +64,7 @@ function FilterFields({
   preorderId,
   layout = "sheet",
 }: FilterFieldsProps) {
-  const selectClass =
-    "border-fog text-ink focus:border-ink mt-1.5 min-h-11 w-full border-0 border-b bg-transparent py-2 text-sm outline-none md:mt-2";
+  const selectClass = CATALOGUE_SELECT_CLASS;
   const itemClass = layout === "toolbar" ? CATALOGUE_FILTER_CLASS : undefined;
 
   const fields = (
@@ -71,7 +72,7 @@ function FilterFields({
       {options.categories.length > 1 ? (
         <div className={itemClass}>
           <label
-            className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase"
+            className={CATALOGUE_LABEL_CLASS}
             htmlFor={categoryId}
           >
             Category
@@ -100,7 +101,7 @@ function FilterFields({
       {options.sizes.length > 1 ? (
         <div className={itemClass}>
           <label
-            className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase"
+            className={CATALOGUE_LABEL_CLASS}
             htmlFor={sizeId}
           >
             Size
@@ -125,7 +126,7 @@ function FilterFields({
       {options.priceRanges.length > 0 ? (
         <div className={itemClass}>
           <label
-            className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase"
+            className={CATALOGUE_LABEL_CLASS}
             htmlFor={priceId}
           >
             Price
@@ -150,7 +151,7 @@ function FilterFields({
       {options.preorderDays.length > 1 ? (
         <div className={itemClass}>
           <label
-            className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase"
+            className={CATALOGUE_LABEL_CLASS}
             htmlFor={preorderId}
           >
             Preorder
@@ -210,7 +211,7 @@ function FilterSheet({
   return (
     <dialog
       aria-labelledby={titleId}
-      className="border-fog bg-mist text-ink w-full max-w-none rounded-t-2xl border p-0 shadow-lg backdrop:bg-ink/40 open:fixed open:inset-x-0 open:bottom-0 open:mt-auto open:mb-0 md:hidden"
+      className="border-fog bg-mist text-ink w-full max-w-none rounded-t-lg border p-0 shadow-none backdrop:bg-ink/40 open:fixed open:inset-x-0 open:bottom-0 open:mt-auto open:mb-0 md:hidden"
       onCancel={(event) => {
         event.preventDefault();
         onClose();
@@ -254,7 +255,7 @@ function FilterSheet({
             </button>
           ) : null}
           <button
-            className="bg-ink text-mist hover:bg-skyline inline-flex min-h-11 flex-1 items-center justify-center rounded-full px-5 text-sm font-medium"
+            className="bg-ink text-mist hover:bg-skyline inline-flex min-h-11 flex-1 items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200"
             onClick={onClose}
             type="button"
           >
@@ -306,7 +307,9 @@ export function BrowseCakeCatalogue({
 
   return (
     <div>
-      <div className={browseToolbarClass(options)}>
+      <div
+        className={`${browseToolbarClass(options)} md:border-fog md:border-b md:pb-5`}
+      >
         <form
           className={CATALOGUE_SEARCH_CLASS}
           onSubmit={(event) => {
@@ -315,7 +318,7 @@ export function BrowseCakeCatalogue({
           role="search"
         >
           <label
-            className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase"
+            className={CATALOGUE_LABEL_CLASS}
             htmlFor={searchId}
           >
             Search
@@ -368,7 +371,7 @@ export function BrowseCakeCatalogue({
           }`}
         >
           <label
-            className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase"
+            className={CATALOGUE_LABEL_CLASS}
             htmlFor={sortId}
           >
             Sort
@@ -389,7 +392,7 @@ export function BrowseCakeCatalogue({
         {showMobileSize ? (
           <div className="min-w-0 md:hidden">
             <label
-              className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase"
+              className={CATALOGUE_LABEL_CLASS}
               htmlFor={`${sizeId}-mobile`}
             >
               Size

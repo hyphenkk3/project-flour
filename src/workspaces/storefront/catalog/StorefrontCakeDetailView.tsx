@@ -33,7 +33,7 @@ export function StorefrontCakeDetailView({
   return (
     <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start lg:gap-10">
       <div className="space-y-3">
-        <div className="border-fog overflow-hidden rounded-2xl border bg-white shadow-sm">
+        <div className="group overflow-hidden">
           <div className="bg-fog aspect-square w-full">
             {hero ? (
               <CakePhotoImage
@@ -41,6 +41,7 @@ export function StorefrontCakeDetailView({
                 priority
                 sizes="(min-width: 1024px) 50vw, 100vw"
                 src={hero.url}
+                zoomOnHover
               />
             ) : (
               <div className="text-skyline flex h-full items-center justify-center text-sm">
@@ -53,7 +54,7 @@ export function StorefrontCakeDetailView({
           <ul className="grid grid-cols-3 gap-3">
             {gallery.map((photo) => (
               <li
-                className="border-fog overflow-hidden rounded-xl border bg-white"
+                className="overflow-hidden"
                 key={photo.id}
               >
                 <div className="bg-fog aspect-square">

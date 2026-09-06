@@ -16,6 +16,10 @@ import { ClearPreorderDraftOnSuccess } from "@/workspaces/storefront/checkout/Cl
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import { getGuestPreorderReceipt } from "@/workspaces/storefront/checkout/receipt";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
+import {
+  storefrontKickerClass,
+} from "@/workspaces/storefront/StorefrontBrand";
+import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
 
 type StorefrontSuccessPageProps = {
   orderId?: string;
@@ -31,10 +35,12 @@ export async function StorefrontSuccessPage({
     flow === FRESH_PICKS_SUCCESS_FLOW || Boolean(receipt?.isFreshPick);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-16 sm:px-6">
+    <main className="bg-paper mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-16 sm:px-6">
       {isFreshPick ? null : <ClearPreorderDraftOnSuccess />}
+      <StorefrontTheme />
       <div className="text-center">
-        <h1 className="font-display text-ink text-3xl tracking-tight">
+        <p className={storefrontKickerClass}>Whitebird</p>
+        <h1 className="font-display text-ink mt-3 text-3xl tracking-tight sm:text-4xl">
           {isFreshPick ? FRESH_PICKS_SUCCESS_TITLE : "Order Received"}
         </h1>
         <p className="text-skyline mt-4 text-base leading-relaxed">
@@ -55,8 +61,8 @@ export async function StorefrontSuccessPage({
       </div>
 
       {receipt ? (
-        <section className="border-fog mt-8 rounded-xl border bg-white px-5 py-4 text-left">
-          <p className="text-skyline text-[11px] font-semibold tracking-[0.14em] uppercase">
+        <section className="border-fog mt-10 border-t pt-8 text-left">
+          <p className="text-skyline text-[11px] font-medium tracking-[0.18em] uppercase">
             Order recap
           </p>
           <ul className="mt-3 space-y-2">
@@ -125,7 +131,7 @@ export async function StorefrontSuccessPage({
             ) : null}
             <div className="flex justify-between gap-4">
               <dt className="text-skyline">Total</dt>
-              <dd className="text-ink text-right font-semibold">
+              <dd className="font-display text-ink text-right text-xl tracking-tight tabular-nums">
                 {formatRm(receipt.total)}
               </dd>
             </div>
@@ -170,13 +176,16 @@ export async function StorefrontSuccessPage({
       <div className="mt-10 text-center">
         {isFreshPick ? (
           <Link
-            className="text-signal text-sm font-medium underline"
+            className="text-ink decoration-fog text-sm font-medium underline underline-offset-4 transition-colors duration-200 hover:text-skyline"
             href="/extra"
           >
             Back to Fresh Picks
           </Link>
         ) : (
-          <Link className="text-signal text-sm font-medium underline" href="/">
+          <Link
+            className="text-ink decoration-fog text-sm font-medium underline underline-offset-4 transition-colors duration-200 hover:text-skyline"
+            href="/"
+          >
             Back to collection
           </Link>
         )}

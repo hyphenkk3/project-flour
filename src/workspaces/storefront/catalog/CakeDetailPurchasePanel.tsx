@@ -67,7 +67,7 @@ export function CakeDetailPurchasePanel({
     <div className="flex flex-col gap-5 lg:gap-6">
       <div>
         {category ? (
-          <p className="text-signal text-[11px] font-semibold tracking-[0.14em] uppercase">
+          <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
             {category}
           </p>
         ) : null}
@@ -83,7 +83,7 @@ export function CakeDetailPurchasePanel({
 
       {cake.sharingGuide?.trim() ? (
         <section>
-          <h2 className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase">
+          <h2 className="text-ink text-[11px] font-medium tracking-[0.16em] uppercase">
             Sharing guide
           </h2>
           <p className="text-skyline mt-1.5 text-sm leading-relaxed whitespace-pre-wrap">
@@ -94,16 +94,16 @@ export function CakeDetailPurchasePanel({
 
       {cake.allergens.length > 0 ? (
         <section>
-          <h2 className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase">
+          <h2 className="text-ink text-[11px] font-medium tracking-[0.16em] uppercase">
             Allergens
           </h2>
           <p className="text-skyline mt-1.5 text-sm">{cake.allergens.join(", ")}</p>
         </section>
       ) : null}
 
-      <section className="border-fog rounded-2xl border bg-white p-4 sm:p-5">
+      <section className="border-fog border-t pt-5">
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-ink text-[11px] font-semibold tracking-[0.14em] uppercase">
+          <h2 className="text-ink text-[11px] font-medium tracking-[0.16em] uppercase">
             Available sizes
           </h2>
           {selectedSize ? (
@@ -121,8 +121,8 @@ export function CakeDetailPurchasePanel({
                   aria-pressed={selected}
                   className={
                     selected
-                      ? "border-ink bg-mist text-ink flex min-h-12 w-full items-center justify-between rounded-xl border-2 px-4 py-2 text-left"
-                      : "border-fog text-ink hover:border-skyline flex min-h-12 w-full items-center justify-between rounded-xl border bg-white px-4 py-2 text-left"
+                      ? "border-ink bg-mist text-ink flex min-h-12 w-full items-center justify-between border px-4 py-2 text-left"
+                      : "border-fog text-ink hover:border-ink flex min-h-12 w-full items-center justify-between border bg-transparent px-4 py-2 text-left"
                   }
                   onClick={() => onSelectedSizeIdChange(size.id)}
                   type="button"
@@ -147,7 +147,7 @@ export function CakeDetailPurchasePanel({
         <p className="text-status-danger text-sm">{availabilityNote}</p>
       ) : null}
 
-      <section className="border-fog rounded-2xl border bg-white px-4 py-4 sm:px-5">
+      <section className="border-fog border-t pt-4">
         <p className="text-ink text-sm leading-relaxed">
           {pickupDateNotice ??
             "Your available cakes depend on your pickup date."}

@@ -31,7 +31,7 @@ assert.match(browseSrc, /Currently published cakes for Whitebird/);
 assert.match(browseSrc, /sm:hidden/);
 assert.match(browseSrc, /hidden sm:inline/);
 assert.match(browseSrc, /Discover cakes currently published for Whitebird/);
-assert.match(browseSrc, /sm:mt-8 sm:text-3xl/);
+assert.match(browseSrc, /sm:mt-8 sm:text-4xl/);
 assert.match(browseSrc, /py-4 sm:px-6 sm:py-10/);
 assert.match(browseSrc, /Prefer a monthly collection or Special Menu/);
 assert.match(browseSrc, /className="mt-8 sm:mt-8"/);
@@ -59,16 +59,14 @@ assert.match(cardSrc, /border-ink/);
 assert.match(cardSrc, /text-ink/);
 assert.match(cardSrc, /text-\[15px\]/);
 assert.match(cardSrc, /font-medium/);
-assert.match(cardSrc, /rounded-xl/);
-assert.match(cardSrc, /sm:bg-ink/);
-assert.match(cardSrc, /sm:text-mist/);
-assert.match(cardSrc, /sm:rounded-full/);
+assert.match(cardSrc, /rounded-md/);
+assert.match(cardSrc, /sm:bg-transparent/);
 assert.match(cardSrc, /sm:text-sm/);
 assert.match(cardSrc, /View cake/);
 assert.match(cardSrc, /overflow-hidden/);
 assert.match(
   addButtonSrc,
-  /inline-flex min-h-11 w-full items-center justify-center rounded-full px-4 text-sm font-medium/,
+  /inline-flex min-h-11 w-full items-center justify-center rounded-md px-4 text-sm font-medium/,
 );
 assert.match(addButtonSrc, /onClick=\{\(\) => setOpen\(true\)\}/);
 assert.match(addButtonSrc, /<AddToOrderSheet/);
@@ -86,7 +84,7 @@ assert.match(cardSrc, /cakeCardPreorderLabel/);
 assert.match(cardSrc, /absolute top-3 left-3/);
 assert.match(cardSrc, /aspect-\[4\/3\]/);
 assert.match(cardSrc, /50vw/);
-assert.match(cardSrc, /sm:rounded-2xl sm:border/);
+assert.doesNotMatch(cardSrc, /sm:rounded-2xl sm:border/);
 assert.match(cardSrc, /sm:block/);
 assert.match(cardSrc, /sm:inline-flex/);
 

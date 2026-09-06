@@ -963,7 +963,7 @@ export function GuestCheckoutForm({
           </p>
         ) : null}
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-signal text-[11px] font-semibold tracking-[0.18em] uppercase">
+          <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
             Selected date
           </p>
           <button
@@ -1543,7 +1543,7 @@ export function GuestCheckoutForm({
 
       <FormActions className="border-fog border-t pt-8 sm:items-center">
         <FormSubmitButton
-          className="w-full rounded-full sm:w-auto"
+          className="w-full rounded-md sm:w-auto"
           disabled={submitBlocked || confirmOpen}
           pending={pending}
           pendingLabel="Submitting…"

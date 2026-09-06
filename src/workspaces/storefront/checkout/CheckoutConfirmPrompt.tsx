@@ -134,7 +134,7 @@ function ConfirmBlock({
 }) {
   return (
     <section className="space-y-1.5">
-      <h3 className="text-skyline text-[11px] font-semibold tracking-[0.14em] uppercase">
+      <h3 className="text-skyline text-[11px] font-medium tracking-[0.16em] uppercase">
         {label}
       </h3>
       <div className="text-ink text-sm leading-relaxed">{children}</div>
@@ -171,16 +171,16 @@ export function CheckoutConfirmPrompt({
   if (!open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-50 animate-storefront-fade">
       <div aria-hidden className="bg-ink/40 absolute inset-0" />
       <div
         aria-labelledby={titleId}
         aria-modal="true"
-        className="border-fog bg-mist text-ink absolute inset-x-0 bottom-0 z-[60] mx-auto flex w-full max-w-md max-h-[min(85dvh,40rem)] flex-col overflow-hidden rounded-t-2xl border shadow-lg md:top-1/2 md:bottom-auto md:left-1/2 md:right-auto md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl"
+        className="border-fog bg-mist text-ink absolute inset-x-0 bottom-0 z-[60] mx-auto flex w-full max-w-md max-h-[min(85dvh,40rem)] flex-col overflow-hidden rounded-t-lg border md:top-1/2 md:bottom-auto md:left-1/2 md:right-auto md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-lg"
         role="dialog"
       >
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-5">
-          <p className="text-signal text-[11px] font-semibold tracking-[0.18em] uppercase">
+          <p className="text-signal text-[11px] font-medium tracking-[0.22em] uppercase">
             Whitebird
           </p>
           <h2
@@ -256,7 +256,7 @@ export function CheckoutConfirmPrompt({
           </p>
           <div className="mt-4 flex flex-col gap-3">
             <button
-              className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-full px-6 text-sm font-medium transition disabled:opacity-60"
+              className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-md px-6 text-sm font-medium transition duration-200 disabled:opacity-60"
               disabled={pending}
               onClick={onConfirm}
               ref={confirmRef}
@@ -265,7 +265,7 @@ export function CheckoutConfirmPrompt({
               {pending ? "Submitting…" : "Confirm Order"}
             </button>
             <button
-              className="text-ink hover:text-skyline inline-flex min-h-12 items-center justify-center rounded-full px-6 text-sm font-medium disabled:opacity-60"
+              className="text-ink hover:text-skyline inline-flex min-h-12 items-center justify-center rounded-md px-6 text-sm font-medium transition-colors duration-200 disabled:opacity-60"
               disabled={pending}
               onClick={onGoBack}
               type="button"

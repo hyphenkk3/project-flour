@@ -25,9 +25,9 @@ export async function StorefrontBrowsePage() {
   ]);
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-5 py-4 sm:px-6 sm:py-10">
+    <main className="bg-paper mx-auto min-h-screen max-w-5xl px-5 py-4 sm:px-6 sm:py-10">
       <StorefrontHomeLink />
-      <h1 className="font-display text-ink mt-3 text-2xl tracking-tight sm:mt-8 sm:text-3xl">
+      <h1 className="font-display text-ink mt-3 text-2xl tracking-tight sm:mt-8 sm:text-4xl">
         Browse Cakes
       </h1>
       <p className="text-skyline mt-1.5 max-w-xl text-sm leading-snug sm:mt-3 sm:text-[0.95rem] sm:leading-relaxed">
@@ -42,7 +42,7 @@ export async function StorefrontBrowsePage() {
       </p>
       <p className="mt-1.5 sm:mt-3">
         <Link
-          className="text-ink hover:text-skyline text-sm font-medium"
+          className="text-ink hover:text-skyline text-sm font-medium transition-colors duration-200"
           href="/order"
         >
           Prefer a monthly collection or Special Menu? Choose a collection →
@@ -79,10 +79,10 @@ export async function StorefrontBrowsePage() {
               const period = catalogueHistoryPeriodLabel(menu);
               return (
                 <li
-                  className="border-fog rounded-3xl border bg-white px-6 py-6"
+                  className="border-fog border-b py-6"
                   key={menu.id}
                 >
-                  <p className="text-signal text-[11px] font-semibold tracking-[0.14em] uppercase">
+                  <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
                     {PAST_MENU_LABEL}
                   </p>
                   <h3 className="font-display text-ink mt-2 text-xl tracking-tight">

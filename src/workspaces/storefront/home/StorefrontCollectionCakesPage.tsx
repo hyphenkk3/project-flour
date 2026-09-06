@@ -137,7 +137,7 @@ export async function StorefrontCollectionCakesPage({
         );
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-5 py-4 sm:px-6 sm:py-10">
+    <main className="bg-paper mx-auto min-h-screen max-w-5xl px-5 py-4 sm:px-6 sm:py-10">
       <StorefrontHomeLink />
       <Link
         className="text-skyline hover:text-ink mt-3 inline-block text-sm font-medium sm:mt-6"
@@ -179,7 +179,7 @@ export async function StorefrontCollectionCakesPage({
 
       <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3">
         <Link
-          className="bg-ink text-mist hover:bg-skyline inline-flex min-h-11 items-center justify-center rounded-full px-5 text-sm font-medium"
+          className="bg-ink text-mist hover:bg-skyline inline-flex min-h-11 items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200"
           href={checkoutHref}
         >
           Continue to preorder

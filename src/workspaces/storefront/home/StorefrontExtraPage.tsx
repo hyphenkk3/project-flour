@@ -16,7 +16,7 @@ export async function StorefrontExtraPage() {
   const picks = await listStorefrontAvailableExtra();
 
   return (
-    <main className="bg-mist min-h-screen">
+    <main className="bg-paper min-h-screen">
       <div className="mx-auto max-w-3xl px-6 py-10 sm:px-10">
         <StorefrontHomeLink />
         <h1 className="font-display text-ink mt-8 text-3xl tracking-tight sm:text-4xl">
@@ -28,7 +28,7 @@ export async function StorefrontExtraPage() {
         </p>
 
         {picks.length === 0 ? (
-          <section className="border-fog mt-10 rounded-3xl border bg-white px-6 py-10">
+          <section className="border-fog mt-10 border-t pt-8">
             <h2 className="text-ink text-lg font-medium tracking-tight">
               No Fresh Picks right now
             </h2>
@@ -40,9 +40,9 @@ export async function StorefrontExtraPage() {
           <ul className="mt-10 space-y-4">
             {picks.map((pick) => (
               <li key={pick.id}>
-                <article className="border-fog grid overflow-hidden rounded-3xl border bg-white md:grid-cols-[minmax(0,1fr)_13rem]">
-                  <div className="order-2 flex flex-col justify-center px-6 py-6 md:order-1 sm:px-7">
-                    <p className="text-signal text-[11px] font-semibold tracking-[0.14em] uppercase">
+                <article className="border-fog grid overflow-hidden border-t md:grid-cols-[minmax(0,1fr)_13rem]">
+                  <div className="order-2 flex flex-col justify-center py-6 pr-0 md:order-1 md:pr-8">
+                    <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
                       {freshPickAvailabilityLabel(pick.day)}
                     </p>
                     <h2 className="font-display text-ink mt-2 text-2xl tracking-tight">
@@ -50,7 +50,7 @@ export async function StorefrontExtraPage() {
                     </h2>
                     <p className="text-skyline mt-1 text-sm">{pick.sizeLabel}</p>
                     <Link
-                      className="bg-ink text-mist hover:bg-skyline mt-6 inline-flex min-h-11 w-fit items-center justify-center rounded-full px-5 text-sm font-medium"
+                      className="bg-ink text-mist hover:bg-skyline mt-6 inline-flex min-h-11 w-fit items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200"
                       href={`/extra/${pick.id}`}
                     >
                       {FRESH_PICKS_ORDER_CTA}

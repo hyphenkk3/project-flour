@@ -97,12 +97,12 @@ export function AddToOrderSheet({
   if (!open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-50 animate-storefront-fade">
       <div aria-hidden className="bg-ink/40 absolute inset-0" />
       <div
         aria-labelledby={titleId}
         aria-modal="true"
-        className="border-fog bg-mist text-ink absolute inset-x-0 bottom-0 z-[60] max-h-[100dvh] w-full overflow-y-auto rounded-t-2xl border shadow-lg md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:max-w-md md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl"
+        className="border-fog bg-mist text-ink absolute inset-x-0 bottom-0 z-[60] max-h-[100dvh] w-full overflow-y-auto rounded-t-lg border md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:max-w-md md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-lg"
         role="dialog"
       >
       <form
@@ -114,7 +114,7 @@ export function AddToOrderSheet({
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-signal text-[11px] font-semibold tracking-[0.18em] uppercase">
+            <p className="text-signal text-[11px] font-medium tracking-[0.22em] uppercase">
               Add to Order
             </p>
             <h2
@@ -134,7 +134,7 @@ export function AddToOrderSheet({
           </button>
         </div>
 
-        <div className="bg-fog aspect-[4/3] overflow-hidden rounded-xl">
+        <div className="bg-fog aspect-[4/3] overflow-hidden">
           {photo ? (
             <CakePhotoImage
               alt={photo.altText || cake.name}
@@ -161,8 +161,8 @@ export function AddToOrderSheet({
                     <label
                       className={
                         selectedSize
-                          ? "border-ink bg-white flex cursor-pointer items-center justify-between gap-3 rounded-xl border-2 px-4 py-3"
-                          : "border-fog bg-white hover:border-skyline flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-4 py-3"
+                          ? "border-ink bg-mist flex cursor-pointer items-center justify-between gap-3 border px-4 py-3"
+                          : "border-fog bg-transparent hover:border-ink flex cursor-pointer items-center justify-between gap-3 border px-4 py-3"
                       }
                     >
                       <span className="min-w-0">
@@ -203,7 +203,7 @@ export function AddToOrderSheet({
           >
             <button
               aria-label="Decrease quantity"
-              className="border-fog text-ink inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border bg-white text-lg disabled:opacity-40"
+              className="text-ink inline-flex min-h-11 min-w-11 items-center justify-center text-lg disabled:opacity-40"
               disabled={quantity <= 1}
               onClick={() => setQuantity((value) => Math.max(1, value - 1))}
               type="button"
@@ -218,7 +218,7 @@ export function AddToOrderSheet({
             </span>
             <button
               aria-label="Increase quantity"
-              className="border-fog text-ink inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border bg-white text-lg"
+              className="text-ink inline-flex min-h-11 min-w-11 items-center justify-center text-lg"
               onClick={() => setQuantity((value) => Math.min(99, value + 1))}
               type="button"
             >
@@ -228,7 +228,7 @@ export function AddToOrderSheet({
         </div>
 
         <button
-          className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full items-center justify-center rounded-full px-5 text-sm font-medium disabled:opacity-50"
+          className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200 disabled:opacity-50"
           disabled={!selected}
           type="submit"
         >
@@ -242,7 +242,7 @@ export function AddToOrderSheet({
 }
 
 const defaultAddToOrderButtonClassName =
-  "bg-ink text-mist hover:bg-skyline inline-flex min-h-11 w-full items-center justify-center rounded-full px-4 text-sm font-medium disabled:opacity-50";
+  "bg-ink text-mist hover:bg-skyline inline-flex min-h-11 w-full items-center justify-center rounded-md px-4 text-sm font-medium transition duration-200 disabled:opacity-50";
 
 type AddToOrderButtonProps = {
   cake: StorefrontCake;

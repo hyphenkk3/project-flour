@@ -33,7 +33,7 @@ export async function StorefrontCakeDetail({
     /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to);
 
   return (
-    <main className="bg-mist mx-auto min-h-screen max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
+    <main className="bg-paper mx-auto min-h-screen max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
       <StorefrontHomeLink />
 
       <PreorderInProgressBar />

@@ -63,7 +63,7 @@ export function JoinWaitingListForm({
   if (lines.length === 0) return null;
 
   return (
-    <section className="border-fog space-y-4 rounded-2xl border bg-white px-4 py-5">
+    <section className="border-fog space-y-4 border-t pt-5">
       <div>
         <h2 className="text-ink text-sm font-semibold tracking-tight">
           {WAITING_LIST_JOIN_CTA}

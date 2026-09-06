@@ -48,7 +48,7 @@ export async function StorefrontPastMenuPage({
   const period = catalogueHistoryPeriodLabel(historical);
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-5 py-10 sm:px-6">
+    <main className="bg-paper mx-auto min-h-screen max-w-5xl px-5 py-10 sm:px-6">
       <StorefrontHomeLink />
       <Link
         className="text-skyline hover:text-ink mt-6 inline-block text-sm font-medium"
@@ -56,7 +56,7 @@ export async function StorefrontPastMenuPage({
       >
         ← Browse cakes
       </Link>
-      <p className="text-signal mt-6 text-[11px] font-semibold tracking-[0.14em] uppercase">
+      <p className="text-signal mt-6 text-[11px] font-medium tracking-[0.18em] uppercase">
         {PAST_MENU_LABEL}
       </p>
       <h1 className="font-display text-ink mt-2 text-4xl tracking-tight">

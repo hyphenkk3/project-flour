@@ -26,11 +26,11 @@ export async function StorefrontExtraOrderPage({
   const hoursSnapshot = await loadOperatingHoursSnapshot();
 
   return (
-    <main className="bg-mist min-h-screen">
+    <main className="bg-paper min-h-screen">
       <div className="mx-auto max-w-3xl px-6 py-10 sm:px-10">
         <StorefrontHomeLink />
         {!extra ? (
-          <section className="border-fog mt-10 rounded-3xl border bg-white px-6 py-10">
+          <section className="border-fog mt-10 border-t pt-8">
             <h1 className="font-display text-ink text-3xl tracking-tight">
               {FRESH_PICKS_SOLD_OUT}
             </h1>
@@ -45,7 +45,7 @@ export async function StorefrontExtraOrderPage({
           </section>
         ) : (
           <>
-            <p className="text-signal mt-8 text-[11px] font-semibold tracking-[0.14em] uppercase">
+            <p className="text-signal mt-8 text-[11px] font-medium tracking-[0.18em] uppercase">
               {freshPickAvailabilityLabel(extra.day)}
             </p>
             <h1 className="font-display text-ink mt-2 text-3xl tracking-tight sm:text-4xl">
@@ -53,7 +53,7 @@ export async function StorefrontExtraOrderPage({
             </h1>
             <p className="text-skyline mt-1 text-sm">{extra.sizeLabel}</p>
             {extra.imageUrl ? (
-              <div className="border-fog mt-6 aspect-[4/3] overflow-hidden rounded-3xl border">
+              <div className="bg-fog mt-6 aspect-[4/3] overflow-hidden">
                 <CakePhotoImage
                   alt={extra.imageAlt || extra.cakeName}
                   priority

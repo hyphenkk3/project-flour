@@ -54,7 +54,7 @@ function OrderLines({
           <li className="py-5" key={`${item.cakeId}::${item.sizeId}`}>
             <div className="flex items-start gap-3">
               {item.imageUrl ? (
-                <div className="bg-fog relative h-14 w-14 shrink-0 overflow-hidden rounded-lg">
+                <div className="bg-fog relative h-14 w-14 shrink-0 overflow-hidden">
                   <CakePhotoImage
                     alt=""
                     sizes="56px"
@@ -64,20 +64,22 @@ function OrderLines({
               ) : (
                 <div
                   aria-hidden
-                  className="bg-fog h-14 w-14 shrink-0 rounded-lg"
+                  className="bg-fog h-14 w-14 shrink-0"
                 />
               )}
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-ink font-medium">{item.cakeName}</p>
+                    <p className="font-display text-ink text-[1.05rem] leading-snug tracking-tight">
+                      {item.cakeName}
+                    </p>
                     {showSizeEditor ? (
                       <>
                         <label className="sr-only" htmlFor={sizeSelectId}>
                           {item.cakeName} size
                         </label>
                         <select
-                          className="border-fog text-ink mt-1 w-full max-w-[11rem] rounded-lg border bg-white px-2 py-1.5 text-sm"
+                          className="border-fog text-ink mt-1 w-full max-w-[11rem] border-0 border-b bg-transparent py-1.5 text-sm outline-none"
                           id={sizeSelectId}
                           onChange={(event) => {
                             const next = sizeChoices.find(
@@ -101,7 +103,7 @@ function OrderLines({
                       </p>
                     )}
                     {preorder ? (
-                      <p className="text-ink mt-1.5 text-[11px] font-semibold tracking-[0.14em] uppercase">
+                      <p className="text-skyline mt-1.5 text-[11px] font-medium tracking-[0.16em] uppercase">
                         {preorder}
                       </p>
                     ) : null}
@@ -122,7 +124,7 @@ function OrderLines({
                   >
                     <button
                       aria-label={`Decrease ${item.cakeName} quantity`}
-                      className="border-fog text-ink inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border bg-white text-base disabled:opacity-40"
+                      className="text-ink inline-flex min-h-10 min-w-10 items-center justify-center text-lg disabled:opacity-40"
                       disabled={item.quantity <= 1}
                       onClick={() =>
                         setDraftLineQuantity(
@@ -140,7 +142,7 @@ function OrderLines({
                     </span>
                     <button
                       aria-label={`Increase ${item.cakeName} quantity`}
-                      className="border-fog text-ink inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border bg-white text-base"
+                      className="text-ink inline-flex min-h-10 min-w-10 items-center justify-center text-lg"
                       onClick={() =>
                         setDraftLineQuantity(
                           item.cakeId,
@@ -199,7 +201,7 @@ function OrderSummary({
     <div className="space-y-5">
       <dl className="space-y-3 text-sm">
         <div>
-          <dt className="text-skyline text-[11px] font-semibold tracking-[0.14em] uppercase">
+          <dt className="text-skyline text-[11px] font-medium tracking-[0.16em] uppercase">
             Collection date
           </dt>
           <dd className="text-ink mt-1 font-medium">
@@ -207,7 +209,7 @@ function OrderSummary({
           </dd>
         </div>
         <div>
-          <dt className="text-skyline text-[11px] font-semibold tracking-[0.14em] uppercase">
+          <dt className="text-skyline text-[11px] font-medium tracking-[0.16em] uppercase">
             Earliest collection
           </dt>
           <dd className="text-ink mt-1 font-medium">
@@ -216,7 +218,7 @@ function OrderSummary({
         </div>
         {strongest.label ? (
           <div>
-            <dt className="text-skyline text-[11px] font-semibold tracking-[0.14em] uppercase">
+            <dt className="text-skyline text-[11px] font-medium tracking-[0.16em] uppercase">
               Preorder
             </dt>
             <dd
@@ -250,7 +252,7 @@ function OrderSummary({
             </p>
           ) : null}
           <Link
-            className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full items-center justify-center rounded-full px-5 text-sm font-medium"
+            className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200"
             href={checkoutHref}
             onClick={onContinue}
           >
@@ -273,7 +275,7 @@ function OrderSummary({
           ) : null}
           {checkoutBlocked ? (
             <button
-              className="bg-ink text-mist inline-flex min-h-12 w-full items-center justify-center rounded-full px-5 text-sm font-medium opacity-40"
+              className="bg-ink text-mist inline-flex min-h-12 w-full items-center justify-center rounded-md px-5 text-sm font-medium opacity-40"
               disabled
               type="button"
             >
@@ -281,7 +283,7 @@ function OrderSummary({
             </button>
           ) : (
             <Link
-              className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full items-center justify-center rounded-full px-5 text-sm font-medium"
+              className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200"
               href={checkoutHref}
               onClick={onContinue}
             >
@@ -395,13 +397,13 @@ export function StorefrontCartShell() {
 
       <button
         aria-label={`${itemLabel}, ${formatRm(total)}. View order.`}
-        className="border-fog bg-ink text-mist fixed right-0 bottom-0 left-0 z-40 flex min-h-14 items-center justify-between gap-3 border-t px-4 text-sm md:hidden"
+        className="border-fog bg-mist text-ink fixed right-0 bottom-0 left-0 z-40 flex min-h-14 items-center justify-between gap-3 border-t px-4 text-sm md:hidden"
         onClick={() => setOpen(true)}
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
         type="button"
       >
         <span className="font-medium">
-          🛒 {itemLabel} · {formatRm(total)}
+          {itemLabel} · {formatRm(total)}
         </span>
         <span className="font-medium">View Order →</span>
       </button>
@@ -412,7 +414,7 @@ export function StorefrontCartShell() {
             <div className="md:hidden">
               <div
                 aria-hidden
-                className="bg-ink/40 fixed inset-0 z-50"
+                className="bg-ink/40 animate-storefront-fade fixed inset-0 z-50"
                 onClick={() => setOpen(false)}
               />
               <div
@@ -465,7 +467,7 @@ export function StorefrontCartShell() {
           role="complementary"
         >
           <div className="px-6 pt-8">
-            <p className="text-signal text-[11px] font-semibold tracking-[0.18em] uppercase">
+            <p className="text-signal text-[11px] font-medium tracking-[0.22em] uppercase">
               Whitebird
             </p>
             <h2

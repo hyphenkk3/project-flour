@@ -47,7 +47,7 @@ export function CheckoutOrderSummary({
 }: CheckoutOrderSummaryProps) {
   return (
     <aside className="lg:sticky lg:top-8">
-      <p className="text-signal text-[11px] font-semibold tracking-[0.18em] uppercase">
+      <p className="text-signal text-[11px] font-medium tracking-[0.22em] uppercase">
         Whitebird
       </p>
       <h2 className="font-display text-ink mt-2 text-3xl tracking-tight">
@@ -219,7 +219,7 @@ export function CheckoutOrderSummary({
 
       <dl className="border-fog mt-6 space-y-3 border-t pt-5 text-sm">
         <div>
-          <dt className="text-skyline text-[11px] font-semibold tracking-[0.14em] uppercase">
+          <dt className="text-skyline text-[11px] font-medium tracking-[0.16em] uppercase">
             Collection date
           </dt>
           <dd className="text-ink mt-1 font-medium">
@@ -227,14 +227,14 @@ export function CheckoutOrderSummary({
           </dd>
         </div>
         <div>
-          <dt className="text-skyline text-[11px] font-semibold tracking-[0.14em] uppercase">
+          <dt className="text-skyline text-[11px] font-medium tracking-[0.16em] uppercase">
             Earliest collection
           </dt>
           <dd className="text-ink mt-1 font-medium">{earliestLabel ?? "—"}</dd>
         </div>
         {preorderLabel ? (
           <div>
-            <dt className="text-skyline text-[11px] font-semibold tracking-[0.14em] uppercase">
+            <dt className="text-skyline text-[11px] font-medium tracking-[0.16em] uppercase">
               Preorder
             </dt>
             <dd className="text-ink mt-1 text-[11px] font-semibold tracking-[0.14em] uppercase">

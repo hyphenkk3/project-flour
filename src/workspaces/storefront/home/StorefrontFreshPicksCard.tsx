@@ -20,15 +20,8 @@ export function StorefrontFreshPicksCard({
   const empty = count <= 0;
 
   return (
-    <article
-      className={[
-        "flex h-full flex-col rounded-3xl border p-7 transition duration-200",
-        empty
-          ? "border-fog/80 bg-white/80"
-          : "border-fog hover:border-signal/40 bg-white",
-      ].join(" ")}
-    >
-      <h3 className="text-ink text-xl font-medium tracking-tight">
+    <article className="border-fog flex h-full flex-col border-t pt-6">
+      <h3 className="font-display text-ink text-2xl tracking-tight">
         Fresh Picks
       </h3>
       <p className="text-skyline mt-3 flex-1 text-sm leading-relaxed">
@@ -37,16 +30,16 @@ export function StorefrontFreshPicksCard({
       <p
         className={[
           "mt-4 text-sm",
-          empty ? "text-skyline" : "text-ink font-medium",
+          empty ? "text-skyline" : "text-ink",
         ].join(" ")}
       >
         {summary}
       </p>
       <Link
-        className="border-ink/15 text-ink hover:border-ink/40 mt-8 inline-flex min-h-11 items-center justify-center rounded-full border bg-white px-5 text-sm font-medium transition"
+        className="text-ink hover:text-skyline mt-8 inline-flex min-h-11 items-center text-sm font-medium transition-colors duration-200"
         href="/extra"
       >
-        View Fresh Picks
+        View Fresh Picks →
       </Link>
     </article>
   );

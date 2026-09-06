@@ -8,6 +8,8 @@ type CakePhotoImageProps = {
   className?: string;
   sizes: string;
   priority?: boolean;
+  /** Desktop-only, reduced-motion-safe photo lift. */
+  zoomOnHover?: boolean;
 };
 
 function canOptimizeRemote(src: string): boolean {
@@ -30,13 +32,23 @@ export function CakePhotoImage({
   className,
   sizes,
   priority = false,
+  zoomOnHover = false,
 }: CakePhotoImageProps) {
+  const imageClass = [
+    "object-cover",
+    zoomOnHover
+      ? "transition duration-700 ease-out motion-reduce:transition-none md:group-hover:scale-[1.035]"
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div className={["relative h-full w-full", className].filter(Boolean).join(" ")}>
       {canOptimizeRemote(src) ? (
         <Image
           alt={alt}
-          className="object-cover"
+          className={imageClass}
           fill
           priority={priority}
           sizes={sizes}
@@ -46,7 +58,7 @@ export function CakePhotoImage({
         // eslint-disable-next-line @next/next/no-img-element
         <img
           alt={alt}
-          className="h-full w-full object-cover"
+          className={`h-full w-full ${imageClass}`}
           loading={priority ? "eager" : "lazy"}
           src={src}
         />

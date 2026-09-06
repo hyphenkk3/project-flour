@@ -30,9 +30,9 @@ function optionClass(available: boolean, selected: boolean): string {
     return "border-fog bg-fog/40 text-skyline cursor-not-allowed";
   }
   if (selected) {
-    return "border-[var(--color-signal)] bg-white text-ink";
+    return "border-[var(--color-signal)] bg-mist text-ink";
   }
-  return "border-fog bg-white text-ink";
+  return "border-fog bg-transparent text-ink";
 }
 
 export function FulfilmentMethodChooser({

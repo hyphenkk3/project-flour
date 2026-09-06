@@ -87,7 +87,7 @@ export async function StorefrontCheckoutPage({
       : [];
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-5 py-10 sm:px-6">
+    <main className="bg-paper mx-auto min-h-screen max-w-5xl px-5 py-10 sm:px-6">
       <StorefrontHomeLink />
       <h1 className="sr-only">Your Order</h1>
       <p className="text-skyline mt-8 max-w-xl text-[0.95rem] leading-relaxed">

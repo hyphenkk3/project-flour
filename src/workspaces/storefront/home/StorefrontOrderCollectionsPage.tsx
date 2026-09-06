@@ -38,7 +38,7 @@ function CollectionChoiceCard({
   cta,
 }: CollectionChoiceCardProps) {
   return (
-    <li className="border-fog rounded-3xl border bg-white px-6 py-6">
+    <li className="border-fog border-b py-6">
       <h3 className="font-display text-ink text-xl tracking-tight sm:text-2xl">
         {title}
       </h3>
@@ -77,7 +77,7 @@ export async function StorefrontOrderCollectionsPage() {
   ]);
 
   return (
-    <main className="mx-auto min-h-screen max-w-xl px-5 py-10 sm:px-6">
+    <main className="bg-paper mx-auto min-h-screen max-w-xl px-5 py-10 sm:px-6">
       <StorefrontHomeLink />
       <h1 className="font-display text-ink mt-8 text-3xl tracking-tight">
         Choose your collection
