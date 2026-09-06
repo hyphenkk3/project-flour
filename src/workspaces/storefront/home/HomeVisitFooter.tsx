@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { storefrontKickerClass } from "@/workspaces/storefront/StorefrontBrand";
 import { WhatsAppMark } from "@/workspaces/storefront/home/HomeMarks";
 import {
@@ -18,31 +17,7 @@ export function HomeVisitFooter() {
 
   return (
     <section className="px-6 pb-2 sm:px-10">
-      <div className="border-fog/70 mx-auto grid w-full max-w-6xl gap-6 border-t pt-5 md:grid-cols-3 md:gap-8">
-        <div>
-          <p className={storefrontKickerClass}>FAQ</p>
-          <Link className={`${linkClass} mt-2`} href="/faq">
-            Common questions
-            <span aria-hidden="true">→</span>
-          </Link>
-        </div>
-
-        {whatsappHref ? (
-          <div>
-            <p className={storefrontKickerClass}>WhatsApp Us</p>
-            <a
-              className={`${linkClass} mt-2`}
-              href={whatsappHref}
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              <WhatsAppMark className="h-3.5 w-3.5" />
-              Chat with us on WhatsApp
-              <span aria-hidden="true">→</span>
-            </a>
-          </div>
-        ) : null}
-
+      <div className="border-fog/70 mx-auto grid w-full max-w-6xl items-start gap-8 border-t pt-5 md:grid-cols-2 md:gap-16">
         {addressLines.length > 0 || mapsHref ? (
           <div>
             <p className={storefrontKickerClass}>Find Us</p>
@@ -65,6 +40,22 @@ export function HomeVisitFooter() {
                 <span aria-hidden="true">→</span>
               </a>
             ) : null}
+          </div>
+        ) : null}
+
+        {whatsappHref ? (
+          <div>
+            <p className={storefrontKickerClass}>WhatsApp Us</p>
+            <a
+              className={`${linkClass} mt-2`}
+              href={whatsappHref}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              <WhatsAppMark className="h-3.5 w-3.5" />
+              Chat with us on WhatsApp
+              <span aria-hidden="true">→</span>
+            </a>
           </div>
         ) : null}
       </div>

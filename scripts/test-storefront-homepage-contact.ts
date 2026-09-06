@@ -46,24 +46,33 @@ assert.match(homeSrc, /listStorefrontAvailableExtra/);
 assert.match(homeSrc, /StorefrontFreshPicksCard/);
 assert.match(homeSrc, /HomeVisitFooter/);
 assert.match(homeSrc, /days=\{picks\.map\(\(pick\) => pick\.day\)\}/);
+assert.match(homeSrc, /href="\/faq"/);
+assert.match(
+  homeSrc,
+  /href="\/extra"[\s\S]*Fresh Picks[\s\S]*href="\/faq"[\s\S]*FAQ/,
+);
 
 const footerSrc = readSrc("src/workspaces/storefront/home/HomeVisitFooter.tsx");
-assert.match(footerSrc, /href="\/faq"/);
+assert.doesNotMatch(footerSrc, /href="\/faq"/);
+assert.doesNotMatch(footerSrc, />FAQ</);
 assert.match(footerSrc, /storefrontWhatsAppHref/);
 assert.match(footerSrc, /storefrontMapsHref/);
 assert.match(footerSrc, /Chat with us on WhatsApp|WhatsApp Us/);
 assert.match(footerSrc, /Get Directions/);
+assert.match(footerSrc, /Find Us/);
+assert.match(footerSrc, /md:grid-cols-2/);
+assert.match(footerSrc, /items-start/);
+assert.doesNotMatch(footerSrc, /md:grid-cols-3/);
 assert.doesNotMatch(footerSrc, /wa\.me\/\d+/);
 
 assert.equal(STOREFRONT_WHATSAPP_PHONE, "+60128730060");
 assert.equal(normalizeMalaysiaWhatsAppPhone(STOREFRONT_WHATSAPP_PHONE), "60128730060");
 assert.equal(storefrontWhatsAppHref(), "https://wa.me/60128730060");
 assert.deepEqual(STOREFRONT_ADDRESS_LINES, [
-  "Lot 36, 2nd floor, Block D",
-  "Damai Plaza, PH1",
-  "Luyang Commercial Centre",
-  "88300 Kota Kinabalu, Sabah",
+  "Lot 36, 2nd floor, Block D, Damai Plaza, PH1",
+  "Luyang Commercial Centre, 88300 Kota Kinabalu, Sabah",
 ]);
+assert.equal(STOREFRONT_ADDRESS_LINES.length, 2);
 assert.equal(
   STOREFRONT_MAPS_URL,
   "https://maps.app.goo.gl/q2R4E6PiSKZTDgBZ8?hl=en",

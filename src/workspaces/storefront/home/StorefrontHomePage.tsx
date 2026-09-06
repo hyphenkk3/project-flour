@@ -64,6 +64,12 @@ export async function StorefrontHomePage() {
                 >
                   Fresh Picks
                 </Link>
+                <Link
+                  className="hover:text-ink transition-colors duration-200"
+                  href="/faq"
+                >
+                  FAQ
+                </Link>
               </nav>
               <span aria-hidden="true" className="hidden md:block" />
             </div>

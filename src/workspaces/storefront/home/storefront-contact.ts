@@ -12,10 +12,8 @@ export const STOREFRONT_LOCATION_NAME = "Whitebird";
  * Official street address lines.
  */
 export const STOREFRONT_ADDRESS_LINES: readonly string[] = [
-  "Lot 36, 2nd floor, Block D",
-  "Damai Plaza, PH1",
-  "Luyang Commercial Centre",
-  "88300 Kota Kinabalu, Sabah",
+  "Lot 36, 2nd floor, Block D, Damai Plaza, PH1",
+  "Luyang Commercial Centre, 88300 Kota Kinabalu, Sabah",
 ];
 
 /**
