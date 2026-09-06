@@ -102,13 +102,13 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
       ) : null}
 
       <div className="relative z-10 md:hidden">
-        <div className="relative h-[21.5rem] overflow-hidden">
+        <div className="relative h-[18.5rem] overflow-hidden">
           <div
             aria-hidden
             className="absolute inset-0 bg-no-repeat"
             style={{
               backgroundImage: `url(${STOREFRONT_HOMEPAGE_HERO_SRC})`,
-              backgroundPosition: "30% 12%",
+              backgroundPosition: "30% 20%",
               backgroundSize: "auto 178%",
             }}
           />
@@ -130,9 +130,9 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
           />
           <div
             aria-hidden
-            className="from-paper absolute inset-x-0 bottom-0 z-[1] h-6 bg-gradient-to-t to-transparent"
+            className="from-paper absolute inset-x-0 bottom-0 z-[1] h-5 bg-gradient-to-t to-transparent"
           />
-          <div className="relative z-[2] flex h-[21.5rem] flex-col px-6 pt-3 pb-4">
+          <div className="relative z-[2] flex h-[18.5rem] flex-col px-6 pt-3 pb-3">
             <div className="w-full max-w-[16.5rem]">
               <HeroCopy
                 headingClass="font-display text-ink mt-1.5 text-[1.85rem] leading-[1.12] tracking-tight"
