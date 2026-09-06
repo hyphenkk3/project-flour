@@ -90,6 +90,19 @@ export function BrowseMark({ className }: HomeMarkProps) {
   );
 }
 
+export function WhatsAppMark({ className }: HomeMarkProps) {
+  return (
+    <Mark className={className}>
+      <path
+        d="M7.2 16.6 6 19l2.6-.8A7.2 7.2 0 1 0 7.2 16.6Z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.4"
+      />
+    </Mark>
+  );
+}
+
 export function SparkMark({ className }: HomeMarkProps) {
   return (
     <Mark className={className}>

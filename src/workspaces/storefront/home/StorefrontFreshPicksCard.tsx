@@ -31,7 +31,7 @@ export function StorefrontFreshPicksCard({
         <p
           className={[
             "mt-1 line-clamp-1 text-xs",
-            empty ? "text-skyline" : "text-ink",
+            empty ? "text-skyline/80" : "text-ink",
           ].join(" ")}
         >
           {summary}
@@ -41,6 +41,7 @@ export function StorefrontFreshPicksCard({
       icon={icon}
       title="Fresh Picks"
       tone="linen"
+      unavailable={empty}
     />
   );
 }

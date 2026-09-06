@@ -20,6 +20,7 @@ import {
 } from "@/workspaces/storefront/home/HomeMarks";
 import { HomeOrderSummary } from "@/workspaces/storefront/home/HomeOrderSummary";
 import { HomePopularCakes } from "@/workspaces/storefront/home/HomePopularCakes";
+import { HomeVisitFooter } from "@/workspaces/storefront/home/HomeVisitFooter";
 import { StorefrontFreshPicksCard } from "@/workspaces/storefront/home/StorefrontFreshPicksCard";
 
 export const dynamic = "force-dynamic";
@@ -106,6 +107,8 @@ export async function StorefrontHomePage() {
           <HomePopularCakes cakes={popular} />
         </div>
       </section>
+
+      <HomeVisitFooter />
 
       <div className="px-6 sm:px-10">
         <div className="mx-auto w-full max-w-6xl">
