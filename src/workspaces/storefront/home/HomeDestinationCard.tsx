@@ -49,7 +49,7 @@ export function HomeDestinationCard({
   return (
     <article className="h-[10.25rem] md:h-[11.5rem]">
       <Link
-        className={`group border-ink/10 relative flex h-full overflow-hidden rounded-lg border transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink/30 ${colors.surface}`}
+        className={`group border-ink/10 relative flex h-full overflow-hidden rounded-md border shadow-[0_1px_8px_rgba(28,25,22,0.04)] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink/30 ${colors.surface}`}
         href={href}
       >
         {hasImage && imageUrl ? (

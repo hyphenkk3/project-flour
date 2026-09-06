@@ -37,7 +37,7 @@ export async function StorefrontHomePage() {
   return (
     <main className="bg-paper min-h-dvh overflow-x-clip">
       <StorefrontTheme />
-      <header className="px-6 pt-5 sm:px-10 sm:pt-6">
+      <header className="relative z-20 px-6 pt-5 sm:px-10 sm:pt-6">
         <div className="mx-auto flex w-full max-w-6xl items-baseline justify-between gap-4">
           <p className={storefrontKickerClass}>Whitebird</p>
           <nav className="text-skyline flex flex-wrap items-center justify-end gap-x-5 gap-y-1 text-sm">
@@ -96,8 +96,12 @@ export async function StorefrontHomePage() {
         </div>
       </section>
 
-      <HomeFeaturedFreshPick pick={featured} />
-      <HomePopularCakes cakes={popular} />
+      <section className="px-6 pb-14 sm:px-10 sm:pb-16">
+        <div className="border-fog/80 mx-auto grid w-full max-w-6xl gap-8 border-t pt-6 md:grid-cols-[minmax(0,0.38fr)_minmax(0,0.62fr)] md:gap-10 lg:gap-12">
+          <HomeFeaturedFreshPick pick={featured} />
+          <HomePopularCakes cakes={popular} />
+        </div>
+      </section>
 
       <div className="px-6 sm:px-10">
         <div className="mx-auto w-full max-w-6xl">

@@ -10,72 +10,67 @@ type HomeFeaturedFreshPickProps = {
 export function HomeFeaturedFreshPick({ pick }: HomeFeaturedFreshPickProps) {
   if (!pick) {
     return (
-      <section className="px-6 pb-8 sm:px-10 sm:pb-10">
-        <div className="border-fog/80 mx-auto w-full max-w-6xl border-t pt-5">
-          <h2 className="font-display text-ink text-xl tracking-tight sm:text-2xl">
-            Today&apos;s Fresh Pick
-          </h2>
-          <p className="text-skyline mt-1.5 max-w-lg text-sm leading-relaxed">
-            Fresh Picks are currently unavailable. Check back later.
-          </p>
-        </div>
-      </section>
+      <div>
+        <h2 className="font-display text-ink text-xl tracking-tight sm:text-2xl">
+          Today&apos;s Fresh Pick
+        </h2>
+        <p className="text-skyline mt-1.5 text-sm leading-relaxed">
+          Fresh Picks are currently unavailable. Check back later.
+        </p>
+      </div>
     );
   }
 
   const isToday = pick.day === "today";
 
   return (
-    <section className="px-6 pb-8 sm:px-10 sm:pb-10">
-      <div className="mx-auto w-full max-w-6xl">
-        <div className="mb-3 flex items-baseline justify-between gap-3 sm:mb-4">
-          <h2 className="font-display text-ink text-xl tracking-tight sm:text-2xl">
-            {isToday ? "Today's Fresh Pick" : "Fresh Pick"}
-          </h2>
+    <div>
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <h2 className="font-display text-ink text-xl tracking-tight sm:text-2xl">
+          Today&apos;s Fresh Pick
+        </h2>
+        {isToday ? (
           <p className="text-skyline text-[11px] font-medium tracking-[0.18em] uppercase">
-            {isToday ? "New" : pick.availabilityLabel}
+            New
           </p>
-        </div>
-        <article className="grid md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] md:items-center md:gap-8 lg:gap-12">
-          <div className="relative aspect-[5/4] overflow-hidden md:aspect-auto md:min-h-[15.5rem] lg:min-h-[17.5rem]">
-            {pick.imageUrl ? (
-              <>
-                <CakePhotoImage
-                  alt={pick.imageAlt || pick.cakeName}
-                  sizes="(min-width: 768px) 50vw, 100vw"
-                  src={pick.imageUrl}
-                />
-                <div className="from-paper absolute inset-y-0 right-0 hidden w-1/4 bg-gradient-to-l to-transparent md:block" />
-              </>
-            ) : (
-              <div className="text-skyline flex h-full min-h-[11rem] items-center justify-center px-4 text-center text-sm">
-                Photo coming soon
-              </div>
-            )}
-          </div>
-          <div className="pt-3 md:pt-0">
-            <h3 className="font-display text-ink text-[1.65rem] leading-tight tracking-tight sm:text-3xl">
-              {pick.cakeName}
-            </h3>
-            <p className="text-skyline mt-1 text-sm">{pick.sizeLabel}</p>
-            <p className="text-skyline mt-3 max-w-sm text-sm leading-relaxed">
-              {pick.availabilityLabel}. Limited quantity, available for pickup
-              during the stated window.
-            </p>
-            {pick.unitPrice != null ? (
-              <p className="text-ink mt-3 tabular-nums">
-                {formatRm(pick.unitPrice)}
-              </p>
-            ) : null}
-            <Link
-              className="text-ink hover:text-skyline mt-4 inline-flex min-h-11 items-center text-sm font-medium"
-              href={`/extra/${pick.id}`}
-            >
-              View Details →
-            </Link>
-          </div>
-        </article>
+        ) : (
+          <p className="text-skyline text-[11px] font-medium tracking-[0.14em] uppercase">
+            {pick.availabilityLabel}
+          </p>
+        )}
       </div>
-    </section>
+      <article>
+        <div className="relative aspect-[4/3] overflow-hidden">
+          {pick.imageUrl ? (
+            <CakePhotoImage
+              alt={pick.imageAlt || pick.cakeName}
+              sizes="(min-width: 768px) 28vw, 100vw"
+              src={pick.imageUrl}
+            />
+          ) : (
+            <div className="text-skyline flex h-full min-h-[9rem] items-center justify-center px-4 text-center text-sm">
+              Photo coming soon
+            </div>
+          )}
+        </div>
+        <h3 className="font-display text-ink mt-3 text-xl leading-tight tracking-tight">
+          {pick.cakeName}
+        </h3>
+        <p className="text-skyline mt-0.5 text-sm">{pick.sizeLabel}</p>
+        <p className="text-skyline mt-2 line-clamp-2 text-sm leading-relaxed">
+          {pick.availabilityLabel}. Limited quantity, available for pickup
+          during the stated window.
+        </p>
+        {pick.unitPrice != null ? (
+          <p className="text-ink mt-2 tabular-nums">{formatRm(pick.unitPrice)}</p>
+        ) : null}
+        <Link
+          className="text-ink hover:text-skyline mt-3 inline-flex min-h-11 items-center text-sm font-medium"
+          href={`/extra/${pick.id}`}
+        >
+          View Details →
+        </Link>
+      </article>
+    </div>
   );
 }
