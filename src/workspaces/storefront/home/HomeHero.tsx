@@ -49,7 +49,7 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
         </div>
       ) : null}
 
-      <div className="relative z-10 px-6 pt-3 pb-2 sm:px-10 sm:pt-4 sm:pb-3 lg:pt-4 lg:pb-3">
+      <div className="relative z-10 px-6 pt-3 pb-2 sm:px-10 sm:pt-4 sm:pb-3 md:pb-6 lg:pt-4">
         <div className="mx-auto w-full max-w-6xl">
           <div className="max-w-[17.5rem] sm:max-w-[20rem] lg:max-w-[23.5rem]">
             <p className="text-skyline text-[11px] font-medium tracking-[0.18em] uppercase">
@@ -66,7 +66,7 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
               From everyday moments to once-in-a-lifetime celebrations,
               we&apos;re here to make it sweeter.
             </p>
-            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 sm:mt-3.5 sm:gap-x-5 lg:gap-x-7">
+            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 sm:mt-3.5 sm:gap-x-5 md:mt-6.5 lg:gap-x-7">
               {VALUE_CUES.map((cue) => (
                 <li className="flex items-center gap-2.5" key={cue.label.join(" ")}>
                   <span className="bg-ink/[0.045] text-ink/65 flex h-8 w-8 shrink-0 items-center justify-center rounded-full sm:h-9 sm:w-9">

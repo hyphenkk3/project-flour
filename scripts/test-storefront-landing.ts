@@ -261,6 +261,11 @@ assert.doesNotMatch(homeSrc, /whitebird-homepage-hero/);
 
 const homeHeroSrc = readSrc("src/workspaces/storefront/home/HomeHero.tsx");
 assert.match(homeHeroSrc, /\/storefront\/whitebird-homepage-hero\.jpg/);
+assert.match(
+  homeHeroSrc,
+  /gap-x-4 gap-y-2 sm:mt-3\.5 sm:gap-x-5 md:mt-6\.5 lg:gap-x-7/,
+);
+assert.match(homeHeroSrc, /sm:pb-3 md:pb-6/);
 assert.doesNotMatch(homeHeroSrc, /listHomepagePopularCakes/);
 assert.doesNotMatch(homeHeroSrc, /listStorefrontAvailableExtra/);
 

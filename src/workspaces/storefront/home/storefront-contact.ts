@@ -8,6 +8,10 @@ export const STOREFRONT_WHATSAPP_PHONE = "+60128730060";
 /** Display name for the Find Us block. */
 export const STOREFRONT_LOCATION_NAME = "Whitebird";
 
+/** Short wayfinding note under the location name. */
+export const STOREFRONT_LOCATION_LANDMARK =
+  "Access via Hyphen, above Orange Convenience Store";
+
 /**
  * Official street address lines.
  */

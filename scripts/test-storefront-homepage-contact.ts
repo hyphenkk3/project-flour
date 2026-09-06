@@ -12,6 +12,7 @@ import { normalizeMalaysiaWhatsAppPhone } from "@/engines/orders/whatsapp";
 import {
   STOREFRONT_ADDRESS_LINES,
   STOREFRONT_FAQ_ITEMS,
+  STOREFRONT_LOCATION_LANDMARK,
   STOREFRONT_MAPS_URL,
   STOREFRONT_WHATSAPP_PHONE,
   storefrontMapsHref,
@@ -60,6 +61,7 @@ assert.match(footerSrc, /storefrontMapsHref/);
 assert.match(footerSrc, /Chat with us on WhatsApp|WhatsApp Us/);
 assert.match(footerSrc, /Get Directions/);
 assert.match(footerSrc, /Find Us/);
+assert.match(footerSrc, /STOREFRONT_LOCATION_LANDMARK/);
 assert.match(footerSrc, /md:grid-cols-2/);
 assert.match(footerSrc, /items-start/);
 assert.doesNotMatch(footerSrc, /md:grid-cols-3/);
@@ -68,6 +70,10 @@ assert.doesNotMatch(footerSrc, /wa\.me\/\d+/);
 assert.equal(STOREFRONT_WHATSAPP_PHONE, "+60128730060");
 assert.equal(normalizeMalaysiaWhatsAppPhone(STOREFRONT_WHATSAPP_PHONE), "60128730060");
 assert.equal(storefrontWhatsAppHref(), "https://wa.me/60128730060");
+assert.equal(
+  STOREFRONT_LOCATION_LANDMARK,
+  "Access via Hyphen, above Orange Convenience Store",
+);
 assert.deepEqual(STOREFRONT_ADDRESS_LINES, [
   "Lot 36, 2nd floor, Block D, Damai Plaza, PH1",
   "Luyang Commercial Centre, 88300 Kota Kinabalu, Sabah",

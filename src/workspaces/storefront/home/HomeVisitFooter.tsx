@@ -2,6 +2,7 @@ import { storefrontKickerClass } from "@/workspaces/storefront/StorefrontBrand";
 import { WhatsAppMark } from "@/workspaces/storefront/home/HomeMarks";
 import {
   STOREFRONT_ADDRESS_LINES,
+  STOREFRONT_LOCATION_LANDMARK,
   STOREFRONT_LOCATION_NAME,
   storefrontMapsHref,
   storefrontWhatsAppHref,
@@ -24,8 +25,14 @@ export function HomeVisitFooter() {
             <p className="font-display text-ink mt-2 text-lg tracking-tight">
               {STOREFRONT_LOCATION_NAME}
             </p>
-            {addressLines.map((line) => (
-              <p className="text-skyline mt-1 text-sm leading-relaxed" key={line}>
+            <p className="text-skyline mt-0.5 text-sm leading-relaxed">
+              {STOREFRONT_LOCATION_LANDMARK}
+            </p>
+            {addressLines.map((line, index) => (
+              <p
+                className={`text-skyline text-sm leading-relaxed ${index === 0 ? "mt-2" : "mt-1"}`}
+                key={line}
+              >
                 {line}
               </p>
             ))}
