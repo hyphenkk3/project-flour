@@ -69,7 +69,9 @@ assert.match(
   /items\.length > 0 && collectionDateInvalid/,
 );
 
-assert.match(formSrc, /WAITING_LIST_NAME_HELP/);
+assert.match(formSrc, /CUSTOMER_NAME_HELP/);
+assert.match(formSrc, /CUSTOMER_NAME_SPACE_HINT/);
+assert.doesNotMatch(formSrc, /WAITING_LIST_NAME_HELP/);
 assert.match(formSrc, /WAITING_LIST_WHATSAPP_NOTE/);
 assert.equal(
   WAITING_LIST_NAME_HELP,

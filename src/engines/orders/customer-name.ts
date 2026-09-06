@@ -4,7 +4,11 @@ export const CUSTOMER_NAME_TITLE_ERROR =
   "Please enter your name without a title.";
 
 export const CUSTOMER_NAME_SURNAME_ERROR =
-  "Please enter your name and surname.";
+  "Please enter your name and surname with a space between them.";
+
+export const CUSTOMER_NAME_HELP = "English / preferred name and surname";
+
+export const CUSTOMER_NAME_SPACE_HINT = "Please leave a space between names.";
 
 const CUSTOMER_NAME_TITLES = new Set([
   "mr",

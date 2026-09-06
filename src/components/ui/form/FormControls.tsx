@@ -29,7 +29,7 @@ export const formStyles = {
 type FormFieldProps = {
   label: string;
   htmlFor?: string;
-  help?: string;
+  help?: ReactNode;
   children: ReactNode;
   className?: string;
 };

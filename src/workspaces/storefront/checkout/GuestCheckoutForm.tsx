@@ -61,10 +61,11 @@ import {
 } from "@/engines/orders/fulfilment";
 import { formatShortBusinessDate } from "@/lib/dates";
 import {
-  WAITING_LIST_NAME_HELP,
-  WAITING_LIST_WHATSAPP_NOTE,
-} from "@/engines/waiting-list/phone";
-import { customerNameValidationError } from "@/engines/orders/customer-name";
+  CUSTOMER_NAME_HELP,
+  CUSTOMER_NAME_SPACE_HINT,
+  customerNameValidationError,
+} from "@/engines/orders/customer-name";
+import { WAITING_LIST_WHATSAPP_NOTE } from "@/engines/waiting-list/phone";
 import {
   buildCheckoutConfirmSnapshot,
   CheckoutConfirmPrompt,
@@ -1432,7 +1433,12 @@ export function GuestCheckoutForm({
         title="Customer Details"
       >
         <FormField
-          help={WAITING_LIST_NAME_HELP}
+          help={
+            <>
+              {CUSTOMER_NAME_HELP}
+              <span className="mt-0.5 block">{CUSTOMER_NAME_SPACE_HINT}</span>
+            </>
+          }
           htmlFor="customer_name"
           label="Name"
         >

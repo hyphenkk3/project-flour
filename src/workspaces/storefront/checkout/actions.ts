@@ -49,6 +49,7 @@ import {
 import type { StorefrontCake, StorefrontCollection } from "@/types/storefront";
 import { createClient } from "@/lib/supabase/server";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
+import { scheduleGuestPreorderCopyEmail } from "@/workspaces/storefront/checkout/guest-preorder-copy-email";
 import {
   cakePickupDateBounds,
   cartExcludedPickupDates,
@@ -485,6 +486,11 @@ export async function submitGuestPreorderAction(
 
   await setGuestPreorderReceiptCookie(orderId);
   scheduleStaffNotificationDispatch();
+  scheduleGuestPreorderCopyEmail({
+    orderId,
+    email,
+    requested: receiptRequested,
+  });
   return { error: null, orderId };
 }
 

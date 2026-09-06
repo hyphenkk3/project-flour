@@ -6,6 +6,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  CUSTOMER_NAME_HELP,
+  CUSTOMER_NAME_SPACE_HINT,
   CUSTOMER_NAME_SURNAME_ERROR,
   CUSTOMER_NAME_TITLE_ERROR,
   customerNameValidationError,
@@ -16,12 +18,17 @@ function readSrc(rel: string): string {
 }
 
 assert.equal(customerNameValidationError("Lim"), CUSTOMER_NAME_SURNAME_ERROR);
+assert.equal(customerNameValidationError("YCWee"), CUSTOMER_NAME_SURNAME_ERROR);
+assert.equal(customerNameValidationError("TanMeiLing"), CUSTOMER_NAME_SURNAME_ERROR);
+assert.equal(customerNameValidationError("JohnLim"), CUSTOMER_NAME_SURNAME_ERROR);
 assert.equal(customerNameValidationError("Mr Lim"), CUSTOMER_NAME_TITLE_ERROR);
 assert.equal(customerNameValidationError("Mdm Lim"), CUSTOMER_NAME_TITLE_ERROR);
 assert.equal(customerNameValidationError("Mr John Lim"), CUSTOMER_NAME_TITLE_ERROR);
 assert.equal(customerNameValidationError("Mrs Lim"), CUSTOMER_NAME_TITLE_ERROR);
 assert.equal(customerNameValidationError("Ms Lim"), CUSTOMER_NAME_TITLE_ERROR);
 assert.equal(customerNameValidationError("Miss Lim"), CUSTOMER_NAME_TITLE_ERROR);
+assert.equal(customerNameValidationError("Miss Tan"), CUSTOMER_NAME_TITLE_ERROR);
+assert.equal(customerNameValidationError("Dr John Lim"), CUSTOMER_NAME_TITLE_ERROR);
 assert.equal(customerNameValidationError("Madam Lim"), CUSTOMER_NAME_TITLE_ERROR);
 assert.equal(customerNameValidationError("Dr Tan"), CUSTOMER_NAME_TITLE_ERROR);
 assert.equal(customerNameValidationError("Prof Tan Wei"), CUSTOMER_NAME_TITLE_ERROR);
@@ -35,10 +42,18 @@ assert.equal(customerNameValidationError("mr. lim"), CUSTOMER_NAME_TITLE_ERROR);
 assert.equal(customerNameValidationError("MDM LIM"), CUSTOMER_NAME_TITLE_ERROR);
 assert.equal(customerNameValidationError("JOHN LIM"), null);
 assert.equal(customerNameValidationError("John Lim"), null);
+assert.equal(customerNameValidationError("YC Wee"), null);
+assert.equal(customerNameValidationError("Mei Ling Tan"), null);
 assert.equal(customerNameValidationError("John Tan"), null);
 assert.equal(customerNameValidationError("Tan Wei Ming"), null);
 assert.equal(customerNameValidationError("Siti Nur"), null);
 assert.equal(customerNameValidationError(""), null);
+assert.equal(CUSTOMER_NAME_HELP, "English / preferred name and surname");
+assert.equal(CUSTOMER_NAME_SPACE_HINT, "Please leave a space between names.");
+assert.equal(
+  CUSTOMER_NAME_SURNAME_ERROR,
+  "Please enter your name and surname with a space between them.",
+);
 
 const formSrc = readSrc("src/workspaces/storefront/checkout/GuestCheckoutForm.tsx");
 const handleSubmitSrc = formSrc.slice(
@@ -49,7 +64,9 @@ assert.match(handleSubmitSrc, /customerNameValidationError/);
 assert.match(handleSubmitSrc, /setNameError\(nameErrorMessage\)/);
 assert.match(handleSubmitSrc, /setConfirmOpen\(true\)/);
 assert.doesNotMatch(handleSubmitSrc, /formAction\(/);
-assert.match(formSrc, /WAITING_LIST_NAME_HELP/);
+assert.match(formSrc, /CUSTOMER_NAME_HELP/);
+assert.match(formSrc, /CUSTOMER_NAME_SPACE_HINT/);
+assert.doesNotMatch(formSrc, /WAITING_LIST_NAME_HELP/);
 assert.match(formSrc, /setNameError\(null\)/);
 
 const actionsSrc = readSrc("src/workspaces/storefront/checkout/actions.ts");
