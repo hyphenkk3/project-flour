@@ -30,7 +30,7 @@ export function StorefrontFreshPicksCard({
       extra={
         <p
           className={[
-            "mt-1.5 line-clamp-1 text-sm",
+            "mt-1 line-clamp-1 text-xs",
             empty ? "text-skyline" : "text-ink",
           ].join(" ")}
         >
@@ -41,7 +41,7 @@ export function StorefrontFreshPicksCard({
       imageAlt={imageAlt}
       imageUrl={imageUrl}
       title="Fresh Picks"
-      tone="sage"
+      tone="linen"
     />
   );
 }

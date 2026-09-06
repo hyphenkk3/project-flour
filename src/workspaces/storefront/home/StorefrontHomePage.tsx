@@ -49,7 +49,7 @@ export async function StorefrontHomePage() {
         </div>
       </header>
 
-      <section className="px-6 pt-7 pb-6 sm:px-10 sm:pt-12 sm:pb-10">
+      <section className="px-6 pt-7 pb-4 sm:px-10 sm:pt-12 sm:pb-8">
         <div className="mx-auto grid w-full max-w-5xl items-center gap-5 sm:gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.7fr)] lg:gap-14">
           <div>
             <h1 className="font-display text-ink max-w-xl text-[1.85rem] leading-[1.15] tracking-tight sm:text-5xl">
@@ -76,11 +76,11 @@ export async function StorefrontHomePage() {
 
       <section className="px-6 pb-14 sm:px-10 sm:pb-20">
         <div className="mx-auto w-full max-w-5xl">
-          <p className="text-skyline mb-4 text-[11px] font-medium tracking-[0.18em] uppercase sm:mb-6">
+          <p className="text-skyline mb-3 text-[11px] font-medium tracking-[0.18em] uppercase sm:mb-5">
             Preorder · Pickup · WhatsApp
           </p>
           <PreorderInProgressBar />
-          <div className="grid gap-3.5 md:grid-cols-3 md:gap-5">
+          <div className="grid gap-3 md:grid-cols-3 md:gap-4">
             <HomeDestinationCard
               actionLabel="Start Ordering"
               description="Choose a monthly collection or Special Menu."
@@ -97,7 +97,7 @@ export async function StorefrontHomePage() {
               imageAlt={browsePhoto?.imageAlt}
               imageUrl={browsePhoto?.imageUrl}
               title="Browse Cakes"
-              tone="blush"
+              tone="sage"
             />
             <StorefrontFreshPicksCard
               days={picks.map((pick) => pick.day)}
