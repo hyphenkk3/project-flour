@@ -369,4 +369,38 @@ assert.deepEqual(
   ["Apple", "Cherry", "Durian", "Elderflower", "Fig"],
 );
 
+const bananaPopular: LibraryCake = {
+  ...banana,
+  showInPopularCakes: true,
+  popularCakesSortOrder: 1,
+};
+const durianPopular: LibraryCake = {
+  ...durian,
+  showInPopularCakes: true,
+  popularCakesSortOrder: 2,
+};
+const catalogueWithPopular = catalogue.map((item) => {
+  if (item.id === "banana") return bananaPopular;
+  if (item.id === "durian") return durianPopular;
+  return item;
+});
+assert.deepEqual(
+  names(filterLibraryCakes(catalogueWithPopular, { popular: "shown" })).sort(
+    (a, b) => a.localeCompare(b, "en"),
+  ),
+  ["Banana", "Durian"],
+);
+assert.equal(
+  names(
+    filterLibraryCakes(catalogueWithPopular, { popular: "not_shown" }),
+  ).includes("Durian"),
+  false,
+);
+assert.equal(
+  filterLibraryCakes(catalogueWithPopular, { popular: "shown" }).every(
+    (item) => item.showInPopularCakes,
+  ),
+  true,
+);
+
 console.log("PASS cake library list sorting and filtering");

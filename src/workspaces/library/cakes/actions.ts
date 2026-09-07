@@ -22,8 +22,10 @@ import {
 } from "@/workspaces/library/labels";
 import { parsePreorderDays } from "@/engines/preorder/lead";
 import {
-  nextPopularCakesSortOrder,
   parsePopularCakesSortOrder,
+  planPopularCakesChange,
+  type PopularCakesPlanItem,
+  type PopularCakesSortable,
 } from "@/engines/menu/homepage-popular-cakes";
 
 async function requireLibraryStaff() {
@@ -148,34 +150,79 @@ async function parseCakeInput(
   };
 }
 
-async function resolvePopularCakesSortOrder(
-  showInPopularCakes: boolean,
-  requestedOrder: number | null,
-  exceptCakeId?: string,
-): Promise<number | null> {
-  if (!showInPopularCakes) return null;
-  if (requestedOrder != null) return requestedOrder;
+const NEW_POPULAR_CAKES_PLAN_ID = "__new_cake__";
+
+function mapPopularCakesRow(row: {
+  id: string;
+  name: string;
+  show_in_popular_cakes?: boolean | null;
+  popular_cakes_sort_order?: number | string | null;
+}): PopularCakesSortable {
+  const rawOrder = row.popular_cakes_sort_order;
+  const order =
+    rawOrder == null || rawOrder === ""
+      ? null
+      : Number(rawOrder);
+  return {
+    id: row.id,
+    name: row.name,
+    showInPopularCakes: row.show_in_popular_cakes === true,
+    popularCakesSortOrder: Number.isInteger(order) ? order : null,
+  };
+}
+
+async function listSelectedPopularCakes(): Promise<PopularCakesSortable[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("library_cakes")
-    .select("id, popular_cakes_sort_order")
+    .select("id, name, show_in_popular_cakes, popular_cakes_sort_order")
     .eq("show_in_popular_cakes", true);
   if (error) {
     throw new Error(error.message);
   }
-  const existing = (
-    (data ?? []) as Array<{
-      id: string;
-      popular_cakes_sort_order: number | string | null;
-    }>
-  )
-    .filter((row) => row.id !== exceptCakeId)
-    .map((row) =>
-      row.popular_cakes_sort_order == null
-        ? null
-        : Number(row.popular_cakes_sort_order),
-    );
-  return nextPopularCakesSortOrder(existing);
+  return ((data ?? []) as Array<Parameters<typeof mapPopularCakesRow>[0]>).map(
+    mapPopularCakesRow,
+  );
+}
+
+async function applyPopularCakesUpdates(
+  updates: readonly PopularCakesPlanItem[],
+  staffId: string,
+  skipCakeId?: string,
+) {
+  const supabase = await createClient();
+  for (const update of updates) {
+    if (update.id === skipCakeId) continue;
+    const { error } = await supabase
+      .from("library_cakes")
+      .update({
+        show_in_popular_cakes: update.showInPopularCakes,
+        popular_cakes_sort_order: update.popularCakesSortOrder,
+        updated_by: staffId,
+      })
+      .eq("id", update.id);
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+}
+
+async function planCakePopularCakes(
+  cake: PopularCakesSortable,
+  showInPopularCakes: boolean,
+  requestedOrder: number | null,
+): Promise<PopularCakesPlanItem[] | string> {
+  const selected = await listSelectedPopularCakes();
+  const plan = planPopularCakesChange({
+    selected,
+    cake,
+    showInPopularCakes,
+    requestedOrder,
+  });
+  if (!plan.ok) {
+    return plan.error;
+  }
+  return plan.updates;
 }
 
 /**
@@ -287,12 +334,22 @@ export async function createCakeAction(
   }
 
   const supabase = await createClient();
-  let popularOrder: number | null;
+  let popularUpdates: PopularCakesPlanItem[];
   try {
-    popularOrder = await resolvePopularCakesSortOrder(
+    const planned = await planCakePopularCakes(
+      {
+        id: NEW_POPULAR_CAKES_PLAN_ID,
+        name: parsed.name,
+        showInPopularCakes: false,
+        popularCakesSortOrder: null,
+      },
       parsed.showInPopularCakes,
       parsed.popularCakesSortOrder,
     );
+    if (typeof planned === "string") {
+      return { error: planned };
+    }
+    popularUpdates = planned;
   } catch (orderError) {
     return {
       error:
@@ -301,6 +358,9 @@ export async function createCakeAction(
           : "Could not save Popular Cakes order.",
     };
   }
+  const thisCakePlan = popularUpdates.find(
+    (update) => update.id === NEW_POPULAR_CAKES_PLAN_ID,
+  );
   const { data, error } = await supabase
     .from("library_cakes")
     .insert({
@@ -311,8 +371,8 @@ export async function createCakeAction(
       allergens: parsed.allergens,
       bakery_notes: parsed.bakeryNotes,
       status: parsed.status,
-      show_in_popular_cakes: parsed.showInPopularCakes,
-      popular_cakes_sort_order: popularOrder,
+      show_in_popular_cakes: thisCakePlan?.showInPopularCakes ?? false,
+      popular_cakes_sort_order: thisCakePlan?.popularCakesSortOrder ?? null,
       created_by: staff.id,
       updated_by: staff.id,
     })
@@ -331,6 +391,21 @@ export async function createCakeAction(
         childError instanceof Error
           ? childError.message
           : "Could not save sizes.",
+    };
+  }
+
+  try {
+    await applyPopularCakesUpdates(
+      popularUpdates,
+      staff.id,
+      NEW_POPULAR_CAKES_PLAN_ID,
+    );
+  } catch (orderError) {
+    return {
+      error:
+        orderError instanceof Error
+          ? orderError.message
+          : "Could not save Popular Cakes order.",
     };
   }
 
@@ -354,13 +429,22 @@ export async function updateCakeAction(
   }
 
   const supabase = await createClient();
-  let popularOrder: number | null;
+  let popularUpdates: PopularCakesPlanItem[];
   try {
-    popularOrder = await resolvePopularCakesSortOrder(
+    const planned = await planCakePopularCakes(
+      {
+        id,
+        name: parsed.name,
+        showInPopularCakes: current?.showInPopularCakes ?? false,
+        popularCakesSortOrder: current?.popularCakesSortOrder ?? null,
+      },
       parsed.showInPopularCakes,
       parsed.popularCakesSortOrder,
-      id,
     );
+    if (typeof planned === "string") {
+      return { error: planned };
+    }
+    popularUpdates = planned;
   } catch (orderError) {
     return {
       error:
@@ -369,6 +453,7 @@ export async function updateCakeAction(
           : "Could not save Popular Cakes order.",
     };
   }
+  const thisCakePlan = popularUpdates.find((update) => update.id === id);
   const { error } = await supabase
     .from("library_cakes")
     .update({
@@ -379,8 +464,8 @@ export async function updateCakeAction(
       allergens: parsed.allergens,
       bakery_notes: parsed.bakeryNotes,
       status: parsed.status,
-      show_in_popular_cakes: parsed.showInPopularCakes,
-      popular_cakes_sort_order: popularOrder,
+      show_in_popular_cakes: thisCakePlan?.showInPopularCakes ?? false,
+      popular_cakes_sort_order: thisCakePlan?.popularCakesSortOrder ?? null,
       updated_by: staff.id,
     })
     .eq("id", id);
@@ -400,11 +485,91 @@ export async function updateCakeAction(
     };
   }
 
+  try {
+    await applyPopularCakesUpdates(popularUpdates, staff.id, id);
+  } catch (orderError) {
+    return {
+      error:
+        orderError instanceof Error
+          ? orderError.message
+          : "Could not save Popular Cakes order.",
+    };
+  }
+
   revalidatePath("/library/cakes");
   revalidatePath(`/library/cakes/${id}`);
   revalidatePath(`/library/cakes/${id}/edit`);
   revalidatePath("/");
   redirect(`/library/cakes/${id}`);
+}
+
+export async function updateCakePopularCakesFromLibraryAction(
+  _prev: LibraryActionState,
+  formData: FormData,
+): Promise<LibraryActionState> {
+  const staff = await requireLibraryStaff();
+  const cakeId = String(formData.get("cake_id") ?? "").trim();
+  if (!cakeId) {
+    return { error: "Choose a cake to update Popular Cakes." };
+  }
+
+  const showInPopularCakes =
+    String(formData.get("show_in_popular_cakes") ?? "").trim() === "on";
+  const parsedOrder = showInPopularCakes
+    ? parsePopularCakesSortOrder(
+        String(formData.get("popular_cakes_sort_order") ?? ""),
+      )
+    : null;
+  if (typeof parsedOrder === "string") {
+    return { error: parsedOrder };
+  }
+
+  const current = await getCakeById(cakeId);
+  if (!current) {
+    return { error: "That cake is no longer in the Cake Library." };
+  }
+
+  let updates: PopularCakesPlanItem[];
+  try {
+    const planned = await planCakePopularCakes(
+      {
+        id: current.id,
+        name: current.name,
+        showInPopularCakes: current.showInPopularCakes,
+        popularCakesSortOrder: current.popularCakesSortOrder,
+      },
+      showInPopularCakes,
+      parsedOrder,
+    );
+    if (typeof planned === "string") {
+      return { error: planned };
+    }
+    updates = planned;
+  } catch (orderError) {
+    return {
+      error:
+        orderError instanceof Error
+          ? orderError.message
+          : "Could not save Popular Cakes order.",
+    };
+  }
+
+  try {
+    await applyPopularCakesUpdates(updates, staff.id);
+  } catch (orderError) {
+    return {
+      error:
+        orderError instanceof Error
+          ? orderError.message
+          : "Could not save Popular Cakes order.",
+    };
+  }
+
+  revalidatePath("/library/cakes");
+  revalidatePath(`/library/cakes/${cakeId}`);
+  revalidatePath(`/library/cakes/${cakeId}/edit`);
+  revalidatePath("/");
+  return { error: null };
 }
 
 export async function deleteCakeAction(id: string): Promise<void> {

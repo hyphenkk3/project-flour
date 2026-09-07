@@ -9,12 +9,14 @@ import type { LibraryCake, LibraryCakeStatus } from "@/types/library-cake";
 export type LibraryCakeCategoryFilter = string;
 export type LibraryCakeStatusFilter = LibraryCakeStatus | "all";
 export type LibraryCakePhotoFilter = "all" | "has_photos" | "missing_photos";
+export type LibraryCakePopularFilter = "all" | "shown" | "not_shown";
 
 export type LibraryCakeDirectoryOptions = {
   query?: string;
   category?: LibraryCakeCategoryFilter;
   status?: LibraryCakeStatusFilter;
   photos?: LibraryCakePhotoFilter;
+  popular?: LibraryCakePopularFilter;
   sort?: LibraryCakeSortId;
 };
 
@@ -32,6 +34,7 @@ export function filterLibraryCakes(
   const category = options.category ?? "all";
   const status = options.status ?? "all";
   const photos = options.photos ?? "all";
+  const popular = options.popular ?? "all";
 
   return cakes.filter((cake) => {
     if (category !== "all" && cake.categoryId !== category) {
@@ -44,6 +47,12 @@ export function filterLibraryCakes(
       return false;
     }
     if (photos === "missing_photos" && cakeHasPhotoCoverage(cake)) {
+      return false;
+    }
+    if (popular === "shown" && !cake.showInPopularCakes) {
+      return false;
+    }
+    if (popular === "not_shown" && cake.showInPopularCakes) {
       return false;
     }
     if (!query) {

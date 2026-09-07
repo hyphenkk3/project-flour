@@ -23,12 +23,18 @@ import {
   applyLibraryCakeDirectory,
   type LibraryCakeCategoryFilter,
   type LibraryCakePhotoFilter,
+  type LibraryCakePopularFilter,
   type LibraryCakeStatusFilter,
 } from "@/workspaces/library/cakes/directory-view";
+import { CakePopularCakesControl } from "@/workspaces/library/cakes/CakePopularCakesControl";
 import {
   cakeCategoryOptionLabel,
   sortCakeCategories,
 } from "@/engines/menu/cake-categories";
+import {
+  popularCakesPosition,
+  sortHomepagePopularCakes,
+} from "@/engines/menu/homepage-popular-cakes";
 import {
   LIBRARY_CAKE_STATUSES,
   cakeCategoryLabel,
@@ -120,12 +126,17 @@ function CakeDirectoryThumb({
   );
 }
 
-export function CakeDirectory({ cakes, categories }: CakeDirectoryProps) {
+export function CakeDirectory({
+  cakes,
+  categories,
+  canManage,
+}: CakeDirectoryProps) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<LibraryCakeSortId>(DEFAULT_LIBRARY_CAKE_SORT);
   const [category, setCategory] = useState<LibraryCakeCategoryFilter>("all");
   const [status, setStatus] = useState<LibraryCakeStatusFilter>("all");
   const [photos, setPhotos] = useState<LibraryCakePhotoFilter>("all");
+  const [popular, setPopular] = useState<LibraryCakePopularFilter>("all");
 
   const visible = useMemo(
     () =>
@@ -134,9 +145,14 @@ export function CakeDirectory({ cakes, categories }: CakeDirectoryProps) {
         category,
         status,
         photos,
+        popular,
         sort,
       }),
-    [cakes, query, category, status, photos, sort],
+    [cakes, query, category, status, photos, popular, sort],
+  );
+  const selectedPopular = useMemo(
+    () => sortHomepagePopularCakes(cakes),
+    [cakes],
   );
 
   return (
@@ -148,7 +164,7 @@ export function CakeDirectory({ cakes, categories }: CakeDirectoryProps) {
           placeholder="Search by name or category"
           value={query}
         />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <FormField htmlFor="library-cake-sort" label="Sort">
             <FormSelect
               id="library-cake-sort"
@@ -209,6 +225,19 @@ export function CakeDirectory({ cakes, categories }: CakeDirectoryProps) {
               <option value="missing_photos">Missing photos</option>
             </FormSelect>
           </FormField>
+          <FormField htmlFor="library-cake-popular" label="Popular">
+            <FormSelect
+              id="library-cake-popular"
+              onChange={(event) =>
+                setPopular(event.target.value as LibraryCakePopularFilter)
+              }
+              value={popular}
+            >
+              <option value="all">All</option>
+              <option value="shown">Shown</option>
+              <option value="not_shown">Not shown</option>
+            </FormSelect>
+          </FormField>
         </div>
       </div>
 
@@ -256,6 +285,12 @@ export function CakeDirectory({ cakes, categories }: CakeDirectoryProps) {
                       />
                     </div>
                     <p className="text-skyline mt-2 text-sm">{coverage}</p>
+                    <CakePopularCakesControl
+                      canManage={canManage}
+                      cakeId={cake.id}
+                      position={popularCakesPosition(selectedPopular, cake.id)}
+                      showInPopularCakes={cake.showInPopularCakes}
+                    />
                     <Link
                       className="text-signal hover:text-ink mt-3 inline-flex min-h-11 items-center text-sm font-medium"
                       href={`/library/cakes/${cake.id}`}

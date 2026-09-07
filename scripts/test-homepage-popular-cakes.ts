@@ -10,7 +10,12 @@ import {
   comparePopularCakesOrder,
   nextPopularCakesSortOrder,
   parsePopularCakesSortOrder,
+  planPopularCakesChange,
+  popularCakesPosition,
+  POPULAR_CAKES_MAX_SELECTION,
+  POPULAR_CAKES_MAX_SELECTION_MESSAGE,
   sortHomepagePopularCakes,
+  type PopularCakesSortable,
 } from "@/engines/menu/homepage-popular-cakes";
 import {
   canManageLibrary,
@@ -40,8 +45,11 @@ assert.equal(nextPopularCakesSortOrder([null, 2]), 3);
 assert.equal(parsePopularCakesSortOrder(""), null);
 assert.equal(parsePopularCakesSortOrder("1"), 1);
 assert.equal(parsePopularCakesSortOrder(" 4 "), 4);
+assert.equal(parsePopularCakesSortOrder("5"), 5);
 assert.match(String(parsePopularCakesSortOrder("0")), /whole number/);
 assert.match(String(parsePopularCakesSortOrder("1.5")), /whole number/);
+assert.match(String(parsePopularCakesSortOrder("6")), /1 to 5/);
+assert.equal(POPULAR_CAKES_MAX_SELECTION, 5);
 
 const ordered = sortHomepagePopularCakes([
   {
@@ -127,6 +135,164 @@ assert.deepEqual(sortHomepagePopularCakes([]), []);
 
 assert.equal(comparePopularCakesOrder(missingOrder[0]!, missingOrder[0]!), 0);
 
+function popularCake(
+  id: string,
+  order: number | null,
+  show = true,
+): PopularCakesSortable {
+  return {
+    id,
+    name: id,
+    showInPopularCakes: show,
+    popularCakesSortOrder: order,
+  };
+}
+
+assert.equal(
+  cakeMayBeSelectedForPopularCakes({ status: "seasonal" }),
+  true,
+);
+assert.equal(
+  cakeMayBeSelectedForPopularCakes({ categoryName: "Limited" }),
+  true,
+);
+
+const firstSelect = planPopularCakesChange({
+  selected: [],
+  cake: popularCake("seasonal", null, false),
+  showInPopularCakes: true,
+  requestedOrder: null,
+});
+assert.equal(firstSelect.ok, true);
+if (firstSelect.ok) {
+  assert.deepEqual(firstSelect.updates, [
+    {
+      id: "seasonal",
+      showInPopularCakes: true,
+      popularCakesSortOrder: 1,
+    },
+  ]);
+}
+
+const limitedSelect = planPopularCakesChange({
+  selected: [popularCake("seasonal", 1)],
+  cake: popularCake("limited", null, false),
+  showInPopularCakes: true,
+  requestedOrder: null,
+});
+assert.equal(limitedSelect.ok, true);
+if (limitedSelect.ok) {
+  assert.deepEqual(
+    limitedSelect.updates.map((row) => [row.id, row.popularCakesSortOrder]),
+    [
+      ["seasonal", 1],
+      ["limited", 2],
+    ],
+  );
+}
+
+const selectedFive = [1, 2, 3, 4, 5].map((order) =>
+  popularCake(`cake-${order}`, order),
+);
+const sixth = planPopularCakesChange({
+  selected: selectedFive,
+  cake: popularCake("cake-6", null, false),
+  showInPopularCakes: true,
+  requestedOrder: null,
+});
+assert.equal(sixth.ok, false);
+if (!sixth.ok) {
+  assert.equal(sixth.error, POPULAR_CAKES_MAX_SELECTION_MESSAGE);
+}
+
+const deselectSecond = planPopularCakesChange({
+  selected: [
+    popularCake("a", 1),
+    popularCake("b", 2),
+    popularCake("c", 3),
+  ],
+  cake: popularCake("b", 2),
+  showInPopularCakes: false,
+  requestedOrder: null,
+});
+assert.equal(deselectSecond.ok, true);
+if (deselectSecond.ok) {
+  assert.deepEqual(
+    deselectSecond.updates.map((row) => [
+      row.id,
+      row.showInPopularCakes,
+      row.popularCakesSortOrder,
+    ]),
+    [
+      ["b", false, null],
+      ["a", true, 1],
+      ["c", true, 2],
+    ],
+  );
+}
+
+const moveToFirst = planPopularCakesChange({
+  selected: [
+    popularCake("a", 1),
+    popularCake("b", 2),
+    popularCake("c", 3),
+  ],
+  cake: popularCake("c", 3),
+  showInPopularCakes: true,
+  requestedOrder: 1,
+});
+assert.equal(moveToFirst.ok, true);
+if (moveToFirst.ok) {
+  assert.deepEqual(
+    moveToFirst.updates.map((row) => [row.id, row.popularCakesSortOrder]),
+    [
+      ["c", 1],
+      ["a", 2],
+      ["b", 3],
+    ],
+  );
+}
+
+const resolveDuplicate = planPopularCakesChange({
+  selected: [popularCake("zebra", 1), popularCake("apple", 1)],
+  cake: popularCake("apple", 1),
+  showInPopularCakes: true,
+  requestedOrder: 1,
+});
+assert.equal(resolveDuplicate.ok, true);
+if (resolveDuplicate.ok) {
+  assert.deepEqual(
+    resolveDuplicate.updates.map((row) => [
+      row.id,
+      row.popularCakesSortOrder,
+    ]),
+    [
+      ["apple", 1],
+      ["zebra", 2],
+    ],
+  );
+}
+
+assert.equal(popularCakesPosition(selectedFive, "cake-3"), 3);
+assert.equal(popularCakesPosition(selectedFive, "missing"), null);
+
+const leaveUnselected = planPopularCakesChange({
+  selected: [popularCake("a", 1)],
+  cake: popularCake("b", null, false),
+  showInPopularCakes: false,
+  requestedOrder: null,
+});
+assert.equal(leaveUnselected.ok, true);
+if (leaveUnselected.ok) {
+  assert.deepEqual(leaveUnselected.updates, [
+    {
+      id: "b",
+      showInPopularCakes: false,
+      popularCakesSortOrder: null,
+    },
+  ]);
+}
+
 assert.equal(canManageLibrary("owner"), true);
 assert.equal(canManageLibrary("manager"), true);
 assert.equal(canManageLibrary("bakery"), false);
@@ -140,6 +306,7 @@ assert.match(queriesSrc, /comparePopularCakesOrder/);
 assert.match(queriesSrc, /\.eq\("show_in_popular_cakes", true\)/);
 assert.doesNotMatch(queriesSrc, /HOMEPAGE_POPULAR_CAKE_LIMIT/);
 assert.doesNotMatch(queriesSrc, /HOMEPAGE_POPULAR_SCAN_LIMIT/);
+assert.doesNotMatch(queriesSrc, /POPULAR_CAKES_MAX_SELECTION/);
 assert.doesNotMatch(
   queriesSrc.slice(
     queriesSrc.indexOf("export async function listHomepagePopularCakes"),
@@ -159,10 +326,32 @@ assert.match(actionsSrc, /canManageLibrary/);
 assert.match(actionsSrc, /show_in_popular_cakes/);
 assert.match(actionsSrc, /popular_cakes_sort_order/);
 assert.match(actionsSrc, /revalidatePath\("\/"\)/);
+assert.match(actionsSrc, /updateCakePopularCakesFromLibraryAction/);
+assert.match(actionsSrc, /planPopularCakesChange/);
+assert.match(actionsSrc, /requireLibraryStaff/);
+assert.doesNotMatch(actionsSrc, /owner-id|manager-id|user_id ===/);
 
 const detailSrc = readSrc("src/app/(app)/library/cakes/[id]/page.tsx");
 assert.match(detailSrc, /Popular Cakes/);
 assert.match(detailSrc, /showInPopularCakes/);
+
+const directorySrc = readSrc(
+  "src/workspaces/library/cakes/CakeDirectory.tsx",
+);
+assert.match(directorySrc, /CakePopularCakesControl/);
+assert.match(directorySrc, /canManage/);
+assert.match(directorySrc, /library-cake-popular/);
+assert.match(directorySrc, /sm:grid-cols-2/);
+
+const controlSrc = readSrc(
+  "src/workspaces/library/cakes/CakePopularCakesControl.tsx",
+);
+assert.match(controlSrc, /Show in Popular Cakes/);
+assert.match(controlSrc, /Not shown/);
+assert.match(controlSrc, /Popular · #/);
+assert.match(controlSrc, /updateCakePopularCakesFromLibraryAction/);
+assert.match(controlSrc, /canManage/);
+assert.match(controlSrc, /POPULAR_CAKES_MAX_SELECTION/);
 
 const popularSrc = readSrc(
   "src/workspaces/storefront/home/HomePopularCakes.tsx",

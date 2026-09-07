@@ -6,6 +6,7 @@ import {
   cakeCategoryOptionLabel,
   cakeEditorCategoryOptions,
 } from "@/engines/menu/cake-categories";
+import { POPULAR_CAKES_MAX_SELECTION } from "@/engines/menu/homepage-popular-cakes";
 import {
   FormActions,
   FormCheckbox,
@@ -191,7 +192,7 @@ export function CakeForm({
         />
         {showInPopularCakes ? (
           <FormField
-            help="Lower numbers appear first. Leave blank to place this cake after the current selection."
+            help="Lower numbers appear first. Up to 5 cakes. Leave blank to place this cake after the current selection."
             htmlFor="popular_cakes_sort_order"
             label="Popular Cakes order"
           >
@@ -203,6 +204,7 @@ export function CakeForm({
               }
               id="popular_cakes_sort_order"
               inputMode="numeric"
+              max={POPULAR_CAKES_MAX_SELECTION}
               min={1}
               name="popular_cakes_sort_order"
               placeholder="1"
