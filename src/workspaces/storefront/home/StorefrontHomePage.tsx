@@ -94,7 +94,7 @@ export async function StorefrontHomePage() {
               tone="sage"
             />
             <StorefrontFreshPicksCard
-              days={picks.map((pick) => pick.day)}
+              days={picks.flatMap((pick) => pick.days)}
               icon={<SparkMark className="h-3.5 w-3.5" />}
             />
           </div>

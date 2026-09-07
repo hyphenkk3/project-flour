@@ -33,6 +33,8 @@ assert.match(cardSrc, /cursor-default/);
 assert.match(cardSrc, /role="group"/);
 assert.match(cardSrc, /<Link className=\{cardClass\} href=\{href\}>/);
 assert.match(cardSrc, /h-\[11\.25rem\]/);
+assert.match(cardSrc, /h-\[14\.5rem\]/);
+assert.match(cardSrc, /md:h-\[12rem\]/);
 assert.match(cardSrc, /rounded-\[14px\]/);
 assert.match(cardSrc, /md:rounded-\[10px\]/);
 assert.match(cardSrc, /px-\[18px\] pt-\[18px\] pb-4/);
@@ -42,7 +44,7 @@ assert.doesNotMatch(cardSrc, /shadow-\[0_1px_8px_rgba\(28,25,22,0\.045\)\] sm:/)
 assert.match(cardSrc, /min-h-11/);
 assert.match(cardSrc, /text-\[13px\]/);
 assert.match(cardSrc, /md:min-h-0 md:py-2 md:text-\[12px\]/);
-assert.match(cardSrc, /dense \? "mb-1\.5" : "mb-2\.5"/);
+assert.match(cardSrc, /max-md:min-h-2 max-md:flex-1 md:hidden/);
 
 const freshCardSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontFreshPicksCard.tsx",
@@ -56,6 +58,7 @@ assert.match(freshCardSrc, /homepageFreshPicksHorizon/);
 assert.match(freshCardSrc, /homepageFreshPicksCountCopy/);
 assert.match(freshCardSrc, /homepageFreshPicksDescription/);
 assert.match(freshCardSrc, /mt-2 space-y-0\.5/);
+assert.match(freshCardSrc, /tall/);
 
 const homeSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
 assert.match(homeSrc, /listStorefrontAvailableExtra/);
@@ -66,7 +69,7 @@ assert.doesNotMatch(homeSrc, /HomeFeaturedFreshPick/);
 assert.doesNotMatch(homeSrc, /getStorefrontExtraById/);
 assert.match(homeSrc, /HomePopularCakes/);
 
-assert.match(homeSrc, /days=\{picks\.map\(\(pick\) => pick\.day\)\}/);
+assert.match(homeSrc, /days=\{picks\.flatMap\(\(pick\) => pick\.days\)\}/);
 assert.match(homeSrc, /href="\/faq"/);
 assert.match(homeSrc, /HomeMobileNav/);
 assert.match(

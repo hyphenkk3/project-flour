@@ -36,14 +36,15 @@ export function StorefrontFreshPicksCard({
       actionLabel={empty ? "View Fresh Picks" : "See Fresh Picks"}
       ctaVariant="soft"
       dense
+      tall
       description={description}
       extra={
         empty ? (
-          <p className="text-skyline/80 mt-1 line-clamp-1 text-[11px] leading-tight">
+          <p className="text-skyline/80 mt-2 line-clamp-1 text-[11px] leading-tight md:mt-1">
             {homepageFreshPicksCountCopy(count, horizon)}
           </p>
         ) : (
-          <ul className="text-ink mt-2 space-y-0.5 text-[11px] leading-tight">
+          <ul className="text-ink mt-2 space-y-0.5 text-[11px] leading-tight md:mt-1">
             {availabilityLines.map((line) => (
               <li className="line-clamp-1" key={line}>
                 {line}

@@ -1,9 +1,10 @@
 import {
-  extraActionableFreshPickDay,
+  extraActionableFreshPickDays,
   freshPickAvailabilityLabel,
   freshPickProductDescription,
   isPublishedFreshPick,
   selectCustomerFreshPickOfferings,
+  sortCustomerFreshPicksByAvailabilityDay,
   type FreshPickDay,
 } from "@/engines/extra/customer-fresh-picks";
 import { resolveCakePhoto } from "@/engines/menu/cake-photos";
@@ -30,6 +31,7 @@ export type StorefrontExtraPick = {
   confirmedAt: string | null;
   soldAt: string | null;
   day: FreshPickDay;
+  days: FreshPickDay[];
   availabilityLabel: string;
   imageUrl: string | null;
   imageAlt: string | null;
@@ -75,13 +77,13 @@ function publishedNow(row: ExtraRow, now: Date): boolean {
   });
 }
 
-function dayFromRemainingPickup(
+function daysFromRemainingPickup(
   pickupAvailableFromAt: string | null,
   pickupThroughAt: string | null,
   todayYmd: string,
   now: Date,
-): FreshPickDay | null {
-  return extraActionableFreshPickDay({
+): FreshPickDay[] {
+  return extraActionableFreshPickDays({
     pickupAvailableFromAt,
     orderCutoffAt: pickupThroughAt,
     todayYmd,
@@ -196,12 +198,13 @@ function mapPick(
   unitPrice: number | null,
   description: string | null,
 ): StorefrontExtraPick | null {
-  const day = dayFromRemainingPickup(
+  const days = daysFromRemainingPickup(
     row.pickup_available_from_at,
     row.pickup_through_at,
     todayYmd,
     now,
   );
+  const day = days[0];
   if (!day) return null;
   const photos = row.library_cake_id
     ? (photosByCake.get(row.library_cake_id) ?? [])
@@ -219,7 +222,8 @@ function mapPick(
     confirmedAt: row.confirmed_at,
     soldAt: row.sold_at,
     day,
-    availabilityLabel: freshPickAvailabilityLabel(day),
+    days,
+    availabilityLabel: freshPickAvailabilityLabel(days),
     imageUrl: image?.url ?? null,
     imageAlt: image?.altText ?? null,
     unitPrice,
@@ -270,7 +274,9 @@ export async function listStorefrontAvailableExtra(): Promise<
         ),
       )
       .filter((pick): pick is StorefrontExtraPick => pick != null);
-    return selectCustomerFreshPickOfferings(picks);
+    return sortCustomerFreshPicksByAvailabilityDay(
+      selectCustomerFreshPickOfferings(picks),
+    );
   } catch {
     return [];
   }

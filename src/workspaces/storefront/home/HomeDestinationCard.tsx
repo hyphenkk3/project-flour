@@ -28,6 +28,8 @@ type HomeDestinationCardProps = {
   unavailable?: boolean;
   /** Tighter title/body rhythm so a short summary can sit above the CTA. */
   dense?: boolean;
+  /** Fresh Picks needs room for availability lines without clipping the CTA. */
+  tall?: boolean;
 };
 
 export function HomeDestinationCard({
@@ -41,6 +43,7 @@ export function HomeDestinationCard({
   ctaVariant = "soft",
   unavailable = false,
   dense = false,
+  tall = false,
 }: HomeDestinationCardProps) {
   const cardClass = `relative flex h-full flex-col overflow-hidden rounded-[14px] border px-[18px] pt-[18px] pb-4 md:rounded-[10px] md:px-5 md:py-4 md:shadow-[0_1px_8px_rgba(28,25,22,0.045)] ${TONE_CLASS[tone]} ${
     unavailable
@@ -71,8 +74,14 @@ export function HomeDestinationCard({
         >
           {description}
         </p>
-        {extra}
       </div>
+      {extra}
+      {extra ? (
+        <div
+          aria-hidden="true"
+          className="max-md:min-h-2 max-md:flex-1 md:hidden"
+        />
+      ) : null}
       <span
         className={`mt-auto inline-flex min-h-11 w-full items-center justify-between rounded-full px-3.5 text-[13px] font-medium md:min-h-0 md:py-2 md:text-[12px] ${ctaClass}`}
       >
@@ -83,7 +92,7 @@ export function HomeDestinationCard({
   );
 
   return (
-    <article className="h-[11.25rem] md:h-[12rem]">
+    <article className={`${tall ? "h-[14.5rem]" : "h-[11.25rem]"} md:h-[12rem]`}>
       {unavailable ? (
         <div
           aria-disabled="true"

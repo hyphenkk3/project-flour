@@ -52,8 +52,18 @@ export function isPublishedFreshPick(input: {
   });
 }
 
-export function freshPickAvailabilityLabel(day: FreshPickDay): string {
-  return day === "today" ? "Available today" : "Available tomorrow";
+export function freshPickAvailabilityLabel(
+  day: FreshPickDay | readonly FreshPickDay[],
+): string {
+  if (typeof day === "string") {
+    return day === "today" ? "Available today" : "Available tomorrow";
+  }
+  const hasToday = day.includes("today");
+  const hasTomorrow = day.includes("tomorrow");
+  if (hasToday && hasTomorrow) return "Available today & tomorrow";
+  if (hasTomorrow) return "Available tomorrow";
+  if (hasToday) return "Available today";
+  return "";
 }
 
 /**
@@ -114,6 +124,37 @@ export function extraSubmitCustomerError(message: string): string {
 }
 
 /**
+ * Remaining customer pickup days (today and/or tomorrow) from bakery hours.
+ * Does not invent dates outside the Extra window.
+ */
+export function extraActionableFreshPickDays(input: {
+  pickupAvailableFromAt: string | null;
+  orderCutoffAt: string | null;
+  todayYmd: string;
+  now?: Date;
+}): FreshPickDay[] {
+  if (!input.pickupAvailableFromAt || !input.orderCutoffAt) return [];
+  const window: ExtraPickupWindow = {
+    pickupAvailableFromAt: input.pickupAvailableFromAt,
+    orderCutoffAt: input.orderCutoffAt,
+  };
+  const now = input.now ?? new Date();
+  const today = input.todayYmd.trim().slice(0, 10);
+  const days: FreshPickDay[] = [];
+  if (extraCustomerPickupSlotsForDate(today, window, now).length > 0) {
+    days.push("today");
+  }
+  const tomorrow = addBusinessCalendarDays(today, 1);
+  if (
+    tomorrow &&
+    extraCustomerPickupSlotsForDate(tomorrow, window, now).length > 0
+  ) {
+    days.push("tomorrow");
+  }
+  return days;
+}
+
+/**
  * Customer card day from remaining bakery pickup hours (Malaysia time),
  * not prepared_on / pickup-from calendar date alone.
  * Today stays "today" before the pickup-from clock if later today slots remain.
@@ -125,24 +166,7 @@ export function extraActionableFreshPickDay(input: {
   todayYmd: string;
   now?: Date;
 }): FreshPickDay | null {
-  if (!input.pickupAvailableFromAt || !input.orderCutoffAt) return null;
-  const window: ExtraPickupWindow = {
-    pickupAvailableFromAt: input.pickupAvailableFromAt,
-    orderCutoffAt: input.orderCutoffAt,
-  };
-  const now = input.now ?? new Date();
-  const today = input.todayYmd.trim().slice(0, 10);
-  if (extraCustomerPickupSlotsForDate(today, window, now).length > 0) {
-    return "today";
-  }
-  const tomorrow = addBusinessCalendarDays(today, 1);
-  if (
-    tomorrow &&
-    extraCustomerPickupSlotsForDate(tomorrow, window, now).length > 0
-  ) {
-    return "tomorrow";
-  }
-  return null;
+  return extraActionableFreshPickDays(input)[0] ?? null;
 }
 
 /** Calendar date that matches a featured Fresh Pick's today / tomorrow label. */
@@ -154,6 +178,41 @@ export function homepageFeaturedFreshPickDateYmd(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(today)) return null;
   if (day === "today") return today;
   return addBusinessCalendarDays(today, 1);
+}
+
+function formatFreshPickAvailabilityDateRange(
+  fromYmd: string,
+  toYmd: string,
+): string {
+  const from = formatShortBusinessDate(fromYmd);
+  const to = formatShortBusinessDate(toYmd);
+  const fromParts = from.split(" ");
+  const toParts = to.split(" ");
+  if (fromParts[1] && toParts[1] && fromParts[1] === toParts[1]) {
+    return `${fromParts[0]}–${toParts[0]} ${toParts[1]}`.toUpperCase();
+  }
+  return `${from}–${to}`.toUpperCase();
+}
+
+/** Exact date line for one Fresh Pick: 7 SEP, 8 SEP, or 7–8 SEP. */
+export function freshPickAvailabilityDateLabel(
+  days: readonly FreshPickDay[],
+  todayYmd: string,
+): string | null {
+  const hasToday = days.includes("today");
+  const hasTomorrow = days.includes("tomorrow");
+  const todayDate = homepageFeaturedFreshPickDateYmd("today", todayYmd);
+  const tomorrowDate = homepageFeaturedFreshPickDateYmd("tomorrow", todayYmd);
+  if (hasToday && hasTomorrow && todayDate && tomorrowDate) {
+    return formatFreshPickAvailabilityDateRange(todayDate, tomorrowDate);
+  }
+  if (hasToday && todayDate) {
+    return formatShortBusinessDate(todayDate).toUpperCase();
+  }
+  if (hasTomorrow && tomorrowDate) {
+    return formatShortBusinessDate(tomorrowDate).toUpperCase();
+  }
+  return null;
 }
 
 export function homepageFreshPicksHorizon(
@@ -308,4 +367,17 @@ export function selectCustomerFreshPickOfferings<
     }
   }
   return order.map((key) => chosen.get(key)!);
+}
+
+/**
+ * Customer listing order: remaining today first, then tomorrow.
+ * Stable within the same day so offering order is unchanged.
+ */
+export function sortCustomerFreshPicksByAvailabilityDay<
+  T extends { day: FreshPickDay },
+>(picks: readonly T[]): T[] {
+  return [...picks].sort((a, b) => {
+    const rank = (day: FreshPickDay) => (day === "today" ? 0 : 1);
+    return rank(a.day) - rank(b.day);
+  });
 }

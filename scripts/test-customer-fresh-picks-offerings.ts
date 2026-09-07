@@ -149,11 +149,12 @@ function readSrc(rel: string): string {
 
 const extraQueriesSrc = readSrc("src/workspaces/storefront/extra/queries.ts");
 assert.match(extraQueriesSrc, /selectCustomerFreshPickOfferings/);
-assert.match(extraQueriesSrc, /extraActionableFreshPickDay/);
+assert.match(extraQueriesSrc, /extraActionableFreshPickDays/);
+assert.match(extraQueriesSrc, /sortCustomerFreshPicksByAvailabilityDay/);
 assert.match(
   extraQueriesSrc,
-  /return selectCustomerFreshPickOfferings/,
-  "Fresh Picks listing is the customer offering layer",
+  /sortCustomerFreshPicksByAvailabilityDay\(\s*selectCustomerFreshPickOfferings\(picks\)/,
+  "Fresh Picks listing is the customer offering layer, today before tomorrow",
 );
 assert.doesNotMatch(
   extraQueriesSrc,
@@ -167,7 +168,8 @@ const extraPageSrc = readSrc(
 assert.match(extraPageSrc, /listStorefrontAvailableExtra/);
 assert.match(extraPageSrc, /FRESH_PICKS_ORDER_CTA/);
 assert.match(extraPageSrc, /freshPickAvailabilityLabel/);
-assert.match(extraPageSrc, /homepageFeaturedFreshPickDateYmd/);
+assert.match(extraPageSrc, /freshPickAvailabilityDateLabel/);
+assert.match(extraPageSrc, /freshPickAvailabilityLabel\(pick\.days\)/);
 assert.match(extraPageSrc, /pick\.description/);
 assert.match(extraPageSrc, /formatRm/);
 assert.doesNotMatch(extraPageSrc, /×\s*2/);

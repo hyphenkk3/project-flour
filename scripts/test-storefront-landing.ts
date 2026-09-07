@@ -36,6 +36,8 @@ import {
   homepageFreshPicksDescription,
   homepageFreshPicksHorizon,
   freshPickProductDescription,
+  sortCustomerFreshPicksByAvailabilityDay,
+  freshPickAvailabilityDateLabel,
 } from "@/engines/extra/customer-fresh-picks";
 import { formatShortBusinessDate } from "@/lib/dates";
 import { unpublishedCataloguePreorderMessage } from "@/workspaces/storefront/catalog/queries";
@@ -204,6 +206,18 @@ assert.equal(freshPickDay("2026-08-22", "2026-08-17"), null);
 assert.equal(freshPickDay("2026-08-16", "2026-08-17"), null);
 assert.equal(freshPickAvailabilityLabel("today"), "Available today");
 assert.equal(freshPickAvailabilityLabel("tomorrow"), "Available tomorrow");
+assert.equal(
+  freshPickAvailabilityLabel(["today"]),
+  "Available today",
+);
+assert.equal(
+  freshPickAvailabilityLabel(["tomorrow"]),
+  "Available tomorrow",
+);
+assert.equal(
+  freshPickAvailabilityLabel(["today", "tomorrow"]),
+  "Available today & tomorrow",
+);
 assert.equal(homepageFreshPicksCountCopy(0), "No Fresh Picks right now");
 assert.equal(
   homepageFreshPicksCountCopy(1),
@@ -251,6 +265,27 @@ assert.equal(
 );
 assert.equal(formatShortBusinessDate("2026-09-07"), "7 Sep");
 assert.equal(formatShortBusinessDate("2026-09-08"), "8 Sep");
+assert.equal(freshPickAvailabilityDateLabel(["today"], "2026-09-07"), "7 SEP");
+assert.equal(
+  freshPickAvailabilityDateLabel(["tomorrow"], "2026-09-07"),
+  "8 SEP",
+);
+assert.equal(
+  freshPickAvailabilityDateLabel(["today", "tomorrow"], "2026-09-07"),
+  "7–8 SEP",
+);
+assert.equal(
+  freshPickAvailabilityDateLabel(["today", "tomorrow"], "2026-09-30"),
+  "30 SEP–1 OCT",
+);
+assert.deepEqual(
+  sortCustomerFreshPicksByAvailabilityDay([
+    { id: "tomorrow-first", day: "tomorrow" as const },
+    { id: "today-a", day: "today" as const },
+    { id: "today-b", day: "today" as const },
+  ]).map((pick) => pick.id),
+  ["today-a", "today-b", "tomorrow-first"],
+);
 assert.equal(freshPickProductDescription(null), null);
 assert.equal(freshPickProductDescription("  "), null);
 assert.equal(
@@ -293,7 +328,7 @@ assert.match(homeSrc, /href="\/order"/);
 assert.match(homeSrc, /Browse Cakes/);
 assert.match(homeSrc, /href="\/browse"/);
 assert.match(homeSrc, /StorefrontFreshPicksCard/);
-assert.match(homeSrc, /days=\{picks\.map\(\(pick\) => pick\.day\)\}/);
+assert.match(homeSrc, /days=\{picks\.flatMap\(\(pick\) => pick\.days\)\}/);
 assert.match(homeSrc, /listStorefrontAvailableExtra/);
 assert.match(homeSrc, /listHomepagePopularCakes/);
 assert.doesNotMatch(homeSrc, /listAvailableCakes/);
@@ -349,6 +384,7 @@ assert.match(freshCardSrc, /homepageFreshPicksDescription/);
 assert.match(freshCardSrc, /homepageFreshPicksHorizon/);
 assert.match(freshCardSrc, /homepageFreshPicksCountCopy/);
 assert.match(freshCardSrc, /dense/);
+assert.match(freshCardSrc, /tall/);
 assert.match(freshCardSrc, /mt-2 space-y-0\.5/);
 assert.doesNotMatch(freshCardSrc, /Today&apos;s Fresh Picks/);
 
@@ -367,8 +403,9 @@ assert.doesNotMatch(extraSrc, /Prepared /);
 assert.doesNotMatch(extraSrc, /\/bakery\/extra/);
 assert.doesNotMatch(extraSrc, /submit_guest_preorder/);
 assert.match(extraSrc, /\/extra\/\$\{pick\.id\}/);
-assert.match(extraSrc, /homepageFeaturedFreshPickDateYmd/);
-assert.match(extraSrc, /formatShortBusinessDate/);
+assert.match(extraSrc, /freshPickAvailabilityDateLabel/);
+assert.match(extraSrc, /freshPickAvailabilityLabel\(pick\.days\)/);
+assert.match(extraSrc, /pick\.days/);
 assert.match(extraSrc, /formatRm/);
 assert.match(extraSrc, /pick\.description/);
 assert.match(extraSrc, /pick\.unitPrice/);
@@ -386,6 +423,8 @@ assert.doesNotMatch(
 const extraQueriesSrc = readSrc("src/workspaces/storefront/extra/queries.ts");
 assert.match(extraQueriesSrc, /selectCustomerFreshPickOfferings/);
 assert.match(extraQueriesSrc, /listStorefrontAvailableExtra/);
+assert.match(extraQueriesSrc, /sortCustomerFreshPicksByAvailabilityDay/);
+assert.match(extraQueriesSrc, /extraActionableFreshPickDays/);
 assert.match(extraQueriesSrc, /freshPickProductDescription/);
 assert.match(extraQueriesSrc, /library_cakes/);
 assert.match(extraQueriesSrc, /library_cake_sizes/);

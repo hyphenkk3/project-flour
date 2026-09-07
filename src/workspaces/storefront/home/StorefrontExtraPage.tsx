@@ -1,10 +1,10 @@
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import {
   FRESH_PICKS_ORDER_CTA,
+  freshPickAvailabilityDateLabel,
   freshPickAvailabilityLabel,
-  homepageFeaturedFreshPickDateYmd,
 } from "@/engines/extra/customer-fresh-picks";
-import { formatShortBusinessDate, toBusinessDateKey } from "@/lib/dates";
+import { toBusinessDateKey } from "@/lib/dates";
 import {
   StorefrontHomeLink,
   StorefrontStaffSignIn,
@@ -43,19 +43,16 @@ export async function StorefrontExtraPage() {
         ) : (
           <ul className="mt-10 space-y-4">
             {picks.map((pick) => {
-              const dateYmd = homepageFeaturedFreshPickDateYmd(
-                pick.day,
+              const dateLabel = freshPickAvailabilityDateLabel(
+                pick.days,
                 todayYmd,
               );
-              const dateLabel = dateYmd
-                ? formatShortBusinessDate(dateYmd)
-                : null;
               return (
                 <li key={pick.id}>
                   <article className="border-fog grid gap-5 border-t pt-6 md:grid-cols-[minmax(0,1fr)_13rem] md:items-start md:gap-8">
                     <div className="order-2 flex flex-col justify-center md:order-1">
                       <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
-                        {freshPickAvailabilityLabel(pick.day)}
+                        {freshPickAvailabilityLabel(pick.days)}
                       </p>
                       {dateLabel ? (
                         <p className="text-skyline mt-1 text-[11px] font-medium tracking-[0.14em] uppercase">

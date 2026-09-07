@@ -15,10 +15,12 @@ import {
 } from "@/engines/extra/extra-pickup";
 import {
   extraActionableFreshPickDay,
+  extraActionableFreshPickDays,
   homepageFreshPicksCountCopy,
   homepageFreshPicksDescription,
   homepageFreshPicksHorizon,
   isPublishedFreshPick,
+  sortCustomerFreshPicksByAvailabilityDay,
 } from "@/engines/extra/customer-fresh-picks";
 import {
   EXTRA_CUTOFF_NOT_OPERATING,
@@ -555,6 +557,52 @@ assert.equal(
     }),
     "today",
     "before hours end, Extra still available today stays Available today",
+  );
+  assert.deepEqual(
+    extraActionableFreshPickDays({
+      pickupAvailableFromAt: crossWindow.pickupAvailableFromAt,
+      orderCutoffAt: crossWindow.orderCutoffAt,
+      todayYmd: TODAY,
+      now: MID_MORNING,
+    }),
+    ["today", "tomorrow"],
+    "window spanning today and tomorrow keeps both remaining pickup days",
+  );
+  assert.deepEqual(
+    extraActionableFreshPickDays({
+      pickupAvailableFromAt: todayWindow.pickupAvailableFromAt,
+      orderCutoffAt: todayWindow.orderCutoffAt,
+      todayYmd: TODAY,
+      now: MID_MORNING,
+    }),
+    ["today"],
+  );
+  assert.deepEqual(
+    extraActionableFreshPickDays({
+      pickupAvailableFromAt: tomorrowWindow.pickupAvailableFromAt,
+      orderCutoffAt: tomorrowWindow.orderCutoffAt,
+      todayYmd: TODAY,
+      now: MID_MORNING,
+    }),
+    ["tomorrow"],
+  );
+  assert.deepEqual(
+    extraActionableFreshPickDays({
+      pickupAvailableFromAt: crossWindow.pickupAvailableFromAt,
+      orderCutoffAt: crossWindow.orderCutoffAt,
+      todayYmd: TODAY,
+      now: AFTER_MONDAY_HOURS,
+    }),
+    ["tomorrow"],
+    "after today is exhausted, only tomorrow remains",
+  );
+  assert.deepEqual(
+    sortCustomerFreshPicksByAvailabilityDay([
+      { id: "avocado", day: "tomorrow" as const },
+      { id: "matcha", day: "today" as const },
+      { id: "today-two", day: "today" as const },
+    ]).map((pick) => pick.id),
+    ["matcha", "today-two", "avocado"],
   );
   assert.equal(
     extraActionableFreshPickDay({
