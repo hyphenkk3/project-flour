@@ -130,6 +130,17 @@ export function extraActionableFreshPickDay(input: {
   return null;
 }
 
+/** Calendar date that matches a featured Fresh Pick's today / tomorrow label. */
+export function homepageFeaturedFreshPickDateYmd(
+  day: FreshPickDay,
+  todayYmd: string,
+): string | null {
+  const today = todayYmd.trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(today)) return null;
+  if (day === "today") return today;
+  return addBusinessCalendarDays(today, 1);
+}
+
 export function homepageFreshPicksHorizon(
   days: readonly FreshPickDay[],
 ): { hasToday: boolean; hasTomorrow: boolean } {

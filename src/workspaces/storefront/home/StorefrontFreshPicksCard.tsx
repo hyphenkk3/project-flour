@@ -12,30 +12,31 @@ type StorefrontFreshPicksCardProps = {
   icon: ReactNode;
 };
 
+const AVAILABLE_DESCRIPTION =
+  "Special cakes released by Bakery for limited-time pickup.";
+
 export function StorefrontFreshPicksCard({
   days,
   icon,
 }: StorefrontFreshPicksCardProps) {
   const horizon = homepageFreshPicksHorizon(days);
   const count = days.length;
-  const description = homepageFreshPicksDescription(horizon);
-  const summary = homepageFreshPicksCountCopy(count, horizon);
   const empty = count <= 0;
+  const description = empty
+    ? homepageFreshPicksDescription(horizon)
+    : AVAILABLE_DESCRIPTION;
 
   return (
     <HomeDestinationCard
-      actionLabel="View Fresh Picks"
+      actionLabel={empty ? "View Fresh Picks" : "See Fresh Picks"}
       ctaVariant="soft"
       description={description}
       extra={
-        <p
-          className={[
-            "mt-1 line-clamp-1 text-xs",
-            empty ? "text-skyline/80" : "text-ink",
-          ].join(" ")}
-        >
-          {summary}
-        </p>
+        empty ? (
+          <p className="text-skyline/80 mt-1 line-clamp-1 text-xs">
+            {homepageFreshPicksCountCopy(count, horizon)}
+          </p>
+        ) : undefined
       }
       href="/extra"
       icon={icon}

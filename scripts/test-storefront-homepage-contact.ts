@@ -48,6 +48,8 @@ const freshCardSrc = readSrc(
 );
 assert.match(freshCardSrc, /unavailable=\{empty\}/);
 assert.match(freshCardSrc, /href="\/extra"/);
+assert.match(freshCardSrc, /See Fresh Picks/);
+assert.match(freshCardSrc, /limited-time pickup/);
 assert.match(freshCardSrc, /homepageFreshPicksHorizon/);
 assert.match(freshCardSrc, /homepageFreshPicksCountCopy/);
 assert.match(freshCardSrc, /homepageFreshPicksDescription/);
@@ -62,6 +64,9 @@ const featuredSrc = readSrc(
 );
 assert.match(featuredSrc, />Fresh Pick</);
 assert.match(featuredSrc, /currently unavailable/);
+assert.match(featuredSrc, /homepageFeaturedFreshPickDateYmd/);
+assert.match(featuredSrc, /formatShortBusinessDate/);
+assert.doesNotMatch(featuredSrc, /availabilityLabel\}\. Limited/);
 assert.doesNotMatch(featuredSrc, /Today&apos;s Fresh Pick/);
 assert.doesNotMatch(featuredSrc, /Today's Fresh Pick/);
 

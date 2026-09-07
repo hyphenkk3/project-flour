@@ -30,10 +30,12 @@ import {
 import {
   freshPickAvailabilityLabel,
   freshPickDay,
+  homepageFeaturedFreshPickDateYmd,
   homepageFreshPicksCountCopy,
   homepageFreshPicksDescription,
   homepageFreshPicksHorizon,
 } from "@/engines/extra/customer-fresh-picks";
+import { formatShortBusinessDate } from "@/lib/dates";
 import { unpublishedCataloguePreorderMessage } from "@/workspaces/storefront/catalog/queries";
 
 function readSrc(rel: string): string {
@@ -237,6 +239,16 @@ assert.equal(
   homepageFreshPicksCountCopy(3, homepageFreshPicksHorizon(["today"])),
   "3 cakes available today",
 );
+assert.equal(
+  homepageFeaturedFreshPickDateYmd("today", "2026-09-07"),
+  "2026-09-07",
+);
+assert.equal(
+  homepageFeaturedFreshPickDateYmd("tomorrow", "2026-09-07"),
+  "2026-09-08",
+);
+assert.equal(formatShortBusinessDate("2026-09-07"), "7 Sep");
+assert.equal(formatShortBusinessDate("2026-09-08"), "8 Sep");
 
 const homeSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
 assert.match(homeSrc, /Order a Cake/);
@@ -263,6 +275,13 @@ const featuredSrc = readSrc(
 );
 assert.match(featuredSrc, />Fresh Pick</);
 assert.match(featuredSrc, /availabilityLabel/);
+assert.match(featuredSrc, /homepageFeaturedFreshPickDateYmd/);
+assert.match(featuredSrc, /formatShortBusinessDate/);
+assert.match(
+  featuredSrc,
+  /Limited quantity, available for pickup during the stated window/,
+);
+assert.doesNotMatch(featuredSrc, /availabilityLabel\}\. Limited/);
 assert.match(featuredSrc, /relative h-\[6\.75rem\] w-\[6\.75rem\] shrink-0 overflow-hidden rounded-\[10px\]/);
 assert.match(featuredSrc, /CakePhotoImage/);
 assert.doesNotMatch(featuredSrc, /Today&apos;s Fresh Pick/);
@@ -296,7 +315,9 @@ const freshCardSrc = readSrc(
 );
 assert.match(freshCardSrc, /Fresh Picks/);
 assert.match(freshCardSrc, /href="\/extra"/);
+assert.match(freshCardSrc, /See Fresh Picks/);
 assert.match(freshCardSrc, /View Fresh Picks/);
+assert.match(freshCardSrc, /limited-time pickup/);
 assert.match(freshCardSrc, /homepageFreshPicksDescription/);
 assert.match(freshCardSrc, /homepageFreshPicksHorizon/);
 assert.match(freshCardSrc, /homepageFreshPicksCountCopy/);

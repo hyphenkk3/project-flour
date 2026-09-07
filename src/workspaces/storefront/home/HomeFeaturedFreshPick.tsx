@@ -1,5 +1,10 @@
 import Link from "next/link";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
+import { homepageFeaturedFreshPickDateYmd } from "@/engines/extra/customer-fresh-picks";
+import {
+  formatShortBusinessDate,
+  toBusinessDateKey,
+} from "@/lib/dates";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type { StorefrontExtraPick } from "@/workspaces/storefront/extra/queries";
 
@@ -22,13 +27,20 @@ export function HomeFeaturedFreshPick({ pick }: HomeFeaturedFreshPickProps) {
     );
   }
 
+  const dateYmd = homepageFeaturedFreshPickDateYmd(
+    pick.day,
+    toBusinessDateKey(),
+  );
+  const dateLabel = dateYmd ? formatShortBusinessDate(dateYmd) : null;
+
   return (
     <div>
-      <div className="mb-2.5 flex items-baseline justify-between gap-3">
+      <div className="mb-2.5 flex items-start justify-between gap-3">
         <h2 className={headingClass}>Fresh Pick</h2>
-        <p className="text-skyline shrink-0 text-[11px] font-medium tracking-[0.14em] uppercase">
-          {pick.availabilityLabel}
-        </p>
+        <div className="text-skyline shrink-0 text-right text-[11px] font-medium tracking-[0.14em] uppercase">
+          <p>{pick.availabilityLabel}</p>
+          {dateLabel ? <p>{dateLabel}</p> : null}
+        </div>
       </div>
       <article className="flex gap-3.5">
         <div className="relative h-[6.75rem] w-[6.75rem] shrink-0 overflow-hidden rounded-[10px] sm:h-[7.5rem] sm:w-[7.5rem]">
@@ -50,8 +62,7 @@ export function HomeFeaturedFreshPick({ pick }: HomeFeaturedFreshPickProps) {
           </h3>
           <p className="text-skyline mt-0.5 text-sm">{pick.sizeLabel}</p>
           <p className="text-skyline mt-1.5 line-clamp-2 text-[13px] leading-relaxed">
-            {pick.availabilityLabel}. Limited quantity, available for pickup
-            during the stated window.
+            Limited quantity, available for pickup during the stated window.
           </p>
           {pick.unitPrice != null ? (
             <p className="text-ink mt-1.5 text-sm tabular-nums">
