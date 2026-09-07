@@ -6,12 +6,8 @@ import {
 import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
 import { listHomepagePopularCakes } from "@/workspaces/storefront/catalog/queries";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
-import {
-  getStorefrontExtraById,
-  listStorefrontAvailableExtra,
-} from "@/workspaces/storefront/extra/queries";
+import { listStorefrontAvailableExtra } from "@/workspaces/storefront/extra/queries";
 import { HomeDestinationCard } from "@/workspaces/storefront/home/HomeDestinationCard";
-import { HomeFeaturedFreshPick } from "@/workspaces/storefront/home/HomeFeaturedFreshPick";
 import { HomeHero } from "@/workspaces/storefront/home/HomeHero";
 import { HomeMobileNav } from "@/workspaces/storefront/home/HomeMobileNav";
 import {
@@ -31,11 +27,6 @@ export async function StorefrontHomePage() {
     listStorefrontAvailableExtra(),
     listHomepagePopularCakes(),
   ]);
-  const featuredSeed =
-    picks.find((pick) => pick.day === "today") ?? picks[0] ?? null;
-  const featured = featuredSeed
-    ? ((await getStorefrontExtraById(featuredSeed.id)) ?? featuredSeed)
-    : null;
 
   return (
     <main className="bg-paper min-h-dvh overflow-x-clip">
@@ -111,8 +102,7 @@ export async function StorefrontHomePage() {
       </section>
 
       <section className="px-6 pb-9 sm:px-10 sm:pb-10">
-        <div className="border-fog/70 mx-auto grid w-full max-w-6xl gap-5 border-t pt-3 md:grid-cols-[minmax(0,0.37fr)_minmax(0,0.63fr)] md:gap-8">
-          <HomeFeaturedFreshPick pick={featured} />
+        <div className="border-fog/70 mx-auto w-full max-w-6xl border-t pt-3">
           <HomePopularCakes cakes={popular} />
         </div>
       </section>

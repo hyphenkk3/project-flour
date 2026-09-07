@@ -75,6 +75,11 @@ assert.equal(freshPickAvailabilityLabel("today"), "Available today");
 assert.equal(freshPickAvailabilityLabel("tomorrow"), "Available tomorrow");
 assert.match(extraPageSrc, /Fresh Picks/);
 assert.match(extraPageSrc, /FRESH_PICKS_ORDER_CTA/);
+assert.match(extraPageSrc, /homepageFeaturedFreshPickDateYmd/);
+assert.match(extraPageSrc, /pick\.description/);
+assert.match(extraPageSrc, /formatRm/);
+assert.match(extraPageSrc, /overflow-hidden rounded-\[10px\]/);
+assert.match(extraOrderPageSrc, /overflow-hidden rounded-\[10px\]/);
 assert.equal(FRESH_PICKS_ORDER_CTA, "Order this Fresh Pick");
 assert.equal(
   isPublishedFreshPick({

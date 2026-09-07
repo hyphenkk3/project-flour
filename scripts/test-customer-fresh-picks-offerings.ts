@@ -167,6 +167,9 @@ const extraPageSrc = readSrc(
 assert.match(extraPageSrc, /listStorefrontAvailableExtra/);
 assert.match(extraPageSrc, /FRESH_PICKS_ORDER_CTA/);
 assert.match(extraPageSrc, /freshPickAvailabilityLabel/);
+assert.match(extraPageSrc, /homepageFeaturedFreshPickDateYmd/);
+assert.match(extraPageSrc, /pick\.description/);
+assert.match(extraPageSrc, /formatRm/);
 assert.doesNotMatch(extraPageSrc, /×\s*2/);
 assert.doesNotMatch(extraPageSrc, /x2/);
 assert.doesNotMatch(extraPageSrc, /name="quantity"/);

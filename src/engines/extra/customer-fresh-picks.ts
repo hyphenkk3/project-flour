@@ -56,6 +56,21 @@ export function freshPickAvailabilityLabel(day: FreshPickDay): string {
   return day === "today" ? "Available today" : "Available tomorrow";
 }
 
+/**
+ * Library cake copy for a Fresh Pick. Strips a leading Available today /
+ * Available tomorrow prefix so timing stays on the dedicated status line.
+ */
+export function freshPickProductDescription(
+  description: string | null | undefined,
+): string | null {
+  const text = description?.trim() ?? "";
+  if (!text) return null;
+  const stripped = text
+    .replace(/^(available today|available tomorrow)\.?\s*/i, "")
+    .trim();
+  return stripped || null;
+}
+
 export const FRESH_PICKS_ORDER_CTA = "Order this Fresh Pick";
 
 export const FRESH_PICKS_NAME_HELP = "Nickname / English name and surname";

@@ -55,22 +55,16 @@ assert.match(freshCardSrc, /homepageFreshPicksAvailabilityLines/);
 assert.match(freshCardSrc, /homepageFreshPicksHorizon/);
 assert.match(freshCardSrc, /homepageFreshPicksCountCopy/);
 assert.match(freshCardSrc, /homepageFreshPicksDescription/);
+assert.match(freshCardSrc, /mt-2 space-y-0\.5/);
 
 const homeSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
 assert.match(homeSrc, /listStorefrontAvailableExtra/);
 assert.match(homeSrc, /StorefrontFreshPicksCard/);
 assert.match(homeSrc, /HomeVisitFooter/);
 
-const featuredSrc = readSrc(
-  "src/workspaces/storefront/home/HomeFeaturedFreshPick.tsx",
-);
-assert.match(featuredSrc, />Fresh Pick</);
-assert.match(featuredSrc, /currently unavailable/);
-assert.match(featuredSrc, /homepageFeaturedFreshPickDateYmd/);
-assert.match(featuredSrc, /formatShortBusinessDate/);
-assert.doesNotMatch(featuredSrc, /availabilityLabel\}\. Limited/);
-assert.doesNotMatch(featuredSrc, /Today&apos;s Fresh Pick/);
-assert.doesNotMatch(featuredSrc, /Today's Fresh Pick/);
+assert.doesNotMatch(homeSrc, /HomeFeaturedFreshPick/);
+assert.doesNotMatch(homeSrc, /getStorefrontExtraById/);
+assert.match(homeSrc, /HomePopularCakes/);
 
 assert.match(homeSrc, /days=\{picks\.map\(\(pick\) => pick\.day\)\}/);
 assert.match(homeSrc, /href="\/faq"/);

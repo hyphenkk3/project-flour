@@ -43,7 +43,7 @@ export function StorefrontFreshPicksCard({
             {homepageFreshPicksCountCopy(count, horizon)}
           </p>
         ) : (
-          <ul className="text-ink mt-1 space-y-0.5 text-[11px] leading-tight">
+          <ul className="text-ink mt-2 space-y-0.5 text-[11px] leading-tight">
             {availabilityLines.map((line) => (
               <li className="line-clamp-1" key={line}>
                 {line}

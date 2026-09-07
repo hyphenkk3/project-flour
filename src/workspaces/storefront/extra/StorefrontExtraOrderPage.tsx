@@ -53,7 +53,7 @@ export async function StorefrontExtraOrderPage({
             </h1>
             <p className="text-skyline mt-1 text-sm">{extra.sizeLabel}</p>
             {extra.imageUrl ? (
-              <div className="bg-fog mt-6 aspect-[4/3] overflow-hidden">
+              <div className="bg-fog mt-6 aspect-[4/3] overflow-hidden rounded-[10px]">
                 <CakePhotoImage
                   alt={extra.imageAlt || extra.cakeName}
                   priority

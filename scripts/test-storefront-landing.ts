@@ -35,6 +35,7 @@ import {
   homepageFreshPicksCountCopy,
   homepageFreshPicksDescription,
   homepageFreshPicksHorizon,
+  freshPickProductDescription,
 } from "@/engines/extra/customer-fresh-picks";
 import { formatShortBusinessDate } from "@/lib/dates";
 import { unpublishedCataloguePreorderMessage } from "@/workspaces/storefront/catalog/queries";
@@ -250,6 +251,19 @@ assert.equal(
 );
 assert.equal(formatShortBusinessDate("2026-09-07"), "7 Sep");
 assert.equal(formatShortBusinessDate("2026-09-08"), "8 Sep");
+assert.equal(freshPickProductDescription(null), null);
+assert.equal(freshPickProductDescription("  "), null);
+assert.equal(
+  freshPickProductDescription("Creamy avocado sponge with a light finish."),
+  "Creamy avocado sponge with a light finish.",
+);
+assert.equal(
+  freshPickProductDescription(
+    "Available tomorrow. Limited quantity, available for pickup during the stated window.",
+  ),
+  "Limited quantity, available for pickup during the stated window.",
+);
+assert.equal(freshPickProductDescription("Available today."), null);
 assert.deepEqual(homepageFreshPicksAvailabilityLines([], "2026-09-07"), []);
 assert.deepEqual(homepageFreshPicksAvailabilityLines(["today"], "2026-09-07"), [
   "1 cake available today · 7 SEP",
@@ -290,26 +304,15 @@ assert.doesNotMatch(homeSrc, /collection_id/);
 assert.doesNotMatch(homeSrc, /Only 3 cakes remaining today/);
 assert.match(homeSrc, /desktopRail=\{false\}/);
 assert.match(homeSrc, /HomeHero/);
-assert.match(homeSrc, /HomeFeaturedFreshPick/);
 assert.match(homeSrc, /HomePopularCakes/);
-
-const featuredSrc = readSrc(
-  "src/workspaces/storefront/home/HomeFeaturedFreshPick.tsx",
+assert.doesNotMatch(homeSrc, /HomeFeaturedFreshPick/);
+assert.doesNotMatch(homeSrc, /getStorefrontExtraById/);
+assert.doesNotMatch(
+  homeSrc,
+  /md:grid-cols-\[minmax\(0,0\.37fr\)_minmax\(0,0\.63fr\)\]/,
 );
-assert.match(featuredSrc, />Fresh Pick</);
-assert.match(featuredSrc, /availabilityLabel/);
-assert.match(featuredSrc, /homepageFeaturedFreshPickDateYmd/);
-assert.match(featuredSrc, /formatShortBusinessDate/);
-assert.match(
-  featuredSrc,
-  /Limited quantity, available for pickup during the stated window/,
-);
-assert.doesNotMatch(featuredSrc, /availabilityLabel\}\. Limited/);
-assert.match(featuredSrc, /relative h-\[6\.75rem\] w-\[6\.75rem\] shrink-0 overflow-hidden rounded-\[10px\]/);
-assert.match(featuredSrc, /CakePhotoImage/);
-assert.doesNotMatch(featuredSrc, /Today&apos;s Fresh Pick/);
-assert.doesNotMatch(featuredSrc, /Today's Fresh Pick/);
-assert.doesNotMatch(featuredSrc, />New</);
+assert.doesNotMatch(homeSrc, />Fresh Pick</);
+assert.doesNotMatch(homeSrc, /View Details/);
 
 assert.doesNotMatch(homeSrc, /whitebird-homepage-hero/);
 
@@ -346,6 +349,7 @@ assert.match(freshCardSrc, /homepageFreshPicksDescription/);
 assert.match(freshCardSrc, /homepageFreshPicksHorizon/);
 assert.match(freshCardSrc, /homepageFreshPicksCountCopy/);
 assert.match(freshCardSrc, /dense/);
+assert.match(freshCardSrc, /mt-2 space-y-0\.5/);
 assert.doesNotMatch(freshCardSrc, /Today&apos;s Fresh Picks/);
 
 const extraSrc = readSrc("src/workspaces/storefront/home/StorefrontExtraPage.tsx");
@@ -363,13 +367,39 @@ assert.doesNotMatch(extraSrc, /Prepared /);
 assert.doesNotMatch(extraSrc, /\/bakery\/extra/);
 assert.doesNotMatch(extraSrc, /submit_guest_preorder/);
 assert.match(extraSrc, /\/extra\/\$\{pick\.id\}/);
+assert.match(extraSrc, /homepageFeaturedFreshPickDateYmd/);
+assert.match(extraSrc, /formatShortBusinessDate/);
+assert.match(extraSrc, /formatRm/);
+assert.match(extraSrc, /pick\.description/);
+assert.match(extraSrc, /pick\.unitPrice/);
+assert.match(extraSrc, /FRESH_PICKS_ORDER_CTA/);
+assert.match(extraSrc, /overflow-hidden rounded-\[10px\]/);
 assert.doesNotMatch(extraSrc, /monthly catalogue/);
 assert.doesNotMatch(extraSrc, /×\s*2/);
 assert.doesNotMatch(extraSrc, /units available/i);
+assert.doesNotMatch(extraSrc, /View Details/);
+assert.doesNotMatch(
+  extraSrc,
+  /Limited quantity, available for pickup during the stated window/,
+);
 
 const extraQueriesSrc = readSrc("src/workspaces/storefront/extra/queries.ts");
 assert.match(extraQueriesSrc, /selectCustomerFreshPickOfferings/);
 assert.match(extraQueriesSrc, /listStorefrontAvailableExtra/);
+assert.match(extraQueriesSrc, /freshPickProductDescription/);
+assert.match(extraQueriesSrc, /library_cakes/);
+assert.match(extraQueriesSrc, /library_cake_sizes/);
+assert.match(extraQueriesSrc, /description: string \| null/);
+
+const extraOrderSrc = readSrc(
+  "src/workspaces/storefront/extra/StorefrontExtraOrderPage.tsx",
+);
+assert.match(extraOrderSrc, /overflow-hidden rounded-\[10px\]/);
+
+const popularSrc = readSrc(
+  "src/workspaces/storefront/home/HomePopularCakes.tsx",
+);
+assert.match(popularSrc, /overflow-hidden rounded-\[10px\]/);
 
 const homeLinkSrc = readSrc("src/workspaces/storefront/StorefrontBrand.tsx");
 assert.match(homeLinkSrc, /← Whitebird/);
