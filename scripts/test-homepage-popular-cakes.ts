@@ -46,10 +46,16 @@ assert.equal(parsePopularCakesSortOrder(""), null);
 assert.equal(parsePopularCakesSortOrder("1"), 1);
 assert.equal(parsePopularCakesSortOrder(" 4 "), 4);
 assert.equal(parsePopularCakesSortOrder("5"), 5);
+assert.equal(parsePopularCakesSortOrder("6"), 6);
+assert.equal(parsePopularCakesSortOrder("10"), 10);
 assert.match(String(parsePopularCakesSortOrder("0")), /whole number/);
 assert.match(String(parsePopularCakesSortOrder("1.5")), /whole number/);
-assert.match(String(parsePopularCakesSortOrder("6")), /1 to 5/);
-assert.equal(POPULAR_CAKES_MAX_SELECTION, 5);
+assert.match(String(parsePopularCakesSortOrder("11")), /1 to 10/);
+assert.equal(POPULAR_CAKES_MAX_SELECTION, 10);
+assert.equal(
+  POPULAR_CAKES_MAX_SELECTION_MESSAGE,
+  "You can feature up to 10 cakes in Popular Cakes. Remove one before adding another.",
+);
 
 const ordered = sortHomepagePopularCakes([
   {
@@ -200,9 +206,33 @@ const sixth = planPopularCakesChange({
   showInPopularCakes: true,
   requestedOrder: null,
 });
-assert.equal(sixth.ok, false);
-if (!sixth.ok) {
-  assert.equal(sixth.error, POPULAR_CAKES_MAX_SELECTION_MESSAGE);
+assert.equal(sixth.ok, true);
+if (sixth.ok) {
+  assert.deepEqual(
+    sixth.updates.map((row) => [row.id, row.popularCakesSortOrder]),
+    [
+      ["cake-1", 1],
+      ["cake-2", 2],
+      ["cake-3", 3],
+      ["cake-4", 4],
+      ["cake-5", 5],
+      ["cake-6", 6],
+    ],
+  );
+}
+
+const selectedTen = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((order) =>
+  popularCake(`cake-${order}`, order),
+);
+const eleventh = planPopularCakesChange({
+  selected: selectedTen,
+  cake: popularCake("cake-11", null, false),
+  showInPopularCakes: true,
+  requestedOrder: null,
+});
+assert.equal(eleventh.ok, false);
+if (!eleventh.ok) {
+  assert.equal(eleventh.error, POPULAR_CAKES_MAX_SELECTION_MESSAGE);
 }
 
 const deselectSecond = planPopularCakesChange({
@@ -275,6 +305,7 @@ if (resolveDuplicate.ok) {
 
 assert.equal(popularCakesPosition(selectedFive, "cake-3"), 3);
 assert.equal(popularCakesPosition(selectedFive, "missing"), null);
+assert.equal(popularCakesPosition(selectedTen, "cake-10"), 10);
 
 const leaveUnselected = planPopularCakesChange({
   selected: [popularCake("a", 1)],
@@ -320,6 +351,7 @@ assert.match(formSrc, /name="show_in_popular_cakes"/);
 assert.match(formSrc, /Popular Cakes order/);
 assert.match(formSrc, /name="popular_cakes_sort_order"/);
 assert.match(formSrc, /Seasonal and limited cakes may be included/);
+assert.match(formSrc, /Up to \$\{POPULAR_CAKES_MAX_SELECTION\} cakes/);
 
 const actionsSrc = readSrc("src/workspaces/library/cakes/actions.ts");
 assert.match(actionsSrc, /canManageLibrary/);

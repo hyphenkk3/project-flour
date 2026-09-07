@@ -35,7 +35,7 @@ export function CakePhotoImage({
   zoomOnHover = false,
 }: CakePhotoImageProps) {
   const imageClass = [
-    "object-cover",
+    "rounded-[10px] object-cover",
     zoomOnHover
       ? "transition duration-700 ease-out motion-reduce:transition-none md:group-hover:scale-[1.035]"
       : "",
@@ -44,7 +44,14 @@ export function CakePhotoImage({
     .join(" ");
 
   return (
-    <div className={["relative h-full w-full", className].filter(Boolean).join(" ")}>
+    <div
+      className={[
+        "relative h-full w-full overflow-hidden rounded-[10px]",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
       {canOptimizeRemote(src) ? (
         <Image
           alt={alt}

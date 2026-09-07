@@ -56,7 +56,7 @@ function OrderLines({
           <li className="py-5" key={`${item.cakeId}::${item.sizeId}`}>
             <div className="flex items-start gap-3">
               {item.imageUrl ? (
-                <div className="bg-fog relative h-14 w-14 shrink-0 overflow-hidden">
+                <div className="bg-fog relative h-14 w-14 shrink-0 overflow-hidden rounded-[10px]">
                   <CakePhotoImage
                     alt=""
                     sizes="56px"

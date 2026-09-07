@@ -50,7 +50,7 @@ export function StorefrontCakeCard({
 
   return (
     <article className="flex h-full flex-col overflow-hidden">
-      <div className="bg-fog group relative aspect-[4/3] overflow-hidden">
+      <div className="bg-fog group relative aspect-[4/3] overflow-hidden rounded-[10px]">
         {hideOrderCta ? (
           imageUrl ? (
             <CakePhotoImage

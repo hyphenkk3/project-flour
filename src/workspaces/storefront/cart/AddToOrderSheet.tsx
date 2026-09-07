@@ -134,7 +134,7 @@ export function AddToOrderSheet({
           </button>
         </div>
 
-        <div className="bg-fog aspect-[4/3] overflow-hidden">
+        <div className="bg-fog aspect-[4/3] overflow-hidden rounded-[10px]">
           {photo ? (
             <CakePhotoImage
               alt={photo.altText || cake.name}

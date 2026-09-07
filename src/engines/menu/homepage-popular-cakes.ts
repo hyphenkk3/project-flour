@@ -18,10 +18,10 @@ export function cakeMayBeSelectedForPopularCakes(_input?: {
   return true;
 }
 
-export const POPULAR_CAKES_MAX_SELECTION = 5;
+export const POPULAR_CAKES_MAX_SELECTION = 10;
 
 export const POPULAR_CAKES_MAX_SELECTION_MESSAGE =
-  "You can feature up to 5 cakes in Popular Cakes. Remove one before adding another.";
+  "You can feature up to 10 cakes in Popular Cakes. Remove one before adding another.";
 
 export function nextPopularCakesSortOrder(
   existingOrders: readonly (number | null | undefined)[],

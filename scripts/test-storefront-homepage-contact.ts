@@ -33,7 +33,8 @@ assert.match(cardSrc, /cursor-default/);
 assert.match(cardSrc, /role="group"/);
 assert.match(cardSrc, /<Link className=\{cardClass\} href=\{href\}>/);
 assert.match(cardSrc, /h-\[11\.25rem\]/);
-assert.match(cardSrc, /h-\[14\.5rem\]/);
+assert.match(cardSrc, /h-auto/);
+assert.doesNotMatch(cardSrc, /h-\[14\.5rem\]/);
 assert.match(cardSrc, /md:h-\[12rem\]/);
 assert.match(cardSrc, /rounded-\[14px\]/);
 assert.match(cardSrc, /md:rounded-\[10px\]/);
@@ -44,7 +45,8 @@ assert.doesNotMatch(cardSrc, /shadow-\[0_1px_8px_rgba\(28,25,22,0\.045\)\] sm:/)
 assert.match(cardSrc, /min-h-11/);
 assert.match(cardSrc, /text-\[13px\]/);
 assert.match(cardSrc, /md:min-h-0 md:py-2 md:text-\[12px\]/);
-assert.match(cardSrc, /max-md:min-h-2 max-md:flex-1 md:hidden/);
+assert.match(cardSrc, /mt-3 md:mt-auto/);
+assert.doesNotMatch(cardSrc, /max-md:min-h-2 max-md:flex-1 md:hidden/);
 
 const freshCardSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontFreshPicksCard.tsx",

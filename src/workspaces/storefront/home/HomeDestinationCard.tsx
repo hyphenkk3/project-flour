@@ -76,14 +76,8 @@ export function HomeDestinationCard({
         </p>
       </div>
       {extra}
-      {extra ? (
-        <div
-          aria-hidden="true"
-          className="max-md:min-h-2 max-md:flex-1 md:hidden"
-        />
-      ) : null}
       <span
-        className={`mt-auto inline-flex min-h-11 w-full items-center justify-between rounded-full px-3.5 text-[13px] font-medium md:min-h-0 md:py-2 md:text-[12px] ${ctaClass}`}
+        className={`${extra ? "mt-3 md:mt-auto" : "mt-auto"} inline-flex min-h-11 w-full items-center justify-between rounded-full px-3.5 text-[13px] font-medium md:min-h-0 md:py-2 md:text-[12px] ${ctaClass}`}
       >
         {actionLabel}
         <span aria-hidden="true">→</span>
@@ -92,7 +86,7 @@ export function HomeDestinationCard({
   );
 
   return (
-    <article className={`${tall ? "h-[14.5rem]" : "h-[11.25rem]"} md:h-[12rem]`}>
+    <article className={`${tall ? "h-auto" : "h-[11.25rem]"} md:h-[12rem]`}>
       {unavailable ? (
         <div
           aria-disabled="true"

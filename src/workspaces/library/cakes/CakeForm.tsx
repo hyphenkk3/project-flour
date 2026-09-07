@@ -192,7 +192,7 @@ export function CakeForm({
         />
         {showInPopularCakes ? (
           <FormField
-            help="Lower numbers appear first. Up to 5 cakes. Leave blank to place this cake after the current selection."
+            help={`Lower numbers appear first. Up to ${POPULAR_CAKES_MAX_SELECTION} cakes. Leave blank to place this cake after the current selection.`}
             htmlFor="popular_cakes_sort_order"
             label="Popular Cakes order"
           >

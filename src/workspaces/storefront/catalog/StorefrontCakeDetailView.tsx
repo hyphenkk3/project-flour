@@ -33,8 +33,8 @@ export function StorefrontCakeDetailView({
   return (
     <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start lg:gap-10">
       <div className="space-y-3">
-        <div className="group overflow-hidden">
-          <div className="bg-fog aspect-square w-full">
+        <div className="group overflow-hidden rounded-[10px]">
+          <div className="bg-fog aspect-square w-full overflow-hidden rounded-[10px]">
             {hero ? (
               <CakePhotoImage
                 alt={hero.altText || cake.name}
@@ -54,10 +54,10 @@ export function StorefrontCakeDetailView({
           <ul className="grid grid-cols-3 gap-3">
             {gallery.map((photo) => (
               <li
-                className="overflow-hidden"
+                className="overflow-hidden rounded-[10px]"
                 key={photo.id}
               >
-                <div className="bg-fog aspect-square">
+                <div className="bg-fog aspect-square overflow-hidden rounded-[10px]">
                   <CakePhotoImage
                     alt={photo.altText || cake.name}
                     sizes="160px"

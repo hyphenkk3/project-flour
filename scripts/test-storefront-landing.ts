@@ -468,6 +468,25 @@ assert.doesNotMatch(browseSrc, /submit_guest_preorder/);
 const cardSrc = readSrc("src/workspaces/storefront/catalog/StorefrontCakeCard.tsx");
 assert.match(cardSrc, /availabilityNote/);
 assert.match(cardSrc, /text-status-danger/);
+assert.match(cardSrc, /overflow-hidden rounded-\[10px\]/);
+
+const photoImageSrc = readSrc("src/components/ui/CakePhotoImage.tsx");
+assert.match(photoImageSrc, /overflow-hidden rounded-\[10px\]/);
+
+const detailViewSrc = readSrc(
+  "src/workspaces/storefront/catalog/StorefrontCakeDetailView.tsx",
+);
+assert.match(detailViewSrc, /overflow-hidden rounded-\[10px\]/);
+
+const addToOrderSrc = readSrc(
+  "src/workspaces/storefront/cart/AddToOrderSheet.tsx",
+);
+assert.match(addToOrderSrc, /overflow-hidden rounded-\[10px\]/);
+
+const cartSrc = readSrc(
+  "src/workspaces/storefront/cart/StorefrontCartShell.tsx",
+);
+assert.match(cartSrc, /h-14 w-14 shrink-0 overflow-hidden rounded-\[10px\]/);
 
 const queriesSrc = readSrc("src/workspaces/storefront/catalog/queries.ts");
 assert.match(queriesSrc, /listBrowsePublishedCakes/);
