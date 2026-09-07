@@ -840,7 +840,7 @@ const extraFormSrc = readFileSync(
   "utf8",
 );
 assert.match(extraFormSrc, /submitGuestExtraOrder/);
-assert.match(extraFormSrc, /extraOrderablePickupDates/);
+assert.match(extraFormSrc, /extraCustomerVisiblePickupDates/);
 assert.match(extraFormSrc, /name="extra_stock_id"/);
 assert.match(extraFormSrc, /value=\{extra\.id\}/);
 assert.match(extraFormSrc, /name="customer_name"/);

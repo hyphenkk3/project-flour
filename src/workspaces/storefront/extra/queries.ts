@@ -8,7 +8,7 @@ import {
   type FreshPickDay,
 } from "@/engines/extra/customer-fresh-picks";
 import { resolveCakePhoto } from "@/engines/menu/cake-photos";
-import { extraOrderablePickupDates } from "@/engines/extra/extra-pickup";
+import { extraCustomerVisiblePickupDates } from "@/engines/extra/extra-pickup";
 import { toBusinessDateKey } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import { isMissingCakePhotoSchema } from "@/workspaces/library/cakes/photo-storage";
@@ -303,10 +303,13 @@ export async function getStorefrontExtraById(
     if (!publishedNow(row, now)) return null;
     if (!row.pickup_available_from_at || !row.pickup_through_at) return null;
     if (
-      extraOrderablePickupDates({
-        pickupAvailableFromAt: row.pickup_available_from_at,
-        orderCutoffAt: row.pickup_through_at,
-      }).length === 0
+      extraCustomerVisiblePickupDates(
+        {
+          pickupAvailableFromAt: row.pickup_available_from_at,
+          orderCutoffAt: row.pickup_through_at,
+        },
+        now,
+      ).length === 0
     ) {
       return null;
     }

@@ -94,7 +94,7 @@ assert.equal(
 );
 
 // 2. Fresh Pick uses its own date configuration
-assert.match(extraFormSrc, /extraOrderablePickupDates/);
+assert.match(extraFormSrc, /extraCustomerVisiblePickupDates/);
 assert.match(extraFormSrc, /FRESH_PICKS_FIXED_DATES_NOTE/);
 assert.equal(
   FRESH_PICKS_FIXED_DATES_NOTE,

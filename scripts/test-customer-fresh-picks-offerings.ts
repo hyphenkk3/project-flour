@@ -184,7 +184,7 @@ const extraFormSrc = readSrc(
 );
 assert.match(extraFormSrc, /name="extra_stock_id"/);
 assert.match(extraFormSrc, /value=\{extra\.id\}/);
-assert.match(extraFormSrc, /extraOrderablePickupDates/);
+assert.match(extraFormSrc, /extraCustomerVisiblePickupDates/);
 assert.match(extraFormSrc, /name="customer_name"/);
 assert.match(extraFormSrc, /FRESH_PICKS_ORDER_CTA/);
 

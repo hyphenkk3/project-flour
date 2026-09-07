@@ -17,7 +17,7 @@ import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hour
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
   extraCustomerPickupSlotsForDate,
-  extraOrderablePickupDates,
+  extraCustomerVisiblePickupDates,
 } from "@/engines/extra/extra-pickup";
 import {
   FRESH_PICKS_FIXED_DATES_NOTE,
@@ -58,7 +58,7 @@ export function GuestExtraOrderForm({
     pickupAvailableFromAt: extra.pickupAvailableFromAt ?? "",
     orderCutoffAt: extra.pickupThroughAt ?? "",
   };
-  const dates = extraOrderablePickupDates(window, undefined, hoursSnapshot);
+  const dates = extraCustomerVisiblePickupDates(window, undefined, hoursSnapshot);
   const [pickupDate, setPickupDate] = useState(dates[0] ?? "");
   const [pickupTime, setPickupTime] = useState("");
   const [receiptRequested, setReceiptRequested] = useState(false);

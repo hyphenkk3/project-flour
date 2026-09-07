@@ -59,6 +59,29 @@ export function extraOrderablePickupDates(
   );
 }
 
+/**
+ * Customer-facing Fresh Pick pickup dates.
+ * Configured window dates are not all visible from the first day:
+ * before the first remaining offering date, only that first date is shown;
+ * on that date, the next remaining offering date may also appear.
+ * Past dates and dates with no remaining bakery slots stay hidden.
+ */
+export function extraCustomerVisiblePickupDates(
+  input: ExtraPickupWindow,
+  now?: Date,
+  snapshot: OperatingHoursSnapshot = OPERATING_HOURS_SEED,
+): string[] {
+  const when = now ?? new Date();
+  const todayYmd = toBusinessDateKey(when);
+  const upcoming = extraOrderablePickupDates(input, when, snapshot).filter(
+    (ymd) => ymd >= todayYmd,
+  );
+  if (upcoming.length === 0) return [];
+  const first = upcoming[0]!;
+  if (first > todayYmd) return [first];
+  return upcoming.slice(0, 2);
+}
+
 export function extraCustomerPickupSlotsForDate(
   dateYmd: string,
   input: ExtraPickupWindow,
@@ -91,12 +114,18 @@ export function isValidExtraCustomerPickup(input: {
   orderCutoffAt: string;
   now?: Date;
 }): boolean {
+  const window: ExtraPickupWindow = {
+    pickupAvailableFromAt: input.pickupAvailableFromAt,
+    orderCutoffAt: input.orderCutoffAt,
+  };
+  if (
+    !extraCustomerVisiblePickupDates(window, input.now).includes(input.pickupDate)
+  ) {
+    return false;
+  }
   return extraCustomerPickupSlotsForDate(
     input.pickupDate,
-    {
-      pickupAvailableFromAt: input.pickupAvailableFromAt,
-      orderCutoffAt: input.orderCutoffAt,
-    },
+    window,
     input.now,
   ).some((slot) => slot.value === input.pickupTime);
 }
