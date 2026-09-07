@@ -51,6 +51,8 @@ type CakeRow = {
   allergens: string[] | null;
   bakery_notes: string | null;
   status: LibraryCakeStatus;
+  show_in_popular_cakes?: boolean | null;
+  popular_cakes_sort_order?: number | string | null;
   created_at: string;
   updated_at: string;
   library_cake_categories?: CategoryEmbed | CategoryEmbed[] | null;
@@ -127,6 +129,14 @@ export function mapCake(row: CakeRow): LibraryCake {
     allergens: row.allergens ?? [],
     bakeryNotes: row.bakery_notes,
     status: row.status,
+    showInPopularCakes: row.show_in_popular_cakes === true,
+    popularCakesSortOrder: (() => {
+      if (row.popular_cakes_sort_order == null || row.popular_cakes_sort_order === "") {
+        return null;
+      }
+      const order = Number(row.popular_cakes_sort_order);
+      return Number.isInteger(order) ? order : null;
+    })(),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     sizes,
@@ -143,6 +153,8 @@ const cakeListSelect = `
   allergens,
   bakery_notes,
   status,
+  show_in_popular_cakes,
+  popular_cakes_sort_order,
   created_at,
   updated_at,
   library_cake_categories (

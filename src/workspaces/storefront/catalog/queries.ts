@@ -27,6 +27,7 @@ import {
   STOREFRONT_CAKE_PHOTO_SELECT_LEGACY,
   type StorefrontCakePhotoRow,
 } from "@/workspaces/storefront/catalog/cake-photo-map";
+import { comparePopularCakesOrder } from "@/engines/menu/homepage-popular-cakes";
 import {
   formatRm,
   startingPrice,
@@ -49,6 +50,8 @@ type LibraryCakeEmbed = {
   status: string;
   sharing_guide: string | null;
   allergens: string[] | null;
+  show_in_popular_cakes?: boolean | null;
+  popular_cakes_sort_order?: number | string | null;
   library_cake_categories?: CategoryEmbed | CategoryEmbed[] | null;
   library_cake_sizes: Array<{
     id: string;
@@ -88,7 +91,9 @@ export async function getCustomerCakePickupMemberships(
   const supabase = await createClient();
   const { data: catalogues, error: catalogueError } = await supabase
     .from("collections")
-    .select("id, month, purpose, status, start_date, end_date, website_override")
+    .select(
+      "id, month, purpose, status, start_date, end_date, website_override",
+    )
     .eq("status", "active");
 
   if (catalogueError) {
@@ -172,7 +177,11 @@ export async function getCustomerCakePickupMemberships(
     const special = specialWindowById.get(row.collection_id);
     if (special) {
       const windows = specialByCake.get(row.library_cake_id) ?? [];
-      if (!windows.some((entry) => entry.from === special.from && entry.to === special.to)) {
+      if (
+        !windows.some(
+          (entry) => entry.from === special.from && entry.to === special.to,
+        )
+      ) {
         windows.push(special);
       }
       specialByCake.set(row.library_cake_id, windows);
@@ -301,8 +310,7 @@ function mapCollection(
     id: row.id,
     name: row.name,
     month: row.month ? String(row.month).slice(0, 10) : null,
-    displayOrder:
-      row.display_order == null ? null : Number(row.display_order),
+    displayOrder: row.display_order == null ? null : Number(row.display_order),
   };
 }
 
@@ -508,7 +516,10 @@ function mapSpecialCatalogue(
 ): StorefrontSpecialCatalogue | null {
   const startDate = row.start_date ? String(row.start_date).slice(0, 10) : "";
   const endDate = row.end_date ? String(row.end_date).slice(0, 10) : "";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(startDate) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(endDate)
+  ) {
     return null;
   }
   return {
@@ -516,8 +527,7 @@ function mapSpecialCatalogue(
     name: row.name,
     startDate,
     endDate,
-    displayOrder:
-      row.display_order == null ? null : Number(row.display_order),
+    displayOrder: row.display_order == null ? null : Number(row.display_order),
   };
 }
 
@@ -599,7 +609,9 @@ type HistoryCatalogueRow = {
   show_in_past_menu?: boolean | null;
 };
 
-function mapHistoryCatalogue(row: HistoryCatalogueRow): StorefrontHistoryCatalogue {
+function mapHistoryCatalogue(
+  row: HistoryCatalogueRow,
+): StorefrontHistoryCatalogue {
   return {
     id: row.id,
     name: row.name,
@@ -608,8 +620,7 @@ function mapHistoryCatalogue(row: HistoryCatalogueRow): StorefrontHistoryCatalog
     startDate: row.start_date ? String(row.start_date).slice(0, 10) : null,
     endDate: row.end_date ? String(row.end_date).slice(0, 10) : null,
     status: row.status,
-    displayOrder:
-      row.display_order == null ? null : Number(row.display_order),
+    displayOrder: row.display_order == null ? null : Number(row.display_order),
     showInPastMenu: row.show_in_past_menu === true,
   };
 }
@@ -782,98 +793,66 @@ export async function getBrowsePublishedCakeById(
   id: string,
 ): Promise<BrowseStorefrontCake | null> {
   const cakes = await listBrowsePublishedCakes();
-  return cakes.find((cake) => cake.id === id) ?? null;
+  const published = cakes.find((cake) => cake.id === id) ?? null;
+  if (published) return published;
+  const popular = await listHomepagePopularCakes();
+  const merchandised = popular.find((cake) => cake.id === id);
+  if (!merchandised) return null;
+  return { ...merchandised, availabilityNote: null };
 }
 
-/** Homepage merchandising only. Never used as Browse or checkout authority. */
-export const HOMEPAGE_POPULAR_CAKE_LIMIT = 5;
-const HOMEPAGE_POPULAR_SCAN_LIMIT = 32;
-
 /**
- * Limited published-cake snapshot for the customer homepage.
- * Does not load the Browse catalogue and does not change Browse ordering.
+ * Owner-curated homepage Popular Cakes. Explicit Library selection only.
+ * Independent of catalogues, sales, and inferred ranking.
  */
-export async function listHomepagePopularCakes(
-  limit: number = HOMEPAGE_POPULAR_CAKE_LIMIT,
-  todayYmd: string = toBusinessDateKey(),
-): Promise<StorefrontCake[]> {
-  const cap = Math.min(Math.max(Math.trunc(limit), 1), HOMEPAGE_POPULAR_CAKE_LIMIT);
+export async function listHomepagePopularCakes(): Promise<StorefrontCake[]> {
   try {
     const supabase = await createClient();
-    const { data: catalogues, error: catalogueError } = await supabase
-      .from("collections")
-      .select("id, month, purpose, status, end_date, website_override")
-      .eq("status", "active");
-
-    if (catalogueError) return [];
-
-    const active = (
-      (catalogues ?? []) as Array<{
-        id: string;
-        month: string | null;
-        purpose: string | null;
-        status: string;
-        end_date: string | null;
-        website_override: boolean | null;
-      }>
-    ).filter((row) =>
-      isCurrentlyCustomerOrderable(
-        {
-          purpose: row.purpose ?? "monthly",
-          status: row.status,
-          month: row.month ? String(row.month).slice(0, 10) : null,
-          endDate: row.end_date ? String(row.end_date).slice(0, 10) : null,
-          websiteOverride: row.website_override === true,
-        },
-        todayYmd,
-      ),
-    );
-    if (active.length === 0) return [];
-
     const data = await withCakePhotoSelectFallback((photoSelect) =>
       supabase
-        .from("collection_cakes")
+        .from("library_cakes")
         .select(
           `
-      collection_id,
-      sort_order,
-      library_cakes (
-        ${libraryCakeEmbedSelect(photoSelect)}
-      )
+      show_in_popular_cakes,
+      popular_cakes_sort_order,
+      ${libraryCakeEmbedSelect(photoSelect)}
     `,
         )
-        .eq("available", true)
-        .in(
-          "collection_id",
-          active.map((row) => row.id),
-        )
-        .order("sort_order", { ascending: true })
-        .limit(HOMEPAGE_POPULAR_SCAN_LIMIT),
+        .eq("show_in_popular_cakes", true),
     );
 
-    const byId = new Map<string, StorefrontCake>();
-    for (const row of (data ?? []) as unknown as CatalogRow[]) {
-      const embed = unwrapOne(row.library_cakes);
-      if (!embed || !isOfferableStatus(embed.status)) continue;
-      const cake = mapStorefrontCake(embed);
-      if (cake.sizes.length === 0) continue;
-      const existing = byId.get(cake.id);
-      if (!existing) {
-        byId.set(cake.id, cake);
-        continue;
-      }
-      if (!existing.image && cake.image) {
-        byId.set(cake.id, cake);
-      }
-    }
-
-    return [...byId.values()]
-      .sort((a, b) => {
-        const photoDelta = Number(Boolean(b.image)) - Number(Boolean(a.image));
-        if (photoDelta !== 0) return photoDelta;
-        return a.name.localeCompare(b.name, "en");
+    const selected = ((data ?? []) as unknown as LibraryCakeEmbed[])
+      .filter((row) => row.show_in_popular_cakes === true)
+      .map((row) => {
+        const cake = mapStorefrontCake(row);
+        const rawOrder = row.popular_cakes_sort_order;
+        const order = rawOrder == null ? null : Number(rawOrder);
+        return {
+          cake,
+          showInPopularCakes: true,
+          popularCakesSortOrder: Number.isInteger(order) ? order : null,
+        };
       })
-      .slice(0, cap);
+      .filter((row) => row.cake.sizes.length > 0)
+      .sort((a, b) =>
+        comparePopularCakesOrder(
+          {
+            id: a.cake.id,
+            name: a.cake.name,
+            showInPopularCakes: a.showInPopularCakes,
+            popularCakesSortOrder: a.popularCakesSortOrder,
+          },
+          {
+            id: b.cake.id,
+            name: b.cake.name,
+            showInPopularCakes: b.showInPopularCakes,
+            popularCakesSortOrder: b.popularCakesSortOrder,
+          },
+        ),
+      )
+      .map((row) => row.cake);
+
+    return selected;
   } catch {
     return [];
   }

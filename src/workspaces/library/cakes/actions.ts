@@ -11,13 +11,20 @@ import type {
   LibraryCakeStatus,
 } from "@/types/library-cake";
 import type { LibraryActionState } from "@/workspaces/library/action-state";
-import { getCakeById, listCakeCategories } from "@/workspaces/library/cakes/queries";
+import {
+  getCakeById,
+  listCakeCategories,
+} from "@/workspaces/library/cakes/queries";
 import {
   emptyToNull,
   LIBRARY_CAKE_STATUSES,
   parseNonNegativeNumber,
 } from "@/workspaces/library/labels";
 import { parsePreorderDays } from "@/engines/preorder/lead";
+import {
+  nextPopularCakesSortOrder,
+  parsePopularCakesSortOrder,
+} from "@/engines/menu/homepage-popular-cakes";
 
 async function requireLibraryStaff() {
   const staff = await requireStaff();
@@ -54,7 +61,7 @@ function parseSizes(formData: FormData): LibraryCakeSizeInput[] | string {
       continue;
     }
     if (!label) {
-      return "Enter a size for each row (e.g. 6\").";
+      return 'Enter a size for each row (e.g. 6").';
     }
     if (!priceRaw) {
       return `Enter a price for size “${label}”.`;
@@ -100,6 +107,17 @@ async function parseCakeInput(
     return sizes;
   }
 
+  const showInPopularCakes =
+    String(formData.get("show_in_popular_cakes") ?? "").trim() === "on";
+  const parsedOrder = showInPopularCakes
+    ? parsePopularCakesSortOrder(
+        String(formData.get("popular_cakes_sort_order") ?? ""),
+      )
+    : null;
+  if (typeof parsedOrder === "string") {
+    return parsedOrder;
+  }
+
   if (!name) return "Name is required.";
   if (!categoryId) return "Choose a valid category.";
 
@@ -123,9 +141,41 @@ async function parseCakeInput(
     allergens,
     bakeryNotes,
     status,
+    showInPopularCakes,
+    popularCakesSortOrder: showInPopularCakes ? parsedOrder : null,
     sizes,
     photos: [],
   };
+}
+
+async function resolvePopularCakesSortOrder(
+  showInPopularCakes: boolean,
+  requestedOrder: number | null,
+  exceptCakeId?: string,
+): Promise<number | null> {
+  if (!showInPopularCakes) return null;
+  if (requestedOrder != null) return requestedOrder;
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("library_cakes")
+    .select("id, popular_cakes_sort_order")
+    .eq("show_in_popular_cakes", true);
+  if (error) {
+    throw new Error(error.message);
+  }
+  const existing = (
+    (data ?? []) as Array<{
+      id: string;
+      popular_cakes_sort_order: number | string | null;
+    }>
+  )
+    .filter((row) => row.id !== exceptCakeId)
+    .map((row) =>
+      row.popular_cakes_sort_order == null
+        ? null
+        : Number(row.popular_cakes_sort_order),
+    );
+  return nextPopularCakesSortOrder(existing);
 }
 
 /**
@@ -222,10 +272,7 @@ async function reconcileCakeSizes(
   }
 }
 
-async function saveCakeChildren(
-  cakeId: string,
-  sizes: LibraryCakeSizeInput[],
-) {
+async function saveCakeChildren(cakeId: string, sizes: LibraryCakeSizeInput[]) {
   await reconcileCakeSizes(cakeId, sizes);
 }
 
@@ -240,6 +287,20 @@ export async function createCakeAction(
   }
 
   const supabase = await createClient();
+  let popularOrder: number | null;
+  try {
+    popularOrder = await resolvePopularCakesSortOrder(
+      parsed.showInPopularCakes,
+      parsed.popularCakesSortOrder,
+    );
+  } catch (orderError) {
+    return {
+      error:
+        orderError instanceof Error
+          ? orderError.message
+          : "Could not save Popular Cakes order.",
+    };
+  }
   const { data, error } = await supabase
     .from("library_cakes")
     .insert({
@@ -250,6 +311,8 @@ export async function createCakeAction(
       allergens: parsed.allergens,
       bakery_notes: parsed.bakeryNotes,
       status: parsed.status,
+      show_in_popular_cakes: parsed.showInPopularCakes,
+      popular_cakes_sort_order: popularOrder,
       created_by: staff.id,
       updated_by: staff.id,
     })
@@ -272,6 +335,7 @@ export async function createCakeAction(
   }
 
   revalidatePath("/library/cakes");
+  revalidatePath("/");
   redirect(`/library/cakes/${data.id}`);
 }
 
@@ -290,6 +354,21 @@ export async function updateCakeAction(
   }
 
   const supabase = await createClient();
+  let popularOrder: number | null;
+  try {
+    popularOrder = await resolvePopularCakesSortOrder(
+      parsed.showInPopularCakes,
+      parsed.popularCakesSortOrder,
+      id,
+    );
+  } catch (orderError) {
+    return {
+      error:
+        orderError instanceof Error
+          ? orderError.message
+          : "Could not save Popular Cakes order.",
+    };
+  }
   const { error } = await supabase
     .from("library_cakes")
     .update({
@@ -300,6 +379,8 @@ export async function updateCakeAction(
       allergens: parsed.allergens,
       bakery_notes: parsed.bakeryNotes,
       status: parsed.status,
+      show_in_popular_cakes: parsed.showInPopularCakes,
+      popular_cakes_sort_order: popularOrder,
       updated_by: staff.id,
     })
     .eq("id", id);
@@ -322,6 +403,7 @@ export async function updateCakeAction(
   revalidatePath("/library/cakes");
   revalidatePath(`/library/cakes/${id}`);
   revalidatePath(`/library/cakes/${id}/edit`);
+  revalidatePath("/");
   redirect(`/library/cakes/${id}`);
 }
 
@@ -333,5 +415,6 @@ export async function deleteCakeAction(id: string): Promise<void> {
     throw new Error(error.message);
   }
   revalidatePath("/library/cakes");
+  revalidatePath("/");
   redirect("/library/cakes");
 }

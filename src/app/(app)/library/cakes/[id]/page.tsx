@@ -104,6 +104,16 @@ export default async function LibraryCakeDetailPage({
             {cake.bakeryNotes ?? "—"}
           </dd>
         </div>
+        <div>
+          <dt className="text-skyline">Popular Cakes</dt>
+          <dd className="text-ink mt-1">
+            {cake.showInPopularCakes
+              ? cake.popularCakesSortOrder != null
+                ? `Shown · order ${cake.popularCakesSortOrder}`
+                : "Shown"
+              : "Not shown"}
+          </dd>
+        </div>
       </dl>
 
       <section className="border-fog rounded-xl border bg-white p-5">

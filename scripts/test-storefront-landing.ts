@@ -439,6 +439,10 @@ const popularSrc = readSrc(
   "src/workspaces/storefront/home/HomePopularCakes.tsx",
 );
 assert.match(popularSrc, /overflow-hidden rounded-\[10px\]/);
+assert.match(popularSrc, /Popular Cakes/);
+assert.match(popularSrc, /View all →/);
+assert.match(popularSrc, /cakes.length > 0 \?/);
+assert.doesNotMatch(popularSrc, /if \(cakes.length === 0\) return null/);
 
 const homeLinkSrc = readSrc("src/workspaces/storefront/StorefrontBrand.tsx");
 assert.match(homeLinkSrc, /← Whitebird/);
@@ -464,8 +468,10 @@ assert.match(cardSrc, /text-status-danger/);
 const queriesSrc = readSrc("src/workspaces/storefront/catalog/queries.ts");
 assert.match(queriesSrc, /listBrowsePublishedCakes/);
 assert.match(queriesSrc, /listHomepagePopularCakes/);
-assert.match(queriesSrc, /HOMEPAGE_POPULAR_CAKE_LIMIT/);
-assert.match(queriesSrc, /HOMEPAGE_POPULAR_SCAN_LIMIT/);
+assert.match(queriesSrc, /show_in_popular_cakes/);
+assert.match(queriesSrc, /comparePopularCakesOrder/);
+assert.doesNotMatch(queriesSrc, /HOMEPAGE_POPULAR_CAKE_LIMIT/);
+assert.doesNotMatch(queriesSrc, /HOMEPAGE_POPULAR_SCAN_LIMIT/);
 assert.match(queriesSrc, /isCurrentlyCustomerOrderable/);
 assert.match(queriesSrc, /eq\("status", "active"\)/);
 assert.match(queriesSrc, /eq\("purpose", "monthly"\)/);

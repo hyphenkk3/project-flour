@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import {
   cakeCategoryOptionLabel,
@@ -8,6 +8,7 @@ import {
 } from "@/engines/menu/cake-categories";
 import {
   FormActions,
+  FormCheckbox,
   FormError,
   FormField,
   FormInput,
@@ -57,6 +58,9 @@ export function CakeForm({
   const defaultCategoryId = cake?.categoryId ?? options[0]?.id ?? "";
   const currentInactive =
     cake != null && cake.categoryId !== "" && !cake.categoryActive;
+  const [showInPopularCakes, setShowInPopularCakes] = useState(
+    cake?.showInPopularCakes ?? false,
+  );
 
   return (
     <form action={formAction} className="flex max-w-2xl flex-col gap-5">
@@ -175,6 +179,39 @@ export function CakeForm({
           ))}
         </FormSelect>
       </FormField>
+
+      <div className="flex flex-col gap-3">
+        <FormCheckbox
+          defaultChecked={cake?.showInPopularCakes ?? false}
+          help="Homepage merchandising only. Seasonal and limited cakes may be included."
+          id="show_in_popular_cakes"
+          label="Show in Popular Cakes"
+          name="show_in_popular_cakes"
+          onChange={(event) => setShowInPopularCakes(event.target.checked)}
+        />
+        {showInPopularCakes ? (
+          <FormField
+            help="Lower numbers appear first. Leave blank to place this cake after the current selection."
+            htmlFor="popular_cakes_sort_order"
+            label="Popular Cakes order"
+          >
+            <FormInput
+              defaultValue={
+                cake?.popularCakesSortOrder != null
+                  ? String(cake.popularCakesSortOrder)
+                  : ""
+              }
+              id="popular_cakes_sort_order"
+              inputMode="numeric"
+              min={1}
+              name="popular_cakes_sort_order"
+              placeholder="1"
+              step={1}
+              type="number"
+            />
+          </FormField>
+        ) : null}
+      </div>
 
       <FormError message={state.error} />
 

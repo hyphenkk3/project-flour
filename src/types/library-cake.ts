@@ -43,6 +43,8 @@ export type LibraryCake = {
   allergens: string[];
   bakeryNotes: string | null;
   status: LibraryCakeStatus;
+  showInPopularCakes: boolean;
+  popularCakesSortOrder: number | null;
   createdAt: string;
   updatedAt: string;
   sizes: LibraryCakeSize[];
@@ -80,6 +82,8 @@ export type LibraryCakeInput = {
   allergens: string[];
   bakeryNotes: string | null;
   status: LibraryCakeStatus;
+  showInPopularCakes: boolean;
+  popularCakesSortOrder: number | null;
   sizes: LibraryCakeSizeInput[];
   photos: LibraryCakePhotoInput[];
 };
