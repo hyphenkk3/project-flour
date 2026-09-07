@@ -186,6 +186,8 @@ assert.match(cartSrc, /preorderCheckoutHref/);
 assert.match(cartSrc, /View Order →/);
 assert.match(cartSrc, /Collection date/);
 assert.match(cartSrc, /Earliest collection/);
+assert.match(cartSrc, /bg-\[#EBE6D8\]/);
+assert.doesNotMatch(cartSrc, /bg-paper\/95/);
 assert.match(cartSrc, /draftStrongestPreorder/);
 assert.match(cartSrc, /setDraftLineQuantity/);
 assert.match(cartSrc, /setDraftLineSize/);

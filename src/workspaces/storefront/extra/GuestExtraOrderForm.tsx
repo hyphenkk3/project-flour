@@ -25,6 +25,7 @@ import {
   FRESH_PICKS_ORDER_CTA,
   FRESH_PICKS_WHATSAPP_NOTE,
 } from "@/engines/extra/customer-fresh-picks";
+import { OPTIONAL_NOTES_CUSTOMER_WARNING } from "@/engines/orders/order-guide";
 import {
   formatCustomerPreorderOptionLabel,
   type CustomerComplimentaryOption,
@@ -61,7 +62,6 @@ export function GuestExtraOrderForm({
   const dates = extraCustomerVisiblePickupDates(window, undefined, hoursSnapshot);
   const [pickupDate, setPickupDate] = useState(dates[0] ?? "");
   const [pickupTime, setPickupTime] = useState("");
-  const [receiptRequested, setReceiptRequested] = useState(false);
   const [includeReceiptChoice, setIncludeReceiptChoice] =
     useState<PhysicalReceiptChoice>("");
   const [complimentaryOptions, setComplimentaryOptions] = useState<
@@ -216,33 +216,13 @@ export function GuestExtraOrderForm({
         >
           <FormInput id="customer_name" name="customer_name" required />
         </FormField>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <FormField
-            help={FRESH_PICKS_WHATSAPP_NOTE}
-            htmlFor="phone"
-            label="WhatsApp phone"
-          >
-            <FormInput id="phone" name="phone" required type="tel" />
-          </FormField>
-          <FormField
-            help="For a copy of your order"
-            htmlFor="email"
-            label="Email (optional)"
-          >
-            <FormInput
-              id="email"
-              name="email"
-              required={receiptRequested}
-              type="email"
-            />
-          </FormField>
-        </div>
-        <FormCheckbox
-          checked={receiptRequested}
-          label="Email me a copy of my order"
-          name="email_submission_receipt_requested"
-          onChange={(event) => setReceiptRequested(event.target.checked)}
-        />
+        <FormField
+          help={FRESH_PICKS_WHATSAPP_NOTE}
+          htmlFor="phone"
+          label="WhatsApp phone"
+        >
+          <FormInput id="phone" name="phone" required type="tel" />
+        </FormField>
         <FormRadioGroup
           legend="Would you like a copy of the receipt? (will be attached during pickup)"
           name="include_receipt"
@@ -264,9 +244,20 @@ export function GuestExtraOrderForm({
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
           Notes
         </h2>
-        <FormField htmlFor="notes" label="Optional notes">
-          <FormTextarea id="notes" name="notes" rows={3} />
-        </FormField>
+        <p className="text-ink text-sm font-medium">Optional notes</p>
+        <p
+          className="text-status-danger text-sm leading-snug font-bold"
+          id="optional-notes-warning"
+        >
+          {OPTIONAL_NOTES_CUSTOMER_WARNING}
+        </p>
+        <FormTextarea
+          aria-describedby="optional-notes-warning"
+          aria-label="Optional notes"
+          id="notes"
+          name="notes"
+          rows={3}
+        />
       </section>
 
       <FormError message={state.error} />

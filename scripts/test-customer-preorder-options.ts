@@ -441,7 +441,7 @@ assert.match(
   extraFormSrc,
   /Would you like a copy of the receipt\? \(will be attached during pickup\)/,
 );
-assert.match(extraFormSrc, /email_submission_receipt_requested/);
+assert.doesNotMatch(extraFormSrc, /email_submission_receipt_requested/);
 assert.match(extraFormSrc, /name="complimentary_code"/);
 assert.doesNotMatch(extraFormSrc, /submit_guest_preorder/);
 assert.doesNotMatch(extraFormSrc, /GuestCheckoutForm/);
@@ -452,7 +452,9 @@ const extraActionsSrc = readSrc("src/workspaces/storefront/extra/actions.ts");
 assert.match(extraActionsSrc, /p_include_receipt/);
 assert.match(extraActionsSrc, /p_complimentary/);
 assert.match(extraActionsSrc, /parseRequiredPhysicalReceipt/);
-assert.match(extraActionsSrc, /email_submission_receipt_requested/);
+assert.match(extraActionsSrc, /p_email: null/);
+assert.match(extraActionsSrc, /p_email_submission_receipt_requested: false/);
+assert.doesNotMatch(extraActionsSrc, /formData\.get\("email"\)/);
 assert.doesNotMatch(extraActionsSrc, /submit_guest_preorder/);
 assert.doesNotMatch(extraActionsSrc, /p_paid_addons/);
 

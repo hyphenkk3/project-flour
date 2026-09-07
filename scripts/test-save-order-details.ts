@@ -202,11 +202,16 @@ assert.match(staffDispatchSrc, /from: "Whitebird <onboarding@resend.dev>"/);
 const extraFormSrc = readSrc(
   "src/workspaces/storefront/extra/GuestExtraOrderForm.tsx",
 );
-assert.match(extraFormSrc, /Email me a copy of my order/);
-assert.match(extraFormSrc, /name="email_submission_receipt_requested"/);
+assert.doesNotMatch(extraFormSrc, /Email me a copy of my order/);
+assert.doesNotMatch(extraFormSrc, /name="email_submission_receipt_requested"/);
+assert.doesNotMatch(extraFormSrc, /name="email"/);
 
-const extraActionsSrc = readSrc("src/workspaces/storefront/extra/actions.ts");
+const extraActionsSrc = readSrc(
+  "src/workspaces/storefront/extra/actions.ts",
+);
 assert.doesNotMatch(extraActionsSrc, /scheduleGuestPreorderCopyEmail/);
+assert.match(extraActionsSrc, /p_email: null/);
+assert.match(extraActionsSrc, /p_email_submission_receipt_requested: false/);
 
 const successSrc = readSrc(
   "src/workspaces/storefront/checkout/StorefrontSuccessPage.tsx",

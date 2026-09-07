@@ -59,9 +59,11 @@ assert.match(checkoutSrc, /optional-notes-warning/);
 const extraFormSrc = readSrc(
   "src/workspaces/storefront/extra/GuestExtraOrderForm.tsx",
 );
-assert.doesNotMatch(extraFormSrc, /order-guide/);
+assert.match(extraFormSrc, /OPTIONAL_NOTES_CUSTOMER_WARNING/);
+assert.match(extraFormSrc, /text-status-danger/);
+assert.match(extraFormSrc, /optional-notes-warning/);
 assert.doesNotMatch(extraFormSrc, /OrderGuideCallout/);
-assert.doesNotMatch(extraFormSrc, /ORDER_GUIDE/);
+assert.doesNotMatch(extraFormSrc, /ORDER_GUIDE_LINES/);
 assert.doesNotMatch(extraFormSrc, /No wording on cakes or cake boards\./);
 
 const extraPageSrc = readSrc(

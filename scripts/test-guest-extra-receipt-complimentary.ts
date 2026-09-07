@@ -186,7 +186,7 @@ const extraFormSrc = readSrc(
 );
 assert.match(extraFormSrc, /Would you like a copy of the receipt\? \(will be attached during pickup\)/);
 assert.match(extraFormSrc, /name="include_receipt"/);
-assert.match(extraFormSrc, /email_submission_receipt_requested/);
+assert.doesNotMatch(extraFormSrc, /email_submission_receipt_requested/);
 assert.match(extraFormSrc, /name="complimentary_code"/);
 assert.match(extraFormSrc, /formatCustomerPreorderOptionLabel\(option\.name, 0\)/);
 assert.match(extraFormSrc, /formatRm\(extra\.unitPrice\)/);

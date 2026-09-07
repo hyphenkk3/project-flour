@@ -80,6 +80,7 @@ assert.match(extraPageSrc, /freshPickAvailabilityLabel\(pick\.days\)/);
 assert.match(extraPageSrc, /pick\.description/);
 assert.match(extraPageSrc, /formatRm/);
 assert.match(extraPageSrc, /overflow-hidden rounded-\[10px\]/);
+assert.match(extraPageSrc, /md:h-\[12rem\]/);
 assert.match(extraOrderPageSrc, /overflow-hidden rounded-\[10px\]/);
 assert.equal(FRESH_PICKS_ORDER_CTA, "Order this Fresh Pick");
 assert.equal(
@@ -292,7 +293,11 @@ assert.equal(
 );
 assert.match(extraFormSrc, /name="customer_name"/);
 assert.match(extraFormSrc, /name="phone"/);
+assert.doesNotMatch(extraFormSrc, /name="email"/);
+assert.doesNotMatch(extraFormSrc, /Email \(optional\)/);
+assert.doesNotMatch(extraFormSrc, /Email me a copy of my order/);
 assert.doesNotMatch(extraFormSrc, /name="surname"/);
+assert.match(extraFormSrc, /OPTIONAL_NOTES_CUSTOMER_WARNING/);
 assert.match(
   extraActionsSrc,
   /Please fill in your name and WhatsApp phone number/,

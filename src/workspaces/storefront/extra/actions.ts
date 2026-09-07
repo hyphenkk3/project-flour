@@ -22,10 +22,6 @@ export type ExtraOrderState = {
   error: string | null;
 };
 
-function isPlausibleEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
 function parseComplimentaryOptions(
   rows: unknown,
 ): CustomerComplimentaryOption[] {
@@ -74,10 +70,6 @@ export async function submitGuestExtraOrderAction(
   const extraStockId = String(formData.get("extra_stock_id") ?? "").trim();
   const customerName = String(formData.get("customer_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim();
-  const receiptRequested =
-    String(formData.get("email_submission_receipt_requested") ?? "") === "on" ||
-    String(formData.get("email_submission_receipt_requested") ?? "") === "true";
   const includeReceipt = parseRequiredPhysicalReceipt(
     String(formData.get("include_receipt") ?? "").trim(),
   );
@@ -99,14 +91,6 @@ export async function submitGuestExtraOrderAction(
     return {
       error: "Please choose whether you would like a copy of the receipt.",
     };
-  }
-  if (receiptRequested && !email) {
-    return {
-      error: "Please enter your email to receive a copy of your order.",
-    };
-  }
-  if (email && !isPlausibleEmail(email)) {
-    return { error: "Please enter a valid email address." };
   }
 
   const extra = await getStorefrontExtraById(extraStockId);
@@ -141,12 +125,12 @@ export async function submitGuestExtraOrderAction(
   const { data, error } = await supabase.rpc("submit_guest_extra_order", {
     p_customer_name: customerName,
     p_phone: phone,
-    p_email: email || null,
+    p_email: null,
     p_pickup_date: pickupDate,
     p_pickup_time: pickupTime,
     p_notes: notes || null,
     p_extra_stock_id: extraStockId,
-    p_email_submission_receipt_requested: receiptRequested,
+    p_email_submission_receipt_requested: false,
     p_include_receipt: includeReceipt,
     p_complimentary: complimentary,
   });

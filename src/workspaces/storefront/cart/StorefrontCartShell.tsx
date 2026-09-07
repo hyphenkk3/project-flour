@@ -419,7 +419,7 @@ export function StorefrontCartShell({
 
       <button
         aria-label={`${itemLabel}, ${formatRm(total)}. View order.`}
-        className="border-fog bg-mist text-ink fixed right-0 bottom-0 left-0 z-40 flex min-h-14 items-center justify-between gap-3 border-t px-4 text-sm md:hidden"
+        className="border-fog bg-[#EBE6D8] text-ink fixed right-0 bottom-0 left-0 z-40 flex min-h-14 items-center justify-between gap-3 border-t px-4 text-sm md:hidden"
         onClick={() => setOpen(true)}
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
         type="button"
@@ -436,7 +436,7 @@ export function StorefrontCartShell({
             <div className="mx-auto w-full max-w-6xl">
               <button
                 aria-label={`Collection ${selectedDate ?? "not selected"}, earliest ${earliestDate ?? "unavailable"}. View order, ${count} ${count === 1 ? "item" : "items"}.`}
-                className="border-ink/10 bg-paper/95 text-ink pointer-events-auto flex min-h-16 w-full items-center justify-between gap-6 rounded-[10px] border px-6 shadow-[0_8px_30px_rgba(28,25,22,0.08)] backdrop-blur-sm"
+                className="border-ink/15 bg-[#EBE6D8] text-ink pointer-events-auto flex min-h-16 w-full items-center justify-between gap-6 rounded-[10px] border px-6 shadow-[0_10px_28px_rgba(28,25,22,0.1)]"
                 onClick={() => setOpen(true)}
                 type="button"
               >

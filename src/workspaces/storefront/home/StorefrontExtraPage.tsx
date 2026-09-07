@@ -82,7 +82,7 @@ export async function StorefrontExtraPage() {
                         {FRESH_PICKS_ORDER_CTA}
                       </Link>
                     </div>
-                    <div className="bg-fog order-1 aspect-[4/3] overflow-hidden rounded-[10px] md:order-2 md:aspect-auto md:min-h-[12rem]">
+                    <div className="bg-fog relative order-1 aspect-[4/3] overflow-hidden rounded-[10px] md:order-2 md:aspect-auto md:h-[12rem]">
                       {pick.imageUrl ? (
                         <CakePhotoImage
                           alt={pick.imageAlt || pick.cakeName}

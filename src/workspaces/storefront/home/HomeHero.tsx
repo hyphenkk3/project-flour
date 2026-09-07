@@ -139,7 +139,7 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
                 supportingClass="text-skyline mt-2 text-[0.95rem] leading-relaxed"
               />
               <HeroValueCues
-                iconClass="bg-paper/80 text-ink/65 flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                iconClass="bg-paper/80 text-ink/65 flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
                 itemClass="flex min-w-0 flex-col items-center gap-1.5 text-center"
                 listClass="mt-4 grid w-[13.75rem] grid-cols-3 gap-x-1"
               />
@@ -156,7 +156,7 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
               supportingClass="text-skyline mt-2 max-w-md text-[0.95rem] leading-relaxed md:max-w-sm"
             />
             <HeroValueCues
-              iconClass="bg-ink/[0.045] text-ink/65 flex h-8 w-8 shrink-0 items-center justify-center rounded-full md:h-9 md:w-9"
+              iconClass="bg-ink/[0.045] text-ink/65 flex h-7 w-7 shrink-0 items-center justify-center rounded-full md:h-8 md:w-8"
               itemClass="flex min-w-0 flex-col items-center gap-1.5 text-center md:flex-row md:items-center md:gap-2.5 md:text-left"
               listClass="mt-4 grid grid-cols-3 gap-x-3 md:mt-6.5 md:flex md:flex-wrap md:gap-x-5 md:gap-y-2 lg:gap-x-7"
             />
