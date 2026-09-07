@@ -257,6 +257,18 @@ assert.match(homeSrc, /desktopRail=\{false\}/);
 assert.match(homeSrc, /HomeHero/);
 assert.match(homeSrc, /HomeFeaturedFreshPick/);
 assert.match(homeSrc, /HomePopularCakes/);
+
+const featuredSrc = readSrc(
+  "src/workspaces/storefront/home/HomeFeaturedFreshPick.tsx",
+);
+assert.match(featuredSrc, />Fresh Pick</);
+assert.match(featuredSrc, /availabilityLabel/);
+assert.match(featuredSrc, /relative h-\[6\.75rem\] w-\[6\.75rem\] shrink-0 overflow-hidden rounded-\[10px\]/);
+assert.match(featuredSrc, /CakePhotoImage/);
+assert.doesNotMatch(featuredSrc, /Today&apos;s Fresh Pick/);
+assert.doesNotMatch(featuredSrc, /Today's Fresh Pick/);
+assert.doesNotMatch(featuredSrc, />New</);
+
 assert.doesNotMatch(homeSrc, /whitebird-homepage-hero/);
 
 const homeHeroSrc = readSrc("src/workspaces/storefront/home/HomeHero.tsx");

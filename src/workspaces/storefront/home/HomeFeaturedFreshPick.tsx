@@ -7,13 +7,14 @@ type HomeFeaturedFreshPickProps = {
   pick: StorefrontExtraPick | null;
 };
 
+const headingClass =
+  "font-display text-ink text-xl tracking-tight sm:text-2xl";
+
 export function HomeFeaturedFreshPick({ pick }: HomeFeaturedFreshPickProps) {
   if (!pick) {
     return (
       <div>
-        <h2 className="font-display text-ink text-xl tracking-tight sm:text-2xl">
-          Today&apos;s Fresh Pick
-        </h2>
+        <h2 className={headingClass}>Fresh Pick</h2>
         <p className="text-skyline mt-1.5 max-w-sm text-sm leading-relaxed">
           Fresh Picks are currently unavailable. Check back later.
         </p>
@@ -21,26 +22,16 @@ export function HomeFeaturedFreshPick({ pick }: HomeFeaturedFreshPickProps) {
     );
   }
 
-  const isToday = pick.day === "today";
-
   return (
     <div>
       <div className="mb-2.5 flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-ink text-xl tracking-tight sm:text-2xl">
-          Today&apos;s Fresh Pick
-        </h2>
-        {isToday ? (
-          <p className="border-ink/15 text-skyline rounded-full border px-2 py-0.5 text-[10px] font-medium tracking-[0.16em] uppercase">
-            New
-          </p>
-        ) : (
-          <p className="text-skyline text-[11px] font-medium tracking-[0.14em] uppercase">
-            {pick.availabilityLabel}
-          </p>
-        )}
+        <h2 className={headingClass}>Fresh Pick</h2>
+        <p className="text-skyline shrink-0 text-[11px] font-medium tracking-[0.14em] uppercase">
+          {pick.availabilityLabel}
+        </p>
       </div>
       <article className="flex gap-3.5">
-        <div className="relative h-[6.75rem] w-[6.75rem] shrink-0 overflow-hidden sm:h-[7.5rem] sm:w-[7.5rem]">
+        <div className="relative h-[6.75rem] w-[6.75rem] shrink-0 overflow-hidden rounded-[10px] sm:h-[7.5rem] sm:w-[7.5rem]">
           {pick.imageUrl ? (
             <CakePhotoImage
               alt={pick.imageAlt || pick.cakeName}

@@ -56,6 +56,15 @@ const homeSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx")
 assert.match(homeSrc, /listStorefrontAvailableExtra/);
 assert.match(homeSrc, /StorefrontFreshPicksCard/);
 assert.match(homeSrc, /HomeVisitFooter/);
+
+const featuredSrc = readSrc(
+  "src/workspaces/storefront/home/HomeFeaturedFreshPick.tsx",
+);
+assert.match(featuredSrc, />Fresh Pick</);
+assert.match(featuredSrc, /currently unavailable/);
+assert.doesNotMatch(featuredSrc, /Today&apos;s Fresh Pick/);
+assert.doesNotMatch(featuredSrc, /Today's Fresh Pick/);
+
 assert.match(homeSrc, /days=\{picks\.map\(\(pick\) => pick\.day\)\}/);
 assert.match(homeSrc, /href="\/faq"/);
 assert.match(homeSrc, /HomeMobileNav/);
