@@ -77,7 +77,7 @@ export function HomeDestinationCard({
       </div>
       {extra}
       <span
-        className={`${extra ? "mt-3 md:mt-auto" : "mt-auto"} inline-flex min-h-11 w-full items-center justify-between rounded-full px-3.5 text-[13px] font-medium md:min-h-0 md:py-2 md:text-[12px] ${ctaClass}`}
+        className={`${extra ? "mt-3 md:mt-auto" : "mt-auto"} inline-flex min-h-11 w-[11.5rem] max-w-[68%] shrink-0 items-center justify-between self-center rounded-full px-3.5 text-[13px] font-medium md:min-h-0 md:py-2 md:text-[12px] ${ctaClass}`}
       >
         {actionLabel}
         <span aria-hidden="true">→</span>

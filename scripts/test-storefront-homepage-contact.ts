@@ -43,6 +43,13 @@ assert.match(cardSrc, /md:px-5 md:py-4/);
 assert.match(cardSrc, /md:shadow-\[0_1px_8px_rgba\(28,25,22,0\.045\)\]/);
 assert.doesNotMatch(cardSrc, /shadow-\[0_1px_8px_rgba\(28,25,22,0\.045\)\] sm:/);
 assert.match(cardSrc, /min-h-11/);
+assert.match(cardSrc, /w-\[11\.5rem\]/);
+assert.match(cardSrc, /max-w-\[68%\]/);
+assert.match(cardSrc, /self-center/);
+assert.doesNotMatch(
+  cardSrc,
+  /inline-flex min-h-11 w-full items-center justify-between rounded-full/,
+);
 assert.match(cardSrc, /text-\[13px\]/);
 assert.match(cardSrc, /md:min-h-0 md:py-2 md:text-\[12px\]/);
 assert.match(cardSrc, /mt-3 md:mt-auto/);
