@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/admin";
-import { calculateOrderTotal } from "@/engines/orders/totals";
+import { calculateCommercialSubtotal } from "@/engines/orders/totals";
 
 export type GuestPreorderReceiptItem = {
   key: string;
@@ -10,8 +10,20 @@ export type GuestPreorderReceiptItem = {
   unitPrice: number | null;
 };
 
+export type GuestPreorderReceiptAddon = {
+  key: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+};
+
 export type GuestPreorderReceipt = {
+  orderNumber: string | null;
+  guestName: string;
+  guestPhone: string;
+  notes: string | null;
   items: GuestPreorderReceiptItem[];
+  paidAddons: GuestPreorderReceiptAddon[];
   pickupDate: string;
   pickupTime: string;
   fulfilmentMethod: "pickup" | "dine_in" | "delivery";
@@ -87,6 +99,10 @@ export async function loadGuestPreorderReceipt(
       .from("orders")
       .select(
         `
+        order_number,
+        guest_name,
+        guest_phone,
+        notes,
         pickup_date,
         pickup_time,
         fulfilment_method,
@@ -101,6 +117,13 @@ export async function loadGuestPreorderReceipt(
           size_label,
           library_cakes ( name ),
           library_cake_sizes ( label )
+        ),
+        order_paid_addons (
+          id,
+          name,
+          quantity,
+          unit_price,
+          sort_order
         )
       `,
       )
@@ -136,6 +159,31 @@ export async function loadGuestPreorderReceipt(
       };
     });
 
+    const addonRows = Array.isArray(
+      (data as { order_paid_addons?: unknown }).order_paid_addons,
+    )
+      ? (
+          data as {
+            order_paid_addons: Array<{
+              id?: string;
+              name?: string | null;
+              quantity?: number | string | null;
+              unit_price?: number | string | null;
+              sort_order?: number | null;
+            }>;
+          }
+        ).order_paid_addons
+      : [];
+    const paidAddons: GuestPreorderReceiptAddon[] = [...addonRows]
+      .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))
+      .map((row, index) => ({
+        key: row.id ?? `addon-${index}`,
+        name: String(row.name ?? "Add-on").trim() || "Add-on",
+        quantity: Number(row.quantity ?? 1),
+        unitPrice: Number(row.unit_price ?? 0),
+      }))
+      .filter((row) => row.quantity > 0);
+
     const reservationRel = (
       data as {
         order_dine_in_reservations?:
@@ -163,11 +211,28 @@ export async function loadGuestPreorderReceipt(
         ? methodRaw
         : "pickup";
     const guestCountRaw = Number(reservation?.guest_count);
-    const venueRaw = String(reservation?.venue ?? "").trim().toLowerCase();
+    const venueRaw = String(reservation?.venue ?? "")
+      .trim()
+      .toLowerCase();
     const dineInVenue =
       venueRaw === "hyphen" || venueRaw === "whitebird" ? venueRaw : null;
+    const notesRaw = String(
+      (data as { notes?: string | null }).notes ?? "",
+    ).trim();
     return {
+      orderNumber:
+        String(
+          (data as { order_number?: string | null }).order_number ?? "",
+        ).trim() || null,
+      guestName: String(
+        (data as { guest_name?: string | null }).guest_name ?? "",
+      ).trim(),
+      guestPhone: String(
+        (data as { guest_phone?: string | null }).guest_phone ?? "",
+      ).trim(),
+      notes: notesRaw || null,
       items,
+      paidAddons,
       pickupDate: String(data.pickup_date),
       pickupTime: String(data.pickup_time),
       fulfilmentMethod,
@@ -180,12 +245,16 @@ export async function loadGuestPreorderReceipt(
         fulfilmentMethod === "dine_in"
           ? String(reservation?.reservation_time ?? "").slice(0, 5) || null
           : null,
-      total: calculateOrderTotal(
-        items.map((item) => ({
+      total: calculateCommercialSubtotal({
+        items: items.map((item) => ({
           unitPrice: item.unitPrice ?? 0,
           quantity: item.quantity,
         })),
-      ),
+        paidAddons: paidAddons.map((addon) => ({
+          unitPrice: addon.unitPrice,
+          quantity: addon.quantity,
+        })),
+      }),
       isFreshPick: Boolean(
         (data as { extra_stock_id?: string | null }).extra_stock_id,
       ),

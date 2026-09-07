@@ -15,10 +15,9 @@ import {
 import { ClearPreorderDraftOnSuccess } from "@/workspaces/storefront/checkout/ClearPreorderDraft";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import { getGuestPreorderReceipt } from "@/workspaces/storefront/checkout/receipt";
+import { SaveOrderDetailsButton } from "@/workspaces/storefront/checkout/SaveOrderDetailsButton";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
-import {
-  storefrontKickerClass,
-} from "@/workspaces/storefront/StorefrontBrand";
+import { storefrontKickerClass } from "@/workspaces/storefront/StorefrontBrand";
 import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
 
 type StorefrontSuccessPageProps = {
@@ -78,8 +77,18 @@ export async function StorefrontSuccessPage({
                 </span>
               </li>
             ))}
+            {receipt.paidAddons.map((addon) => (
+              <li className="text-ink text-sm" key={addon.key}>
+                <span className="font-medium">{addon.name}</span>
+                <span className="text-skyline">
+                  {" "}
+                  · × {addon.quantity} ·{" "}
+                  {formatRm(addon.unitPrice * addon.quantity)}
+                </span>
+              </li>
+            ))}
           </ul>
-          <dl className="mt-4 space-y-2 border-t border-fog pt-3 text-sm">
+          <dl className="border-fog mt-4 space-y-2 border-t pt-3 text-sm">
             <div className="flex justify-between gap-4">
               <dt className="text-skyline">Fulfilment</dt>
               <dd className="text-ink text-right font-medium">
@@ -139,6 +148,10 @@ export async function StorefrontSuccessPage({
         </section>
       ) : null}
 
+      {receipt && !isFreshPick ? (
+        <SaveOrderDetailsButton receipt={receipt} />
+      ) : null}
+
       <section className="mt-8 space-y-2 text-left text-sm">
         {isFreshPick ? (
           <>
@@ -176,14 +189,14 @@ export async function StorefrontSuccessPage({
       <div className="mt-10 text-center">
         {isFreshPick ? (
           <Link
-            className="text-ink decoration-fog text-sm font-medium underline underline-offset-4 transition-colors duration-200 hover:text-skyline"
+            className="text-ink decoration-fog hover:text-skyline text-sm font-medium underline underline-offset-4 transition-colors duration-200"
             href="/extra"
           >
             Back to Fresh Picks
           </Link>
         ) : (
           <Link
-            className="text-ink decoration-fog text-sm font-medium underline underline-offset-4 transition-colors duration-200 hover:text-skyline"
+            className="text-ink decoration-fog hover:text-skyline text-sm font-medium underline underline-offset-4 transition-colors duration-200"
             href="/"
           >
             Back to collection

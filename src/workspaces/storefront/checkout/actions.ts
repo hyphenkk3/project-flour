@@ -13,10 +13,7 @@ import {
   earliestPickupDateYmd,
   isValidPickupSlot,
 } from "@/engines/business-calendar/pickup-slots";
-import {
-  preorderCartLineId,
-  readPreorderDays,
-} from "@/engines/preorder/lead";
+import { preorderCartLineId, readPreorderDays } from "@/engines/preorder/lead";
 import {
   loadLivePreorderDaysBySizeId,
   loadMalaysiaPreorderBusinessDate,
@@ -49,7 +46,6 @@ import {
 import type { StorefrontCake, StorefrontCollection } from "@/types/storefront";
 import { createClient } from "@/lib/supabase/server";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
-import { scheduleGuestPreorderCopyEmail } from "@/workspaces/storefront/checkout/guest-preorder-copy-email";
 import {
   cakePickupDateBounds,
   cartExcludedPickupDates,
@@ -183,21 +179,12 @@ function consolidateItems(items: SubmitItem[]): SubmitItem[] {
   return Array.from(map.values());
 }
 
-function isPlausibleEmail(value: string): boolean {
-  // Lightweight client/server guard — not a full RFC validator.
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
 export async function submitGuestPreorderAction(
   _prev: CheckoutState,
   formData: FormData,
 ): Promise<CheckoutState> {
   const customerName = String(formData.get("customer_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim();
-  const receiptRequested =
-    String(formData.get("email_submission_receipt_requested") ?? "") === "on" ||
-    String(formData.get("email_submission_receipt_requested") ?? "") === "true";
   const includeReceipt = parseRequiredPhysicalReceipt(
     String(formData.get("include_receipt") ?? "").trim(),
   );
@@ -224,15 +211,6 @@ export async function submitGuestPreorderAction(
       error: "Please choose whether you would like a copy of the receipt.",
     };
   }
-  if (receiptRequested && !email) {
-    return {
-      error:
-        "Please enter your email to receive a copy of your preorder submission.",
-    };
-  }
-  if (email && !isPlausibleEmail(email)) {
-    return { error: "Please enter a valid email address." };
-  }
   if (!pickupDate) {
     return {
       error:
@@ -252,19 +230,28 @@ export async function submitGuestPreorderAction(
   const hoursSnapshot = await loadOperatingHoursSnapshot();
 
   if (fulfilmentMethod === "pickup") {
-    if (!pickupTime || !isValidPickupSlot(pickupDate, pickupTime, hoursSnapshot)) {
+    if (
+      !pickupTime ||
+      !isValidPickupSlot(pickupDate, pickupTime, hoursSnapshot)
+    ) {
       return {
         error: "Please choose a valid pickup time for that date.",
       };
     }
   } else if (fulfilmentMethod === "dine_in") {
     reservationTime = String(formData.get("reservation_time") ?? "").trim();
-    if (!reservationTime || !isValidDineInSlot(pickupDate, reservationTime, hoursSnapshot)) {
+    if (
+      !reservationTime ||
+      !isValidDineInSlot(pickupDate, reservationTime, hoursSnapshot)
+    ) {
       return {
         error: "Please choose a valid dine-in reservation time for that date.",
       };
     }
-    if (!pickupTime || !isValidDineInSlot(pickupDate, pickupTime, hoursSnapshot)) {
+    if (
+      !pickupTime ||
+      !isValidDineInSlot(pickupDate, pickupTime, hoursSnapshot)
+    ) {
       return {
         error: "Please choose a valid cake serving time for that date.",
       };
@@ -292,7 +279,10 @@ export async function submitGuestPreorderAction(
       };
     }
   } else {
-    if (!pickupTime || !isValidDeliverySlot(pickupDate, pickupTime, hoursSnapshot)) {
+    if (
+      !pickupTime ||
+      !isValidDeliverySlot(pickupDate, pickupTime, hoursSnapshot)
+    ) {
       return {
         error: "Please choose a valid delivery time for that date.",
       };
@@ -343,7 +333,8 @@ export async function submitGuestPreorderAction(
     const size = cake?.sizes.find((entry) => entry.id === item.cake_size_id);
     if (!cake || !size) {
       return {
-        error: "Please add at least one cake from the catalogue for that pickup date.",
+        error:
+          "Please add at least one cake from the catalogue for that pickup date.",
       };
     }
   }
@@ -431,12 +422,12 @@ export async function submitGuestPreorderAction(
   const rpcArgs: Record<string, unknown> = {
     p_customer_name: customerName,
     p_phone: phone,
-    p_email: email || null,
+    p_email: null,
     p_pickup_date: pickupDate,
     p_pickup_time: pickupTime,
     p_notes: notes || null,
     p_items: items,
-    p_email_submission_receipt_requested: receiptRequested,
+    p_email_submission_receipt_requested: false,
     p_include_receipt: includeReceipt,
     p_fulfilment_method: fulfilmentMethod,
     p_delivery:
@@ -486,11 +477,6 @@ export async function submitGuestPreorderAction(
 
   await setGuestPreorderReceiptCookie(orderId);
   scheduleStaffNotificationDispatch();
-  scheduleGuestPreorderCopyEmail({
-    orderId,
-    email,
-    requested: receiptRequested,
-  });
   return { error: null, orderId };
 }
 

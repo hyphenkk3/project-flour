@@ -379,7 +379,7 @@ assert.match(formSrc, /complimentaryOptions/);
 assert.match(formSrc, /paidAddonOptions/);
 assert.match(formSrc, /formatCustomerPreorderOptionLabel/);
 assert.match(formSrc, /Written message on \$\{option\.name\}/);
-assert.match(formSrc, /email_submission_receipt_requested/);
+assert.doesNotMatch(formSrc, /email_submission_receipt_requested/);
 assert.match(
   formSrc,
   /Would you like a copy of the receipt\? \(will be attached during pickup\)/,

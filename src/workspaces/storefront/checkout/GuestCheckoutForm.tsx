@@ -229,6 +229,8 @@ function persistDraft(
 ): void {
   const draft: PreorderDraft = {
     ...fields,
+    email: "",
+    emailSubmissionReceiptRequested: false,
     items,
   };
   writePreorderDraft(draft);
@@ -457,9 +459,8 @@ export function GuestCheckoutForm({
       ...emptyPreorderFields(),
       customerName: draft?.customerName ?? "",
       phone: draft?.phone ?? "",
-      email: draft?.email ?? "",
-      emailSubmissionReceiptRequested:
-        draft?.emailSubmissionReceiptRequested ?? false,
+      email: "",
+      emailSubmissionReceiptRequested: false,
       includeReceiptChoice: draft?.includeReceiptChoice ?? "",
       pickupDate,
       pickupScopeFrom: hasEntryScope
@@ -1458,46 +1459,20 @@ export function GuestCheckoutForm({
             {nameError}
           </p>
         ) : null}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <FormField
-            help={WAITING_LIST_WHATSAPP_NOTE}
-            htmlFor="phone"
-            label="WhatsApp phone"
-          >
-            <FormInput
-              id="phone"
-              name="phone"
-              onChange={(event) => patchFields({ phone: event.target.value })}
-              required
-              type="tel"
-              value={fields.phone}
-            />
-          </FormField>
-          <FormField
-            help="For a copy of your preorder submission"
-            htmlFor="email"
-            label="Email (optional)"
-          >
-            <FormInput
-              id="email"
-              name="email"
-              onChange={(event) => patchFields({ email: event.target.value })}
-              required={fields.emailSubmissionReceiptRequested}
-              type="email"
-              value={fields.email}
-            />
-          </FormField>
-        </div>
-        <FormCheckbox
-          checked={fields.emailSubmissionReceiptRequested}
-          label="Email me a copy of my preorder submission"
-          name="email_submission_receipt_requested"
-          onChange={(event) =>
-            patchFields({
-              emailSubmissionReceiptRequested: event.target.checked,
-            })
-          }
-        />
+        <FormField
+          help={WAITING_LIST_WHATSAPP_NOTE}
+          htmlFor="phone"
+          label="WhatsApp phone"
+        >
+          <FormInput
+            id="phone"
+            name="phone"
+            onChange={(event) => patchFields({ phone: event.target.value })}
+            required
+            type="tel"
+            value={fields.phone}
+          />
+        </FormField>
         <FormRadioGroup
           legend="Would you like a copy of the receipt? (will be attached during pickup)"
           name="include_receipt"
