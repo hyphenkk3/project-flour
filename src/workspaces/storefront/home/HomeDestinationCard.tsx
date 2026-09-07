@@ -26,6 +26,8 @@ type HomeDestinationCardProps = {
   ctaVariant?: HomeDestinationCta;
   /** When true, the card is not a link and must not navigate. */
   unavailable?: boolean;
+  /** Tighter title/body rhythm so a short summary can sit above the CTA. */
+  dense?: boolean;
 };
 
 export function HomeDestinationCard({
@@ -38,6 +40,7 @@ export function HomeDestinationCard({
   icon,
   ctaVariant = "soft",
   unavailable = false,
+  dense = false,
 }: HomeDestinationCardProps) {
   const cardClass = `relative flex h-full flex-col overflow-hidden rounded-[14px] border px-[18px] pt-[18px] pb-4 md:rounded-[10px] md:px-5 md:py-4 md:shadow-[0_1px_8px_rgba(28,25,22,0.045)] ${TONE_CLASS[tone]} ${
     unavailable
@@ -51,16 +54,20 @@ export function HomeDestinationCard({
   const body = (
     <>
       <div className="min-w-0">
-        <span className="bg-ink/[0.05] text-ink/70 mb-2.5 flex h-8 w-8 items-center justify-center rounded-full">
+        <span
+          className={`bg-ink/[0.05] text-ink/70 flex h-8 w-8 items-center justify-center rounded-full ${
+            dense ? "mb-1.5" : "mb-2.5"
+          }`}
+        >
           {icon}
         </span>
         <h3 className="font-display text-ink text-[1.2rem] leading-tight tracking-tight sm:text-[1.32rem]">
           {title}
         </h3>
         <p
-          className={`mt-1 line-clamp-2 text-[13px] leading-relaxed ${
-            unavailable ? "text-skyline/80" : "text-skyline"
-          }`}
+          className={`line-clamp-2 text-[13px] ${
+            dense ? "mt-0.5 leading-snug" : "mt-1 leading-relaxed"
+          } ${unavailable ? "text-skyline/80" : "text-skyline"}`}
         >
           {description}
         </p>

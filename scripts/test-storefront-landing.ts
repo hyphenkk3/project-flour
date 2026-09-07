@@ -31,6 +31,7 @@ import {
   freshPickAvailabilityLabel,
   freshPickDay,
   homepageFeaturedFreshPickDateYmd,
+  homepageFreshPicksAvailabilityLines,
   homepageFreshPicksCountCopy,
   homepageFreshPicksDescription,
   homepageFreshPicksHorizon,
@@ -249,6 +250,28 @@ assert.equal(
 );
 assert.equal(formatShortBusinessDate("2026-09-07"), "7 Sep");
 assert.equal(formatShortBusinessDate("2026-09-08"), "8 Sep");
+assert.deepEqual(homepageFreshPicksAvailabilityLines([], "2026-09-07"), []);
+assert.deepEqual(homepageFreshPicksAvailabilityLines(["today"], "2026-09-07"), [
+  "1 cake available today · 7 SEP",
+]);
+assert.deepEqual(
+  homepageFreshPicksAvailabilityLines(["tomorrow", "tomorrow"], "2026-09-07"),
+  ["2 cakes available tomorrow · 8 SEP"],
+);
+assert.deepEqual(
+  homepageFreshPicksAvailabilityLines(
+    ["today", "tomorrow", "tomorrow"],
+    "2026-09-07",
+  ),
+  [
+    "1 cake available today · 7 SEP",
+    "2 cakes available tomorrow · 8 SEP",
+  ],
+);
+assert.deepEqual(
+  homepageFreshPicksAvailabilityLines(["today", "today", "today"], "2026-09-07"),
+  ["3 cakes available today · 7 SEP"],
+);
 
 const homeSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
 assert.match(homeSrc, /Order a Cake/);
@@ -318,9 +341,11 @@ assert.match(freshCardSrc, /href="\/extra"/);
 assert.match(freshCardSrc, /See Fresh Picks/);
 assert.match(freshCardSrc, /View Fresh Picks/);
 assert.match(freshCardSrc, /limited-time pickup/);
+assert.match(freshCardSrc, /homepageFreshPicksAvailabilityLines/);
 assert.match(freshCardSrc, /homepageFreshPicksDescription/);
 assert.match(freshCardSrc, /homepageFreshPicksHorizon/);
 assert.match(freshCardSrc, /homepageFreshPicksCountCopy/);
+assert.match(freshCardSrc, /dense/);
 assert.doesNotMatch(freshCardSrc, /Today&apos;s Fresh Picks/);
 
 const extraSrc = readSrc("src/workspaces/storefront/home/StorefrontExtraPage.tsx");

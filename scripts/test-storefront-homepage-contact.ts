@@ -42,6 +42,7 @@ assert.doesNotMatch(cardSrc, /shadow-\[0_1px_8px_rgba\(28,25,22,0\.045\)\] sm:/)
 assert.match(cardSrc, /min-h-11/);
 assert.match(cardSrc, /text-\[13px\]/);
 assert.match(cardSrc, /md:min-h-0 md:py-2 md:text-\[12px\]/);
+assert.match(cardSrc, /dense \? "mb-1\.5" : "mb-2\.5"/);
 
 const freshCardSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontFreshPicksCard.tsx",
@@ -50,6 +51,7 @@ assert.match(freshCardSrc, /unavailable=\{empty\}/);
 assert.match(freshCardSrc, /href="\/extra"/);
 assert.match(freshCardSrc, /See Fresh Picks/);
 assert.match(freshCardSrc, /limited-time pickup/);
+assert.match(freshCardSrc, /homepageFreshPicksAvailabilityLines/);
 assert.match(freshCardSrc, /homepageFreshPicksHorizon/);
 assert.match(freshCardSrc, /homepageFreshPicksCountCopy/);
 assert.match(freshCardSrc, /homepageFreshPicksDescription/);

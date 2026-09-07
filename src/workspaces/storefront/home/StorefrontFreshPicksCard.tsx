@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
 import {
+  homepageFreshPicksAvailabilityLines,
   homepageFreshPicksCountCopy,
   homepageFreshPicksDescription,
   homepageFreshPicksHorizon,
   type FreshPickDay,
 } from "@/engines/extra/customer-fresh-picks";
+import { toBusinessDateKey } from "@/lib/dates";
 import { HomeDestinationCard } from "@/workspaces/storefront/home/HomeDestinationCard";
 
 type StorefrontFreshPicksCardProps = {
@@ -25,18 +27,30 @@ export function StorefrontFreshPicksCard({
   const description = empty
     ? homepageFreshPicksDescription(horizon)
     : AVAILABLE_DESCRIPTION;
+  const availabilityLines = empty
+    ? []
+    : homepageFreshPicksAvailabilityLines(days, toBusinessDateKey());
 
   return (
     <HomeDestinationCard
       actionLabel={empty ? "View Fresh Picks" : "See Fresh Picks"}
       ctaVariant="soft"
+      dense
       description={description}
       extra={
         empty ? (
-          <p className="text-skyline/80 mt-1 line-clamp-1 text-xs">
+          <p className="text-skyline/80 mt-1 line-clamp-1 text-[11px] leading-tight">
             {homepageFreshPicksCountCopy(count, horizon)}
           </p>
-        ) : undefined
+        ) : (
+          <ul className="text-ink mt-1 space-y-0.5 text-[11px] leading-tight">
+            {availabilityLines.map((line) => (
+              <li className="line-clamp-1" key={line}>
+                {line}
+              </li>
+            ))}
+          </ul>
+        )
       }
       href="/extra"
       icon={icon}

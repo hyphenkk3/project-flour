@@ -8,7 +8,7 @@ import {
   extraCustomerPickupSlotsForDate,
   type ExtraPickupWindow,
 } from "@/engines/extra/extra-pickup";
-import { addBusinessCalendarDays } from "@/lib/dates";
+import { addBusinessCalendarDays, formatShortBusinessDate } from "@/lib/dates";
 
 export type FreshPickDay = "today" | "tomorrow";
 
@@ -185,6 +185,42 @@ export function homepageFreshPicksCountCopy(
     return `${count} ${noun} available today`;
   }
   return `${count} ${noun} available today or tomorrow`;
+}
+
+function cakeAvailablePhrase(count: number, when: "today" | "tomorrow"): string {
+  const noun = count === 1 ? "cake" : "cakes";
+  return `${count} ${noun} available ${when}`;
+}
+
+/**
+ * Homepage Fresh Picks card summary lines. One line per remaining pickup day.
+ * Dates follow the same today / tomorrow calendar mapping as the featured pick.
+ */
+export function homepageFreshPicksAvailabilityLines(
+  days: readonly FreshPickDay[],
+  todayYmd: string,
+): string[] {
+  let todayCount = 0;
+  let tomorrowCount = 0;
+  for (const day of days) {
+    if (day === "today") todayCount += 1;
+    if (day === "tomorrow") tomorrowCount += 1;
+  }
+
+  const lines: string[] = [];
+  if (todayCount > 0) {
+    const ymd = homepageFeaturedFreshPickDateYmd("today", todayYmd);
+    const date = ymd ? formatShortBusinessDate(ymd).toUpperCase() : null;
+    const phrase = cakeAvailablePhrase(todayCount, "today");
+    lines.push(date ? `${phrase} · ${date}` : phrase);
+  }
+  if (tomorrowCount > 0) {
+    const ymd = homepageFeaturedFreshPickDateYmd("tomorrow", todayYmd);
+    const date = ymd ? formatShortBusinessDate(ymd).toUpperCase() : null;
+    const phrase = cakeAvailablePhrase(tomorrowCount, "tomorrow");
+    lines.push(date ? `${phrase} · ${date}` : phrase);
+  }
+  return lines;
 }
 
 /**
