@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { storefrontKickerClass } from "@/workspaces/storefront/StorefrontBrand";
 import { WhatsAppMark } from "@/workspaces/storefront/home/HomeMarks";
 import {
@@ -9,18 +10,26 @@ import {
 } from "@/workspaces/storefront/home/storefront-contact";
 
 const linkClass =
-  "text-ink hover:text-skyline inline-flex items-center gap-2 text-sm font-medium transition-colors duration-200";
+  "text-ink hover:text-skyline inline-flex max-w-full items-center gap-2 text-sm font-medium transition-colors duration-200";
 
-export function HomeVisitFooter() {
+type HomeVisitFooterProps = {
+  lead?: ReactNode;
+};
+
+export function HomeVisitFooter({ lead }: HomeVisitFooterProps) {
   const whatsappHref = storefrontWhatsAppHref();
   const mapsHref = storefrontMapsHref();
   const addressLines = STOREFRONT_ADDRESS_LINES.filter((line) => line.trim());
 
   return (
     <section className="px-6 pb-2 sm:px-10">
-      <div className="border-fog/70 mx-auto grid w-full max-w-6xl items-start gap-8 border-t pt-5 md:grid-cols-2 md:gap-16">
+      <div className="border-fog/70 mx-auto grid w-full max-w-6xl items-start gap-8 border-t pt-3 md:grid-cols-2 md:gap-x-16 md:gap-y-8 md:pt-4 lg:grid-cols-[minmax(0,0.55fr)_minmax(0,0.27fr)_minmax(0,0.18fr)] lg:gap-x-8 lg:gap-y-0 lg:pt-5">
+        {lead ? (
+          <div className="min-w-0 md:col-span-2 lg:col-span-1">{lead}</div>
+        ) : null}
+
         {addressLines.length > 0 || mapsHref ? (
-          <div>
+          <div className="min-w-0">
             <p className={storefrontKickerClass}>Find Us</p>
             <p className="font-display text-ink mt-2 text-lg tracking-tight">
               {STOREFRONT_LOCATION_NAME}
@@ -51,15 +60,15 @@ export function HomeVisitFooter() {
         ) : null}
 
         {whatsappHref ? (
-          <div>
+          <div className="min-w-0">
             <p className={storefrontKickerClass}>WhatsApp Us</p>
             <a
-              className={`${linkClass} mt-2`}
+              className={`${linkClass} mt-2 flex-wrap`}
               href={whatsappHref}
               rel="noopener noreferrer"
               target="_blank"
             >
-              <WhatsAppMark className="h-3.5 w-3.5" />
+              <WhatsAppMark className="h-3.5 w-3.5 shrink-0" />
               Chat with us on WhatsApp
               <span aria-hidden="true">→</span>
             </a>

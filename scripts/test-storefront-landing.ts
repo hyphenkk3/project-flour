@@ -340,6 +340,10 @@ assert.doesNotMatch(homeSrc, /Only 3 cakes remaining today/);
 assert.match(homeSrc, /desktopRail=\{false\}/);
 assert.match(homeSrc, /HomeHero/);
 assert.match(homeSrc, /HomePopularCakes/);
+assert.match(
+  homeSrc,
+  /HomeVisitFooter lead=\{<HomePopularCakes cakes=\{popular\} \/>\}/,
+);
 assert.doesNotMatch(homeSrc, /HomeFeaturedFreshPick/);
 assert.doesNotMatch(homeSrc, /getStorefrontExtraById/);
 assert.doesNotMatch(

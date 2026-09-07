@@ -101,13 +101,7 @@ export async function StorefrontHomePage() {
         </div>
       </section>
 
-      <section className="px-6 pb-9 sm:px-10 sm:pb-10">
-        <div className="border-fog/70 mx-auto w-full max-w-6xl border-t pt-3">
-          <HomePopularCakes cakes={popular} />
-        </div>
-      </section>
-
-      <HomeVisitFooter />
+      <HomeVisitFooter lead={<HomePopularCakes cakes={popular} />} />
 
       <div className="px-6 sm:px-10">
         <div className="mx-auto w-full max-w-6xl">

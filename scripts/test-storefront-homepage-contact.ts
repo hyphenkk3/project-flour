@@ -64,6 +64,10 @@ const homeSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx")
 assert.match(homeSrc, /listStorefrontAvailableExtra/);
 assert.match(homeSrc, /StorefrontFreshPicksCard/);
 assert.match(homeSrc, /HomeVisitFooter/);
+assert.match(
+  homeSrc,
+  /HomeVisitFooter lead=\{<HomePopularCakes cakes=\{popular\} \/>\}/,
+);
 
 assert.doesNotMatch(homeSrc, /HomeFeaturedFreshPick/);
 assert.doesNotMatch(homeSrc, /getStorefrontExtraById/);
@@ -109,7 +113,14 @@ assert.match(footerSrc, /Find Us/);
 assert.match(footerSrc, /STOREFRONT_LOCATION_LANDMARK/);
 assert.match(footerSrc, /md:grid-cols-2/);
 assert.match(footerSrc, /items-start/);
+assert.match(
+  footerSrc,
+  /lg:grid-cols-\[minmax\(0,0\.55fr\)_minmax\(0,0\.27fr\)_minmax\(0,0\.18fr\)\]/,
+);
+assert.match(footerSrc, /md:col-span-2 lg:col-span-1/);
+assert.match(footerSrc, /border-t/);
 assert.doesNotMatch(footerSrc, /md:grid-cols-3/);
+assert.doesNotMatch(footerSrc, /lg:grid-cols-3/);
 assert.doesNotMatch(footerSrc, /wa\.me\/\d+/);
 
 assert.equal(STOREFRONT_WHATSAPP_PHONE, "+60128730060");
