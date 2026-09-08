@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
+import { BROWSE_CURRENTLY_UNAVAILABLE_NOTE } from "@/engines/menu/homepage-collection-preview";
 import type { StorefrontCake } from "@/types/storefront";
 import { AddToOrderButton, type AddToOrderPickupScope } from "@/workspaces/storefront/cart/AddToOrderSheet";
 import { storefrontDefaultPhoto } from "@/workspaces/storefront/catalog/cake-photo-map";
@@ -17,6 +18,7 @@ type StorefrontCakeCardProps = {
   cake: StorefrontCake;
   availabilityNote?: string | null;
   hideOrderCta?: boolean;
+  hideAddToOrder?: boolean;
   /** Collection entry scope forwarded to cake detail. */
   detailHref?: string;
   pickupScope?: AddToOrderPickupScope | null;
@@ -35,6 +37,7 @@ export function StorefrontCakeCard({
   cake,
   availabilityNote,
   hideOrderCta = false,
+  hideAddToOrder = false,
   detailHref,
   pickupScope = null,
 }: StorefrontCakeCardProps) {
@@ -128,18 +131,26 @@ export function StorefrontCakeCard({
             </p>
           ) : null}
           {availabilityNote ? (
-            <p className="text-status-danger mt-1.5 text-xs sm:mt-2 sm:text-sm">
+            <p
+              className={`${
+                availabilityNote === BROWSE_CURRENTLY_UNAVAILABLE_NOTE
+                  ? "text-skyline"
+                  : "text-status-danger"
+              } mt-1.5 text-xs sm:mt-2 sm:text-sm`}
+            >
               {availabilityNote}
             </p>
           ) : null}
         </div>
         {hideOrderCta ? null : (
           <div className="mt-auto grid gap-1 pt-1 sm:gap-1.5 sm:pt-0">
-            <AddToOrderButton
-              buttonClassName="border-ink bg-mist text-ink hover:border-skyline inline-flex h-11 min-h-11 w-full items-center justify-center rounded-md border px-3 text-[15px] leading-none font-medium transition duration-200 disabled:opacity-50 sm:h-auto sm:min-h-11 sm:rounded-md sm:border-fog sm:bg-transparent sm:px-4 sm:text-sm sm:leading-normal sm:hover:border-ink sm:hover:bg-transparent sm:active:bg-transparent"
-              cake={cake}
-              pickupScope={pickupScope}
-            />
+            {hideAddToOrder ? null : (
+              <AddToOrderButton
+                buttonClassName="border-ink bg-mist text-ink hover:border-skyline inline-flex h-11 min-h-11 w-full items-center justify-center rounded-md border px-3 text-[15px] leading-none font-medium transition duration-200 disabled:opacity-50 sm:h-auto sm:min-h-11 sm:rounded-md sm:border-fog sm:bg-transparent sm:px-4 sm:text-sm sm:leading-normal sm:hover:border-ink sm:hover:bg-transparent sm:active:bg-transparent"
+                cake={cake}
+                pickupScope={pickupScope}
+              />
+            )}
             <Link
               className="text-skyline hover:text-ink hidden min-h-11 w-full items-center justify-center text-sm font-medium transition-colors duration-200 sm:inline-flex"
               href={href}

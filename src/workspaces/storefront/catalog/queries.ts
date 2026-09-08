@@ -8,6 +8,11 @@ import {
   isCustomerPastMenuVisible,
 } from "@/engines/menu/customer-browse";
 import {
+  BROWSE_CURRENTLY_UNAVAILABLE_NOTE,
+  HOMEPAGE_COLLECTION_PREVIEW_MAX,
+  isCustomerFacingHistoricalCatalogue,
+} from "@/engines/menu/homepage-collection-preview";
+import {
   businessYearMonth,
   formatBusinessMonthYear,
   toBusinessDateKey,
@@ -72,6 +77,7 @@ type CatalogRow = {
 
 export type BrowseStorefrontCake = StorefrontCake & {
   availabilityNote: string | null;
+  currentlyOffered: boolean;
 };
 
 export type CakePickupMembership = {
@@ -387,6 +393,44 @@ export async function listAvailableCakes(
 }
 
 /**
+ * Owner-curated homepage preview for one collection.
+ * Empty when nothing is explicitly selected — never infers first-N cakes.
+ */
+export async function listHomepageCollectionPreviewCakes(
+  collectionId: string,
+): Promise<StorefrontCake[]> {
+  const supabase = await createClient();
+  try {
+    const data = await withCakePhotoSelectFallback((photoSelect) =>
+      supabase
+        .from("collection_cakes")
+        .select(
+          `
+      homepage_sort_order,
+      library_cakes (
+        ${libraryCakeEmbedSelect(photoSelect)}
+      )
+    `,
+        )
+        .eq("collection_id", collectionId)
+        .eq("available", true)
+        .eq("show_on_homepage", true)
+        .order("homepage_sort_order", { ascending: true }),
+    );
+
+    return ((data ?? []) as unknown as CatalogRow[])
+      .map((row) => unwrapOne(row.library_cakes))
+      .filter((cake): cake is LibraryCakeEmbed => Boolean(cake))
+      .filter((cake) => isOfferableStatus(cake.status))
+      .map(mapStorefrontCake)
+      .filter((cake) => cake.sizes.length > 0)
+      .slice(0, HOMEPAGE_COLLECTION_PREVIEW_MAX);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Cake offered on the public storefront for Singapore today (homepage
  * merchandising). Checkout ordering uses the pickup-date catalogue instead.
  */
@@ -691,34 +735,49 @@ export async function getHistoricalCatalogueById(
 }
 
 /**
- * Discovery only: cakes in customer-orderable catalogues
- * (active monthly including future months, and specials with website_override).
- * Not checkout authority — pickup date still selects the catalogue.
+ * Discovery: cakes Whitebird has offered on the customer storefront.
+ * Currently orderable cakes keep existing notes (e.g. Available from Oct).
+ * Historical offerings that are not currently offered show
+ * "Currently unavailable". Not checkout authority.
  */
 export async function listBrowsePublishedCakes(
   todayYmd: string = toBusinessDateKey(),
 ): Promise<BrowseStorefrontCake[]> {
   const todayYm = businessYearMonth(todayYmd) ?? todayYmd.slice(0, 7);
   const supabase = await createClient();
-  const { data: catalogues, error: catalogueError } = await supabase
+  const withHistoryFlag = await supabase
     .from("collections")
-    .select("id, month, purpose, status, end_date, website_override")
-    .eq("status", "active");
+    .select(
+      "id, month, purpose, status, end_date, website_override, show_in_past_menu",
+    )
+    .in("status", ["active", "archived"]);
+  const cataloguesQuery = (withHistoryFlag.error?.message ?? "").includes(
+    "show_in_past_menu",
+  )
+    ? await supabase
+        .from("collections")
+        .select("id, month, purpose, status, end_date, website_override")
+        .in("status", ["active", "archived"])
+    : withHistoryFlag;
+
+  const { data: catalogues, error: catalogueError } = cataloguesQuery;
 
   if (catalogueError) {
     throw new Error(catalogueError.message);
   }
 
-  const active = (
-    (catalogues ?? []) as Array<{
-      id: string;
-      month: string | null;
-      purpose: string | null;
-      status: string;
-      end_date: string | null;
-      website_override: boolean | null;
-    }>
-  ).filter((row) =>
+  type BrowseCatalogueRow = {
+    id: string;
+    month: string | null;
+    purpose: string | null;
+    status: string;
+    end_date: string | null;
+    website_override: boolean | null;
+    show_in_past_menu?: boolean | null;
+  };
+
+  const rows = (catalogues ?? []) as BrowseCatalogueRow[];
+  const currentlyOrderable = rows.filter((row) =>
     isCurrentlyCustomerOrderable(
       {
         purpose: row.purpose ?? "monthly",
@@ -730,12 +789,27 @@ export async function listBrowsePublishedCakes(
       todayYmd,
     ),
   );
-  if (active.length === 0) {
+  const historical = rows.filter(
+    (row) =>
+      !currentlyOrderable.some((active) => active.id === row.id) &&
+      isCustomerFacingHistoricalCatalogue({
+        purpose: row.purpose ?? "monthly",
+        status: row.status,
+        websiteOverride: row.website_override === true,
+        showInPastMenu: row.show_in_past_menu === true,
+      }),
+  );
+  const catalogueIds = [
+    ...currentlyOrderable.map((row) => row.id),
+    ...historical.map((row) => row.id),
+  ];
+  if (catalogueIds.length === 0) {
     return [];
   }
 
+  const currentlyOrderableIds = new Set(currentlyOrderable.map((row) => row.id));
   const monthlyMonthById = new Map<string, string>();
-  for (const row of active) {
+  for (const row of currentlyOrderable) {
     if (row.purpose !== "monthly" || !row.month) continue;
     monthlyMonthById.set(row.id, String(row.month).slice(0, 10));
   }
@@ -753,40 +827,51 @@ export async function listBrowsePublishedCakes(
     `,
       )
       .eq("available", true)
-      .in(
-        "collection_id",
-        active.map((row) => row.id),
-      )
+      .in("collection_id", catalogueIds)
       .order("sort_order", { ascending: true }),
   );
 
   const cakeById = new Map<string, StorefrontCake>();
   const monthsByCakeId = new Map<string, string[]>();
+  const currentlyOfferedIds = new Set<string>();
 
   for (const row of (data ?? []) as unknown as CatalogRow[]) {
     const embed = unwrapOne(row.library_cakes);
-    if (!embed || !isOfferableStatus(embed.status)) continue;
+    if (!embed) continue;
+    const collectionId = row.collection_id;
+    const inCurrent =
+      typeof collectionId === "string" &&
+      currentlyOrderableIds.has(collectionId);
+    if (inCurrent && !isOfferableStatus(embed.status)) continue;
     const cake = mapStorefrontCake(embed);
     if (cake.sizes.length === 0) continue;
     cakeById.set(cake.id, cake);
-    const month = row.collection_id
-      ? monthlyMonthById.get(row.collection_id)
-      : undefined;
-    if (!month) continue;
-    const months = monthsByCakeId.get(cake.id) ?? [];
-    months.push(month);
-    monthsByCakeId.set(cake.id, months);
+    if (inCurrent) {
+      currentlyOfferedIds.add(cake.id);
+      const month = monthlyMonthById.get(collectionId);
+      if (month) {
+        const months = monthsByCakeId.get(cake.id) ?? [];
+        months.push(month);
+        monthsByCakeId.set(cake.id, months);
+      }
+    }
   }
 
   return [...cakeById.values()]
     .sort((a, b) => a.name.localeCompare(b.name, "en"))
-    .map((cake) => ({
-      ...cake,
-      availabilityNote: browseCakeAvailabilityNote(
-        todayYm,
-        monthsByCakeId.get(cake.id) ?? [],
-      ),
-    }));
+    .map((cake) => {
+      const currentlyOffered = currentlyOfferedIds.has(cake.id);
+      return {
+        ...cake,
+        currentlyOffered,
+        availabilityNote: currentlyOffered
+          ? browseCakeAvailabilityNote(
+              todayYm,
+              monthsByCakeId.get(cake.id) ?? [],
+            )
+          : BROWSE_CURRENTLY_UNAVAILABLE_NOTE,
+      };
+    });
 }
 
 export async function getBrowsePublishedCakeById(
@@ -798,7 +883,11 @@ export async function getBrowsePublishedCakeById(
   const popular = await listHomepagePopularCakes();
   const merchandised = popular.find((cake) => cake.id === id);
   if (!merchandised) return null;
-  return { ...merchandised, availabilityNote: null };
+  return {
+    ...merchandised,
+    availabilityNote: null,
+    currentlyOffered: true,
+  };
 }
 
 /**

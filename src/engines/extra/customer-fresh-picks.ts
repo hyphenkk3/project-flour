@@ -381,3 +381,33 @@ export function sortCustomerFreshPicksByAvailabilityDay<
     return rank(a.day) - rank(b.day);
   });
 }
+
+function homepageFreshPickAvailabilityRank(
+  days: readonly FreshPickDay[],
+): number {
+  const hasToday = days.includes("today");
+  const hasTomorrow = days.includes("tomorrow");
+  if (hasToday && !hasTomorrow) return 0;
+  if (hasToday && hasTomorrow) return 1;
+  if (!hasToday && hasTomorrow) return 2;
+  return 3;
+}
+
+/**
+ * Homepage Fresh Picks order: today only, then today+tomorrow, then tomorrow
+ * only. Offering order is preserved within each group.
+ */
+export function sortHomepageFreshPicks<
+  T extends { days: readonly FreshPickDay[] },
+>(picks: readonly T[]): T[] {
+  return picks
+    .map((pick, index) => ({ pick, index }))
+    .sort((left, right) => {
+      const diff =
+        homepageFreshPickAvailabilityRank(left.pick.days) -
+        homepageFreshPickAvailabilityRank(right.pick.days);
+      if (diff !== 0) return diff;
+      return left.index - right.index;
+    })
+    .map((entry) => entry.pick);
+}

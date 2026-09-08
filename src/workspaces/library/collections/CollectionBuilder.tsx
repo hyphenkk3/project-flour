@@ -45,6 +45,7 @@ import type {
   CollectionCakeRow,
   LibraryCollection,
 } from "@/workspaces/library/collections/queries";
+import { CollectionHomepagePreviewControl } from "@/workspaces/library/collections/CollectionHomepagePreviewControl";
 import { cakeCategoryOptionLabel, sortCakeCategories } from "@/engines/menu/cake-categories";
 import {
   LIBRARY_CAKE_STATUSES,
@@ -65,6 +66,7 @@ type CollectionBuilderProps = {
   libraryCakes: LibraryCake[];
   categories: LibraryCakeCategoryRecord[];
   isWebsiteCatalogue: boolean;
+  canManage: boolean;
 };
 
 export function CollectionBuilder({
@@ -73,6 +75,7 @@ export function CollectionBuilder({
   libraryCakes,
   categories,
   isWebsiteCatalogue,
+  canManage,
 }: CollectionBuilderProps) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -169,7 +172,8 @@ export function CollectionBuilder({
             cakes still need Active or Seasonal Library status, at least one
             size, and to belong to the current website catalogue before they
             appear on the website. Drag cakes to set this catalogue’s order, or
-            use Sort catalogue.
+            use Sort catalogue. Homepage preview is a separate, Owner/Manager
+            selection of up to 6 cakes for this collection’s storefront section.
           </p>
         </div>
 
@@ -230,6 +234,7 @@ export function CollectionBuilder({
           >
             {members.map((member, index) => (
               <CollectionMemberCard
+                canManage={canManage}
                 collectionStatus={collection.status}
                 disabled={pending || locked}
                 dragging={draggedId === member.id}
@@ -441,6 +446,7 @@ type CollectionMemberCardProps = {
   member: CollectionCakeRow;
   collectionStatus: string;
   isWebsiteCatalogue: boolean;
+  canManage: boolean;
   index: number;
   total: number;
   disabled: boolean;
@@ -459,6 +465,7 @@ function CollectionMemberCard({
   member,
   collectionStatus,
   isWebsiteCatalogue,
+  canManage,
   index,
   total,
   disabled,
@@ -536,6 +543,15 @@ function CollectionMemberCard({
               >
                 Open in Cake Library →
               </Link>
+              <CollectionHomepagePreviewControl
+                available={member.available}
+                canManage={canManage}
+                collectionId={member.collectionId}
+                disabled={disabled}
+                membershipId={member.id}
+                position={member.homepageSortOrder}
+                showOnHomepage={member.showOnHomepage}
+              />
             </div>
           </div>
 

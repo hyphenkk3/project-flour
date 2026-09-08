@@ -215,9 +215,9 @@ assert.doesNotMatch(orderSrc, /\/browse\/menu\//);
 const browseSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontBrowsePage.tsx",
 );
-assert.match(browseSrc, /listHistoricalCatalogues/);
-assert.match(browseSrc, /PAST_MENU_LABEL/);
-assert.match(browseSrc, /\/browse\/menu\//);
+assert.doesNotMatch(browseSrc, /listHistoricalCatalogues/);
+assert.doesNotMatch(browseSrc, /PAST_MENU_LABEL/);
+assert.doesNotMatch(browseSrc, /Past menus/);
 assert.doesNotMatch(browseSrc, /Continue to preorder|\/order\/checkout/);
 
 const pastSrc = readSrc(

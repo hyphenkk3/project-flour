@@ -48,6 +48,7 @@ export async function StorefrontCakeDetail({
       <StorefrontCakeDetailView
         availabilityNote={cake.availabilityNote}
         cake={cake}
+        hideAddToOrder={cake.currentlyOffered === false}
         pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
         pickupScopeFrom={pickupScopeFrom}
         pickupScopePickup={pickupScopePickup}

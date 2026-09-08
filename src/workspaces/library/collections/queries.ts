@@ -26,6 +26,8 @@ export type CollectionCakeRow = {
   libraryCakeId: string;
   available: boolean;
   sortOrder: number;
+  showOnHomepage: boolean;
+  homepageSortOrder: number | null;
   cake: LibraryCake;
 };
 
@@ -49,6 +51,8 @@ type MembershipRow = {
   library_cake_id: string;
   available: boolean;
   sort_order: number;
+  show_on_homepage?: boolean | null;
+  homepage_sort_order?: number | null;
   library_cakes:
     Parameters<typeof mapCake>[0] | Parameters<typeof mapCake>[0][] | null;
 };
@@ -302,14 +306,73 @@ export async function getLibraryCollectionById(
   );
 }
 
+function mapMembershipRow(row: MembershipRow, cake: LibraryCake): CollectionCakeRow {
+  const rawOrder = row.homepage_sort_order;
+  const homepageSortOrder = rawOrder == null ? null : Number(rawOrder);
+  return {
+    id: row.id,
+    collectionId: row.collection_id,
+    libraryCakeId: row.library_cake_id,
+    available: row.available,
+    sortOrder: row.sort_order,
+    showOnHomepage: row.show_on_homepage === true,
+    homepageSortOrder: Number.isInteger(homepageSortOrder)
+      ? homepageSortOrder
+      : null,
+    cake,
+  };
+}
+
 export async function listCollectionCakeRows(
   collectionId: string,
 ): Promise<CollectionCakeRow[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const membershipSelect = `
+      id,
+      collection_id,
+      library_cake_id,
+      available,
+      sort_order,
+      show_on_homepage,
+      homepage_sort_order,
+      library_cakes (
+        id,
+        name,
+        category_id,
+        description,
+        sharing_guide,
+        allergens,
+        bakery_notes,
+        status,
+        created_at,
+        updated_at,
+        library_cake_categories (
+          id,
+          name,
+          is_active,
+          sort_order
+        ),
+        library_cake_sizes (
+          id,
+          cake_id,
+          label,
+          price,
+          sort_order
+        )
+      )
+    `;
+  const withHomepage = await supabase
     .from("collection_cakes")
-    .select(
-      `
+    .select(membershipSelect)
+    .eq("collection_id", collectionId)
+    .order("sort_order", { ascending: true });
+  const { data, error } =
+    (withHomepage.error?.message ?? "").includes("show_on_homepage") ||
+    (withHomepage.error?.message ?? "").includes("homepage_sort_order")
+      ? await supabase
+          .from("collection_cakes")
+          .select(
+            `
       id,
       collection_id,
       library_cake_id,
@@ -341,9 +404,10 @@ export async function listCollectionCakeRows(
         )
       )
     `,
-    )
-    .eq("collection_id", collectionId)
-    .order("sort_order", { ascending: true });
+          )
+          .eq("collection_id", collectionId)
+          .order("sort_order", { ascending: true })
+      : withHomepage;
   if (error) {
     throw new Error(error.message);
   }
@@ -352,14 +416,7 @@ export async function listCollectionCakeRows(
   for (const row of (data ?? []) as MembershipRow[]) {
     const cakeRow = unwrapOne(row.library_cakes);
     if (!cakeRow) continue;
-    rows.push({
-      id: row.id,
-      collectionId: row.collection_id,
-      libraryCakeId: row.library_cake_id,
-      available: row.available,
-      sortOrder: row.sort_order,
-      cake: mapCake(cakeRow),
-    });
+    rows.push(mapMembershipRow(row, mapCake(cakeRow)));
   }
   return rows;
 }

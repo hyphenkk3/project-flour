@@ -61,17 +61,22 @@ const freshCardSrc = readSrc(
 assert.match(freshCardSrc, /unavailable=\{empty\}/);
 assert.match(freshCardSrc, /href="\/extra"/);
 assert.match(freshCardSrc, /See Fresh Picks/);
-assert.match(freshCardSrc, /limited-time pickup/);
+assert.match(freshCardSrc, /Extra cakes available for selected dates/);
+assert.match(freshCardSrc, /For last-minute orders, subject to availability/);
+assert.doesNotMatch(freshCardSrc, /limited-time pickup/);
+assert.doesNotMatch(freshCardSrc, /earlier pickup/);
+assert.doesNotMatch(freshCardSrc, /seasonal/);
+assert.doesNotMatch(freshCardSrc, /leftover/);
+assert.doesNotMatch(freshCardSrc, /clearance/);
 assert.match(freshCardSrc, /homepageFreshPicksAvailabilityLines/);
 assert.match(freshCardSrc, /homepageFreshPicksHorizon/);
 assert.match(freshCardSrc, /homepageFreshPicksCountCopy/);
-assert.match(freshCardSrc, /homepageFreshPicksDescription/);
+assert.doesNotMatch(freshCardSrc, /homepageFreshPicksDescription/);
 assert.match(freshCardSrc, /mt-2 space-y-0\.5/);
 assert.match(freshCardSrc, /tall/);
 
 const homeSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
 assert.match(homeSrc, /listStorefrontAvailableExtra/);
-assert.match(homeSrc, /StorefrontFreshPicksCard/);
 assert.match(homeSrc, /HomeVisitFooter/);
 assert.match(
   homeSrc,
@@ -82,14 +87,18 @@ assert.doesNotMatch(homeSrc, /HomeFeaturedFreshPick/);
 assert.doesNotMatch(homeSrc, /getStorefrontExtraById/);
 assert.match(homeSrc, /HomePopularCakes/);
 
-assert.match(homeSrc, /days=\{picks\.flatMap\(\(pick\) => pick\.days\)\}/);
 assert.match(homeSrc, /href="\/faq"/);
 assert.match(homeSrc, /HomeMobileNav/);
 assert.match(
   homeSrc,
   /href="\/extra"[\s\S]*Fresh Picks[\s\S]*href="\/faq"[\s\S]*FAQ/,
 );
-assert.match(homeSrc, /grid gap-4 md:grid-cols-3 md:gap-3\.5/);
+assert.match(homeSrc, /HomeFeaturedCollection/);
+assert.match(homeSrc, /HomeBrowseAllCakes/);
+assert.match(homeSrc, /HomeFreshPicksSection/);
+assert.match(homeSrc, /listOrderableMonthlyCatalogues/);
+assert.doesNotMatch(homeSrc, /listAvailableCakes/);
+assert.match(homeSrc, /md:hidden/);
 assert.match(homeSrc, /hidden[\s\S]*md:flex/);
 assert.doesNotMatch(
   homeSrc,

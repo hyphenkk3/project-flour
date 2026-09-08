@@ -12,6 +12,7 @@ import {
 type StorefrontCakeDetailViewProps = {
   cake: StorefrontCake;
   availabilityNote?: string | null;
+  hideAddToOrder?: boolean;
   pickupDateNotice?: string | null;
   pickupScopeFrom?: string | null;
   pickupScopeTo?: string | null;
@@ -21,6 +22,7 @@ type StorefrontCakeDetailViewProps = {
 export function StorefrontCakeDetailView({
   cake,
   availabilityNote,
+  hideAddToOrder = false,
   pickupDateNotice,
   pickupScopeFrom,
   pickupScopeTo,
@@ -73,6 +75,7 @@ export function StorefrontCakeDetailView({
       <CakeDetailPurchasePanel
         availabilityNote={availabilityNote}
         cake={cake}
+        hideAddToOrder={hideAddToOrder}
         onSelectedSizeIdChange={setSelectedSizeId}
         pickupDateNotice={pickupDateNotice}
         pickupScopeFrom={pickupScopeFrom}

@@ -29,6 +29,23 @@ function isMachineDispatchPath(pathname: string) {
   return pathname === "/api/staff/notifications/dispatch";
 }
 
+function staffLoginRedirect(request: NextRequest): NextResponse {
+  const loginUrl = request.nextUrl.clone();
+  const returnPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+  loginUrl.pathname = "/login";
+  loginUrl.search = "";
+  loginUrl.hash = "";
+  if (
+    returnPath.startsWith("/") &&
+    !returnPath.startsWith("//") &&
+    returnPath !== "/login" &&
+    !returnPath.startsWith("/login?")
+  ) {
+    loginUrl.searchParams.set("next", returnPath);
+  }
+  return NextResponse.redirect(loginUrl);
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -44,17 +61,13 @@ export async function middleware(request: NextRequest) {
     );
 
     if (!user) {
-      const loginUrl = request.nextUrl.clone();
-      loginUrl.pathname = "/login";
-      return NextResponse.redirect(loginUrl);
+      return staffLoginRedirect(request);
     }
 
     return supabaseResponse;
   } catch {
     // Timeout / network failure: fail closed to login, never hang.
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    return NextResponse.redirect(loginUrl);
+    return staffLoginRedirect(request);
   }
 }
 

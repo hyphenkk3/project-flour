@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { StorefrontCake } from "@/types/storefront";
 import { AddToOrderButton } from "@/workspaces/storefront/cart/AddToOrderSheet";
 import { usePreorderDraft } from "@/workspaces/storefront/cart/usePreorderDraft";
+import { BROWSE_CURRENTLY_UNAVAILABLE_NOTE } from "@/engines/menu/homepage-collection-preview";
 import {
   formatPreorderRequirement,
   formatRm,
@@ -13,6 +14,7 @@ import {
 type CakeDetailPurchasePanelProps = {
   cake: StorefrontCake;
   availabilityNote?: string | null;
+  hideAddToOrder?: boolean;
   pickupDateNotice?: string | null;
   pickupScopeFrom?: string | null;
   pickupScopeTo?: string | null;
@@ -34,6 +36,7 @@ function existingQuantityForSize(
 export function CakeDetailPurchasePanel({
   cake,
   availabilityNote,
+  hideAddToOrder = false,
   pickupDateNotice,
   pickupScopeFrom = null,
   pickupScopeTo = null,
@@ -144,32 +147,44 @@ export function CakeDetailPurchasePanel({
       </section>
 
       {availabilityNote ? (
-        <p className="text-status-danger text-sm">{availabilityNote}</p>
-      ) : null}
-
-      <section className="border-fog border-t pt-4">
-        <p className="text-ink text-sm leading-relaxed">
-          {pickupDateNotice ??
-            "Your available cakes depend on your pickup date."}
-        </p>
-        <p className="text-skyline mt-1 text-sm">
-          We&apos;ll confirm your preorder after you submit. Payment is
-          arranged afterwards — not on this website.
-        </p>
-      </section>
-
-      {existingQuantity > 0 ? (
-        <p className="text-skyline text-sm">
-          {existingQuantity} already in your order for this size.
+        <p
+          className={
+            availabilityNote === BROWSE_CURRENTLY_UNAVAILABLE_NOTE
+              ? "text-skyline text-sm"
+              : "text-status-danger text-sm"
+          }
+        >
+          {availabilityNote}
         </p>
       ) : null}
 
-      <AddToOrderButton
-        cake={cake}
-        initialSizeId={selectedSizeId}
-        pickupScope={pickupScope}
-      />
-      <div aria-hidden className="h-20 md:hidden" />
+      {hideAddToOrder ? null : (
+        <>
+          <section className="border-fog border-t pt-4">
+            <p className="text-ink text-sm leading-relaxed">
+              {pickupDateNotice ??
+                "Your available cakes depend on your pickup date."}
+            </p>
+            <p className="text-skyline mt-1 text-sm">
+              We&apos;ll confirm your preorder after you submit. Payment is
+              arranged afterwards — not on this website.
+            </p>
+          </section>
+
+          {existingQuantity > 0 ? (
+            <p className="text-skyline text-sm">
+              {existingQuantity} already in your order for this size.
+            </p>
+          ) : null}
+
+          <AddToOrderButton
+            cake={cake}
+            initialSizeId={selectedSizeId}
+            pickupScope={pickupScope}
+          />
+          <div aria-hidden className="h-20 md:hidden" />
+        </>
+      )}
     </div>
   );
 }

@@ -33,13 +33,14 @@ function HeroCopy({
         Cakes made with heart
       </p>
       <h1 className={headingClass}>
-        Every celebration
+        <span className="whitespace-nowrap">Every celebration</span>
         <br />
         begins here.
       </h1>
       <p className={supportingClass}>
-        From everyday moments to once-in-a-lifetime celebrations,
-        we&apos;re here to make it sweeter.
+        From everyday moments to
+        <br className="md:hidden" /> once-in-a-lifetime celebrations,
+        <br className="md:hidden" /> we&apos;re here to make it sweeter.
       </p>
     </>
   );
@@ -89,7 +90,9 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
         <div className="from-paper absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t to-transparent" />
       </div>
 
-      {header ? <div className="relative z-20">{header}</div> : null}
+      {header ? (
+        <div className="absolute inset-x-0 top-0 z-20 md:relative">{header}</div>
+      ) : null}
 
       {orderPanel ? (
         <div className="pointer-events-auto absolute inset-x-0 top-[3.35rem] z-20 hidden md:block">
@@ -102,14 +105,18 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
       ) : null}
 
       <div className="relative z-10 md:hidden">
-        <div className="relative h-[18.5rem] overflow-hidden">
+        <div className="relative h-[22.5rem] overflow-hidden">
           <div
             aria-hidden
             className="absolute inset-0 bg-no-repeat"
             style={{
               backgroundImage: `url(${STOREFRONT_HOMEPAGE_HERO_SRC})`,
-              backgroundPosition: "30% 20%",
-              backgroundSize: "auto 178%",
+              backgroundPosition: "28% 46%",
+              backgroundSize: "auto 122%",
+              WebkitMaskImage:
+                "linear-gradient(to bottom, #000 0%, #000 68%, transparent 100%)",
+              maskImage:
+                "linear-gradient(to bottom, #000 0%, #000 68%, transparent 100%)",
             }}
           />
           <Image
@@ -122,26 +129,34 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
           />
           <div
             aria-hidden
-            className="from-paper/75 absolute inset-y-0 left-0 z-[1] w-[58%] bg-gradient-to-r via-paper/18 to-transparent"
+            className="from-paper/16 absolute inset-y-0 left-0 z-[1] w-[30%] bg-gradient-to-r to-transparent"
           />
           <div
             aria-hidden
-            className="from-paper absolute inset-x-0 top-0 z-[1] h-8 bg-gradient-to-b to-transparent"
+            className="from-paper/50 absolute inset-x-0 top-0 z-[1] h-12 bg-gradient-to-b to-transparent"
           />
           <div
             aria-hidden
-            className="from-paper absolute inset-x-0 bottom-0 z-[1] h-5 bg-gradient-to-t to-transparent"
+            className="from-paper absolute inset-y-0 left-0 z-[1] w-3 bg-gradient-to-r to-transparent"
           />
-          <div className="relative z-[2] flex h-[18.5rem] flex-col px-6 pt-3 pb-3">
-            <div className="w-full max-w-[16.5rem]">
+          <div
+            aria-hidden
+            className="from-paper absolute inset-y-0 right-0 z-[1] w-2.5 bg-gradient-to-l to-transparent"
+          />
+          <div
+            aria-hidden
+            className="from-paper absolute inset-x-0 bottom-0 z-[1] h-16 bg-gradient-to-t to-transparent"
+          />
+          <div className="relative z-[2] flex h-[22.5rem] flex-col justify-start px-6 pt-[4.35rem] pb-5">
+            <div className="w-full max-w-[18.25rem]">
               <HeroCopy
-                headingClass="font-display text-ink mt-1.5 text-[1.85rem] leading-[1.12] tracking-tight"
-                supportingClass="text-skyline mt-2 text-[0.95rem] leading-relaxed"
+                headingClass="font-display text-ink mt-1.5 text-[1.85rem] leading-[1.14] tracking-[-0.02em]"
+                supportingClass="text-skyline mt-2.5 max-w-[17.5rem] text-[0.88rem] leading-[1.5]"
               />
               <HeroValueCues
-                iconClass="bg-paper/80 text-ink/65 flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
-                itemClass="flex min-w-0 flex-col items-center gap-1.5 text-center"
-                listClass="mt-4 grid w-[13.75rem] grid-cols-3 gap-x-1"
+                iconClass="bg-paper/80 text-ink/60 flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+                itemClass="flex min-w-0 flex-col items-center gap-1 text-center"
+                listClass="mt-3.5 grid w-[13.75rem] grid-cols-3 gap-x-1"
               />
             </div>
           </div>

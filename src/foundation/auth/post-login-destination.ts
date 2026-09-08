@@ -1,4 +1,5 @@
 import { canAccessWorkspace } from "@/foundation/navigation/access";
+import { isWorkspaceNavActive } from "@/foundation/navigation/is-active";
 import {
   getNavigationForRole,
   WORKSPACE_CATALOG,
@@ -21,16 +22,14 @@ export function sanitizePostLoginPath(
 
 /**
  * True when `path` is under a workspace the role can navigate to.
+ * Uses the same workspace path matching as staff navigation, so Library
+ * routes like `/library/collections/[id]` are not rejected just because
+ * the Library nav href is `/library/cakes`.
  */
 export function canAccessPostLoginPath(role: RoleCode, path: string): boolean {
   const pathname = path.split(/[?#]/, 1)[0] ?? path;
-  const hrefs = getNavigationForRole(role)
-    .map((item) => item.href)
-    .filter((href): href is string => Boolean(href))
-    .sort((a, b) => b.length - a.length);
-
-  return hrefs.some(
-    (href) => pathname === href || pathname.startsWith(`${href}/`),
+  return getNavigationForRole(role).some((item) =>
+    isWorkspaceNavActive(item, pathname),
   );
 }
 

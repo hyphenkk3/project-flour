@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import {
   homepageFreshPicksAvailabilityLines,
   homepageFreshPicksCountCopy,
-  homepageFreshPicksDescription,
   homepageFreshPicksHorizon,
   type FreshPickDay,
 } from "@/engines/extra/customer-fresh-picks";
@@ -14,8 +13,8 @@ type StorefrontFreshPicksCardProps = {
   icon: ReactNode;
 };
 
-const AVAILABLE_DESCRIPTION =
-  "Special cakes released by Bakery for limited-time pickup.";
+const FRESH_PICKS_DESCRIPTION =
+  "Extra cakes available for selected dates. For last-minute orders, subject to availability.";
 
 export function StorefrontFreshPicksCard({
   days,
@@ -24,9 +23,6 @@ export function StorefrontFreshPicksCard({
   const horizon = homepageFreshPicksHorizon(days);
   const count = days.length;
   const empty = count <= 0;
-  const description = empty
-    ? homepageFreshPicksDescription(horizon)
-    : AVAILABLE_DESCRIPTION;
   const availabilityLines = empty
     ? []
     : homepageFreshPicksAvailabilityLines(days, toBusinessDateKey());
@@ -37,7 +33,7 @@ export function StorefrontFreshPicksCard({
       ctaVariant="soft"
       dense
       tall
-      description={description}
+      description={FRESH_PICKS_DESCRIPTION}
       extra={
         empty ? (
           <p className="text-skyline/80 mt-2 line-clamp-1 text-[11px] leading-tight md:mt-1">

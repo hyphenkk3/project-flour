@@ -323,14 +323,23 @@ assert.deepEqual(
 );
 
 const homeSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
-assert.match(homeSrc, /Order a Cake/);
 assert.match(homeSrc, /href="\/order"/);
 assert.match(homeSrc, /Browse Cakes/);
 assert.match(homeSrc, /href="\/browse"/);
-assert.match(homeSrc, /StorefrontFreshPicksCard/);
-assert.match(homeSrc, /days=\{picks\.flatMap\(\(pick\) => pick\.days\)\}/);
 assert.match(homeSrc, /listStorefrontAvailableExtra/);
 assert.match(homeSrc, /listHomepagePopularCakes/);
+assert.match(homeSrc, /listOrderableMonthlyCatalogues/);
+assert.match(homeSrc, /listCustomerSpecialCatalogues/);
+assert.match(homeSrc, /selectHomepageFeaturedCollections/);
+assert.match(homeSrc, /listHomepageCollectionPreviewCakes/);
+assert.match(homeSrc, /sortHomepageFreshPicks/);
+assert.match(homeSrc, /HomeFeaturedCollection/);
+assert.match(homeSrc, /HomeMoreCollections/);
+assert.match(homeSrc, /HomeBrowseAllCakes/);
+assert.match(homeSrc, /HomeFreshPicksSection/);
+assert.doesNotMatch(homeSrc, /HomeCurrentCollection/);
+assert.doesNotMatch(homeSrc, /HomeDestinationCard/);
+assert.doesNotMatch(homeSrc, /StorefrontFreshPicksCard/);
 assert.doesNotMatch(homeSrc, /listAvailableCakes/);
 assert.doesNotMatch(homeSrc, /listBrowsePublishedCakes/);
 assert.doesNotMatch(homeSrc, /getCurrentCollection/);
@@ -362,10 +371,28 @@ assert.match(homeHeroSrc, /md:mt-6\.5/);
 assert.match(homeHeroSrc, /md:flex md:flex-wrap md:gap-x-5 md:gap-y-2 lg:gap-x-7/);
 assert.match(homeHeroSrc, /md:pb-6/);
 assert.match(homeHeroSrc, /md:max-w-\[20rem\] lg:max-w-\[23\.5rem\]/);
-assert.match(homeHeroSrc, /h-\[18\.5rem\]/);
-assert.match(homeHeroSrc, /backgroundPosition: "30% 20%"/);
-assert.match(homeHeroSrc, /backgroundSize: "auto 178%"/);
-assert.match(homeHeroSrc, /w-\[13\.75rem\] grid-cols-3 gap-x-1/);
+assert.match(homeHeroSrc, /h-\[22\.5rem\]/);
+assert.match(homeHeroSrc, /backgroundPosition: "28% 46%"/);
+assert.match(homeHeroSrc, /backgroundSize: "auto 122%"/);
+assert.match(homeHeroSrc, /bg-no-repeat/);
+assert.match(homeHeroSrc, /maskImage/);
+assert.match(homeHeroSrc, /whitespace-nowrap/);
+assert.match(homeHeroSrc, /Every celebration/);
+assert.match(homeHeroSrc, /begins here/);
+assert.match(homeHeroSrc, /bg-paper\/80/);
+assert.match(homeHeroSrc, /w-\[13\.75rem\]/);
+assert.doesNotMatch(homeHeroSrc, /h-\[24\.5rem\]/);
+assert.doesNotMatch(homeHeroSrc, /h-\[26\.25rem\]/);
+assert.doesNotMatch(homeHeroSrc, /VIEW FULL CATALOG/);
+assert.doesNotMatch(homeHeroSrc, /View Full Catalog/);
+assert.match(homeHeroSrc, /absolute inset-x-0 top-0 z-20 md:relative/);
+assert.doesNotMatch(
+  homeHeroSrc,
+  /2–3 days preorder · Quality ingredients · Made with care/,
+);
+assert.doesNotMatch(homeHeroSrc, /backgroundPosition: "30% 20%"/);
+assert.doesNotMatch(homeHeroSrc, /backgroundSize: "auto 178%"/);
+assert.doesNotMatch(homeHeroSrc, /h-\[18\.5rem\]/);
 assert.match(homeHeroSrc, /h-7 w-7/);
 assert.match(homeHeroSrc, /md:h-8 md:w-8/);
 assert.doesNotMatch(homeHeroSrc, /md:h-9 md:w-9/);
@@ -385,15 +412,59 @@ assert.match(freshCardSrc, /Fresh Picks/);
 assert.match(freshCardSrc, /href="\/extra"/);
 assert.match(freshCardSrc, /See Fresh Picks/);
 assert.match(freshCardSrc, /View Fresh Picks/);
-assert.match(freshCardSrc, /limited-time pickup/);
+assert.match(freshCardSrc, /Extra cakes available for selected dates/);
+assert.match(freshCardSrc, /For last-minute orders, subject to availability/);
+assert.doesNotMatch(freshCardSrc, /limited-time pickup/);
+assert.doesNotMatch(freshCardSrc, /earlier pickup/);
 assert.match(freshCardSrc, /homepageFreshPicksAvailabilityLines/);
-assert.match(freshCardSrc, /homepageFreshPicksDescription/);
+assert.doesNotMatch(freshCardSrc, /homepageFreshPicksDescription/);
 assert.match(freshCardSrc, /homepageFreshPicksHorizon/);
 assert.match(freshCardSrc, /homepageFreshPicksCountCopy/);
 assert.match(freshCardSrc, /dense/);
 assert.match(freshCardSrc, /tall/);
 assert.match(freshCardSrc, /mt-2 space-y-0\.5/);
 assert.doesNotMatch(freshCardSrc, /Today&apos;s Fresh Picks/);
+
+const currentCollectionSrc = readSrc(
+  "src/workspaces/storefront/home/HomeFeaturedCollection.tsx",
+);
+assert.match(currentCollectionSrc, /kicker/);
+assert.match(currentCollectionSrc, /viewAllLabel/);
+assert.match(currentCollectionSrc, /rounded-\[10px\]/);
+assert.match(currentCollectionSrc, /aspect-square/);
+assert.doesNotMatch(currentCollectionSrc, /aspect-\[4\/5\]/);
+assert.doesNotMatch(currentCollectionSrc, /01 \/ 02/);
+assert.doesNotMatch(currentCollectionSrc, /VIEW FULL CATALOG/);
+assert.match(homeSrc, /Current collection/);
+assert.match(homeSrc, /Our current selection of cakes for your celebrations/);
+
+const browseAllSrc = readSrc(
+  "src/workspaces/storefront/home/HomeBrowseAllCakes.tsx",
+);
+assert.match(browseAllSrc, /href="\/browse"/);
+assert.match(browseAllSrc, /Browse all cakes/);
+assert.match(browseAllSrc, /Explore the full Whitebird collection/);
+assert.doesNotMatch(browseAllSrc, /HomeDestinationCard/);
+
+const freshSectionSrc = readSrc(
+  "src/workspaces/storefront/home/HomeFreshPicksSection.tsx",
+);
+assert.match(freshSectionSrc, /Extra cakes available for selected dates/);
+assert.match(freshSectionSrc, /For last-minute orders, subject to availability/);
+assert.match(freshSectionSrc, /Nothing extra is available right now/);
+assert.match(freshSectionSrc, /Check back here for last-minute cake availability/);
+assert.match(freshSectionSrc, /\/extra\/\$\{pick\.id\}/);
+assert.match(freshSectionSrc, /href="\/extra"/);
+assert.match(freshSectionSrc, /rounded-\[10px\]/);
+assert.match(freshSectionSrc, /aspect-square/);
+assert.match(freshSectionSrc, /h-\[5\.5rem\] w-\[5\.5rem\]/);
+assert.doesNotMatch(freshSectionSrc, /h-\[6\.75rem\]/);
+assert.doesNotMatch(freshSectionSrc, /w-\[5\.4rem\]/);
+assert.doesNotMatch(freshSectionSrc, /earlier pickup/);
+assert.doesNotMatch(freshSectionSrc, /leftover/);
+assert.doesNotMatch(freshSectionSrc, /clearance/);
+assert.doesNotMatch(freshSectionSrc, /seasonal/);
+assert.doesNotMatch(freshSectionSrc, /HomeDestinationCard/);
 
 const extraSrc = readSrc("src/workspaces/storefront/home/StorefrontExtraPage.tsx");
 assert.match(extraSrc, /Fresh Picks/);
@@ -448,9 +519,13 @@ const popularSrc = readSrc(
   "src/workspaces/storefront/home/HomePopularCakes.tsx",
 );
 assert.match(popularSrc, /overflow-hidden rounded-\[10px\]/);
+assert.match(popularSrc, /h-24 w-24/);
+assert.match(popularSrc, /w-24 shrink-0/);
 assert.match(popularSrc, /Popular Cakes/);
 assert.match(popularSrc, /View all →/);
 assert.match(popularSrc, /cakes.length > 0 \?/);
+assert.doesNotMatch(popularSrc, /aspect-\[4\/5\]/);
+assert.doesNotMatch(popularSrc, /w-\[7\.5rem\]/);
 assert.doesNotMatch(popularSrc, /if \(cakes.length === 0\) return null/);
 
 const homeLinkSrc = readSrc("src/workspaces/storefront/StorefrontBrand.tsx");
@@ -465,8 +540,9 @@ const browseSrc = readSrc("src/workspaces/storefront/home/StorefrontBrowsePage.t
 assert.match(browseSrc, /listBrowsePublishedCakes/);
 assert.match(browseSrc, /BrowseCakeCatalogue/);
 assert.match(browseSrc, /href="\/order"/);
-assert.match(browseSrc, /listHistoricalCatalogues/);
-assert.match(browseSrc, /Past menus/);
+assert.match(browseSrc, /Explore the full Whitebird collection/);
+assert.doesNotMatch(browseSrc, /Past menus/);
+assert.doesNotMatch(browseSrc, /listHistoricalCatalogues/);
 assert.doesNotMatch(browseSrc, /getCurrentCollection/);
 assert.doesNotMatch(browseSrc, /submit_guest_preorder/);
 

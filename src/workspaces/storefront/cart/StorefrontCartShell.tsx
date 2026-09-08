@@ -419,15 +419,15 @@ export function StorefrontCartShell({
 
       <button
         aria-label={`${itemLabel}, ${formatRm(total)}. View order.`}
-        className="border-fog bg-[#E2E1DC] text-ink fixed right-0 bottom-0 left-0 z-40 flex min-h-14 items-center justify-between gap-3 border-t px-4 text-sm md:hidden"
+        className="border-ink/[0.08] bg-[#E2E1DC] text-ink fixed right-0 bottom-0 left-0 z-40 flex min-h-12 items-center justify-between gap-3 border-t px-5 py-2.5 text-[13px] md:hidden"
         onClick={() => setOpen(true)}
-        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        style={{ paddingBottom: "max(0.625rem, env(safe-area-inset-bottom))" }}
         type="button"
       >
-        <span className="font-medium">
+        <span className="text-skyline">
           {itemLabel} · {formatRm(total)}
         </span>
-        <span className="font-medium">View Order →</span>
+        <span className="font-medium tracking-tight">View Order →</span>
       </button>
 
       {!desktopRail ? (

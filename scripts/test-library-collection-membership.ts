@@ -645,7 +645,8 @@ assert.match(builderSrc, /Sort catalogue/);
 assert.match(builderSrc, /Move .* up/);
 assert.match(builderSrc, /reorderCollectionCakesAction/);
 assert.match(builderSrc, /collection-add-category/);
-assert.doesNotMatch(builderSrc, /listCakes\(\)/);
+assert.match(builderSrc, /CollectionHomepagePreviewControl/);
+assert.match(builderSrc, /Homepage preview/);
 
 const cakeDetailSrc = readFileSync(
   resolve("src/app/(app)/library/cakes/[id]/page.tsx"),

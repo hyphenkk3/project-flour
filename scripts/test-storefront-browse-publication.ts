@@ -134,12 +134,16 @@ const detailByIdFn = queriesSrc.slice(
 assert.match(browseFn, /isCurrentlyCustomerOrderable/);
 assert.match(browseFn, /website_override/);
 assert.match(browseFn, /browseCakeAvailabilityNote/);
+assert.match(browseFn, /isCustomerFacingHistoricalCatalogue/);
+assert.match(browseFn, /BROWSE_CURRENTLY_UNAVAILABLE_NOTE/);
+assert.match(browseFn, /currentlyOffered/);
 assert.match(browseFn, /localeCompare\(b\.name, "en"\)/);
 assert.match(browseFn, /cakeById\.set/);
 assert.match(browseFn, /isOfferableStatus/);
 assert.match(browseFn, /cake\.sizes\.length === 0/);
 assert.doesNotMatch(browseFn, /isCatalogueExpired/);
 assert.doesNotMatch(browseFn, /engines\/preorder/);
+assert.doesNotMatch(browseFn, /capacity/i);
 assert.match(
   detailByIdFn,
   /listBrowsePublishedCakes\(\)/,
@@ -187,7 +191,11 @@ const browsePageSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontBrowsePage.tsx",
 );
 assert.match(browsePageSrc, /listBrowsePublishedCakes/);
-assert.match(browsePageSrc, /listHistoricalCatalogues/);
-assert.doesNotMatch(browsePageSrc, /hideOrderCta/);
+assert.doesNotMatch(browsePageSrc, /listHistoricalCatalogues/);
+assert.doesNotMatch(browsePageSrc, /Past menus/);
+assert.match(
+  readSrc("src/workspaces/storefront/catalog/BrowseCakeCatalogue.tsx"),
+  /hideAddToOrder/,
+);
 
 console.log("PASS storefront browse publication set");

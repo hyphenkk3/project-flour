@@ -45,15 +45,34 @@ assert.equal(
   resolvePostLoginDestination("owner", "/owner/orders/abc-123"),
   "/owner/orders/abc-123",
 );
+assert.equal(
+  resolvePostLoginDestination("owner", "/library/collections/abc-123"),
+  "/library/collections/abc-123",
+);
+assert.equal(
+  resolvePostLoginDestination(
+    "manager",
+    "/library/collections/abc-123?updated=1",
+  ),
+  "/library/collections/abc-123?updated=1",
+);
+assert.equal(
+  resolvePostLoginDestination("collection", "/library/collections/abc-123"),
+  "/home",
+);
 
 // --- Unauthorized / unsafe next falls back to default ---
 assert.equal(
-  resolvePostLoginDestination("bakery", "/owner/calendar"),
+  resolvePostLoginDestination("bakery", "/owner"),
   "/home",
 );
 assert.equal(
   resolvePostLoginDestination("collection", "/owner"),
   "/home",
+);
+assert.equal(
+  resolvePostLoginDestination("bakery", "/owner/calendar"),
+  "/owner/calendar",
 );
 assert.equal(resolvePostLoginDestination("owner", "https://evil.example"), "/home");
 assert.equal(resolvePostLoginDestination("owner", "//evil.example"), "/home");
@@ -82,6 +101,22 @@ assert.equal(sanitizePostLoginPath("/owner/calendar"), "/owner/calendar");
 assert.equal(sanitizePostLoginPath("//evil"), null);
 assert.equal(canAccessPostLoginPath("bakery", "/bakery"), true);
 assert.equal(canAccessPostLoginPath("bakery", "/owner"), false);
+assert.equal(
+  canAccessPostLoginPath("owner", "/library/collections/abc-123"),
+  true,
+);
+assert.equal(
+  canAccessPostLoginPath("manager", "/library/collections/abc-123"),
+  true,
+);
+assert.equal(
+  canAccessPostLoginPath("collection", "/library/collections/abc-123"),
+  false,
+);
+
+const middlewareSrc = readFileSync(resolve("src/middleware.ts"), "utf8");
+assert.match(middlewareSrc, /searchParams\.set\(["']next["']/);
+assert.match(middlewareSrc, /staffLoginRedirect/);
 
 // --- Wiring: loginAction uses resolver; Owner hard-code removed ---
 const actionsSource = readFileSync(

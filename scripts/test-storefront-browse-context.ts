@@ -15,8 +15,8 @@ function readSrc(rel: string): string {
 const homeSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
 assert.match(homeSrc, /href="\/order"/);
 assert.match(homeSrc, /href="\/browse"/);
-assert.match(homeSrc, /StorefrontFreshPicksCard/);
-assert.match(homeSrc, /monthly collection or Special Menu/);
+assert.match(homeSrc, /HomeFreshPicksSection/);
+assert.match(homeSrc, /HomeFeaturedCollection/);
 assert.doesNotMatch(homeSrc, /step by step/);
 assert.doesNotMatch(homeSrc, /listBrowsePublishedCakes/);
 assert.doesNotMatch(homeSrc, /writePreorderDraft/);

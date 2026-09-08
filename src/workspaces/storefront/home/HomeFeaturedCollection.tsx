@@ -10,27 +10,38 @@ import {
   formatRm,
   startingPrice,
 } from "@/workspaces/storefront/catalog/pricing";
+import { storefrontKickerClass } from "@/workspaces/storefront/StorefrontBrand";
 
-type HomePopularCakesProps = {
+export type HomeFeaturedCollectionProps = {
+  kicker: string;
+  heading: string;
+  description: string;
+  viewAllHref: string;
+  viewAllLabel: string;
   cakes: readonly StorefrontCake[];
+  cakeHrefs: Readonly<Record<string, string>>;
 };
 
-export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
+export function HomeFeaturedCollection({
+  kicker,
+  heading,
+  description,
+  viewAllHref,
+  viewAllLabel,
+  cakes,
+  cakeHrefs,
+}: HomeFeaturedCollectionProps) {
   return (
-    <div className="min-w-0">
-      <div className="mb-2.5 flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-ink text-xl tracking-tight sm:text-2xl">
-          Popular Cakes
-        </h2>
-        <Link
-          className="text-ink hover:text-skyline inline-flex items-center text-sm font-medium"
-          href="/browse"
-        >
-          View all →
-        </Link>
-      </div>
+    <section className="px-6 pt-6">
+      <p className={storefrontKickerClass}>{kicker}</p>
+      <h2 className="font-display text-ink mt-2 text-[1.45rem] leading-tight tracking-tight">
+        {heading}
+      </h2>
+      <p className="text-skyline mt-1.5 max-w-[20rem] text-[13px] leading-relaxed">
+        {description}
+      </p>
       {cakes.length > 0 ? (
-        <ul className="flex gap-2.5 overflow-x-auto pb-1">
+        <ul className="mt-4 flex gap-3 overflow-x-auto pb-1">
           {cakes.map((cake) => {
             const size = cake.sizes[0] ?? null;
             const photo =
@@ -38,14 +49,15 @@ export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
               storefrontDefaultPhoto(cake.photos);
             const from = startingPrice(cake);
             const preorder = cakeCardPreorderLabel(cake);
+            const href = cakeHrefs[cake.id] ?? viewAllHref;
             return (
-              <li className="w-24 shrink-0" key={cake.id}>
-                <Link className="group block" href={`/cakes/${cake.id}`}>
-                  <div className="relative aspect-square h-24 w-24 overflow-hidden rounded-[10px]">
+              <li className="w-[8.5rem] shrink-0" key={cake.id}>
+                <Link className="group block" href={href}>
+                  <div className="relative aspect-square overflow-hidden rounded-[10px]">
                     {photo?.url ? (
                       <CakePhotoImage
                         alt={photo.altText || cake.name}
-                        sizes="96px"
+                        sizes="136px"
                         src={photo.url}
                       />
                     ) : (
@@ -73,6 +85,12 @@ export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
           })}
         </ul>
       ) : null}
-    </div>
+      <Link
+        className="text-ink mt-4 inline-flex items-center text-[13px] font-medium"
+        href={viewAllHref}
+      >
+        {viewAllLabel}
+      </Link>
+    </section>
   );
 }

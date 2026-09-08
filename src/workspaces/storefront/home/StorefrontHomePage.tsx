@@ -1,32 +1,205 @@
 import Link from "next/link";
+import { earliestPickupDateYmd } from "@/engines/business-calendar/pickup-slots";
+import {
+  SPECIAL_MENU_DESCRIPTION,
+  SPECIAL_MENU_HEADING,
+  catalogueMonthPickupBounds,
+  collectionScopedCakeHref,
+  customerSpecialMenuPeriodLabel,
+  orderCollectionHeadline,
+  orderCollectionPickupCopy,
+  suggestedPickupDateForCatalogueMonth,
+} from "@/engines/menu/customer-browse";
+import { sortHomepageFreshPicks } from "@/engines/extra/customer-fresh-picks";
+import {
+  selectHomepageFeaturedCollections,
+  type HomepageFeaturedKind,
+} from "@/engines/menu/homepage-featured-collections";
+import { businessYearMonth, toBusinessDateKey } from "@/lib/dates";
 import {
   StorefrontStaffSignIn,
   storefrontKickerClass,
 } from "@/workspaces/storefront/StorefrontBrand";
 import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
-import { listHomepagePopularCakes } from "@/workspaces/storefront/catalog/queries";
+import {
+  listHomepageCollectionPreviewCakes,
+  listHomepagePopularCakes,
+  listCustomerSpecialCatalogues,
+  listOrderableMonthlyCatalogues,
+  type StorefrontSpecialCatalogue,
+} from "@/workspaces/storefront/catalog/queries";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
 import { listStorefrontAvailableExtra } from "@/workspaces/storefront/extra/queries";
-import { HomeDestinationCard } from "@/workspaces/storefront/home/HomeDestinationCard";
+import { HomeBrowseAllCakes } from "@/workspaces/storefront/home/HomeBrowseAllCakes";
+import { HomeFeaturedCollection } from "@/workspaces/storefront/home/HomeFeaturedCollection";
+import { HomeFreshPicksSection } from "@/workspaces/storefront/home/HomeFreshPicksSection";
 import { HomeHero } from "@/workspaces/storefront/home/HomeHero";
 import { HomeMobileNav } from "@/workspaces/storefront/home/HomeMobileNav";
-import {
-  BrowseMark,
-  CakeMark,
-  SparkMark,
-} from "@/workspaces/storefront/home/HomeMarks";
+import { HomeMoreCollections } from "@/workspaces/storefront/home/HomeMoreCollections";
 import { HomeOrderSummary } from "@/workspaces/storefront/home/HomeOrderSummary";
 import { HomePopularCakes } from "@/workspaces/storefront/home/HomePopularCakes";
 import { HomeVisitFooter } from "@/workspaces/storefront/home/HomeVisitFooter";
-import { StorefrontFreshPicksCard } from "@/workspaces/storefront/home/StorefrontFreshPicksCard";
+import type { StorefrontCake } from "@/types/storefront";
 
 export const dynamic = "force-dynamic";
 
+function monthDisplayName(monthYmd: string): string {
+  return orderCollectionHeadline(monthYmd).replace(/ \d{4}/, "");
+}
+
+function collectionCakeHrefs(input: {
+  kind: HomepageFeaturedKind;
+  month: string | null;
+  startDate?: string;
+  endDate?: string;
+  cakes: readonly StorefrontCake[];
+}): Record<string, string> {
+  const earliest = earliestPickupDateYmd();
+  let from = "";
+  let to = "";
+  let pickup: string | null = null;
+
+  if (input.kind === "special" && input.startDate && input.endDate) {
+    from = input.startDate;
+    to = input.endDate;
+    pickup = input.startDate;
+  } else if (input.month) {
+    const bounds = catalogueMonthPickupBounds(input.month);
+    if (!bounds) return {};
+    from = bounds.from;
+    to = bounds.to;
+    pickup = suggestedPickupDateForCatalogueMonth(input.month, earliest);
+  } else {
+    return {};
+  }
+
+  return Object.fromEntries(
+    input.cakes.map((cake) => [
+      cake.id,
+      collectionScopedCakeHref({
+        cakeId: cake.id,
+        from,
+        pickupDate: pickup,
+        to,
+      }),
+    ]),
+  );
+}
+
+function featuredCopy(input: {
+  kind: HomepageFeaturedKind;
+  month: string | null;
+  todayYm: string;
+  special?: StorefrontSpecialCatalogue;
+}): {
+  kicker: string;
+  heading: string;
+  description: string;
+  viewAllLabel: string;
+  moreSupporting: string;
+} {
+  if (input.kind === "special") {
+    const heading = input.special?.name?.trim() || SPECIAL_MENU_HEADING;
+    const period = input.special
+      ? customerSpecialMenuPeriodLabel(
+          input.special.startDate,
+          input.special.endDate,
+        )
+      : null;
+    return {
+      kicker: "Special Menu",
+      heading,
+      description: period ?? SPECIAL_MENU_DESCRIPTION,
+      viewAllLabel: `View all ${heading} →`,
+      moreSupporting: period ?? "Now accepting orders",
+    };
+  }
+
+  const heading = input.month ? monthDisplayName(input.month) : "Collection";
+  if (input.kind === "current_monthly") {
+    return {
+      kicker: "Current collection",
+      heading,
+      description: "Our current selection of cakes for your celebrations.",
+      viewAllLabel: `View all ${heading} →`,
+      moreSupporting: input.month
+        ? orderCollectionPickupCopy(input.month, input.todayYm)
+        : "Now accepting orders",
+    };
+  }
+
+  return {
+    kicker: "Now accepting orders",
+    heading,
+    description: input.month
+      ? orderCollectionPickupCopy(input.month, input.todayYm)
+      : "Preorders are now open.",
+    viewAllLabel: `View all ${heading} →`,
+    moreSupporting: "Now accepting orders",
+  };
+}
+
 export async function StorefrontHomePage() {
-  const [picks, popular] = await Promise.all([
+  const todayYmd = toBusinessDateKey();
+  const todayYm = businessYearMonth(todayYmd) ?? todayYmd.slice(0, 7);
+  const [rawPicks, popular, catalogues, specials] = await Promise.all([
     listStorefrontAvailableExtra(),
     listHomepagePopularCakes(),
+    listOrderableMonthlyCatalogues(todayYmd),
+    listCustomerSpecialCatalogues(todayYmd),
   ]);
+  const picks = sortHomepageFreshPicks(rawPicks);
+  const selection = selectHomepageFeaturedCollections({
+    todayYearMonth: todayYm,
+    specials,
+    monthlies: catalogues,
+  });
+
+  const featured = await Promise.all(
+    selection.featured.map(async (candidate) => {
+      const monthly =
+        catalogues.find((catalogue) => catalogue.id === candidate.id) ?? null;
+      const special =
+        specials.find((row) => row.id === candidate.id) ?? null;
+      const cakes = await listHomepageCollectionPreviewCakes(candidate.id);
+      const copy = featuredCopy({
+        kind: candidate.kind,
+        month: monthly?.month ?? null,
+        todayYm,
+        special: special ?? undefined,
+      });
+      return {
+        id: candidate.id,
+        href: `/order/collection/${candidate.id}`,
+        cakes,
+        cakeHrefs: collectionCakeHrefs({
+          kind: candidate.kind,
+          month: monthly?.month ?? null,
+          startDate: special?.startDate,
+          endDate: special?.endDate,
+          cakes,
+        }),
+        ...copy,
+      };
+    }),
+  );
+
+  const more = selection.more.map((candidate) => {
+    const monthly =
+      catalogues.find((catalogue) => catalogue.id === candidate.id) ?? null;
+    const special = specials.find((row) => row.id === candidate.id) ?? null;
+    const copy = featuredCopy({
+      kind: candidate.kind,
+      month: monthly?.month ?? null,
+      todayYm,
+      special: special ?? undefined,
+    });
+    return {
+      href: `/order/collection/${candidate.id}`,
+      heading: copy.heading,
+      supporting: copy.moreSupporting,
+    };
+  });
 
   return (
     <main className="bg-paper min-h-dvh overflow-x-clip">
@@ -72,34 +245,21 @@ export async function StorefrontHomePage() {
         orderPanel={<HomeOrderSummary />}
       />
 
-      <section className="px-6 pb-3 sm:px-10 sm:pb-4 md:pt-2.5">
-        <div className="mx-auto w-full max-w-6xl">
-          <div className="grid gap-4 md:grid-cols-3 md:gap-3.5">
-            <HomeDestinationCard
-              actionLabel="Start Ordering"
-              ctaVariant="ink"
-              description="Choose a monthly collection or Special Menu."
-              href="/order"
-              icon={<CakeMark className="h-3.5 w-3.5" />}
-              title="Order a Cake"
-              tone="blush"
-            />
-            <HomeDestinationCard
-              actionLabel="Browse Cakes"
-              ctaVariant="soft"
-              description="Explore our full collection and find your favourite."
-              href="/browse"
-              icon={<BrowseMark className="h-3.5 w-3.5" />}
-              title="Browse Cakes"
-              tone="sage"
-            />
-            <StorefrontFreshPicksCard
-              days={picks.flatMap((pick) => pick.days)}
-              icon={<SparkMark className="h-3.5 w-3.5" />}
-            />
-          </div>
-        </div>
-      </section>
+      <HomeFreshPicksSection picks={picks} />
+      {featured.map((collection) => (
+        <HomeFeaturedCollection
+          cakeHrefs={collection.cakeHrefs}
+          cakes={collection.cakes}
+          description={collection.description}
+          heading={collection.heading}
+          key={collection.id}
+          kicker={collection.kicker}
+          viewAllHref={collection.href}
+          viewAllLabel={collection.viewAllLabel}
+        />
+      ))}
+      <HomeMoreCollections items={more} />
+      <HomeBrowseAllCakes />
 
       <HomeVisitFooter lead={<HomePopularCakes cakes={popular} />} />
 

@@ -252,6 +252,7 @@ export default async function LibraryCollectionBuilderPage({
       <CataloguePastMenuVisibilityPanel collection={collection} />
 
       <CollectionBuilder
+        canManage={canManage}
         categories={categories}
         collection={collection}
         isWebsiteCatalogue={isWebsiteCatalogue}

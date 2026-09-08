@@ -21,7 +21,10 @@ import {
 } from "@/workspaces/storefront/catalog/browse-sort";
 import { StorefrontCakeCard } from "@/workspaces/storefront/catalog/StorefrontCakeCard";
 
-type BrowseCake = StorefrontCake & { availabilityNote?: string | null };
+type BrowseCake = StorefrontCake & {
+  availabilityNote?: string | null;
+  currentlyOffered?: boolean;
+};
 
 const CATALOGUE_SEARCH_CLASS =
   "min-w-0 w-full max-w-sm max-md:col-span-3 md:max-w-none md:min-w-[10rem] md:flex-1 lg:w-auto lg:min-w-0 lg:max-w-none lg:flex-none";
@@ -34,7 +37,7 @@ const CATALOGUE_LABEL_CLASS =
 const CATALOGUE_SELECT_CLASS =
   "border-fog text-ink focus:border-ink mt-1.5 min-h-11 w-full border-0 border-b bg-transparent py-2 text-sm outline-none md:mt-2";
 const DEFAULT_EMPTY_MESSAGE =
-  "No cakes are published to browse right now. Please check back soon.";
+  "No cakes to browse right now. Please check back soon.";
 
 type BrowseCakeCatalogueProps = {
   cakes: BrowseCake[];
@@ -474,6 +477,7 @@ export function BrowseCakeCatalogue({
                 availabilityNote={cake.availabilityNote}
                 cake={cake}
                 detailHref={detailHrefs?.[cake.id]}
+                hideAddToOrder={cake.currentlyOffered === false}
                 pickupScope={pickupScope}
               />
             </li>

@@ -6,6 +6,10 @@ import {
   isCatalogueExpired,
   isEffectivelyArchived,
 } from "@/engines/menu/customer-browse";
+import {
+  parseHomepageCollectionPreviewOrder,
+  planHomepageCollectionPreviewChange,
+} from "@/engines/menu/homepage-collection-preview";
 import { requireStaff } from "@/foundation/auth/session";
 import { canManageLibrary } from "@/foundation/navigation/access";
 import { toBusinessDateKey } from "@/lib/dates";
@@ -806,16 +810,131 @@ export async function toggleCollectionCakeAvailableAction(
     const supabase = await createClient();
     const { error } = await supabase
       .from("collection_cakes")
-      .update({ available })
+      .update(
+        available
+          ? { available: true }
+          : {
+              available: false,
+              show_on_homepage: false,
+              homepage_sort_order: null,
+            },
+      )
       .eq("id", membershipId)
       .eq("collection_id", collectionId);
     if (error) {
-      throw new Error(error.message);
+      if (
+        !available &&
+        (error.message.includes("show_on_homepage") ||
+          error.message.includes("homepage_sort_order"))
+      ) {
+        const fallback = await supabase
+          .from("collection_cakes")
+          .update({ available: false })
+          .eq("id", membershipId)
+          .eq("collection_id", collectionId);
+        if (fallback.error) {
+          throw new Error(fallback.error.message);
+        }
+      } else {
+        throw new Error(error.message);
+      }
     }
     revalidateCollectionPaths(collectionId);
     return { error: null };
   } catch (error) {
     return mutationError(error, "Could not update collection availability.");
+  }
+}
+
+export async function updateCollectionCakeHomepageAction(
+  _prev: LibraryActionState,
+  formData: FormData,
+): Promise<LibraryActionState> {
+  await requireLibraryStaff();
+  const collectionId = String(formData.get("collection_id") ?? "").trim();
+  const membershipId = String(formData.get("membership_id") ?? "").trim();
+  if (!collectionId || !membershipId) {
+    return { error: "Choose a cake to update the homepage preview." };
+  }
+
+  const showOnHomepage =
+    String(formData.get("show_on_homepage") ?? "").trim() === "on";
+  const parsedOrder = showOnHomepage
+    ? parseHomepageCollectionPreviewOrder(
+        String(formData.get("homepage_sort_order") ?? ""),
+      )
+    : null;
+  if (typeof parsedOrder === "string") {
+    return { error: parsedOrder };
+  }
+
+  try {
+    const locked = await requireMutableCatalogue(collectionId);
+    if (locked.error) return locked;
+
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("collection_cakes")
+      .select("id, available, show_on_homepage, homepage_sort_order")
+      .eq("collection_id", collectionId);
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const members = ((data ?? []) as Array<{
+      id: string;
+      available: boolean;
+      show_on_homepage: boolean | null;
+      homepage_sort_order: number | null;
+    }>).map((row) => {
+      const order =
+        row.homepage_sort_order == null ? null : Number(row.homepage_sort_order);
+      return {
+        id: row.id,
+        available: row.available === true,
+        showOnHomepage: row.show_on_homepage === true,
+        homepageSortOrder: Number.isInteger(order) ? order : null,
+      };
+    });
+    const current = members.find((member) => member.id === membershipId);
+    if (!current) {
+      return { error: "That cake is not in this collection." };
+    }
+    if (showOnHomepage && !current.available) {
+      return {
+        error: "Offer this cake in the catalogue before featuring it on the homepage.",
+      };
+    }
+
+    const plan = planHomepageCollectionPreviewChange(members, membershipId, {
+      showOnHomepage,
+      homepageSortOrder: parsedOrder,
+    });
+    if (!plan.ok) {
+      return { error: plan.error };
+    }
+
+    for (const update of plan.updates) {
+      const { error: updateError } = await supabase
+        .from("collection_cakes")
+        .update({
+          show_on_homepage: update.showOnHomepage,
+          homepage_sort_order: update.homepageSortOrder,
+        })
+        .eq("id", update.id)
+        .eq("collection_id", collectionId);
+      if (updateError) {
+        throw new Error(updateError.message);
+      }
+    }
+
+    revalidateCollectionPaths(collectionId);
+    return { error: null };
+  } catch (error) {
+    return mutationError(
+      error,
+      "Could not update the homepage preview for this collection.",
+    );
   }
 }
 
