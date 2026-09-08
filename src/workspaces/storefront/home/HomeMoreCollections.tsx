@@ -14,7 +14,7 @@ export function HomeMoreCollections({ items }: HomeMoreCollectionsProps) {
   if (items.length === 0) return null;
 
   return (
-    <section className="px-6 pt-5">
+    <section className="px-6 pt-5 pb-1">
       <ul className="space-y-3">
         {items.map((item) => (
           <li key={item.href}>

@@ -21,6 +21,28 @@ export function formatRm(amount: number): string {
   return `RM${amount.toFixed(amount % 1 === 0 ? 0 : 2)}`;
 }
 
+/**
+ * True when the card shows a minimum/starting size price and a higher
+ * size price exists. One size, or one shared price, is a fixed price.
+ */
+export function isStartingFromPrice(
+  cake: Pick<StorefrontCake, "sizes">,
+): boolean {
+  if (cake.sizes.length <= 1) return false;
+  const prices = cake.sizes.map((size) => size.price);
+  const min = Math.min(...prices);
+  return prices.some((price) => price > min);
+}
+
+/** Homepage card price. Appends "~" only for a true starting size price. */
+export function formatHomepagePrice(
+  cake: Pick<StorefrontCake, "sizes">,
+): string | null {
+  const from = startingPrice(cake);
+  if (from == null) return null;
+  return isStartingFromPrice(cake) ? `${formatRm(from)}~` : formatRm(from);
+}
+
 /** Display-only. Do not use as authoritative preorder validation. */
 export function formatPreorderRequirement(days: number): string {
   const n = Number.isInteger(days) && days >= 1 ? days : 2;

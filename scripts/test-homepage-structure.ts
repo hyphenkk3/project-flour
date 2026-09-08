@@ -12,11 +12,17 @@ import { sortHomepageFreshPicks } from "@/engines/extra/customer-fresh-picks";
 import { orderableMonthlyCatalogues } from "@/engines/menu/customer-browse";
 import {
   BROWSE_CURRENTLY_UNAVAILABLE_NOTE,
+  HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX,
   HOMEPAGE_COLLECTION_PREVIEW_MAX,
   isCustomerFacingHistoricalCatalogue,
   planHomepageCollectionPreviewChange,
+  takeHomepageCollectionPreviewCakes,
 } from "@/engines/menu/homepage-collection-preview";
 import { selectHomepageFeaturedCollections } from "@/engines/menu/homepage-featured-collections";
+import {
+  formatHomepagePrice,
+  isStartingFromPrice,
+} from "@/workspaces/storefront/catalog/pricing";
 
 function readSrc(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -198,7 +204,21 @@ const featuredSrc = readSrc(
 assert.match(featuredSrc, /rounded-\[10px\]/);
 assert.match(featuredSrc, /aspect-square/);
 assert.match(featuredSrc, /w-\[8\.5rem\]/);
+assert.match(featuredSrc, /overflow-x-auto/);
+assert.match(featuredSrc, /-mx-6/);
+assert.match(featuredSrc, /takeHomepageCollectionPreviewCakes/);
 assert.match(featuredSrc, /viewAllLabel/);
+assert.match(
+  featuredSrc,
+  /previewCakes\.map\([\s\S]*\}\)\}\s*<li className="w-\[8\.5rem\] shrink-0">[\s\S]*viewAllHref/,
+);
+
+const queriesSrc = readSrc("src/workspaces/storefront/catalog/queries.ts");
+assert.match(queriesSrc, /takeHomepageCollectionPreviewCakes/);
+assert.doesNotMatch(
+  queriesSrc,
+  /slice\(0,\s*HOMEPAGE_COLLECTION_PREVIEW_MAX\)/,
+);
 assert.match(homeSrc, /View all \$\{heading\}/);
 assert.doesNotMatch(featuredSrc, /01 \/ 02/);
 assert.doesNotMatch(featuredSrc, /VIEW FULL CATALOG/);
@@ -318,6 +338,45 @@ const detailSrc = readSrc(
 assert.match(detailSrc, /hideAddToOrder=\{cake\.currentlyOffered === false\}/);
 
 assert.equal(HOMEPAGE_COLLECTION_PREVIEW_MAX, 6);
+assert.equal(HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX, 4);
+assert.equal(
+  takeHomepageCollectionPreviewCakes(["a", "b", "c", "d", "e", "f"]).length,
+  4,
+);
+assert.deepEqual(
+  takeHomepageCollectionPreviewCakes(["a", "b", "c", "d", "e", "f"]),
+  ["a", "b", "c", "d"],
+);
+
+const size = (id: string, price: number) => ({
+  id,
+  cakeId: "cake",
+  size: id,
+  price,
+  sortOrder: 1,
+  preorderDays: 2,
+});
+assert.equal(
+  formatHomepagePrice({ sizes: [size("6\"", 78)] }),
+  "RM78",
+);
+assert.equal(
+  isStartingFromPrice({ sizes: [size("6\"", 78)] }),
+  false,
+);
+assert.equal(
+  formatHomepagePrice({
+    sizes: [size("4\"", 75), size("6\"", 95)],
+  }),
+  "RM75~",
+);
+assert.equal(
+  formatHomepagePrice({
+    sizes: [size("6\"", 78), size("8\"", 78)],
+  }),
+  "RM78",
+);
+
 const previewPlan = planHomepageCollectionPreviewChange(
   [
     { id: "a", showOnHomepage: true, homepageSortOrder: 1 },

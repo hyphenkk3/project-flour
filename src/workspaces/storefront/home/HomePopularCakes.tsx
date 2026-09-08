@@ -7,9 +7,9 @@ import {
 } from "@/workspaces/storefront/catalog/cake-photo-map";
 import {
   cakeCardPreorderLabel,
-  formatRm,
-  startingPrice,
+  formatHomepagePrice,
 } from "@/workspaces/storefront/catalog/pricing";
+import { storefrontKickerClass } from "@/workspaces/storefront/StorefrontBrand";
 
 type HomePopularCakesProps = {
   cakes: readonly StorefrontCake[];
@@ -18,10 +18,13 @@ type HomePopularCakesProps = {
 export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
   return (
     <div className="min-w-0">
-      <div className="mb-2.5 flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-ink text-xl tracking-tight sm:text-2xl">
-          Popular Cakes
-        </h2>
+      <div className="mb-2.5 flex items-end justify-between gap-3">
+        <div>
+          <p className={storefrontKickerClass}>Favourites</p>
+          <h2 className="font-display text-ink mt-2 text-xl tracking-tight sm:text-2xl">
+            Popular Cakes
+          </h2>
+        </div>
         <Link
           className="text-ink hover:text-skyline inline-flex items-center text-sm font-medium"
           href="/browse"
@@ -36,7 +39,7 @@ export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
             const photo =
               storefrontPhotoForSize(cake.photos, size?.id) ??
               storefrontDefaultPhoto(cake.photos);
-            const from = startingPrice(cake);
+            const from = formatHomepagePrice(cake);
             const preorder = cakeCardPreorderLabel(cake);
             return (
               <li className="w-24 shrink-0" key={cake.id}>
@@ -59,7 +62,7 @@ export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
                   </h3>
                   {from != null ? (
                     <p className="text-ink mt-0.5 text-xs tabular-nums">
-                      {formatRm(from)}
+                      {from}
                     </p>
                   ) : null}
                   {preorder ? (

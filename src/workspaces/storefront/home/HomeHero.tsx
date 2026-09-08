@@ -62,7 +62,7 @@ function HeroValueCues({
           <span className={iconClass}>
             <cue.Icon className="h-4 w-4" />
           </span>
-          <span className="text-skyline text-[11px] leading-[1.25]">
+          <span className="text-skyline w-full text-center text-[11px] leading-[1.3] tracking-[0.01em] md:text-left">
             {cue.label[0]}
             <br />
             {cue.label[1]}
@@ -150,13 +150,13 @@ export function HomeHero({ header = null, orderPanel = null }: HomeHeroProps) {
           <div className="relative z-[2] flex h-[22.5rem] flex-col justify-start px-6 pt-[4.35rem] pb-5">
             <div className="w-full max-w-[18.25rem]">
               <HeroCopy
-                headingClass="font-display text-ink mt-1.5 text-[1.85rem] leading-[1.14] tracking-[-0.02em]"
-                supportingClass="text-skyline mt-2.5 max-w-[17.5rem] text-[0.88rem] leading-[1.5]"
+                headingClass="font-display text-ink mt-1.5 text-[1.98rem] leading-[1.14] tracking-[-0.02em]"
+                supportingClass="text-skyline mt-2.5 max-w-[16.5rem] text-[0.82rem] leading-[1.5]"
               />
               <HeroValueCues
                 iconClass="bg-paper/80 text-ink/60 flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
-                itemClass="flex min-w-0 flex-col items-center gap-1 text-center"
-                listClass="mt-3.5 grid w-[13.75rem] grid-cols-3 gap-x-1"
+                itemClass="flex w-full min-w-0 flex-col items-center gap-1.5 text-center"
+                listClass="mt-3.5 grid w-[12.5rem] grid-cols-3 gap-x-1"
               />
             </div>
           </div>

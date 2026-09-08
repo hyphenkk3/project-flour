@@ -389,6 +389,7 @@ const popularSrc = readSrc(
   "src/workspaces/storefront/home/HomePopularCakes.tsx",
 );
 assert.match(popularSrc, /Popular Cakes/);
+assert.match(popularSrc, /formatHomepagePrice/);
 assert.match(popularSrc, /href="\/browse"/);
 assert.match(popularSrc, /overflow-hidden rounded-\[10px\]/);
 assert.doesNotMatch(popularSrc, /return null/);

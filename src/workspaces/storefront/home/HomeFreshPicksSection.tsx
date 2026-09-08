@@ -6,6 +6,7 @@ import {
 } from "@/engines/extra/customer-fresh-picks";
 import { toBusinessDateKey } from "@/lib/dates";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
+import { storefrontKickerClass } from "@/workspaces/storefront/StorefrontBrand";
 import type { StorefrontExtraPick } from "@/workspaces/storefront/extra/queries";
 
 const FRESH_PICKS_DESCRIPTION =
@@ -20,8 +21,9 @@ export function HomeFreshPicksSection({ picks }: HomeFreshPicksSectionProps) {
   const empty = picks.length <= 0;
 
   return (
-    <section className="px-6 pt-5">
-      <div className="flex items-baseline justify-between gap-3">
+    <section className="px-6 pt-4 pb-2 md:pt-8">
+      <p className={storefrontKickerClass}>Last-minute</p>
+      <div className="mt-2 flex items-baseline justify-between gap-3">
         <h2 className="font-display text-ink text-[1.45rem] tracking-tight">
           Fresh Picks
         </h2>
@@ -79,6 +81,11 @@ export function HomeFreshPicksSection({ picks }: HomeFreshPicksSectionProps) {
                     <h3 className="font-display text-ink mt-1 line-clamp-2 text-[1.02rem] leading-snug tracking-tight">
                       {pick.cakeName}
                     </h3>
+                    {pick.sizeLabel.trim() ? (
+                      <p className="text-skyline mt-0.5 text-xs leading-tight">
+                        {pick.sizeLabel}
+                      </p>
+                    ) : null}
                     {pick.unitPrice != null ? (
                       <p className="text-ink mt-0.5 text-xs tabular-nums">
                         {formatRm(pick.unitPrice)}

@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { storefrontKickerClass } from "@/workspaces/storefront/StorefrontBrand";
 
 export function HomeBrowseAllCakes() {
   return (
-    <section className="px-6 pt-6">
-      <Link className="group block" href="/browse">
+    <section className="border-ink/[0.1] mt-8 border-t px-6 pt-8 pb-2">
+      <p className={storefrontKickerClass}>Catalogue</p>
+      <Link className="group mt-2 block" href="/browse">
         <p className="text-ink text-[15px] font-medium tracking-tight">
           Browse all cakes
           <span aria-hidden="true"> →</span>

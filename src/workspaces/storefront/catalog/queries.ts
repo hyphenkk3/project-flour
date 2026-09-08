@@ -9,7 +9,7 @@ import {
 } from "@/engines/menu/customer-browse";
 import {
   BROWSE_CURRENTLY_UNAVAILABLE_NOTE,
-  HOMEPAGE_COLLECTION_PREVIEW_MAX,
+  takeHomepageCollectionPreviewCakes,
   isCustomerFacingHistoricalCatalogue,
 } from "@/engines/menu/homepage-collection-preview";
 import {
@@ -418,13 +418,14 @@ export async function listHomepageCollectionPreviewCakes(
         .order("homepage_sort_order", { ascending: true }),
     );
 
-    return ((data ?? []) as unknown as CatalogRow[])
-      .map((row) => unwrapOne(row.library_cakes))
-      .filter((cake): cake is LibraryCakeEmbed => Boolean(cake))
-      .filter((cake) => isOfferableStatus(cake.status))
-      .map(mapStorefrontCake)
-      .filter((cake) => cake.sizes.length > 0)
-      .slice(0, HOMEPAGE_COLLECTION_PREVIEW_MAX);
+    return takeHomepageCollectionPreviewCakes(
+      ((data ?? []) as unknown as CatalogRow[])
+        .map((row) => unwrapOne(row.library_cakes))
+        .filter((cake): cake is LibraryCakeEmbed => Boolean(cake))
+        .filter((cake) => isOfferableStatus(cake.status))
+        .map(mapStorefrontCake)
+        .filter((cake) => cake.sizes.length > 0),
+    );
   } catch {
     return [];
   }
