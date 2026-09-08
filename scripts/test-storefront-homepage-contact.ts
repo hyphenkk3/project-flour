@@ -137,6 +137,8 @@ assert.match(
 );
 assert.match(footerSrc, /md:col-span-2 lg:col-span-1/);
 assert.match(footerSrc, /border-t/);
+assert.match(footerSrc, /lg:contents/);
+assert.match(footerSrc, /col-span-full[\s\S]*border-t[\s\S]*Find Us/);
 assert.doesNotMatch(footerSrc, /md:grid-cols-3/);
 assert.doesNotMatch(footerSrc, /lg:grid-cols-3/);
 assert.doesNotMatch(footerSrc, /wa\.me\/\d+/);

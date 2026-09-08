@@ -28,52 +28,54 @@ export function HomeVisitFooter({ lead }: HomeVisitFooterProps) {
           <div className="min-w-0 md:col-span-2 lg:col-span-1">{lead}</div>
         ) : null}
 
-        {addressLines.length > 0 || mapsHref ? (
-          <div className="min-w-0">
-            <p className={storefrontKickerClass}>Find Us</p>
-            <p className="font-display text-ink mt-2 text-lg tracking-tight">
-              {STOREFRONT_LOCATION_NAME}
-            </p>
-            <p className="text-skyline mt-0.5 text-sm leading-relaxed">
-              {STOREFRONT_LOCATION_LANDMARK}
-            </p>
-            {addressLines.map((line, index) => (
-              <p
-                className={`text-skyline text-sm leading-relaxed ${index === 0 ? "mt-2" : "mt-1"}`}
-                key={line}
-              >
-                {line}
+        <div className="border-ink/[0.1] col-span-full -mx-6 grid grid-cols-1 gap-8 border-t px-6 pt-8 md:col-span-2 md:mx-0 md:grid-cols-2 md:gap-x-16 md:px-0 lg:contents lg:border-0 lg:pt-0">
+          {addressLines.length > 0 || mapsHref ? (
+            <div className="min-w-0">
+              <p className={storefrontKickerClass}>Find Us</p>
+              <p className="font-display text-ink mt-2 text-lg tracking-tight">
+                {STOREFRONT_LOCATION_NAME}
               </p>
-            ))}
-            {mapsHref ? (
+              <p className="text-skyline mt-0.5 text-sm leading-relaxed">
+                {STOREFRONT_LOCATION_LANDMARK}
+              </p>
+              {addressLines.map((line, index) => (
+                <p
+                  className={`text-skyline text-sm leading-relaxed ${index === 0 ? "mt-2" : "mt-1"}`}
+                  key={line}
+                >
+                  {line}
+                </p>
+              ))}
+              {mapsHref ? (
+                <a
+                  className={`${linkClass} mt-2`}
+                  href={mapsHref}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  Get Directions
+                  <span aria-hidden="true">→</span>
+                </a>
+              ) : null}
+            </div>
+          ) : null}
+
+          {whatsappHref ? (
+            <div className="min-w-0">
+              <p className={storefrontKickerClass}>WhatsApp Us</p>
               <a
-                className={`${linkClass} mt-2`}
-                href={mapsHref}
+                className={`${linkClass} mt-2 flex-wrap`}
+                href={whatsappHref}
                 rel="noopener noreferrer"
                 target="_blank"
               >
-                Get Directions
+                <WhatsAppMark className="h-3.5 w-3.5 shrink-0" />
+                Chat with us on WhatsApp
                 <span aria-hidden="true">→</span>
               </a>
-            ) : null}
-          </div>
-        ) : null}
-
-        {whatsappHref ? (
-          <div className="min-w-0">
-            <p className={storefrontKickerClass}>WhatsApp Us</p>
-            <a
-              className={`${linkClass} mt-2 flex-wrap`}
-              href={whatsappHref}
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              <WhatsAppMark className="h-3.5 w-3.5 shrink-0" />
-              Chat with us on WhatsApp
-              <span aria-hidden="true">→</span>
-            </a>
-          </div>
-        ) : null}
+            </div>
+          ) : null}
+        </div>
       </div>
     </section>
   );

@@ -58,11 +58,19 @@ function HeroValueCues({
   return (
     <ul className={listClass}>
       {VALUE_CUES.map((cue) => (
-        <li className={itemClass} key={cue.label.join(" ")}>
-          <span className={iconClass}>
+        <li className={`relative ${itemClass}`} key={cue.label.join(" ")}>
+          <span
+            aria-hidden
+            className="pointer-events-none absolute top-[48%] left-1/2 z-0 h-[5.35rem] w-[3.55rem] -translate-x-1/2 -translate-y-1/2 md:hidden"
+            style={{
+              background:
+                "radial-gradient(ellipse at center, rgba(245,240,233,0.96) 0%, rgba(245,240,233,0.72) 48%, rgba(245,240,233,0) 76%)",
+            }}
+          />
+          <span className={`relative z-[1] ${iconClass}`}>
             <cue.Icon className="h-4 w-4" />
           </span>
-          <span className="text-skyline w-full text-center text-[11px] leading-[1.3] tracking-[0.01em] md:text-left">
+          <span className="text-skyline relative z-[1] w-full text-center text-[11px] leading-[1.3] tracking-[0.01em] md:text-left">
             {cue.label[0]}
             <br />
             {cue.label[1]}

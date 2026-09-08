@@ -208,6 +208,10 @@ assert.match(featuredSrc, /overflow-x-auto/);
 assert.match(featuredSrc, /-mx-6/);
 assert.match(featuredSrc, /takeHomepageCollectionPreviewCakes/);
 assert.match(featuredSrc, /viewAllLabel/);
+assert.match(featuredSrc, /See all →/);
+assert.match(featuredSrc, /items-baseline justify-between/);
+assert.match(featuredSrc, /bg-ink\/\[0\.035\]/);
+assert.doesNotMatch(featuredSrc, /border-ink\/\[0\.12\]/);
 assert.match(
   featuredSrc,
   /previewCakes\.map\([\s\S]*\}\)\}\s*<li className="w-\[8\.5rem\] shrink-0">[\s\S]*viewAllHref/,

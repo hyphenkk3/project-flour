@@ -36,9 +36,17 @@ export function HomeFeaturedCollection({
   return (
     <section className="border-ink/[0.1] mt-8 border-t px-6 pt-8">
       <p className={storefrontKickerClass}>{kicker}</p>
-      <h2 className="font-display text-ink mt-2 text-[1.45rem] leading-tight tracking-tight">
-        {heading}
-      </h2>
+      <div className="mt-2 flex items-baseline justify-between gap-3">
+        <h2 className="font-display text-ink text-[1.45rem] leading-tight tracking-tight">
+          {heading}
+        </h2>
+        <Link
+          className="text-skyline hover:text-ink shrink-0 text-[13px] font-medium"
+          href={viewAllHref}
+        >
+          See all →
+        </Link>
+      </div>
       <p className="text-skyline mt-1.5 max-w-[20rem] text-[13px] leading-relaxed">
         {description}
       </p>
@@ -88,12 +96,24 @@ export function HomeFeaturedCollection({
             })}
             <li className="w-[8.5rem] shrink-0">
               <Link
-                className="border-ink/[0.12] flex aspect-square w-[8.5rem] flex-col justify-end rounded-[10px] border px-3 py-3"
+                aria-label={viewAllLabel}
+                className="group block"
                 href={viewAllHref}
               >
-                <span className="text-ink text-[13px] font-medium leading-snug tracking-tight">
-                  {viewAllLabel}
-                </span>
+                <div className="flex aspect-square w-[8.5rem] items-end rounded-[10px] bg-ink/[0.035] px-3.5 py-3.5">
+                  <span
+                    aria-hidden="true"
+                    className="text-ink text-[1.15rem] leading-none"
+                  >
+                    →
+                  </span>
+                </div>
+                <p className="text-ink group-hover:text-skyline mt-1.5 text-[0.88rem] leading-snug font-medium tracking-tight">
+                  View all
+                </p>
+                <p className="text-skyline mt-0.5 text-[10px] leading-tight">
+                  {heading} →
+                </p>
               </Link>
             </li>
           </ul>
