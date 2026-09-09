@@ -258,7 +258,7 @@ export async function listCalendarExtraMarkersForPreparedRange(
   const { data, error } = await supabase
     .from("extra_stock")
     .select(
-      "id, cake_name, size_label, lifecycle, prepared_on, pickup_available_from_at, pickup_through_at, library_cake_id, library_cake_size_id",
+      "id, cake_name, size_label, lifecycle, prepared_on, pickup_available_from_at, pickup_through_at, library_cake_id, library_cake_size_id, sold_at, cut_into_slices_at",
     )
     .in("lifecycle", ["proposed", "confirmed"])
     .not("prepared_on", "is", null)

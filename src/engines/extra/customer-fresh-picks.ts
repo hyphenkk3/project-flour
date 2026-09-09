@@ -33,12 +33,14 @@ export function isPublishedFreshPick(input: {
   pickupThroughAt: string | null;
   confirmedAt?: string | null;
   soldAt?: string | null;
+  cutIntoSlicesAt?: string | null;
   preparedOn?: string | null;
   todayYmd?: string;
   now?: Date;
 }): boolean {
   if (input.lifecycle !== "confirmed") return false;
   if (input.soldAt) return false;
+  if (input.cutIntoSlicesAt) return false;
   const now = input.now ?? new Date();
   if (input.confirmedAt) {
     const posted = Date.parse(input.confirmedAt);
@@ -48,6 +50,7 @@ export function isPublishedFreshPick(input: {
     lifecycle: "confirmed",
     pickupThroughAt: input.pickupThroughAt,
     soldAt: input.soldAt,
+    cutIntoSlicesAt: input.cutIntoSlicesAt,
     now,
   });
 }

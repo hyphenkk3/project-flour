@@ -9,8 +9,10 @@ import { normalizeExtraRejectReason } from "@/engines/extra/reject-reason";
 import { toBusinessDateKey } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import {
+  findAssignableOrderForExtra,
   listExtraCakeOptions,
   listExtraStockUnits,
+  type ExtraAssignableOrder,
 } from "@/workspaces/extra/queries";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
 
@@ -28,7 +30,6 @@ function revalidateExtraPaths() {
   revalidatePath("/extra");
   revalidatePath("/extra", "layout");
   revalidatePath("/");
-  // Calendar shows EXTRA by prepared_on — keep Owner Matrix in sync after propose.
   revalidatePath("/owner/calendar");
 }
 
@@ -47,6 +48,7 @@ function evaluateFreshPickConfirm(input: {
     now: new Date(),
   });
 }
+
 export async function listExtraStockUnitsAction(): Promise<ExtraStockUnit[]> {
   await requireExtraStaff();
   return listExtraStockUnits();
@@ -273,6 +275,124 @@ export async function undoRejectExtraStockAction(
     p_actor_staff_id: staff.id,
   });
 
+  if (error) {
+    return { error: error.message };
+  }
+  revalidateExtraPaths();
+  return { error: null };
+}
+
+export async function findAssignableOrderForExtraAction(
+  query: string,
+): Promise<{ order: ExtraAssignableOrder | null; error: string | null }> {
+  const staff = await requireExtraStaff();
+  const caps = buildExtraWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canAssignExtraToOrder) {
+    return { order: null, error: "Not authorized to assign EXTRA." };
+  }
+  try {
+    const order = await findAssignableOrderForExtra(query);
+    return { order, error: null };
+  } catch (error) {
+    return {
+      order: null,
+      error:
+        error instanceof Error ? error.message : "Could not find that order.",
+    };
+  }
+}
+
+export async function assignExtraStockToOrderAction(input: {
+  extraStockId: string;
+  orderId: string;
+}): Promise<{ error: string | null }> {
+  const staff = await requireExtraStaff();
+  const caps = buildExtraWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canAssignExtraToOrder) {
+    return { error: "Not authorized to assign EXTRA." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("assign_extra_stock_to_order", {
+    p_extra_stock_id: input.extraStockId,
+    p_order_id: input.orderId,
+    p_actor_staff_id: staff.id,
+  });
+  if (error) {
+    return { error: error.message };
+  }
+  revalidateExtraPaths();
+  return { error: null };
+}
+
+export type MoveExtraWindowInput = {
+  extraStockId: string;
+  pickupFromDate: string;
+  pickupFromSlot: string;
+  cutoffDate: string;
+  cutoffSlot: string;
+};
+
+export async function moveExtraStockWindowAction(
+  input: MoveExtraWindowInput,
+): Promise<{ error: string | null }> {
+  const staff = await requireExtraStaff();
+  const caps = buildExtraWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canMoveExtraWindow) {
+    return { error: "Not authorized to move EXTRA." };
+  }
+
+  const window = evaluateFreshPickConfirm({
+    pickupFromDate: input.pickupFromDate,
+    pickupFromSlot: input.pickupFromSlot,
+    cutoffDate: input.cutoffDate,
+    cutoffSlot: input.cutoffSlot,
+  });
+  if (!window.ok) {
+    return { error: window.error };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("move_extra_stock_fresh_pick_window", {
+    p_extra_stock_id: input.extraStockId,
+    p_actor_staff_id: staff.id,
+    p_prepared_on: window.preparedOn,
+    p_pickup_available_from_at: window.pickupAvailableFromIso,
+    p_pickup_through_at: window.orderCutoffIso,
+  });
+  if (error) {
+    return { error: error.message };
+  }
+  revalidateExtraPaths();
+  return { error: null };
+}
+
+export async function cutExtraStockIntoSlicesAction(
+  extraStockId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireExtraStaff();
+  const caps = buildExtraWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canCutExtraIntoSlices) {
+    return { error: "Not authorized to cut EXTRA into slices." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("cut_extra_stock_into_slices", {
+    p_extra_stock_id: extraStockId,
+    p_actor_staff_id: staff.id,
+  });
   if (error) {
     return { error: error.message };
   }

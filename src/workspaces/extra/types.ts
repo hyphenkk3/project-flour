@@ -18,6 +18,10 @@ export type ExtraStockUnit = {
    */
   pickupThroughAt: string | null;
   soldAt: string | null;
+  cutIntoSlicesAt: string | null;
+  assignedOrderId: string | null;
+  assignedOrderNumber: string | null;
+  assignedGuestName: string | null;
   note: string | null;
   proposedAt: string;
   proposedBy: string;

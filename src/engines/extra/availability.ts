@@ -38,10 +38,12 @@ export function isExtraAvailable(input: {
   lifecycle: ExtraLifecycle;
   pickupThroughAt: string | null;
   soldAt?: string | null;
+  cutIntoSlicesAt?: string | null;
   now?: Date;
 }): boolean {
   if (input.lifecycle !== "confirmed") return false;
   if (input.soldAt) return false;
+  if (input.cutIntoSlicesAt) return false;
   if (!input.pickupThroughAt) return false;
   const throughMs = Date.parse(input.pickupThroughAt);
   if (!Number.isFinite(throughMs)) return false;
@@ -53,15 +55,18 @@ export function isExtraExpiredConfirmed(input: {
   lifecycle: ExtraLifecycle;
   pickupThroughAt: string | null;
   soldAt?: string | null;
+  cutIntoSlicesAt?: string | null;
   now?: Date;
 }): boolean {
   if (input.lifecycle !== "confirmed") return false;
   if (input.soldAt) return false;
+  if (input.cutIntoSlicesAt) return false;
   if (!input.pickupThroughAt) return false;
   return !isExtraAvailable({
     lifecycle: input.lifecycle,
     pickupThroughAt: input.pickupThroughAt,
     soldAt: input.soldAt,
+    cutIntoSlicesAt: input.cutIntoSlicesAt,
     now: input.now,
   });
 }

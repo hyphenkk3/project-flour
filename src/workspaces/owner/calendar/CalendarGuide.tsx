@@ -100,16 +100,14 @@ export function CalendarGuide() {
             <li>
               <span className="border-line/70 bg-mist inline-flex items-center gap-1 rounded border px-1 py-0.5 text-[10px]">
                 <span className="font-semibold tracking-wide uppercase">
-                  EXTRA
+                  Fresh Pick · Proposed
                 </span>
-                <span>proposed</span>
               </span>
               {" / "}
               <span className="border-line/70 bg-status-info-soft/50 inline-flex items-center gap-1 rounded border px-1 py-0.5 text-[10px]">
                 <span className="font-semibold tracking-wide uppercase">
-                  EXTRA
+                  Fresh Pick · Available
                 </span>
-                <span>confirmed</span>
               </span>
               {" = physical stock spanning pickup validity (Matrix)"}
             </li>
@@ -118,8 +116,8 @@ export function CalendarGuide() {
       </div>
       <p className="mt-2 text-[11px] text-zinc-500">
         Status colour = order/payment state. Soft background = fulfilment method.
-        EXTRA markers are physical stock (not customers). Tap a customer line to
-        open Quick View.
+        Fresh Pick markers are physical Extra stock (not customers). Tap a
+        customer line to open Quick View.
       </p>
     </aside>
   );

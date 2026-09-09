@@ -370,6 +370,7 @@ export type OrderTimelineEventType =
   | "order_picked_up"
   | "order_picked_up_undone"
   | "order_cancelled"
+  | "extra_assigned"
   | "order_duplicated"
   | "order_out_for_delivery"
   | "order_out_for_delivery_undone"

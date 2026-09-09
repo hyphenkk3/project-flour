@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { FormField, FormTextarea } from "@/components/ui/form";
+import { FormField, FormInput, FormTextarea } from "@/components/ui/form";
 import { formatLongBusinessDate } from "@/lib/dates";
 import type { ExtraWorkspaceCapabilities } from "@/engines/extra/capabilities";
 import { isBakeryExtraProposalActionable } from "@/engines/extra/availability";
@@ -25,13 +25,18 @@ import {
   EXTRA_THROUGH_SLOT_REQUIRED,
 } from "@/engines/extra/fresh-picks-eligibility";
 import {
+  assignExtraStockToOrderAction,
   confirmExtraStockAction,
   createConfirmedExtraStockAction,
+  cutExtraStockIntoSlicesAction,
+  findAssignableOrderForExtraAction,
+  moveExtraStockWindowAction,
   proposeExtraStockAction,
   rejectExtraStockAction,
   unconfirmExtraStockAction,
   undoRejectExtraStockAction,
 } from "@/workspaces/extra/actions";
+import type { ExtraAssignableOrder } from "@/workspaces/extra/queries";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
 
 type ExtraBoardProps = {
@@ -99,6 +104,15 @@ export function ExtraBoard({
     null,
   );
   const [rejectReason, setRejectReason] = useState("");
+  const [assigningUnit, setAssigningUnit] = useState<ExtraStockUnit | null>(
+    null,
+  );
+  const [assignQuery, setAssignQuery] = useState("");
+  const [foundOrder, setFoundOrder] = useState<ExtraAssignableOrder | null>(
+    null,
+  );
+  const [movingUnit, setMovingUnit] = useState<ExtraStockUnit | null>(null);
+  const [slicingUnit, setSlicingUnit] = useState<ExtraStockUnit | null>(null);
   const [drafts, setDrafts] = useState<Record<string, WindowDraft>>({});
 
   const proposed = useMemo(
@@ -120,7 +134,10 @@ export function ExtraBoard({
     [proposed, todayYmd],
   );
   const freshPicks = useMemo(
-    () => units.filter((u) => u.available && !u.soldAt),
+    () =>
+      units.filter(
+        (u) => u.available && !u.soldAt && !u.cutIntoSlicesAt,
+      ),
     [units],
   );
   const sold = useMemo(
@@ -132,6 +149,7 @@ export function ExtraBoard({
       units.filter(
         (u) =>
           u.lifecycle === "rejected" ||
+          Boolean(u.cutIntoSlicesAt) ||
           (u.lifecycle === "confirmed" && !u.soldAt && !u.available),
       ),
     [units],
@@ -251,6 +269,10 @@ export function ExtraBoard({
       setError("Cannot undo a sold Extra.");
       return;
     }
+    if (unit.cutIntoSlicesAt) {
+      setError("Cannot undo an Extra that was cut into slices.");
+      return;
+    }
     setError(null);
     startTransition(async () => {
       const result = await unconfirmExtraStockAction(unit.id);
@@ -287,6 +309,98 @@ export function ExtraBoard({
     startTransition(async () => {
       const result = await undoRejectExtraStockAction(unit.id);
       if (result.error) setError(result.error);
+    });
+  }
+
+  function openAssign(unit: ExtraStockUnit) {
+    setError(null);
+    setAssigningUnit(unit);
+    setAssignQuery("");
+    setFoundOrder(null);
+  }
+
+  function searchAssignOrder() {
+    if (!assignQuery.trim()) {
+      setError("Enter an order number.");
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const result = await findAssignableOrderForExtraAction(assignQuery);
+      if (result.error) {
+        setError(result.error);
+        setFoundOrder(null);
+        return;
+      }
+      if (!result.order) {
+        setError("No matching order found.");
+        setFoundOrder(null);
+        return;
+      }
+      setFoundOrder(result.order);
+    });
+  }
+
+  function runAssign() {
+    if (!assigningUnit) return;
+    if (!foundOrder) {
+      searchAssignOrder();
+      return;
+    }
+    if (foundOrder.extraStockId) {
+      setError("That order already has a Fresh Pick assigned.");
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const result = await assignExtraStockToOrderAction({
+        extraStockId: assigningUnit.id,
+        orderId: foundOrder.id,
+      });
+      if (result.error) setError(result.error);
+      else {
+        setAssigningUnit(null);
+        setFoundOrder(null);
+        setAssignQuery("");
+      }
+    });
+  }
+
+  function runMove() {
+    if (!movingUnit) return;
+    const draft = draftFor(movingUnit);
+    const decision = evaluateExtraConfirm({
+      pickupFromDate: draft.pickupFromDate,
+      pickupFromSlot: draft.pickupFromSlot,
+      cutoffDate: draft.cutoffDate,
+      cutoffSlot: draft.cutoffSlot,
+      todayYmd,
+    });
+    if (!decision.ok) {
+      setError(decision.error);
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const result = await moveExtraStockWindowAction({
+        extraStockId: movingUnit.id,
+        pickupFromDate: decision.pickupFromDate,
+        pickupFromSlot: decision.pickupFromSlot,
+        cutoffDate: decision.cutoffDate,
+        cutoffSlot: decision.cutoffSlot,
+      });
+      if (result.error) setError(result.error);
+      else setMovingUnit(null);
+    });
+  }
+
+  function runCutIntoSlices() {
+    if (!slicingUnit) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await cutExtraStockIntoSlicesAction(slicingUnit.id);
+      if (result.error) setError(result.error);
+      else setSlicingUnit(null);
     });
   }
 
@@ -622,6 +736,47 @@ export function ExtraBoard({
                 {unit.note ? (
                   <p className="text-ink mt-2 text-sm">{unit.note}</p>
                 ) : null}
+                <p className="text-skyline mt-3 text-sm">
+                  Stop Fresh Pick availability
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {capabilities.canAssignExtraToOrder ? (
+                    <button
+                      className={btnSecondary}
+                      disabled={pending}
+                      onClick={() => openAssign(unit)}
+                      type="button"
+                    >
+                      Assign to order
+                    </button>
+                  ) : null}
+                  {capabilities.canMoveExtraWindow ? (
+                    <button
+                      className={btnSecondary}
+                      disabled={pending}
+                      onClick={() => {
+                        setError(null);
+                        setMovingUnit(unit);
+                      }}
+                      type="button"
+                    >
+                      Move pickup window
+                    </button>
+                  ) : null}
+                  {capabilities.canCutExtraIntoSlices ? (
+                    <button
+                      className={btnSecondary}
+                      disabled={pending}
+                      onClick={() => {
+                        setError(null);
+                        setSlicingUnit(unit);
+                      }}
+                      type="button"
+                    >
+                      Cut into slices
+                    </button>
+                  ) : null}
+                </div>
                 {capabilities.canUnconfirmExtra ? (
                   <div className="mt-3">
                     <button
@@ -632,6 +787,10 @@ export function ExtraBoard({
                     >
                       Undo availability
                     </button>
+                    <p className="text-skyline mt-1 text-xs leading-relaxed">
+                      Returns this Extra to a proposal. Use this only to reverse
+                      a mistaken confirm — not to assign, move, or cut a cake.
+                    </p>
                   </div>
                 ) : null}
               </li>
@@ -664,7 +823,16 @@ export function ExtraBoard({
                     {unit.sizeLabel}
                   </span>
                 </p>
-                <p className="text-skyline mt-1 text-sm">Sold</p>
+                <p className="text-skyline mt-1 text-sm">
+                  {unit.assignedOrderNumber
+                    ? `Assigned · ${unit.assignedOrderNumber}`
+                    : "Sold"}
+                </p>
+                {unit.assignedGuestName ? (
+                  <p className="text-skyline mt-1 text-sm">
+                    {unit.assignedGuestName}
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -679,8 +847,8 @@ export function ExtraBoard({
           </span>
         </h2>
         <p className="text-skyline mt-1 text-sm">
-          Rejected proposals and confirmed units whose order cutoff has already
-          passed.
+          Rejected proposals, extras cut into slices, and confirmed units whose
+          order cutoff has already passed.
         </p>
         {past.length === 0 ? (
           <p className="text-skyline mt-3 text-sm">Nothing past yet.</p>
@@ -700,7 +868,9 @@ export function ExtraBoard({
                 <p className="text-skyline mt-1 text-sm">
                   {unit.lifecycle === "rejected"
                     ? "Rejected"
-                    : "Order cutoff passed"}
+                    : unit.cutIntoSlicesAt
+                      ? "Cut into slices"
+                      : "Order cutoff passed"}
                   {unit.preparedOn
                     ? ` · prepared ${formatLongBusinessDate(unit.preparedOn)}`
                     : null}
@@ -724,6 +894,7 @@ export function ExtraBoard({
                   </div>
                 ) : null}
                 {unit.lifecycle === "confirmed" &&
+                !unit.cutIntoSlicesAt &&
                 capabilities.canUnconfirmExtra ? (
                   <div className="mt-3">
                     <button
@@ -771,6 +942,102 @@ export function ExtraBoard({
           />
         </FormField>
       </ConfirmDialog>
+
+      <ConfirmDialog
+        allowDismiss={!pending}
+        confirmLabel="Assign Fresh Pick"
+        description={
+          assigningUnit
+            ? `Assign ${assigningUnit.cakeName} ${assigningUnit.sizeLabel} to an existing order. This Extra will leave Fresh Picks. Cake lines on the order are not changed.`
+            : undefined
+        }
+        onCancel={() => {
+          if (pending) return;
+          setAssigningUnit(null);
+          setFoundOrder(null);
+          setAssignQuery("");
+        }}
+        onConfirm={runAssign}
+        open={assigningUnit != null}
+        pending={pending}
+        title="Assign to order"
+      >
+        <FormField htmlFor="extra-assign-order" label="Order number">
+          <FormInput
+            id="extra-assign-order"
+            onChange={(event) => setAssignQuery(event.target.value)}
+            placeholder="ORD-…"
+            value={assignQuery}
+          />
+        </FormField>
+        <button
+          className={`${btnSecondary} mt-3`}
+          disabled={pending}
+          onClick={searchAssignOrder}
+          type="button"
+        >
+          Find order
+        </button>
+        {foundOrder ? (
+          <p className="text-ink mt-3 text-sm leading-relaxed">
+            {foundOrder.orderNumber} · {foundOrder.guestName} ·{" "}
+            {foundOrder.pickupDate} · {foundOrder.itemSummary}
+            {foundOrder.extraStockId
+              ? " · already has a Fresh Pick"
+              : ""}
+          </p>
+        ) : null}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        allowDismiss={!pending}
+        confirmLabel="Move Fresh Pick"
+        description={
+          movingUnit
+            ? `Move ${movingUnit.cakeName} ${movingUnit.sizeLabel} to another valid Fresh Pick window. The same Extra record is kept.`
+            : undefined
+        }
+        onCancel={() => {
+          if (pending) return;
+          setMovingUnit(null);
+        }}
+        onConfirm={runMove}
+        open={movingUnit != null}
+        pending={pending}
+        title="Move pickup window"
+      >
+        {movingUnit ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <WindowFields
+              dates={dates}
+              disabled={pending}
+              fieldClass={fieldClass}
+              todayYmd={todayYmd}
+              value={draftFor(movingUnit)}
+              onChange={(patch) => patchDraft(movingUnit.id, patch)}
+            />
+          </div>
+        ) : null}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        allowDismiss={!pending}
+        confirmLabel="Cut into slices"
+        description={
+          slicingUnit
+            ? `${slicingUnit.cakeName} ${slicingUnit.sizeLabel} will no longer be offered as a whole-cake Fresh Pick. No slice inventory is created.`
+            : undefined
+        }
+        onCancel={() => {
+          if (pending) return;
+          setSlicingUnit(null);
+        }}
+        onConfirm={runCutIntoSlices}
+        open={slicingUnit != null}
+        pending={pending}
+        title="Cut into slices?"
+        tone="danger"
+      />
     </main>
   );
 }

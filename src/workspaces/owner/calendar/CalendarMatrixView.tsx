@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
 import { CalendarGuide } from "@/workspaces/owner/calendar/CalendarGuide";
 import type { CalendarExtraMarker } from "@/engines/extra/calendar-visibility";
+import { extraCalendarBadgeStatus } from "@/engines/extra/calendar-visibility";
 import {
   buildCalendarMatrix,
   matrixCellHasContent,
@@ -133,7 +134,8 @@ function extraSpanTitle(span: MatrixExtraSpan): string {
     span.startYmd === span.endYmd
       ? span.startYmd
       : `${span.startYmd} → ${span.endYmd}`;
-  return `EXTRA ${extra.lifecycle} · ${range} · ${extra.id}`;
+  const status = extraCalendarBadgeStatus(extra.lifecycle);
+  return `${extra.cakeName} ${extra.sizeLabel} · Fresh Pick · ${status} · ${range} · ${extra.id}`;
 }
 
 function ExtraSpanBadge({
@@ -144,24 +146,21 @@ function ExtraSpanBadge({
   totalsMode: boolean;
 }) {
   const { extra } = span;
+  const status = extraCalendarBadgeStatus(extra.lifecycle);
   return (
     <span
       className={[
-        "border-line/70 text-ink flex w-full min-w-0 items-center gap-1 rounded border px-1 py-0.5 text-left leading-snug",
+        "border-line/70 text-ink flex w-full min-w-0 flex-col gap-0 rounded border px-1 py-0.5 text-left leading-snug",
         extra.lifecycle === "proposed" ? "bg-mist" : "bg-status-info-soft/50",
       ].join(" ")}
       data-extra-id={extra.id}
       title={extraSpanTitle(span)}
     >
-      <span className="text-[9px] font-semibold tracking-wide uppercase">
-        EXTRA
+      <span className="truncate text-[10px] font-medium">
+        {extra.cakeName} {extra.sizeLabel}
       </span>
-      <span className="text-[10px] font-medium">
-        {totalsMode
-          ? "×1"
-          : extra.lifecycle === "proposed"
-            ? "proposed"
-            : "confirmed"}
+      <span className="text-[9px] font-semibold tracking-wide uppercase">
+        {totalsMode ? "Fresh Pick ×1" : `Fresh Pick · ${status}`}
       </span>
     </span>
   );
@@ -220,7 +219,10 @@ function renderExtraSpanRow(
             minWidth: LABEL_COL_WIDTH,
             width: LABEL_COL_WIDTH,
           }}
-        />
+        >
+          <span className="block leading-snug">{row.cakeName}</span>
+          <span className="block leading-snug">{row.sizeLabel}</span>
+        </th>
         {cells}
       </tr>
     );

@@ -107,6 +107,9 @@ for (const role of ["bakery", "manager", "owner"] as const) {
   assert.equal(caps.canRejectExtra, true, `${role} reject`);
   assert.equal(caps.canUndoRejectExtra, true, `${role} undo reject`);
   assert.equal(caps.canUnconfirmExtra, true, `${role} unconfirm`);
+  assert.equal(caps.canAssignExtraToOrder, true, `${role} assign`);
+  assert.equal(caps.canMoveExtraWindow, true, `${role} move`);
+  assert.equal(caps.canCutExtraIntoSlices, true, `${role} slice`);
   assert.equal(caps.canCreateConfirmedExtra, true, `${role} create confirmed`);
   assert.equal(canAccessBakeryWorkspace(role), true);
 }
@@ -122,18 +125,21 @@ for (const role of ["collection", "customer_operations"] as const) {
   assert.equal(caps.canRejectExtra, false);
   assert.equal(caps.canUndoRejectExtra, false);
   assert.equal(caps.canUnconfirmExtra, false);
+  assert.equal(caps.canAssignExtraToOrder, false);
+  assert.equal(caps.canMoveExtraWindow, false);
+  assert.equal(caps.canCutExtraIntoSlices, false);
   assert.equal(caps.canCreateConfirmedExtra, false);
 }
 
-// Collection / Bakery gates unchanged.
+// Collection / Bakery gates: Bakery may operate Collection desk handoff.
 assert.equal(canAccessCollectionWorkspace("collection"), true);
-assert.equal(canAccessCollectionWorkspace("bakery"), false);
+assert.equal(canAccessCollectionWorkspace("bakery"), true);
 assert.equal(
   buildCollectionWorkspaceCapabilities({
     role: "bakery",
     staffId: "b1",
   }).canMarkCollected,
-  false,
+  true,
 );
 
 assert.equal(isBakeryExtraProposalActionable({ lifecycle: "proposed" }), true);

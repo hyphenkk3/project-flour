@@ -7,6 +7,8 @@
  *
  * Rejected never active. Null prepared_on never invented.
  * Confirmed past pickup-through excluded from active planning display.
+ * Sold (`sold_at`) and cut-into-slices extras are not active physical stock.
+ * Assigned/sold extras appear as the customer order, not as EXTRA confirmed.
  */
 
 import { isExtraAvailable } from "@/engines/extra/availability";
@@ -33,10 +35,14 @@ export function isExtraActiveOnCalendar(input: {
   lifecycle: ExtraLifecycle;
   preparedOn: string | null;
   pickupThroughAt: string | null;
+  soldAt?: string | null;
+  cutIntoSlicesAt?: string | null;
   now?: Date;
 }): boolean {
   if (!input.preparedOn?.trim()) return false;
   if (input.lifecycle === "rejected") return false;
+  if (input.soldAt) return false;
+  if (input.cutIntoSlicesAt) return false;
   if (input.lifecycle === "proposed") return true;
   if (input.lifecycle !== "confirmed") return false;
   // Confirmed without cutoff still shows (Bakery may not have set through yet
@@ -45,8 +51,16 @@ export function isExtraActiveOnCalendar(input: {
   return isExtraAvailable({
     lifecycle: "confirmed",
     pickupThroughAt: input.pickupThroughAt,
+    soldAt: input.soldAt,
+    cutIntoSlicesAt: input.cutIntoSlicesAt,
     now: input.now,
   });
+}
+
+export function extraCalendarBadgeStatus(
+  lifecycle: "proposed" | "confirmed",
+): string {
+  return lifecycle === "proposed" ? "Proposed" : "Available";
 }
 
 /** Inclusive calendar validity for one EXTRA marker (Singapore calendar dates). */
@@ -119,22 +133,30 @@ export function clipExtraCalendarSpan(
   };
 }
 
-export function mapExtraStockRowToCalendarMarker(row: {
-  id: string;
-  cake_name: string;
-  size_label: string;
-  lifecycle: string;
-  prepared_on: string | null;
-  pickup_available_from_at: string | null;
-  pickup_through_at: string | null;
-  library_cake_id: string | null;
-  library_cake_size_id: string | null;
-}): CalendarExtraMarker | null {
+export function mapExtraStockRowToCalendarMarker(
+  row: {
+    id: string;
+    cake_name: string;
+    size_label: string;
+    lifecycle: string;
+    prepared_on: string | null;
+    pickup_available_from_at: string | null;
+    pickup_through_at: string | null;
+    library_cake_id: string | null;
+    library_cake_size_id: string | null;
+    sold_at?: string | null;
+    cut_into_slices_at?: string | null;
+  },
+  now?: Date,
+): CalendarExtraMarker | null {
   if (
     !isExtraActiveOnCalendar({
       lifecycle: row.lifecycle as ExtraLifecycle,
       preparedOn: row.prepared_on,
       pickupThroughAt: row.pickup_through_at,
+      soldAt: row.sold_at,
+      cutIntoSlicesAt: row.cut_into_slices_at,
+      now,
     })
   ) {
     return null;

@@ -17,6 +17,7 @@ type ExtraStockRow = {
   pickup_available_from_at: string | null;
   pickup_through_at: string | null;
   sold_at: string | null;
+  cut_into_slices_at: string | null;
   note: string | null;
   proposed_at: string;
   proposed_by: string;
@@ -41,6 +42,7 @@ const EXTRA_SELECT = `
   pickup_available_from_at,
   pickup_through_at,
   sold_at,
+  cut_into_slices_at,
   note,
   proposed_at,
   proposed_by,
@@ -77,6 +79,10 @@ export function mapExtraStockRow(
     pickupAvailableFromAt: row.pickup_available_from_at,
     pickupThroughAt: row.pickup_through_at,
     soldAt: row.sold_at,
+    cutIntoSlicesAt: row.cut_into_slices_at,
+    assignedOrderId: null,
+    assignedOrderNumber: null,
+    assignedGuestName: null,
     note: row.note,
     proposedAt: row.proposed_at,
     proposedBy: row.proposed_by,
@@ -92,6 +98,7 @@ export function mapExtraStockRow(
       lifecycle: row.lifecycle,
       pickupThroughAt: row.pickup_through_at,
       soldAt: row.sold_at,
+      cutIntoSlicesAt: row.cut_into_slices_at,
       now,
     }),
   };
@@ -109,9 +116,44 @@ export async function listExtraStockUnits(): Promise<ExtraStockUnit[]> {
   }
 
   const now = new Date();
-  return ((data ?? []) as unknown as ExtraStockRow[]).map((row) =>
+  const units = ((data ?? []) as unknown as ExtraStockRow[]).map((row) =>
     mapExtraStockRow(row, now),
   );
+  const soldIds = units.filter((unit) => unit.soldAt).map((unit) => unit.id);
+  if (soldIds.length === 0) return units;
+
+  const { data: orders, error: orderError } = await supabase
+    .from("orders")
+    .select("id, order_number, guest_name, extra_stock_id")
+    .in("extra_stock_id", soldIds);
+  if (orderError) {
+    throw new Error(orderError.message);
+  }
+
+  const byExtra = new Map<
+    string,
+    { id: string; order_number: string; guest_name: string | null }
+  >();
+  for (const order of orders ?? []) {
+    const extraId = (order as { extra_stock_id?: string | null }).extra_stock_id;
+    if (!extraId) continue;
+    byExtra.set(extraId, {
+      id: (order as { id: string }).id,
+      order_number: String((order as { order_number?: string }).order_number ?? ""),
+      guest_name: (order as { guest_name?: string | null }).guest_name ?? null,
+    });
+  }
+
+  return units.map((unit) => {
+    const linked = byExtra.get(unit.id);
+    if (!linked) return unit;
+    return {
+      ...unit,
+      assignedOrderId: linked.id,
+      assignedOrderNumber: linked.order_number || null,
+      assignedGuestName: linked.guest_name,
+    };
+  });
 }
 
 /**
@@ -130,6 +172,63 @@ export async function countExtraStockProposed(): Promise<number> {
   }
 
   return count ?? 0;
+}
+
+export type ExtraAssignableOrder = {
+  id: string;
+  orderNumber: string;
+  guestName: string;
+  pickupDate: string;
+  pickupTime: string;
+  extraStockId: string | null;
+  itemSummary: string;
+};
+
+export async function findAssignableOrderForExtra(
+  query: string,
+): Promise<ExtraAssignableOrder | null> {
+  const raw = query.trim();
+  if (!raw) return null;
+  const supabase = await createClient();
+  let lookup = supabase
+    .from("orders")
+    .select(
+      "id, order_number, guest_name, pickup_date, pickup_time, extra_stock_id, status, order_items ( cake_name, size_label, quantity )",
+    )
+    .neq("status", "cancelled")
+    .limit(2);
+
+  const uuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      raw,
+    );
+  lookup = uuid
+    ? lookup.eq("id", raw)
+    : lookup.ilike("order_number", raw);
+
+  const { data, error } = await lookup;
+  if (error) {
+    throw new Error(error.message);
+  }
+  const row = (data ?? [])[0];
+  if (!row || (data ?? []).length !== 1) return null;
+
+  const items = (
+    (row as { order_items?: Array<{ cake_name: string; size_label: string; quantity: number }> })
+      .order_items ?? []
+  )
+    .map((item) => `${item.cake_name} ${item.size_label} ×${item.quantity}`)
+    .join(", ");
+
+  return {
+    id: (row as { id: string }).id,
+    orderNumber: String((row as { order_number?: string }).order_number ?? ""),
+    guestName: String((row as { guest_name?: string | null }).guest_name ?? "Guest"),
+    pickupDate: String((row as { pickup_date?: string }).pickup_date ?? ""),
+    pickupTime: String((row as { pickup_time?: string }).pickup_time ?? ""),
+    extraStockId: (row as { extra_stock_id?: string | null }).extra_stock_id ?? null,
+    itemSummary: items || "No cake lines",
+  };
 }
 
 export async function listExtraCakeOptions(): Promise<ExtraCakeOption[]> {

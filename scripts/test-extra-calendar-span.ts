@@ -173,8 +173,27 @@ const clipped = clipExtraCalendarSpan(extraA, ["2026-08-18", "2026-08-19"]);
 assert.ok(clipped);
 assert.equal(clipped!.extra.id, "extra-a");
 
-const mapped = mapExtraStockRowToCalendarMarker({
-  id: "db-extra-1",
+const mappedNow = new Date("2026-08-18T05:00:00.000Z");
+const mapped = mapExtraStockRowToCalendarMarker(
+  {
+    id: "db-extra-1",
+    cake_name: "Oolong",
+    size_label: '6"',
+    lifecycle: "confirmed",
+    prepared_on: "2026-08-17",
+    pickup_available_from_at: "2026-08-18T04:00:00.000Z",
+    pickup_through_at: "2026-08-19T10:00:00.000Z",
+    library_cake_id: null,
+    library_cake_size_id: null,
+  },
+  mappedNow,
+);
+assert.ok(mapped);
+assert.equal(mapped!.validFromYmd, "2026-08-18");
+assert.equal(mapped!.validToYmd, "2026-08-19");
+
+const mappedSold = mapExtraStockRowToCalendarMarker({
+  id: "db-extra-sold",
   cake_name: "Oolong",
   size_label: '6"',
   lifecycle: "confirmed",
@@ -183,10 +202,23 @@ const mapped = mapExtraStockRowToCalendarMarker({
   pickup_through_at: "2026-08-19T10:00:00.000Z",
   library_cake_id: null,
   library_cake_size_id: null,
+  sold_at: "2026-08-18T05:00:00.000Z",
 });
-assert.ok(mapped);
-assert.equal(mapped!.validFromYmd, "2026-08-18");
-assert.equal(mapped!.validToYmd, "2026-08-19");
+assert.equal(mappedSold, null, "sold Extra is not an active calendar marker");
+
+const mappedSliced = mapExtraStockRowToCalendarMarker({
+  id: "db-extra-sliced",
+  cake_name: "Oolong",
+  size_label: '6"',
+  lifecycle: "confirmed",
+  prepared_on: "2026-08-17",
+  pickup_available_from_at: "2026-08-18T04:00:00.000Z",
+  pickup_through_at: "2026-08-19T10:00:00.000Z",
+  library_cake_id: null,
+  library_cake_size_id: null,
+  cut_into_slices_at: "2026-08-18T05:00:00.000Z",
+});
+assert.equal(mappedSliced, null, "sliced Extra is not an active calendar marker");
 
 assert.ok(matrixRowHasContent(matrixTwo[0]!));
 
@@ -194,15 +226,16 @@ const matrixViewSrc = readFileSync(
   resolve(process.cwd(), "src/workspaces/owner/calendar/CalendarMatrixView.tsx"),
   "utf8",
 );
-assert.match(matrixViewSrc, /colSpan=\{span\.columnSpan\}/);
-assert.match(matrixViewSrc, /data-extra-id=\{extra\.id\}/);
-assert.doesNotMatch(matrixViewSrc, /cell\?\.extras/);
+assert.match(matrixViewSrc, /Fresh Pick/);
+assert.match(matrixViewSrc, /extraCalendarBadgeStatus/);
+assert.doesNotMatch(matrixViewSrc, />EXTRA</);
 
 const queriesSrc = readFileSync(
   resolve(process.cwd(), "src/workspaces/owner/calendar/queries.ts"),
   "utf8",
 );
 assert.match(queriesSrc, /pickup_available_from_at/);
+assert.match(queriesSrc, /sold_at, cut_into_slices_at/);
 assert.match(queriesSrc, /extraCalendarRangeOverlaps/);
 assert.doesNotMatch(queriesSrc, /\.gte\("prepared_on", fromYmd\)/);
 

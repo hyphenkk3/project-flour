@@ -26,6 +26,12 @@ export type ExtraWorkspaceCapabilities = {
    * Does not delete the Library cake; does not write rejected (Past).
    */
   canUnconfirmExtra: boolean;
+  /** Assign a confirmed Fresh Pick to an existing order (sets sold_at + extra_stock_id). */
+  canAssignExtraToOrder: boolean;
+  /** Move a confirmed unsold Fresh Pick to another valid pickup window. */
+  canMoveExtraWindow: boolean;
+  /** Stop offering a confirmed unsold Extra as a whole cake (cut into slices). */
+  canCutExtraIntoSlices: boolean;
   /** Bakery direct-create confirmed Available stock. */
   canCreateConfirmedExtra: boolean;
 };
@@ -49,6 +55,9 @@ export function buildExtraWorkspaceCapabilities(input: {
     canRejectExtra: canMutate,
     canUndoRejectExtra: canMutate,
     canUnconfirmExtra: canMutate,
+    canAssignExtraToOrder: canMutate,
+    canMoveExtraWindow: canMutate,
+    canCutExtraIntoSlices: canMutate,
     canCreateConfirmedExtra: canMutate,
   };
 }
