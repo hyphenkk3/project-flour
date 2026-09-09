@@ -11,7 +11,7 @@ import {
   customerPaidAddonMutationPayload,
   customerPreorderCommercialTotal,
   emptyCustomerPreorderSelections,
-  parseCustomerPaidAddonOptions,
+  selectCustomerPaidAddonOptions,
   type CustomerPaidAddonOption,
 } from "@/engines/orders/customer-preorder-options";
 
@@ -19,7 +19,7 @@ function readSrc(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
 }
 
-const paidOptions: CustomerPaidAddonOption[] = parseCustomerPaidAddonOptions([
+const paidOptions: CustomerPaidAddonOption[] = selectCustomerPaidAddonOptions([
   {
     code: "wishing_card",
     name: "Wishing Card",

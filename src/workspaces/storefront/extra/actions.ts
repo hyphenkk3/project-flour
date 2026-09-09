@@ -6,8 +6,8 @@ import {
   customerComplimentaryMutationPayload,
   customerPaidAddonMutationPayload,
   emptyCustomerPreorderSelections,
-  parseCustomerComplimentaryOptions,
-  parseCustomerPaidAddonOptions,
+  selectCustomerComplimentaryOptions,
+  selectCustomerPaidAddonOptions,
   type CustomerComplimentaryOption,
   type CustomerPaidAddonOption,
 } from "@/engines/orders/customer-preorder-options";
@@ -22,6 +22,39 @@ export type ExtraOrderState = {
   error: string | null;
   orderId?: string;
 };
+
+function parseComplimentaryOptions(
+  rows: unknown,
+): CustomerComplimentaryOption[] {
+  if (!Array.isArray(rows)) return [];
+  return selectCustomerComplimentaryOptions(
+    rows.map((row) => {
+      const item = row as Record<string, unknown>;
+      return {
+        typeId: String(item.typeId ?? ""),
+        code: String(item.code ?? ""),
+        name: String(item.name ?? ""),
+        sortOrder: Number(item.sortOrder ?? 0),
+      };
+    }),
+  );
+}
+
+function parsePaidAddonOptions(rows: unknown): CustomerPaidAddonOption[] {
+  if (!Array.isArray(rows)) return [];
+  return selectCustomerPaidAddonOptions(
+    rows.map((row) => {
+      const item = row as Record<string, unknown>;
+      return {
+        code: String(item.code ?? ""),
+        name: String(item.name ?? ""),
+        unitPrice: Number(item.unitPrice ?? 0),
+        financialShorthand: String(item.financialShorthand ?? ""),
+        sortOrder: Number(item.sortOrder ?? 0),
+      };
+    }),
+  );
+}
 
 export async function loadExtraCustomerOptions(pickupDate: string): Promise<{
   complimentaryOptions: CustomerComplimentaryOption[];
@@ -44,10 +77,8 @@ export async function loadExtraCustomerOptions(pickupDate: string): Promise<{
     if (error || data == null) return empty;
     const payload = data as Record<string, unknown>;
     return {
-      complimentaryOptions: parseCustomerComplimentaryOptions(
-        payload.complimentary,
-      ),
-      paidAddonOptions: parseCustomerPaidAddonOptions(payload.paidAddons),
+      complimentaryOptions: parseComplimentaryOptions(payload.complimentary),
+      paidAddonOptions: parsePaidAddonOptions(payload.paidAddons),
     };
   } catch {
     return empty;
