@@ -403,9 +403,7 @@ export function GuestExtraCheckoutForm() {
         <FormActions>
           <FormSubmitButton
             disabled={confirmOpen}
-            onClick={openConfirm}
             pending={pending || Boolean(state.orderId)}
-            type="button"
           >
             Place order
           </FormSubmitButton>
