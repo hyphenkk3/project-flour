@@ -157,7 +157,7 @@ const cakeListSelect = `
   popular_cakes_sort_order,
   created_at,
   updated_at,
-  library_cake_categories (
+  library_cake_categories!library_cakes_category_id_fkey (
     id,
     name,
     is_active,

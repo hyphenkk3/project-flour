@@ -346,7 +346,7 @@ export async function listCollectionCakeRows(
         status,
         created_at,
         updated_at,
-        library_cake_categories (
+        library_cake_categories!library_cakes_category_id_fkey (
           id,
           name,
           is_active,
@@ -389,7 +389,7 @@ export async function listCollectionCakeRows(
         status,
         created_at,
         updated_at,
-        library_cake_categories (
+        library_cake_categories!library_cakes_category_id_fkey (
           id,
           name,
           is_active,
