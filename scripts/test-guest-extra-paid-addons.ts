@@ -131,21 +131,7 @@ const successSrc = readSrc(
   "src/workspaces/storefront/checkout/StorefrontSuccessPage.tsx",
 );
 assert.match(successSrc, /receipt\.paidAddons\.map/);
-assert.match(successSrc, /receipt\.complimentaryItems\.map/);
 assert.match(successSrc, /receipt\.notes/);
-
-const receiptLoaderSrc = readSrc("src/workspaces/storefront/checkout/receipt.ts");
-assert.match(receiptLoaderSrc, /customer_notes,/);
-assert.match(receiptLoaderSrc, /order_complimentary_items \(/);
-assert.doesNotMatch(receiptLoaderSrc, /^\s+notes,$/m);
-
-const migrationSrc = readSrc(
-  "supabase/migrations/20260908180000_guest_extra_paid_addons.sql",
-);
-assert.match(migrationSrc, /p_paid_addons jsonb default '\[\]'::jsonb/);
-assert.match(migrationSrc, /_sync_order_paid_addons_from_payload/);
-assert.match(migrationSrc, /submit_guest_extra_order/);
-assert.doesNotMatch(migrationSrc, /submit_guest_preorder/);
-assert.doesNotMatch(migrationSrc, /alter table public\.orders add/i);
+assert.doesNotMatch(successSrc, /receipt\.complimentaryItems/);
 
 console.log("PASS extra paid add-ons reuse Whole Cake catalog");

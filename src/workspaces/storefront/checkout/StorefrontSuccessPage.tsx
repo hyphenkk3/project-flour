@@ -88,15 +88,6 @@ export async function StorefrontSuccessPage({
                 </span>
               </li>
             ))}
-            {receipt.complimentaryItems.map((item) => (
-              <li className="text-ink text-sm" key={item.key}>
-                <span className="font-medium">{item.name}</span>
-                <span className="text-skyline">
-                  {" "}
-                  · × {item.quantity} · Complimentary
-                </span>
-              </li>
-            ))}
           </ul>
           <dl className="border-fog mt-4 space-y-2 border-t pt-3 text-sm">
             <div className="flex justify-between gap-4">
