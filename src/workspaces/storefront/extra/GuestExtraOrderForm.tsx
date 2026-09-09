@@ -205,10 +205,7 @@ export function GuestExtraOrderForm({
       ) : null}
 
       <FormActions>
-        <FormSubmitButton
-          disabled={usableSlots.length === 0}
-          type="submit"
-        >
+        <FormSubmitButton disabled={usableSlots.length === 0}>
           {FRESH_PICKS_ADD_TO_CART_CTA}
         </FormSubmitButton>
         <Link
