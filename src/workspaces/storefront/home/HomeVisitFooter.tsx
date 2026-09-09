@@ -22,13 +22,13 @@ export function HomeVisitFooter({ lead }: HomeVisitFooterProps) {
   const addressLines = STOREFRONT_ADDRESS_LINES.filter((line) => line.trim());
 
   return (
-    <section className="px-6 pb-2 sm:px-10">
-      <div className="border-ink/[0.1] mx-auto grid w-full max-w-6xl items-start gap-8 border-t pt-8 md:grid-cols-2 md:gap-x-16 md:gap-y-8 md:pt-7 lg:grid-cols-[minmax(0,0.55fr)_minmax(0,0.27fr)_minmax(0,0.18fr)] lg:gap-x-8 lg:gap-y-0 lg:pt-8">
+    <section className="border-ink/[0.1] mt-8 border-t px-6 pt-8 pb-2 sm:px-10">
+      <div className="mx-auto grid w-full max-w-6xl items-start gap-8 md:grid-cols-2 md:gap-x-16 md:gap-y-8 lg:grid-cols-[minmax(0,0.55fr)_minmax(0,0.27fr)_minmax(0,0.18fr)] lg:gap-x-8 lg:gap-y-0">
         {lead ? (
           <div className="min-w-0 md:col-span-2 lg:col-span-1">{lead}</div>
         ) : null}
 
-        <div className="border-ink/[0.1] col-span-full -mx-6 grid grid-cols-1 gap-8 border-t px-6 pt-8 md:col-span-2 md:mx-0 md:grid-cols-2 md:gap-x-16 md:px-0 lg:contents lg:border-0 lg:pt-0">
+        <div className="col-span-full grid grid-cols-1 gap-8 md:col-span-2 md:grid-cols-2 md:gap-x-16 lg:contents">
           {addressLines.length > 0 || mapsHref ? (
             <div className="min-w-0">
               <p className={storefrontKickerClass}>Find Us</p>
