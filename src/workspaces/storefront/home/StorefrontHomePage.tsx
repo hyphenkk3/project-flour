@@ -258,10 +258,11 @@ export async function StorefrontHomePage() {
           viewAllLabel={collection.viewAllLabel}
         />
       ))}
+      <HomePopularCakes cakes={popular} />
       <HomeMoreCollections items={more} />
       <HomeBrowseAllCakes />
 
-      <HomeVisitFooter lead={<HomePopularCakes cakes={popular} />} />
+      <HomeVisitFooter />
 
       <div className="px-6 sm:px-10">
         <div className="mx-auto w-full max-w-6xl">
