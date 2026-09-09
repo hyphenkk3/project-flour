@@ -25,6 +25,8 @@ import { addBusinessCalendarDays, toBusinessDateKey } from "@/lib/dates";
 const PRODUCT_ORDER_ID = "7e9779ac-152b-42e0-8002-34ba8e9b11b5";
 const MIGRATION_HINT =
   "BLOCKED: apply supabase/migrations/20260817140000_extra_pickup_from_order_cutoff.sql in the Supabase SQL Editor, then re-run this test.";
+const CART_MIGRATION_HINT =
+  "BLOCKED: apply supabase/migrations/20260909140000_guest_extra_cart_multi_claim.sql in the Supabase SQL Editor, then re-run this test.";
 
 class MigrationBlockedError extends Error {
   constructor(message: string) {
@@ -168,6 +170,22 @@ async function main() {
     });
     if (probe.error?.message?.includes("Could not find the function")) {
       throw new MigrationBlockedError(MIGRATION_HINT);
+    }
+    const cartProbe = await admin.rpc("submit_guest_extra_order", {
+      p_customer_name: "Probe",
+      p_phone: "000",
+      p_email: null,
+      p_pickup_date: toBusinessDateKey(),
+      p_pickup_time: "12:00",
+      p_notes: SIG,
+      p_extra_stock_id: "00000000-0000-0000-0000-000000000000",
+      p_extra_stock_ids: ["00000000-0000-0000-0000-000000000000"],
+    });
+    const cartRpcReady = !cartProbe.error?.message?.includes(
+      "Could not find the function",
+    );
+    if (!cartRpcReady) {
+      console.log(`BLOCKED — ${CART_MIGRATION_HINT}`);
     }
 
     const { data: roles } = await admin.from("roles").select("id, code");
@@ -509,6 +527,124 @@ async function main() {
       check(Boolean(undoSoldErr), "sold Extra cannot be undone", rpcMessage(undoSoldErr));
     } else {
       check(true, "E/F/G Extra order (SKIP — no remaining pickup slot)");
+    }
+
+    const cartDate = tomorrowYmd;
+    const cartFrom = tomorrowFrom ?? "12:00";
+    const cartCutoff = tomorrowCutoff ?? "17:30";
+    const cartFromIso = extraPickupThroughIso(cartDate, cartFrom);
+    const cartCutoffIso = extraPickupThroughIso(cartDate, cartCutoff);
+    const cartSlots = extraCustomerPickupSlotsForDate(
+      cartDate,
+      { pickupAvailableFromAt: cartFromIso!, orderCutoffAt: cartCutoffIso! },
+      now,
+    );
+    const cartSlot = cartSlots.at(-1)?.value;
+    if (!cartRpcReady) {
+      check(true, "H/I Extra cart multi-claim (SKIP — apply 20260909140000)");
+    } else if (!cartSlot || !cartFromIso || !cartCutoffIso) {
+      check(true, "H/I Extra cart multi-claim (SKIP — no tomorrow pickup slot)");
+    } else {
+      const extraA = await proposeNamed("CartA", cartDate);
+      const extraB = await proposeNamed("CartB", cartDate);
+      const extraC = await proposeNamed("CartC", cartDate);
+      check(
+        Boolean(extraA.id && extraB.id && extraC.id),
+        "H propose three extras for cart",
+        rpcMessage(extraA.error ?? extraB.error ?? extraC.error),
+      );
+      for (const [label, id] of [
+        ["A", extraA.id],
+        ["B", extraB.id],
+        ["C", extraC.id],
+      ] as const) {
+        if (!id) continue;
+        const { error: confirmErr } = await admin.rpc("confirm_extra_stock", {
+          p_extra_stock_id: id,
+          p_actor_staff_id: actor.id,
+          p_prepared_on: cartDate,
+          p_pickup_available_from_at: cartFromIso,
+          p_pickup_through_at: cartCutoffIso,
+        });
+        check(!confirmErr, `H confirm Extra ${label} for cart`, rpcMessage(confirmErr));
+      }
+      if (!extraA.id || !extraB.id || !extraC.id) {
+        check(false, "H extras remain unsold until submit", "missing extra ids");
+      } else {
+        const { data: unsoldBefore } = await admin
+          .from("extra_stock")
+          .select("id, sold_at")
+          .in("id", [extraA.id, extraB.id, extraC.id]);
+        check(
+          (unsoldBefore ?? []).length === 3 &&
+            (unsoldBefore ?? []).every((row) => !row.sold_at),
+          "H extras remain unsold until submit",
+        );
+        const { data: multiOrder, error: multiErr } = await admin.rpc(
+          "submit_guest_extra_order",
+          {
+            p_customer_name: `Cart ${SIG}`,
+            p_phone: "6590000004",
+            p_email: null,
+            p_pickup_date: cartDate,
+            p_pickup_time: cartSlot,
+            p_notes: SIG,
+            p_extra_stock_id: extraA.id,
+            p_extra_stock_ids: [extraA.id, extraB.id],
+          },
+        );
+        check(!multiErr, "H multi Extra cart claimed atomically", rpcMessage(multiErr));
+        if (multiOrder?.id) extraOrderIds.push(multiOrder.id as string);
+        const { data: claimed } = await admin
+          .from("extra_stock")
+          .select("id, sold_at, order_id")
+          .in("id", [extraA.id, extraB.id]);
+        check(
+          (claimed ?? []).length === 2 &&
+            (claimed ?? []).every(
+              (row) =>
+                Boolean(row.sold_at) &&
+                row.order_id === (multiOrder?.id as string | undefined),
+            ),
+          "H exact extra_stock rows sold and linked",
+        );
+        const { data: orderItems } = await admin
+          .from("order_items")
+          .select("id")
+          .eq("order_id", multiOrder?.id ?? "00000000-0000-0000-0000-000000000000");
+        check((orderItems ?? []).length === 2, "H order has two Fresh Pick items");
+        const { data: siblingBefore } = await admin
+          .from("extra_stock")
+          .select("sold_at")
+          .eq("id", extraC.id)
+          .maybeSingle();
+        check(!siblingBefore?.sold_at, "H unused identical extra stays available");
+
+        const { error: staleErr } = await admin.rpc("submit_guest_extra_order", {
+          p_customer_name: `Stale ${SIG}`,
+          p_phone: "6590000005",
+          p_email: null,
+          p_pickup_date: cartDate,
+          p_pickup_time: cartSlot,
+          p_notes: SIG,
+          p_extra_stock_id: extraA.id,
+          p_extra_stock_ids: [extraA.id, extraC.id],
+        });
+        check(
+          Boolean(staleErr),
+          "I stale cart submission fails without substituting",
+          rpcMessage(staleErr),
+        );
+        const { data: siblingAfter } = await admin
+          .from("extra_stock")
+          .select("sold_at, order_id")
+          .eq("id", extraC.id)
+          .maybeSingle();
+        check(
+          !siblingAfter?.sold_at && !siblingAfter?.order_id,
+          "I sibling extra was not claimed",
+        );
+      }
     }
 
     const { data: catalogueAfter } = await admin.rpc(

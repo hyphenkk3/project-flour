@@ -10,9 +10,9 @@ import { resolve } from "node:path";
 import { isExtraAvailable } from "@/engines/extra/availability";
 import {
   extraSubmitCustomerError,
+  FRESH_PICKS_ADD_TO_CART_CTA,
   FRESH_PICKS_FIXED_DATES_NOTE,
   FRESH_PICKS_NAME_HELP,
-  FRESH_PICKS_ORDER_CTA,
   FRESH_PICKS_SOLD_OUT,
   FRESH_PICKS_SOLD_OUT_MESSAGE,
   FRESH_PICKS_SUCCESS_CONTACT,
@@ -36,6 +36,12 @@ function readSrc(rel: string): string {
 
 const extraFormSrc = readSrc(
   "src/workspaces/storefront/extra/GuestExtraOrderForm.tsx",
+);
+const extraCheckoutSrc = readSrc(
+  "src/workspaces/storefront/extra/GuestExtraCheckoutForm.tsx",
+);
+const extraCartRpcSrc = readSrc(
+  "supabase/migrations/20260909140000_guest_extra_cart_multi_claim.sql",
 );
 const extraActionsSrc = readSrc("src/workspaces/storefront/extra/actions.ts");
 const extraQueriesSrc = readSrc("src/workspaces/storefront/extra/queries.ts");
@@ -74,7 +80,7 @@ const extraSoldRpcSrc = readSrc(
 assert.equal(freshPickAvailabilityLabel("today"), "Available today");
 assert.equal(freshPickAvailabilityLabel("tomorrow"), "Available tomorrow");
 assert.match(extraPageSrc, /Fresh Picks/);
-assert.match(extraPageSrc, /FRESH_PICKS_ORDER_CTA/);
+assert.match(extraPageSrc, /FRESH_PICKS_ADD_TO_CART_CTA/);
 assert.match(extraPageSrc, /freshPickAvailabilityDateLabel/);
 assert.match(extraPageSrc, /freshPickAvailabilityLabel\(pick\.days\)/);
 assert.match(extraPageSrc, /pick\.description/);
@@ -82,7 +88,7 @@ assert.match(extraPageSrc, /formatRm/);
 assert.match(extraPageSrc, /overflow-hidden rounded-\[10px\]/);
 assert.match(extraPageSrc, /md:h-\[12rem\]/);
 assert.match(extraOrderPageSrc, /overflow-hidden rounded-\[10px\]/);
-assert.equal(FRESH_PICKS_ORDER_CTA, "Order this Fresh Pick");
+assert.equal(FRESH_PICKS_ADD_TO_CART_CTA, "Add to Cart");
 assert.equal(
   isPublishedFreshPick({
     lifecycle: "confirmed",
@@ -193,7 +199,7 @@ assert.equal(
   "Please choose a valid pickup time for that date.",
 );
 
-// 9. Multiple Fresh Picks: one Extra unit per order; same cake collapses on listing
+// 9. Multiple Fresh Picks: independent extra_stock.id units, never merged by cake+size
 assert.equal(
   selectCustomerFreshPickOfferings([
     {
@@ -213,27 +219,9 @@ assert.equal(
   ]).length,
   1,
 );
-assert.equal(
-  selectCustomerFreshPickOfferings([
-    {
-      id: "a",
-      cakeName: "Pandan",
-      sizeLabel: '6"',
-      libraryCakeId: "cake-p",
-      libraryCakeSizeId: "size-p",
-    },
-    {
-      id: "c",
-      cakeName: "Amour",
-      sizeLabel: '6"',
-      libraryCakeId: "cake-a",
-      libraryCakeSizeId: "size-a",
-    },
-  ]).length,
-  2,
-);
+assert.doesNotMatch(extraQueriesSrc, /selectCustomerFreshPickOfferings/);
 assert.match(extraFormSrc, /name="extra_stock_id"/);
-assert.doesNotMatch(extraFormSrc, /extra_stock_ids/);
+assert.match(extraCheckoutSrc, /name="extra_stock_id"/);
 assert.doesNotMatch(extraFormSrc, /whitebird-preorder-draft-v1/);
 
 // 10. Different fixed dates cannot be silently combined
@@ -265,6 +253,10 @@ assert.doesNotMatch(addToOrderSrc, /submitGuestExtraOrder/);
 // 12. Normal preorder cakes do not enter Fresh Picks cart
 assert.doesNotMatch(extraFormSrc, /GuestCheckoutForm/);
 assert.doesNotMatch(extraFormSrc, /submit_guest_preorder/);
+assert.match(extraCheckoutSrc, /CheckoutConfirmPrompt/);
+assert.match(extraCheckoutSrc, /setConfirmOpen\(true\)/);
+assert.match(extraCheckoutSrc, /onClick=\{openConfirm\}/);
+assert.doesNotMatch(extraFormSrc, /Review Order/);
 assert.match(extraActionsSrc, /submit_guest_extra_order/);
 assert.doesNotMatch(extraActionsSrc, /submit_guest_preorder/);
 
@@ -283,21 +275,21 @@ assert.doesNotMatch(extraOrderPageSrc, /waiting.?list/i);
 assert.doesNotMatch(extraActionsSrc, /waiting.?list/i);
 
 // 16. Customer details follow current conventions
-assert.match(extraFormSrc, /FRESH_PICKS_NAME_HELP/);
-assert.match(extraFormSrc, /FRESH_PICKS_WHATSAPP_NOTE/);
-assert.match(extraFormSrc, /label="WhatsApp phone"/);
+assert.match(extraCheckoutSrc, /FRESH_PICKS_NAME_HELP/);
+assert.match(extraCheckoutSrc, /FRESH_PICKS_WHATSAPP_NOTE/);
+assert.match(extraCheckoutSrc, /label="WhatsApp phone"/);
 assert.equal(FRESH_PICKS_NAME_HELP, "Nickname / English name and surname");
 assert.equal(
   FRESH_PICKS_WHATSAPP_NOTE,
   "Please ensure the WhatsApp number is correct as we will contact you regarding your order.",
 );
-assert.match(extraFormSrc, /name="customer_name"/);
-assert.match(extraFormSrc, /name="phone"/);
-assert.doesNotMatch(extraFormSrc, /name="email"/);
-assert.doesNotMatch(extraFormSrc, /Email \(optional\)/);
-assert.doesNotMatch(extraFormSrc, /Email me a copy of my order/);
-assert.doesNotMatch(extraFormSrc, /name="surname"/);
-assert.match(extraFormSrc, /OPTIONAL_NOTES_CUSTOMER_WARNING/);
+assert.match(extraCheckoutSrc, /name="customer_name"/);
+assert.match(extraCheckoutSrc, /name="phone"/);
+assert.doesNotMatch(extraCheckoutSrc, /name="email"/);
+assert.doesNotMatch(extraCheckoutSrc, /Email \(optional\)/);
+assert.doesNotMatch(extraCheckoutSrc, /Email me a copy of my order/);
+assert.doesNotMatch(extraCheckoutSrc, /name="surname"/);
+assert.match(extraCheckoutSrc, /OPTIONAL_NOTES_CUSTOMER_WARNING/);
 assert.match(
   extraActionsSrc,
   /Please fill in your name and WhatsApp phone number/,
@@ -306,8 +298,9 @@ assert.match(
 // 17. Server submission revalidates availability
 assert.match(extraActionsSrc, /isValidExtraCustomerPickup/);
 assert.match(extraActionsSrc, /getStorefrontExtraById/);
-assert.match(extraRpcSrc, /stock_row\.lifecycle <> 'confirmed'/);
-assert.match(extraRpcSrc, /stock_row\.sold_at is not null/);
+assert.match(extraCartRpcSrc, /stock_row\.lifecycle <> 'confirmed'/);
+assert.match(extraCartRpcSrc, /stock_row\.sold_at is not null/);
+assert.match(extraCartRpcSrc, /p_extra_stock_ids/);
 
 // 18. Success / payment-pending state
 assert.equal(FRESH_PICKS_SUCCESS_TITLE, "Order Received");
@@ -317,13 +310,21 @@ assert.equal(
   "Whitebird will contact you via WhatsApp.",
 );
 assert.equal(FRESH_PICKS_SUCCESS_FLOW, "fresh-picks");
-assert.match(extraActionsSrc, /FRESH_PICKS_SUCCESS_FLOW/);
+assert.match(extraCheckoutSrc, /FRESH_PICKS_SUCCESS_FLOW/);
+assert.match(
+  extraCheckoutSrc,
+  /window\.location\.assign\(\s*`\/order\/success\?order=\$\{state\.orderId\}&flow=\$\{FRESH_PICKS_SUCCESS_FLOW\}`/,
+);
+assert.match(extraActionsSrc, /return \{ error: null, orderId \}/);
+assert.doesNotMatch(extraActionsSrc, /from "next\/navigation"/);
+assert.doesNotMatch(extraActionsSrc, /redirect\(/);
 assert.match(successSrc, /isFreshPick/);
 assert.match(successSrc, /FRESH_PICKS_SUCCESS_TITLE/);
 assert.match(successSrc, /ClearPreorderDraftOnSuccess/);
+assert.match(successSrc, /ClearFreshPickCartOnSuccess/);
 assert.match(
   successSrc,
-  /isFreshPick \? null : <ClearPreorderDraftOnSuccess/,
+  /isFreshPick \? <ClearFreshPickCartOnSuccess \/> : <ClearPreorderDraftOnSuccess/,
 );
 assert.match(receiptSrc, /isFreshPick/);
 assert.match(receiptSrc, /extra_stock_id/);

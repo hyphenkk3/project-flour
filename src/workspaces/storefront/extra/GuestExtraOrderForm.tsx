@@ -1,17 +1,12 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   FormActions,
-  FormCheckbox,
   FormError,
-  FormField,
-  FormInput,
-  FormRadioGroup,
   FormSelect,
   FormSubmitButton,
-  FormTextarea,
 } from "@/components/ui/form";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
@@ -20,27 +15,19 @@ import {
   extraCustomerVisiblePickupDates,
 } from "@/engines/extra/extra-pickup";
 import {
+  FRESH_PICKS_ADD_TO_CART_CTA,
+  FRESH_PICKS_ADDED_CONFIRMATION,
   FRESH_PICKS_FIXED_DATES_NOTE,
-  FRESH_PICKS_NAME_HELP,
-  FRESH_PICKS_ORDER_CTA,
-  FRESH_PICKS_WHATSAPP_NOTE,
 } from "@/engines/extra/customer-fresh-picks";
-import { OPTIONAL_NOTES_CUSTOMER_WARNING } from "@/engines/orders/order-guide";
-import {
-  formatCustomerPreorderOptionLabel,
-  type CustomerComplimentaryOption,
-} from "@/engines/orders/customer-preorder-options";
 import { formatShortBusinessDate } from "@/lib/dates";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
-import {
-  loadExtraComplimentaryOptions,
-  submitGuestExtraOrderAction,
-  type ExtraOrderState,
-} from "@/workspaces/storefront/extra/actions";
 import type { StorefrontExtraPick } from "@/workspaces/storefront/extra/queries";
-import type { PhysicalReceiptChoice } from "@/workspaces/storefront/checkout/preorder-draft";
-
-const initialState: ExtraOrderState = { error: null };
+import {
+  addFreshPickToCart,
+  extraIsValidForCartPickup,
+  readFreshPickCart,
+  writeFreshPickCart,
+} from "@/workspaces/storefront/extra/fresh-pick-cart";
 
 type GuestExtraOrderFormProps = {
   extra: StorefrontExtraPick;
@@ -51,65 +38,93 @@ export function GuestExtraOrderForm({
   extra,
   hoursSnapshot = OPERATING_HOURS_SEED,
 }: GuestExtraOrderFormProps) {
-  const [state, formAction, pending] = useActionState(
-    submitGuestExtraOrderAction,
-    initialState,
-  );
-  const window = {
+  const pickupWindow = {
     pickupAvailableFromAt: extra.pickupAvailableFromAt ?? "",
     orderCutoffAt: extra.pickupThroughAt ?? "",
   };
-  const dates = extraCustomerVisiblePickupDates(window, undefined, hoursSnapshot);
+  const dates = extraCustomerVisiblePickupDates(
+    pickupWindow,
+    undefined,
+    hoursSnapshot,
+  );
   const [pickupDate, setPickupDate] = useState(dates[0] ?? "");
   const [pickupTime, setPickupTime] = useState("");
-  const [includeReceiptChoice, setIncludeReceiptChoice] =
-    useState<PhysicalReceiptChoice>("");
-  const [complimentaryOptions, setComplimentaryOptions] = useState<
-    CustomerComplimentaryOption[]
-  >([]);
-  const [complimentaryCodes, setComplimentaryCodes] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [added, setAdded] = useState(false);
+  const addedTimer = useRef<number | null>(null);
 
   const usableSlots = extraCustomerPickupSlotsForDate(
     pickupDate,
-    window,
+    pickupWindow,
     undefined,
     hoursSnapshot,
   );
   const timeStillValid = usableSlots.some((slot) => slot.value === pickupTime);
 
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      if (!pickupDate) {
-        setComplimentaryOptions([]);
-        setComplimentaryCodes([]);
-        return;
-      }
-      const next = await loadExtraComplimentaryOptions(pickupDate);
-      if (cancelled) return;
-      setComplimentaryOptions(next.complimentaryOptions);
-      setComplimentaryCodes((current) =>
-        current.filter((code) =>
-          next.complimentaryOptions.some((option) => option.code === code),
-        ),
-      );
+    const existing = readFreshPickCart();
+    if (
+      !existing?.pickupDate ||
+      !existing.pickupTime ||
+      !extra.pickupAvailableFromAt ||
+      !extra.pickupThroughAt
+    ) {
+      return;
     }
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [pickupDate]);
+    if (
+      extraIsValidForCartPickup({
+        pickupDate: existing.pickupDate,
+        pickupTime: existing.pickupTime,
+        pickupAvailableFromAt: extra.pickupAvailableFromAt,
+        orderCutoffAt: extra.pickupThroughAt,
+      })
+    ) {
+      setPickupDate(existing.pickupDate);
+      setPickupTime(existing.pickupTime);
+    }
+  }, [
+    extra.pickupAvailableFromAt,
+    extra.pickupThroughAt,
+  ]);
 
-  function toggleComplimentary(code: string, selected: boolean) {
-    setComplimentaryCodes((current) =>
-      selected
-        ? Array.from(new Set([...current, code]))
-        : current.filter((entry) => entry !== code),
-    );
+  useEffect(() => {
+    return () => {
+      if (addedTimer.current) window.clearTimeout(addedTimer.current);
+    };
+  }, []);
+
+  function addToCart() {
+    setError(null);
+    const result = addFreshPickToCart(readFreshPickCart(), {
+      extraStockId: extra.id,
+      cakeName: extra.cakeName,
+      sizeLabel: extra.sizeLabel,
+      unitPrice: extra.unitPrice,
+      imageUrl: extra.imageUrl,
+      pickupDate,
+      pickupTime: timeStillValid ? pickupTime : "",
+      pickupAvailableFromAt: extra.pickupAvailableFromAt ?? "",
+      orderCutoffAt: extra.pickupThroughAt ?? "",
+    });
+    if (!result.ok) {
+      setAdded(false);
+      setError(result.error);
+      return;
+    }
+    writeFreshPickCart(result.cart);
+    setAdded(true);
+    if (addedTimer.current) window.clearTimeout(addedTimer.current);
+    addedTimer.current = window.setTimeout(() => setAdded(false), 2400);
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-5">
+    <form
+      className="flex flex-col gap-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        addToCart();
+      }}
+    >
       <input name="extra_stock_id" type="hidden" value={extra.id} />
 
       <section className="space-y-3">
@@ -135,7 +150,7 @@ export function GuestExtraOrderForm({
                 setPickupDate(next);
                 const nextSlots = extraCustomerPickupSlotsForDate(
                   next,
-                  window,
+                  pickupWindow,
                   undefined,
                   hoursSnapshot,
                 );
@@ -178,99 +193,29 @@ export function GuestExtraOrderForm({
 
       {extra.unitPrice != null ? (
         <p className="text-ink text-sm font-semibold">
-          Total · {formatRm(extra.unitPrice)}
+          {formatRm(extra.unitPrice)}
         </p>
       ) : null}
 
-      {complimentaryOptions.length > 0 ? (
-        <section className="space-y-4">
-          <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-            Options
-          </h2>
-          <div className="space-y-2">
-            <p className="text-ink text-sm font-medium">Complimentary</p>
-            {complimentaryOptions.map((option) => (
-              <FormCheckbox
-                checked={complimentaryCodes.includes(option.code)}
-                key={option.code}
-                label={formatCustomerPreorderOptionLabel(option.name, 0)}
-                name="complimentary_code"
-                onChange={(event) =>
-                  toggleComplimentary(option.code, event.target.checked)
-                }
-                value={option.code}
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      <section className="space-y-3">
-        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-          Customer
-        </h2>
-        <FormField
-          help={FRESH_PICKS_NAME_HELP}
-          htmlFor="customer_name"
-          label="Name"
-        >
-          <FormInput id="customer_name" name="customer_name" required />
-        </FormField>
-        <FormField
-          help={FRESH_PICKS_WHATSAPP_NOTE}
-          htmlFor="phone"
-          label="WhatsApp phone"
-        >
-          <FormInput id="phone" name="phone" required type="tel" />
-        </FormField>
-        <FormRadioGroup
-          legend="Would you like a copy of the receipt? (will be attached during pickup)"
-          name="include_receipt"
-          onChange={(value) =>
-            setIncludeReceiptChoice(
-              value === "yes" || value === "no" ? value : "",
-            )
-          }
-          options={[
-            { value: "yes", label: "Yes" },
-            { value: "no", label: "No" },
-          ]}
-          required
-          value={includeReceiptChoice}
-        />
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-          Notes
-        </h2>
-        <p className="text-ink text-sm font-medium">Optional notes</p>
-        <p
-          className="text-status-danger text-sm leading-snug font-bold"
-          id="optional-notes-warning"
-        >
-          {OPTIONAL_NOTES_CUSTOMER_WARNING}
+      <FormError message={error} />
+      {added ? (
+        <p className="text-signal text-sm" role="status">
+          {FRESH_PICKS_ADDED_CONFIRMATION}
         </p>
-        <FormTextarea
-          aria-describedby="optional-notes-warning"
-          aria-label="Optional notes"
-          id="notes"
-          name="notes"
-          rows={3}
-        />
-      </section>
-
-      <FormError message={state.error} />
+      ) : null}
 
       <FormActions>
-        <FormSubmitButton disabled={usableSlots.length === 0} pending={pending}>
-          {FRESH_PICKS_ORDER_CTA}
+        <FormSubmitButton
+          disabled={usableSlots.length === 0}
+          type="submit"
+        >
+          {FRESH_PICKS_ADD_TO_CART_CTA}
         </FormSubmitButton>
         <Link
           className="border-fog text-ink inline-flex min-h-12 items-center justify-center rounded-lg border px-5 text-sm font-medium"
           href="/extra"
         >
-          Back
+          Continue shopping
         </Link>
       </FormActions>
     </form>

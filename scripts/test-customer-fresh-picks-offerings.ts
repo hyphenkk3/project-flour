@@ -148,13 +148,12 @@ function readSrc(rel: string): string {
 }
 
 const extraQueriesSrc = readSrc("src/workspaces/storefront/extra/queries.ts");
-assert.match(extraQueriesSrc, /selectCustomerFreshPickOfferings/);
 assert.match(extraQueriesSrc, /extraActionableFreshPickDays/);
 assert.match(extraQueriesSrc, /sortCustomerFreshPicksByAvailabilityDay/);
 assert.match(
   extraQueriesSrc,
-  /sortCustomerFreshPicksByAvailabilityDay\(\s*selectCustomerFreshPickOfferings\(picks\)/,
-  "Fresh Picks listing is the customer offering layer, today before tomorrow",
+  /sortCustomerFreshPicksByAvailabilityDay\(picks\)/,
+  "Fresh Picks listing keeps every extra_stock.id as its own unit",
 );
 assert.doesNotMatch(
   extraQueriesSrc,
@@ -166,7 +165,7 @@ const extraPageSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontExtraPage.tsx",
 );
 assert.match(extraPageSrc, /listStorefrontAvailableExtra/);
-assert.match(extraPageSrc, /FRESH_PICKS_ORDER_CTA/);
+assert.match(extraPageSrc, /FRESH_PICKS_ADD_TO_CART_CTA/);
 assert.match(extraPageSrc, /freshPickAvailabilityLabel/);
 assert.match(extraPageSrc, /freshPickAvailabilityDateLabel/);
 assert.match(extraPageSrc, /freshPickAvailabilityLabel\(pick\.days\)/);
@@ -185,8 +184,7 @@ const extraFormSrc = readSrc(
 assert.match(extraFormSrc, /name="extra_stock_id"/);
 assert.match(extraFormSrc, /value=\{extra\.id\}/);
 assert.match(extraFormSrc, /extraCustomerVisiblePickupDates/);
-assert.match(extraFormSrc, /name="customer_name"/);
-assert.match(extraFormSrc, /FRESH_PICKS_ORDER_CTA/);
+assert.match(extraFormSrc, /FRESH_PICKS_ADD_TO_CART_CTA/);
 
 const boardSrc = readSrc("src/workspaces/extra/ExtraBoard.tsx");
 assert.doesNotMatch(boardSrc, /selectCustomerFreshPickOfferings/);

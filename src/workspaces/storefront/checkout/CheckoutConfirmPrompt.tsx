@@ -1,18 +1,20 @@
 "use client";
 
 import { useEffect, useId, useRef, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import {
   dineInVenueLabel,
   type DineInVenue,
 } from "@/engines/business-calendar/dine-in-hours";
 import {
   CUSTOMER_PAID_ADDON_QUANTITY,
+  type CustomerComplimentaryOption,
   type CustomerPaidAddonOption,
 } from "@/engines/orders/customer-preorder-options";
 import { workspaceFulfilmentSectionTitle } from "@/engines/orders/fulfilment";
+import { formatShortBusinessDate } from "@/lib/dates";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
+import { StorefrontOverlay } from "@/workspaces/storefront/StorefrontOverlay";
 import type {
   PreorderDraftFields,
   PreorderDraftItem,
@@ -24,6 +26,7 @@ export type CheckoutConfirmLine = {
   sizeLabel?: string;
   quantity: number;
   linePrice: number;
+  complimentary?: boolean;
 };
 
 export type CheckoutConfirmSnapshot = {
@@ -117,6 +120,79 @@ function confirmFulfilmentDetails(fields: PreorderDraftFields): string[] {
   return [];
 }
 
+export function buildExtraCheckoutConfirmSnapshot(input: {
+  cakeName: string;
+  sizeLabel: string;
+  unitPrice: number | null;
+  pickupDate: string;
+  pickupTime: string;
+  customerName: string;
+  customerPhone: string;
+  notes: string;
+  paidAddonOptions: readonly CustomerPaidAddonOption[];
+  paidAddonCodes: readonly string[];
+  complimentaryOptions: readonly CustomerComplimentaryOption[];
+  complimentaryCodes: readonly string[];
+  total: number;
+  items?: readonly {
+    extraStockId: string;
+    cakeName: string;
+    sizeLabel: string;
+    unitPrice: number | null;
+  }[];
+}): CheckoutConfirmSnapshot {
+  const cakeLines: CheckoutConfirmLine[] =
+    input.items && input.items.length > 0
+      ? input.items.map((item) => ({
+          key: item.extraStockId,
+          name: item.cakeName,
+          sizeLabel: item.sizeLabel,
+          quantity: 1,
+          linePrice: item.unitPrice ?? 0,
+        }))
+      : [
+          {
+            key: "fresh-pick",
+            name: input.cakeName,
+            sizeLabel: input.sizeLabel,
+            quantity: 1,
+            linePrice: input.unitPrice ?? 0,
+          },
+        ];
+  const selectedAddons = new Set(input.paidAddonCodes);
+  const addonLines: CheckoutConfirmLine[] = input.paidAddonOptions
+    .filter((option) => selectedAddons.has(option.code))
+    .map((option) => ({
+      key: `addon:${option.code}`,
+      name: option.name,
+      quantity: CUSTOMER_PAID_ADDON_QUANTITY,
+      linePrice: option.unitPrice * CUSTOMER_PAID_ADDON_QUANTITY,
+    }));
+  const selectedComplimentary = new Set(input.complimentaryCodes);
+  const complimentaryLines: CheckoutConfirmLine[] = input.complimentaryOptions
+    .filter((option) => selectedComplimentary.has(option.code))
+    .map((option) => ({
+      key: `comp:${option.code}`,
+      name: option.name,
+      quantity: 1,
+      linePrice: 0,
+      complimentary: true,
+    }));
+
+  return {
+    collectionDate:
+      formatShortBusinessDate(input.pickupDate) || input.pickupDate,
+    collectionTime: formatPickupTime(input.pickupTime),
+    fulfilmentLabel: workspaceFulfilmentSectionTitle("pickup"),
+    fulfilmentDetails: [],
+    customerName: input.customerName.trim(),
+    customerPhone: input.customerPhone.trim(),
+    notes: input.notes.trim(),
+    lines: [...cakeLines, ...addonLines, ...complimentaryLines],
+    total: input.total,
+  };
+}
+
 type CheckoutConfirmPromptProps = {
   open: boolean;
   pending?: boolean;
@@ -170,15 +246,11 @@ export function CheckoutConfirmPrompt({
 
   if (!open) return null;
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 animate-storefront-fade">
-      <div aria-hidden className="bg-ink/40 absolute inset-0" />
-      <div
-        aria-labelledby={titleId}
-        aria-modal="true"
-        className="border-fog bg-mist text-ink absolute inset-x-0 bottom-0 z-[60] mx-auto flex w-full max-w-md max-h-[min(85dvh,40rem)] flex-col overflow-hidden rounded-t-lg border md:top-1/2 md:bottom-auto md:left-1/2 md:right-auto md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-lg"
-        role="dialog"
-      >
+  return (
+    <StorefrontOverlay
+      labelledBy={titleId}
+      panelClassName="border-fog bg-mist text-ink flex w-full max-w-md max-h-[min(85dvh,40rem)] flex-col overflow-hidden rounded-t-lg border md:rounded-lg"
+    >
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-5">
           <p className="text-signal text-[11px] font-medium tracking-[0.22em] uppercase">
             Whitebird
@@ -213,9 +285,13 @@ export function CheckoutConfirmPrompt({
                           : `Qty ${line.quantity}`}
                       </p>
                     </div>
-                    <p className="shrink-0 font-medium tabular-nums">
-                      {formatRm(line.linePrice)}
-                    </p>
+                    {line.complimentary ? (
+                      <p className="text-skyline shrink-0">Complimentary</p>
+                    ) : (
+                      <p className="shrink-0 font-medium tabular-nums">
+                        {formatRm(line.linePrice)}
+                      </p>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -256,7 +332,7 @@ export function CheckoutConfirmPrompt({
           </p>
           <div className="mt-4 flex flex-col gap-3">
             <button
-              className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-md px-6 text-sm font-medium transition duration-200 disabled:opacity-60"
+              className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 cursor-pointer items-center justify-center rounded-md px-6 text-sm font-medium transition duration-200 disabled:opacity-60"
               disabled={pending}
               onClick={onConfirm}
               ref={confirmRef}
@@ -265,7 +341,7 @@ export function CheckoutConfirmPrompt({
               {pending ? "Submitting…" : "Confirm Order"}
             </button>
             <button
-              className="text-ink hover:text-skyline inline-flex min-h-12 items-center justify-center rounded-md px-6 text-sm font-medium transition-colors duration-200 disabled:opacity-60"
+              className="text-ink hover:text-skyline inline-flex min-h-12 cursor-pointer items-center justify-center rounded-md px-6 text-sm font-medium transition-colors duration-200 disabled:opacity-60"
               disabled={pending}
               onClick={onGoBack}
               type="button"
@@ -274,8 +350,6 @@ export function CheckoutConfirmPrompt({
             </button>
           </div>
         </div>
-      </div>
-    </div>,
-    document.body,
+    </StorefrontOverlay>
   );
 }

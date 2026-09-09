@@ -182,18 +182,18 @@ assert.match(multiConfirm, /RM135/);
 assert.doesNotMatch(multiConfirm, /\+RM0/);
 
 const extraFormSrc = readSrc(
-  "src/workspaces/storefront/extra/GuestExtraOrderForm.tsx",
+  "src/workspaces/storefront/extra/GuestExtraCheckoutForm.tsx",
 );
 assert.match(extraFormSrc, /Would you like a copy of the receipt\? \(will be attached during pickup\)/);
 assert.match(extraFormSrc, /name="include_receipt"/);
 assert.doesNotMatch(extraFormSrc, /email_submission_receipt_requested/);
 assert.match(extraFormSrc, /name="complimentary_code"/);
 assert.match(extraFormSrc, /formatCustomerPreorderOptionLabel\(option\.name, 0\)/);
-assert.match(extraFormSrc, /formatRm\(extra\.unitPrice\)/);
+assert.match(extraFormSrc, /formatRm\(displayedTotal\)/);
 assert.doesNotMatch(extraFormSrc, /submit_guest_preorder/);
 assert.doesNotMatch(extraFormSrc, /GuestCheckoutForm/);
-assert.doesNotMatch(extraFormSrc, /paidAddon/);
-assert.doesNotMatch(extraFormSrc, /birthday_card/);
+assert.match(extraFormSrc, /paidAddonOptions/);
+assert.match(extraFormSrc, /name="paid_addon_code"/);
 
 const extraActionsSrc = readSrc("src/workspaces/storefront/extra/actions.ts");
 assert.match(extraActionsSrc, /submit_guest_extra_order/);
@@ -205,7 +205,7 @@ assert.match(
 );
 assert.match(extraActionsSrc, /storefront_customer_preorder_options/);
 assert.doesNotMatch(extraActionsSrc, /submit_guest_preorder/);
-assert.doesNotMatch(extraActionsSrc, /p_paid_addons/);
+assert.match(extraActionsSrc, /p_paid_addons/);
 
 const cakeFormSrc = readSrc(
   "src/workspaces/storefront/checkout/GuestCheckoutForm.tsx",

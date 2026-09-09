@@ -8,7 +8,10 @@ import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { customerPreorderCommercialTotal } from "@/engines/orders/customer-preorder-options";
-import { buildCheckoutConfirmSnapshot } from "@/workspaces/storefront/checkout/CheckoutConfirmPrompt";
+import {
+  buildCheckoutConfirmSnapshot,
+  buildExtraCheckoutConfirmSnapshot,
+} from "@/workspaces/storefront/checkout/CheckoutConfirmPrompt";
 import {
   emptyPreorderFields,
   type PreorderDraftItem,
@@ -33,6 +36,10 @@ const actionsSrc = readSrc("src/workspaces/storefront/checkout/actions.ts");
 const extraFormSrc = readSrc(
   "src/workspaces/storefront/extra/GuestExtraOrderForm.tsx",
 );
+const extraCheckoutSrc = readSrc(
+  "src/workspaces/storefront/extra/GuestExtraCheckoutForm.tsx",
+);
+const overlaySrc = readSrc("src/workspaces/storefront/StorefrontOverlay.tsx");
 
 const handleSubmitSrc = formSrc.slice(
   formSrc.indexOf("function handleSubmit"),
@@ -64,6 +71,17 @@ assert.match(promptSrc, /Confirm Your Order/);
 assert.match(promptSrc, /Would you like to confirm this order\?/);
 assert.match(promptSrc, /Confirm Order/);
 assert.match(promptSrc, /Go Back/);
+assert.match(promptSrc, /StorefrontOverlay/);
+assert.match(promptSrc, /panelClassName=/);
+assert.doesNotMatch(promptSrc, /fixed inset-x-0 bottom-0 z-\[60\]/);
+assert.doesNotMatch(promptSrc, /pointer-events-none fixed inset-0 z-50/);
+assert.doesNotMatch(promptSrc, /fixed inset-0 z-50 animate-storefront-fade/);
+assert.match(
+  overlaySrc,
+  /bg-ink\/40 animate-storefront-fade pointer-events-none fixed inset-0 z-50/,
+);
+assert.match(overlaySrc, /fixed inset-x-0 bottom-0 z-\[60\]/);
+assert.doesNotMatch(overlaySrc, /fixed inset-0 z-\[60\] flex/);
 assert.match(promptSrc, /Collection/);
 assert.match(promptSrc, /Your Order/);
 assert.match(promptSrc, /Customer/);
@@ -84,10 +102,7 @@ assert.doesNotMatch(promptSrc, /showModal/);
 assert.doesNotMatch(promptSrc, /<dialog/);
 assert.doesNotMatch(promptSrc, /Proceed to Payment/);
 assert.doesNotMatch(promptSrc, /Review Order/);
-assert.doesNotMatch(
-  promptSrc.split("aria-hidden")[1]?.split('role="dialog"')[0] ?? "",
-  /onClick/,
-);
+assert.doesNotMatch(overlaySrc, /onClick/);
 
 assert.match(goBackSrc, /setConfirmOpen\(false\)/);
 assert.doesNotMatch(goBackSrc, /formAction\(/);
@@ -152,7 +167,61 @@ assert.doesNotMatch(actionsSrc, /from "next\/navigation"/);
 assert.match(successRouteSrc, /StorefrontSuccessPage/);
 assert.match(successSrc, /Order Received/);
 assert.doesNotMatch(successSrc, /Proceed to Payment/);
-assert.doesNotMatch(extraFormSrc, /CheckoutConfirmPrompt/);
+assert.match(extraCheckoutSrc, /CheckoutConfirmPrompt/);
+assert.match(extraCheckoutSrc, /buildExtraCheckoutConfirmSnapshot/);
+assert.match(extraCheckoutSrc, /onClick=\{openConfirm\}/);
+assert.match(extraCheckoutSrc, /type="button"/);
+assert.match(extraCheckoutSrc, /reportValidity/);
+assert.doesNotMatch(extraCheckoutSrc, /action=\{handleSubmit\}/);
+assert.doesNotMatch(extraCheckoutSrc, /action=\{formAction\}/);
+assert.match(extraCheckoutSrc, /setConfirmOpen\(true\)/);
+assert.doesNotMatch(extraCheckoutSrc, /Review Order/);
+assert.doesNotMatch(extraCheckoutSrc, /submit_guest_preorder/);
+assert.match(extraCheckoutSrc, /submitGuestExtraOrderAction/);
+
+const extraOpenConfirmSrc = extraCheckoutSrc.slice(
+  extraCheckoutSrc.indexOf("function openConfirm"),
+  extraCheckoutSrc.indexOf("function confirmOrder"),
+);
+const extraConfirmOrderSrc = extraCheckoutSrc.slice(
+  extraCheckoutSrc.indexOf("function confirmOrder"),
+  extraCheckoutSrc.indexOf("function goBackFromConfirm"),
+);
+const extraGoBackSrc = extraCheckoutSrc.slice(
+  extraCheckoutSrc.indexOf("function goBackFromConfirm"),
+  extraCheckoutSrc.indexOf("function toggleComplimentary"),
+);
+assert.match(extraOpenConfirmSrc, /setConfirmOpen\(true\)/);
+assert.match(extraOpenConfirmSrc, /new FormData\(form\)/);
+assert.doesNotMatch(extraOpenConfirmSrc, /formAction\(/);
+assert.match(extraConfirmOrderSrc, /formAction\(formData\)/);
+assert.match(extraConfirmOrderSrc, /if \(pending \|\| state\.orderId\) return/);
+assert.doesNotMatch(extraGoBackSrc, /formAction\(/);
+assert.match(extraGoBackSrc, /setConfirmOpen\(false\)/);
+assert.match(extraGoBackSrc, /if \(pending \|\| state\.orderId\) return/);
+assert.doesNotMatch(extraGoBackSrc, /setPickupDate/);
+assert.doesNotMatch(extraGoBackSrc, /setPaidAddonCodes/);
+assert.doesNotMatch(extraGoBackSrc, /setComplimentaryCodes/);
+assert.equal(
+  (extraCheckoutSrc.match(/formAction\(formData\)/g) ?? []).length,
+  1,
+  "Fresh Pick Confirm Order is the only formAction submission path",
+);
+assert.match(
+  extraCheckoutSrc,
+  /window\.location\.assign\(\s*`\/order\/success\?order=\$\{state\.orderId\}&flow=\$\{FRESH_PICKS_SUCCESS_FLOW\}`/,
+);
+assert.match(extraCheckoutSrc, /if \(!state.orderId\) return/);
+assert.match(
+  extraCheckoutSrc,
+  /pending=\{pending \|\| Boolean\(state\.orderId\)\}/,
+);
+assert.doesNotMatch(extraCheckoutSrc, /router\.push/);
+assert.doesNotMatch(extraCheckoutSrc, /router\.replace/);
+const extraActionsSrc = readSrc("src/workspaces/storefront/extra/actions.ts");
+assert.match(extraActionsSrc, /return \{ error: null, orderId \}/);
+assert.doesNotMatch(extraActionsSrc, /from "next\/navigation"/);
+assert.doesNotMatch(extraActionsSrc, /redirect\(/);
 
 const avocado: PreorderDraftItem = {
   cakeId: "cake-1",
@@ -237,5 +306,45 @@ const noNotes = buildCheckoutConfirmSnapshot({
   paidAddonOptions: [paidAddon],
 });
 assert.equal(noNotes.notes, "");
+
+const extraSnapshot = buildExtraCheckoutConfirmSnapshot({
+  cakeName: "Avocado Fresh Pick",
+  sizeLabel: '6"',
+  unitPrice: 88,
+  pickupDate: "2026-09-08",
+  pickupTime: "15:00",
+  customerName: "QA Extra Confirm",
+  customerPhone: "0123456789",
+  notes: "Keep these Fresh Pick notes.",
+  paidAddonOptions: [paidAddon],
+  paidAddonCodes: ["birthday_card"],
+  complimentaryOptions: [
+    {
+      typeId: "knife-1",
+      code: "cake_knife",
+      name: "Cake Knife",
+      sortOrder: 1,
+    },
+  ],
+  complimentaryCodes: ["cake_knife"],
+  total: 91,
+});
+assert.equal(extraSnapshot.collectionDate, "8 Sep");
+assert.match(extraSnapshot.collectionTime, /3:00/);
+assert.equal(extraSnapshot.fulfilmentLabel, "Pickup");
+assert.deepEqual(extraSnapshot.fulfilmentDetails, []);
+assert.equal(extraSnapshot.customerName, "QA Extra Confirm");
+assert.equal(extraSnapshot.notes, "Keep these Fresh Pick notes.");
+assert.equal(extraSnapshot.lines.length, 3);
+assert.equal(extraSnapshot.lines[0]?.name, "Avocado Fresh Pick");
+assert.equal(extraSnapshot.lines[0]?.sizeLabel, '6"');
+assert.equal(extraSnapshot.lines[0]?.quantity, 1);
+assert.equal(extraSnapshot.lines[0]?.linePrice, 88);
+assert.equal(extraSnapshot.lines[1]?.name, "Birthday Card");
+assert.equal(extraSnapshot.lines[1]?.linePrice, 3);
+assert.equal(extraSnapshot.lines[2]?.name, "Cake Knife");
+assert.equal(extraSnapshot.lines[2]?.complimentary, true);
+assert.equal(extraSnapshot.total, 91);
+assert.match(promptSrc, /Complimentary/);
 
 console.log("PASS storefront checkout confirmation");

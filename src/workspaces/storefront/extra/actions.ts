@@ -1,15 +1,15 @@
 "use server";
 
-import { redirect } from "next/navigation";
-import {
-  extraSubmitCustomerError,
-  FRESH_PICKS_SUCCESS_FLOW,
-} from "@/engines/extra/customer-fresh-picks";
+import { extraCartItemUnavailableMessage, extraSubmitCustomerError } from "@/engines/extra/customer-fresh-picks";
 import { isValidExtraCustomerPickup } from "@/engines/extra/extra-pickup";
 import {
   customerComplimentaryMutationPayload,
-  selectCustomerComplimentaryOptions,
+  customerPaidAddonMutationPayload,
+  emptyCustomerPreorderSelections,
+  parseCustomerComplimentaryOptions,
+  parseCustomerPaidAddonOptions,
   type CustomerComplimentaryOption,
+  type CustomerPaidAddonOption,
 } from "@/engines/orders/customer-preorder-options";
 import { createClient } from "@/lib/supabase/server";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
@@ -20,29 +20,17 @@ import { setGuestPreorderReceiptCookie } from "@/workspaces/storefront/checkout/
 
 export type ExtraOrderState = {
   error: string | null;
+  orderId?: string;
 };
 
-function parseComplimentaryOptions(
-  rows: unknown,
-): CustomerComplimentaryOption[] {
-  if (!Array.isArray(rows)) return [];
-  return selectCustomerComplimentaryOptions(
-    rows.map((row) => {
-      const item = row as Record<string, unknown>;
-      return {
-        typeId: String(item.typeId ?? ""),
-        code: String(item.code ?? ""),
-        name: String(item.name ?? ""),
-        sortOrder: Number(item.sortOrder ?? 0),
-      };
-    }),
-  );
-}
-
-export async function loadExtraComplimentaryOptions(
-  pickupDate: string,
-): Promise<{ complimentaryOptions: CustomerComplimentaryOption[] }> {
-  const empty = { complimentaryOptions: [] as CustomerComplimentaryOption[] };
+export async function loadExtraCustomerOptions(pickupDate: string): Promise<{
+  complimentaryOptions: CustomerComplimentaryOption[];
+  paidAddonOptions: CustomerPaidAddonOption[];
+}> {
+  const empty = {
+    complimentaryOptions: [] as CustomerComplimentaryOption[],
+    paidAddonOptions: [] as CustomerPaidAddonOption[],
+  };
   const key = pickupDate.trim().slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return empty;
   try {
@@ -56,7 +44,10 @@ export async function loadExtraComplimentaryOptions(
     if (error || data == null) return empty;
     const payload = data as Record<string, unknown>;
     return {
-      complimentaryOptions: parseComplimentaryOptions(payload.complimentary),
+      complimentaryOptions: parseCustomerComplimentaryOptions(
+        payload.complimentary,
+      ),
+      paidAddonOptions: parseCustomerPaidAddonOptions(payload.paidAddons),
     };
   } catch {
     return empty;
@@ -67,7 +58,13 @@ export async function submitGuestExtraOrderAction(
   _prev: ExtraOrderState,
   formData: FormData,
 ): Promise<ExtraOrderState> {
-  const extraStockId = String(formData.get("extra_stock_id") ?? "").trim();
+  const extraStockIds = formData
+    .getAll("extra_stock_id")
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+  const extraCakeNames = formData
+    .getAll("extra_cake_name")
+    .map((value) => String(value).trim());
   const customerName = String(formData.get("customer_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const includeReceipt = parseRequiredPhysicalReceipt(
@@ -80,8 +77,15 @@ export async function submitGuestExtraOrderAction(
     .getAll("complimentary_code")
     .map((value) => String(value).trim())
     .filter(Boolean);
+  const submittedPaidAddonCodes = formData
+    .getAll("paid_addon_code")
+    .map((value) => String(value).trim())
+    .filter(Boolean);
 
-  if (!extraStockId) {
+  if (extraStockIds.length === 0) {
+    return { error: "Extra is required" };
+  }
+  if (new Set(extraStockIds).size !== extraStockIds.length) {
     return { error: "Extra is required" };
   }
   if (!customerName || !phone) {
@@ -93,32 +97,56 @@ export async function submitGuestExtraOrderAction(
     };
   }
 
-  const extra = await getStorefrontExtraById(extraStockId);
-  if (!extra || !extra.pickupAvailableFromAt || !extra.pickupThroughAt) {
-    return { error: extraSubmitCustomerError("Extra is not available") };
-  }
-  if (
-    !pickupDate ||
-    !pickupTime ||
-    !isValidExtraCustomerPickup({
-      pickupDate,
-      pickupTime,
-      pickupAvailableFromAt: extra.pickupAvailableFromAt,
-      orderCutoffAt: extra.pickupThroughAt,
-    })
-  ) {
-    return { error: "Please choose a valid pickup time for that date." };
+  const extras = [];
+  for (const [index, extraStockId] of extraStockIds.entries()) {
+    const extra = await getStorefrontExtraById(extraStockId);
+    if (!extra || !extra.pickupAvailableFromAt || !extra.pickupThroughAt) {
+      return {
+        error: extraCartItemUnavailableMessage(
+          extra?.cakeName || extraCakeNames[index] || "",
+        ),
+      };
+    }
+    if (
+      !pickupDate ||
+      !pickupTime ||
+      !isValidExtraCustomerPickup({
+        pickupDate,
+        pickupTime,
+        pickupAvailableFromAt: extra.pickupAvailableFromAt,
+        orderCutoffAt: extra.pickupThroughAt,
+      })
+    ) {
+      return { error: "Please choose a valid pickup time for that date." };
+    }
+    extras.push(extra);
   }
 
-  const { complimentaryOptions } =
-    await loadExtraComplimentaryOptions(pickupDate);
-  const allowed = new Set(complimentaryOptions.map((option) => option.code));
-  if (submittedComplimentaryCodes.some((code) => !allowed.has(code))) {
+  const { complimentaryOptions, paidAddonOptions } =
+    await loadExtraCustomerOptions(pickupDate);
+  const allowedComplimentary = new Set(
+    complimentaryOptions.map((option) => option.code),
+  );
+  if (submittedComplimentaryCodes.some((code) => !allowedComplimentary.has(code))) {
     return { error: "Complimentary item is not available" };
+  }
+  const allowedPaid = new Set(paidAddonOptions.map((option) => option.code));
+  if (submittedPaidAddonCodes.some((code) => !allowedPaid.has(code))) {
+    return { error: "Paid add-on is not available" };
   }
   const complimentary = customerComplimentaryMutationPayload({
     options: complimentaryOptions,
     selectedCodes: submittedComplimentaryCodes,
+  });
+  const paidAddons = customerPaidAddonMutationPayload({
+    options: paidAddonOptions,
+    selections: {
+      ...emptyCustomerPreorderSelections(),
+      complimentaryCodes: submittedComplimentaryCodes,
+      paidAddonCodes: submittedPaidAddonCodes,
+      birthdayCardMessage: String(formData.get("birthday_card_message") ?? ""),
+      wishingCardMessage: String(formData.get("wishing_card_message") ?? ""),
+    },
   });
 
   const supabase = await createClient();
@@ -129,13 +157,21 @@ export async function submitGuestExtraOrderAction(
     p_pickup_date: pickupDate,
     p_pickup_time: pickupTime,
     p_notes: notes || null,
-    p_extra_stock_id: extraStockId,
+    p_extra_stock_id: extraStockIds[0],
+    p_extra_stock_ids: extraStockIds,
     p_email_submission_receipt_requested: false,
     p_include_receipt: includeReceipt,
     p_complimentary: complimentary,
+    p_paid_addons: paidAddons,
   });
 
   if (error) {
+    for (const extra of extras) {
+      const stillAvailable = await getStorefrontExtraById(extra.id);
+      if (!stillAvailable) {
+        return { error: extraCartItemUnavailableMessage(extra.cakeName) };
+      }
+    }
     return { error: extraSubmitCustomerError(error.message) };
   }
 
@@ -149,7 +185,5 @@ export async function submitGuestExtraOrderAction(
 
   await setGuestPreorderReceiptCookie(orderId);
   scheduleStaffNotificationDispatch();
-  redirect(
-    `/order/success?order=${orderId}&flow=${FRESH_PICKS_SUCCESS_FLOW}`,
-  );
+  return { error: null, orderId };
 }

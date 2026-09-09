@@ -19,6 +19,17 @@ export type ExtraPickupWindow = {
   orderCutoffAt: string;
 };
 
+/** Same-day Fresh Pick only: earliest pickup is now + this lead, then the next 30-minute slot. */
+export const EXTRA_SAME_DAY_PICKUP_LEAD_MS = 60 * 60 * 1000;
+
+function extraCustomerSlotFloorMs(dateYmd: string, now: Date): number {
+  const nowMs = now.getTime();
+  if (dateYmd === toBusinessDateKey(now)) {
+    return nowMs + EXTRA_SAME_DAY_PICKUP_LEAD_MS;
+  }
+  return nowMs;
+}
+
 export function extraPickupDates(input: ExtraPickupWindow): string[] {
   const fromYmd = toBusinessDateKey(input.pickupAvailableFromAt);
   const cutoffYmd = toBusinessDateKey(input.orderCutoffAt);
@@ -91,15 +102,18 @@ export function extraCustomerPickupSlotsForDate(
   if (!extraPickupDates(input).includes(dateYmd)) return [];
   const schedule = getEffectivePickupSchedule(dateYmd, snapshot);
   if (schedule.status !== "open") return [];
+  const when = now ?? new Date();
   const fromMs = Date.parse(input.pickupAvailableFromAt);
-  const nowMs = (now ?? new Date()).getTime();
+  const earliestMs = extraCustomerSlotFloorMs(dateYmd, when);
   return schedule.selectableSlots
     .filter((value) => {
       const iso = extraPickupThroughIso(dateYmd, value);
       if (!iso) return false;
       const ms = Date.parse(iso);
-      // Pickup is not truncated at the order cutoff. Past-now slots are hidden.
-      return ms >= fromMs && ms >= nowMs;
+      // Pickup is not truncated at the order cutoff.
+      // Same-day Fresh Pick: now + 1 hour, rounded up by remaining 30-minute slots.
+      // Later dates keep configured bakery slots (past-now slots still hidden).
+      return ms >= fromMs && ms >= earliestMs;
     })
     .map((value) => ({
       value,

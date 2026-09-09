@@ -13,6 +13,7 @@ import {
   workspaceScheduleTimeLabel,
 } from "@/engines/orders/fulfilment";
 import { ClearPreorderDraftOnSuccess } from "@/workspaces/storefront/checkout/ClearPreorderDraft";
+import { ClearFreshPickCartOnSuccess } from "@/workspaces/storefront/extra/ClearFreshPickCartOnSuccess";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import { getGuestPreorderReceipt } from "@/workspaces/storefront/checkout/receipt";
 import { SaveOrderDetailsButton } from "@/workspaces/storefront/checkout/SaveOrderDetailsButton";
@@ -35,7 +36,7 @@ export async function StorefrontSuccessPage({
 
   return (
     <main className="bg-paper mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-16 sm:px-6">
-      {isFreshPick ? null : <ClearPreorderDraftOnSuccess />}
+      {isFreshPick ? <ClearFreshPickCartOnSuccess /> : <ClearPreorderDraftOnSuccess />}
       <StorefrontTheme />
       <div className="text-center">
         <p className={storefrontKickerClass}>Whitebird</p>
@@ -84,6 +85,15 @@ export async function StorefrontSuccessPage({
                   {" "}
                   · × {addon.quantity} ·{" "}
                   {formatRm(addon.unitPrice * addon.quantity)}
+                </span>
+              </li>
+            ))}
+            {receipt.complimentaryItems.map((item) => (
+              <li className="text-ink text-sm" key={item.key}>
+                <span className="font-medium">{item.name}</span>
+                <span className="text-skyline">
+                  {" "}
+                  · × {item.quantity} · Complimentary
                 </span>
               </li>
             ))}
@@ -144,13 +154,19 @@ export async function StorefrontSuccessPage({
                 {formatRm(receipt.total)}
               </dd>
             </div>
+            {receipt.notes ? (
+              <div className="flex justify-between gap-4">
+                <dt className="text-skyline">Notes</dt>
+                <dd className="text-ink text-right font-medium whitespace-pre-wrap">
+                  {receipt.notes}
+                </dd>
+              </div>
+            ) : null}
           </dl>
         </section>
       ) : null}
 
-      {receipt && !isFreshPick ? (
-        <SaveOrderDetailsButton receipt={receipt} />
-      ) : null}
+      {receipt ? <SaveOrderDetailsButton receipt={receipt} /> : null}
 
       <section className="mt-8 space-y-2 text-left text-sm">
         {isFreshPick ? (

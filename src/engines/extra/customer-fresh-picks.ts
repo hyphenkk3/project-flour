@@ -86,6 +86,19 @@ export function freshPickProductDescription(
 
 export const FRESH_PICKS_ORDER_CTA = "Order this Fresh Pick";
 
+export const FRESH_PICKS_ADD_TO_CART_CTA = "Add to Cart";
+
+export const FRESH_PICKS_ADDED_CONFIRMATION = "Added to your order.";
+
+export const FRESH_PICKS_ALREADY_IN_CART =
+  "This Fresh Pick is already in your order.";
+
+export const FRESH_PICKS_CART_PICKUP_MISMATCH =
+  "Your Fresh Pick order already has a pickup time. Choose that same pickup, or remove items from your cart.";
+
+export const FRESH_PICKS_CART_UNAVAILABLE_FOR_PICKUP =
+  "This Fresh Pick is not available for your current pickup time. Remove other items or choose a different Fresh Pick.";
+
 export const FRESH_PICKS_NAME_HELP = "Nickname / English name and surname";
 
 export const FRESH_PICKS_WHATSAPP_NOTE =
@@ -124,6 +137,11 @@ export function extraSubmitCustomerError(message: string): string {
     return FRESH_PICKS_SOLD_OUT_MESSAGE;
   }
   return text;
+}
+
+export function extraCartItemUnavailableMessage(cakeName: string): string {
+  const name = cakeName.trim() || "This Fresh Pick";
+  return `${name} is no longer available. Remove it from your order to continue.`;
 }
 
 /**

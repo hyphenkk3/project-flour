@@ -3,7 +3,6 @@ import {
   freshPickAvailabilityLabel,
   freshPickProductDescription,
   isPublishedFreshPick,
-  selectCustomerFreshPickOfferings,
   sortCustomerFreshPicksByAvailabilityDay,
   type FreshPickDay,
 } from "@/engines/extra/customer-fresh-picks";
@@ -234,8 +233,8 @@ function mapPick(
 }
 
 /**
- * Bakery-confirmed Extra currently orderable, one card per cake offering.
- * Independent of monthly catalogues. Never invents extra stock.
+ * Bakery-confirmed Extra currently orderable. Each extra_stock.id is its own
+ * customer unit — identical cakes are not collapsed or substituted.
  */
 export async function listStorefrontAvailableExtra(): Promise<
   StorefrontExtraPick[]
@@ -277,9 +276,7 @@ export async function listStorefrontAvailableExtra(): Promise<
         ),
       )
       .filter((pick): pick is StorefrontExtraPick => pick != null);
-    return sortCustomerFreshPicksByAvailabilityDay(
-      selectCustomerFreshPickOfferings(picks),
-    );
+    return sortCustomerFreshPicksByAvailabilityDay(picks);
   } catch {
     return [];
   }

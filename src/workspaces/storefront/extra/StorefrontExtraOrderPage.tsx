@@ -10,6 +10,7 @@ import {
 } from "@/workspaces/storefront/StorefrontBrand";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import { GuestExtraOrderForm } from "@/workspaces/storefront/extra/GuestExtraOrderForm";
+import { FreshPickCartShell } from "@/workspaces/storefront/extra/FreshPickCartShell";
 import { getStorefrontExtraById } from "@/workspaces/storefront/extra/queries";
 import Link from "next/link";
 
@@ -69,6 +70,7 @@ export async function StorefrontExtraOrderPage({
         )}
         <StorefrontStaffSignIn />
       </div>
+      <FreshPickCartShell />
     </main>
   );
 }

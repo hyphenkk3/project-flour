@@ -402,7 +402,12 @@ for (const date of ["2026-08-19", "2026-08-20", "2026-08-22"]) {
   const slotsAtOne = extraCustomerPickupSlotsForDate(TODAY, window, ONE_PM);
   const values = slotsAtOne.map((s) => s.value);
   assert.equal(values.includes("12:00"), false, "past pickup slots hidden");
-  assert.equal(values.includes("13:00"), true, "same-day pickup after pickup-from");
+  assert.equal(
+    values.includes("13:00"),
+    false,
+    "same-day Fresh Pick requires now + 1 hour",
+  );
+  assert.equal(values.includes("13:30"), false);
   assert.equal(values.includes("14:00"), true);
   assert.equal(values.includes("14:30"), true, "pickup not truncated at order cutoff");
   assert.equal(values.includes("17:30"), true);
@@ -462,7 +467,12 @@ for (const date of ["2026-08-19", "2026-08-20", "2026-08-22"]) {
     nowBeforeCutoff,
   ).map((s) => s.value);
   assert.equal(values.includes("12:00"), false, "before pickup-from");
-  assert.equal(values.includes("13:00"), true);
+  assert.equal(
+    values.includes("13:00"),
+    false,
+    "same-day 1:00 PM cannot pick 1:00 PM",
+  );
+  assert.equal(values.includes("13:30"), false);
   assert.equal(values.includes("14:00"), true);
   assert.equal(values.includes("14:30"), true, "after Wed 2 PM cutoff still pickable");
   assert.equal(values.includes("15:00"), true);
@@ -839,34 +849,38 @@ const extraFormSrc = readFileSync(
   resolve(process.cwd(), "src/workspaces/storefront/extra/GuestExtraOrderForm.tsx"),
   "utf8",
 );
-assert.match(extraFormSrc, /submitGuestExtraOrder/);
+const extraCheckoutSrc = readFileSync(
+  resolve(process.cwd(), "src/workspaces/storefront/extra/GuestExtraCheckoutForm.tsx"),
+  "utf8",
+);
+assert.doesNotMatch(extraFormSrc, /submitGuestExtraOrder/);
 assert.match(extraFormSrc, /extraCustomerVisiblePickupDates/);
 assert.match(extraFormSrc, /name="extra_stock_id"/);
 assert.match(extraFormSrc, /value=\{extra\.id\}/);
-assert.match(extraFormSrc, /name="customer_name"/);
-assert.match(extraFormSrc, /name="phone"/);
-assert.doesNotMatch(extraFormSrc, /name="email"/);
-assert.match(extraFormSrc, /name="notes"/);
-assert.doesNotMatch(extraFormSrc, /email_submission_receipt_requested/);
+assert.match(extraCheckoutSrc, /name="customer_name"/);
+assert.match(extraCheckoutSrc, /name="phone"/);
+assert.doesNotMatch(extraCheckoutSrc, /name="email"/);
+assert.match(extraCheckoutSrc, /name="notes"/);
+assert.doesNotMatch(extraCheckoutSrc, /email_submission_receipt_requested/);
 assert.match(extraFormSrc, /name="pickup_date"/);
 assert.match(extraFormSrc, /name="pickup_time"/);
 assert.match(extraFormSrc, /extraCustomerPickupSlotsForDate/);
 assert.match(extraFormSrc, /htmlFor="pickup_date"/);
 assert.match(extraFormSrc, /htmlFor="pickup_time"/);
-assert.match(extraFormSrc, /name="include_receipt"/);
+assert.match(extraCheckoutSrc, /name="include_receipt"/);
 assert.match(
-  extraFormSrc,
+  extraCheckoutSrc,
   /Would you like a copy of the receipt\? \(will be attached during pickup\)/,
 );
-assert.match(extraFormSrc, /name="complimentary_code"/);
-assert.match(extraFormSrc, /loadExtraComplimentaryOptions/);
+assert.match(extraCheckoutSrc, /name="complimentary_code"/);
+assert.match(extraCheckoutSrc, /loadExtraCustomerOptions/);
 assert.doesNotMatch(extraFormSrc, /<FormField[\s\S]*htmlFor="pickup_date"/);
 assert.doesNotMatch(extraFormSrc, /<FormField[\s\S]*htmlFor="pickup_time"/);
 assert.doesNotMatch(extraFormSrc, /submit_guest_preorder/);
 assert.doesNotMatch(extraFormSrc, /GuestCheckoutForm/);
 assert.doesNotMatch(extraFormSrc, /disabled=\{true\}/);
-assert.doesNotMatch(extraFormSrc, /birthday_card/);
-assert.doesNotMatch(extraFormSrc, /wishing_card/);
+assert.match(extraCheckoutSrc, /paidAddonOptions/);
+assert.match(extraCheckoutSrc, /name="paid_addon_code"/);
 
 const extraActionsSrc = readFileSync(
   resolve(process.cwd(), "src/workspaces/storefront/extra/actions.ts"),
@@ -879,7 +893,7 @@ assert.match(extraActionsSrc, /parseRequiredPhysicalReceipt/);
 assert.match(extraActionsSrc, /customerComplimentaryMutationPayload/);
 assert.doesNotMatch(extraActionsSrc, /submit_guest_preorder/);
 assert.doesNotMatch(extraActionsSrc, /storefront_collection_for_pickup_date/);
-assert.doesNotMatch(extraActionsSrc, /p_paid_addons/);
+assert.match(extraActionsSrc, /p_paid_addons/);
 
 const actionsSrc = readFileSync(
   resolve(process.cwd(), "src/workspaces/extra/actions.ts"),
