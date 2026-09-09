@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { calculateCommercialSubtotal } from "@/engines/orders/totals";
 
@@ -47,16 +47,25 @@ export function guestPreorderReceiptAuthorized(
   return orderId === cookieOrderId;
 }
 
+/** Secure only on HTTPS. `next start` over LAN HTTP must not set Secure. */
+export function receiptCookieSecure(
+  forwardedProto: string | null | undefined,
+): boolean {
+  const proto = (forwardedProto ?? "").split(",")[0]?.trim().toLowerCase();
+  return proto === "https";
+}
+
 export async function setGuestPreorderReceiptCookie(
   orderId: string,
 ): Promise<void> {
   const store = await cookies();
+  const hdrs = await headers();
   store.set({
     name: GUEST_PREORDER_RECEIPT_COOKIE,
     value: orderId,
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: receiptCookieSecure(hdrs.get("x-forwarded-proto")),
     maxAge: RECEIPT_COOKIE_MAX_AGE_SECONDS,
     path: "/order",
   });
@@ -95,6 +104,7 @@ export async function loadGuestPreorderReceipt(
 
   try {
     const supabase = createServiceClient();
+    // Column is customer_notes. A `notes` select fails PostgREST and hides Save Order Details.
     const { data, error } = await supabase
       .from("orders")
       .select(
@@ -102,7 +112,7 @@ export async function loadGuestPreorderReceipt(
         order_number,
         guest_name,
         guest_phone,
-        notes,
+        customer_notes,
         pickup_date,
         pickup_time,
         fulfilment_method,
@@ -217,7 +227,7 @@ export async function loadGuestPreorderReceipt(
     const dineInVenue =
       venueRaw === "hyphen" || venueRaw === "whitebird" ? venueRaw : null;
     const notesRaw = String(
-      (data as { notes?: string | null }).notes ?? "",
+      (data as { customer_notes?: string | null }).customer_notes ?? "",
     ).trim();
     return {
       orderNumber:
