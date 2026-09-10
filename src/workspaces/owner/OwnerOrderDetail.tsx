@@ -21,7 +21,9 @@ import {
   listConfirmationSnapshots,
   listOrderTimeline,
 } from "@/workspaces/owner/orders/queries";
+import { staffHasBakeryPreorderApprover } from "@/workspaces/owner/approvals/designations";
 import { listApprovalsForOrder } from "@/workspaces/owner/approvals/queries";
+import { loadMalaysiaPreorderBusinessDate } from "@/engines/preorder/server";
 import {
   getAvailableCakeById,
   getCurrentCollection,
@@ -46,9 +48,13 @@ export async function OwnerOrderDetail({
     notFound();
   }
 
+  const isBakeryPreorderApprover = await staffHasBakeryPreorderApprover(
+    staff.id,
+  );
   const capabilities = buildGuestOrderWorkspaceCapabilities({
     role: staff.role.code,
     staffId: staff.id,
+    isBakeryPreorderApprover,
   });
 
   const order = await getGuestOrderById(orderId);
@@ -85,6 +91,7 @@ export async function OwnerOrderDetail({
   const confirmations = await listConfirmationSnapshots(orderId);
   const approvals = await listApprovalsForOrder(orderId);
   const hoursSnapshot = await loadOperatingHoursSnapshot();
+  const preorderBusinessDate = await loadMalaysiaPreorderBusinessDate();
   const back = resolveOwnerReturnTo(returnTo);
   const safeReturnTo = shouldPropagateOwnerReturnTo(back) ? back.href : null;
   const backHref =
@@ -136,6 +143,7 @@ export async function OwnerOrderDetail({
         confirmations={confirmations}
         highlightApprovalId={approvalId ?? null}
         hoursSnapshot={hoursSnapshot}
+        preorderBusinessDate={preorderBusinessDate}
         order={order}
         paidAddonCatalog={paidAddonCatalog}
         returnTo={safeReturnTo}

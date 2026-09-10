@@ -11,6 +11,7 @@ import type {
   LateOrderEditPayload,
   LateOrderEditProposedItem,
   OperationsApprovalPayload,
+  PreorderLeadTimeExceptionPayload,
 } from "@/engines/operations/approvals";
 
 export type ApprovalChangeLinePart =
@@ -43,7 +44,54 @@ export function buildApprovalChangeSummary(
   if (payload.kind === "cross_month_pickup") {
     return summarizeCrossMonthPickup(payload);
   }
+  if (payload.kind === "preorder_lead_time_exception") {
+    return summarizePreorderLeadTimeException(payload);
+  }
   return summarizeLateOrderEdit(payload);
+}
+
+function summarizePreorderLeadTimeException(
+  payload: PreorderLeadTimeExceptionPayload,
+): ApprovalChangeSummary {
+  const requestedDate = formatDdMmYyyy(payload.requestedPickupDate);
+  const earliest = payload.earliestValidDate
+    ? formatDdMmYyyy(payload.earliestValidDate)
+    : null;
+  const required =
+    payload.requiredPreorderDays != null
+      ? `${payload.requiredPreorderDays}-day preorder`
+      : "preorder lead time";
+  const cakes =
+    payload.cakes.length > 0
+      ? payload.cakes.map((cake) => `${cake.cakeName} (${cake.sizeLabel})`)
+      : [];
+  const changeLines = [
+    plainLine(
+      earliest
+        ? `Allow pickup on ${requestedDate} (earliest valid date ${earliest})`
+        : `Allow pickup on ${requestedDate} before the ${required}`,
+    ),
+  ];
+  const currentLines = [
+    payload.orderPickupDate
+      ? `Current pickup ${formatDdMmYyyy(payload.orderPickupDate)}`
+      : "Current pickup unchanged until this exception is approved",
+    `Required ${required}`,
+  ];
+  if (earliest) currentLines.push(`Earliest valid date ${earliest}`);
+  if (cakes.length > 0) currentLines.push(cakes.join(", "));
+  const requestedLines = [
+    `Requested pickup ${requestedDate}${
+      payload.pickupTime ? ` · ${formatPickupClock(payload.pickupTime)}` : ""
+    }`,
+    `Why: selected date is before the ${required}`,
+  ];
+  return {
+    lines: changeLines.map((line) => line.plain),
+    changeLines,
+    currentLines,
+    requestedLines,
+  };
 }
 
 function summarizeDiscountException(

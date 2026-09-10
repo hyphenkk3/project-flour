@@ -35,6 +35,15 @@ import {
 } from "@/engines/operations/owner-attention";
 import { reconcilePaymentLifecycleStatus } from "@/engines/orders/payment-status";
 import type { OrderSettlement } from "@/types/storefront";
+import {
+  approvedPreorderExceptionPermitsDate,
+  canCorrectPreorderExceptionCustomerInformed,
+  canMarkPreorderExceptionCustomerInformed,
+  canWithdrawPreorderLeadTimeException,
+  pendingPreorderException,
+  preorderExceptionForPickupDate,
+} from "@/engines/operations/preorder-lead-time-exception";
+import type { OperationsApprovalRecord } from "@/engines/operations/approvals";
 
 assert.equal(canRequestOperationsApproval("customer_operations"), true);
 assert.equal(canRequestOperationsApproval("owner"), false);
@@ -73,11 +82,31 @@ assert.equal(
   canRequestOperationsApprovalType("bakery", "cross_month_pickup"),
   false,
 );
+assert.equal(
+  canRequestOperationsApprovalType(
+    "customer_operations",
+    "preorder_lead_time_exception",
+  ),
+  true,
+);
+assert.equal(
+  canRequestOperationsApprovalType("manager", "preorder_lead_time_exception"),
+  false,
+);
+assert.equal(
+  canRequestOperationsApprovalType("bakery", "preorder_lead_time_exception"),
+  false,
+);
+assert.equal(
+  canRequestOperationsApprovalType("collection", "preorder_lead_time_exception"),
+  false,
+);
 
 for (const type of [
   "discount_exception",
   "cross_month_pickup",
   "late_order_edit",
+  "preorder_lead_time_exception",
 ] as const) {
   assert.equal(canReviewOperationsApprovalType("owner", type), true);
   assert.equal(canReviewOperationsApprovalType("manager", type), true);
@@ -86,9 +115,39 @@ for (const type of [
   assert.equal(canReviewOperationsApprovalType("collection", type), false);
 }
 
+assert.equal(
+  canReviewOperationsApprovalType("bakery", "preorder_lead_time_exception", {
+    isBakeryPreorderApprover: true,
+  }),
+  true,
+);
+assert.equal(
+  canReviewOperationsApprovalType("bakery", "late_order_edit", {
+    isBakeryPreorderApprover: true,
+  }),
+  false,
+);
+assert.equal(
+  canReviewOperationsApprovalType("collection", "preorder_lead_time_exception", {
+    isBakeryPreorderApprover: true,
+  }),
+  false,
+);
+
 assert.equal(canAccessOperationsApprovalsInbox("owner"), true);
 assert.equal(canAccessOperationsApprovalsInbox("manager"), true);
 assert.equal(canAccessOperationsApprovalsInbox("customer_operations"), false);
+assert.equal(canAccessOperationsApprovalsInbox("bakery"), false);
+assert.equal(
+  canAccessOperationsApprovalsInbox("bakery", { isBakeryPreorderApprover: true }),
+  true,
+);
+assert.equal(
+  canAccessOperationsApprovalsInbox("collection", {
+    isBakeryPreorderApprover: true,
+  }),
+  false,
+);
 
 assert.equal(
   requesterCannotDecideOwnRequest({
@@ -182,6 +241,10 @@ assert.equal(
 assert.equal(approvalTypeLabel("discount_exception"), "Discount exception");
 assert.equal(approvalTypeLabel("cross_month_pickup"), "Cross-month pickup");
 assert.equal(approvalTypeLabel("late_order_edit"), "Late order edit");
+assert.equal(
+  approvalTypeLabel("preorder_lead_time_exception"),
+  "Preorder lead-time exception",
+);
 
 function sg(isoLocal: string): Date {
   return new Date(isoLocal);
@@ -594,6 +657,167 @@ if (parsed?.kind === "discount_exception") {
   assert.equal(parsed.requestedAmountDue, 115);
 }
 
+const parsedPreorder = parseOperationsApprovalPayload(
+  "preorder_lead_time_exception",
+  {
+    kind: "preorder_lead_time_exception",
+    requested_pickup_date: "2026-09-12",
+    required_preorder_days: 3,
+    order_pickup_date: "2026-09-15",
+    details: {
+      earliest_valid_date: "2026-09-14",
+      pickup_time: "16:00",
+      cakes: [{ cake_name: "Chocolate D'Amour", size_label: '6"' }],
+    },
+  },
+);
+assert.equal(parsedPreorder?.kind, "preorder_lead_time_exception");
+if (parsedPreorder?.kind === "preorder_lead_time_exception") {
+  assert.equal(parsedPreorder.requestedPickupDate, "2026-09-12");
+  assert.equal(parsedPreorder.requiredPreorderDays, 3);
+  assert.equal(parsedPreorder.earliestValidDate, "2026-09-14");
+  assert.equal(parsedPreorder.cakes[0]?.cakeName, "Chocolate D'Amour");
+}
+
+function preorderRecord(
+  overrides: Partial<OperationsApprovalRecord> & {
+    payloadDate: string;
+    status: OperationsApprovalRecord["status"];
+  },
+): OperationsApprovalRecord {
+  return {
+    id: overrides.id ?? "req-1",
+    orderId: "ord-1",
+    orderNumber: "ORD-1",
+    customerName: "Amy",
+    pickupDate: "2026-09-15",
+    pickupTime: "16:00",
+    requestType: "preorder_lead_time_exception",
+    status: overrides.status,
+    reason: "Customer asked for earlier",
+    payload: {
+      kind: "preorder_lead_time_exception",
+      requestedPickupDate: overrides.payloadDate,
+      requiredPreorderDays: 3,
+      orderPickupDate: "2026-09-15",
+      earliestValidDate: "2026-09-14",
+      cakes: [{ cakeName: "Cake", sizeLabel: '6"' }],
+      pickupTime: "16:00",
+    },
+    orderFingerprint: {
+      pickupDate: "2026-09-15",
+      pickupTime: "16:00",
+      status: "paid",
+      hasRm10: false,
+      hasAugust: false,
+      itemsSignature: "",
+      paidAddonsSignature: "",
+    },
+    requestedBy: "co-1",
+    requestedByName: "Vivian",
+    requestedByRoleName: "Customer Operations",
+    reviewedBy: overrides.reviewedBy ?? null,
+    reviewedByName: null,
+    reviewedByRoleName: null,
+    reviewedAt: null,
+    reviewerNote: null,
+    customerInformedAt: overrides.customerInformedAt ?? null,
+    customerInformedBy: null,
+    customerInformedByName: null,
+    withdrawnAt: null,
+    withdrawnBy: null,
+    withdrawnByName: null,
+    createdAt: "2026-09-10T00:00:00.000Z",
+    updatedAt: "2026-09-10T00:00:00.000Z",
+  };
+}
+
+const pendingA = preorderRecord({
+  id: "pending-a",
+  payloadDate: "2026-09-12",
+  status: "pending",
+});
+const approvedA = preorderRecord({
+  id: "approved-a",
+  payloadDate: "2026-09-12",
+  status: "approved",
+  reviewedBy: "bakery-1",
+});
+assert.equal(preorderExceptionForPickupDate([pendingA], "2026-09-12")?.id, "pending-a");
+assert.equal(preorderExceptionForPickupDate([approvedA], "2026-09-13"), null);
+assert.equal(
+  approvedPreorderExceptionPermitsDate({
+    status: "approved",
+    requestedPickupDate: "2026-09-12",
+    pickupDate: "2026-09-12",
+  }),
+  true,
+);
+assert.equal(
+  approvedPreorderExceptionPermitsDate({
+    status: "pending",
+    requestedPickupDate: "2026-09-12",
+    pickupDate: "2026-09-12",
+  }),
+  false,
+);
+assert.equal(
+  approvedPreorderExceptionPermitsDate({
+    status: "approved",
+    requestedPickupDate: "2026-09-12",
+    pickupDate: "2026-09-13",
+  }),
+  false,
+);
+assert.equal(pendingPreorderException([approvedA, pendingA])?.id, "pending-a");
+assert.equal(canMarkPreorderExceptionCustomerInformed("customer_operations"), true);
+assert.equal(canMarkPreorderExceptionCustomerInformed("bakery"), false);
+assert.equal(canMarkPreorderExceptionCustomerInformed("collection"), false);
+assert.equal(canCorrectPreorderExceptionCustomerInformed("owner"), true);
+assert.equal(canCorrectPreorderExceptionCustomerInformed("customer_operations"), false);
+assert.equal(
+  canWithdrawPreorderLeadTimeException({
+    role: "customer_operations",
+    status: "approved",
+    customerInformedAt: null,
+  }),
+  true,
+);
+assert.equal(
+  canWithdrawPreorderLeadTimeException({
+    role: "customer_operations",
+    status: "approved",
+    customerInformedAt: "2026-09-10T12:00:00.000Z",
+  }),
+  false,
+);
+assert.equal(
+  canWithdrawPreorderLeadTimeException({
+    role: "bakery",
+    status: "approved",
+    customerInformedAt: null,
+    isBakeryPreorderApprover: false,
+  }),
+  false,
+);
+assert.equal(
+  canWithdrawPreorderLeadTimeException({
+    role: "bakery",
+    status: "approved",
+    customerInformedAt: null,
+    isBakeryPreorderApprover: true,
+  }),
+  true,
+);
+assert.equal(
+  canWithdrawPreorderLeadTimeException({
+    role: "collection",
+    status: "approved",
+    customerInformedAt: null,
+  }),
+  false,
+);
+
 assert.match(formatApprovalAge(new Date().toISOString()), /just now|min ago/);
 assert.equal(STALE_APPROVAL_MESSAGE.includes("stale"), true);
 
@@ -644,6 +868,26 @@ const bakery = buildGuestOrderWorkspaceCapabilities({
 });
 assert.equal(bakery.canRequestOperationsApproval, false);
 assert.equal(bakery.canReviewOperationsApprovals, false);
+assert.equal(bakery.isBakeryPreorderApprover, false);
+
+const designatedBakery = buildGuestOrderWorkspaceCapabilities({
+  role: "bakery",
+  staffId: "bakery-approver-1",
+  isBakeryPreorderApprover: true,
+});
+assert.equal(designatedBakery.canReviewOperationsApprovals, true);
+assert.equal(designatedBakery.isBakeryPreorderApprover, true);
+assert.equal(designatedBakery.canEditOrderWorkspace, false);
+assert.equal(designatedBakery.canRequestOperationsApproval, false);
+assert.equal(designatedBakery.canAccessOperationsBoard, false);
+
+const collectionFlagged = buildGuestOrderWorkspaceCapabilities({
+  role: "collection",
+  staffId: "col-flagged",
+  isBakeryPreorderApprover: true,
+});
+assert.equal(collectionFlagged.canReviewOperationsApprovals, false);
+assert.equal(collectionFlagged.isBakeryPreorderApprover, false);
 
 const collection = buildGuestOrderWorkspaceCapabilities({
   role: "collection",
@@ -855,7 +1099,21 @@ assert.match(workspaceForm, /LATE_ORDER_EDIT_APPROVAL_SCOPE_EXCLUSIONS/);
 assert.match(workspaceForm, /LATE_ORDER_EDIT_SECTION_INCLUDED/);
 assert.match(workspaceForm, /LATE_ORDER_EDIT_SECTION_EXCLUDED/);
 assert.match(workspaceForm, /lateEditScopeHint/);
-assert.match(workspaceForm, /lateEditCutoffHints=\{blockDirectSave\}/);
+assert.match(workspaceForm, /PreorderLeadTimeExceptionNotice/);
+assert.match(
+  readFileSync(
+    resolve("src/workspaces/owner/approvals/PreorderLeadTimeExceptionNotice.tsx"),
+    "utf8",
+  ),
+  /preorder_lead_time_exception/,
+);
+assert.match(
+  readFileSync(
+    resolve("src/workspaces/owner/approvals/PreorderLeadTimeExceptionNotice.tsx"),
+    "utf8",
+  ),
+  /Request exception/,
+);
 assert.match(
   workspaceForm,
   /blockDirectSave =\s*capabilities\.canRequestOperationsApproval && lateChangeRequired/,
@@ -881,6 +1139,22 @@ const approvalsActions = readFileSync(
 );
 assert.match(approvalsActions, /canRequestOperationsApprovalType/);
 assert.match(approvalsActions, /reconcilePaymentLifecycleAfterApproval/);
+assert.match(
+  approvalsActions,
+  /create_preorder_lead_time_exception_request/,
+);
+assert.match(
+  approvalsActions,
+  /mark_preorder_exception_customer_informed/,
+);
+assert.match(
+  approvalsActions,
+  /withdraw_preorder_lead_time_exception/,
+);
+assert.match(
+  approvalsActions,
+  /correct_preorder_exception_customer_informed/,
+);
 assert.match(
   approvalsActions,
   /row\.request_type === "late_order_edit"/,
@@ -926,6 +1200,34 @@ const approvalsPage = readFileSync(
 );
 assert.match(approvalsPage, /canAccessOperationsApprovalsInbox/);
 assert.match(approvalsPage, /listPendingOperationsApprovals/);
+assert.match(approvalsPage, /visiblePendingApprovalsForInbox/);
+assert.match(approvalsPage, /staffHasBakeryPreorderApprover/);
+
+const wiringSql = readFileSync(
+  resolve(
+    "supabase/migrations/20260910200000_preorder_lead_time_exception_wiring.sql",
+  ),
+  "utf8",
+);
+assert.match(
+  wiringSql,
+  /operations_approval_preorder_exception_active_date_uidx/,
+);
+assert.match(wiringSql, /correct_preorder_exception_customer_informed/);
+assert.match(wiringSql, /bakery_preorder_approver/);
+assert.doesNotMatch(wiringSql, /Jasmine/i);
+
+const guardSrc = readFileSync(
+  resolve("src/workspaces/owner/orders/collection-date-guard.ts"),
+  "utf8",
+);
+assert.match(guardSrc, /orderId/);
+assert.match(guardSrc, /before_preorder/);
+assert.match(guardSrc, /PENDING_PREORDER_EXCEPTION_BLOCKS_DATE_MESSAGE/);
+assert.match(
+  saveSrc,
+  /collectionId: before\.collectionId,\s*orderId,/,
+);
 
 const feeActions = readFileSync(
   resolve("src/workspaces/owner/orders/actions.ts"),

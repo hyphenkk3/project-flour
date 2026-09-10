@@ -10,6 +10,7 @@ import {
   OPERATIONS_APPROVAL_TYPES,
   approvalTypeLabel,
   canAccessOperationsApprovalsInbox,
+  type OperationsApprovalAuthorityContext,
   type OperationsApprovalRecord,
   type OperationsApprovalStatus,
   type OperationsApprovalType,
@@ -28,6 +29,7 @@ export const OPERATIONS_APPROVAL_STATUS_LABELS: Record<
   approved: "Approved",
   rejected: "Rejected",
   cancelled: "Cancelled",
+  withdrawn: "Withdrawn",
 };
 
 export const PENDING_LATE_EDIT_ALREADY_TITLE = "Approval already pending";
@@ -56,9 +58,26 @@ export const LATE_ORDER_EDIT_SECTION_PICKUP_INCLUDED =
 export const LATE_ORDER_EDIT_SECTION_EXCLUDED =
   "Not included in late-change approval — ask Owner if this needs updating.";
 
-export function canAccessOperationsApprovalHistory(role: RoleCode): boolean {
-  return (
-    role === "owner" || role === "manager" || role === "customer_operations"
+export function canAccessOperationsApprovalHistory(
+  role: RoleCode,
+  context?: OperationsApprovalAuthorityContext,
+): boolean {
+  if (role === "owner" || role === "manager" || role === "customer_operations") {
+    return true;
+  }
+  return role === "bakery" && Boolean(context?.isBakeryPreorderApprover);
+}
+
+export function visiblePendingApprovalsForInbox(
+  rows: readonly OperationsApprovalRecord[],
+  role: RoleCode,
+  context?: OperationsApprovalAuthorityContext,
+): OperationsApprovalRecord[] {
+  const pending = rows.filter((row) => row.status === "pending");
+  if (role !== "bakery") return pending;
+  if (!context?.isBakeryPreorderApprover) return [];
+  return pending.filter(
+    (row) => row.requestType === "preorder_lead_time_exception",
   );
 }
 
@@ -83,8 +102,11 @@ const OPERATIONS_TODAY_PENDING_APPROVALS_HREF = `/owner?pickup=today#${OPERATION
  * Owner + Manager: dedicated inbox. Customer Operations: Operations section
  * (they cannot open `/owner/approvals`).
  */
-export function homePendingApprovalsHref(role: RoleCode): string {
-  if (canAccessOperationsApprovalsInbox(role)) {
+export function homePendingApprovalsHref(
+  role: RoleCode,
+  context?: OperationsApprovalAuthorityContext,
+): string {
+  if (canAccessOperationsApprovalsInbox(role, context)) {
     return "/owner/approvals";
   }
   return OPERATIONS_TODAY_PENDING_APPROVALS_HREF;

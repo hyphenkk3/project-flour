@@ -10,16 +10,20 @@ import {
   canReviewOperationsApprovalType,
   crossMonthPayloadToRpc,
   discountExceptionToRpcPayload,
+  isOperationsApprovalStatus,
   isOperationsApprovalType,
   isWithinTwoDayChangeCutoff,
   lateOrderEditPayloadToRpc,
+  preorderLeadTimeExceptionToRpc,
   requesterCannotDecideOwnRequest,
   requiresCrossMonthApproval,
   type CrossMonthPickupPayload,
   type DiscountExceptionPayload,
   type LateOrderEditPayload,
   type OperationsApprovalType,
+  type PreorderLeadTimeExceptionPayload,
 } from "@/engines/operations/approvals";
+import { staffHasBakeryPreorderApprover } from "@/workspaces/owner/approvals/designations";
 import {
   financialMateriallyAffectsConfirmation,
   orderStatusAllowsConfirmationInvalidation,
@@ -45,6 +49,8 @@ async function revalidateApprovalPaths(orderId: string) {
   revalidatePath("/owner/approvals");
   revalidatePath("/owner/approvals/history");
   revalidatePath("/customer-operations/orders");
+  revalidatePath("/home");
+  revalidatePath("/bakery");
   revalidatePath(`/owner/orders/${orderId}`);
   revalidatePath(`/owner/orders/${orderId}/payment`);
   revalidatePath(`/owner/orders/${orderId}/confirmation`);
@@ -57,7 +63,8 @@ export async function createOperationsApprovalAction(input: {
   payload:
     | DiscountExceptionPayload
     | CrossMonthPickupPayload
-    | LateOrderEditPayload;
+    | LateOrderEditPayload
+    | PreorderLeadTimeExceptionPayload;
 }): Promise<OperationsApprovalActionState> {
   const staff = await requireStaff();
   if (!isOperationsApprovalType(input.requestType)) {
@@ -78,12 +85,20 @@ export async function createOperationsApprovalAction(input: {
   if (!order) {
     return { error: "Order not found.", success: false };
   }
+  if (
+    input.requestType === "preorder_lead_time_exception" &&
+    input.payload.kind !== "preorder_lead_time_exception"
+  ) {
+    return { error: "Preorder exception payload is required.", success: false };
+  }
 
   let rpcPayload: Record<string, unknown>;
   if (input.payload.kind === "discount_exception") {
     rpcPayload = discountExceptionToRpcPayload(input.payload);
   } else if (input.payload.kind === "cross_month_pickup") {
     rpcPayload = crossMonthPayloadToRpc(input.payload);
+  } else if (input.payload.kind === "preorder_lead_time_exception") {
+    rpcPayload = preorderLeadTimeExceptionToRpc(input.payload);
   } else {
     if (
       !isWithinTwoDayChangeCutoff({ pickupDate: order.pickupDate })
@@ -111,6 +126,24 @@ export async function createOperationsApprovalAction(input: {
   }
 
   const supabase = await createClient();
+  if (input.requestType === "preorder_lead_time_exception") {
+    const { error } = await supabase.rpc(
+      "create_preorder_lead_time_exception_request",
+      {
+        p_order_id: input.orderId,
+        p_actor_staff_id: staff.id,
+        p_reason: reason,
+        p_payload: rpcPayload,
+      },
+    );
+    if (error) {
+      return { error: rpcErrorMessage(error), success: false };
+    }
+    scheduleStaffNotificationDispatch();
+    await revalidateApprovalPaths(input.orderId);
+    return { error: null, success: true };
+  }
+
   const { error } = await supabase.rpc("create_operations_approval_request", {
     p_order_id: input.orderId,
     p_actor_staff_id: staff.id,
@@ -148,7 +181,9 @@ export async function cancelOperationsApprovalAction(
       role: staff.role.code,
       staffId: staff.id,
       requestedBy: row.requested_by as string,
-      status: row.status as "pending" | "approved" | "rejected" | "cancelled",
+      status: isOperationsApprovalStatus(String(row.status))
+        ? row.status
+        : "pending",
     })
   ) {
     return { error: "Not authorized to cancel this approval request.", success: false };
@@ -195,7 +230,11 @@ export async function rejectOperationsApprovalAction(
       success: false,
     };
   }
-  if (!canReviewOperationsApprovalType(staff.role.code, row.request_type)) {
+  if (
+    !canReviewOperationsApprovalType(staff.role.code, row.request_type, {
+      isBakeryPreorderApprover: await staffHasBakeryPreorderApprover(staff.id),
+    })
+  ) {
     return { error: "Not authorized to reject this approval request.", success: false };
   }
   const note = reviewerNote.trim();
@@ -253,7 +292,11 @@ export async function approveOperationsApprovalAction(
       success: false,
     };
   }
-  if (!canReviewOperationsApprovalType(staff.role.code, row.request_type)) {
+  if (
+    !canReviewOperationsApprovalType(staff.role.code, row.request_type, {
+      isBakeryPreorderApprover: await staffHasBakeryPreorderApprover(staff.id),
+    })
+  ) {
     return { error: "Not authorized to approve this approval request.", success: false };
   }
 
@@ -377,4 +420,118 @@ async function reconcileAfterDiscountApproval(input: {
   }
 
   return { error: null };
+}
+
+export async function markPreorderExceptionCustomerInformedAction(
+  requestId: string,
+  orderId: string,
+): Promise<OperationsApprovalActionState> {
+  const staff = await requireStaff();
+  if (
+    staff.role.code !== "customer_operations" &&
+    staff.role.code !== "manager" &&
+    staff.role.code !== "owner"
+  ) {
+    return { error: "Not authorized to mark customer informed.", success: false };
+  }
+
+  const supabase = await createClient();
+  const { data: row, error: loadError } = await supabase
+    .from("operations_approval_requests")
+    .select("id, order_id, request_type, status")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (loadError) {
+    return { error: rpcErrorMessage(loadError), success: false };
+  }
+  if (!row) {
+    return { error: "Approval request not found.", success: false };
+  }
+  if (String(row.order_id) !== orderId) {
+    return { error: "Approval request does not match this order.", success: false };
+  }
+  if (String(row.request_type) !== "preorder_lead_time_exception") {
+    return {
+      error: "Only preorder exceptions support customer informed.",
+      success: false,
+    };
+  }
+
+  const { error } = await supabase.rpc(
+    "mark_preorder_exception_customer_informed",
+    {
+      p_request_id: requestId,
+      p_actor_staff_id: staff.id,
+    },
+  );
+  if (error) {
+    return { error: rpcErrorMessage(error), success: false };
+  }
+  await revalidateApprovalPaths(orderId);
+  return { error: null, success: true };
+}
+
+export async function withdrawPreorderLeadTimeExceptionAction(
+  requestId: string,
+  orderId: string,
+  note?: string,
+): Promise<OperationsApprovalActionState> {
+  const staff = await requireStaff();
+  const isBakeryPreorderApprover =
+    staff.role.code === "bakery"
+      ? await staffHasBakeryPreorderApprover(staff.id)
+      : false;
+  if (
+    staff.role.code !== "owner" &&
+    staff.role.code !== "manager" &&
+    staff.role.code !== "customer_operations" &&
+    !(staff.role.code === "bakery" && isBakeryPreorderApprover)
+  ) {
+    return { error: "Not authorized to withdraw this approval.", success: false };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("withdraw_preorder_lead_time_exception", {
+    p_request_id: requestId,
+    p_actor_staff_id: staff.id,
+    p_note: note?.trim() || null,
+  });
+  if (error) {
+    return { error: rpcErrorMessage(error), success: false };
+  }
+  await revalidateApprovalPaths(orderId);
+  return { error: null, success: true };
+}
+
+export async function correctPreorderExceptionCustomerInformedAction(
+  requestId: string,
+  orderId: string,
+  note: string,
+): Promise<OperationsApprovalActionState> {
+  const staff = await requireStaff();
+  if (staff.role.code !== "owner" && staff.role.code !== "manager") {
+    return {
+      error: "Only Manager or Owner can correct Customer Informed.",
+      success: false,
+    };
+  }
+  const correctionNote = note.trim();
+  if (!correctionNote) {
+    return { error: "A correction note is required.", success: false };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "correct_preorder_exception_customer_informed",
+    {
+      p_request_id: requestId,
+      p_actor_staff_id: staff.id,
+      p_note: correctionNote,
+    },
+  );
+  if (error) {
+    return { error: rpcErrorMessage(error), success: false };
+  }
+  await revalidateApprovalPaths(orderId);
+  return { error: null, success: true };
 }

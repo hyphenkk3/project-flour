@@ -73,8 +73,18 @@ export function OperationsApprovalsSection({
                     </p>
                     <p className="text-ink truncate text-sm">{row.reason}</p>
                     <p className="text-skyline text-sm">
-                      {formatDdMmYyyy(row.pickupDate)} ·{" "}
-                      {formatPickupTime(row.pickupTime)} · requested by{" "}
+                      {formatDdMmYyyy(
+                        row.payload.kind === "preorder_lead_time_exception"
+                          ? row.payload.requestedPickupDate
+                          : row.pickupDate,
+                      )}{" "}
+                      ·{" "}
+                      {formatPickupTime(
+                        row.payload.kind === "preorder_lead_time_exception"
+                          ? row.payload.pickupTime || row.pickupTime
+                          : row.pickupTime,
+                      )}{" "}
+                      · requested by{" "}
                       {formatApprovalActorLabel({
                         name: row.requestedByName,
                         roleName: row.requestedByRoleName,

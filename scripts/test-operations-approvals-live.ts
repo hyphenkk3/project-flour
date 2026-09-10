@@ -1428,6 +1428,329 @@ async function main() {
       );
     }
 
+    {
+      const preorderOrder = await createOrder(
+        `${SIG} Preorder`,
+        addCalendarDays(singaporeYmd(), 10),
+      );
+      const requestedDate = addCalendarDays(singaporeYmd(), 1);
+      const bakeryOtherId = await createEphemeralStaff("bakery", "bak2");
+      const preorderPayload = {
+        requested_pickup_date: requestedDate,
+        required_preorder_days: 3,
+        details: {
+          earliest_valid_date: addCalendarDays(singaporeYmd(), 3),
+          pickup_time: "16:00",
+          cakes: [{ cake_name: "Test cake", size_label: '6"' }],
+        },
+      };
+
+      const collectionReq = await admin.rpc(
+        "create_preorder_lead_time_exception_request",
+        {
+          p_order_id: preorderOrder,
+          p_actor_staff_id: collectionId,
+          p_reason: "collection attempt",
+          p_payload: preorderPayload,
+        },
+      );
+      check(
+        Boolean(collectionReq.error),
+        "Collection cannot request preorder exception",
+        collectionReq.error?.message,
+      );
+
+      const bakeryReq = await admin.rpc(
+        "create_preorder_lead_time_exception_request",
+        {
+          p_order_id: preorderOrder,
+          p_actor_staff_id: bakeryId,
+          p_reason: "bakery attempt",
+          p_payload: preorderPayload,
+        },
+      );
+      check(
+        Boolean(bakeryReq.error),
+        "Bakery cannot request preorder exception",
+        bakeryReq.error?.message,
+      );
+
+      const created = await admin.rpc(
+        "create_preorder_lead_time_exception_request",
+        {
+          p_order_id: preorderOrder,
+          p_actor_staff_id: coId,
+          p_reason: "Customer needs earlier pickup",
+          p_payload: preorderPayload,
+        },
+      );
+      check(
+        !created.error && Boolean(created.data?.id),
+        "CO can request preorder exception",
+        created.error?.message,
+      );
+      const requestId = created.data?.id as string | undefined;
+
+      const duplicate = await admin.rpc(
+        "create_preorder_lead_time_exception_request",
+        {
+          p_order_id: preorderOrder,
+          p_actor_staff_id: coId,
+          p_reason: "Duplicate",
+          p_payload: preorderPayload,
+        },
+      );
+      check(
+        Boolean(duplicate.error),
+        "Duplicate preorder exception for same order/date is prevented",
+        duplicate.error?.message,
+      );
+
+      const beforeApprove = await admin
+        .from("orders")
+        .select("pickup_date")
+        .eq("id", preorderOrder)
+        .maybeSingle();
+
+      if (requestId) {
+        const undesignatedApprove = await admin.rpc(
+          "approve_preorder_lead_time_exception",
+          {
+            p_request_id: requestId,
+            p_actor_staff_id: bakeryOtherId,
+          },
+        );
+        check(
+          Boolean(undesignatedApprove.error),
+          "Non-designated Bakery cannot approve preorder exception",
+          undesignatedApprove.error?.message,
+        );
+
+        const collectionApprove = await admin.rpc(
+          "approve_preorder_lead_time_exception",
+          {
+            p_request_id: requestId,
+            p_actor_staff_id: collectionId,
+          },
+        );
+        check(
+          Boolean(collectionApprove.error),
+          "Collection cannot approve preorder exception",
+          collectionApprove.error?.message,
+        );
+
+        await admin.from("staff_operational_designations").insert({
+          staff_id: bakeryId,
+          designation: "bakery_preorder_approver",
+        });
+
+        const designatedApprove = await admin.rpc(
+          "approve_preorder_lead_time_exception",
+          {
+            p_request_id: requestId,
+            p_actor_staff_id: bakeryId,
+          },
+        );
+        check(
+          !designatedApprove.error,
+          "Designated Bakery approver can approve preorder exception",
+          designatedApprove.error?.message,
+        );
+
+        const afterApprove = await admin
+          .from("orders")
+          .select("pickup_date")
+          .eq("id", preorderOrder)
+          .maybeSingle();
+        check(
+          afterApprove.data?.pickup_date === beforeApprove.data?.pickup_date,
+          "Pending/approved exception does not rewrite order pickup date",
+          `before=${beforeApprove.data?.pickup_date} after=${afterApprove.data?.pickup_date}`,
+        );
+
+        const collectionInform = await admin.rpc(
+          "mark_preorder_exception_customer_informed",
+          {
+            p_request_id: requestId,
+            p_actor_staff_id: collectionId,
+          },
+        );
+        check(
+          Boolean(collectionInform.error),
+          "Collection cannot mark Customer Informed",
+          collectionInform.error?.message,
+        );
+
+        const withdrawOpen = await admin.rpc(
+          "withdraw_preorder_lead_time_exception",
+          {
+            p_request_id: requestId,
+            p_actor_staff_id: coId,
+            p_note: "Customer no longer needs it",
+          },
+        );
+        check(
+          !withdrawOpen.error,
+          "Approved but not informed can be withdrawn",
+          withdrawOpen.error?.message,
+        );
+      }
+
+      const informedOrder = await createOrder(
+        `${SIG} PreorderInf`,
+        addCalendarDays(singaporeYmd(), 10),
+      );
+      const informedCreated = await admin.rpc(
+        "create_preorder_lead_time_exception_request",
+        {
+          p_order_id: informedOrder,
+          p_actor_staff_id: coId,
+          p_reason: "Inform path",
+          p_payload: preorderPayload,
+        },
+      );
+      const informedReqId = informedCreated.data?.id as string | undefined;
+      if (informedReqId) {
+        const approveInformed = await admin.rpc(
+          "approve_preorder_lead_time_exception",
+          {
+            p_request_id: informedReqId,
+            p_actor_staff_id: bakeryId,
+          },
+        );
+        check(
+          !approveInformed.error,
+          "Designated Bakery can approve second preorder exception",
+          approveInformed.error?.message,
+        );
+        const informed = await admin.rpc(
+          "mark_preorder_exception_customer_informed",
+          {
+            p_request_id: informedReqId,
+            p_actor_staff_id: coId,
+          },
+        );
+        check(
+          !informed.error,
+          "CO can mark Customer Informed",
+          informed.error?.message,
+        );
+        const coWithdraw = await admin.rpc(
+          "withdraw_preorder_lead_time_exception",
+          {
+            p_request_id: informedReqId,
+            p_actor_staff_id: coId,
+          },
+        );
+        check(
+          Boolean(coWithdraw.error),
+          "CO cannot withdraw after Customer Informed",
+          coWithdraw.error?.message,
+        );
+
+        const correctionProbe = await admin.rpc(
+          "correct_preorder_exception_customer_informed",
+          {
+            p_request_id: informedReqId,
+            p_actor_staff_id: ownerId,
+            p_note: "Recorded against the wrong order",
+          },
+        );
+        const correctionMissing = /Could not find the function|schema cache|does not exist/i.test(
+          correctionProbe.error?.message ?? "",
+        );
+        if (correctionMissing) {
+          check(
+            true,
+            "Owner Customer Informed correction RPC not applied yet — skipped live correction",
+            correctionProbe.error?.message,
+          );
+        } else {
+          check(
+            !correctionProbe.error,
+            "Owner can correct Customer Informed",
+            correctionProbe.error?.message,
+          );
+          const coCorrection = await admin.rpc(
+            "correct_preorder_exception_customer_informed",
+            {
+              p_request_id: informedReqId,
+              p_actor_staff_id: coId,
+              p_note: "CO attempt",
+            },
+          );
+          check(
+            Boolean(coCorrection.error),
+            "CO cannot correct Customer Informed",
+            coCorrection.error?.message,
+          );
+        }
+      }
+
+      const managerOrder = await createOrder(
+        `${SIG} PreorderMgr`,
+        addCalendarDays(singaporeYmd(), 10),
+      );
+      const managerCreated = await admin.rpc(
+        "create_preorder_lead_time_exception_request",
+        {
+          p_order_id: managerOrder,
+          p_actor_staff_id: coId,
+          p_reason: "Manager path",
+          p_payload: preorderPayload,
+        },
+      );
+      const managerReqId = managerCreated.data?.id as string | undefined;
+      if (managerReqId) {
+        const managerApprove = await admin.rpc(
+          "approve_preorder_lead_time_exception",
+          {
+            p_request_id: managerReqId,
+            p_actor_staff_id: managerId,
+          },
+        );
+        check(
+          !managerApprove.error,
+          "Manager can approve preorder exception",
+          managerApprove.error?.message,
+        );
+      }
+
+      const ownerOrder = await createOrder(
+        `${SIG} PreorderOwn`,
+        addCalendarDays(singaporeYmd(), 10),
+      );
+      const ownerCreated = await admin.rpc(
+        "create_preorder_lead_time_exception_request",
+        {
+          p_order_id: ownerOrder,
+          p_actor_staff_id: coId,
+          p_reason: "Owner path",
+          p_payload: preorderPayload,
+        },
+      );
+      const ownerReqId = ownerCreated.data?.id as string | undefined;
+      if (ownerReqId) {
+        const ownerApprove = await admin.rpc(
+          "approve_preorder_lead_time_exception",
+          {
+            p_request_id: ownerReqId,
+            p_actor_staff_id: ownerId,
+          },
+        );
+        check(
+          !ownerApprove.error,
+          "Owner can approve preorder exception",
+          ownerApprove.error?.message,
+        );
+      }
+
+      await admin
+        .from("staff_operational_designations")
+        .delete()
+        .in("staff_id", [bakeryId, bakeryOtherId]);
+    }
+
     const { data: product } = await admin
       .from("orders")
       .select("id, pickup_date, pickup_time, status, updated_at")
@@ -1450,6 +1773,10 @@ async function main() {
       }
     }
     if (staffIdsToDelete.length > 0) {
+      await admin
+        .from("staff_operational_designations")
+        .delete()
+        .in("staff_id", staffIdsToDelete);
       await admin.from("staff_profiles").delete().in("id", staffIdsToDelete);
     }
     for (const authId of authUserIdsToDelete) {

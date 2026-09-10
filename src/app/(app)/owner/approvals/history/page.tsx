@@ -2,7 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { requireStaff } from "@/foundation/auth/session";
-import { canAccessOperationsApprovalHistory } from "@/engines/operations/approval-ux";
+import { staffHasBakeryPreorderApprover } from "@/workspaces/owner/approvals/designations";
+import {
+  canAccessOperationsApprovalHistory,
+} from "@/engines/operations/approval-ux";
 import { canAccessOperationsApprovalsInbox } from "@/engines/operations/approvals";
 import { canAccessOperationsBoard } from "@/engines/orders/delivery-finance-capabilities";
 import {
@@ -26,7 +29,11 @@ export default async function OperationsApprovalHistoryPage({
   searchParams,
 }: PageProps) {
   const staff = await requireStaff();
-  if (!canAccessOperationsApprovalHistory(staff.role.code)) {
+  const isBakeryPreorderApprover = await staffHasBakeryPreorderApprover(
+    staff.id,
+  );
+  const authority = { isBakeryPreorderApprover };
+  if (!canAccessOperationsApprovalHistory(staff.role.code, authority)) {
     redirect(
       canAccessOperationsBoard(staff.role.code) ? "/owner" : "/home",
     );
@@ -37,17 +44,31 @@ export default async function OperationsApprovalHistoryPage({
     params[APPROVAL_HISTORY_RETURN_POSITION_PARAM] ===
     APPROVAL_HISTORY_RETURN_POSITION_VALUE;
 
-  const approvals = await listOperationsApprovals();
+  const loaded = await listOperationsApprovals();
+  const approvals =
+    staff.role.code === "bakery"
+      ? loaded.filter(
+          (row) => row.requestType === "preorder_lead_time_exception",
+        )
+      : loaded;
+  const canInbox = canAccessOperationsApprovalsInbox(
+    staff.role.code,
+    authority,
+  );
   const backHref = canAccessOperationsBoard(staff.role.code)
     ? "/owner"
-    : canAccessOperationsApprovalsInbox(staff.role.code)
+    : canInbox
       ? "/owner/approvals"
-      : "/customer-operations/orders";
+      : staff.role.code === "bakery"
+        ? "/bakery"
+        : "/customer-operations/orders";
   const backLabel = canAccessOperationsBoard(staff.role.code)
     ? "Operations"
-    : canAccessOperationsApprovalsInbox(staff.role.code)
+    : canInbox
       ? "Approvals"
-      : "Customer Operations";
+      : staff.role.code === "bakery"
+        ? "Bakery"
+        : "Customer Operations";
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -60,10 +81,10 @@ export default async function OperationsApprovalHistoryPage({
         </Link>
         <PageHeader title="Approval History" />
         <p className="text-skyline -mt-2 text-sm">
-          Approved, rejected, cancelled, and pending requests from existing
-          approval records.
+          Approved, rejected, cancelled, withdrawn, and pending requests from
+          existing approval records.
         </p>
-        {canAccessOperationsApprovalsInbox(staff.role.code) ? (
+        {canInbox ? (
           <p className="mt-2">
             <Link
               className="text-signal text-sm font-medium"

@@ -23,11 +23,17 @@ import {
   listOfferableLibraryCakes,
 } from "@/workspaces/storefront/catalog/queries";
 import { createClient } from "@/lib/supabase/server";
+import {
+  PENDING_PREORDER_EXCEPTION_BLOCKS_DATE_MESSAGE,
+  approvedPreorderExceptionPermitsDate,
+} from "@/engines/operations/preorder-lead-time-exception";
+import { parseOperationsApprovalPayload } from "@/engines/operations/approvals";
 
 export async function assertStaffCollectionDateAllowed(input: {
   pickupDate: string;
   fulfilmentMethod: string | null | undefined;
   collectionId?: string | null;
+  orderId?: string | null;
   items: Array<{
     cakeId: string;
     cakeSizeId: string;
@@ -128,15 +134,71 @@ export async function assertStaffCollectionDateAllowed(input: {
   });
 
   if (!evaluation.valid) {
+    if (evaluation.reason.code === "before_preorder" && input.orderId) {
+      const exception = await loadPreorderExceptionForDate(
+        input.orderId,
+        pickupDate,
+      );
+      if (exception === "approved") {
+        return { error: null };
+      }
+      if (exception === "pending") {
+        return { error: PENDING_PREORDER_EXCEPTION_BLOCKS_DATE_MESSAGE };
+      }
+    }
     const detail =
       customerCollectionDateMessage(evaluation, lines) ??
       "This collection date is not available for this order.";
+    const staffDetail = staffCollectionDateMessage(detail);
+    if (evaluation.reason.code === "before_preorder") {
+      return {
+        error: `Preorder exception required. ${staffDetail}`,
+      };
+    }
     return {
-      error: staffCollectionDateMessage(detail),
+      error: staffDetail,
     };
   }
 
   return { error: null };
+}
+
+async function loadPreorderExceptionForDate(
+  orderId: string,
+  pickupDate: string,
+): Promise<"approved" | "pending" | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("operations_approval_requests")
+    .select("status, payload")
+    .eq("order_id", orderId)
+    .eq("request_type", "preorder_lead_time_exception")
+    .in("status", ["pending", "approved"]);
+  if (error || !data) return null;
+
+  let pending = false;
+  for (const row of data) {
+    const payload = parseOperationsApprovalPayload(
+      "preorder_lead_time_exception",
+      row.payload,
+    );
+    const requested =
+      payload?.kind === "preorder_lead_time_exception"
+        ? payload.requestedPickupDate
+        : null;
+    if (requested !== pickupDate) continue;
+    if (
+      approvedPreorderExceptionPermitsDate({
+        status: row.status === "approved" ? "approved" : "pending",
+        requestedPickupDate: requested,
+        pickupDate,
+      })
+    ) {
+      return "approved";
+    }
+    if (row.status === "pending") pending = true;
+  }
+  return pending ? "pending" : null;
 }
 
 function staffCollectionDateMessage(customerMessage: string): string {

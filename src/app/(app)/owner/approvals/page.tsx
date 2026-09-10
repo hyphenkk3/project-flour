@@ -3,8 +3,12 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { requireStaff } from "@/foundation/auth/session";
 import { canAccessOperationsApprovalsInbox } from "@/engines/operations/approvals";
 import { canAccessOperationsBoard } from "@/engines/orders/delivery-finance-capabilities";
-import { OPERATIONS_APPROVAL_HISTORY_PATH } from "@/engines/operations/approval-ux";
+import {
+  OPERATIONS_APPROVAL_HISTORY_PATH,
+  visiblePendingApprovalsForInbox,
+} from "@/engines/operations/approval-ux";
 import { OperationsApprovalsSection } from "@/workspaces/owner/approvals/OperationsApprovalsSection";
+import { staffHasBakeryPreorderApprover } from "@/workspaces/owner/approvals/designations";
 import { listPendingOperationsApprovals } from "@/workspaces/owner/approvals/queries";
 import Link from "next/link";
 
@@ -12,23 +16,36 @@ export const dynamic = "force-dynamic";
 
 /**
  * Pending exception approvals for Owner + Manager.
+ * Designated Bakery may review preorder lead-time exceptions only.
  * Does not grant the Operations board, Calendar Owner controls, or EXTRA.
  */
 export default async function OperationsApprovalsPage() {
   const staff = await requireStaff();
-  if (!canAccessOperationsApprovalsInbox(staff.role.code)) {
+  const isBakeryPreorderApprover = await staffHasBakeryPreorderApprover(
+    staff.id,
+  );
+  const authority = { isBakeryPreorderApprover };
+  if (!canAccessOperationsApprovalsInbox(staff.role.code, authority)) {
     redirect(
       canAccessOperationsBoard(staff.role.code) ? "/owner" : "/home",
     );
   }
 
-  const pendingApprovals = await listPendingOperationsApprovals();
+  const pendingApprovals = visiblePendingApprovalsForInbox(
+    await listPendingOperationsApprovals(),
+    staff.role.code,
+    authority,
+  );
   const backHref = canAccessOperationsBoard(staff.role.code)
     ? "/owner"
-    : "/customer-operations/orders";
+    : staff.role.code === "bakery"
+      ? "/bakery"
+      : "/customer-operations/orders";
   const backLabel = canAccessOperationsBoard(staff.role.code)
     ? "Operations"
-    : "Customer Operations";
+    : staff.role.code === "bakery"
+      ? "Bakery"
+      : "Customer Operations";
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">

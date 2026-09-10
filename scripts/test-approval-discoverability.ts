@@ -129,6 +129,12 @@ function record(input: {
     reviewedByRoleName: input.reviewedByRoleName ?? null,
     reviewedAt: input.reviewedAt ?? null,
     reviewerNote: null,
+    customerInformedAt: null,
+    customerInformedBy: null,
+    customerInformedByName: null,
+    withdrawnAt: null,
+    withdrawnBy: null,
+    withdrawnByName: null,
     createdAt: input.createdAt ?? "2026-08-14T12:00:00.000Z",
     updatedAt: input.createdAt ?? "2026-08-14T12:00:00.000Z",
   };
@@ -322,10 +328,24 @@ assert.equal(canAccessOperationsApprovalHistory("owner"), true);
 assert.equal(canAccessOperationsApprovalHistory("manager"), true);
 assert.equal(canAccessOperationsApprovalHistory("customer_operations"), true);
 assert.equal(canAccessOperationsApprovalHistory("bakery"), false);
+assert.equal(
+  canAccessOperationsApprovalHistory("bakery", {
+    isBakeryPreorderApprover: true,
+  }),
+  true,
+);
 assert.equal(canAccessOperationsApprovalHistory("collection"), false);
 assert.equal(canAccessOperationsApprovalsInbox("customer_operations"), false);
 assert.equal(canAccessOperationsApprovalsInbox("owner"), true);
 assert.equal(canAccessOperationsApprovalsInbox("manager"), true);
+assert.equal(
+  canAccessOperationsApprovalsInbox("bakery", { isBakeryPreorderApprover: true }),
+  true,
+);
+assert.equal(
+  homePendingApprovalsHref("bakery", { isBakeryPreorderApprover: true }),
+  "/owner/approvals",
+);
 
 assert.equal(canRequestOperationsApproval("customer_operations"), true);
 assert.equal(canRequestOperationsApproval("owner"), false);

@@ -316,6 +316,21 @@ function lateEdit(input: {
   assert.deepEqual(summary.requestedLines, ["10/09/2026 · 11:00 AM"]);
 }
 
+{
+  const summary = buildApprovalChangeSummary({
+    kind: "preorder_lead_time_exception",
+    requestedPickupDate: "2026-09-12",
+    requiredPreorderDays: 3,
+    orderPickupDate: "2026-09-15",
+    earliestValidDate: "2026-09-14",
+    cakes: [{ cakeName: "Chocolate D'Amour", sizeLabel: '6"' }],
+    pickupTime: "16:00",
+  });
+  assert.match(summary.lines[0] ?? "", /12\/09\/2026/);
+  assert.match(summary.currentLines.join(" "), /3-day preorder/);
+  assert.match(summary.requestedLines.join(" "), /before the 3-day preorder/);
+}
+
 const panelSrc = readFileSync(
   resolve("src/workspaces/owner/approvals/OrderApprovalPanel.tsx"),
   "utf8",

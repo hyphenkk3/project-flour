@@ -576,6 +576,7 @@ export async function saveOrderWorkspaceAction(
       fulfilmentMethod,
       items: draftItems,
       collectionId: before.collectionId,
+      orderId,
     });
     if (dateGuard.error) {
       return { error: dateGuard.error, success: false };
@@ -840,6 +841,7 @@ export async function saveOrderWorkspaceAction(
       fulfilmentMethod,
       items: draftItems,
       collectionId: before.collectionId,
+      orderId,
     });
     if (addedCakeGuard.error) {
       return { error: addedCakeGuard.error, success: false };

@@ -565,7 +565,34 @@ const exceptionSql = read(
 );
 assert.match(exceptionSql, /mark_preorder_exception_customer_informed/);
 assert.match(exceptionSql, /customer_informed_at/);
-assert.doesNotMatch(actionsSrc, /mark_preorder_exception_customer_informed/);
+assert.match(actionsSrc, /assertStaffCollectionDateAllowed/);
+assert.match(actionsSrc, /collectionId: before\.collectionId,\s*orderId,/);
+assert.match(
+  read("src/workspaces/owner/approvals/actions.ts"),
+  /mark_preorder_exception_customer_informed/,
+);
+assert.match(
+  read("src/workspaces/owner/approvals/actions.ts"),
+  /create_preorder_lead_time_exception_request/,
+);
+assert.match(
+  read("src/workspaces/owner/approvals/actions.ts"),
+  /withdraw_preorder_lead_time_exception/,
+);
+assert.match(
+  read("src/workspaces/owner/approvals/actions.ts"),
+  /correct_preorder_exception_customer_informed/,
+);
+assert.match(
+  read("src/workspaces/owner/orders/collection-date-guard.ts"),
+  /before_preorder/,
+);
+const dateGuardIdx = actionsSrc.indexOf("export async function saveOrderWorkspaceAction");
+const saveBody = actionsSrc.slice(dateGuardIdx);
+const firstDateGuard = saveBody.indexOf("assertStaffCollectionDateAllowed");
+const postPay = saveBody.indexOf("decidePostPaymentSave");
+assert.ok(firstDateGuard > -1 && postPay > firstDateGuard);
+assert.ok(saveBody.indexOf("guard_post_payment_customer_change") > postPay);
 
 // 27 search by reference / customer / date / status / lifecycle
 const searchOrder: OperationsBoardOrder = {

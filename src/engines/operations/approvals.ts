@@ -5,10 +5,12 @@
  * When an existing restriction blocks that role, they request approval for a
  * specific order + specific proposed mutation. Manager may also request
  * cross_month_pickup (not late_order_edit or discount_exception).
- * Owner and Manager approve/reject the three supported types. Owner remains
- * the only role with direct cross-month override. Approval executes that
- * mutation. It does not grant temporary extra role power. Time passing does
- * not expire a pending request.
+ * Owner and Manager approve/reject the supported types. Designated Bakery
+ * may review preorder_lead_time_exception only. Owner remains the only role
+ * with direct cross-month override. Approval executes that mutation except
+ * for preorder lead-time exceptions, which do not rewrite the order date.
+ * It does not grant temporary extra role power. Time passing does not expire
+ * a pending request.
  *
  * Delivery fee request/resolve remains a separate existing workflow.
  */
@@ -26,6 +28,7 @@ export const OPERATIONS_APPROVAL_TYPES = [
   "discount_exception",
   "late_order_edit",
   "cross_month_pickup",
+  "preorder_lead_time_exception",
 ] as const;
 
 export type OperationsApprovalType = (typeof OPERATIONS_APPROVAL_TYPES)[number];
@@ -35,6 +38,7 @@ export const OPERATIONS_APPROVAL_STATUSES = [
   "approved",
   "rejected",
   "cancelled",
+  "withdrawn",
 ] as const;
 
 export type OperationsApprovalStatus =
@@ -50,6 +54,7 @@ export const OPERATIONS_APPROVAL_TYPE_LABELS: Record<
   discount_exception: "Discount exception",
   late_order_edit: "Late order edit",
   cross_month_pickup: "Cross-month pickup",
+  preorder_lead_time_exception: "Preorder lead-time exception",
 };
 
 export type DiscountExceptionAction = "redeem_rm10" | "change_august_to_rm10";
@@ -108,10 +113,26 @@ export type LateOrderEditPayload = {
   };
 };
 
+export type PreorderLeadTimeExceptionCake = {
+  cakeName: string;
+  sizeLabel: string;
+};
+
+export type PreorderLeadTimeExceptionPayload = {
+  kind: "preorder_lead_time_exception";
+  requestedPickupDate: string;
+  requiredPreorderDays: number | null;
+  orderPickupDate: string | null;
+  earliestValidDate: string | null;
+  cakes: PreorderLeadTimeExceptionCake[];
+  pickupTime: string | null;
+};
+
 export type OperationsApprovalPayload =
   | DiscountExceptionPayload
   | CrossMonthPickupPayload
-  | LateOrderEditPayload;
+  | LateOrderEditPayload
+  | PreorderLeadTimeExceptionPayload;
 
 export type OperationsApprovalFingerprint = {
   pickupDate: string;
@@ -144,8 +165,18 @@ export type OperationsApprovalRecord = {
   reviewedByRoleName: string | null;
   reviewedAt: string | null;
   reviewerNote: string | null;
+  customerInformedAt: string | null;
+  customerInformedBy: string | null;
+  customerInformedByName: string | null;
+  withdrawnAt: string | null;
+  withdrawnBy: string | null;
+  withdrawnByName: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type OperationsApprovalAuthorityContext = {
+  isBakeryPreorderApprover?: boolean;
 };
 
 export function isOperationsApprovalType(
@@ -167,8 +198,9 @@ export function canRequestOperationsApproval(role: RoleCode): boolean {
 
 /**
  * Type-aware request authority.
- * Customer Operations: all three types.
- * Manager: cross_month_pickup only — not late_order_edit or discount_exception.
+ * Customer Operations: all supported types including preorder_lead_time_exception.
+ * Manager: cross_month_pickup only — not late_order_edit, discount_exception,
+ * or preorder_lead_time_exception.
  * Owner executes exceptions directly and does not file requests.
  */
 export function canRequestOperationsApprovalType(
@@ -183,26 +215,34 @@ export function canRequestOperationsApprovalType(
 
 /**
  * Review authority for a typed request.
- * Owner and Manager: all three supported types.
+ * Owner and Manager: all supported types.
+ * Designated Bakery: preorder_lead_time_exception only.
  * Manager fee Approve/Reject stays on the independent fee-request workflow.
  * Manager review does not grant the Operations board.
  */
 export function canReviewOperationsApprovalType(
   role: RoleCode,
   requestType: string,
+  context?: OperationsApprovalAuthorityContext,
 ): boolean {
   if (!isOperationsApprovalType(requestType)) return false;
-  if (role !== "owner" && role !== "manager") return false;
+  if (role === "owner" || role === "manager") return true;
   return (
-    requestType === "discount_exception" ||
-    requestType === "late_order_edit" ||
-    requestType === "cross_month_pickup"
+    role === "bakery" &&
+    requestType === "preorder_lead_time_exception" &&
+    Boolean(context?.isBakeryPreorderApprover)
   );
 }
 
-/** Inbox page for pending approvals — Owner + Manager, not the Operations board. */
-export function canAccessOperationsApprovalsInbox(role: RoleCode): boolean {
-  return role === "owner" || role === "manager";
+/** Inbox page for pending approvals — Owner + Manager, not the Operations board.
+ * Designated Bakery may open the inbox for preorder exceptions only.
+ */
+export function canAccessOperationsApprovalsInbox(
+  role: RoleCode,
+  context?: OperationsApprovalAuthorityContext,
+): boolean {
+  if (role === "owner" || role === "manager") return true;
+  return role === "bakery" && Boolean(context?.isBakeryPreorderApprover);
 }
 
 export function canCancelOperationsApproval(input: {
@@ -229,6 +269,7 @@ export function canReviewPendingOperationsApproval(input: {
   staffId: string;
   requestedBy: string;
   requestType: string;
+  isBakeryPreorderApprover?: boolean;
 }): boolean {
   if (
     requesterCannotDecideOwnRequest({
@@ -238,7 +279,9 @@ export function canReviewPendingOperationsApproval(input: {
   ) {
     return false;
   }
-  return canReviewOperationsApprovalType(input.role, input.requestType);
+  return canReviewOperationsApprovalType(input.role, input.requestType, {
+    isBakeryPreorderApprover: input.isBakeryPreorderApprover,
+  });
 }
 
 export function approvalTypeLabel(type: OperationsApprovalType): string {
@@ -419,6 +462,9 @@ export function parseOperationsApprovalPayload(
 ): OperationsApprovalPayload | null {
   if (!raw || typeof raw !== "object") return null;
   const row = raw as Record<string, unknown>;
+  if (requestType === "preorder_lead_time_exception") {
+    return parsePreorderLeadTimeExceptionPayload(row);
+  }
   if (requestType === "discount_exception") {
     const action = row.action;
     const voucherNumber = stringField(row.voucher_number ?? row.voucherNumber);
@@ -570,6 +616,24 @@ export function crossMonthPayloadToRpc(
   };
 }
 
+export function preorderLeadTimeExceptionToRpc(
+  payload: PreorderLeadTimeExceptionPayload,
+): Record<string, unknown> {
+  return {
+    kind: "preorder_lead_time_exception",
+    requested_pickup_date: payload.requestedPickupDate,
+    required_preorder_days: payload.requiredPreorderDays,
+    details: {
+      earliest_valid_date: payload.earliestValidDate,
+      pickup_time: payload.pickupTime,
+      cakes: payload.cakes.map((cake) => ({
+        cake_name: cake.cakeName,
+        size_label: cake.sizeLabel,
+      })),
+    },
+  };
+}
+
 export function lateOrderEditPayloadToRpc(
   payload: LateOrderEditPayload,
 ): Record<string, unknown> {
@@ -694,6 +758,67 @@ function parseLateEditPaidAddons(
       };
     })
     .filter((addon): addon is LateOrderEditPaidAddon => addon != null);
+}
+
+function parsePreorderLeadTimeExceptionPayload(
+  row: Record<string, unknown>,
+): PreorderLeadTimeExceptionPayload | null {
+  const requestedPickupDate = ymdField(
+    row.requested_pickup_date ?? row.requestedPickupDate,
+  );
+  if (!requestedPickupDate) return null;
+  const detailsRaw =
+    row.details && typeof row.details === "object"
+      ? (row.details as Record<string, unknown>)
+      : {};
+  const requiredRaw = row.required_preorder_days ?? row.requiredPreorderDays;
+  const requiredDays =
+    requiredRaw == null || requiredRaw === ""
+      ? null
+      : Number.parseInt(String(requiredRaw), 10);
+  return {
+    kind: "preorder_lead_time_exception",
+    requestedPickupDate,
+    requiredPreorderDays:
+      Number.isInteger(requiredDays) && (requiredDays as number) > 0
+        ? (requiredDays as number)
+        : null,
+    orderPickupDate: ymdField(row.order_pickup_date ?? row.orderPickupDate),
+    earliestValidDate: ymdField(
+      detailsRaw.earliest_valid_date ?? detailsRaw.earliestValidDate,
+    ),
+    pickupTime:
+      stringField(detailsRaw.pickup_time ?? detailsRaw.pickupTime) ??
+      stringField(row.pickup_time ?? row.pickupTime),
+    cakes: parsePreorderExceptionCakes(detailsRaw.cakes ?? row.cakes),
+  };
+}
+
+function parsePreorderExceptionCakes(
+  raw: unknown,
+): PreorderLeadTimeExceptionCake[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const row = entry as Record<string, unknown>;
+      const cakeName = stringField(row.cake_name ?? row.cakeName);
+      const sizeLabel = stringField(row.size_label ?? row.sizeLabel);
+      if (!cakeName || !sizeLabel) return null;
+      return { cakeName, sizeLabel };
+    })
+    .filter((row): row is PreorderLeadTimeExceptionCake => row != null);
+}
+
+function ymdField(value: unknown): string | null {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+  const text = String(value ?? "").trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
 }
 
 function stringField(value: unknown): string | null {

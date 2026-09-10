@@ -88,10 +88,13 @@ export type GuestOrderWorkspaceCapabilities = {
    */
   canRequestCrossMonthPickupApproval: boolean;
   /**
-   * Approve/reject Operations approval requests of the three supported types
-   * (Owner and Manager). Independent of Operations board VIEW access.
+   * Approve/reject Operations approval requests of the supported types
+   * (Owner and Manager; designated Bakery for preorder exceptions only).
+   * Independent of Operations board VIEW access.
    */
   canReviewOperationsApprovals: boolean;
+  /** Bakery staff holding bakery_preorder_approver. Never hardcoded. */
+  isBakeryPreorderApprover: boolean;
   /** Cancel a guest Whole Cake order (Owner + Manager + Customer Operations). */
   canCancelGuestOrder: boolean;
   /**
@@ -139,11 +142,14 @@ export function canViewWholeCakeCalendar(role: RoleCode): boolean {
 export function buildGuestOrderWorkspaceCapabilities(input: {
   role: RoleCode;
   staffId: string;
+  isBakeryPreorderApprover?: boolean;
 }): GuestOrderWorkspaceCapabilities {
   const { role, staffId } = input;
   const isOwner = role === "owner";
   const isManager = role === "manager";
   const isCounter = role === "customer_operations";
+  const isBakeryPreorderApprover =
+    role === "bakery" && Boolean(input.isBakeryPreorderApprover);
   const canAccess = canAccessGuestOrderWorkspace(role);
   const feeExceptionAuthority = isOwner || isManager;
   /**
@@ -181,7 +187,8 @@ export function buildGuestOrderWorkspaceCapabilities(input: {
     canViewWholeCakeCalendar: canViewWholeCakeCalendar(role),
     canRequestOperationsApproval: isCounter,
     canRequestCrossMonthPickupApproval: isManager || isCounter,
-    canReviewOperationsApprovals: isOwner || isManager,
+    canReviewOperationsApprovals: isOwner || isManager || isBakeryPreorderApprover,
+    isBakeryPreorderApprover,
     canCancelGuestOrder: isRoutineOrderOperator,
     canDuplicateGuestOrder: isRoutineOrderOperator,
     canOverrideUnpaidReady: isOwner || isManager,

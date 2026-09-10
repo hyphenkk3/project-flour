@@ -86,6 +86,16 @@ import {
   deliveryFinanceFactsFromDelivery,
 } from "@/engines/orders/delivery-finance";
 import type { GuestOrderWorkspaceCapabilities } from "@/engines/orders/delivery-finance-capabilities";
+import { cartEarliestCollectionDate } from "@/engines/preorder/lead";
+import {
+  canCorrectPreorderExceptionCustomerInformed,
+  canMarkPreorderExceptionCustomerInformed,
+  canWithdrawPreorderLeadTimeException,
+  preorderExceptionForPickupDate,
+  preorderLinesFromWorkspaceItems,
+  requiredPreorderDaysFromLines,
+} from "@/engines/operations/preorder-lead-time-exception";
+import { PreorderLeadTimeExceptionNotice } from "@/workspaces/owner/approvals/PreorderLeadTimeExceptionNotice";
 import { OrderApprovalPanel } from "@/workspaces/owner/approvals/OrderApprovalPanel";
 import { PendingLateOrderEditNotice } from "@/workspaces/owner/approvals/PendingLateOrderEditNotice";
 import { createOperationsApprovalAction } from "@/workspaces/owner/approvals/actions";
@@ -159,6 +169,7 @@ type OrderWorkspaceFormProps = {
   approvals?: OperationsApprovalRecord[];
   highlightApprovalId?: string | null;
   hoursSnapshot?: OperatingHoursSnapshot;
+  preorderBusinessDate: string;
 };
 
 function ViewBlock({
@@ -191,6 +202,7 @@ export function OrderWorkspaceForm({
   approvals = [],
   highlightApprovalId = null,
   hoursSnapshot = OPERATING_HOURS_SEED,
+  preorderBusinessDate,
 }: OrderWorkspaceFormProps) {
   const router = useRouter();
   const boundSave = saveOrderWorkspaceAction.bind(null, order.id);
@@ -264,6 +276,65 @@ export function OrderWorkspaceForm({
   const pendingLateEdit = pendingLateOrderEdit(pendingApprovals);
   const blockDirectSave =
     capabilities.canRequestOperationsApproval && lateChangeRequired;
+
+  const selectedPickupDate = mode === "edit" ? editPickupDate : order.pickupDate;
+  const preorderLines = preorderLinesFromWorkspaceItems({
+    items:
+      mode === "edit"
+        ? editItems
+        : order.items.map((item) => ({
+            cakeId: item.cakeId,
+            cakeSizeId: item.cakeSizeId,
+            quantity: item.quantity,
+            cakeName: item.cakeName,
+            sizeLabel: item.sizeLabel,
+          })),
+    cakes,
+  });
+  const preorderEarliestYmd = cartEarliestCollectionDate(
+    preorderLines,
+    preorderBusinessDate,
+  ).earliestYmd;
+  const preorderNeedsException = selectedPickupDate < preorderEarliestYmd;
+  const preorderForSelectedDate = preorderExceptionForPickupDate(
+    approvals,
+    selectedPickupDate,
+  );
+  const showPreorderExceptionNotice =
+    preorderNeedsException ||
+    preorderForSelectedDate?.status === "pending" ||
+    preorderForSelectedDate?.status === "approved";
+
+  function renderPreorderExceptionNotice() {
+    if (!showPreorderExceptionNotice) return null;
+    return (
+      <PreorderLeadTimeExceptionNotice
+        approvals={approvals}
+        cakes={preorderLines.map((line) => ({
+          cakeName: line.cakeName,
+          sizeLabel: line.sizeLabel,
+        }))}
+        canCorrect={canCorrectPreorderExceptionCustomerInformed(
+          capabilities.role,
+        )}
+        canInform={canMarkPreorderExceptionCustomerInformed(capabilities.role)}
+        canRequest={capabilities.canRequestOperationsApproval}
+        canWithdraw={canWithdrawPreorderLeadTimeException({
+          role: capabilities.role,
+          status: preorderForSelectedDate?.status ?? "pending",
+          customerInformedAt: preorderForSelectedDate?.customerInformedAt,
+          isBakeryPreorderApprover: capabilities.isBakeryPreorderApprover,
+        })}
+        earliestValidDate={preorderEarliestYmd}
+        onChanged={() => router.refresh()}
+        orderId={order.id}
+        orderPickupDate={order.pickupDate}
+        pickupTime={mode === "edit" ? editPickupTime : order.pickupTime}
+        requiredPreorderDays={requiredPreorderDaysFromLines(preorderLines)}
+        selectedPickupDate={selectedPickupDate}
+      />
+    );
+  }
 
   function lateEditScopeHint(
     kind: "included" | "pickup" | "excluded",
@@ -354,7 +425,20 @@ export function OrderWorkspaceForm({
               staffId: capabilities.staffId,
               requestedBy: request.requestedBy,
               requestType: request.requestType,
+              isBakeryPreorderApprover: capabilities.isBakeryPreorderApprover,
             })}
+            canWithdrawPreorder={canWithdrawPreorderLeadTimeException({
+              role: capabilities.role,
+              status: request.status,
+              customerInformedAt: request.customerInformedAt,
+              isBakeryPreorderApprover: capabilities.isBakeryPreorderApprover,
+            })}
+            canMarkPreorderInformed={canMarkPreorderExceptionCustomerInformed(
+              capabilities.role,
+            )}
+            canCorrectPreorderInformed={canCorrectPreorderExceptionCustomerInformed(
+              capabilities.role,
+            )}
             customerName={order.customerName}
             highlighted={highlightApprovalId === request.id}
             orderNumber={order.orderNumber}
@@ -852,6 +936,8 @@ export function OrderWorkspaceForm({
             </div>
           ) : null}
         </ViewBlock>
+
+        {renderPreorderExceptionNotice()}
 
         <DeliveryChargesSection
           capabilities={capabilities}
@@ -1444,6 +1530,7 @@ export function OrderWorkspaceForm({
             ) : null}
           </div>
         ) : null}
+        {renderPreorderExceptionNotice()}
       </div>
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">

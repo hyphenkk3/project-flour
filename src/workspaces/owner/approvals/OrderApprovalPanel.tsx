@@ -15,7 +15,10 @@ import { formatDateTime } from "@/lib/dates";
 import {
   approveOperationsApprovalAction,
   cancelOperationsApprovalAction,
+  correctPreorderExceptionCustomerInformedAction,
+  markPreorderExceptionCustomerInformedAction,
   rejectOperationsApprovalAction,
+  withdrawPreorderLeadTimeExceptionAction,
 } from "@/workspaces/owner/approvals/actions";
 import { ApprovalChangeLines } from "@/workspaces/owner/approvals/ApprovalChangeLines";
 import { FormField, FormTextarea } from "@/components/ui/form";
@@ -26,6 +29,9 @@ type OrderApprovalPanelProps = {
   customerName: string;
   canReview: boolean;
   canCancel: boolean;
+  canWithdrawPreorder?: boolean;
+  canMarkPreorderInformed?: boolean;
+  canCorrectPreorderInformed?: boolean;
   highlighted?: boolean;
 };
 
@@ -35,15 +41,20 @@ export function OrderApprovalPanel({
   customerName,
   canReview,
   canCancel,
+  canWithdrawPreorder = false,
+  canMarkPreorderInformed = false,
+  canCorrectPreorderInformed = false,
   highlighted = false,
 }: OrderApprovalPanelProps) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState("");
   const [showReject, setShowReject] = useState(false);
+  const [correctionNote, setCorrectionNote] = useState("");
 
   const payload = request.payload;
   const isPending = request.status === "pending";
+  const isPreorder = request.requestType === "preorder_lead_time_exception";
   const summary = buildApprovalChangeSummary(payload);
   const requesterLabel = formatApprovalActorLabel({
     name: request.requestedByName,
@@ -136,7 +147,13 @@ export function OrderApprovalPanel({
         <p className="text-ink text-sm whitespace-pre-wrap">{request.reason}</p>
       </div>
 
-      {!isPending && request.reviewedAt ? (
+      {!isPending && request.status === "withdrawn" && request.withdrawnAt ? (
+        <p className="text-ink text-sm">
+          Withdrawn
+          {request.withdrawnByName ? ` by ${request.withdrawnByName}` : ""}{" "}
+          · {formatDateTime(request.withdrawnAt)}
+        </p>
+      ) : !isPending && request.reviewedAt ? (
         <p className="text-ink text-sm">
           {request.status === "approved"
             ? "Approved"
@@ -144,6 +161,24 @@ export function OrderApprovalPanel({
               ? "Rejected"
               : "Cancelled"}{" "}
           by {reviewerLabel} · {formatDateTime(request.reviewedAt)}
+        </p>
+      ) : null}
+
+      {isPreorder && request.status === "approved" && request.customerInformedAt ? (
+        <p className="text-ink text-sm">
+          Customer Informed
+          {request.customerInformedByName
+            ? ` by ${request.customerInformedByName}`
+            : ""}{" "}
+          · {formatDateTime(request.customerInformedAt)}. Committed for this
+          pickup date.
+        </p>
+      ) : null}
+
+      {isPreorder && request.status === "approved" && !request.customerInformedAt ? (
+        <p className="text-ink text-sm">
+          Approved — Customer Not Informed. Contact the customer, then mark
+          Customer Informed.
         </p>
       ) : null}
 
@@ -228,6 +263,83 @@ export function OrderApprovalPanel({
         >
           Cancel request
         </button>
+      ) : null}
+
+      {isPreorder &&
+      request.status === "approved" &&
+      !request.customerInformedAt ? (
+        <div className="flex flex-wrap gap-2">
+          {canMarkPreorderInformed ? (
+            <button
+              className="bg-ink text-mist hover:bg-skyline inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-medium disabled:opacity-60"
+              disabled={pending}
+              onClick={() =>
+                run(() =>
+                  markPreorderExceptionCustomerInformedAction(
+                    request.id,
+                    request.orderId,
+                  ),
+                )
+              }
+              type="button"
+            >
+              {pending ? "Working…" : "Customer Informed"}
+            </button>
+          ) : null}
+          {canWithdrawPreorder ? (
+            <button
+              className="border-fog text-ink hover:bg-mist inline-flex min-h-10 items-center justify-center rounded-lg border bg-white px-4 text-sm font-medium disabled:opacity-60"
+              disabled={pending}
+              onClick={() =>
+                run(() =>
+                  withdrawPreorderLeadTimeExceptionAction(
+                    request.id,
+                    request.orderId,
+                  ),
+                )
+              }
+              type="button"
+            >
+              Withdraw
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {isPreorder &&
+      request.status === "approved" &&
+      request.customerInformedAt &&
+      canCorrectPreorderInformed ? (
+        <div className="space-y-2">
+          <FormField
+            htmlFor={`correct-informed-${request.id}`}
+            label="Manager/Owner correction note"
+          >
+            <FormTextarea
+              id={`correct-informed-${request.id}`}
+              onChange={(event) => setCorrectionNote(event.target.value)}
+              placeholder="Required"
+              rows={2}
+              value={correctionNote}
+            />
+          </FormField>
+          <button
+            className="border-fog text-ink hover:bg-mist inline-flex min-h-10 items-center justify-center rounded-lg border bg-white px-4 text-sm font-medium disabled:opacity-60"
+            disabled={pending || !correctionNote.trim()}
+            onClick={() =>
+              run(() =>
+                correctPreorderExceptionCustomerInformedAction(
+                  request.id,
+                  request.orderId,
+                  correctionNote,
+                ),
+              )
+            }
+            type="button"
+          >
+            Correct Customer Informed
+          </button>
+        </div>
       ) : null}
     </section>
   );

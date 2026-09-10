@@ -21,6 +21,10 @@ type ApprovalRow = {
   reviewed_by: string | null;
   reviewed_at: string | null;
   reviewer_note: string | null;
+  customer_informed_at: string | null;
+  customer_informed_by: string | null;
+  withdrawn_at: string | null;
+  withdrawn_by: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -47,6 +51,9 @@ function unwrapRoleName(
   return name || null;
 }
 
+const APPROVAL_SELECT =
+  "id, order_id, request_type, status, reason, payload, order_fingerprint, requested_by, reviewed_by, reviewed_at, reviewer_note, customer_informed_at, customer_informed_by, withdrawn_at, withdrawn_by, created_at, updated_at";
+
 export async function listPendingOperationsApprovals(): Promise<
   OperationsApprovalRecord[]
 > {
@@ -60,9 +67,7 @@ export async function listOperationsApprovals(input?: {
   const supabase = await createClient();
   let query = supabase
     .from("operations_approval_requests")
-    .select(
-      "id, order_id, request_type, status, reason, payload, order_fingerprint, requested_by, reviewed_by, reviewed_at, reviewer_note, created_at, updated_at",
-    )
+    .select(APPROVAL_SELECT)
     .order("created_at", { ascending: false });
   if (input?.status) {
     query = query.eq("status", input.status);
@@ -90,9 +95,7 @@ export async function getOperationsApprovalById(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("operations_approval_requests")
-    .select(
-      "id, order_id, request_type, status, reason, payload, order_fingerprint, requested_by, reviewed_by, reviewed_at, reviewer_note, created_at, updated_at",
-    )
+    .select(APPROVAL_SELECT)
     .eq("id", id)
     .maybeSingle();
   if (error) {
@@ -113,9 +116,12 @@ async function hydrateApprovalRows(
   const staffIds = [
     ...new Set(
       rows.flatMap((row) =>
-        [row.requested_by, row.reviewed_by].filter(
-          (id): id is string => Boolean(id),
-        ),
+        [
+          row.requested_by,
+          row.reviewed_by,
+          row.customer_informed_by,
+          row.withdrawn_by,
+        ].filter((id): id is string => Boolean(id)),
       ),
     ),
   ];
@@ -154,6 +160,12 @@ async function hydrateApprovalRows(
     const reviewer = row.reviewed_by
       ? (staffMap.get(row.reviewed_by) ?? null)
       : null;
+    const informed = row.customer_informed_by
+      ? (staffMap.get(row.customer_informed_by) ?? null)
+      : null;
+    const withdrawn = row.withdrawn_by
+      ? (staffMap.get(row.withdrawn_by) ?? null)
+      : null;
     mapped.push({
       id: row.id,
       orderId: row.order_id,
@@ -174,6 +186,12 @@ async function hydrateApprovalRows(
       reviewedByRoleName: reviewer?.roleName ?? null,
       reviewedAt: row.reviewed_at,
       reviewerNote: row.reviewer_note,
+      customerInformedAt: row.customer_informed_at ?? null,
+      customerInformedBy: row.customer_informed_by ?? null,
+      customerInformedByName: informed?.displayName ?? null,
+      withdrawnAt: row.withdrawn_at ?? null,
+      withdrawnBy: row.withdrawn_by ?? null,
+      withdrawnByName: withdrawn?.displayName ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     });

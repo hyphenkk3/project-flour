@@ -386,6 +386,9 @@ export type OrderTimelineEventType =
   | "operations_approval_approved"
   | "operations_approval_rejected"
   | "operations_approval_cancelled"
+  | "operations_approval_withdrawn"
+  | "preorder_exception_customer_informed"
+  | "preorder_exception_customer_informed_corrected"
   | "post_payment_customer_change"
   | "post_payment_customer_change_override";
 

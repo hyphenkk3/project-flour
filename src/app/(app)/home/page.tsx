@@ -7,7 +7,8 @@ import {
 } from "@/engines/orders/delivery-finance-capabilities";
 import { canAccessBakeryWorkspace } from "@/engines/bakery/capabilities";
 import { canAccessCollectionWorkspace } from "@/engines/collection/capabilities";
-import { homePendingApprovalsHref } from "@/engines/operations/approval-ux";
+import { homePendingApprovalsHref, visiblePendingApprovalsForInbox } from "@/engines/operations/approval-ux";
+import { staffHasBakeryPreorderApprover } from "@/workspaces/owner/approvals/designations";
 import { operationsTodayYmd } from "@/engines/operations/order-board";
 import { listPendingOperationsApprovals } from "@/workspaces/owner/approvals/queries";
 import { listGuestOrders } from "@/workspaces/owner/orders/queries";
@@ -26,10 +27,15 @@ export default async function HomePage() {
   const staff = await requireStaff();
   const role = staff.role.code;
   const navigation = getNavigationForRole(role);
+  const isBakeryPreorderApprover = await staffHasBakeryPreorderApprover(
+    staff.id,
+  );
   const capabilities = buildGuestOrderWorkspaceCapabilities({
     role,
     staffId: staff.id,
+    isBakeryPreorderApprover,
   });
+  const approvalAuthority = { isBakeryPreorderApprover };
   const todayYmd = operationsTodayYmd();
 
   const canOps = canAccessOperationsBoard(role);
@@ -70,20 +76,26 @@ export default async function HomePage() {
       : Promise.resolve([]),
   ]);
 
+  const visiblePendingApprovals = visiblePendingApprovalsForInbox(
+    pendingApprovals,
+    role,
+    approvalAuthority,
+  );
+
   const model = buildHomeCockpitModel({
     orders,
     readyCollection,
     completedCollection,
     dineInCollection,
     bakeryOrders,
-    pendingApprovals,
+    pendingApprovals: visiblePendingApprovals,
     navigation,
   });
 
   return (
     <HomeCockpit
       canAccessApprovals={canApprovals}
-      pendingApprovalsHref={homePendingApprovalsHref(role)}
+      pendingApprovalsHref={homePendingApprovalsHref(role, approvalAuthority)}
       canAccessBakery={canBakery}
       canAccessCalendar={canCalendar}
       canAccessCollection={canCollection}
