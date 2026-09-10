@@ -350,7 +350,7 @@ assert.match(homeSrc, /desktopRail=\{false\}/);
 assert.match(homeSrc, /HomeHero/);
 assert.match(homeSrc, /HomePopularCakes/);
 assert.match(homeSrc, /<HomePopularCakes cakes=\{popular\} \/>/);
-assert.match(homeSrc, /<HomeVisitFooter \/>/);
+assert.match(homeSrc, /HomeVisitFooter lead=\{<HomeCatalogueBlock \/>\}/);
 assert.doesNotMatch(
   homeSrc,
   /HomeVisitFooter lead=\{<HomePopularCakes cakes=\{popular\} \/>\}/,
@@ -467,6 +467,8 @@ assert.match(browseAllSrc, /href="\/browse"/);
 assert.match(browseAllSrc, /Browse all cakes/);
 assert.match(browseAllSrc, /Explore the full Whitebird collection/);
 assert.match(browseAllSrc, /Catalogue/);
+assert.match(browseAllSrc, /HomeCatalogueBlock/);
+assert.match(browseAllSrc, /lg:hidden/);
 assert.match(browseAllSrc, /mx-auto w-full max-w-6xl/);
 assert.match(browseAllSrc, /px-6 pt-8 pb-2 sm:px-10/);
 assert.doesNotMatch(browseAllSrc, /HomeDestinationCard/);
@@ -485,7 +487,9 @@ assert.match(freshSectionSrc, /aspect-square/);
 assert.match(freshSectionSrc, /h-\[5\.5rem\] w-\[5\.5rem\]/);
 assert.match(freshSectionSrc, /View all →/);
 assert.match(freshSectionSrc, /mx-auto w-full max-w-6xl/);
-assert.match(freshSectionSrc, /lg:grid lg:grid-cols-2/);
+assert.match(freshSectionSrc, /lg:h-\[10\.5rem\] lg:w-\[10\.5rem\]/);
+assert.match(freshSectionSrc, /lg:flex lg:w-max/);
+assert.doesNotMatch(freshSectionSrc, /lg:grid lg:grid-cols-2/);
 assert.doesNotMatch(freshSectionSrc, /md:grid-cols-2/);
 assert.doesNotMatch(freshSectionSrc, /See all →/);
 assert.match(freshSectionSrc, /pick\.sizeLabel/);

@@ -30,7 +30,10 @@ import {
 } from "@/workspaces/storefront/catalog/queries";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
 import { listStorefrontAvailableExtra } from "@/workspaces/storefront/extra/queries";
-import { HomeBrowseAllCakes } from "@/workspaces/storefront/home/HomeBrowseAllCakes";
+import {
+  HomeBrowseAllCakes,
+  HomeCatalogueBlock,
+} from "@/workspaces/storefront/home/HomeBrowseAllCakes";
 import { HomeFeaturedCollection } from "@/workspaces/storefront/home/HomeFeaturedCollection";
 import { HomeFreshPicksSection } from "@/workspaces/storefront/home/HomeFreshPicksSection";
 import { HomeHero } from "@/workspaces/storefront/home/HomeHero";
@@ -262,7 +265,7 @@ export async function StorefrontHomePage() {
       <HomeMoreCollections items={more} />
       <HomeBrowseAllCakes />
 
-      <HomeVisitFooter />
+      <HomeVisitFooter lead={<HomeCatalogueBlock />} />
 
       <div className="px-6 sm:px-10">
         <div className="mx-auto w-full max-w-6xl">

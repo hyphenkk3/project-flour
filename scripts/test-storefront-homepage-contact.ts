@@ -78,7 +78,8 @@ assert.match(freshCardSrc, /tall/);
 const homeSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
 assert.match(homeSrc, /listStorefrontAvailableExtra/);
 assert.match(homeSrc, /HomeVisitFooter/);
-assert.match(
+assert.match(homeSrc, /HomeVisitFooter lead=\{<HomeCatalogueBlock \/>\}/);
+assert.doesNotMatch(
   homeSrc,
   /HomeVisitFooter lead=\{<HomePopularCakes cakes=\{popular\} \/>\}/,
 );
@@ -133,12 +134,13 @@ assert.match(footerSrc, /md:grid-cols-2/);
 assert.match(footerSrc, /items-start/);
 assert.match(
   footerSrc,
-  /lg:grid-cols-\[minmax\(0,0\.55fr\)_minmax\(0,0\.27fr\)_minmax\(0,0\.18fr\)\]/,
+  /lg:grid-cols-\[minmax\(0,1fr\)_minmax\(0,1fr\)_minmax\(0,1fr\)\]/,
 );
+assert.match(footerSrc, /hidden min-w-0 md:col-span-2 lg:col-span-1 lg:block/);
 assert.match(footerSrc, /md:col-span-2 lg:col-span-1/);
 assert.match(footerSrc, /border-t/);
 assert.match(footerSrc, /lg:contents/);
-assert.match(footerSrc, /col-span-full[\s\S]*border-t[\s\S]*Find Us/);
+assert.match(footerSrc, /col-span-full[\s\S]*Find Us/);
 assert.doesNotMatch(footerSrc, /md:grid-cols-3/);
 assert.doesNotMatch(footerSrc, /lg:grid-cols-3/);
 assert.doesNotMatch(footerSrc, /wa\.me\/\d+/);

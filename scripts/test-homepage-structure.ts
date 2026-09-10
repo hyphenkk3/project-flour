@@ -57,8 +57,10 @@ assert.doesNotMatch(freshSectionSrc, /See all/);
 assert.match(freshSectionSrc, /px-6 pt-4 pb-2 sm:px-10 md:pt-8/);
 assert.match(freshSectionSrc, /mx-auto w-full max-w-6xl/);
 assert.match(freshSectionSrc, /h-\[5\.5rem\] w-\[5\.5rem\]/);
-assert.match(freshSectionSrc, /lg:grid lg:grid-cols-2/);
+assert.match(freshSectionSrc, /lg:h-\[10\.5rem\] lg:w-\[10\.5rem\]/);
+assert.match(freshSectionSrc, /lg:flex lg:w-max/);
 assert.match(freshSectionSrc, /lg:space-y-0/);
+assert.doesNotMatch(freshSectionSrc, /lg:grid lg:grid-cols-2/);
 assert.doesNotMatch(freshSectionSrc, /md:grid-cols-2/);
 assert.doesNotMatch(freshSectionSrc, /HomeDestinationCard/);
 
@@ -81,7 +83,8 @@ assert.ok(moreIndex > popularIndex);
 assert.ok(browseIndex > moreIndex);
 assert.ok(visitIndex > browseIndex);
 assert.match(homeSrc, /<HomePopularCakes cakes=\{popular\} \/>/);
-assert.match(homeSrc, /<HomeVisitFooter \/>/);
+assert.match(homeSrc, /HomeVisitFooter lead=\{<HomeCatalogueBlock \/>\}/);
+assert.match(homeSrc, /<HomeBrowseAllCakes \/>/);
 assert.doesNotMatch(
   homeSrc,
   /HomeVisitFooter lead=\{<HomePopularCakes cakes=\{popular\} \/>\}/,
@@ -251,6 +254,14 @@ assert.match(
 assert.match(
   readSrc("src/workspaces/storefront/home/HomeBrowseAllCakes.tsx"),
   /px-6 pt-8 pb-2 sm:px-10/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/home/HomeBrowseAllCakes.tsx"),
+  /HomeCatalogueBlock/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/home/HomeBrowseAllCakes.tsx"),
+  /lg:hidden/,
 );
 
 const queriesSrc = readSrc("src/workspaces/storefront/catalog/queries.ts");

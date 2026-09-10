@@ -48,24 +48,25 @@ export function HomeFreshPicksSection({ picks }: HomeFreshPicksSectionProps) {
             </p>
           </div>
         ) : (
-          <ul className="mt-4 space-y-4 lg:grid lg:grid-cols-2 lg:gap-x-10 lg:gap-y-4 lg:space-y-0">
+          <div className="max-lg:contents lg:mt-4 lg:overflow-x-auto lg:overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <ul className="mt-4 space-y-4 lg:mt-0 lg:flex lg:w-max lg:gap-8 lg:space-y-0">
             {picks.map((pick) => {
               const dateLabel = freshPickAvailabilityDateLabel(
                 pick.days,
                 todayYmd,
               );
               return (
-                <li key={pick.id}>
+                <li className="lg:shrink-0" key={pick.id}>
                   <article className="flex gap-3.5">
                     <Link
                       aria-label={pick.cakeName}
-                      className="bg-fog relative aspect-square h-[5.5rem] w-[5.5rem] shrink-0 overflow-hidden rounded-[10px]"
+                      className="bg-fog relative aspect-square h-[5.5rem] w-[5.5rem] shrink-0 overflow-hidden rounded-[10px] lg:h-[10.5rem] lg:w-[10.5rem]"
                       href={`/extra/${pick.id}`}
                     >
                       {pick.imageUrl ? (
                         <CakePhotoImage
                           alt={pick.imageAlt || pick.cakeName}
-                          sizes="88px"
+                          sizes="(min-width: 1024px) 168px, 88px"
                           src={pick.imageUrl}
                         />
                       ) : (
@@ -74,7 +75,7 @@ export function HomeFreshPicksSection({ picks }: HomeFreshPicksSectionProps) {
                         </span>
                       )}
                     </Link>
-                    <div className="min-w-0 flex-1 py-0.5">
+                    <div className="min-w-0 flex-1 py-0.5 lg:max-w-[12.5rem] lg:flex-none">
                       <p className="text-skyline text-[11px] leading-tight">
                         {freshPickAvailabilityLabel(pick.days)}
                         {dateLabel ? ` · ${dateLabel}` : ""}
@@ -104,6 +105,7 @@ export function HomeFreshPicksSection({ picks }: HomeFreshPicksSectionProps) {
               );
             })}
           </ul>
+          </div>
         )}
       </div>
     </section>

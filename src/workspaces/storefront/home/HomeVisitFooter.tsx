@@ -23,9 +23,11 @@ export function HomeVisitFooter({ lead }: HomeVisitFooterProps) {
 
   return (
     <section className="border-ink/[0.1] mt-8 border-t px-6 pt-8 pb-2 sm:px-10">
-      <div className="mx-auto grid w-full max-w-6xl items-start gap-8 md:grid-cols-2 md:gap-x-16 md:gap-y-8 lg:grid-cols-[minmax(0,0.55fr)_minmax(0,0.27fr)_minmax(0,0.18fr)] lg:gap-x-8 lg:gap-y-0">
+      <div className="mx-auto grid w-full max-w-6xl items-start gap-8 md:grid-cols-2 md:gap-x-16 md:gap-y-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] lg:gap-x-8 lg:gap-y-0">
         {lead ? (
-          <div className="min-w-0 md:col-span-2 lg:col-span-1">{lead}</div>
+          <div className="hidden min-w-0 md:col-span-2 lg:col-span-1 lg:block">
+            {lead}
+          </div>
         ) : null}
 
         <div className="col-span-full grid grid-cols-1 gap-8 md:col-span-2 md:grid-cols-2 md:gap-x-16 lg:contents">
