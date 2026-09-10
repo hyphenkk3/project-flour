@@ -17,6 +17,7 @@ import {
 import {
   FRESH_PICKS_ADD_TO_CART_CTA,
   FRESH_PICKS_ADDED_CONFIRMATION,
+  FRESH_PICKS_ADDED_TO_CART_CTA,
   FRESH_PICKS_FIXED_DATES_NOTE,
 } from "@/engines/extra/customer-fresh-picks";
 import { formatShortBusinessDate } from "@/lib/dates";
@@ -25,9 +26,11 @@ import type { StorefrontExtraPick } from "@/workspaces/storefront/extra/queries"
 import {
   addFreshPickToCart,
   extraIsValidForCartPickup,
+  freshPickCartHasExtra,
   readFreshPickCart,
   writeFreshPickCart,
 } from "@/workspaces/storefront/extra/fresh-pick-cart";
+import { useFreshPickCart } from "@/workspaces/storefront/extra/useFreshPickCart";
 
 type GuestExtraOrderFormProps = {
   extra: StorefrontExtraPick;
@@ -52,6 +55,8 @@ export function GuestExtraOrderForm({
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
   const addedTimer = useRef<number | null>(null);
+  const cart = useFreshPickCart();
+  const inCart = freshPickCartHasExtra(cart, extra.id);
 
   const usableSlots = extraCustomerPickupSlotsForDate(
     pickupDate,
@@ -95,6 +100,10 @@ export function GuestExtraOrderForm({
 
   function addToCart() {
     setError(null);
+    if (freshPickCartHasExtra(readFreshPickCart(), extra.id)) {
+      setAdded(true);
+      return;
+    }
     const result = addFreshPickToCart(readFreshPickCart(), {
       extraStockId: extra.id,
       cakeName: extra.cakeName,
@@ -206,7 +215,7 @@ export function GuestExtraOrderForm({
 
       <FormActions>
         <FormSubmitButton disabled={usableSlots.length === 0}>
-          {FRESH_PICKS_ADD_TO_CART_CTA}
+          {inCart ? FRESH_PICKS_ADDED_TO_CART_CTA : FRESH_PICKS_ADD_TO_CART_CTA}
         </FormSubmitButton>
         <Link
           className="border-fog text-ink inline-flex min-h-12 items-center justify-center rounded-lg border px-5 text-sm font-medium"

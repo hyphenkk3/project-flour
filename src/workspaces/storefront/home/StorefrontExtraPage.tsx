@@ -12,7 +12,7 @@ import {
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import { listStorefrontAvailableExtra } from "@/workspaces/storefront/extra/queries";
 import { FreshPickCartShell } from "@/workspaces/storefront/extra/FreshPickCartShell";
-import Link from "next/link";
+import { FreshPickCatalogueAddCta } from "@/workspaces/storefront/extra/FreshPickCatalogueAddCta";
 
 export const dynamic = "force-dynamic";
 
@@ -76,12 +76,12 @@ export async function StorefrontExtraPage() {
                           {formatRm(pick.unitPrice)}
                         </p>
                       ) : null}
-                      <Link
-                        className="bg-ink text-mist hover:bg-skyline mt-6 inline-flex min-h-11 w-fit items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200"
+                      <FreshPickCatalogueAddCta
+                        extraStockId={pick.id}
                         href={`/extra/${pick.id}`}
                       >
                         {FRESH_PICKS_ADD_TO_CART_CTA}
-                      </Link>
+                      </FreshPickCatalogueAddCta>
                     </div>
                     <div className="bg-fog relative order-1 aspect-[4/3] overflow-hidden rounded-[10px] md:order-2 md:aspect-auto md:h-[12rem]">
                       {pick.imageUrl ? (

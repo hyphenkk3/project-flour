@@ -171,6 +171,15 @@ export function freshPickCartHasItems(cart: FreshPickCart | null): boolean {
   return Boolean(cart && cart.items.length > 0);
 }
 
+export function freshPickCartHasExtra(
+  cart: FreshPickCart | null | undefined,
+  extraStockId: string,
+): boolean {
+  const id = extraStockId.trim();
+  if (!id || !cart) return false;
+  return cart.items.some((item) => item.extraStockId === id);
+}
+
 export function freshPickCartCount(cart: FreshPickCart | null): number {
   return cart?.items.length ?? 0;
 }

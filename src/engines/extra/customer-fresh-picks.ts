@@ -88,6 +88,12 @@ export const FRESH_PICKS_ORDER_CTA = "Order this Fresh Pick";
 
 export const FRESH_PICKS_ADD_TO_CART_CTA = "Add to Cart";
 
+export const FRESH_PICKS_ADDED_TO_CART_CTA = "✓ Added to Cart";
+
+export function freshPickCartCtaLabel(inCart: boolean): string {
+  return inCart ? FRESH_PICKS_ADDED_TO_CART_CTA : FRESH_PICKS_ADD_TO_CART_CTA;
+}
+
 export const FRESH_PICKS_ADDED_CONFIRMATION = "Added to your order.";
 
 export const FRESH_PICKS_ALREADY_IN_CART =

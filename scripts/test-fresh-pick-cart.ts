@@ -9,8 +9,10 @@ import {
   extraCartItemUnavailableMessage,
   FRESH_PICKS_ADD_TO_CART_CTA,
   FRESH_PICKS_ADDED_CONFIRMATION,
+  FRESH_PICKS_ADDED_TO_CART_CTA,
   FRESH_PICKS_ALREADY_IN_CART,
   FRESH_PICKS_CART_PICKUP_MISMATCH,
+  freshPickCartCtaLabel,
 } from "@/engines/extra/customer-fresh-picks";
 import { EXTRA_SAME_DAY_PICKUP_LEAD_MS } from "@/engines/extra/extra-pickup";
 import {
@@ -19,6 +21,7 @@ import {
   extraIsValidForCartPickup,
   FRESH_PICK_CART_KEY,
   freshPickCartCount,
+  freshPickCartHasExtra,
   freshPickCartHasItems,
   freshPickCartTotal,
   parseFreshPickCart,
@@ -152,6 +155,138 @@ assert.equal(
   "Avocado is no longer available. Remove it from your order to continue.",
 );
 assert.equal(FRESH_PICKS_ADD_TO_CART_CTA, "Add to Cart");
+assert.equal(FRESH_PICKS_ADDED_TO_CART_CTA, "✓ Added to Cart");
+assert.equal(freshPickCartCtaLabel(false), "Add to Cart");
+assert.equal(freshPickCartCtaLabel(true), "✓ Added to Cart");
+assert.equal(
+  freshPickCartHasExtra(null, avocadoA.extraStockId),
+  false,
+  "exact unit not in cart",
+);
+assert.equal(
+  freshPickCartCtaLabel(freshPickCartHasExtra(null, avocadoA.extraStockId)),
+  FRESH_PICKS_ADD_TO_CART_CTA,
+);
+assert.equal(
+  freshPickCartHasExtra(first.ok ? first.cart : null, avocadoA.extraStockId),
+  true,
+  "exact unit in cart",
+);
+assert.equal(
+  freshPickCartCtaLabel(
+    freshPickCartHasExtra(first.ok ? first.cart : null, avocadoA.extraStockId),
+  ),
+  FRESH_PICKS_ADDED_TO_CART_CTA,
+);
+assert.equal(
+  freshPickCartHasExtra(first.ok ? first.cart : null, avocadoB.extraStockId),
+  false,
+  "identical second unit stays Add to Cart",
+);
+assert.equal(
+  freshPickCartCtaLabel(
+    freshPickCartHasExtra(first.ok ? first.cart : null, avocadoB.extraStockId),
+  ),
+  FRESH_PICKS_ADD_TO_CART_CTA,
+);
+assert.equal(
+  freshPickCartHasExtra(
+    twoAvocados.ok ? twoAvocados.cart : null,
+    avocadoA.extraStockId,
+  ),
+  true,
+);
+assert.equal(
+  freshPickCartHasExtra(
+    twoAvocados.ok ? twoAvocados.cart : null,
+    avocadoB.extraStockId,
+  ),
+  true,
+  "both exact units added",
+);
+assert.equal(
+  freshPickCartCtaLabel(
+    freshPickCartHasExtra(
+      twoAvocados.ok ? twoAvocados.cart : null,
+      avocadoA.extraStockId,
+    ),
+  ),
+  FRESH_PICKS_ADDED_TO_CART_CTA,
+);
+assert.equal(
+  freshPickCartCtaLabel(
+    freshPickCartHasExtra(
+      twoAvocados.ok ? twoAvocados.cart : null,
+      avocadoB.extraStockId,
+    ),
+  ),
+  FRESH_PICKS_ADDED_TO_CART_CTA,
+);
+
+const removedOne = removeFreshPickFromCart(
+  twoAvocados.ok ? twoAvocados.cart : cart,
+  avocadoA.extraStockId,
+);
+assert.equal(
+  freshPickCartHasExtra(removedOne, avocadoA.extraStockId),
+  false,
+  "removed exact unit returns to Add to Cart",
+);
+assert.equal(
+  freshPickCartCtaLabel(freshPickCartHasExtra(removedOne, avocadoA.extraStockId)),
+  FRESH_PICKS_ADD_TO_CART_CTA,
+);
+assert.equal(
+  freshPickCartHasExtra(removedOne, avocadoB.extraStockId),
+  true,
+  "sibling unit stays Added to Cart",
+);
+assert.equal(
+  freshPickCartCtaLabel(freshPickCartHasExtra(removedOne, avocadoB.extraStockId)),
+  FRESH_PICKS_ADDED_TO_CART_CTA,
+);
+
+const sessionPayload = JSON.stringify({
+  pickupDate: "2026-09-09",
+  pickupTime: "14:00",
+  items: [
+    {
+      extraStockId: "extra-avocado-a",
+      cakeName: "Avocado",
+      sizeLabel: '6"',
+      unitPrice: 90,
+      pickupDate: "2026-09-09",
+      pickupTime: "14:00",
+    },
+    {
+      extraStockId: "extra-avocado-b",
+      cakeName: "Avocado",
+      sizeLabel: '6"',
+      unitPrice: 90,
+      pickupDate: "2026-09-09",
+      pickupTime: "14:00",
+    },
+  ],
+});
+const hydrated = parseFreshPickCart(JSON.parse(sessionPayload) as unknown);
+assert.equal(
+  freshPickCartCtaLabel(
+    freshPickCartHasExtra(hydrated, "extra-avocado-a"),
+  ),
+  FRESH_PICKS_ADDED_TO_CART_CTA,
+  "sessionStorage hydration restores Added to Cart",
+);
+assert.equal(
+  freshPickCartCtaLabel(
+    freshPickCartHasExtra(hydrated, "extra-avocado-b"),
+  ),
+  FRESH_PICKS_ADDED_TO_CART_CTA,
+);
+assert.equal(
+  freshPickCartCtaLabel(freshPickCartHasExtra(hydrated, "extra-peanut-c")),
+  FRESH_PICKS_ADD_TO_CART_CTA,
+);
+
 assert.equal(FRESH_PICKS_ADDED_CONFIRMATION, "Added to your order.");
 assert.equal(EXTRA_SAME_DAY_PICKUP_LEAD_MS, 60 * 60 * 1000);
 
@@ -191,6 +326,9 @@ const successSrc = readSrc(
 );
 
 assert.match(extraFormSrc, /FRESH_PICKS_ADD_TO_CART_CTA/);
+assert.match(extraFormSrc, /FRESH_PICKS_ADDED_TO_CART_CTA/);
+assert.match(extraFormSrc, /useFreshPickCart/);
+assert.match(extraFormSrc, /freshPickCartHasExtra/);
 assert.match(extraFormSrc, /addFreshPickToCart/);
 assert.match(extraFormSrc, /writeFreshPickCart/);
 assert.doesNotMatch(extraFormSrc, /submitGuestExtraOrderAction/);
@@ -221,6 +359,21 @@ assert.match(extraQueriesSrc, /\.is\("sold_at", null\)/);
 
 assert.match(extraPageSrc, /FreshPickCartShell/);
 assert.match(extraPageSrc, /FRESH_PICKS_ADD_TO_CART_CTA/);
+assert.match(extraPageSrc, /FreshPickCatalogueAddCta/);
+assert.match(extraPageSrc, /extraStockId=\{pick\.id\}/);
+assert.doesNotMatch(extraPageSrc, /1 left/);
+assert.doesNotMatch(extraPageSrc, /2 available/);
+assert.doesNotMatch(extraPageSrc, /units available/i);
+
+const catalogueCtaSrc = readSrc(
+  "src/workspaces/storefront/extra/FreshPickCatalogueAddCta.tsx",
+);
+assert.match(catalogueCtaSrc, /useFreshPickCart/);
+assert.match(catalogueCtaSrc, /freshPickCartHasExtra/);
+assert.match(catalogueCtaSrc, /FRESH_PICKS_ADDED_TO_CART_CTA/);
+assert.match(catalogueCtaSrc, /extraStockId/);
+assert.doesNotMatch(catalogueCtaSrc, /sold_at/);
+assert.doesNotMatch(catalogueCtaSrc, /production_capacity/);
 assert.match(extraOrderPageSrc, /FreshPickCartShell/);
 assert.doesNotMatch(extraPageSrc, /StorefrontCartShell/);
 assert.doesNotMatch(extraOrderPageSrc, /StorefrontCartShell/);
