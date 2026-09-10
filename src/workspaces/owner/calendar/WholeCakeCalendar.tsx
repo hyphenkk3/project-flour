@@ -34,6 +34,8 @@ import { CalendarMonthHeader } from "@/workspaces/owner/calendar/CalendarMonthHe
 import { CalendarQuickView } from "@/workspaces/owner/calendar/CalendarQuickView";
 import { CalendarExtraActionDialog } from "@/workspaces/owner/calendar/CalendarExtraActionDialog";
 import { AssignExtraToOrderDialog } from "@/workspaces/extra/AssignExtraToOrderDialog";
+import { CutExtraIntoSlicesDialog } from "@/workspaces/extra/CutExtraIntoSlicesDialog";
+import { MoveExtraWindowDialog } from "@/workspaces/extra/MoveExtraWindowDialog";
 import {
   buildMonthDateColumns,
   buildMonthGrid,
@@ -76,6 +78,12 @@ type WholeCakeCalendarProps = {
   canMutateCalendarOrderActions?: boolean;
   /** Bakery / Manager / Owner may assign a Fresh Pick to an existing order. */
   canAssignExtraToOrder?: boolean;
+  /** Bakery / Manager / Owner may move a confirmed Fresh Pick window. */
+  canMoveExtraWindow?: boolean;
+  /** Bakery / Manager / Owner may cut a confirmed Fresh Pick into slices. */
+  canCutExtraIntoSlices?: boolean;
+  /** Bakery / Manager / Owner may undo a mistaken Fresh Pick confirmation. */
+  canUnconfirmExtra?: boolean;
 };
 
 type OrderRowPayload = {
@@ -114,6 +122,9 @@ export function WholeCakeCalendar({
   canMarkReady = false,
   canMutateCalendarOrderActions = false,
   canAssignExtraToOrder = false,
+  canMoveExtraWindow = false,
+  canCutExtraIntoSlices = false,
+  canUnconfirmExtra = false,
 }: WholeCakeCalendarProps) {
   const [entries, setEntries] = useState(initialEntries);
   const [extras, setExtras] = useState(initialExtras);
@@ -124,6 +135,12 @@ export function WholeCakeCalendar({
   );
   const [assigningExtra, setAssigningExtra] =
     useState<CalendarExtraMarker | null>(null);
+  const [movingExtra, setMovingExtra] = useState<CalendarExtraMarker | null>(
+    null,
+  );
+  const [slicingExtra, setSlicingExtra] = useState<CalendarExtraMarker | null>(
+    null,
+  );
   const quickViewOrderIdRef = useRef<string | null>(null);
   quickViewOrderIdRef.current = quickViewOrderId;
   const todayYmd = singaporeTodayParts().ymd;
@@ -165,6 +182,8 @@ export function WholeCakeCalendar({
 
   const openExtra = useCallback((extra: CalendarExtraMarker) => {
     setAssigningExtra(null);
+    setMovingExtra(null);
+    setSlicingExtra(null);
     setSelectedExtra(extra);
   }, []);
 
@@ -427,12 +446,27 @@ export function WholeCakeCalendar({
       />
       <CalendarExtraActionDialog
         canAssignExtraToOrder={canAssignExtraToOrder}
+        canCutExtraIntoSlices={canCutExtraIntoSlices}
+        canMoveExtraWindow={canMoveExtraWindow}
+        canUnconfirmExtra={canUnconfirmExtra}
         extra={selectedExtra}
         onAssignToOrder={(extra) => {
           setSelectedExtra(null);
           setAssigningExtra(extra);
         }}
         onClose={() => setSelectedExtra(null)}
+        onCutIntoSlices={(extra) => {
+          setSelectedExtra(null);
+          setSlicingExtra(extra);
+        }}
+        onMoveWindow={(extra) => {
+          setSelectedExtra(null);
+          setMovingExtra(extra);
+        }}
+        onUnconfirmed={() => {
+          setSelectedExtra(null);
+          void refreshExtrasOnly();
+        }}
       />
       <AssignExtraToOrderDialog
         candidateOrders={assignExtraCandidates}
@@ -443,6 +477,25 @@ export function WholeCakeCalendar({
         }}
         onClose={() => setAssigningExtra(null)}
         open={assigningExtra != null}
+      />
+      <MoveExtraWindowDialog
+        extra={movingExtra}
+        onClose={() => setMovingExtra(null)}
+        onMoved={() => {
+          setMovingExtra(null);
+          void refreshExtrasOnly();
+        }}
+        open={movingExtra != null}
+        todayYmd={todayYmd}
+      />
+      <CutExtraIntoSlicesDialog
+        extra={slicingExtra}
+        onClose={() => setSlicingExtra(null)}
+        onCut={() => {
+          setSlicingExtra(null);
+          void refreshExtrasOnly();
+        }}
+        open={slicingExtra != null}
       />
     </div>
   );

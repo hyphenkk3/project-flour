@@ -93,33 +93,40 @@ assert.doesNotMatch(
 
 assert.equal(timelineEventLabel("extra_assigned"), "Fresh Pick assigned");
 
-const unsoldMarker = mapExtraStockRowToCalendarMarker({
-  id: "extra-a",
-  cake_name: "Avocado",
-  size_label: '6"',
-  lifecycle: "confirmed",
-  prepared_on: "2026-09-09",
-  pickup_available_from_at: "2026-09-09T04:00:00.000Z",
-  pickup_through_at: "2026-09-10T10:00:00.000Z",
-  library_cake_id: null,
-  library_cake_size_id: null,
-  sold_at: null,
-});
+const calendarNow = new Date("2026-09-09T06:00:00.000Z");
+const unsoldMarker = mapExtraStockRowToCalendarMarker(
+  {
+    id: "extra-a",
+    cake_name: "Avocado",
+    size_label: '6"',
+    lifecycle: "confirmed",
+    prepared_on: "2026-09-09",
+    pickup_available_from_at: "2026-09-09T04:00:00.000Z",
+    pickup_through_at: "2026-09-10T10:00:00.000Z",
+    library_cake_id: null,
+    library_cake_size_id: null,
+    sold_at: null,
+  },
+  calendarNow,
+);
 assert.ok(unsoldMarker);
 assert.equal(unsoldMarker!.id, "extra-a");
 
-const twinSold = mapExtraStockRowToCalendarMarker({
-  id: "extra-b",
-  cake_name: "Avocado",
-  size_label: '6"',
-  lifecycle: "confirmed",
-  prepared_on: "2026-09-09",
-  pickup_available_from_at: "2026-09-09T04:00:00.000Z",
-  pickup_through_at: "2026-09-10T10:00:00.000Z",
-  library_cake_id: null,
-  library_cake_size_id: null,
-  sold_at: "2026-09-09T08:00:00.000Z",
-});
+const twinSold = mapExtraStockRowToCalendarMarker(
+  {
+    id: "extra-b",
+    cake_name: "Avocado",
+    size_label: '6"',
+    lifecycle: "confirmed",
+    prepared_on: "2026-09-09",
+    pickup_available_from_at: "2026-09-09T04:00:00.000Z",
+    pickup_through_at: "2026-09-10T10:00:00.000Z",
+    library_cake_id: null,
+    library_cake_size_id: null,
+    sold_at: "2026-09-09T08:00:00.000Z",
+  },
+  calendarNow,
+);
 assert.equal(twinSold, null, "identical twin Extra sold independently");
 
 for (const role of ["bakery", "manager", "owner"] as const) {
@@ -178,6 +185,8 @@ assert.match(extraBoardQueries, /assignedOrderNumber: linked\.order_number/);
 const boardSrc = readSrc("src/workspaces/extra/ExtraBoard.tsx");
 assert.match(boardSrc, /Assign to order/);
 assert.match(boardSrc, /AssignExtraToOrderDialog/);
+assert.match(boardSrc, /MoveExtraWindowDialog/);
+assert.match(boardSrc, /CutExtraIntoSlicesDialog/);
 assert.match(boardSrc, /Move pickup window/);
 assert.match(boardSrc, /Cut into slices/);
 assert.match(boardSrc, /Stop Fresh Pick availability/);

@@ -813,12 +813,33 @@ assert.match(boardSrc, /Pickup available from/);
 assert.match(boardSrc, /Orders available through/);
 assert.match(boardSrc, /Confirm Available/);
 assert.match(boardSrc, /Undo availability/);
-assert.match(boardSrc, /extraOrderCutoffDateOptions/);
+assert.match(boardSrc, /ExtraWindowFields/);
 assert.match(boardSrc, /formatExtraBoardWindowInstant/);
 assert.doesNotMatch(boardSrc, /Asia\/Singapore/);
 assert.doesNotMatch(boardSrc, /Singapore time/);
 assert.doesNotMatch(boardSrc, /\bSGT\b/);
 assert.doesNotMatch(boardSrc, /formatExtraPickupThroughClock/);
+
+const windowFieldsSrc = readFileSync(
+  resolve(process.cwd(), "src/workspaces/extra/ExtraWindowFields.tsx"),
+  "utf8",
+);
+assert.match(windowFieldsSrc, /extraOrderCutoffDateOptions/);
+assert.match(windowFieldsSrc, /Pickup available from/);
+assert.match(windowFieldsSrc, /Orders available through/);
+assert.match(
+  windowFieldsSrc,
+  /Order cutoff is the last time a new customer may place an order/,
+);
+assert.match(windowFieldsSrc, /Pickup times follow bakery hours/);
+assert.doesNotMatch(windowFieldsSrc, /pickup through/i);
+assert.equal(/datetime-local/.test(windowFieldsSrc), false);
+assert.equal(/EXTRA_THROUGH_SLOTS/.test(windowFieldsSrc), false);
+assert.doesNotMatch(windowFieldsSrc, /11:30 PM/);
+assert.doesNotMatch(boardSrc, /pickup through/i);
+assert.equal(/datetime-local/.test(boardSrc), false);
+assert.equal(/EXTRA_THROUGH_SLOTS/.test(boardSrc), false);
+assert.doesNotMatch(boardSrc, /11:30 PM/);
 
 const extraTimeSrc = readFileSync(
   resolve(process.cwd(), "src/engines/extra/fresh-picks-time.ts"),
@@ -827,12 +848,6 @@ const extraTimeSrc = readFileSync(
 assert.match(extraTimeSrc, /formatExtraBoardWindowInstant/);
 assert.match(extraTimeSrc, /Malaysia time/);
 assert.match(extraTimeSrc, /timeZone: "Asia\/Singapore"/);
-assert.match(boardSrc, /Order cutoff is the last time a new customer may place an order/);
-assert.match(boardSrc, /Pickup times follow bakery hours/);
-assert.doesNotMatch(boardSrc, /pickup through/i);
-assert.equal(/datetime-local/.test(boardSrc), false);
-assert.equal(/EXTRA_THROUGH_SLOTS/.test(boardSrc), false);
-assert.doesNotMatch(boardSrc, /11:30 PM/);
 
 const extraPageSrc = readFileSync(
   resolve(process.cwd(), "src/workspaces/storefront/home/StorefrontExtraPage.tsx"),

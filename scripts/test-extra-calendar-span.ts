@@ -222,6 +222,101 @@ assert.equal(mappedSliced, null, "sliced Extra is not an active calendar marker"
 
 assert.ok(matrixRowHasContent(matrixTwo[0]!));
 
+const chocolateOrder = {
+  kind: "order" as const,
+  id: "ord-damour",
+  pickupDate: "2026-09-10",
+  pickupTime: "15:00:00",
+  fulfilmentMethod: "pickup" as const,
+  customerName: "Mei",
+  displayName: "Mei",
+  status: "paid" as const,
+  needsBakeryAttention: false,
+  hasEffectiveRm10: false,
+  readyAt: null,
+  pickedUpAt: null,
+  outForDeliveryAt: null,
+  deliveredAt: null,
+  items: [
+    {
+      id: "item-8",
+      cakeName: "Chocolate D'Amour",
+      sizeLabel: '8"',
+      quantity: 1,
+    },
+    {
+      id: "item-4",
+      cakeName: "Chocolate D'Amour",
+      sizeLabel: '4"',
+      quantity: 1,
+    },
+  ],
+};
+const damourMatrix = buildCalendarMatrix(
+  [chocolateOrder],
+  ["2026-09-10"],
+  [
+    marker({
+      id: "extra-4",
+      cakeName: "Chocolate D'Amour",
+      sizeLabel: '4"',
+      validFromYmd: "2026-09-10",
+      validToYmd: "2026-09-10",
+    }),
+    marker({
+      id: "extra-8",
+      cakeName: "Chocolate D'Amour",
+      sizeLabel: '8"',
+      validFromYmd: "2026-09-10",
+      validToYmd: "2026-09-10",
+    }),
+  ],
+);
+assert.equal(
+  damourMatrix.length,
+  2,
+  "one 4\" + one 8\" is two matrix rows, not four",
+);
+assert.equal(
+  damourMatrix.filter((row) => row.sizeLabel === '4"').length,
+  1,
+);
+assert.equal(
+  damourMatrix.filter((row) => row.sizeLabel === '8"').length,
+  1,
+);
+assert.equal(damourMatrix[0]!.extraSpans.length, 1);
+assert.equal(damourMatrix[1]!.extraSpans.length, 1);
+assert.notEqual(
+  damourMatrix[0]!.extraSpans[0]!.extra.id,
+  damourMatrix[1]!.extraSpans[0]!.extra.id,
+);
+
+const twinExtras = buildCalendarMatrix(
+  [],
+  ["2026-09-10"],
+  [
+    marker({
+      id: "extra-twin-a",
+      cakeName: "Salted Peanut",
+      sizeLabel: '6"',
+      validFromYmd: "2026-09-10",
+      validToYmd: "2026-09-10",
+    }),
+    marker({
+      id: "extra-twin-b",
+      cakeName: "Salted Peanut",
+      sizeLabel: '6"',
+      validFromYmd: "2026-09-10",
+      validToYmd: "2026-09-10",
+    }),
+  ],
+);
+assert.equal(twinExtras.length, 1);
+assert.equal(twinExtras[0]!.extraSpans.length, 2);
+assert.equal(twinExtras[0]!.extraSpans[0]!.extra.id, "extra-twin-a");
+assert.equal(twinExtras[0]!.extraSpans[1]!.extra.id, "extra-twin-b");
+
 const matrixViewSrc = readFileSync(
   resolve(process.cwd(), "src/workspaces/owner/calendar/CalendarMatrixView.tsx"),
   "utf8",
@@ -229,6 +324,13 @@ const matrixViewSrc = readFileSync(
 assert.match(matrixViewSrc, /Fresh Pick/);
 assert.match(matrixViewSrc, /extraCalendarBadgeStatus/);
 assert.doesNotMatch(matrixViewSrc, />EXTRA</);
+const extraSpanFn = matrixViewSrc.slice(
+  matrixViewSrc.indexOf("function renderExtraSpanRow"),
+  matrixViewSrc.indexOf("export function CalendarMatrixView"),
+);
+assert.match(extraSpanFn, />Fresh Pick</);
+assert.doesNotMatch(extraSpanFn, /\{row\.cakeName\}/);
+assert.doesNotMatch(extraSpanFn, /\{row\.sizeLabel\}/);
 
 const queriesSrc = readFileSync(
   resolve(process.cwd(), "src/workspaces/owner/calendar/queries.ts"),

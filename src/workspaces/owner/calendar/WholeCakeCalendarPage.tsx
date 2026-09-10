@@ -81,6 +81,9 @@ export async function WholeCakeCalendarPage({
         canMarkReady={canMarkReady}
         canMutateCalendarOrderActions={canMutateCalendarOrderActions}
         canAssignExtraToOrder={extraCapabilities.canAssignExtraToOrder}
+        canCutExtraIntoSlices={extraCapabilities.canCutExtraIntoSlices}
+        canMoveExtraWindow={extraCapabilities.canMoveExtraWindow}
+        canUnconfirmExtra={extraCapabilities.canUnconfirmExtra}
         canOperateOrderActions={canOperateOrderActions}
         focusToday={focusToday}
         initialEntries={entries}

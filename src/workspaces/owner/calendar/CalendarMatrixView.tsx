@@ -231,8 +231,7 @@ function renderExtraSpanRow(
             width: LABEL_COL_WIDTH,
           }}
         >
-          <span className="block leading-snug">{row.cakeName}</span>
-          <span className="block leading-snug">{row.sizeLabel}</span>
+          <span className="block leading-snug">Fresh Pick</span>
         </th>
         {cells}
       </tr>

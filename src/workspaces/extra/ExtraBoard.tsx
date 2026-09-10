@@ -9,32 +9,30 @@ import { formatLongBusinessDate } from "@/lib/dates";
 import type { ExtraWorkspaceCapabilities } from "@/engines/extra/capabilities";
 import { isBakeryExtraProposalActionable } from "@/engines/extra/availability";
 import {
-  clampExtraOrderCutoffDate,
-  defaultExtraOrderCutoffSlot,
-  defaultExtraPickupFromSlot,
   evaluateExtraConfirm,
   extraAvailabilityDayLabel,
-  extraFreshPickDates,
   extraFreshPickDay,
   formatExtraBoardWindowInstant,
-  extraOrderCutoffDateOptions,
-  extraOrderCutoffSlotsForDate,
-  extraPickupFromSlotsForDate,
-  extraPickupThroughIso,
   EXTRA_NO_TODAY_SLOTS_LEFT,
   EXTRA_THROUGH_SLOT_REQUIRED,
 } from "@/engines/extra/fresh-picks-eligibility";
 import {
   confirmExtraStockAction,
   createConfirmedExtraStockAction,
-  cutExtraStockIntoSlicesAction,
-  moveExtraStockWindowAction,
   proposeExtraStockAction,
   rejectExtraStockAction,
   unconfirmExtraStockAction,
   undoRejectExtraStockAction,
 } from "@/workspaces/extra/actions";
 import { AssignExtraToOrderDialog } from "@/workspaces/extra/AssignExtraToOrderDialog";
+import { CutExtraIntoSlicesDialog } from "@/workspaces/extra/CutExtraIntoSlicesDialog";
+import { ExtraWindowFields } from "@/workspaces/extra/ExtraWindowFields";
+import { MoveExtraWindowDialog } from "@/workspaces/extra/MoveExtraWindowDialog";
+import {
+  initialExtraWindow,
+  nextExtraWindow,
+  type ExtraWindowDraft,
+} from "@/workspaces/extra/extra-window";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
 
 type ExtraBoardProps = {
@@ -45,42 +43,6 @@ type ExtraBoardProps = {
   todayYmd: string;
 };
 
-type WindowDraft = {
-  pickupFromDate: string;
-  pickupFromSlot: string;
-  cutoffDate: string;
-  cutoffSlot: string;
-};
-
-function initialWindow(todayYmd: string, preparedOn?: string | null): WindowDraft {
-  const locked = extraFreshPickDay(preparedOn ?? null, todayYmd);
-  const pickupFromDate = locked && preparedOn ? preparedOn : todayYmd;
-  const pickupFromSlot =
-    defaultExtraPickupFromSlot({ pickupFromDate, todayYmd }) ?? "";
-  const fromIso = extraPickupThroughIso(pickupFromDate, pickupFromSlot);
-  const cutoffDate = todayYmd;
-  let cutoffSlot =
-    defaultExtraOrderCutoffSlot({
-      cutoffDate,
-      todayYmd,
-      notBeforeIso: fromIso ?? undefined,
-    }) ?? "";
-  if (!cutoffSlot && extraFreshPickDates(todayYmd).tomorrow) {
-    return {
-      pickupFromDate,
-      pickupFromSlot,
-      cutoffDate: extraFreshPickDates(todayYmd).tomorrow!,
-      cutoffSlot:
-        defaultExtraOrderCutoffSlot({
-          cutoffDate: extraFreshPickDates(todayYmd).tomorrow!,
-          todayYmd,
-          notBeforeIso: fromIso ?? undefined,
-        }) ?? "",
-    };
-  }
-  return { pickupFromDate, pickupFromSlot, cutoffDate, cutoffSlot };
-}
-
 export function ExtraBoard({
   units,
   cakes,
@@ -88,7 +50,6 @@ export function ExtraBoard({
   initialMode = "create",
   todayYmd,
 }: ExtraBoardProps) {
-  const dates = extraFreshPickDates(todayYmd);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"propose" | "create">(
@@ -107,7 +68,7 @@ export function ExtraBoard({
   );
   const [movingUnit, setMovingUnit] = useState<ExtraStockUnit | null>(null);
   const [slicingUnit, setSlicingUnit] = useState<ExtraStockUnit | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, WindowDraft>>({});
+  const [drafts, setDrafts] = useState<Record<string, ExtraWindowDraft>>({});
 
   const proposed = useMemo(
     () => units.filter((u) => isBakeryExtraProposalActionable(u)),
@@ -157,8 +118,8 @@ export function ExtraBoard({
     selectedCake?.sizes[0];
 
   const [preparedOn, setPreparedOn] = useState(todayYmd);
-  const [createWindow, setCreateWindow] = useState<WindowDraft>(() =>
-    initialWindow(todayYmd),
+  const [createWindow, setCreateWindow] = useState<ExtraWindowDraft>(() =>
+    initialExtraWindow(todayYmd),
   );
   const [note, setNote] = useState("");
 
@@ -168,19 +129,19 @@ export function ExtraBoard({
     setSizeId(cake?.sizes[0]?.id ?? "");
   }
 
-  function patchCreateWindow(patch: Partial<WindowDraft>) {
-    setCreateWindow((prev) => nextWindow(prev, patch, todayYmd));
+  function patchCreateWindow(patch: Partial<ExtraWindowDraft>) {
+    setCreateWindow((prev) => nextExtraWindow(prev, patch, todayYmd));
   }
 
-  function draftFor(unit: ExtraStockUnit): WindowDraft {
-    return drafts[unit.id] ?? initialWindow(todayYmd, unit.preparedOn);
+  function draftFor(unit: ExtraStockUnit): ExtraWindowDraft {
+    return drafts[unit.id] ?? initialExtraWindow(todayYmd, unit.preparedOn);
   }
 
-  function patchDraft(unitId: string, patch: Partial<WindowDraft>) {
+  function patchDraft(unitId: string, patch: Partial<ExtraWindowDraft>) {
     setDrafts((prev) => {
       const unit = units.find((row) => row.id === unitId);
-      const base = prev[unitId] ?? initialWindow(todayYmd, unit?.preparedOn);
-      return { ...prev, [unitId]: nextWindow(base, patch, todayYmd) };
+      const base = prev[unitId] ?? initialExtraWindow(todayYmd, unit?.preparedOn);
+      return { ...prev, [unitId]: nextExtraWindow(base, patch, todayYmd) };
     });
   }
 
@@ -226,7 +187,7 @@ export function ExtraBoard({
       if (result.error) setError(result.error);
       else {
         setNote("");
-        setCreateWindow(initialWindow(todayYmd));
+        setCreateWindow(initialExtraWindow(todayYmd));
       }
     });
   }
@@ -309,44 +270,6 @@ export function ExtraBoard({
   function openAssign(unit: ExtraStockUnit) {
     setError(null);
     setAssigningUnit(unit);
-  }
-
-  function runMove() {
-    if (!movingUnit) return;
-    const draft = draftFor(movingUnit);
-    const decision = evaluateExtraConfirm({
-      pickupFromDate: draft.pickupFromDate,
-      pickupFromSlot: draft.pickupFromSlot,
-      cutoffDate: draft.cutoffDate,
-      cutoffSlot: draft.cutoffSlot,
-      todayYmd,
-    });
-    if (!decision.ok) {
-      setError(decision.error);
-      return;
-    }
-    setError(null);
-    startTransition(async () => {
-      const result = await moveExtraStockWindowAction({
-        extraStockId: movingUnit.id,
-        pickupFromDate: decision.pickupFromDate,
-        pickupFromSlot: decision.pickupFromSlot,
-        cutoffDate: decision.cutoffDate,
-        cutoffSlot: decision.cutoffSlot,
-      });
-      if (result.error) setError(result.error);
-      else setMovingUnit(null);
-    });
-  }
-
-  function runCutIntoSlices() {
-    if (!slicingUnit) return;
-    setError(null);
-    startTransition(async () => {
-      const result = await cutExtraStockIntoSlicesAction(slicingUnit.id);
-      if (result.error) setError(result.error);
-      else setSlicingUnit(null);
-    });
   }
 
   const fieldClass =
@@ -446,8 +369,7 @@ export function ExtraBoard({
                 </select>
               </label>
               {mode === "create" ? (
-                <WindowFields
-                  dates={dates}
+                <ExtraWindowFields
                   disabled={pending}
                   fieldClass={fieldClass}
                   todayYmd={todayYmd}
@@ -541,8 +463,7 @@ export function ExtraBoard({
 
                   {capabilities.canConfirmExtra ? (
                     <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      <WindowFields
-                        dates={dates}
+                      <ExtraWindowFields
                         disabled={pending}
                         fieldClass={fieldClass}
                         todayYmd={todayYmd}
@@ -895,191 +816,20 @@ export function ExtraBoard({
         open={assigningUnit != null}
       />
 
-      <ConfirmDialog
-        allowDismiss={!pending}
-        confirmLabel="Move Fresh Pick"
-        description={
-          movingUnit
-            ? `Move ${movingUnit.cakeName} ${movingUnit.sizeLabel} to another valid Fresh Pick window. The same Extra record is kept.`
-            : undefined
-        }
-        onCancel={() => {
-          if (pending) return;
-          setMovingUnit(null);
-        }}
-        onConfirm={runMove}
+      <MoveExtraWindowDialog
+        extra={movingUnit}
+        onClose={() => setMovingUnit(null)}
+        onMoved={() => setMovingUnit(null)}
         open={movingUnit != null}
-        pending={pending}
-        title="Move pickup window"
-      >
-        {movingUnit ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <WindowFields
-              dates={dates}
-              disabled={pending}
-              fieldClass={fieldClass}
-              todayYmd={todayYmd}
-              value={draftFor(movingUnit)}
-              onChange={(patch) => patchDraft(movingUnit.id, patch)}
-            />
-          </div>
-        ) : null}
-      </ConfirmDialog>
+        todayYmd={todayYmd}
+      />
 
-      <ConfirmDialog
-        allowDismiss={!pending}
-        confirmLabel="Cut into slices"
-        description={
-          slicingUnit
-            ? `${slicingUnit.cakeName} ${slicingUnit.sizeLabel} will no longer be offered as a whole-cake Fresh Pick. No slice inventory is created.`
-            : undefined
-        }
-        onCancel={() => {
-          if (pending) return;
-          setSlicingUnit(null);
-        }}
-        onConfirm={runCutIntoSlices}
+      <CutExtraIntoSlicesDialog
+        extra={slicingUnit}
+        onClose={() => setSlicingUnit(null)}
+        onCut={() => setSlicingUnit(null)}
         open={slicingUnit != null}
-        pending={pending}
-        title="Cut into slices?"
-        tone="danger"
       />
     </main>
-  );
-}
-
-function nextWindow(
-  base: WindowDraft,
-  patch: Partial<WindowDraft>,
-  todayYmd: string,
-): WindowDraft {
-  const next = { ...base, ...patch };
-  if (patch.pickupFromDate && patch.pickupFromSlot == null) {
-    next.pickupFromSlot =
-      defaultExtraPickupFromSlot({
-        pickupFromDate: patch.pickupFromDate,
-        todayYmd,
-      }) ?? "";
-  }
-  if (patch.pickupFromDate && patch.cutoffDate == null) {
-    next.cutoffDate = clampExtraOrderCutoffDate(
-      next.pickupFromDate,
-      next.cutoffDate,
-    );
-  }
-  if (
-    patch.pickupFromDate ||
-    patch.pickupFromSlot ||
-    patch.cutoffDate
-  ) {
-    const fromIso = extraPickupThroughIso(
-      next.pickupFromDate,
-      next.pickupFromSlot,
-    );
-    if (patch.cutoffSlot == null) {
-      next.cutoffSlot =
-        defaultExtraOrderCutoffSlot({
-          cutoffDate: next.cutoffDate,
-          todayYmd,
-          notBeforeIso: fromIso ?? undefined,
-        }) ?? "";
-    }
-  }
-  return next;
-}
-
-function WindowFields({
-  value,
-  onChange,
-  dates,
-  todayYmd,
-  disabled,
-  fieldClass,
-}: {
-  value: WindowDraft;
-  onChange: (patch: Partial<WindowDraft>) => void;
-  dates: { today: string; tomorrow: string | null };
-  todayYmd: string;
-  disabled: boolean;
-  fieldClass: string;
-}) {
-  const pickupSlots = extraPickupFromSlotsForDate({
-    pickupFromDate: value.pickupFromDate,
-    todayYmd,
-  });
-  const cutoffDates = extraOrderCutoffDateOptions(
-    value.pickupFromDate,
-    todayYmd,
-  );
-  const cutoffSlots = extraOrderCutoffSlotsForDate({
-    cutoffDate: value.cutoffDate,
-    todayYmd,
-  });
-  return (
-    <>
-      <label className="block text-sm">
-        <span className="text-ink font-medium">Pickup available from</span>
-        <select
-          className={`${fieldClass} mt-1.5`}
-          disabled={disabled}
-          onChange={(e) => onChange({ pickupFromDate: e.target.value })}
-          value={value.pickupFromDate}
-        >
-          <option value={dates.today}>Today</option>
-          {dates.tomorrow ? (
-            <option value={dates.tomorrow}>Tomorrow</option>
-          ) : null}
-        </select>
-      </label>
-      <label className="block text-sm">
-        <span className="text-ink font-medium">Pickup from time</span>
-        <select
-          className={`${fieldClass} mt-1.5`}
-          disabled={disabled}
-          onChange={(e) => onChange({ pickupFromSlot: e.target.value })}
-          value={value.pickupFromSlot}
-        >
-          {pickupSlots.map((slot) => (
-            <option disabled={slot.disabled} key={slot.value} value={slot.value}>
-              {slot.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="block text-sm">
-        <span className="text-ink font-medium">Orders available through</span>
-        <select
-          className={`${fieldClass} mt-1.5`}
-          disabled={disabled}
-          onChange={(e) => onChange({ cutoffDate: e.target.value })}
-          value={value.cutoffDate}
-        >
-          {cutoffDates.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="block text-sm">
-        <span className="text-ink font-medium">Order cutoff time</span>
-        <select
-          className={`${fieldClass} mt-1.5`}
-          disabled={disabled}
-          onChange={(e) => onChange({ cutoffSlot: e.target.value })}
-          value={value.cutoffSlot}
-        >
-          {cutoffSlots.map((slot) => (
-            <option disabled={slot.disabled} key={slot.value} value={slot.value}>
-              {slot.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <p className="text-skyline sm:col-span-2 text-xs leading-relaxed">
-        Order cutoff is the last time a new customer may place an order.
-        Pickup times follow bakery hours and are not cut off at this time.
-      </p>
-    </>
   );
 }
