@@ -238,6 +238,8 @@ export function OrderWorkspaceForm({
     normalizePickupTimeValue(order.pickupTime),
   );
   const [pickupMonthOverride, setPickupMonthOverride] = useState(false);
+  const [postPaymentChangeOverride, setPostPaymentChangeOverride] =
+    useState(false);
   const [crossMonthReason, setCrossMonthReason] = useState("");
   const [crossMonthError, setCrossMonthError] = useState<string | null>(null);
   const [lateEditReason, setLateEditReason] = useState("");
@@ -699,6 +701,22 @@ export function OrderWorkspaceForm({
           />
           <p className="text-skyline text-sm">{order.orderNumber}</p>
         </div>
+        {order.status === "paid" &&
+        (order.postPaymentCustomerChangeCount ?? 0) >= 1 ? (
+          <p className="border-fog text-ink rounded-lg border bg-white px-4 py-3 text-sm">
+            The one-time post-payment customer change has been used
+            {order.postPaymentCustomerChangeUsedAt
+              ? ` (${formatLongBusinessDate(order.postPaymentCustomerChangeUsedAt.slice(0, 10))})`
+              : ""}
+            . Further customer changes or cancellation need Manager or Owner
+            override.
+          </p>
+        ) : order.status === "paid" ? (
+          <p className="text-skyline text-sm">
+            After payment, one customer change is allowed (usually pickup date).
+            Existing cake lines cannot be changed or removed.
+          </p>
+        ) : null}
 
         <OrderLifecycleActions
           capabilities={capabilities}
@@ -1654,6 +1672,28 @@ export function OrderWorkspaceForm({
       </section>
 
       <FormError message={state.error} />
+
+      {order.status === "paid" &&
+      capabilities.canOverridePostPaymentCustomerChange ? (
+        <label className="text-ink flex items-start gap-2 text-sm">
+          <input
+            checked={postPaymentChangeOverride}
+            className="mt-0.5"
+            name="post_payment_change_override"
+            onChange={(event) =>
+              setPostPaymentChangeOverride(event.target.checked)
+            }
+            type="checkbox"
+            value="1"
+          />
+          <span>
+            Manager/Owner override — allow a further post-payment customer
+            change
+          </span>
+        </label>
+      ) : (
+        <input name="post_payment_change_override" type="hidden" value="0" />
+      )}
 
       {blockDirectSave ? (
         <div className="border-status-warning/30 bg-status-warning-soft space-y-3 rounded-lg border px-4 py-3">

@@ -25,12 +25,18 @@ export function OrderLifecycleActions({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<"cancel" | "duplicate" | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelOverride, setCancelOverride] = useState(false);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [pickupDate, setPickupDate] = useState(order.pickupDate);
 
   const canCancel =
     capabilities.canCancelGuestOrder && !isGuestOrderCancelled(order.status);
   const canDuplicate = capabilities.canDuplicateGuestOrder;
+  const postPaymentChangeUsed =
+    order.status === "paid" &&
+    (order.postPaymentCustomerChangeCount ?? 0) >= 1;
+  const canOverridePostPayment =
+    capabilities.canOverridePostPaymentCustomerChange;
 
   if (!canCancel && !canDuplicate) {
     return null;
@@ -41,7 +47,10 @@ export function OrderLifecycleActions({
     setError(null);
     setPending("cancel");
     try {
-      const result = await cancelGuestOrderAction(order.id);
+      const result = await cancelGuestOrderAction(
+        order.id,
+        postPaymentChangeUsed && cancelOverride,
+      );
       if (result.error) {
         setError(result.error);
         return;
@@ -91,6 +100,7 @@ export function OrderLifecycleActions({
             className="border-status-danger/40 text-status-danger hover:bg-status-danger-soft inline-flex min-h-11 items-center justify-center rounded-xl border bg-white px-4 text-sm font-medium"
             onClick={() => {
               setError(null);
+              setCancelOverride(false);
               setCancelOpen(true);
             }}
             type="button"
@@ -106,14 +116,33 @@ export function OrderLifecycleActions({
       <ConfirmDialog
         cancelLabel="Keep order"
         confirmLabel="Cancel order"
-        description="The order and its history are kept. It cannot resume the normal lifecycle."
+        description={
+          postPaymentChangeUsed
+            ? "The one-time post-payment customer change has already been used. Normal cancellation is blocked. Manager or Owner override is required."
+            : "The order and its history are kept. It cannot resume the normal lifecycle."
+        }
         onCancel={() => setCancelOpen(false)}
         onConfirm={() => void runCancel()}
         open={cancelOpen}
         pending={pending === "cancel"}
         title="Cancel this order?"
         tone="danger"
-      />
+      >
+        {postPaymentChangeUsed && canOverridePostPayment ? (
+          <label className="text-ink flex items-start gap-2 text-sm">
+            <input
+              checked={cancelOverride}
+              className="mt-0.5"
+              onChange={(event) => setCancelOverride(event.target.checked)}
+              type="checkbox"
+            />
+            <span>
+              Manager/Owner override — cancel after the one-time post-payment
+              change
+            </span>
+          </label>
+        ) : null}
+      </ConfirmDialog>
 
       <ConfirmDialog
         cancelLabel="Back"

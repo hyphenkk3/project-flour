@@ -314,6 +314,11 @@ export type StorefrontOrder = {
   paymentAllocations: OrderPaymentAllocationView[];
   refunds: OrderRefundView[];
   settlement: OrderSettlement;
+  /** 0 unused; 1 = normal post-payment customer change consumed. */
+  postPaymentCustomerChangeCount: number;
+  postPaymentCustomerChangeUsedAt: string | null;
+  postPaymentChangeOverrideAt: string | null;
+  postPaymentChangeOverrideBy: string | null;
 };
 
 export type StorefrontOrderListItem = {
@@ -380,7 +385,9 @@ export type OrderTimelineEventType =
   | "operations_approval_requested"
   | "operations_approval_approved"
   | "operations_approval_rejected"
-  | "operations_approval_cancelled";
+  | "operations_approval_cancelled"
+  | "post_payment_customer_change"
+  | "post_payment_customer_change_override";
 
 export type OrderTimelineEvent = {
   id: string;

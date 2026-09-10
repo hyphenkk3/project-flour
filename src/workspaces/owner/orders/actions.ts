@@ -40,6 +40,11 @@ import {
 } from "@/engines/orders/lifecycle";
 import { reconcilePaymentLifecycleStatus } from "@/engines/orders/payment-status";
 import {
+  classifyPaidOrderSave,
+  decidePostPaymentCancel,
+  decidePostPaymentSave,
+} from "@/engines/orders/post-payment-customer-change";
+import {
   isValidDineInReservationPair,
   parseDineInVenue,
   parseGuestCount,
@@ -790,7 +795,90 @@ export async function saveOrderWorkspaceAction(
   }
   const finalItems = Array.from(consolidated.values());
 
+  const postPaymentOverride =
+    String(formData.get("post_payment_change_override") ?? "") === "1";
+  const classification = classifyPaidOrderSave(before, {
+    guestName,
+    guestPhone,
+    guestEmail,
+    pickupDate,
+    pickupTime,
+    customerNotes,
+    fulfilmentMethod,
+    deliveryKey:
+      fulfilmentMethod === "delivery"
+        ? [
+            deliveryDraft.recipientName,
+            deliveryDraft.recipientPhone,
+            deliveryDraft.addressLine1,
+            deliveryDraft.addressLine2,
+            deliveryDraft.postcode,
+            deliveryDraft.city,
+            deliveryDraft.state,
+          ].join("\u0000")
+        : "",
+    items: finalItems.map((item) => ({
+      cakeId: item.cakeId,
+      cakeSizeId: item.cakeSizeId,
+      quantity: item.quantity,
+    })),
+    complimentary: draftComplimentary.map((item) => ({
+      typeId: item.typeId,
+      name: item.name,
+      quantity: item.quantity,
+    })),
+    paidAddons: draftPaidAddons.map((item) => ({
+      code: item.code,
+      quantity: item.quantity,
+      messages: item.messages,
+    })),
+  });
+
+  if (pickupDate === before.pickupDate && classification.newCakeLineAdded) {
+    const addedCakeGuard = await assertStaffCollectionDateAllowed({
+      pickupDate,
+      fulfilmentMethod,
+      items: draftItems,
+      collectionId: before.collectionId,
+    });
+    if (addedCakeGuard.error) {
+      return { error: addedCakeGuard.error, success: false };
+    }
+  }
+
+  const postPaymentDecision = decidePostPaymentSave({
+    status: before.status,
+    changeCount: before.postPaymentCustomerChangeCount ?? 0,
+    role: staff.role.code,
+    override: postPaymentOverride,
+    classification,
+  });
+  if (
+    postPaymentDecision.action === "block_used" ||
+    postPaymentDecision.action === "block_cake_line" ||
+    postPaymentDecision.action === "block_override_role"
+  ) {
+    return { error: postPaymentDecision.error, success: false };
+  }
+
   const supabase = await createClient();
+
+  if (
+    postPaymentDecision.action === "consume" ||
+    postPaymentDecision.action === "override"
+  ) {
+    const { error: guardError } = await supabase.rpc(
+      "guard_post_payment_customer_change",
+      {
+        p_order_id: orderId,
+        p_actor_staff_id: staff.id,
+        p_override: postPaymentDecision.action === "override",
+      },
+    );
+    if (guardError) {
+      return { error: guardError.message, success: false };
+    }
+  }
 
   const { error: updateError } = await supabase
     .from("orders")
@@ -2416,6 +2504,7 @@ export async function resolveGuestOrderProcessingFeeRequestAction(
 
 export async function cancelGuestOrderAction(
   orderId: string,
+  override = false,
 ): Promise<{ error: string | null }> {
   const staff = await requireOwnerOrCustomerOperations();
   const order = await getGuestOrderById(orderId);
@@ -2435,11 +2524,21 @@ export async function cancelGuestOrderAction(
   if (!gate.ok) {
     return { error: gate.error };
   }
+  const postPaymentGate = decidePostPaymentCancel({
+    status: order.status,
+    changeCount: order.postPaymentCustomerChangeCount ?? 0,
+    role: staff.role.code,
+    override,
+  });
+  if (!postPaymentGate.ok) {
+    return { error: postPaymentGate.error };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("cancel_guest_order", {
     p_order_id: orderId,
     p_actor_staff_id: staff.id,
+    p_override: override,
   });
   if (error) {
     return { error: error.message };

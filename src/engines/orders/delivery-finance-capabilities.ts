@@ -101,6 +101,11 @@ export type GuestOrderWorkspaceCapabilities = {
   canDuplicateGuestOrder: boolean;
   /** Owner/Manager may mark Ready while payment is still pending. */
   canOverrideUnpaidReady: boolean;
+  /**
+   * Override the one-time post-payment customer change / cancellation lock
+   * (Owner or Manager). Customer Operations and Bakery cannot.
+   */
+  canOverridePostPaymentCustomerChange: boolean;
 };
 
 /** Roles that may open/view the shared Operations board. */
@@ -180,6 +185,7 @@ export function buildGuestOrderWorkspaceCapabilities(input: {
     canCancelGuestOrder: isRoutineOrderOperator,
     canDuplicateGuestOrder: isRoutineOrderOperator,
     canOverrideUnpaidReady: isOwner || isManager,
+    canOverridePostPaymentCustomerChange: isOwner || isManager,
   };
 }
 

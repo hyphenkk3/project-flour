@@ -67,6 +67,10 @@ type OrderRow = {
   payment_request_sent_at: string | null;
   rm10_card_issuance_suppressed: boolean | null;
   rm10_card_issuance_suppression_code: Rm10IssuanceSuppressionCode | null;
+  post_payment_customer_change_count?: number | null;
+  post_payment_customer_change_used_at?: string | null;
+  post_payment_change_override_at?: string | null;
+  post_payment_change_override_by?: string | null;
   order_delivery_details?:
     | {
         order_id: string;
@@ -302,6 +306,12 @@ function mapOrder(
     paymentAllocations,
     refunds,
     settlement,
+    postPaymentCustomerChangeCount:
+      Number(row.post_payment_customer_change_count ?? 0) || 0,
+    postPaymentCustomerChangeUsedAt:
+      row.post_payment_customer_change_used_at ?? null,
+    postPaymentChangeOverrideAt: row.post_payment_change_override_at ?? null,
+    postPaymentChangeOverrideBy: row.post_payment_change_override_by ?? null,
   };
 }
 
@@ -340,6 +350,10 @@ const orderSelect = `
   payment_request_sent_at,
   rm10_card_issuance_suppressed,
   rm10_card_issuance_suppression_code,
+  post_payment_customer_change_count,
+  post_payment_customer_change_used_at,
+  post_payment_change_override_at,
+  post_payment_change_override_by,
   order_delivery_details (
     order_id,
     recipient_name,

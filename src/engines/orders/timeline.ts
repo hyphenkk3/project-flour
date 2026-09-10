@@ -37,6 +37,8 @@ export const TIMELINE_EVENT_LABELS: Record<string, string> = {
   operations_approval_approved: "Approval approved",
   operations_approval_rejected: "Approval rejected",
   operations_approval_cancelled: "Approval cancelled",
+  post_payment_customer_change: "Post-payment customer change",
+  post_payment_customer_change_override: "Post-payment change override",
   delivery_finance_initialized: "Delivery charges enabled",
   delivery_fee_quoted: "Delivery fee quoted",
   delivery_fee_waived: "Delivery fee waived",

@@ -25,6 +25,13 @@ import {
   orderLifecycleLabel,
 } from "@/engines/orders/lifecycle";
 import {
+  POST_PAYMENT_CUSTOMER_CHANGE_ERRORS,
+  classifyPaidOrderSave,
+  decidePostPaymentCancel,
+  decidePostPaymentSave,
+} from "@/engines/orders/post-payment-customer-change";
+import { timelineEventLabel } from "@/engines/orders/timeline";
+import {
   matchesOperationsLifecycleFilter,
   matchesOperationsSearch,
   matchesOperationsStatusFilter,
@@ -191,6 +198,7 @@ assert.equal(co.canCancelGuestOrder, true);
 assert.equal(co.canDuplicateGuestOrder, true);
 assert.equal(co.canEditOrderWorkspace, true);
 assert.equal(co.canOverrideUnpaidReady, false);
+assert.equal(co.canOverridePostPaymentCustomerChange, false);
 assert.equal(
   canCompleteGuestOrder({
     snapshot: preparing,
@@ -204,6 +212,21 @@ assert.equal(
 // 15 Manager/Owner override
 assert.equal(canOverrideUnpaidReadyRole("owner"), true);
 assert.equal(canOverrideUnpaidReadyRole("manager"), true);
+assert.equal(
+  buildGuestOrderWorkspaceCapabilities({ role: "owner", staffId: "o1" })
+    .canOverridePostPaymentCustomerChange,
+  true,
+);
+assert.equal(
+  buildGuestOrderWorkspaceCapabilities({ role: "manager", staffId: "m1" })
+    .canOverridePostPaymentCustomerChange,
+  true,
+);
+assert.equal(
+  buildGuestOrderWorkspaceCapabilities({ role: "bakery", staffId: "b1" })
+    .canOverridePostPaymentCustomerChange,
+  false,
+);
 assert.equal(canOverrideCompleteBeforeReadyRole("owner"), true);
 assert.equal(
   canCompleteGuestOrder({
@@ -297,12 +320,244 @@ assert.match(
   /evaluateCollectionDate/,
 );
 
-// 24 post-payment one-time change columns remain unwired (not redesigned)
+// 24 post-payment one-time customer change is enforced
 const phase2Sql = read(
   "supabase/migrations/20260902120000_phase2_ordering_foundation.sql",
 );
 assert.match(phase2Sql, /post_payment_customer_change/);
-assert.doesNotMatch(actionsSrc, /post_payment_customer_change_/);
+const postPaymentSql = read(
+  "supabase/migrations/20260910120000_post_payment_customer_change_guard.sql",
+);
+assert.match(postPaymentSql, /guard_post_payment_customer_change/);
+assert.match(postPaymentSql, /for update/i);
+assert.match(postPaymentSql, /post_payment_customer_change_count = 1/);
+assert.match(postPaymentSql, /post_payment_change_override_at/);
+assert.match(postPaymentSql, /post_payment_change_override_by/);
+assert.match(postPaymentSql, /p_override boolean default false/);
+assert.match(actionsSrc, /guard_post_payment_customer_change/);
+assert.match(actionsSrc, /post_payment_change_override/);
+assert.match(actionsSrc, /decidePostPaymentSave/);
+assert.match(actionsSrc, /decidePostPaymentCancel/);
+assert.match(actionsSrc, /p_override: override/);
+assert.match(actionsSrc, /unitPrice: prior \? prior.unitPrice : size.price/);
+assert.match(
+  actionsSrc,
+  /classification.newCakeLineAdded/,
+);
+
+const workspaceSrc = read(
+  "src/workspaces/owner/orders/OrderWorkspaceForm.tsx",
+);
+assert.match(workspaceSrc, /one-time post-payment customer change has been used/);
+assert.match(workspaceSrc, /post_payment_change_override/);
+assert.match(
+  workspaceSrc,
+  /canOverridePostPaymentCustomerChange/,
+);
+
+const lifecycleActionsSrc = read(
+  "src/workspaces/owner/orders/OrderLifecycleActions.tsx",
+);
+assert.match(lifecycleActionsSrc, /cancelGuestOrderAction\(/);
+assert.match(lifecycleActionsSrc, /cancelOverride/);
+
+assert.equal(
+  timelineEventLabel("post_payment_customer_change"),
+  "Post-payment customer change",
+);
+assert.equal(
+  timelineEventLabel("post_payment_customer_change_override"),
+  "Post-payment change override",
+);
+
+const paidBefore = {
+  customerName: "Amy",
+  phone: "012",
+  email: "",
+  pickupDate: "2026-09-20",
+  pickupTime: "15:00:00",
+  notes: null,
+  fulfilmentMethod: "pickup" as const,
+  delivery: null,
+  items: [
+    {
+      cakeId: "c1",
+      cakeSizeId: "s8",
+      quantity: 1,
+    },
+  ],
+  complimentaryItems: [],
+  paidAddons: [],
+};
+
+function proposedFrom(patch: {
+  pickupDate?: string;
+  pickupTime?: string;
+  items?: Array<{ cakeId: string; cakeSizeId: string; quantity: number }>;
+}) {
+  return {
+    guestName: "Amy",
+    guestPhone: "012",
+    guestEmail: "",
+    pickupDate: patch.pickupDate ?? "2026-09-20",
+    pickupTime: patch.pickupTime ?? "15:00:00",
+    customerNotes: "",
+    fulfilmentMethod: "pickup",
+    deliveryKey: "",
+    items: patch.items ?? [{ cakeId: "c1", cakeSizeId: "s8", quantity: 1 }],
+    complimentary: [],
+    paidAddons: [],
+  };
+}
+
+const unpaidDecision = decidePostPaymentSave({
+  status: "awaiting_payment",
+  changeCount: 0,
+  role: "customer_operations",
+  override: false,
+  classification: classifyPaidOrderSave(
+    paidBefore,
+    proposedFrom({ pickupDate: "2026-09-21" }),
+  ),
+});
+assert.equal(unpaidDecision.action, "allow_unpaid");
+
+const firstChange = classifyPaidOrderSave(
+  paidBefore,
+  proposedFrom({ pickupDate: "2026-09-21" }),
+);
+assert.equal(firstChange.pickupOrFulfilmentChanged, true);
+assert.equal(firstChange.existingCakeLineAltered, false);
+assert.equal(
+  decidePostPaymentSave({
+    status: "paid",
+    changeCount: 0,
+    role: "customer_operations",
+    override: false,
+    classification: firstChange,
+  }).action,
+  "consume",
+);
+
+const secondChange = decidePostPaymentSave({
+  status: "paid",
+  changeCount: 1,
+  role: "customer_operations",
+  override: false,
+  classification: firstChange,
+});
+assert.equal(secondChange.action, "block_used");
+if (secondChange.action === "block_used") {
+  assert.equal(secondChange.error, POST_PAYMENT_CUSTOMER_CHANGE_ERRORS.used);
+}
+
+const ownerSecond = decidePostPaymentSave({
+  status: "paid",
+  changeCount: 1,
+  role: "owner",
+  override: true,
+  classification: firstChange,
+});
+assert.equal(ownerSecond.action, "override");
+
+const bakeryOverride = decidePostPaymentSave({
+  status: "paid",
+  changeCount: 1,
+  role: "bakery",
+  override: true,
+  classification: firstChange,
+});
+assert.equal(bakeryOverride.action, "block_override_role");
+
+const cakeEdit = classifyPaidOrderSave(
+  paidBefore,
+  proposedFrom({
+    items: [{ cakeId: "c1", cakeSizeId: "s8", quantity: 2 }],
+  }),
+);
+assert.equal(cakeEdit.existingCakeLineAltered, true);
+assert.equal(
+  decidePostPaymentSave({
+    status: "paid",
+    changeCount: 0,
+    role: "customer_operations",
+    override: false,
+    classification: cakeEdit,
+  }).action,
+  "block_cake_line",
+);
+
+const addCake = classifyPaidOrderSave(
+  paidBefore,
+  proposedFrom({
+    items: [
+      { cakeId: "c1", cakeSizeId: "s8", quantity: 1 },
+      { cakeId: "c1", cakeSizeId: "s4", quantity: 1 },
+    ],
+  }),
+);
+assert.equal(addCake.newCakeLineAdded, true);
+assert.equal(addCake.existingCakeLineAltered, false);
+assert.equal(
+  decidePostPaymentSave({
+    status: "paid",
+    changeCount: 0,
+    role: "customer_operations",
+    override: false,
+    classification: addCake,
+  }).action,
+  "consume",
+);
+
+const staffOnly = classifyPaidOrderSave(paidBefore, proposedFrom({}));
+assert.equal(staffOnly.customerFacingChange, false);
+assert.equal(
+  decidePostPaymentSave({
+    status: "paid",
+    changeCount: 1,
+    role: "customer_operations",
+    override: false,
+    classification: staffOnly,
+  }).action,
+  "allow_staff_only",
+);
+
+assert.equal(
+  decidePostPaymentCancel({
+    status: "paid",
+    changeCount: 0,
+    role: "customer_operations",
+    override: false,
+  }).ok,
+  true,
+);
+assert.equal(
+  decidePostPaymentCancel({
+    status: "paid",
+    changeCount: 1,
+    role: "customer_operations",
+    override: false,
+  }).ok,
+  false,
+);
+assert.equal(
+  decidePostPaymentCancel({
+    status: "paid",
+    changeCount: 1,
+    role: "owner",
+    override: true,
+  }).ok,
+  true,
+);
+assert.equal(
+  decidePostPaymentCancel({
+    status: "awaiting_payment",
+    changeCount: 0,
+    role: "customer_operations",
+    override: false,
+  }).ok,
+  true,
+);
 
 // 25–26 preorder exception / customer informed remain in SQL (not redesigned)
 const exceptionSql = read(
