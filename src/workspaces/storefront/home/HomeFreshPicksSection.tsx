@@ -31,7 +31,7 @@ export function HomeFreshPicksSection({ picks }: HomeFreshPicksSectionProps) {
           className="text-skyline hover:text-ink shrink-0 text-[13px] font-medium"
           href="/extra"
         >
-          See all →
+          View all →
         </Link>
       </div>
       <p className="text-skyline mt-1.5 max-w-[22rem] text-[13px] leading-relaxed">
