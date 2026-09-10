@@ -272,8 +272,9 @@ const unitB = groupPick({
     ],
   });
   const afterOne = freshPickCatalogueCtaState(cards[0]!.extraStockIds, cartWithB);
-  assert.equal(afterOne.addedToCart, false, "sibling unit still Add to Cart");
-  assert.equal(afterOne.extraStockId, "peanut-a");
+  assert.equal(afterOne.addedToCart, true, "one grouped unit in cart shows Added to Cart");
+  assert.equal(afterOne.extraStockId, "peanut-b");
+  assert.equal(afterOne.addAnotherStockId, "peanut-a", "Add another targets remaining exact id");
   const cartWithBoth = parseFreshPickCart({
     pickupDate: "2026-09-10",
     pickupTime: "14:00",
@@ -301,6 +302,7 @@ const unitB = groupPick({
     cartWithBoth,
   );
   assert.equal(afterBoth.addedToCart, true, "all exact units added");
+  assert.equal(afterBoth.addAnotherStockId, null, "no Add another when none remain");
 }
 
 {
@@ -379,6 +381,8 @@ assert.match(extraPageSrc, /listStorefrontAvailableExtra/);
 assert.match(extraPageSrc, /FRESH_PICKS_ADD_TO_CART_CTA/);
 assert.match(extraPageSrc, /FreshPickCatalogueAddCta/);
 assert.match(extraPageSrc, /extraStockIds=\{pick\.extraStockIds\}/);
+assert.doesNotMatch(extraPageSrc, /1 left/);
+assert.doesNotMatch(extraPageSrc, /2 available/);
 assert.match(extraPageSrc, /freshPickAvailabilityLabel/);
 assert.match(extraPageSrc, /freshPickAvailabilityDateLabel/);
 assert.match(extraPageSrc, /freshPickAvailabilityLabel\(pick\.days\)/);

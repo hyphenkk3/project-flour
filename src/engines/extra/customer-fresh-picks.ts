@@ -90,6 +90,8 @@ export const FRESH_PICKS_ADD_TO_CART_CTA = "Add to Cart";
 
 export const FRESH_PICKS_ADDED_TO_CART_CTA = "✓ Added to Cart";
 
+export const FRESH_PICKS_ADD_ANOTHER_CTA = "Add another";
+
 export function freshPickCartCtaLabel(inCart: boolean): string {
   return inCart ? FRESH_PICKS_ADDED_TO_CART_CTA : FRESH_PICKS_ADD_TO_CART_CTA;
 }

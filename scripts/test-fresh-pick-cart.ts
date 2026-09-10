@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   extraCartItemUnavailableMessage,
+  FRESH_PICKS_ADD_ANOTHER_CTA,
   FRESH_PICKS_ADD_TO_CART_CTA,
   FRESH_PICKS_ADDED_CONFIRMATION,
   FRESH_PICKS_ADDED_TO_CART_CTA,
@@ -157,6 +158,7 @@ assert.equal(
 );
 assert.equal(FRESH_PICKS_ADD_TO_CART_CTA, "Add to Cart");
 assert.equal(FRESH_PICKS_ADDED_TO_CART_CTA, "✓ Added to Cart");
+assert.equal(FRESH_PICKS_ADD_ANOTHER_CTA, "Add another");
 assert.equal(freshPickCartCtaLabel(false), "Add to Cart");
 assert.equal(freshPickCartCtaLabel(true), "✓ Added to Cart");
 assert.equal(
@@ -289,17 +291,72 @@ assert.equal(
 );
 
 const groupedIds = ["extra-avocado-a", "extra-avocado-b"];
-assert.deepEqual(freshPickCatalogueCtaState(groupedIds, null), {
-  extraStockId: "extra-avocado-a",
-  addedToCart: false,
-});
-assert.deepEqual(freshPickCatalogueCtaState(groupedIds, first.ok ? first.cart : null), {
-  extraStockId: "extra-avocado-b",
-  addedToCart: false,
-});
+assert.deepEqual(
+  freshPickCatalogueCtaState(groupedIds, null),
+  {
+    extraStockId: "extra-avocado-a",
+    addedToCart: false,
+    addAnotherStockId: null,
+  },
+  "none in cart → Add to Cart",
+);
+assert.deepEqual(
+  freshPickCatalogueCtaState(groupedIds, first.ok ? first.cart : null),
+  {
+    extraStockId: "extra-avocado-a",
+    addedToCart: true,
+    addAnotherStockId: "extra-avocado-b",
+  },
+  "first id in cart → Added to Cart + Add another",
+);
+assert.equal(
+  twoAvocados.ok && twoAvocados.cart.items[0]?.extraStockId,
+  "extra-avocado-a",
+  "first exact id remains after Add another",
+);
+assert.equal(
+  twoAvocados.ok && twoAvocados.cart.items[1]?.extraStockId,
+  "extra-avocado-b",
+  "Add another uses a different extra_stock.id",
+);
 assert.deepEqual(
   freshPickCatalogueCtaState(groupedIds, twoAvocados.ok ? twoAvocados.cart : null),
-  { extraStockId: "extra-avocado-a", addedToCart: true },
+  {
+    extraStockId: "extra-avocado-a",
+    addedToCart: true,
+    addAnotherStockId: null,
+  },
+  "both ids in cart → Added to Cart, no Add another",
+);
+
+const afterRemoveOne = removeFreshPickFromCart(
+  twoAvocados.ok ? twoAvocados.cart : cart,
+  "extra-avocado-a",
+);
+assert.deepEqual(
+  afterRemoveOne.items.map((item) => item.extraStockId),
+  ["extra-avocado-b"],
+);
+assert.deepEqual(
+  freshPickCatalogueCtaState(groupedIds, afterRemoveOne),
+  {
+    extraStockId: "extra-avocado-b",
+    addedToCart: true,
+    addAnotherStockId: "extra-avocado-a",
+  },
+  "removing one exact id restores Add another",
+);
+assert.deepEqual(
+  freshPickCatalogueCtaState(
+    groupedIds,
+    removeFreshPickFromCart(afterRemoveOne, "extra-avocado-b"),
+  ),
+  {
+    extraStockId: "extra-avocado-a",
+    addedToCart: false,
+    addAnotherStockId: null,
+  },
+  "removing all exact ids returns Add to Cart",
 );
 
 assert.equal(FRESH_PICKS_ADDED_CONFIRMATION, "Added to your order.");
@@ -388,7 +445,11 @@ const catalogueCtaSrc = readSrc(
 assert.match(catalogueCtaSrc, /useFreshPickCart/);
 assert.match(catalogueCtaSrc, /freshPickCatalogueCtaState/);
 assert.match(catalogueCtaSrc, /FRESH_PICKS_ADDED_TO_CART_CTA/);
+assert.match(catalogueCtaSrc, /FRESH_PICKS_ADD_ANOTHER_CTA/);
 assert.match(catalogueCtaSrc, /extraStockIds/);
+assert.match(catalogueCtaSrc, /addAnotherStockId/);
+assert.doesNotMatch(catalogueCtaSrc, /1 left/);
+assert.doesNotMatch(catalogueCtaSrc, /2 available/);
 assert.doesNotMatch(catalogueCtaSrc, /sold_at/);
 assert.doesNotMatch(catalogueCtaSrc, /production_capacity/);
 assert.match(extraOrderPageSrc, /FreshPickCartShell/);

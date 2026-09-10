@@ -181,20 +181,32 @@ export function freshPickCartHasExtra(
 }
 
 /**
- * Catalogue CTA for a grouped offering: Add to Cart while any exact unit is
- * still unselected; otherwise ✓ Added to Cart. Target id is the first remaining
- * extra_stock.id, so Continue Shopping can add a sibling unit.
+ * Grouped catalogue CTA: Added to Cart once any exact unit is in the cart.
+ * Add another is offered only while a remaining exact extra_stock.id exists.
  */
 export function freshPickCatalogueCtaState(
   extraStockIds: readonly string[],
   cart: FreshPickCart | null | undefined,
-): { extraStockId: string | null; addedToCart: boolean } {
+): {
+  extraStockId: string | null;
+  addedToCart: boolean;
+  addAnotherStockId: string | null;
+} {
   const ids = extraStockIds.map((id) => id.trim()).filter(Boolean);
   const remaining = ids.filter((id) => !freshPickCartHasExtra(cart, id));
-  if (remaining.length > 0) {
-    return { extraStockId: remaining[0] ?? null, addedToCart: false };
+  const selected = ids.filter((id) => freshPickCartHasExtra(cart, id));
+  if (selected.length === 0) {
+    return {
+      extraStockId: remaining[0] ?? ids[0] ?? null,
+      addedToCart: false,
+      addAnotherStockId: null,
+    };
   }
-  return { extraStockId: ids[0] ?? null, addedToCart: ids.length > 0 };
+  return {
+    extraStockId: selected[0] ?? null,
+    addedToCart: true,
+    addAnotherStockId: remaining[0] ?? null,
+  };
 }
 
 export function freshPickCartCount(cart: FreshPickCart | null): number {
