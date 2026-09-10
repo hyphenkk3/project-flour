@@ -5,8 +5,11 @@
 
 export const HOMEPAGE_COLLECTION_PREVIEW_MAX = 6;
 
-/** Homepage carousel shows at most this many cakes. Curation may still hold 6. */
+/** Mobile homepage carousel shows at most this many cakes. */
 export const HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX = 4;
+
+/** lg+ homepage carousel shows at most this many cakes. Curation may still hold 6. */
+export const HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX_LG = 5;
 
 export const HOMEPAGE_COLLECTION_PREVIEW_MAX_MESSAGE =
   "You can feature up to 6 cakes on the homepage for this collection. Remove one before adding another.";
@@ -14,7 +17,7 @@ export const HOMEPAGE_COLLECTION_PREVIEW_MAX_MESSAGE =
 export function takeHomepageCollectionPreviewCakes<T>(
   cakes: readonly T[],
 ): T[] {
-  return cakes.slice(0, HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX);
+  return cakes.slice(0, HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX_LG);
 }
 
 export type HomepageCollectionPreviewSortable = {

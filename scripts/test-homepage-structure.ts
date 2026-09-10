@@ -13,6 +13,7 @@ import { orderableMonthlyCatalogues } from "@/engines/menu/customer-browse";
 import {
   BROWSE_CURRENTLY_UNAVAILABLE_NOTE,
   HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX,
+  HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX_LG,
   HOMEPAGE_COLLECTION_PREVIEW_MAX,
   isCustomerFacingHistoricalCatalogue,
   planHomepageCollectionPreviewChange,
@@ -222,7 +223,11 @@ const featuredSrc = readSrc(
 assert.match(featuredSrc, /rounded-\[10px\]/);
 assert.match(featuredSrc, /aspect-square/);
 assert.match(featuredSrc, /w-\[8\.5rem\]/);
-assert.match(featuredSrc, /lg:w-\[12rem\]/);
+assert.match(featuredSrc, /lg:w-\[calc\(\(100%-3\.75rem\)\/6\)\]/);
+assert.match(featuredSrc, /max-lg:hidden/);
+assert.match(featuredSrc, /HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX/);
+assert.doesNotMatch(featuredSrc, /lg:w-\[12rem\]/);
+assert.doesNotMatch(featuredSrc, /grid-cols/);
 assert.match(featuredSrc, /overflow-x-auto/);
 assert.match(featuredSrc, /-mx-6/);
 assert.match(featuredSrc, /sm:-mx-10 lg:mx-0/);
@@ -390,13 +395,14 @@ assert.match(detailSrc, /hideAddToOrder=\{cake\.currentlyOffered === false\}/);
 
 assert.equal(HOMEPAGE_COLLECTION_PREVIEW_MAX, 6);
 assert.equal(HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX, 4);
+assert.equal(HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX_LG, 5);
 assert.equal(
   takeHomepageCollectionPreviewCakes(["a", "b", "c", "d", "e", "f"]).length,
-  4,
+  5,
 );
 assert.deepEqual(
   takeHomepageCollectionPreviewCakes(["a", "b", "c", "d", "e", "f"]),
-  ["a", "b", "c", "d"],
+  ["a", "b", "c", "d", "e"],
 );
 
 const size = (id: string, price: number) => ({

@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
-import { takeHomepageCollectionPreviewCakes } from "@/engines/menu/homepage-collection-preview";
+import {
+  HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX,
+  takeHomepageCollectionPreviewCakes,
+} from "@/engines/menu/homepage-collection-preview";
 import type { StorefrontCake } from "@/types/storefront";
 import {
   storefrontDefaultPhoto,
@@ -53,8 +56,8 @@ export function HomeFeaturedCollection({
         </p>
         {previewCakes.length > 0 ? (
           <div className="-mx-6 mt-4 overflow-x-auto overscroll-x-contain sm:-mx-10 lg:mx-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <ul className="flex w-max gap-3 px-6 pr-8 sm:px-10 sm:pr-12 lg:pl-0 lg:pr-8">
-              {previewCakes.map((cake) => {
+            <ul className="flex w-max gap-3 px-6 pr-8 sm:px-10 sm:pr-12 lg:w-full lg:pl-0 lg:pr-0">
+              {previewCakes.map((cake, index) => {
                 const size = cake.sizes[0] ?? null;
                 const photo =
                   storefrontPhotoForSize(cake.photos, size?.id) ??
@@ -62,14 +65,19 @@ export function HomeFeaturedCollection({
                 const price = formatHomepagePrice(cake);
                 const preorder = cakeCardPreorderLabel(cake);
                 const href = cakeHrefs[cake.id] ?? viewAllHref;
+                const hideOnMobile =
+                  index >= HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX;
                 return (
-                  <li className="w-[8.5rem] shrink-0 lg:w-[12rem]" key={cake.id}>
+                  <li
+                    className={`w-[8.5rem] shrink-0 lg:min-w-0 lg:w-[calc((100%-3.75rem)/6)]${hideOnMobile ? " max-lg:hidden" : ""}`}
+                    key={cake.id}
+                  >
                     <Link className="group block" href={href}>
-                      <div className="relative aspect-square w-[8.5rem] overflow-hidden rounded-[10px] lg:w-[12rem]">
+                      <div className="relative aspect-square w-[8.5rem] overflow-hidden rounded-[10px] lg:w-full">
                         {photo?.url ? (
                           <CakePhotoImage
                             alt={photo.altText || cake.name}
-                            sizes="(min-width: 1024px) 192px, 136px"
+                            sizes="(min-width: 1024px) 182px, 136px"
                             src={photo.url}
                           />
                         ) : (
@@ -95,13 +103,13 @@ export function HomeFeaturedCollection({
                   </li>
                 );
               })}
-              <li className="w-[8.5rem] shrink-0 lg:w-[12rem]">
+              <li className="w-[8.5rem] shrink-0 lg:min-w-0 lg:w-[calc((100%-3.75rem)/6)]">
                 <Link
                   aria-label={viewAllLabel}
                   className="group block"
                   href={viewAllHref}
                 >
-                  <div className="flex aspect-square w-[8.5rem] items-end rounded-[10px] bg-ink/[0.035] px-3.5 py-3.5 lg:w-[12rem]">
+                  <div className="flex aspect-square w-[8.5rem] items-end rounded-[10px] bg-ink/[0.035] px-3.5 py-3.5 lg:w-full">
                     <span
                       aria-hidden="true"
                       className="text-ink text-[1.15rem] leading-none"
