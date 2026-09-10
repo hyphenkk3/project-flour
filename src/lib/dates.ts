@@ -74,6 +74,43 @@ export function formatBusinessWeekdayAbbrev(ymd: string): string {
   return SHORT_WEEKDAY_NAMES[date.getDay()] ?? "";
 }
 
+/** Customer receipt calendar date from YYYY-MM-DD, e.g. 11 September 2026. */
+export function formatLongBusinessDayMonthYear(ymd: string): string {
+  const parts = businessDateParts(ymd.trim().slice(0, 10));
+  if (!parts) return ymd;
+  const monthLabel = LONG_MONTH_NAMES[parts.month - 1];
+  if (!monthLabel) return ymd;
+  return `${parts.day} ${monthLabel} ${parts.year}`;
+}
+
+/**
+ * Order submission instant in the business timezone (Asia/Singapore = Malaysia).
+ * e.g. 9 September 2026 · 8:38 AM
+ */
+export function formatCustomerOrderPlacedAt(iso: string): string {
+  const date = toDate(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  const dateLabel = new Intl.DateTimeFormat(LOCALE, {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: TIME_ZONE,
+  }).format(date);
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const hours24 = Number(parts.find((part) => part.type === "hour")?.value ?? NaN);
+  const minutes = parts.find((part) => part.type === "minute")?.value ?? "00";
+  if (!Number.isFinite(hours24)) return dateLabel;
+  const normalized = hours24 === 24 ? 0 : hours24;
+  const suffix = normalized >= 12 ? "PM" : "AM";
+  const hour12 = normalized % 12 === 0 ? 12 : normalized % 12;
+  return `${dateLabel} · ${hour12}:${minutes} ${suffix}`;
+}
+
 /** Calendar date, e.g. 3 Aug 2026 */
 export function formatDate(value: string | number | Date): string {
   return new Intl.DateTimeFormat(LOCALE, {

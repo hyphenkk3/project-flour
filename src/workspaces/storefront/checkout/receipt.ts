@@ -17,6 +17,12 @@ export type GuestPreorderReceiptAddon = {
   unitPrice: number;
 };
 
+export type GuestPreorderReceiptComplimentary = {
+  key: string;
+  name: string;
+  quantity: number;
+};
+
 export type GuestPreorderReceipt = {
   orderNumber: string | null;
   guestName: string;
@@ -24,6 +30,7 @@ export type GuestPreorderReceipt = {
   notes: string | null;
   items: GuestPreorderReceiptItem[];
   paidAddons: GuestPreorderReceiptAddon[];
+  complimentaryItems: GuestPreorderReceiptComplimentary[];
   pickupDate: string;
   pickupTime: string;
   fulfilmentMethod: "pickup" | "dine_in" | "delivery";
@@ -31,6 +38,8 @@ export type GuestPreorderReceipt = {
   dineInVenue: "hyphen" | "whitebird" | null;
   reservationTime: string | null;
   total: number;
+  /** ISO timestamptz from `orders.created_at`. Order submission, not pickup. */
+  placedAt: string | null;
   /** True when this recap is a Fresh Picks Extra order, not a Whole Cake preorder. */
   isFreshPick: boolean;
 };
@@ -117,6 +126,7 @@ export async function loadGuestPreorderReceipt(
         pickup_time,
         fulfilment_method,
         extra_stock_id,
+        created_at,
         customer_id,
         order_dine_in_reservations ( guest_count, venue, reservation_time ),
         order_items (
@@ -133,6 +143,12 @@ export async function loadGuestPreorderReceipt(
           name,
           quantity,
           unit_price,
+          sort_order
+        ),
+        order_complimentary_items (
+          id,
+          name,
+          quantity,
           sort_order
         )
       `,
@@ -194,6 +210,31 @@ export async function loadGuestPreorderReceipt(
       }))
       .filter((row) => row.quantity > 0);
 
+    const complimentaryRows = Array.isArray(
+      (data as { order_complimentary_items?: unknown }).order_complimentary_items,
+    )
+      ? (
+          data as {
+            order_complimentary_items: Array<{
+              id?: string;
+              name?: string | null;
+              quantity?: number | string | null;
+              sort_order?: number | null;
+            }>;
+          }
+        ).order_complimentary_items
+      : [];
+    const complimentaryItems: GuestPreorderReceiptComplimentary[] = [
+      ...complimentaryRows,
+    ]
+      .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))
+      .map((row, index) => ({
+        key: row.id ?? `complimentary-${index}`,
+        name: String(row.name ?? "Complimentary").trim() || "Complimentary",
+        quantity: Number(row.quantity ?? 1),
+      }))
+      .filter((row) => row.quantity > 0);
+
     const reservationRel = (
       data as {
         order_dine_in_reservations?:
@@ -243,6 +284,7 @@ export async function loadGuestPreorderReceipt(
       notes: notesRaw || null,
       items,
       paidAddons,
+      complimentaryItems,
       pickupDate: String(data.pickup_date),
       pickupTime: String(data.pickup_time),
       fulfilmentMethod,
@@ -265,6 +307,10 @@ export async function loadGuestPreorderReceipt(
           quantity: addon.quantity,
         })),
       }),
+      placedAt:
+        String(
+          (data as { created_at?: string | null }).created_at ?? "",
+        ).trim() || null,
       isFreshPick: Boolean(
         (data as { extra_stock_id?: string | null }).extra_stock_id,
       ),

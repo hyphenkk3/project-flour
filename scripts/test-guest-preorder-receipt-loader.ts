@@ -30,12 +30,15 @@ const checkoutActionsSrc = readSrc(
 
 assert.match(receiptSrc, /customer_notes,/);
 assert.match(receiptSrc, /customer_notes \?\? ""/);
+assert.match(receiptSrc, /created_at,/);
+assert.match(receiptSrc, /placedAt:/);
 assert.doesNotMatch(receiptSrc, /^\s+notes,$/m);
 assert.doesNotMatch(receiptSrc, /\.notes \?\? ""/);
 assert.match(receiptSrc, /order_items \(/);
 assert.match(receiptSrc, /size_label/);
 assert.match(receiptSrc, /unit_price/);
 assert.match(receiptSrc, /order_paid_addons \(/);
+assert.match(receiptSrc, /order_complimentary_items \(/);
 assert.match(receiptSrc, /fulfilment_method/);
 assert.match(receiptSrc, /extra_stock_id/);
 assert.match(receiptSrc, /guestPreorderReceiptAuthorized/);
