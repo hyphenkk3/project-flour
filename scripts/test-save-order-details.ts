@@ -562,10 +562,10 @@ assert.match(buttonSrc, /Save Order Details/);
 assert.match(buttonSrc, /shareOrDownloadOrderDetailsImage/);
 assert.match(buttonSrc, /renderOrderDetailsPng/);
 assert.match(buttonSrc, /ensureStorefrontCanvasFonts/);
+assert.match(buttonSrc, /await ensureStorefrontCanvasFonts/);
 assert.doesNotMatch(buttonSrc, /await renderOrderDetailsPng/);
-assert.doesNotMatch(buttonSrc, /await ensureStorefrontCanvasFonts/);
 assert.match(buttonSrc, /const blob = renderOrderDetailsPng\(model\)/);
-assert.match(buttonSrc, /const sharing = shareOrDownloadOrderDetailsImage/);
+assert.match(buttonSrc, /shareOrDownloadOrderDetailsImage/);
 assert.match(buttonSrc, /result\.action === "preview"/);
 assert.match(buttonSrc, /Press and hold the image to save it/);
 assert.match(buttonSrc, /createPortal/);
@@ -620,6 +620,7 @@ assert.match(cardSrc, /ensureStorefrontCanvasFonts/);
 assert.match(cardSrc, /document\.fonts\.ready/);
 assert.match(cardSrc, /Promise\.race/);
 assert.match(cardSrc, /toDataURL/);
+assert.match(cardSrc, /if \(input\.isIos\) return "preview"/);
 assert.match(cardSrc, /isIosTouchDevice/);
 assert.match(cardSrc, /resolveOrderDetailsSavePath/);
 assert.match(cardSrc, /isSecureContext/);
@@ -671,7 +672,8 @@ async function runShareTests() {
       canShareFiles: true,
       isIos: true,
     }),
-    "share",
+    "preview",
+    "Photo 2: iPhone HTTPS must stay on the in-page overlay, not the share sheet",
   );
   assert.equal(
     resolveOrderDetailsSavePath({
@@ -680,7 +682,8 @@ async function runShareTests() {
       canShareFiles: "unknown",
       isIos: true,
     }),
-    "share",
+    "preview",
+    "Photo 2: iPhone does not use native share as the customer-facing presentation",
   );
   assert.equal(
     resolveOrderDetailsSavePath({
@@ -737,10 +740,38 @@ async function runShareTests() {
   );
   assert.equal(downloads.includes("whitebird-order-WB-http.png"), false);
 
+  let httpsIphoneShareCalls = 0;
+  const httpsIphone = await shareOrDownloadOrderDetailsImage({
+    blob: pngBlob(),
+    fileName: "whitebird-order-WB-https-ios.png",
+    title: "Whitebird order details",
+    isIos: true,
+    isSecureContext: true,
+    nav: {
+      canShare: () => true,
+      share: async () => {
+        httpsIphoneShareCalls += 1;
+      },
+    },
+    download: (_blob, fileName) => {
+      downloads.push(fileName);
+    },
+    createObjectUrl: () => "blob:preview-https-ios",
+  });
+  assert.equal(httpsIphone.action, "preview");
+  assert.equal(httpsIphone.objectUrl, "blob:preview-https-ios");
+  assert.equal(
+    httpsIphoneShareCalls,
+    0,
+    "Photo 2: iPhone HTTPS must not open the native share sheet",
+  );
+  assert.equal(downloads.includes("whitebird-order-WB-https-ios.png"), false);
+
   const shared = await shareOrDownloadOrderDetailsImage({
     blob: pngBlob(),
     fileName: "whitebird-order-WB-1001.png",
     title: "Whitebird order details",
+    isIos: false,
     isSecureContext: true,
     nav: {
       canShare: () => true,

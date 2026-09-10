@@ -41,7 +41,7 @@ export function storefrontCanvasFontFamily(
   return value || fallback;
 }
 
-const CANVAS_FONT_WAIT_MS = 80;
+const CANVAS_FONT_WAIT_MS = 2000;
 
 export async function ensureStorefrontCanvasFonts(): Promise<void> {
   if (typeof document === "undefined" || !document.fonts) return;
@@ -231,10 +231,11 @@ export function orderDetailsFileShareCapability(
 }
 
 /**
- * A: share missing or insecure context → iOS in-page preview / desktop download
- * B: share exists but canShare({ files }) is false → same fallback
- * C/D: share() throws without presenting a sheet → same fallback
- * E: PNG generation happens before this decision
+ * Photo 2 customer presentation is the in-page overlay on iPhone.
+ * Native file share remains for non-iOS secure contexts only.
+ * A: iOS → always preview (HTTP or HTTPS)
+ * B: desktop share missing / insecure → download
+ * C: desktop share available → share
  */
 export function resolveOrderDetailsSavePath(input: {
   isSecureContext: boolean;
@@ -242,12 +243,13 @@ export function resolveOrderDetailsSavePath(input: {
   canShareFiles: OrderDetailsFileShareCapability;
   isIos: boolean;
 }): OrderDetailsSavePath {
+  if (input.isIos) return "preview";
   const fileShareOk =
     input.isSecureContext &&
     input.hasShare &&
     input.canShareFiles !== false;
   if (fileShareOk) return "share";
-  return input.isIos ? "preview" : "download";
+  return "download";
 }
 
 function currentIsSecureContext(override?: boolean): boolean {

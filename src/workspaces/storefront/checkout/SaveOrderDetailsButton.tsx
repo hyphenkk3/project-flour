@@ -42,16 +42,16 @@ export function SaveOrderDetailsButton({
   async function handleSave() {
     if (busy) return;
     setError(null);
+    setBusy(true);
     try {
+      await ensureStorefrontCanvasFonts();
       const model = buildOrderDetailsCardModel(receipt);
       const blob = renderOrderDetailsPng(model);
-      const sharing = shareOrDownloadOrderDetailsImage({
+      const result = await shareOrDownloadOrderDetailsImage({
         blob,
         fileName: orderDetailsFileName(receipt.orderNumber),
         title: "Whitebird order details",
       });
-      setBusy(true);
-      const result = await sharing;
       if (result.action === "preview" && result.objectUrl) {
         setPreviewUrl((current) => {
           if (current) URL.revokeObjectURL(current);
