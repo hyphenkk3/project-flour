@@ -396,6 +396,90 @@ export function selectCustomerFreshPickOfferings<
   return order.map((key) => chosen.get(key)!);
 }
 
+export type FreshPickGroupablePick = FreshPickOfferingIdentity & {
+  days: readonly FreshPickDay[];
+  unitPrice?: number | null;
+};
+
+/**
+ * Customer catalogue grouping: cake + size, plus price when present so a
+ * different priced variant stays a separate offering.
+ */
+export function freshPickOfferingGroupKey(
+  input: FreshPickOfferingIdentity & { unitPrice?: number | null },
+): string {
+  const base = freshPickOfferingKey(input);
+  if (typeof input.unitPrice === "number" && Number.isFinite(input.unitPrice)) {
+    return `${base}|price:${input.unitPrice}`;
+  }
+  return base;
+}
+
+/** Union of remaining today / tomorrow days only. Never invents other dates. */
+export function unionFreshPickAvailabilityDays(
+  members: readonly { days: readonly FreshPickDay[] }[],
+): FreshPickDay[] {
+  let hasToday = false;
+  let hasTomorrow = false;
+  for (const member of members) {
+    if (member.days.includes("today")) hasToday = true;
+    if (member.days.includes("tomorrow")) hasTomorrow = true;
+  }
+  const days: FreshPickDay[] = [];
+  if (hasToday) days.push("today");
+  if (hasTomorrow) days.push("tomorrow");
+  return days;
+}
+
+function freshPickCoverageRank(days: readonly FreshPickDay[]): number {
+  const hasToday = days.includes("today");
+  const hasTomorrow = days.includes("tomorrow");
+  if (hasToday && hasTomorrow) return 0;
+  if (hasToday) return 1;
+  if (hasTomorrow) return 2;
+  return 3;
+}
+
+/**
+ * One customer-facing offering per cake/size/price. Underlying extra_stock.id
+ * values stay listed so cart/checkout can target an exact unit.
+ * Availability is the union of remaining members' today/tomorrow days.
+ * Representative (card id) prefers the widest remaining window.
+ */
+export function groupCustomerFreshPickOfferings<T extends FreshPickGroupablePick>(
+  picks: readonly T[],
+): Array<T & { extraStockIds: string[]; days: FreshPickDay[] }> {
+  const groups = new Map<string, T[]>();
+  const order: string[] = [];
+  for (const pick of picks) {
+    const key = freshPickOfferingGroupKey(pick);
+    const existing = groups.get(key);
+    if (!existing) {
+      groups.set(key, [pick]);
+      order.push(key);
+      continue;
+    }
+    existing.push(pick);
+  }
+
+  return order.map((key) => {
+    const members = groups.get(key) ?? [];
+    const days = unionFreshPickAvailabilityDays(members);
+    const ranked = [...members].sort((left, right) => {
+      const coverage =
+        freshPickCoverageRank(left.days) - freshPickCoverageRank(right.days);
+      if (coverage !== 0) return coverage;
+      return compareFreshPickRepresentatives(left, right);
+    });
+    const representative = ranked[0]!;
+    return {
+      ...representative,
+      days,
+      extraStockIds: ranked.map((member) => member.id),
+    };
+  });
+}
+
 /**
  * Customer listing order: remaining today first, then tomorrow.
  * Stable within the same day so offering order is unchanged.

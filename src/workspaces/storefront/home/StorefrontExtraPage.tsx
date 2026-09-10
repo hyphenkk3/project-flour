@@ -77,7 +77,7 @@ export async function StorefrontExtraPage() {
                         </p>
                       ) : null}
                       <FreshPickCatalogueAddCta
-                        extraStockId={pick.id}
+                        extraStockIds={pick.extraStockIds}
                         href={`/extra/${pick.id}`}
                       >
                         {FRESH_PICKS_ADD_TO_CART_CTA}

@@ -180,6 +180,23 @@ export function freshPickCartHasExtra(
   return cart.items.some((item) => item.extraStockId === id);
 }
 
+/**
+ * Catalogue CTA for a grouped offering: Add to Cart while any exact unit is
+ * still unselected; otherwise ✓ Added to Cart. Target id is the first remaining
+ * extra_stock.id, so Continue Shopping can add a sibling unit.
+ */
+export function freshPickCatalogueCtaState(
+  extraStockIds: readonly string[],
+  cart: FreshPickCart | null | undefined,
+): { extraStockId: string | null; addedToCart: boolean } {
+  const ids = extraStockIds.map((id) => id.trim()).filter(Boolean);
+  const remaining = ids.filter((id) => !freshPickCartHasExtra(cart, id));
+  if (remaining.length > 0) {
+    return { extraStockId: remaining[0] ?? null, addedToCart: false };
+  }
+  return { extraStockId: ids[0] ?? null, addedToCart: ids.length > 0 };
+}
+
 export function freshPickCartCount(cart: FreshPickCart | null): number {
   return cart?.items.length ?? 0;
 }

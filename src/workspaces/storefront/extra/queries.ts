@@ -2,6 +2,7 @@ import {
   extraActionableFreshPickDays,
   freshPickAvailabilityLabel,
   freshPickProductDescription,
+  groupCustomerFreshPickOfferings,
   isPublishedFreshPick,
   sortCustomerFreshPicksByAvailabilityDay,
   type FreshPickDay,
@@ -31,6 +32,7 @@ export type StorefrontExtraPick = {
   soldAt: string | null;
   day: FreshPickDay;
   days: FreshPickDay[];
+  extraStockIds: string[];
   availabilityLabel: string;
   imageUrl: string | null;
   imageAlt: string | null;
@@ -224,6 +226,7 @@ function mapPick(
     soldAt: row.sold_at,
     day,
     days,
+    extraStockIds: [row.id],
     availabilityLabel: freshPickAvailabilityLabel(days),
     imageUrl: image?.url ?? null,
     imageAlt: image?.altText ?? null,
@@ -233,8 +236,8 @@ function mapPick(
 }
 
 /**
- * Bakery-confirmed Extra currently orderable. Each extra_stock.id is its own
- * customer unit — identical cakes are not collapsed or substituted.
+ * Bakery-confirmed Extra currently orderable. Matching cake/size/price units
+ * share one customer-facing offering; extra_stock.id values stay independent.
  */
 export async function listStorefrontAvailableExtra(): Promise<
   StorefrontExtraPick[]
@@ -260,7 +263,7 @@ export async function listStorefrontAvailableExtra(): Promise<
       publishedNow(row, now),
     );
     const details = await extraListingDetails(supabase, live);
-    const picks = live
+    const units = live
       .map((row) =>
         mapPick(
           row,
@@ -276,6 +279,11 @@ export async function listStorefrontAvailableExtra(): Promise<
         ),
       )
       .filter((pick): pick is StorefrontExtraPick => pick != null);
+    const picks = groupCustomerFreshPickOfferings(units).map((pick) => ({
+      ...pick,
+      day: pick.days[0] ?? pick.day,
+      availabilityLabel: freshPickAvailabilityLabel(pick.days),
+    }));
     return sortCustomerFreshPicksByAvailabilityDay(picks);
   } catch {
     return [];

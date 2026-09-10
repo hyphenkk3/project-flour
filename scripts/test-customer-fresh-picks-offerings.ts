@@ -6,10 +6,19 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  freshPickAvailabilityDateLabel,
+  freshPickAvailabilityLabel,
   freshPickOfferingKey,
+  groupCustomerFreshPickOfferings,
   selectCustomerFreshPickOfferings,
+  unionFreshPickAvailabilityDays,
+  type FreshPickDay,
   type FreshPickOfferingIdentity,
 } from "@/engines/extra/customer-fresh-picks";
+import {
+  freshPickCatalogueCtaState,
+  parseFreshPickCart,
+} from "@/workspaces/storefront/extra/fresh-pick-cart";
 
 function pick(
   overrides: Partial<FreshPickOfferingIdentity> & Pick<FreshPickOfferingIdentity, "id">,
@@ -143,6 +152,206 @@ function pick(
   assert.equal(selectCustomerFreshPickOfferings([a, b]).length, 2);
 }
 
+type GroupPick = FreshPickOfferingIdentity & {
+  days: FreshPickDay[];
+  unitPrice?: number | null;
+};
+
+function groupPick(
+  overrides: Partial<GroupPick> & Pick<GroupPick, "id" | "days">,
+): GroupPick {
+  return {
+    cakeName: "Salted Peanut",
+    sizeLabel: '6"',
+    libraryCakeId: "cake-peanut",
+    libraryCakeSizeId: "size-peanut-6",
+    unitPrice: 135,
+    pickupAvailableFromAt: "2026-09-10T04:00:00.000Z",
+    confirmedAt: "2026-09-10T03:00:00.000Z",
+    ...overrides,
+  };
+}
+
+const todayYmd = "2026-09-10";
+const unitA = groupPick({
+  id: "peanut-a",
+  days: ["today"],
+  pickupAvailableFromAt: "2026-09-10T04:00:00.000Z",
+});
+const unitB = groupPick({
+  id: "peanut-b",
+  days: ["today", "tomorrow"],
+  pickupAvailableFromAt: "2026-09-10T04:00:00.000Z",
+  confirmedAt: "2026-09-10T04:00:00.000Z",
+});
+
+{
+  const cards = groupCustomerFreshPickOfferings([unitA, unitB]);
+  assert.equal(cards.length, 1, "matching Salted Peanut 6\" collapses to one offering");
+  assert.deepEqual(cards[0]?.days, ["today", "tomorrow"]);
+  assert.equal(
+    freshPickAvailabilityLabel(cards[0]!.days),
+    "Available today & tomorrow",
+  );
+  assert.equal(
+    freshPickAvailabilityDateLabel(cards[0]!.days, todayYmd),
+    "10–11 SEP",
+  );
+  assert.equal(cards[0]?.id, "peanut-b", "widest remaining window is the Order target");
+  assert.deepEqual(cards[0]?.extraStockIds, ["peanut-b", "peanut-a"]);
+}
+
+{
+  const cards = groupCustomerFreshPickOfferings([unitA]);
+  assert.equal(cards.length, 1, "after selling B, A remains one offering");
+  assert.deepEqual(cards[0]?.days, ["today"]);
+  assert.equal(freshPickAvailabilityLabel(cards[0]!.days), "Available today");
+  assert.equal(
+    freshPickAvailabilityDateLabel(cards[0]!.days, todayYmd),
+    "10 SEP",
+  );
+  assert.deepEqual(cards[0]?.extraStockIds, ["peanut-a"]);
+}
+
+{
+  const cards = groupCustomerFreshPickOfferings([unitB]);
+  assert.equal(cards.length, 1, "after selling A, B remains one offering");
+  assert.deepEqual(cards[0]?.days, ["today", "tomorrow"]);
+  assert.equal(
+    freshPickAvailabilityLabel(cards[0]!.days),
+    "Available today & tomorrow",
+  );
+  assert.deepEqual(cards[0]?.extraStockIds, ["peanut-b"]);
+}
+
+{
+  const cards = groupCustomerFreshPickOfferings([]);
+  assert.equal(cards.length, 0, "both sold → no customer-facing offering");
+}
+
+{
+  const moved = groupPick({
+    id: "peanut-b",
+    days: ["tomorrow"],
+    pickupAvailableFromAt: "2026-09-11T04:00:00.000Z",
+  });
+  const cards = groupCustomerFreshPickOfferings([moved]);
+  assert.equal(cards[0]?.id, "peanut-b", "moved unit keeps extra_stock.id");
+  assert.deepEqual(cards[0]?.days, ["tomorrow"]);
+  assert.equal(
+    freshPickAvailabilityLabel(cards[0]!.days),
+    "Available tomorrow",
+  );
+}
+
+{
+  const slicedIgnored = groupCustomerFreshPickOfferings([unitA]);
+  assert.deepEqual(slicedIgnored[0]?.extraStockIds, ["peanut-a"]);
+  assert.equal(
+    slicedIgnored.length,
+    1,
+    "sliced unit omitted from input no longer contributes",
+  );
+}
+
+{
+  const cards = groupCustomerFreshPickOfferings([unitA, unitB]);
+  assert.notEqual(cards[0]?.extraStockIds[0], cards[0]?.extraStockIds[1]);
+  const cartWithB = parseFreshPickCart({
+    pickupDate: "2026-09-10",
+    pickupTime: "14:00",
+    items: [
+      {
+        extraStockId: "peanut-b",
+        cakeName: "Salted Peanut",
+        sizeLabel: '6"',
+        unitPrice: 135,
+        pickupDate: "2026-09-10",
+        pickupTime: "14:00",
+      },
+    ],
+  });
+  const afterOne = freshPickCatalogueCtaState(cards[0]!.extraStockIds, cartWithB);
+  assert.equal(afterOne.addedToCart, false, "sibling unit still Add to Cart");
+  assert.equal(afterOne.extraStockId, "peanut-a");
+  const cartWithBoth = parseFreshPickCart({
+    pickupDate: "2026-09-10",
+    pickupTime: "14:00",
+    items: [
+      {
+        extraStockId: "peanut-b",
+        cakeName: "Salted Peanut",
+        sizeLabel: '6"',
+        unitPrice: 135,
+        pickupDate: "2026-09-10",
+        pickupTime: "14:00",
+      },
+      {
+        extraStockId: "peanut-a",
+        cakeName: "Salted Peanut",
+        sizeLabel: '6"',
+        unitPrice: 135,
+        pickupDate: "2026-09-10",
+        pickupTime: "14:00",
+      },
+    ],
+  });
+  const afterBoth = freshPickCatalogueCtaState(
+    cards[0]!.extraStockIds,
+    cartWithBoth,
+  );
+  assert.equal(afterBoth.addedToCart, true, "all exact units added");
+}
+
+{
+  const eight = groupPick({
+    id: "peanut-8",
+    sizeLabel: '8"',
+    libraryCakeSizeId: "size-peanut-8",
+    days: ["today"],
+    unitPrice: 165,
+  });
+  const cards = groupCustomerFreshPickOfferings([unitA, eight]);
+  assert.equal(cards.length, 2, "6\" and 8\" remain separate offerings");
+}
+
+{
+  const avocado = groupPick({
+    id: "avocado-6",
+    cakeName: "Avocado",
+    libraryCakeId: "cake-avocado",
+    libraryCakeSizeId: "size-avocado-6",
+    days: ["today"],
+  });
+  const cards = groupCustomerFreshPickOfferings([unitA, avocado]);
+  assert.equal(cards.length, 2, "different cakes remain separate offerings");
+}
+
+{
+  const differentPrice = groupPick({
+    id: "peanut-alt-price",
+    days: ["today"],
+    unitPrice: 150,
+  });
+  const cards = groupCustomerFreshPickOfferings([unitA, differentPrice]);
+  assert.equal(cards.length, 2, "different price stays a separate offering");
+}
+
+{
+  assert.deepEqual(
+    unionFreshPickAvailabilityDays([
+      { days: ["today"] },
+      { days: ["tomorrow"] },
+    ]),
+    ["today", "tomorrow"],
+    "non-overlapping today + tomorrow still union to those two days only",
+  );
+  assert.deepEqual(
+    unionFreshPickAvailabilityDays([{ days: ["today"] }]),
+    ["today"],
+  );
+}
+
 function readSrc(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
 }
@@ -150,22 +359,26 @@ function readSrc(rel: string): string {
 const extraQueriesSrc = readSrc("src/workspaces/storefront/extra/queries.ts");
 assert.match(extraQueriesSrc, /extraActionableFreshPickDays/);
 assert.match(extraQueriesSrc, /sortCustomerFreshPicksByAvailabilityDay/);
+assert.match(extraQueriesSrc, /groupCustomerFreshPickOfferings/);
 assert.match(
   extraQueriesSrc,
   /sortCustomerFreshPicksByAvailabilityDay\(picks\)/,
-  "Fresh Picks listing keeps every extra_stock.id as its own unit",
 );
 assert.doesNotMatch(
   extraQueriesSrc,
-  /getStorefrontExtraById[\s\S]*selectCustomerFreshPickOfferings/,
+  /getStorefrontExtraById[\s\S]*groupCustomerFreshPickOfferings/,
   "order page still loads one Extra unit by id",
 );
+assert.doesNotMatch(extraQueriesSrc, /1 left/);
+assert.doesNotMatch(extraQueriesSrc, /2 available/);
 
 const extraPageSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontExtraPage.tsx",
 );
 assert.match(extraPageSrc, /listStorefrontAvailableExtra/);
 assert.match(extraPageSrc, /FRESH_PICKS_ADD_TO_CART_CTA/);
+assert.match(extraPageSrc, /FreshPickCatalogueAddCta/);
+assert.match(extraPageSrc, /extraStockIds=\{pick\.extraStockIds\}/);
 assert.match(extraPageSrc, /freshPickAvailabilityLabel/);
 assert.match(extraPageSrc, /freshPickAvailabilityDateLabel/);
 assert.match(extraPageSrc, /freshPickAvailabilityLabel\(pick\.days\)/);

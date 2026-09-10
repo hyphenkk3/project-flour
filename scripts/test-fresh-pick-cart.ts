@@ -22,6 +22,7 @@ import {
   FRESH_PICK_CART_KEY,
   freshPickCartCount,
   freshPickCartHasExtra,
+  freshPickCatalogueCtaState,
   freshPickCartHasItems,
   freshPickCartTotal,
   parseFreshPickCart,
@@ -287,6 +288,20 @@ assert.equal(
   FRESH_PICKS_ADD_TO_CART_CTA,
 );
 
+const groupedIds = ["extra-avocado-a", "extra-avocado-b"];
+assert.deepEqual(freshPickCatalogueCtaState(groupedIds, null), {
+  extraStockId: "extra-avocado-a",
+  addedToCart: false,
+});
+assert.deepEqual(freshPickCatalogueCtaState(groupedIds, first.ok ? first.cart : null), {
+  extraStockId: "extra-avocado-b",
+  addedToCart: false,
+});
+assert.deepEqual(
+  freshPickCatalogueCtaState(groupedIds, twoAvocados.ok ? twoAvocados.cart : null),
+  { extraStockId: "extra-avocado-a", addedToCart: true },
+);
+
 assert.equal(FRESH_PICKS_ADDED_CONFIRMATION, "Added to your order.");
 assert.equal(EXTRA_SAME_DAY_PICKUP_LEAD_MS, 60 * 60 * 1000);
 
@@ -354,13 +369,15 @@ assert.doesNotMatch(extraActionsSrc, /libraryCakeId/);
 assert.doesNotMatch(extraActionsSrc, /production_capacity/);
 
 assert.doesNotMatch(extraQueriesSrc, /selectCustomerFreshPickOfferings/);
+assert.match(extraQueriesSrc, /groupCustomerFreshPickOfferings/);
 assert.match(extraQueriesSrc, /sortCustomerFreshPicksByAvailabilityDay\(picks\)/);
 assert.match(extraQueriesSrc, /\.is\("sold_at", null\)/);
 
 assert.match(extraPageSrc, /FreshPickCartShell/);
 assert.match(extraPageSrc, /FRESH_PICKS_ADD_TO_CART_CTA/);
 assert.match(extraPageSrc, /FreshPickCatalogueAddCta/);
-assert.match(extraPageSrc, /extraStockId=\{pick\.id\}/);
+assert.match(extraPageSrc, /extraStockIds=\{pick\.extraStockIds\}/);
+assert.match(extraPageSrc, /href=\{\`\/extra\/\$\{pick\.id\}\`\}/);
 assert.doesNotMatch(extraPageSrc, /1 left/);
 assert.doesNotMatch(extraPageSrc, /2 available/);
 assert.doesNotMatch(extraPageSrc, /units available/i);
@@ -369,9 +386,9 @@ const catalogueCtaSrc = readSrc(
   "src/workspaces/storefront/extra/FreshPickCatalogueAddCta.tsx",
 );
 assert.match(catalogueCtaSrc, /useFreshPickCart/);
-assert.match(catalogueCtaSrc, /freshPickCartHasExtra/);
+assert.match(catalogueCtaSrc, /freshPickCatalogueCtaState/);
 assert.match(catalogueCtaSrc, /FRESH_PICKS_ADDED_TO_CART_CTA/);
-assert.match(catalogueCtaSrc, /extraStockId/);
+assert.match(catalogueCtaSrc, /extraStockIds/);
 assert.doesNotMatch(catalogueCtaSrc, /sold_at/);
 assert.doesNotMatch(catalogueCtaSrc, /production_capacity/);
 assert.match(extraOrderPageSrc, /FreshPickCartShell/);
