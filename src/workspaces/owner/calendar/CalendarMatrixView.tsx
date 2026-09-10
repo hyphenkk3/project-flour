@@ -33,6 +33,8 @@ type CalendarMatrixViewProps = {
   focusToday: boolean;
   /** Open Calendar Quick View for this order (Matrix Customers only). */
   onOpenQuickView: (orderId: string) => void;
+  /** Open Extra detail/actions for this exact extra_stock.id. */
+  onOpenExtra?: (extra: CalendarExtraMarker) => void;
   /**
    * One-shot Order Workspace return horizontal restore.
    * Wins over automatic Today for this mount only.
@@ -141,20 +143,24 @@ function extraSpanTitle(span: MatrixExtraSpan): string {
 function ExtraSpanBadge({
   span,
   totalsMode,
+  onOpenExtra,
 }: {
   span: MatrixExtraSpan;
   totalsMode: boolean;
+  onOpenExtra?: (extra: CalendarExtraMarker) => void;
 }) {
   const { extra } = span;
   const status = extraCalendarBadgeStatus(extra.lifecycle);
   return (
-    <span
+    <button
       className={[
         "border-line/70 text-ink flex w-full min-w-0 flex-col gap-0 rounded border px-1 py-0.5 text-left leading-snug",
         extra.lifecycle === "proposed" ? "bg-mist" : "bg-status-info-soft/50",
       ].join(" ")}
       data-extra-id={extra.id}
+      onClick={() => onOpenExtra?.(extra)}
       title={extraSpanTitle(span)}
+      type="button"
     >
       <span className="truncate text-[10px] font-medium">
         {extra.cakeName} {extra.sizeLabel}
@@ -162,7 +168,7 @@ function ExtraSpanBadge({
       <span className="text-[9px] font-semibold tracking-wide uppercase">
         {totalsMode ? "Fresh Pick ×1" : `Fresh Pick · ${status}`}
       </span>
-    </span>
+    </button>
   );
 }
 
@@ -170,6 +176,7 @@ function renderExtraSpanRow(
   row: MatrixRow,
   columns: CalendarDayCell[],
   mode: CalendarMatrixMode,
+  onOpenExtra?: (extra: CalendarExtraMarker) => void,
 ) {
   if (row.extraSpans.length === 0) return null;
 
@@ -191,7 +198,11 @@ function renderExtraSpanRow(
               minWidth: `calc(${DATE_COL_WIDTH} * ${span.columnSpan})`,
             }}
           >
-            <ExtraSpanBadge span={span} totalsMode={mode === "totals"} />
+            <ExtraSpanBadge
+              onOpenExtra={onOpenExtra}
+              span={span}
+              totalsMode={mode === "totals"}
+            />
           </td>,
         );
         colIndex += span.columnSpan;
@@ -238,6 +249,7 @@ export function CalendarMatrixView({
   month,
   focusToday,
   onOpenQuickView,
+  onOpenExtra,
   orderReturnMatrixScrollLeft = null,
   onOrderReturnMatrixApplied,
 }: CalendarMatrixViewProps) {
@@ -451,7 +463,12 @@ export function CalendarMatrixView({
                     })}
                   </tr>
                 );
-                const extraRows = renderExtraSpanRow(row, columns, mode);
+                const extraRows = renderExtraSpanRow(
+                  row,
+                  columns,
+                  mode,
+                  onOpenExtra,
+                );
                 return [customerRow, ...(extraRows ?? [])];
               })
             )}

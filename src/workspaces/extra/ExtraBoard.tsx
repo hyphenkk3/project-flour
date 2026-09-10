@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { FormField, FormInput, FormTextarea } from "@/components/ui/form";
+import { FormField, FormTextarea } from "@/components/ui/form";
 import { formatLongBusinessDate } from "@/lib/dates";
 import type { ExtraWorkspaceCapabilities } from "@/engines/extra/capabilities";
 import { isBakeryExtraProposalActionable } from "@/engines/extra/availability";
@@ -25,18 +25,16 @@ import {
   EXTRA_THROUGH_SLOT_REQUIRED,
 } from "@/engines/extra/fresh-picks-eligibility";
 import {
-  assignExtraStockToOrderAction,
   confirmExtraStockAction,
   createConfirmedExtraStockAction,
   cutExtraStockIntoSlicesAction,
-  findAssignableOrderForExtraAction,
   moveExtraStockWindowAction,
   proposeExtraStockAction,
   rejectExtraStockAction,
   unconfirmExtraStockAction,
   undoRejectExtraStockAction,
 } from "@/workspaces/extra/actions";
-import type { ExtraAssignableOrder } from "@/workspaces/extra/queries";
+import { AssignExtraToOrderDialog } from "@/workspaces/extra/AssignExtraToOrderDialog";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
 
 type ExtraBoardProps = {
@@ -105,10 +103,6 @@ export function ExtraBoard({
   );
   const [rejectReason, setRejectReason] = useState("");
   const [assigningUnit, setAssigningUnit] = useState<ExtraStockUnit | null>(
-    null,
-  );
-  const [assignQuery, setAssignQuery] = useState("");
-  const [foundOrder, setFoundOrder] = useState<ExtraAssignableOrder | null>(
     null,
   );
   const [movingUnit, setMovingUnit] = useState<ExtraStockUnit | null>(null);
@@ -315,55 +309,6 @@ export function ExtraBoard({
   function openAssign(unit: ExtraStockUnit) {
     setError(null);
     setAssigningUnit(unit);
-    setAssignQuery("");
-    setFoundOrder(null);
-  }
-
-  function searchAssignOrder() {
-    if (!assignQuery.trim()) {
-      setError("Enter an order number.");
-      return;
-    }
-    setError(null);
-    startTransition(async () => {
-      const result = await findAssignableOrderForExtraAction(assignQuery);
-      if (result.error) {
-        setError(result.error);
-        setFoundOrder(null);
-        return;
-      }
-      if (!result.order) {
-        setError("No matching order found.");
-        setFoundOrder(null);
-        return;
-      }
-      setFoundOrder(result.order);
-    });
-  }
-
-  function runAssign() {
-    if (!assigningUnit) return;
-    if (!foundOrder) {
-      searchAssignOrder();
-      return;
-    }
-    if (foundOrder.extraStockId) {
-      setError("That order already has a Fresh Pick assigned.");
-      return;
-    }
-    setError(null);
-    startTransition(async () => {
-      const result = await assignExtraStockToOrderAction({
-        extraStockId: assigningUnit.id,
-        orderId: foundOrder.id,
-      });
-      if (result.error) setError(result.error);
-      else {
-        setAssigningUnit(null);
-        setFoundOrder(null);
-        setAssignQuery("");
-      }
-    });
   }
 
   function runMove() {
@@ -943,51 +888,12 @@ export function ExtraBoard({
         </FormField>
       </ConfirmDialog>
 
-      <ConfirmDialog
-        allowDismiss={!pending}
-        confirmLabel="Assign Fresh Pick"
-        description={
-          assigningUnit
-            ? `Assign ${assigningUnit.cakeName} ${assigningUnit.sizeLabel} to an existing order. This Extra will leave Fresh Picks. Cake lines on the order are not changed.`
-            : undefined
-        }
-        onCancel={() => {
-          if (pending) return;
-          setAssigningUnit(null);
-          setFoundOrder(null);
-          setAssignQuery("");
-        }}
-        onConfirm={runAssign}
+      <AssignExtraToOrderDialog
+        extra={assigningUnit}
+        onAssigned={() => setAssigningUnit(null)}
+        onClose={() => setAssigningUnit(null)}
         open={assigningUnit != null}
-        pending={pending}
-        title="Assign to order"
-      >
-        <FormField htmlFor="extra-assign-order" label="Order number">
-          <FormInput
-            id="extra-assign-order"
-            onChange={(event) => setAssignQuery(event.target.value)}
-            placeholder="ORD-…"
-            value={assignQuery}
-          />
-        </FormField>
-        <button
-          className={`${btnSecondary} mt-3`}
-          disabled={pending}
-          onClick={searchAssignOrder}
-          type="button"
-        >
-          Find order
-        </button>
-        {foundOrder ? (
-          <p className="text-ink mt-3 text-sm leading-relaxed">
-            {foundOrder.orderNumber} · {foundOrder.guestName} ·{" "}
-            {foundOrder.pickupDate} · {foundOrder.itemSummary}
-            {foundOrder.extraStockId
-              ? " · already has a Fresh Pick"
-              : ""}
-          </p>
-        ) : null}
-      </ConfirmDialog>
+      />
 
       <ConfirmDialog
         allowDismiss={!pending}

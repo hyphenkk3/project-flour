@@ -177,6 +177,7 @@ assert.match(extraBoardQueries, /assignedOrderNumber: linked\.order_number/);
 
 const boardSrc = readSrc("src/workspaces/extra/ExtraBoard.tsx");
 assert.match(boardSrc, /Assign to order/);
+assert.match(boardSrc, /AssignExtraToOrderDialog/);
 assert.match(boardSrc, /Move pickup window/);
 assert.match(boardSrc, /Cut into slices/);
 assert.match(boardSrc, /Stop Fresh Pick availability/);

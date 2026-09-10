@@ -32,6 +32,8 @@ import {
 import { CalendarMonthGrid } from "@/workspaces/owner/calendar/CalendarMonthGrid";
 import { CalendarMonthHeader } from "@/workspaces/owner/calendar/CalendarMonthHeader";
 import { CalendarQuickView } from "@/workspaces/owner/calendar/CalendarQuickView";
+import { CalendarExtraActionDialog } from "@/workspaces/owner/calendar/CalendarExtraActionDialog";
+import { AssignExtraToOrderDialog } from "@/workspaces/extra/AssignExtraToOrderDialog";
 import {
   buildMonthDateColumns,
   buildMonthGrid,
@@ -72,6 +74,8 @@ type WholeCakeCalendarProps = {
   canMarkReady?: boolean;
   /** Owner-only Propose EXTRA in Quick View. */
   canMutateCalendarOrderActions?: boolean;
+  /** Bakery / Manager / Owner may assign a Fresh Pick to an existing order. */
+  canAssignExtraToOrder?: boolean;
 };
 
 type OrderRowPayload = {
@@ -109,11 +113,17 @@ export function WholeCakeCalendar({
   canManageOrderMessages = false,
   canMarkReady = false,
   canMutateCalendarOrderActions = false,
+  canAssignExtraToOrder = false,
 }: WholeCakeCalendarProps) {
   const [entries, setEntries] = useState(initialEntries);
   const [extras, setExtras] = useState(initialExtras);
   const [quickViewOrderId, setQuickViewOrderId] = useState<string | null>(null);
   const [quickViewRefreshKey, setQuickViewRefreshKey] = useState(0);
+  const [selectedExtra, setSelectedExtra] = useState<CalendarExtraMarker | null>(
+    null,
+  );
+  const [assigningExtra, setAssigningExtra] =
+    useState<CalendarExtraMarker | null>(null);
   const quickViewOrderIdRef = useRef<string | null>(null);
   quickViewOrderIdRef.current = quickViewOrderId;
   const todayYmd = singaporeTodayParts().ymd;
@@ -152,6 +162,22 @@ export function WholeCakeCalendar({
     clearRememberedCalendarQuickViewOrder();
     setQuickViewOrderId(null);
   }, []);
+
+  const openExtra = useCallback((extra: CalendarExtraMarker) => {
+    setAssigningExtra(null);
+    setSelectedExtra(extra);
+  }, []);
+
+  const assignExtraCandidates = useMemo(
+    () =>
+      sortEntries(entries).map((entry) => ({
+        id: entry.id,
+        customerName: entry.customerName,
+        pickupDate: entry.pickupDate,
+        pickupTime: entry.pickupTime,
+      })),
+    [entries],
+  );
 
   const upsertEntry = useCallback(
     (entry: CalendarEntry) => {
@@ -373,6 +399,7 @@ export function WholeCakeCalendar({
           focusToday={focusToday}
           mode={matrixMode}
           month={month}
+          onOpenExtra={openExtra}
           onOpenQuickView={openQuickView}
           onOrderReturnMatrixApplied={clearOrderReturnMatrix}
           orderReturnMatrixScrollLeft={orderReturnMatrixScrollLeft}
@@ -397,6 +424,25 @@ export function WholeCakeCalendar({
         refreshKey={quickViewRefreshKey}
         returnTo={calendarReturnTo}
         staffDisplayName={staffDisplayName}
+      />
+      <CalendarExtraActionDialog
+        canAssignExtraToOrder={canAssignExtraToOrder}
+        extra={selectedExtra}
+        onAssignToOrder={(extra) => {
+          setSelectedExtra(null);
+          setAssigningExtra(extra);
+        }}
+        onClose={() => setSelectedExtra(null)}
+      />
+      <AssignExtraToOrderDialog
+        candidateOrders={assignExtraCandidates}
+        extra={assigningExtra}
+        onAssigned={() => {
+          setAssigningExtra(null);
+          void refreshExtrasOnly();
+        }}
+        onClose={() => setAssigningExtra(null)}
+        open={assigningExtra != null}
       />
     </div>
   );
