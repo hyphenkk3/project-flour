@@ -349,7 +349,9 @@ assert.doesNotMatch(homeSrc, /Only 3 cakes remaining today/);
 assert.match(homeSrc, /desktopRail=\{false\}/);
 assert.match(homeSrc, /HomeHero/);
 assert.match(homeSrc, /HomePopularCakes/);
-assert.match(
+assert.match(homeSrc, /<HomePopularCakes cakes=\{popular\} \/>/);
+assert.match(homeSrc, /<HomeVisitFooter \/>/);
+assert.doesNotMatch(
   homeSrc,
   /HomeVisitFooter lead=\{<HomePopularCakes cakes=\{popular\} \/>\}/,
 );
@@ -440,6 +442,11 @@ assert.match(currentCollectionSrc, /rounded-\[10px\]/);
 assert.match(currentCollectionSrc, /aspect-square/);
 assert.match(currentCollectionSrc, /overflow-x-auto/);
 assert.match(currentCollectionSrc, /-mx-6/);
+assert.match(currentCollectionSrc, /w-\[8\.5rem\]/);
+assert.match(currentCollectionSrc, /lg:w-\[12rem\]/);
+assert.match(currentCollectionSrc, /sm:-mx-10 lg:mx-0/);
+assert.match(currentCollectionSrc, /mx-auto w-full max-w-6xl/);
+assert.match(currentCollectionSrc, /px-6 pt-8 sm:px-10/);
 assert.match(currentCollectionSrc, /takeHomepageCollectionPreviewCakes/);
 assert.match(currentCollectionSrc, /viewAllHref/);
 assert.match(currentCollectionSrc, /View all →/);
@@ -460,6 +467,8 @@ assert.match(browseAllSrc, /href="\/browse"/);
 assert.match(browseAllSrc, /Browse all cakes/);
 assert.match(browseAllSrc, /Explore the full Whitebird collection/);
 assert.match(browseAllSrc, /Catalogue/);
+assert.match(browseAllSrc, /mx-auto w-full max-w-6xl/);
+assert.match(browseAllSrc, /px-6 pt-8 pb-2 sm:px-10/);
 assert.doesNotMatch(browseAllSrc, /HomeDestinationCard/);
 
 const freshSectionSrc = readSrc(
@@ -474,6 +483,11 @@ assert.match(freshSectionSrc, /href="\/extra"/);
 assert.match(freshSectionSrc, /rounded-\[10px\]/);
 assert.match(freshSectionSrc, /aspect-square/);
 assert.match(freshSectionSrc, /h-\[5\.5rem\] w-\[5\.5rem\]/);
+assert.match(freshSectionSrc, /View all →/);
+assert.match(freshSectionSrc, /mx-auto w-full max-w-6xl/);
+assert.match(freshSectionSrc, /lg:grid lg:grid-cols-2/);
+assert.doesNotMatch(freshSectionSrc, /md:grid-cols-2/);
+assert.doesNotMatch(freshSectionSrc, /See all →/);
 assert.match(freshSectionSrc, /pick\.sizeLabel/);
 assert.match(freshSectionSrc, /Last-minute/);
 assert.doesNotMatch(freshSectionSrc, /-mt-6/);
@@ -540,6 +554,10 @@ const popularSrc = readSrc(
 assert.match(popularSrc, /overflow-hidden rounded-\[10px\]/);
 assert.match(popularSrc, /h-24 w-24/);
 assert.match(popularSrc, /w-24 shrink-0/);
+assert.match(popularSrc, /lg:w-\[10\.5rem\]/);
+assert.match(popularSrc, /mx-auto w-full max-w-6xl/);
+assert.match(popularSrc, /px-6 pt-8 sm:px-10/);
+assert.match(popularSrc, /-mx-6 overflow-x-auto/);
 assert.match(popularSrc, /Popular Cakes/);
 assert.match(popularSrc, /formatHomepagePrice/);
 assert.match(popularSrc, /View all →/);

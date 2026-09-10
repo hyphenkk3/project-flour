@@ -52,6 +52,15 @@ assert.doesNotMatch(freshSectionSrc, /return null/);
 assert.doesNotMatch(freshSectionSrc, /if \(picks\.length === 0\) return null/);
 assert.doesNotMatch(freshSectionSrc, /text-status-danger/);
 assert.doesNotMatch(freshSectionSrc, /homepageFreshPicksCountCopy/);
+assert.match(freshSectionSrc, /View all →/);
+assert.doesNotMatch(freshSectionSrc, /See all/);
+assert.match(freshSectionSrc, /px-6 pt-4 pb-2 sm:px-10 md:pt-8/);
+assert.match(freshSectionSrc, /mx-auto w-full max-w-6xl/);
+assert.match(freshSectionSrc, /h-\[5\.5rem\] w-\[5\.5rem\]/);
+assert.match(freshSectionSrc, /lg:grid lg:grid-cols-2/);
+assert.match(freshSectionSrc, /lg:space-y-0/);
+assert.doesNotMatch(freshSectionSrc, /md:grid-cols-2/);
+assert.doesNotMatch(freshSectionSrc, /HomeDestinationCard/);
 
 const homeSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
 assert.match(homeSrc, /sortHomepageFreshPicks/);
@@ -61,15 +70,19 @@ assert.match(homeSrc, /HomeFreshPicksSection picks=\{picks\}/);
 const heroIndex = homeSrc.indexOf("<HomeHero");
 const freshIndex = homeSrc.indexOf("<HomeFreshPicksSection");
 const featuredIndex = homeSrc.indexOf("<HomeFeaturedCollection");
+const popularIndex = homeSrc.indexOf("<HomePopularCakes");
 const moreIndex = homeSrc.indexOf("<HomeMoreCollections");
 const browseIndex = homeSrc.indexOf("<HomeBrowseAllCakes");
 const visitIndex = homeSrc.indexOf("<HomeVisitFooter");
 assert.ok(heroIndex >= 0 && freshIndex > heroIndex);
 assert.ok(featuredIndex > freshIndex);
-assert.ok(moreIndex > featuredIndex);
+assert.ok(popularIndex > featuredIndex);
+assert.ok(moreIndex > popularIndex);
 assert.ok(browseIndex > moreIndex);
 assert.ok(visitIndex > browseIndex);
-assert.match(
+assert.match(homeSrc, /<HomePopularCakes cakes=\{popular\} \/>/);
+assert.match(homeSrc, /<HomeVisitFooter \/>/);
+assert.doesNotMatch(
   homeSrc,
   /HomeVisitFooter lead=\{<HomePopularCakes cakes=\{popular\} \/>\}/,
 );
@@ -194,6 +207,8 @@ const moreSrc = readSrc(
 );
 assert.match(moreSrc, /item\.heading/);
 assert.match(moreSrc, /item\.supporting/);
+assert.match(moreSrc, /px-6 pt-5 pb-1 sm:px-10/);
+assert.match(moreSrc, /mx-auto w-full max-w-6xl/);
 assert.doesNotMatch(moreSrc, /More collections/);
 assert.doesNotMatch(moreSrc, /HomeDestinationCard/);
 assert.match(homeSrc, /Now accepting orders/);
@@ -204,8 +219,12 @@ const featuredSrc = readSrc(
 assert.match(featuredSrc, /rounded-\[10px\]/);
 assert.match(featuredSrc, /aspect-square/);
 assert.match(featuredSrc, /w-\[8\.5rem\]/);
+assert.match(featuredSrc, /lg:w-\[12rem\]/);
 assert.match(featuredSrc, /overflow-x-auto/);
 assert.match(featuredSrc, /-mx-6/);
+assert.match(featuredSrc, /sm:-mx-10 lg:mx-0/);
+assert.match(featuredSrc, /px-6 pt-8 sm:px-10/);
+assert.match(featuredSrc, /mx-auto w-full max-w-6xl/);
 assert.match(featuredSrc, /takeHomepageCollectionPreviewCakes/);
 assert.match(featuredSrc, /viewAllLabel/);
 assert.match(featuredSrc, /View all →/);
@@ -215,7 +234,23 @@ assert.match(featuredSrc, /bg-ink\/\[0\.035\]/);
 assert.doesNotMatch(featuredSrc, /border-ink\/\[0\.12\]/);
 assert.match(
   featuredSrc,
-  /previewCakes\.map\([\s\S]*\}\)\}\s*<li className="w-\[8\.5rem\] shrink-0">[\s\S]*viewAllHref/,
+  /previewCakes\.map\([\s\S]*\}\)\}\s*<li className="w-\[8\.5rem\] shrink-0[^"]*">[\s\S]*viewAllHref/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/home/HomePopularCakes.tsx"),
+  /w-24 shrink-0 lg:w-\[10\.5rem\]/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/home/HomePopularCakes.tsx"),
+  /h-24 w-24/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/home/HomeBrowseAllCakes.tsx"),
+  /mx-auto w-full max-w-6xl/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/home/HomeBrowseAllCakes.tsx"),
+  /px-6 pt-8 pb-2 sm:px-10/,
 );
 
 const queriesSrc = readSrc("src/workspaces/storefront/catalog/queries.ts");

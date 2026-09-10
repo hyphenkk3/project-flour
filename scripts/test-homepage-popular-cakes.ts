@@ -392,6 +392,12 @@ assert.match(popularSrc, /Popular Cakes/);
 assert.match(popularSrc, /formatHomepagePrice/);
 assert.match(popularSrc, /href="\/browse"/);
 assert.match(popularSrc, /overflow-hidden rounded-\[10px\]/);
+assert.match(popularSrc, /mx-auto w-full max-w-6xl/);
+assert.match(popularSrc, /w-24 shrink-0 lg:w-\[10\.5rem\]/);
+assert.match(popularSrc, /h-24 w-24/);
+assert.match(popularSrc, /lg:h-\[10\.5rem\] lg:w-\[10\.5rem\]/);
+assert.match(popularSrc, /sm:px-10/);
+assert.match(popularSrc, /sm:-mx-10 lg:mx-0/);
 assert.doesNotMatch(popularSrc, /return null/);
 
 const migrationSrc = readSrc(
