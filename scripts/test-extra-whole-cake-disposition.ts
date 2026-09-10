@@ -81,8 +81,15 @@ assert.equal(
   "customers do not see sliced extras",
 );
 
-assert.equal(extraCalendarBadgeStatus("confirmed"), "Available");
+assert.equal(
+  extraCalendarBadgeStatus("confirmed"),
+  "Available",
+);
 assert.equal(extraCalendarBadgeStatus("proposed"), "Proposed");
+assert.doesNotMatch(
+  extraCalendarBadgeStatus("confirmed"),
+  /EXTRA confirmed/i,
+);
 
 assert.equal(timelineEventLabel("extra_assigned"), "Fresh Pick assigned");
 
@@ -120,12 +127,15 @@ for (const role of ["bakery", "manager", "owner"] as const) {
   assert.equal(caps.canAssignExtraToOrder, true);
   assert.equal(caps.canMoveExtraWindow, true);
   assert.equal(caps.canCutExtraIntoSlices, true);
+  assert.equal(caps.canUnconfirmExtra, true);
 }
-assert.equal(
-  buildExtraWorkspaceCapabilities({ role: "collection", staffId: "x" })
-    .canAssignExtraToOrder,
-  false,
-);
+for (const role of ["collection", "customer_operations"] as const) {
+  const caps = buildExtraWorkspaceCapabilities({ role, staffId: role });
+  assert.equal(caps.canAssignExtraToOrder, false);
+  assert.equal(caps.canMoveExtraWindow, false);
+  assert.equal(caps.canCutExtraIntoSlices, false);
+  assert.equal(caps.canUnconfirmExtra, false);
+}
 
 const migration = readSrc(
   "supabase/migrations/20260909120000_extra_whole_cake_disposition.sql",
@@ -139,13 +149,31 @@ assert.match(migration, /_extra_stock_guard_disposition/);
 assert.match(migration, /inserted_order_item', false/);
 assert.match(migration, /for update/);
 assert.match(migration, /_assert_fresh_picks_confirm_window/);
+assert.match(migration, /Cannot undo a sold Extra/);
+assert.match(migration, /Cannot undo an Extra that was cut into slices/);
+assert.match(migration, /sliced_requires_confirmed/);
+assert.match(migration, /Not authorized to assign EXTRA/);
+assert.match(migration, /Not authorized to move EXTRA/);
+assert.match(migration, /Not authorized to cut EXTRA into slices/);
+assert.match(migration, /Not authorized to undo EXTRA availability/);
 assert.doesNotMatch(migration, /html2canvas/);
 
 const calendarQueries = readSrc("src/workspaces/owner/calendar/queries.ts");
 assert.match(calendarQueries, /sold_at, cut_into_slices_at/);
 
+const calendarView = readSrc(
+  "src/workspaces/owner/calendar/CalendarMatrixView.tsx",
+);
+assert.match(calendarView, /Fresh Pick · \$\{status\}/);
+assert.doesNotMatch(calendarView, /EXTRA confirmed/);
+
 const extraQueries = readSrc("src/workspaces/storefront/extra/queries.ts");
+assert.match(extraQueries, /\.is\("sold_at", null\)/);
 assert.match(extraQueries, /\.is\("cut_into_slices_at", null\)/);
+
+const extraBoardQueries = readSrc("src/workspaces/extra/queries.ts");
+assert.match(extraBoardQueries, /in\("extra_stock_id", soldIds\)/);
+assert.match(extraBoardQueries, /assignedOrderNumber: linked\.order_number/);
 
 const boardSrc = readSrc("src/workspaces/extra/ExtraBoard.tsx");
 assert.match(boardSrc, /Assign to order/);
@@ -153,6 +181,8 @@ assert.match(boardSrc, /Move pickup window/);
 assert.match(boardSrc, /Cut into slices/);
 assert.match(boardSrc, /Stop Fresh Pick availability/);
 assert.match(boardSrc, /Undo availability/);
+assert.match(boardSrc, /Assigned · \$\{unit\.assignedOrderNumber\}/);
+assert.match(boardSrc, /Cut into slices/);
 
 const extraPage = readSrc(
   "src/workspaces/storefront/home/StorefrontExtraPage.tsx",
@@ -164,5 +194,6 @@ const actionsSrc = readSrc("src/workspaces/extra/actions.ts");
 assert.match(actionsSrc, /assign_extra_stock_to_order/);
 assert.match(actionsSrc, /move_extra_stock_fresh_pick_window/);
 assert.match(actionsSrc, /cut_extra_stock_into_slices/);
+assert.match(actionsSrc, /unconfirm_extra_stock/);
 
 console.log("PASS extra whole-cake disposition");

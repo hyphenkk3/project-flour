@@ -276,6 +276,46 @@ async function main() {
       "customer Fresh Picks still shows Extra B",
     );
 
+    const { data: listedAfterSale } = await admin
+      .from("extra_stock")
+      .select("id")
+      .eq("lifecycle", "confirmed")
+      .is("sold_at", null)
+      .is("cut_into_slices_at", null)
+      .in("id", [extraA, extraB]);
+    const listedAfterSaleIds = new Set(
+      (listedAfterSale ?? []).map((row) => row.id as string),
+    );
+    check(
+      !listedAfterSaleIds.has(extraA),
+      "sold Extra A is hidden from customer Fresh Pick availability",
+    );
+    check(
+      listedAfterSaleIds.has(extraB),
+      "identical Extra B remains in customer Fresh Pick availability",
+    );
+
+    const { data: boardA } = await admin
+      .from("orders")
+      .select("id, extra_stock_id")
+      .eq("extra_stock_id", extraA)
+      .maybeSingle();
+    check(
+      boardA?.id === soldOrder?.id && boardA?.extra_stock_id === extraA,
+      "Extra Board can resolve sold Extra A to its order",
+    );
+
+    const { error: resellA } = await admin.rpc("submit_guest_extra_order", {
+      p_customer_name: `${SIG} Guest A retry`,
+      p_phone: "0190000197",
+      p_email: null,
+      p_pickup_date: fromDate,
+      p_pickup_time: pickupTime,
+      p_notes: SIG,
+      p_extra_stock_id: extraA,
+    });
+    check(Boolean(resellA), "sold Extra A cannot be purchased again", rpcMessage(resellA));
+
     const extraC = await confirmTwin("C");
     const { data: orderNumber, error: numErr } = await admin.rpc(
       "allocate_order_number",
@@ -349,6 +389,15 @@ async function main() {
       .select("id", { count: "exact", head: true })
       .eq("order_id", assignOrder?.id ?? "");
     check(itemCount === 1, "assign did not insert a duplicate order item");
+    const { data: boardC } = await admin
+      .from("orders")
+      .select("id, order_number, extra_stock_id")
+      .eq("extra_stock_id", extraC)
+      .maybeSingle();
+    check(
+      boardC?.id === assignOrder?.id && boardC?.extra_stock_id === extraC,
+      "Extra Board can resolve assigned Extra C to its order",
+    );
     check(
       mapExtraStockRowToCalendarMarker({
         ...(cAfter as object),
@@ -368,31 +417,63 @@ async function main() {
     );
 
     const extraD = await confirmTwin("D");
-    if (tomorrowYmd && fromDate === todayYmd) {
-      const tFrom =
-        extraOperatingSlotsForDate(tomorrowYmd)[0]?.value ?? "12:00";
-      const tCut =
-        extraOperatingSlotsForDate(tomorrowYmd).at(-1)?.value ?? "17:30";
-      const { error: moveErr } = await admin.rpc(
-        "move_extra_stock_fresh_pick_window",
-        {
-          p_extra_stock_id: extraD,
-          p_actor_staff_id: actor.id,
-          p_prepared_on: tomorrowYmd,
-          p_pickup_available_from_at: extraPickupThroughIso(tomorrowYmd, tFrom),
-          p_pickup_through_at: extraPickupThroughIso(tomorrowYmd, tCut),
-        },
-      );
-      check(!moveErr, "move Extra D to tomorrow", rpcMessage(moveErr));
-      const { data: moved } = await admin
-        .from("extra_stock")
-        .select("prepared_on")
-        .eq("id", extraD)
-        .maybeSingle();
-      check(moved?.prepared_on === tomorrowYmd, "moved Extra prepared_on is tomorrow");
-    } else {
-      check(true, "move Extra D to tomorrow (SKIP — already on tomorrow window)");
+    const destDate =
+      fromDate === todayYmd && tomorrowYmd ? tomorrowYmd : fromDate;
+    const destSlots = extraOperatingSlotsForDate(destDate);
+    const destFrom = destSlots[0]?.value ?? "12:00";
+    let destCut = destSlots.at(-1)?.value ?? "17:30";
+    if (destDate === fromDate && destSlots.length >= 3) {
+      destCut = destSlots[1]?.value ?? destCut;
     }
+    const destFromIso = extraPickupThroughIso(destDate, destFrom);
+    const destThroughIso = extraPickupThroughIso(destDate, destCut);
+    if (!destFromIso || !destThroughIso) {
+      throw new Error("move destination window iso missing");
+    }
+    const { error: moveErr } = await admin.rpc(
+      "move_extra_stock_fresh_pick_window",
+      {
+        p_extra_stock_id: extraD,
+        p_actor_staff_id: actor.id,
+        p_prepared_on: destDate,
+        p_pickup_available_from_at: destFromIso,
+        p_pickup_through_at: destThroughIso,
+      },
+    );
+    check(!moveErr, "move Extra D to another valid Fresh Pick window", rpcMessage(moveErr));
+    const { data: moved } = await admin
+      .from("extra_stock")
+      .select(
+        "id, prepared_on, pickup_available_from_at, pickup_through_at, sold_at, cut_into_slices_at, lifecycle, cake_name, size_label, library_cake_id, library_cake_size_id",
+      )
+      .eq("id", extraD)
+      .maybeSingle();
+    check(moved?.id === extraD, "moved Extra keeps the same extra_stock.id");
+    check(moved?.prepared_on === destDate, "moved Extra prepared_on follows the new window");
+    check(
+      new Date(moved?.pickup_available_from_at ?? "").getTime() ===
+        new Date(destFromIso).getTime(),
+      "moved Extra pickup_available_from_at follows the new window",
+    );
+    check(
+      new Date(moved?.pickup_through_at ?? "").getTime() ===
+        new Date(destThroughIso).getTime(),
+      "moved Extra pickup_through_at follows the new window",
+    );
+    check(
+      mapExtraStockRowToCalendarMarker(moved as never) != null,
+      "moved Extra remains an active calendar marker",
+    );
+    check(
+      isPublishedFreshPick({
+        lifecycle: "confirmed",
+        pickupThroughAt: moved?.pickup_through_at ?? null,
+        soldAt: moved?.sold_at ?? null,
+        cutIntoSlicesAt: moved?.cut_into_slices_at ?? null,
+        now,
+      }),
+      "customer Fresh Picks follow Extra D's new window",
+    );
 
     const future = addBusinessCalendarDays(todayYmd, 2);
     if (future) {
@@ -407,6 +488,69 @@ async function main() {
         },
       );
       check(Boolean(badMove), "invalid move date rejected", rpcMessage(badMove));
+    }
+
+    const extraE = await confirmTwin("E");
+    const unconfirmActor = (await staffFor("manager")) ?? actor;
+    const { error: unconfirmE } = await admin.rpc("unconfirm_extra_stock", {
+      p_extra_stock_id: extraE,
+      p_actor_staff_id: unconfirmActor.id,
+    });
+    check(!unconfirmE, "ordinary confirmed Extra can be unconfirmed", rpcMessage(unconfirmE));
+    const { data: eAfter } = await admin
+      .from("extra_stock")
+      .select("lifecycle, sold_at, cut_into_slices_at")
+      .eq("id", extraE)
+      .maybeSingle();
+    check(eAfter?.lifecycle === "proposed", "unconfirmed Extra returns to proposed");
+
+    const { error: undoSold } = await admin.rpc("unconfirm_extra_stock", {
+      p_extra_stock_id: extraA,
+      p_actor_staff_id: actor.id,
+    });
+    check(Boolean(undoSold), "sold Extra cannot be unconfirmed", rpcMessage(undoSold));
+
+    const opsStaff = await staffFor("customer_operations");
+    if (opsStaff?.id) {
+      const { error } = await admin.rpc("assign_extra_stock_to_order", {
+        p_extra_stock_id: extraD,
+        p_order_id: assignOrder?.id,
+        p_actor_staff_id: opsStaff.id,
+      });
+      check(
+        Boolean(error) && /not authorized/i.test(error?.message ?? ""),
+        "customer operations cannot assign Extra",
+        rpcMessage(error),
+      );
+    } else {
+      check(
+        true,
+        "customer operations cannot assign Extra (SKIP — no customer_operations staff)",
+      );
+    }
+
+    if (collectionStaff?.id) {
+      const { error: cutDenied } = await admin.rpc("cut_extra_stock_into_slices", {
+        p_extra_stock_id: extraD,
+        p_actor_staff_id: collectionStaff.id,
+      });
+      check(
+        Boolean(cutDenied) && /not authorized/i.test(cutDenied?.message ?? ""),
+        "collection cannot cut Extra",
+        rpcMessage(cutDenied),
+      );
+      const { error: unconfirmDenied } = await admin.rpc("unconfirm_extra_stock", {
+        p_extra_stock_id: extraD,
+        p_actor_staff_id: collectionStaff.id,
+      });
+      check(
+        Boolean(unconfirmDenied) && /not authorized/i.test(unconfirmDenied?.message ?? ""),
+        "collection cannot unconfirm Extra",
+        rpcMessage(unconfirmDenied),
+      );
+    } else {
+      check(true, "collection cannot cut Extra (SKIP — no collection staff)");
+      check(true, "collection cannot unconfirm Extra (SKIP — no collection staff)");
     }
 
     const { error: sliceErr } = await admin.rpc("cut_extra_stock_into_slices", {
@@ -458,16 +602,52 @@ async function main() {
       "sliced Extra is not available",
     );
 
+    const { error: undoSliced } = await admin.rpc("unconfirm_extra_stock", {
+      p_extra_stock_id: extraB,
+      p_actor_staff_id: actor.id,
+    });
+    check(Boolean(undoSliced), "sliced Extra cannot be unconfirmed", rpcMessage(undoSliced));
+
+    const { data: dAfterSlice } = await admin
+      .from("extra_stock")
+      .select("sold_at, cut_into_slices_at, lifecycle")
+      .eq("id", extraD)
+      .maybeSingle();
+    check(!dAfterSlice?.cut_into_slices_at, "identical Extra D is unaffected by slicing Extra B");
+    check(!dAfterSlice?.sold_at, "identical Extra D remains unsold after slicing Extra B");
+    check(dAfterSlice?.lifecycle === "confirmed", "identical Extra D stays confirmed");
+
+    const { data: listedAfterSlice } = await admin
+      .from("extra_stock")
+      .select("id")
+      .eq("lifecycle", "confirmed")
+      .is("sold_at", null)
+      .is("cut_into_slices_at", null)
+      .in("id", [extraB, extraD]);
+    const listedAfterSliceIds = new Set(
+      (listedAfterSlice ?? []).map((row) => row.id as string),
+    );
+    check(
+      !listedAfterSliceIds.has(extraB),
+      "sliced Extra B is hidden from customer Fresh Pick availability",
+    );
+    check(
+      listedAfterSliceIds.has(extraD),
+      "identical Extra D remains purchasable after Extra B is sliced",
+    );
+
     const { data: events } = await admin
       .from("extra_stock_events")
       .select("event_type, extra_stock_id")
-      .in("extra_stock_id", [extraA, extraB, extraC, extraD]);
+      .in("extra_stock_id", [extraA, extraB, extraC, extraD, extraE]);
     const types = new Set((events ?? []).map((row) => row.event_type as string));
     check(types.has("created"), "history records created");
     check(types.has("confirmed"), "history records confirmed");
     check(types.has("sold"), "history records sold");
     check(types.has("assigned"), "history records assigned");
+    check(types.has("moved"), "history records moved");
     check(types.has("cut_into_slices"), "history records cut into slices");
+    check(types.has("unconfirmed"), "history records unconfirmed");
 
     const { data: productAfter } = await admin
       .from("orders")
