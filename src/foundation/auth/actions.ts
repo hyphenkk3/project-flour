@@ -1,7 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { resolvePostLoginDestination } from "@/foundation/auth/post-login-destination";
+import { PASSKEY_COPY } from "@/foundation/auth/passkeys";
+import {
+  resolvePostLoginDestination,
+  sanitizePostLoginPath,
+} from "@/foundation/auth/post-login-destination";
+import { getSessionStaff } from "@/foundation/auth/session";
 import {
   findStaffByUsername,
   getAuthEmailForUserId,
@@ -68,4 +73,25 @@ export async function logoutAction() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/login");
+}
+
+/**
+ * After a browser Passkey ceremony writes a normal Auth session cookie,
+ * reuse the existing staff lookup and post-login redirect.
+ */
+export async function completePasskeyLoginAction(
+  requestedNext?: string | null,
+): Promise<LoginState> {
+  const staff = await getSessionStaff();
+
+  if (!staff) {
+    return { error: PASSKEY_COPY.failedSignIn };
+  }
+
+  redirect(
+    resolvePostLoginDestination(
+      staff.role.code,
+      sanitizePostLoginPath(requestedNext),
+    ),
+  );
 }

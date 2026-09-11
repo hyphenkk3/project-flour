@@ -3,6 +3,7 @@ import { canManageStaff } from "@/foundation/navigation/access";
 import { getNotificationDefinitionsForRole } from "@/foundation/staff/notification-preferences";
 import { loadStaffNotificationPreferences } from "@/foundation/staff/notification-preferences-queries";
 import { NotificationPreferences } from "@/components/settings/NotificationPreferences";
+import { StaffPasskeySettings } from "@/components/settings/StaffPasskeySettings";
 import { StaffProfileForm } from "@/components/settings/StaffProfileForm";
 
 export default async function SettingsPage() {
@@ -58,6 +59,8 @@ export default async function SettingsPage() {
           </div>
         </div>
       </section>
+
+      <StaffPasskeySettings />
 
       <section className="border-fog rounded-xl border bg-white p-5">
         <h3 className="text-ink text-sm font-semibold">Notifications</h3>
