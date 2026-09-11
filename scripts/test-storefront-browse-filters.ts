@@ -120,6 +120,74 @@ assert.deepEqual(
   ["pandan", "choco"],
 );
 
+const strawberry = {
+  ...chocolate,
+  id: "strawberry",
+  name: "Chocolate Strawberry",
+  categories: [
+    {
+      id: "cat-chocolate",
+      name: "Chocolate",
+      isActive: true,
+      sortOrder: 1,
+    },
+    {
+      id: "cat-fruit",
+      name: "Fruit",
+      isActive: true,
+      sortOrder: 2,
+    },
+  ],
+  categoryId: "cat-chocolate",
+  categoryName: "Chocolate",
+  categorySortOrder: 1,
+};
+assert.deepEqual(
+  filterBrowseCakes(
+    [strawberry, ...published],
+    { ...EMPTY_BROWSE_FILTERS, category: "cat-chocolate" },
+    ranges,
+  ).map((cake) => cake.id),
+  ["strawberry"],
+  "dual-category cake appears under Chocolate",
+);
+assert.deepEqual(
+  filterBrowseCakes(
+    [strawberry, ...published],
+    { ...EMPTY_BROWSE_FILTERS, category: "cat-fruit" },
+    ranges,
+  ).map((cake) => cake.id),
+  ["strawberry"],
+  "dual-category cake appears under Fruit",
+);
+assert.equal(
+  filterBrowseCakes(
+    [strawberry, ...published],
+    EMPTY_BROWSE_FILTERS,
+    ranges,
+  ).filter((cake) => cake.id === "strawberry").length,
+  1,
+  "All Cakes shows a dual-category cake once",
+);
+assert.deepEqual(
+  filterBrowseCakes(
+    [strawberry, ...published],
+    { ...EMPTY_BROWSE_FILTERS, category: "cat-chocolate,cat-fruit" },
+    ranges,
+  ).map((cake) => cake.id),
+  ["strawberry"],
+  "H. multiple selected categories use OR and do not duplicate cakes",
+);
+assert.deepEqual(
+  filterBrowseCakes(
+    [strawberry, ...published],
+    { ...EMPTY_BROWSE_FILTERS, category: "cat-chocolate", size: '8"' },
+    ranges,
+  ).map((cake) => cake.id),
+  ["strawberry"],
+  "dual-category cake still respects size filter",
+);
+
 assert.deepEqual(
   filterBrowseCakes(
     published,
@@ -364,7 +432,9 @@ assert.match(catalogueSrc, /sizeId\}-mobile/);
 assert.match(catalogueSrc, /setFilters\(\{ \.\.\.filters, size: event\.target\.value \}\)/);
 assert.match(catalogueSrc, /options\.sizes\.map/);
 assert.match(catalogueSrc, /return fields/);
-assert.match(catalogueSrc, /Clear filters/);
+assert.match(catalogueSrc, /All Cakes/);
+assert.doesNotMatch(catalogueSrc, /<option value="">Any<\/option>[\s\S]*options\.categories\.map/);
+assert.doesNotMatch(catalogueSrc, /tag_ids|Browse Tags|filter by tag|options\.tags/i);
 assert.match(catalogueSrc, /Try adjusting your search or filters/);
 assert.doesNotMatch(catalogueSrc, /md:contents/);
 assert.doesNotMatch(catalogueSrc, /lg:flex-nowrap/);
@@ -389,5 +459,6 @@ const cardSrc = readSrc(
   "src/workspaces/storefront/catalog/StorefrontCakeCard.tsx",
 );
 assert.match(cardSrc, /cakeCardPreorderLabel/);
+assert.match(cardSrc, /storefrontTagLabel/);
 
 console.log("PASS storefront browse filters");

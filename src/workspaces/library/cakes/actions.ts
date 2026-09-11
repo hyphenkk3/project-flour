@@ -14,6 +14,7 @@ import type { LibraryActionState } from "@/workspaces/library/action-state";
 import {
   getCakeById,
   listCakeCategories,
+  listCakeTags,
 } from "@/workspaces/library/cakes/queries";
 import {
   emptyToNull,
@@ -21,6 +22,13 @@ import {
   parseNonNegativeNumber,
 } from "@/workspaces/library/labels";
 import { parsePreorderDays } from "@/engines/preorder/lead";
+import {
+  parseCakeCategoryAssignmentIds,
+} from "@/engines/menu/cake-categories";
+import {
+  isMissingCakeTagAssignmentSchema,
+  parseCakeTagAssignmentIds,
+} from "@/engines/menu/cake-tags";
 import {
   parsePopularCakesSortOrder,
   planPopularCakesChange,
@@ -93,10 +101,12 @@ function parseSizes(formData: FormData): LibraryCakeSizeInput[] | string {
 
 async function parseCakeInput(
   formData: FormData,
-  options: { currentCategoryId?: string } = {},
+  options: {
+    currentCategoryIds?: readonly string[];
+    currentTagIds?: readonly string[];
+  } = {},
 ): Promise<LibraryCakeInput | string> {
   const name = String(formData.get("name") ?? "").trim();
-  const categoryId = String(formData.get("category") ?? "").trim();
   const description = emptyToNull(formData.get("description"));
   const sharingGuide = emptyToNull(formData.get("sharing_guide"));
   const bakeryNotes = emptyToNull(formData.get("bakery_notes"));
@@ -121,15 +131,43 @@ async function parseCakeInput(
   }
 
   if (!name) return "Name is required.";
-  if (!categoryId) return "Choose a valid category.";
+
+  const parsedIds = parseCakeCategoryAssignmentIds(
+    formData.getAll("category_ids").map((value) => String(value)),
+  );
+  if (typeof parsedIds === "string") {
+    return parsedIds;
+  }
 
   const categories = await listCakeCategories();
-  const match = categories.find((row) => row.id === categoryId);
-  if (!match) {
-    return "Choose a valid category.";
+  const current = new Set(
+    (options.currentCategoryIds ?? []).map((id) => id.trim()).filter(Boolean),
+  );
+  for (const categoryId of parsedIds) {
+    const match = categories.find((row) => row.id === categoryId);
+    if (!match) {
+      return "Choose a valid category.";
+    }
+    if (!match.isActive && !current.has(match.id)) {
+      return "Choose an active category.";
+    }
   }
-  if (!match.isActive && match.id !== options.currentCategoryId) {
-    return "Choose an active category.";
+
+  const parsedTagIds = parseCakeTagAssignmentIds(
+    formData.getAll("tag_ids").map((value) => String(value)),
+  );
+  const tags = await listCakeTags();
+  const currentTags = new Set(
+    (options.currentTagIds ?? []).map((id) => id.trim()).filter(Boolean),
+  );
+  for (const tagId of parsedTagIds) {
+    const match = tags.find((row) => row.id === tagId);
+    if (!match) {
+      return "Choose a valid tag.";
+    }
+    if (!match.isActive && !currentTags.has(match.id)) {
+      return "Choose an active tag.";
+    }
   }
   if (!LIBRARY_CAKE_STATUSES.includes(status)) {
     return "Choose a valid status.";
@@ -137,7 +175,8 @@ async function parseCakeInput(
 
   return {
     name,
-    categoryId,
+    categoryIds: parsedIds,
+    tagIds: parsedTagIds,
     description,
     sharingGuide,
     allergens,
@@ -148,6 +187,63 @@ async function parseCakeInput(
     sizes,
     photos: [],
   };
+}
+
+async function replaceCakeCategoryAssignments(
+  cakeId: string,
+  categoryIds: readonly string[],
+) {
+  const supabase = await createClient();
+  const { error: deleteError } = await supabase
+    .from("library_cake_category_assignments")
+    .delete()
+    .eq("cake_id", cakeId);
+  if (deleteError) {
+    throw new Error(deleteError.message);
+  }
+  if (categoryIds.length === 0) {
+    return;
+  }
+  const { error } = await supabase.from("library_cake_category_assignments").insert(
+    categoryIds.map((categoryId, index) => ({
+      cake_id: cakeId,
+      category_id: categoryId,
+      sort_order: index + 1,
+    })),
+  );
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+async function replaceCakeTagAssignments(
+  cakeId: string,
+  tagIds: readonly string[],
+) {
+  const supabase = await createClient();
+  const { error: deleteError } = await supabase
+    .from("library_cake_tag_assignments")
+    .delete()
+    .eq("cake_id", cakeId);
+  if (deleteError) {
+    if (isMissingCakeTagAssignmentSchema(deleteError.message)) {
+      return;
+    }
+    throw new Error(deleteError.message);
+  }
+  if (tagIds.length === 0) {
+    return;
+  }
+  const { error } = await supabase.from("library_cake_tag_assignments").insert(
+    tagIds.map((tagId, index) => ({
+      cake_id: cakeId,
+      tag_id: tagId,
+      sort_order: index + 1,
+    })),
+  );
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 const NEW_POPULAR_CAKES_PLAN_ID = "__new_cake__";
@@ -365,7 +461,7 @@ export async function createCakeAction(
     .from("library_cakes")
     .insert({
       name: parsed.name,
-      category_id: parsed.categoryId,
+      category_id: parsed.categoryIds[0] ?? null,
       description: parsed.description,
       sharing_guide: parsed.sharingGuide,
       allergens: parsed.allergens,
@@ -385,6 +481,8 @@ export async function createCakeAction(
 
   try {
     await saveCakeChildren(data.id, parsed.sizes);
+    await replaceCakeCategoryAssignments(data.id, parsed.categoryIds);
+    await replaceCakeTagAssignments(data.id, parsed.tagIds);
   } catch (childError) {
     return {
       error:
@@ -422,7 +520,8 @@ export async function updateCakeAction(
   const staff = await requireLibraryStaff();
   const current = await getCakeById(id);
   const parsed = await parseCakeInput(formData, {
-    currentCategoryId: current?.categoryId,
+    currentCategoryIds: current?.categories.map((row) => row.id) ?? [],
+    currentTagIds: current?.tags?.map((row) => row.id) ?? [],
   });
   if (typeof parsed === "string") {
     return { error: parsed };
@@ -458,7 +557,7 @@ export async function updateCakeAction(
     .from("library_cakes")
     .update({
       name: parsed.name,
-      category_id: parsed.categoryId,
+      category_id: parsed.categoryIds[0] ?? null,
       description: parsed.description,
       sharing_guide: parsed.sharingGuide,
       allergens: parsed.allergens,
@@ -476,6 +575,8 @@ export async function updateCakeAction(
 
   try {
     await saveCakeChildren(id, parsed.sizes);
+    await replaceCakeCategoryAssignments(id, parsed.categoryIds);
+    await replaceCakeTagAssignments(id, parsed.tagIds);
   } catch (childError) {
     return {
       error:

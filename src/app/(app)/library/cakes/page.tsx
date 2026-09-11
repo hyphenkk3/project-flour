@@ -48,6 +48,12 @@ export default async function LibraryCakesPage() {
               Manage categories
             </Link>
             <Link
+              className="border-fog text-ink hover:border-skyline inline-flex min-h-12 items-center justify-center rounded-lg border bg-white px-5 text-sm font-medium transition"
+              href="/library/cakes/tags"
+            >
+              Manage tags
+            </Link>
+            <Link
               className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium transition"
               href="/library/cakes/new"
             >

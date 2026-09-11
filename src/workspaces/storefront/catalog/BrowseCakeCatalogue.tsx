@@ -92,7 +92,7 @@ function FilterFields({
             }
             value={filters.category}
           >
-            <option value="">Any</option>
+            <option value="">All Cakes</option>
             {options.categories.map((category) => (
               <option key={category.value} value={category.value}>
                 {category.label}

@@ -46,7 +46,8 @@ import type {
   LibraryCollection,
 } from "@/workspaces/library/collections/queries";
 import { CollectionHomepagePreviewControl } from "@/workspaces/library/collections/CollectionHomepagePreviewControl";
-import { cakeCategoryOptionLabel, sortCakeCategories } from "@/engines/menu/cake-categories";
+import { cakeCategoryOptionLabel, formatCakeCategoryNames, sortCakeCategories } from "@/engines/menu/cake-categories";
+import { formatCakeTagNames } from "@/engines/menu/cake-tags";
 import {
   LIBRARY_CAKE_STATUSES,
   cakeCategoryLabel,
@@ -366,9 +367,14 @@ export function CollectionBuilder({
                 <div className="min-w-0">
                   <p className="text-ink font-medium">{cake.name}</p>
                   <p className="text-skyline mt-1 text-sm">
-                    {cakeCategoryLabel(cake.categoryName)} ·{" "}
+                    {formatCakeCategoryNames(cake.categories) || cakeCategoryLabel(cake.categoryName)} ·{" "}
                     {formatCakeSizePrices(cake.sizes)}
                   </p>
+                  {formatCakeTagNames(cake.tags ?? [], { includeInactive: true }) ? (
+                    <p className="text-skyline mt-1 text-sm">
+                      {formatCakeTagNames(cake.tags ?? [], { includeInactive: true })}
+                    </p>
+                  ) : null}
                   <p className="text-skyline mt-1 text-sm">
                     {libraryAddHint(cake.status, cake.sizes.length)}
                   </p>
@@ -516,9 +522,16 @@ function CollectionMemberCard({
             <div className="min-w-0">
               <p className="text-ink font-medium">{member.cake.name}</p>
               <p className="text-skyline mt-1 text-sm">
-                {cakeCategoryLabel(member.cake.categoryName)} ·{" "}
+                {formatCakeCategoryNames(member.cake.categories) || cakeCategoryLabel(member.cake.categoryName)} ·{" "}
                 {formatCakeSizePrices(member.cake.sizes)}
               </p>
+              {formatCakeTagNames(member.cake.tags ?? [], { includeInactive: true }) ? (
+                <p className="text-skyline mt-1 text-sm">
+                  {formatCakeTagNames(member.cake.tags ?? [], {
+                    includeInactive: true,
+                  })}
+                </p>
+              ) : null}
               <div className="mt-2 flex flex-wrap gap-2">
                 <StatusBadge
                   label={`Library: ${cakeStatusLabel(member.cake.status)}`}

@@ -11,6 +11,7 @@ import {
   formatRm,
   startingPrice,
   storefrontCategoryLabel,
+  storefrontTagLabel,
   type CakeCardPreorderBadgeTone,
 } from "@/workspaces/storefront/catalog/pricing";
 
@@ -43,7 +44,8 @@ export function StorefrontCakeCard({
 }: StorefrontCakeCardProps) {
   const from = startingPrice(cake);
   const sizes = formatAvailableSizes(cake);
-  const category = storefrontCategoryLabel(cake.categoryName);
+  const category = storefrontCategoryLabel(cake);
+  const tags = storefrontTagLabel(cake);
   const preorder = cakeCardPreorderLabel(cake);
   const preorderTone = cakeCardPreorderBadgeTone(cake);
   const hero = storefrontDefaultPhoto(cake.photos);
@@ -128,6 +130,11 @@ export function StorefrontCakeCard({
           {sizes ? (
             <p className="text-skyline mt-0.5 text-xs sm:mt-1 sm:text-sm">
               {sizes}
+            </p>
+          ) : null}
+          {tags ? (
+            <p className="text-skyline mt-1.5 text-[11px] leading-snug tracking-[0.02em]">
+              {tags}
             </p>
           ) : null}
           {availabilityNote ? (

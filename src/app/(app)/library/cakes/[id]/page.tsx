@@ -8,8 +8,9 @@ import { CakePhotoManager } from "@/workspaces/library/cakes/CakePhotoManager";
 import { deleteCakeAction } from "@/workspaces/library/cakes/actions";
 import { getCakeById } from "@/workspaces/library/cakes/queries";
 import { DeleteLibraryItemButton } from "@/workspaces/library/DeleteLibraryItemButton";
+import { formatCakeCategoryNames } from "@/engines/menu/cake-categories";
+import { formatCakeTagNames } from "@/engines/menu/cake-tags";
 import {
-  cakeCategoryLabel,
   cakeStatusLabel,
   formatLibraryMoney,
   libraryStatusTone,
@@ -49,13 +50,24 @@ export default async function LibraryCakeDetailPage({
               label={cakeStatusLabel(cake.status)}
               tone={libraryStatusTone(cake.status)}
             />
-            <StatusBadge
-              label={cakeCategoryLabel(cake.categoryName)}
-              tone="neutral"
-            />
-            {cake.categoryActive ? null : (
+            {formatCakeCategoryNames(cake.categories) ? (
+              <StatusBadge
+                label={formatCakeCategoryNames(cake.categories)}
+                tone="neutral"
+              />
+            ) : null}
+            {formatCakeTagNames(cake.tags ?? [], { includeInactive: true }) ? (
+              <StatusBadge
+                label={formatCakeTagNames(cake.tags ?? [], { includeInactive: true })}
+                tone="neutral"
+              />
+            ) : null}
+            {cake.categories.some((row) => !row.isActive) ? (
               <StatusBadge label="Category inactive" tone="warning" />
-            )}
+            ) : null}
+            {cake.tags?.some((row) => !row.isActive) ? (
+              <StatusBadge label="Tag inactive" tone="warning" />
+            ) : null}
           </div>
           <div className="min-w-0 [&_h2]:break-words">
             <PageHeader title={cake.name} />

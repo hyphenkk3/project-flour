@@ -1,4 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
+import {
+  isMissingCakeCategoryAssignmentSchema,
+  omitCakeCategoryAssignmentEmbed,
+} from "@/engines/menu/cake-categories";
+import {
+  isMissingCakeTagAssignmentSchema,
+  omitCakeTagAssignmentEmbed,
+} from "@/engines/menu/cake-tags";
 import { mapCake } from "@/workspaces/library/cakes/queries";
 import type { LibraryCake } from "@/types/library-cake";
 import type { CataloguePurpose } from "@/workspaces/library/collections/catalogue";
@@ -352,6 +360,26 @@ export async function listCollectionCakeRows(
           is_active,
           sort_order
         ),
+        library_cake_category_assignments!cake_id (
+          category_id,
+          sort_order,
+          library_cake_categories!category_id (
+            id,
+            name,
+            is_active,
+            sort_order
+          )
+        ),
+        library_cake_tag_assignments!cake_id (
+          tag_id,
+          sort_order,
+          library_cake_tags!tag_id (
+            id,
+            name,
+            is_active,
+            sort_order
+          )
+        ),
         library_cake_sizes (
           id,
           cake_id,
@@ -366,7 +394,7 @@ export async function listCollectionCakeRows(
     .select(membershipSelect)
     .eq("collection_id", collectionId)
     .order("sort_order", { ascending: true });
-  const { data, error } =
+  let { data, error } =
     (withHomepage.error?.message ?? "").includes("show_on_homepage") ||
     (withHomepage.error?.message ?? "").includes("homepage_sort_order")
       ? await supabase
@@ -395,6 +423,26 @@ export async function listCollectionCakeRows(
           is_active,
           sort_order
         ),
+        library_cake_category_assignments!cake_id (
+          category_id,
+          sort_order,
+          library_cake_categories!category_id (
+            id,
+            name,
+            is_active,
+            sort_order
+          )
+        ),
+        library_cake_tag_assignments!cake_id (
+          tag_id,
+          sort_order,
+          library_cake_tags!tag_id (
+            id,
+            name,
+            is_active,
+            sort_order
+          )
+        ),
         library_cake_sizes (
           id,
           cake_id,
@@ -408,6 +456,33 @@ export async function listCollectionCakeRows(
           .eq("collection_id", collectionId)
           .order("sort_order", { ascending: true })
       : withHomepage;
+  if (error && isMissingCakeTagAssignmentSchema(error.message)) {
+    const retry = await supabase
+      .from("collection_cakes")
+      .select(omitCakeTagAssignmentEmbed(membershipSelect))
+      .eq("collection_id", collectionId)
+      .order("sort_order", { ascending: true });
+    data = retry.data as typeof data;
+    error = retry.error;
+  }
+  if (error && isMissingCakeCategoryAssignmentSchema(error.message)) {
+    const retry = await supabase
+      .from("collection_cakes")
+      .select(omitCakeCategoryAssignmentEmbed(membershipSelect))
+      .eq("collection_id", collectionId)
+      .order("sort_order", { ascending: true });
+    data = retry.data as typeof data;
+    error = retry.error;
+  }
+  if (error && isMissingCakeTagAssignmentSchema(error.message)) {
+    const retry = await supabase
+      .from("collection_cakes")
+      .select(omitCakeTagAssignmentEmbed(membershipSelect))
+      .eq("collection_id", collectionId)
+      .order("sort_order", { ascending: true });
+    data = retry.data as typeof data;
+    error = retry.error;
+  }
   if (error) {
     throw new Error(error.message);
   }

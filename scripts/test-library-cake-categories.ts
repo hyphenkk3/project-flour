@@ -146,6 +146,7 @@ const banana = {
   status: "active" as const,
   createdAt: "2026-08-01T00:00:00.000Z",
   updatedAt: "2026-08-01T00:00:00.000Z",
+  tags: [],
   sizes: [],
 };
 assert.equal(banana.categoryId, classic.id);
@@ -162,6 +163,14 @@ const deactivatedAssignment = {
   categoryActive: false,
   categoryId: specialty.id,
   categoryName: "Specialty",
+  categories: [
+    {
+      id: specialty.id,
+      name: "Specialty",
+      isActive: false,
+      sortOrder: specialty.sortOrder,
+    },
+  ],
 };
 assert.equal(deactivatedAssignment.categoryId, specialty.id);
 assert.deepEqual(
@@ -184,6 +193,7 @@ function storefront(
     description: null,
     ...fields,
     categoryActive: active,
+    categories: fields.categories.map((row) => ({ ...row, isActive: active })),
     image: null,
     photos: [],
     sharingGuide: null,
@@ -227,15 +237,32 @@ assert.deepEqual(
   reordered.map((row) => row.name),
   ["Seasonal", "Classic"],
 );
+function withCategorySortOrder(
+  cake: ReturnType<typeof storefront>,
+  categoryId: string,
+  sortOrder: number,
+) {
+  return {
+    ...cake,
+    categorySortOrder:
+      cake.categoryId === categoryId ? sortOrder : cake.categorySortOrder,
+    categories: cake.categories.map((row) =>
+      row.id === categoryId ? { ...row, sortOrder } : row,
+    ),
+  };
+}
+
 const reorderedBrowse = [
-  {
-    ...storefront("a", "seasonal"),
-    categorySortOrder: reordered.find((row) => row.id === seasonal.id)!.sortOrder,
-  },
-  {
-    ...storefront("b", "classic"),
-    categorySortOrder: reordered.find((row) => row.id === classic.id)!.sortOrder,
-  },
+  withCategorySortOrder(
+    storefront("a", "seasonal"),
+    seasonal.id,
+    reordered.find((row) => row.id === seasonal.id)!.sortOrder,
+  ),
+  withCategorySortOrder(
+    storefront("b", "classic"),
+    classic.id,
+    reordered.find((row) => row.id === classic.id)!.sortOrder,
+  ),
 ];
 assert.deepEqual(
   browseCategoryOptionsFromCakes(reorderedBrowse).map((row) => row.label),

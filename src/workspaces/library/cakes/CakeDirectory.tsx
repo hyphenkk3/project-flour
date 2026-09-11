@@ -29,8 +29,10 @@ import {
 import { CakePopularCakesControl } from "@/workspaces/library/cakes/CakePopularCakesControl";
 import {
   cakeCategoryOptionLabel,
+  formatCakeCategoryNames,
   sortCakeCategories,
 } from "@/engines/menu/cake-categories";
+import { formatCakeTagNames } from "@/engines/menu/cake-tags";
 import {
   popularCakesPosition,
   sortHomepagePopularCakes,
@@ -272,9 +274,16 @@ export function CakeDirectory({
                           {cake.name}
                         </p>
                         <p className="text-skyline mt-1 text-sm">
-                          {cakeCategoryLabel(cake.categoryName)}
+                          {formatCakeCategoryNames(cake.categories) || cakeCategoryLabel(cake.categoryName)}
                           {!cake.categoryActive ? " (inactive)" : ""}
                         </p>
+                        {formatCakeTagNames(cake.tags ?? [], { includeInactive: true }) ? (
+                          <p className="text-skyline mt-1 text-sm">
+                            {formatCakeTagNames(cake.tags ?? [], {
+                              includeInactive: true,
+                            })}
+                          </p>
+                        ) : null}
                         <p className="text-ink mt-1 text-sm">
                           {formatCakeSizePrices(cake.sizes)}
                         </p>

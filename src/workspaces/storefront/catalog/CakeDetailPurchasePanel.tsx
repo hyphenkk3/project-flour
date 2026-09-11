@@ -9,6 +9,7 @@ import {
   formatPreorderRequirement,
   formatRm,
   storefrontCategoryLabel,
+  storefrontTagLabel,
 } from "@/workspaces/storefront/catalog/pricing";
 
 type CakeDetailPurchasePanelProps = {
@@ -46,7 +47,8 @@ export function CakeDetailPurchasePanel({
 }: CakeDetailPurchasePanelProps) {
   const draft = usePreorderDraft();
   const selectedSize = cake.sizes.find((size) => size.id === selectedSizeId);
-  const category = storefrontCategoryLabel(cake.categoryName);
+  const category = storefrontCategoryLabel(cake);
+  const tags = storefrontTagLabel(cake);
   const from = pickupScopeFrom?.trim().slice(0, 10) ?? "";
   const to = pickupScopeTo?.trim().slice(0, 10) ?? "";
   const pickupScope =
@@ -77,6 +79,11 @@ export function CakeDetailPurchasePanel({
         <h1 className="font-display text-ink text-[2rem] leading-tight tracking-tight sm:text-4xl">
           {cake.name}
         </h1>
+        {tags ? (
+          <p className="text-skyline mt-2 text-[11px] leading-snug tracking-[0.02em]">
+            {tags}
+          </p>
+        ) : null}
         {cake.description ? (
           <p className="text-skyline mt-3 text-sm leading-relaxed sm:text-[0.95rem]">
             {cake.description}

@@ -177,6 +177,20 @@ export type StorefrontCakePhoto = {
   isDefault: boolean;
 };
 
+export type StorefrontCakeCategory = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+};
+
+export type StorefrontCakeTag = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+};
+
 export type StorefrontCake = {
   id: string;
   name: string;
@@ -185,6 +199,8 @@ export type StorefrontCake = {
   categoryName: string | null;
   categoryActive: boolean;
   categorySortOrder: number;
+  categories: StorefrontCakeCategory[];
+  tags?: StorefrontCakeTag[];
   image: string | null;
   photos: StorefrontCakePhoto[];
   sharingGuide: string | null;

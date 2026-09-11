@@ -1,6 +1,17 @@
 import { sortCakePhotos } from "@/engines/menu/cake-photos";
 import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
-import { sortCakeCategories } from "@/engines/menu/cake-categories";
+import {
+  cakeCategoryRefsFromPrimary,
+  isMissingCakeCategoryAssignmentSchema,
+  omitCakeCategoryAssignmentEmbed,
+  primaryCakeCategory,
+  sortCakeCategories,
+} from "@/engines/menu/cake-categories";
+import {
+  isMissingCakeTagAssignmentSchema,
+  omitCakeTagAssignmentEmbed,
+  sortCakeTags,
+} from "@/engines/menu/cake-tags";
 import { readPreorderDays } from "@/engines/preorder/lead";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -10,6 +21,7 @@ import type {
   LibraryCakePhoto,
   LibraryCakeSize,
   LibraryCakeStatus,
+  LibraryCakeTagRecord,
 } from "@/types/library-cake";
 
 type SizeRow = {
@@ -45,7 +57,7 @@ type CategoryEmbed = {
 type CakeRow = {
   id: string;
   name: string;
-  category_id: string;
+  category_id: string | null;
   description: string | null;
   sharing_guide: string | null;
   allergens: string[] | null;
@@ -56,6 +68,16 @@ type CakeRow = {
   created_at: string;
   updated_at: string;
   library_cake_categories?: CategoryEmbed | CategoryEmbed[] | null;
+  library_cake_category_assignments?: Array<{
+    category_id?: string;
+    sort_order?: number;
+    library_cake_categories?: CategoryEmbed | CategoryEmbed[] | null;
+  }> | null;
+  library_cake_tag_assignments?: Array<{
+    tag_id?: string;
+    sort_order?: number;
+    library_cake_tags?: CategoryEmbed | CategoryEmbed[] | null;
+  }> | null;
   library_cake_sizes?: SizeRow[] | null;
   library_cake_photos?: PhotoRow[] | null;
 };
@@ -115,15 +137,55 @@ export function mapCake(row: CakeRow): LibraryCake {
     (row.library_cake_sizes ?? []).map(mapSize),
     (size) => size.label,
   );
-  const category = unwrapOne(row.library_cake_categories);
+  const assignmentRows = row.library_cake_category_assignments;
+  const hasAssignmentEmbed = assignmentRows !== undefined;
+  const assigned = (assignmentRows ?? [])
+    .map((assignment) => {
+      const category = unwrapOne(assignment.library_cake_categories);
+      if (!category) return null;
+      return {
+        id: category.id,
+        name: category.name,
+        isActive: category.is_active,
+        sortOrder: category.sort_order,
+      };
+    })
+    .filter((category): category is NonNullable<typeof category> => category != null);
+  const fallback = unwrapOne(row.library_cake_categories);
+  const categories = hasAssignmentEmbed
+    ? sortCakeCategories(assigned)
+    : cakeCategoryRefsFromPrimary({
+        categoryId: fallback?.id ?? row.category_id,
+        categoryName: fallback?.name,
+        categoryActive: fallback?.is_active,
+        categorySortOrder: fallback?.sort_order,
+      });
+  const primary = primaryCakeCategory(categories);
+  const tagAssignmentRows = row.library_cake_tag_assignments;
+  const hasTagEmbed = tagAssignmentRows !== undefined;
+  const assignedTags = (tagAssignmentRows ?? [])
+    .map((assignment) => {
+      const tag = unwrapOne(assignment.library_cake_tags);
+      if (!tag) return null;
+      return {
+        id: tag.id,
+        name: tag.name,
+        isActive: tag.is_active,
+        sortOrder: tag.sort_order,
+      };
+    })
+    .filter((tag): tag is NonNullable<typeof tag> => tag != null);
+  const tags = hasTagEmbed ? sortCakeTags(assignedTags) : [];
 
   return {
     id: row.id,
     name: row.name,
-    categoryId: row.category_id,
-    categoryName: category?.name ?? "",
-    categoryActive: category?.is_active ?? true,
-    categorySortOrder: category?.sort_order ?? 0,
+    categoryId: primary?.id ?? (hasAssignmentEmbed ? "" : (row.category_id ?? "")),
+    categoryName: primary?.name ?? "",
+    categoryActive: categories.length === 0 || categories.every((row) => row.isActive),
+    categorySortOrder: primary?.sortOrder ?? 0,
+    categories,
+    tags,
     description: row.description,
     sharingGuide: row.sharing_guide,
     allergens: row.allergens ?? [],
@@ -163,6 +225,26 @@ const cakeListSelect = `
     is_active,
     sort_order
   ),
+  library_cake_category_assignments!cake_id (
+    category_id,
+    sort_order,
+    library_cake_categories!category_id (
+      id,
+      name,
+      is_active,
+      sort_order
+    )
+  ),
+  library_cake_tag_assignments!cake_id (
+    tag_id,
+    sort_order,
+    library_cake_tags!tag_id (
+      id,
+      name,
+      is_active,
+      sort_order
+    )
+  ),
   library_cake_sizes (
     id,
     cake_id,
@@ -188,40 +270,93 @@ export async function listCakes(query?: string): Promise<LibraryCake[]> {
   const supabase = await createClient();
   const trimmed = query?.trim() ?? "";
 
-  let request = supabase
-    .from("library_cakes")
-    .select(cakeListSelect)
-    .order("updated_at", { ascending: false });
+  const run = (select: string) => {
+    let request = supabase
+      .from("library_cakes")
+      .select(select)
+      .order("updated_at", { ascending: false });
+    if (trimmed) {
+      const escaped = trimmed
+        .replaceAll("\\", "\\\\")
+        .replaceAll("%", "\\%")
+        .replaceAll("_", "\\_")
+        .replaceAll(",", " ");
+      const pattern = `%${escaped}%`;
+      request = request.or(
+        `name.ilike."${pattern}",description.ilike."${pattern}"`,
+      );
+    }
+    return request;
+  };
 
-  if (trimmed) {
-    const escaped = trimmed
-      .replaceAll("\\", "\\\\")
-      .replaceAll("%", "\\%")
-      .replaceAll("_", "\\_")
-      .replaceAll(",", " ");
-    const pattern = `%${escaped}%`;
-    request = request.or(
-      `name.ilike."${pattern}",description.ilike."${pattern}"`,
-    );
+  let select = cakeListSelect;
+  let { data, error } = await run(select);
+  if (error && isMissingCakeTagAssignmentSchema(error.message)) {
+    select = omitCakeTagAssignmentEmbed(select);
+    const retry = await run(select);
+    data = retry.data as typeof data;
+    error = retry.error;
   }
-
-  const { data, error } = await request;
+  if (error && isMissingCakeCategoryAssignmentSchema(error.message)) {
+    select = omitCakeCategoryAssignmentEmbed(select);
+    const retry = await run(select);
+    data = retry.data as typeof data;
+    error = retry.error;
+  }
+  if (error && isMissingCakeTagAssignmentSchema(error.message)) {
+    select = omitCakeTagAssignmentEmbed(select);
+    const retry = await run(select);
+    data = retry.data as typeof data;
+    error = retry.error;
+  }
   if (error) {
     throw new Error(error.message);
   }
 
-  return (data as CakeRow[]).map(mapCake);
+  return ((data ?? []) as unknown as CakeRow[]).map(mapCake);
 }
 
 export async function getCakeById(
   id: string,
 ): Promise<LibraryCakeDetail | null> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let select = cakeListSelect;
+  let { data, error } = await supabase
     .from("library_cakes")
-    .select(cakeListSelect)
+    .select(select)
     .eq("id", id)
     .maybeSingle();
+
+  if (error && isMissingCakeTagAssignmentSchema(error.message)) {
+    select = omitCakeTagAssignmentEmbed(select);
+    const retry = await supabase
+      .from("library_cakes")
+      .select(select)
+      .eq("id", id)
+      .maybeSingle();
+    data = retry.data as typeof data;
+    error = retry.error;
+  }
+  if (error && isMissingCakeCategoryAssignmentSchema(error.message)) {
+    select = omitCakeCategoryAssignmentEmbed(select);
+    const retry = await supabase
+      .from("library_cakes")
+      .select(select)
+      .eq("id", id)
+      .maybeSingle();
+    data = retry.data as typeof data;
+    error = retry.error;
+  }
+  if (error && isMissingCakeTagAssignmentSchema(error.message)) {
+    select = omitCakeTagAssignmentEmbed(select);
+    const retry = await supabase
+      .from("library_cakes")
+      .select(select)
+      .eq("id", id)
+      .maybeSingle();
+    data = retry.data as typeof data;
+    error = retry.error;
+  }
 
   if (error) {
     throw new Error(error.message);
@@ -230,7 +365,7 @@ export async function getCakeById(
     return null;
   }
 
-  const mapped = mapCake(data as CakeRow);
+  const mapped = mapCake(data as unknown as CakeRow);
   return {
     ...mapped,
     photos: mapped.photos ?? [],
@@ -255,8 +390,24 @@ export async function listCakeCategories(): Promise<LibraryCakeCategoryRecord[]>
 export async function countCakesByCategoryId(): Promise<Map<string, number>> {
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from("library_cakes")
+    .from("library_cake_category_assignments")
     .select("category_id");
+
+  if (error && isMissingCakeCategoryAssignmentSchema(error.message)) {
+    const fallback = await supabase
+      .from("library_cakes")
+      .select("category_id");
+    if (fallback.error) {
+      throw new Error(fallback.error.message);
+    }
+    const counts = new Map<string, number>();
+    for (const row of (fallback.data ?? []) as Array<{ category_id: string | null }>) {
+      const id = row.category_id?.trim() ?? "";
+      if (!id) continue;
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+    return counts;
+  }
 
   if (error) {
     throw new Error(error.message);
@@ -265,6 +416,48 @@ export async function countCakesByCategoryId(): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
   for (const row of (data ?? []) as Array<{ category_id: string | null }>) {
     const id = row.category_id?.trim() ?? "";
+    if (!id) continue;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return counts;
+}
+
+export async function listCakeTags(): Promise<LibraryCakeTagRecord[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("library_cake_tags")
+    .select("id, name, is_active, sort_order, created_at, updated_at")
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error && isMissingCakeTagAssignmentSchema(error.message)) {
+    return [];
+  }
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return sortCakeTags((data as CategoryRow[]).map(mapCakeCategory));
+}
+
+export async function countCakesByTagId(): Promise<Map<string, number>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("library_cake_tag_assignments")
+    .select("tag_id");
+
+  if (error && isMissingCakeTagAssignmentSchema(error.message)) {
+    return new Map();
+  }
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const counts = new Map<string, number>();
+  for (const row of (data ?? []) as Array<{ tag_id: string | null }>) {
+    const id = row.tag_id?.trim() ?? "";
     if (!id) continue;
     counts.set(id, (counts.get(id) ?? 0) + 1);
   }

@@ -1,6 +1,16 @@
 import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
 import { readPreorderDays } from "@/engines/preorder/lead";
 import {
+  cakeCategoryRefsFromPrimary,
+  isMissingCakeCategoryAssignmentSchema,
+  primaryCakeCategory,
+  sortCakeCategories,
+} from "@/engines/menu/cake-categories";
+import {
+  isMissingCakeTagAssignmentSchema,
+  sortCakeTags,
+} from "@/engines/menu/cake-tags";
+import {
   browseCakeAvailabilityNote,
   catalogueValidThroughYmd,
   isCurrentlyCustomerOrderable,
@@ -58,6 +68,16 @@ type LibraryCakeEmbed = {
   show_in_popular_cakes?: boolean | null;
   popular_cakes_sort_order?: number | string | null;
   library_cake_categories?: CategoryEmbed | CategoryEmbed[] | null;
+  library_cake_category_assignments?: Array<{
+    category_id?: string;
+    sort_order?: number;
+    library_cake_categories?: CategoryEmbed | CategoryEmbed[] | null;
+  }> | null;
+  library_cake_tag_assignments?: Array<{
+    tag_id?: string;
+    sort_order?: number;
+    library_cake_tags?: CategoryEmbed | CategoryEmbed[] | null;
+  }> | null;
   library_cake_sizes: Array<{
     id: string;
     cake_id: string;
@@ -224,7 +244,37 @@ function mapSize(row: {
   };
 }
 
-function libraryCakeEmbedSelect(photoSelect: string): string {
+function libraryCakeEmbedSelect(
+  photoSelect: string,
+  includeAssignments = true,
+  includeTags = true,
+): string {
+  const assignmentSelect = includeAssignments
+    ? `
+      library_cake_category_assignments!cake_id (
+        category_id,
+        sort_order,
+        library_cake_categories!category_id (
+          id,
+          name,
+          is_active,
+          sort_order
+        )
+      ),`
+    : "";
+  const tagSelect = includeTags
+    ? `
+      library_cake_tag_assignments!cake_id (
+        tag_id,
+        sort_order,
+        library_cake_tags!tag_id (
+          id,
+          name,
+          is_active,
+          sort_order
+        )
+      ),`
+    : "";
   return `
       id,
       name,
@@ -239,6 +289,8 @@ function libraryCakeEmbedSelect(photoSelect: string): string {
         is_active,
         sort_order
       ),
+      ${assignmentSelect}
+      ${tagSelect}
       library_cake_sizes (
         id,
         cake_id,
@@ -254,22 +306,54 @@ function libraryCakeEmbedSelect(photoSelect: string): string {
 }
 
 async function withCakePhotoSelectFallback<T>(
-  run: (photoSelect: string) => unknown,
+  run: (
+    photoSelect: string,
+    includeAssignments: boolean,
+    includeTags: boolean,
+  ) => unknown,
 ): Promise<T | null> {
-  const first = (await run(STOREFRONT_CAKE_PHOTO_SELECT)) as {
-    data: T | null;
-    error: { message: string } | null;
+  const attempt = async (
+    photoSelect: string,
+    includeAssignments: boolean,
+    includeTags: boolean,
+  ) =>
+    (await run(photoSelect, includeAssignments, includeTags)) as {
+      data: T | null;
+      error: { message: string } | null;
+    };
+
+  const resolveSchema = async (photoSelect: string) => {
+    let result = await attempt(photoSelect, true, true);
+    if (!result.error) return result;
+
+    if (isMissingCakeTagAssignmentSchema(result.error.message)) {
+      result = await attempt(photoSelect, true, false);
+      if (!result.error) return result;
+    }
+
+    if (isMissingCakeCategoryAssignmentSchema(result.error.message)) {
+      result = await attempt(photoSelect, false, true);
+      if (!result.error) return result;
+      if (isMissingCakeTagAssignmentSchema(result.error.message)) {
+        result = await attempt(photoSelect, false, false);
+        if (!result.error) return result;
+      }
+    }
+
+    return result;
   };
-  if (!first.error) return first.data;
-  if (!isMissingCakePhotoSchema(first.error.message)) {
-    throw new Error(first.error.message);
+
+  let result = await resolveSchema(STOREFRONT_CAKE_PHOTO_SELECT);
+  if (!result.error) return result.data;
+
+  if (!isMissingCakePhotoSchema(result.error.message)) {
+    throw new Error(result.error.message);
   }
-  const second = (await run(STOREFRONT_CAKE_PHOTO_SELECT_LEGACY)) as {
-    data: T | null;
-    error: { message: string } | null;
-  };
-  if (second.error) throw new Error(second.error.message);
-  return second.data;
+
+  result = await resolveSchema(STOREFRONT_CAKE_PHOTO_SELECT_LEGACY);
+  if (!result.error) return result.data;
+
+  throw new Error(result.error.message);
 }
 
 export function mapStorefrontCake(row: LibraryCakeEmbed): StorefrontCake {
@@ -281,16 +365,56 @@ export function mapStorefrontCake(row: LibraryCakeEmbed): StorefrontCake {
     .sort((a, b) => a.sort_order - b.sort_order)
     .filter((photo) => Boolean(photo.image_url))
     .map((photo, index) => mapStorefrontCakePhoto(photo, index));
-  const category = unwrapOne(row.library_cake_categories);
+  const assignmentRows = row.library_cake_category_assignments;
+  const hasAssignmentEmbed = assignmentRows !== undefined;
+  const assigned = (assignmentRows ?? [])
+    .map((assignment) => {
+      const category = unwrapOne(assignment.library_cake_categories);
+      if (!category) return null;
+      return {
+        id: category.id,
+        name: category.name,
+        isActive: category.is_active,
+        sortOrder: category.sort_order,
+      };
+    })
+    .filter((category): category is NonNullable<typeof category> => category != null);
+  const fallback = unwrapOne(row.library_cake_categories);
+  const categories = hasAssignmentEmbed
+    ? sortCakeCategories(assigned)
+    : cakeCategoryRefsFromPrimary({
+        categoryId: fallback?.id ?? row.category_id,
+        categoryName: fallback?.name,
+        categoryActive: fallback?.is_active,
+        categorySortOrder: fallback?.sort_order,
+      });
+  const primary = primaryCakeCategory(categories);
+  const tagAssignmentRows = row.library_cake_tag_assignments;
+  const hasTagEmbed = tagAssignmentRows !== undefined;
+  const assignedTags = (tagAssignmentRows ?? [])
+    .map((assignment) => {
+      const tag = unwrapOne(assignment.library_cake_tags);
+      if (!tag) return null;
+      return {
+        id: tag.id,
+        name: tag.name,
+        isActive: tag.is_active,
+        sortOrder: tag.sort_order,
+      };
+    })
+    .filter((tag): tag is NonNullable<typeof tag> => tag != null);
+  const tags = hasTagEmbed ? sortCakeTags(assignedTags) : [];
 
   return {
     id: row.id,
     name: row.name,
     description: row.description,
-    categoryId: category?.id ?? row.category_id ?? null,
-    categoryName: category?.name ?? null,
-    categoryActive: category?.is_active ?? true,
-    categorySortOrder: category?.sort_order ?? 0,
+    categoryId: primary?.id ?? (hasAssignmentEmbed ? null : (row.category_id ?? null)),
+    categoryName: primary?.name ?? null,
+    categoryActive: categories.length === 0 || categories.every((category) => category.isActive),
+    categorySortOrder: primary?.sortOrder ?? 0,
+    categories,
+    tags,
     image: storefrontDefaultPhoto(photos)?.url ?? null,
     photos,
     sharingGuide: row.sharing_guide,
@@ -368,14 +492,14 @@ export async function listAvailableCakes(
   collectionId: string,
 ): Promise<StorefrontCake[]> {
   const supabase = await createClient();
-  const data = await withCakePhotoSelectFallback((photoSelect) =>
+  const data = await withCakePhotoSelectFallback((photoSelect, includeAssignments, includeTags) =>
     supabase
       .from("collection_cakes")
       .select(
         `
       sort_order,
       library_cakes (
-        ${libraryCakeEmbedSelect(photoSelect)}
+        ${libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags)}
       )
     `,
       )
@@ -401,14 +525,14 @@ export async function listHomepageCollectionPreviewCakes(
 ): Promise<StorefrontCake[]> {
   const supabase = await createClient();
   try {
-    const data = await withCakePhotoSelectFallback((photoSelect) =>
+    const data = await withCakePhotoSelectFallback((photoSelect, includeAssignments, includeTags) =>
       supabase
         .from("collection_cakes")
         .select(
           `
       homepage_sort_order,
       library_cakes (
-        ${libraryCakeEmbedSelect(photoSelect)}
+        ${libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags)}
       )
     `,
         )
@@ -449,10 +573,10 @@ export async function getAvailableCakeById(
   id: string,
 ): Promise<StorefrontCake | null> {
   const supabase = await createClient();
-  const data = await withCakePhotoSelectFallback((photoSelect) =>
+  const data = await withCakePhotoSelectFallback((photoSelect, includeAssignments, includeTags) =>
     supabase
       .from("library_cakes")
-      .select(libraryCakeEmbedSelect(photoSelect))
+      .select(libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags))
       .eq("id", id)
       .maybeSingle(),
   );
@@ -471,10 +595,10 @@ export async function getAvailableCakeById(
  */
 export async function listOfferableLibraryCakes(): Promise<StorefrontCake[]> {
   const supabase = await createClient();
-  const data = await withCakePhotoSelectFallback((photoSelect) =>
+  const data = await withCakePhotoSelectFallback((photoSelect, includeAssignments, includeTags) =>
     supabase
       .from("library_cakes")
-      .select(libraryCakeEmbedSelect(photoSelect))
+      .select(libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags))
       .in("status", ["active", "seasonal"])
       .order("name", { ascending: true }),
   );
@@ -815,7 +939,7 @@ export async function listBrowsePublishedCakes(
     monthlyMonthById.set(row.id, String(row.month).slice(0, 10));
   }
 
-  const data = await withCakePhotoSelectFallback((photoSelect) =>
+  const data = await withCakePhotoSelectFallback((photoSelect, includeAssignments, includeTags) =>
     supabase
       .from("collection_cakes")
       .select(
@@ -823,7 +947,7 @@ export async function listBrowsePublishedCakes(
       collection_id,
       sort_order,
       library_cakes (
-        ${libraryCakeEmbedSelect(photoSelect)}
+        ${libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags)}
       )
     `,
       )
@@ -898,14 +1022,14 @@ export async function getBrowsePublishedCakeById(
 export async function listHomepagePopularCakes(): Promise<StorefrontCake[]> {
   try {
     const supabase = await createClient();
-    const data = await withCakePhotoSelectFallback((photoSelect) =>
+    const data = await withCakePhotoSelectFallback((photoSelect, includeAssignments, includeTags) =>
       supabase
         .from("library_cakes")
         .select(
           `
       show_in_popular_cakes,
       popular_cakes_sort_order,
-      ${libraryCakeEmbedSelect(photoSelect)}
+      ${libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags)}
     `,
         )
         .eq("show_in_popular_cakes", true),

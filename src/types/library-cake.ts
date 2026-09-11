@@ -10,6 +10,29 @@ export type LibraryCakeCategoryRecord = {
   updatedAt: string;
 };
 
+export type LibraryCakeCategoryRef = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+};
+
+export type LibraryCakeTagRecord = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type LibraryCakeTagRef = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+};
+
 export type LibraryCakeSize = {
   id: string;
   cakeId: string;
@@ -38,6 +61,8 @@ export type LibraryCake = {
   categoryName: string;
   categoryActive: boolean;
   categorySortOrder: number;
+  categories: LibraryCakeCategoryRef[];
+  tags?: LibraryCakeTagRef[];
   description: string | null;
   sharingGuide: string | null;
   allergens: string[];
@@ -76,7 +101,8 @@ export type LibraryCakePhotoInput = {
 
 export type LibraryCakeInput = {
   name: string;
-  categoryId: string;
+  categoryIds: string[];
+  tagIds: string[];
   description: string | null;
   sharingGuide: string | null;
   allergens: string[];

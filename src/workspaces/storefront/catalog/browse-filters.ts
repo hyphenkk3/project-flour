@@ -1,6 +1,9 @@
 import type { StorefrontCake } from "@/types/storefront";
 import { compareCakeSizeLabels } from "@/engines/menu/cake-size-order";
-import { browseCategoryOptionsFromCakes } from "@/engines/menu/cake-categories";
+import {
+  browseCategoryOptionsFromCakes,
+  cakeHasAnyCategoryId,
+} from "@/engines/menu/cake-categories";
 import { filterBrowseCakesBySearch } from "@/workspaces/storefront/catalog/browse-search";
 import {
   formatPreorderRequirement,
@@ -13,6 +16,7 @@ export type BrowseFilterCake = Pick<
   | "categoryName"
   | "categoryActive"
   | "categorySortOrder"
+  | "categories"
   | "sizes"
 >;
 
@@ -186,8 +190,14 @@ export function cakeMatchesBrowseFilters(
   filters: BrowseFilterState,
   priceRanges: readonly BrowsePriceRange[] = [],
 ): boolean {
-  if (filters.category && cake.categoryId !== filters.category) {
-    return false;
+  if (filters.category) {
+    const selected = filters.category
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
+    if (selected.length > 0 && !cakeHasAnyCategoryId(cake, selected)) {
+      return false;
+    }
   }
   if (filters.size && !cake.sizes.some((size) => size.size === filters.size)) {
     return false;

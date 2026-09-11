@@ -3,6 +3,7 @@ import {
   sortLibraryCakes,
   type LibraryCakeSortId,
 } from "@/engines/menu/cake-library-list";
+import { cakeHasCategoryId } from "@/engines/menu/cake-categories";
 import { libraryPhotosHaveCoverage } from "@/engines/menu/cake-photos";
 import type { LibraryCake, LibraryCakeStatus } from "@/types/library-cake";
 
@@ -37,7 +38,7 @@ export function filterLibraryCakes(
   const popular = options.popular ?? "all";
 
   return cakes.filter((cake) => {
-    if (category !== "all" && cake.categoryId !== category) {
+    if (category !== "all" && !cakeHasCategoryId(cake, category)) {
       return false;
     }
     if (status !== "all" && cake.status !== status) {
@@ -60,7 +61,8 @@ export function filterLibraryCakes(
     }
     return (
       cake.name.toLowerCase().includes(query) ||
-      cake.categoryName.toLowerCase().includes(query)
+      cake.categoryName.toLowerCase().includes(query) ||
+      cake.categories.some((row) => row.name.toLowerCase().includes(query))
     );
   });
 }

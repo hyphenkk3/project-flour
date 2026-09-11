@@ -1,4 +1,5 @@
 import { cakeSizeNumericValue } from "@/engines/menu/cake-size-order";
+import { formatCakeCategoryNames } from "@/engines/menu/cake-categories";
 import type {
   LibraryCake,
   LibraryCakeStatus,
@@ -87,6 +88,16 @@ function compareThenName(
   return compareLibraryCakeNames(a, b);
 }
 
+function libraryCakeCategorySortLabel(
+  cake: Pick<LibraryCake, "categories" | "categoryName" | "categorySortOrder">,
+): string {
+  return formatCakeCategoryNames(
+    cake.categories.length > 0
+      ? cake.categories
+      : [{ name: cake.categoryName, sortOrder: cake.categorySortOrder }],
+  );
+}
+
 export function sortLibraryCakes(
   cakes: readonly LibraryCake[],
   sort: LibraryCakeSortId = DEFAULT_LIBRARY_CAKE_SORT,
@@ -140,13 +151,19 @@ export function sortLibraryCakes(
         );
       case "category_asc":
         return compareThenName(
-          a.categoryName.localeCompare(b.categoryName, "en"),
+          libraryCakeCategorySortLabel(a).localeCompare(
+            libraryCakeCategorySortLabel(b),
+            "en",
+          ),
           a,
           b,
         );
       case "category_desc":
         return compareThenName(
-          b.categoryName.localeCompare(a.categoryName, "en"),
+          libraryCakeCategorySortLabel(b).localeCompare(
+            libraryCakeCategorySortLabel(a),
+            "en",
+          ),
           a,
           b,
         );

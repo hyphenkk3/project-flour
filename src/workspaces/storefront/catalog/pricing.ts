@@ -1,4 +1,9 @@
 import type { StorefrontCake, StorefrontCollection } from "@/types/storefront";
+import {
+  cakeCategoryRefsFromPrimary,
+  formatCakeCategoryNames,
+} from "@/engines/menu/cake-categories";
+import { formatCakeTagNames } from "@/engines/menu/cake-tags";
 
 export function startingPrice(cake: Pick<StorefrontCake, "sizes">): number | null {
   if (cake.sizes.length === 0) return null;
@@ -11,10 +16,28 @@ export function formatAvailableSizes(cake: StorefrontCake): string | null {
 }
 
 export function storefrontCategoryLabel(
-  categoryName: string | null | undefined,
+  cake: Pick<
+    StorefrontCake,
+    | "categoryName"
+    | "categoryId"
+    | "categoryActive"
+    | "categorySortOrder"
+    | "categories"
+  > | string | null | undefined,
 ): string | null {
-  const name = categoryName?.trim();
-  return name ? name : null;
+  if (typeof cake === "string" || cake == null) {
+    const name = cake?.trim();
+    return name ? name : null;
+  }
+  const names = formatCakeCategoryNames(cakeCategoryRefsFromPrimary(cake));
+  return names || cake.categoryName?.trim() || null;
+}
+
+export function storefrontTagLabel(
+  cake: Pick<StorefrontCake, "tags"> | null | undefined,
+): string | null {
+  if (!cake) return null;
+  return formatCakeTagNames(cake.tags ?? []) || null;
 }
 
 export function formatRm(amount: number): string {

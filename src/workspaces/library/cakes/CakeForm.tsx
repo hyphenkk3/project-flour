@@ -3,9 +3,14 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import {
+  CAKE_CATEGORY_ASSIGNMENT_MAX,
   cakeCategoryOptionLabel,
   cakeEditorCategoryOptions,
 } from "@/engines/menu/cake-categories";
+import {
+  cakeEditorTagOptions,
+  cakeTagOptionLabel,
+} from "@/engines/menu/cake-tags";
 import { POPULAR_CAKES_MAX_SELECTION } from "@/engines/menu/homepage-popular-cakes";
 import {
   FormActions,
@@ -20,6 +25,7 @@ import {
 import type {
   LibraryCakeCategoryRecord,
   LibraryCakeDetail,
+  LibraryCakeTagRecord,
 } from "@/types/library-cake";
 import { libraryActionInitialState } from "@/workspaces/library/action-state";
 import {
@@ -36,6 +42,7 @@ type CakeFormProps = {
   mode: "create" | "edit";
   cake?: LibraryCakeDetail;
   categories: LibraryCakeCategoryRecord[];
+  tags: LibraryCakeTagRecord[];
   cancelHref: string;
 };
 
@@ -43,6 +50,7 @@ export function CakeForm({
   mode,
   cake,
   categories,
+  tags,
   cancelHref,
 }: CakeFormProps) {
   const action =
@@ -55,10 +63,16 @@ export function CakeForm({
   );
 
   const allergens = cake?.allergens.join("\n") ?? "";
-  const options = cakeEditorCategoryOptions(categories, cake?.categoryId);
-  const defaultCategoryId = cake?.categoryId ?? options[0]?.id ?? "";
-  const currentInactive =
-    cake != null && cake.categoryId !== "" && !cake.categoryActive;
+  const currentCategoryIds = cake?.categories.map((row) => row.id) ?? [];
+  const currentTagIds = cake?.tags?.map((row) => row.id) ?? [];
+  const options = cakeEditorCategoryOptions(categories, currentCategoryIds);
+  const tagOptions = cakeEditorTagOptions(tags, currentTagIds);
+  const currentInactive = cake?.categories.some((row) => !row.isActive) ?? false;
+  const currentInactiveTags = cake?.tags?.some((row) => !row.isActive) ?? false;
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(
+    currentCategoryIds,
+  );
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>(currentTagIds);
   const [showInPopularCakes, setShowInPopularCakes] = useState(
     cake?.showInPopularCakes ?? false,
   );
@@ -75,36 +89,99 @@ export function CakeForm({
       </FormField>
 
       <div className="flex flex-col gap-1.5">
-        <FormField
-          help={
-            currentInactive
-              ? "This cake keeps its inactive category until you choose an active one. Owner and Manager can reactivate it under Manage categories."
-              : "Used in the Cake Library and customer Browse."
-          }
-          htmlFor="category"
-          label="Category"
-        >
-          <FormSelect
-            defaultValue={defaultCategoryId}
-            id="category"
-            name="category"
-            required
-          >
+        <fieldset>
+          <legend className="text-ink text-sm font-medium">Categories</legend>
+          <p className="text-skyline mt-1 text-sm leading-relaxed">
+            {currentInactive
+              ? "This cake keeps any inactive category until you replace it. Owner and Manager can reactivate categories under Manage categories."
+              : `Choose up to ${CAKE_CATEGORY_ASSIGNMENT_MAX} categories. Used in the Cake Library and customer Browse.`}
+          </p>
+          <div className="mt-2 grid gap-2">
             {options.length === 0 ? (
-              <option value="">No categories yet</option>
-            ) : null}
-            {options.map((category) => (
-              <option key={category.id} value={category.id}>
-                {cakeCategoryOptionLabel(category)}
-              </option>
-            ))}
-          </FormSelect>
-        </FormField>
+              <p className="text-skyline text-sm">No categories yet.</p>
+            ) : (
+              options.map((category) => {
+                const checked = selectedCategoryIds.includes(category.id);
+                const disabled =
+                  !checked &&
+                  selectedCategoryIds.length >= CAKE_CATEGORY_ASSIGNMENT_MAX;
+                return (
+                  <FormCheckbox
+                    checked={checked}
+                    disabled={disabled}
+                    key={category.id}
+                    label={cakeCategoryOptionLabel(category)}
+                    name="category_ids"
+                    onChange={(event) => {
+                      const nextChecked = event.target.checked;
+                      setSelectedCategoryIds((current) => {
+                        if (nextChecked) {
+                          if (current.includes(category.id)) return current;
+                          if (current.length >= CAKE_CATEGORY_ASSIGNMENT_MAX) {
+                            return current;
+                          }
+                          return [...current, category.id];
+                        }
+                        return current.filter((id) => id !== category.id);
+                      });
+                    }}
+                    value={category.id}
+                  />
+                );
+              })
+            )}
+          </div>
+        </fieldset>
         <Link
           className="text-signal hover:text-ink inline-flex min-h-11 items-center text-sm font-medium"
           href="/library/cakes/categories"
         >
           Manage categories
+        </Link>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <fieldset>
+          <legend className="text-ink text-sm font-medium">Tags</legend>
+          <p className="text-skyline mt-1 text-sm leading-relaxed">
+            {currentInactiveTags
+              ? "This cake keeps any inactive tag until you replace it. Owner and Manager can reactivate tags under Manage tags."
+              : "Optional merchandising badges on cake cards. Prefer a small set — tags are not Browse filters."}
+          </p>
+          <div className="mt-2 grid gap-2">
+            {tagOptions.length === 0 ? (
+              <p className="text-skyline text-sm">No tags yet.</p>
+            ) : (
+              tagOptions.map((tag) => {
+                const checked = selectedTagIds.includes(tag.id);
+                return (
+                  <FormCheckbox
+                    checked={checked}
+                    key={tag.id}
+                    label={cakeTagOptionLabel(tag)}
+                    name="tag_ids"
+                    onChange={(event) => {
+                      const nextChecked = event.target.checked;
+                      setSelectedTagIds((current) => {
+                        if (nextChecked) {
+                          if (current.includes(tag.id)) return current;
+                          return [...current, tag.id];
+                        }
+                        return current.filter((id) => id !== tag.id);
+                      });
+                    }}
+                    value={tag.id}
+                  />
+                );
+              })
+            )}
+          </div>
+        </fieldset>
+        <Link
+          className="text-signal hover:text-ink inline-flex min-h-11 items-center text-sm font-medium"
+          href="/library/cakes/tags"
+        >
+          Manage tags
         </Link>
       </div>
 
