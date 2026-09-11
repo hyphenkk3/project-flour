@@ -1,7 +1,22 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/foundation/auth/session";
+import {
+  mapPasswordUpdateError,
+  validatePasswordChangeInput,
+} from "@/foundation/staff/password-update";
+import { findStaffByUsername } from "@/foundation/staff/queries";
+import {
+  STAFF_USERNAME_COPY,
+  isUsernameFormatViolation,
+  isUsernameUniqueViolation,
+  normalizeStaffUsername,
+  staffUsernamesMatch,
+  validateStaffUsername,
+} from "@/foundation/staff/username";
 import { createServiceClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 function normalizeEmail(value: FormDataEntryValue | null): string {
   return String(value ?? "").trim().toLowerCase();
@@ -81,4 +96,79 @@ export async function updateStaffEmailAction(
     error: null,
     success: true,
   };
+}
+
+export async function updateStaffUsernameAction(
+  formData: FormData,
+): Promise<{ error: string | null; success: boolean }> {
+  const staff = await requireStaff();
+  const username = normalizeStaffUsername(String(formData.get("username") ?? ""));
+
+  const validationError = validateStaffUsername(username);
+  if (validationError) {
+    return { error: validationError, success: false };
+  }
+
+  if (staffUsernamesMatch(username, staff.username)) {
+    return { error: null, success: true };
+  }
+
+  const existing = await findStaffByUsername(username);
+  if (existing && existing.id !== staff.id) {
+    return { error: STAFF_USERNAME_COPY.taken, success: false };
+  }
+
+  const admin = createServiceClient();
+  const { error: profileError } = await admin
+    .from("staff_profiles")
+    .update({
+      username,
+    })
+    .eq("id", staff.id)
+    .eq("auth_user_id", staff.authUserId);
+
+  if (profileError) {
+    if (isUsernameUniqueViolation(profileError)) {
+      return { error: STAFF_USERNAME_COPY.taken, success: false };
+    }
+    if (isUsernameFormatViolation(profileError)) {
+      return { error: STAFF_USERNAME_COPY.invalid, success: false };
+    }
+    return { error: STAFF_USERNAME_COPY.failed, success: false };
+  }
+
+  revalidatePath("/settings");
+  return { error: null, success: true };
+}
+
+export async function updateStaffPasswordAction(
+  formData: FormData,
+): Promise<{ error: string | null; success: boolean }> {
+  await requireStaff();
+
+  const currentPassword = String(formData.get("currentPassword") ?? "");
+  const newPassword = String(formData.get("newPassword") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+  const validationError = validatePasswordChangeInput({
+    currentPassword,
+    newPassword,
+    confirmPassword,
+  });
+
+  if (validationError) {
+    return { error: validationError, success: false };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword,
+    current_password: currentPassword,
+  });
+
+  if (error) {
+    return { error: mapPasswordUpdateError(error), success: false };
+  }
+
+  return { error: null, success: true };
 }

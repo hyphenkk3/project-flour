@@ -4,7 +4,9 @@ import { getNotificationDefinitionsForRole } from "@/foundation/staff/notificati
 import { loadStaffNotificationPreferences } from "@/foundation/staff/notification-preferences-queries";
 import { NotificationPreferences } from "@/components/settings/NotificationPreferences";
 import { StaffPasskeySettings } from "@/components/settings/StaffPasskeySettings";
+import { StaffPasswordSettings } from "@/components/settings/StaffPasswordSettings";
 import { StaffProfileForm } from "@/components/settings/StaffProfileForm";
+import { StaffUsernameForm } from "@/components/settings/StaffUsernameForm";
 
 export default async function SettingsPage() {
   const staff = await requireStaff();
@@ -40,11 +42,8 @@ export default async function SettingsPage() {
             </p>
           </div>
 
-          <div>
-            <p className="text-skyline text-xs">Username</p>
-            <p className="text-ink mt-1 text-sm font-medium">
-              {staff.username}
-            </p>
+          <div className="md:col-span-2">
+            <StaffUsernameForm initialUsername={staff.username} />
           </div>
 
           <div className="md:col-span-2">
@@ -61,6 +60,8 @@ export default async function SettingsPage() {
       </section>
 
       <StaffPasskeySettings />
+
+      <StaffPasswordSettings />
 
       <section className="border-fog rounded-xl border bg-white p-5">
         <h3 className="text-ink text-sm font-semibold">Notifications</h3>
