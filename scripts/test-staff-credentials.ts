@@ -231,7 +231,16 @@ assert.match(passwordForm, /setCurrentPassword\(""\)/);
 assert.match(passwordForm, /setNewPassword\(""\)/);
 assert.match(passwordForm, /setConfirmPassword\(""\)/);
 assert.match(passwordForm, /STAFF_PASSWORD_COPY\.success/);
-assert.match(passwordForm, /signed in with a Passkey/);
+assert.match(passwordForm, /STAFF_PASSWORD_COPY\.helperTitle/);
+assert.match(passwordForm, /STAFF_PASSWORD_COPY\.helperMinLength/);
+assert.match(passwordForm, /STAFF_PASSWORD_COPY\.helperDifferent/);
+assert.match(passwordForm, /STAFF_PASSWORD_COPY\.helperCurrent/);
+assert.equal(STAFF_PASSWORD_COPY.helperMinLength, "At least 6 characters.");
+assert.equal(
+  STAFF_PASSWORD_COPY.helperDifferent,
+  "Must be different from your current password.",
+);
+assert.match(STAFF_PASSWORD_COPY.helperCurrent, /signed in with a Passkey/);
 assert.doesNotMatch(passwordForm, /console\.(log|info|debug|warn|error)/);
 assert.doesNotMatch(passwordForm, /localStorage/);
 

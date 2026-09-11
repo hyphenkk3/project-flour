@@ -7,6 +7,11 @@ export const STAFF_PASSWORD_COPY = {
   weak: "That password doesn't meet Whitebird's security requirements. Please choose a stronger password.",
   reauth: "Please sign in again, then change your password.",
   failed: "That password couldn't be updated. Please try again.",
+  helperTitle: "Password requirements",
+  helperMinLength: "At least 6 characters.",
+  helperDifferent: "Must be different from your current password.",
+  helperCurrent:
+    "Enter your current password to change it. This is required even if you signed in with a Passkey.",
 } as const;
 
 export function validatePasswordChangeInput(input: {

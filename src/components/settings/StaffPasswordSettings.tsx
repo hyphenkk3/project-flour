@@ -104,10 +104,14 @@ export function StaffPasswordSettings() {
           />
         </label>
 
-        <p className="text-skyline text-xs">
-          Enter your current password to change it. This is required even if you
-          signed in with a Passkey.
-        </p>
+        <div className="text-skyline space-y-1.5 text-xs">
+          <p>{STAFF_PASSWORD_COPY.helperTitle}</p>
+          <ul className="list-disc space-y-0.5 pl-4">
+            <li>{STAFF_PASSWORD_COPY.helperMinLength}</li>
+            <li>{STAFF_PASSWORD_COPY.helperDifferent}</li>
+          </ul>
+          <p>{STAFF_PASSWORD_COPY.helperCurrent}</p>
+        </div>
 
         <button
           className="bg-signal text-white rounded-lg px-4 py-2.5 text-sm font-medium transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
