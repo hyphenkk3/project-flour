@@ -9,7 +9,9 @@ import {
 import {
   browserSupportsPasskeySignIn,
   classifyPasskeyFailure,
+  isNextRedirectError,
   logPasskeyError,
+  passkeyCeremonyFailureMessage,
   passkeySignInMessage,
 } from "@/foundation/auth/passkeys";
 import { createClient } from "@/lib/supabase/client";
@@ -40,31 +42,67 @@ export function LoginForm({ next = null }: LoginFormProps) {
     }
 
     setPasskeyPending(true);
+    let navigating = false;
 
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPasskey();
+      let ceremonyError: unknown = null;
 
-      if (error) {
-        logPasskeyError("signInWithPasskey", error);
-        const kind = classifyPasskeyFailure(error);
+      try {
+        const { error } = await supabase.auth.signInWithPasskey();
+        if (error) ceremonyError = error;
+      } catch (error) {
+        ceremonyError = error;
+      }
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (ceremonyError && !user) {
+        logPasskeyError("signInWithPasskey", ceremonyError);
+      }
+
+      const ceremonyMessage = passkeyCeremonyFailureMessage({
+        hasAuthenticatedUser: Boolean(user),
+        ceremonyError,
+      });
+
+      if (ceremonyMessage) {
+        const kind = classifyPasskeyFailure(ceremonyError);
         setPasskeyTone(kind === "failed" ? "error" : "quiet");
-        setPasskeyMessage(passkeySignInMessage(kind));
+        setPasskeyMessage(ceremonyMessage);
+        return;
+      }
+
+      if (!user) {
+        setPasskeyTone("error");
+        setPasskeyMessage(passkeySignInMessage("failed"));
         return;
       }
 
       const result = await completePasskeyLoginAction(next);
-      if (result?.error) {
+      if (!result.ok) {
         setPasskeyTone("error");
         setPasskeyMessage(result.error);
+        return;
       }
+
+      navigating = true;
+      window.location.replace(result.destination);
     } catch (error) {
+      if (isNextRedirectError(error)) {
+        navigating = true;
+        throw error;
+      }
       logPasskeyError("signInWithPasskey", error);
       const kind = classifyPasskeyFailure(error);
       setPasskeyTone(kind === "failed" ? "error" : "quiet");
       setPasskeyMessage(passkeySignInMessage(kind));
     } finally {
-      setPasskeyPending(false);
+      if (!navigating) {
+        setPasskeyPending(false);
+      }
     }
   }
 

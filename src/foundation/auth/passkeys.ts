@@ -67,6 +67,36 @@ export function passkeySignInMessage(kind: PasskeyFailureKind): string {
   return PASSKEY_COPY.failedSignIn;
 }
 
+/**
+ * Next.js `redirect()` throws a special error. Catching it in the Passkey
+ * login UI must not be treated as an authentication failure.
+ */
+export function isNextRedirectError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  if ("digest" in error && typeof error.digest === "string") {
+    return error.digest.startsWith("NEXT_REDIRECT");
+  }
+
+  const message = extractMessage(error);
+  return message === "NEXT_REDIRECT" || message.startsWith("NEXT_REDIRECT");
+}
+
+/**
+ * After the WebAuthn ceremony, a confirmed Auth user must never see the
+ * Passkey failure copy — even if the ceremony/result object still reports
+ * an error (for example a swallowed Next.js redirect).
+ */
+export function passkeyCeremonyFailureMessage(input: {
+  hasAuthenticatedUser: boolean;
+  ceremonyError: unknown | null;
+}): string | null {
+  if (input.hasAuthenticatedUser) return null;
+  if (isNextRedirectError(input.ceremonyError)) return null;
+  if (!input.ceremonyError) return PASSKEY_COPY.failedSignIn;
+  return passkeySignInMessage(classifyPasskeyFailure(input.ceremonyError));
+}
+
 export function passkeySetupMessage(kind: PasskeyFailureKind): string {
   if (kind === "cancelled") return PASSKEY_COPY.cancelledSetup;
   if (kind === "unsupported") return PASSKEY_COPY.unsupported;

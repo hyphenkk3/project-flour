@@ -18,6 +18,10 @@ export type LoginState = {
   error: string | null;
 };
 
+export type PasskeyLoginCompletion =
+  | { ok: true; destination: string }
+  | { ok: false; error: string };
+
 const genericLoginError = "Invalid username or password.";
 
 export async function loginAction(
@@ -77,21 +81,25 @@ export async function logoutAction() {
 
 /**
  * After a browser Passkey ceremony writes a normal Auth session cookie,
- * reuse the existing staff lookup and post-login redirect.
+ * confirm staff and return the existing post-login destination.
+ *
+ * Do not `redirect()` here: the login form awaits this action in a try/catch,
+ * and Next.js redirect errors were being shown as Passkey failures.
  */
 export async function completePasskeyLoginAction(
   requestedNext?: string | null,
-): Promise<LoginState> {
+): Promise<PasskeyLoginCompletion> {
   const staff = await getSessionStaff();
 
   if (!staff) {
-    return { error: PASSKEY_COPY.failedSignIn };
+    return { ok: false, error: PASSKEY_COPY.failedSignIn };
   }
 
-  redirect(
-    resolvePostLoginDestination(
+  return {
+    ok: true,
+    destination: resolvePostLoginDestination(
       staff.role.code,
       sanitizePostLoginPath(requestedNext),
     ),
-  );
+  };
 }

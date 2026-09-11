@@ -10,6 +10,8 @@ import {
   browserSupportsPasskeySignIn,
   classifyPasskeyFailure,
   formatPasskeyAddedAt,
+  isNextRedirectError,
+  passkeyCeremonyFailureMessage,
   passkeySetupMessage,
   passkeySignInMessage,
 } from "@/foundation/auth/passkeys";
@@ -51,6 +53,42 @@ assert.match(
   /^Added 11 Sep/,
 );
 
+assert.equal(
+  isNextRedirectError({ digest: "NEXT_REDIRECT;push;/home;307;" }),
+  true,
+);
+assert.equal(isNextRedirectError({ message: "NEXT_REDIRECT" }), true);
+assert.equal(isNextRedirectError({ message: "webauthn_verification_failed" }), false);
+
+assert.equal(
+  passkeyCeremonyFailureMessage({
+    hasAuthenticatedUser: true,
+    ceremonyError: { digest: "NEXT_REDIRECT;push;/home;307;" },
+  }),
+  null,
+);
+assert.equal(
+  passkeyCeremonyFailureMessage({
+    hasAuthenticatedUser: true,
+    ceremonyError: { message: PASSKEY_COPY.failedSignIn },
+  }),
+  null,
+);
+assert.equal(
+  passkeyCeremonyFailureMessage({
+    hasAuthenticatedUser: false,
+    ceremonyError: { name: "AbortError" },
+  }),
+  PASSKEY_COPY.cancelledSignIn,
+);
+assert.equal(
+  passkeyCeremonyFailureMessage({
+    hasAuthenticatedUser: false,
+    ceremonyError: { message: "webauthn_verification_failed" },
+  }),
+  PASSKEY_COPY.failedSignIn,
+);
+
 const actionsSource = readFileSync(
   resolve("src/foundation/auth/actions.ts"),
   "utf8",
@@ -59,7 +97,13 @@ assert.match(actionsSource, /signInWithPassword/);
 assert.match(actionsSource, /completePasskeyLoginAction/);
 assert.match(actionsSource, /getSessionStaff/);
 assert.match(actionsSource, /resolvePostLoginDestination/);
+assert.match(actionsSource, /ok:\s*true/);
+assert.match(actionsSource, /destination:\s*resolvePostLoginDestination/);
 assert.doesNotMatch(actionsSource, /signInWithPasskey/);
+assert.doesNotMatch(
+  actionsSource,
+  /completePasskeyLoginAction[\s\S]*redirect\(/,
+);
 
 const loginFormSource = readFileSync(
   resolve("src/components/LoginForm.tsx"),
@@ -74,6 +118,11 @@ assert.doesNotMatch(loginFormSource, /Biometric Login/);
 assert.match(loginFormSource, /completePasskeyLoginAction/);
 assert.match(loginFormSource, /classifyPasskeyFailure/);
 assert.match(loginFormSource, /passkeySignInMessage/);
+assert.match(loginFormSource, /passkeyCeremonyFailureMessage/);
+assert.match(loginFormSource, /auth\.getUser\(\)/);
+assert.match(loginFormSource, /location\.replace\(result\.destination\)/);
+assert.match(loginFormSource, /isNextRedirectError/);
+assert.doesNotMatch(loginFormSource, /result\?\.error/);
 
 const clientSource = readFileSync(
   resolve("src/lib/supabase/client.ts"),
