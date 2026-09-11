@@ -14,8 +14,10 @@ import {
   STAFF_ADMIN_COPY,
   isStaffRoleCode,
   staffAdminActorError,
+  staffAdminCreateRoleError,
   staffAdminDeactivateError,
   staffAdminRoleChangeError,
+  staffAdminTransferError,
   staffAdminUsernameChangeError,
 } from "@/foundation/staff/admin-guards";
 
@@ -137,11 +139,20 @@ assert.match(adminActions, /auth\.admin\.createUser/);
 assert.match(adminActions, /email_confirm:\s*true/);
 assert.match(adminActions, /auth\.admin\.deleteUser/);
 assert.match(adminActions, /from\("staff_profiles"\)\.insert/);
+assert.match(adminActions, /is_master_owner:\s*false/);
+assert.match(adminActions, /staffAdminCreateRoleError/);
 assert.match(adminActions, /updateManagedStaffUsernameAction/);
 assert.match(adminActions, /updateManagedStaffRoleAction/);
 assert.match(adminActions, /setManagedStaffActiveAction/);
+assert.match(adminActions, /transferMasterOwnerAction/);
+assert.match(adminActions, /transfer_master_owner/);
+assert.match(adminActions, /p_actor_staff_id:\s*actor\.id/);
 assert.match(adminActions, /staffAdminDeactivateError/);
 assert.match(adminActions, /staffAdminRoleChangeError/);
+assert.match(adminActions, /staffAdminTransferError/);
+assert.doesNotMatch(adminActions, /formData\.get\("isMasterOwner"\)/);
+assert.doesNotMatch(adminActions, /\.update\(\{[^}]*is_master_owner/);
+assert.doesNotMatch(adminActions, /export async function setMaster/);
 assert.match(adminActions, /\.update\(\{\s*username,/);
 assert.match(adminActions, /\.update\(\{\s*role_id:/);
 assert.match(adminActions, /\.update\(\{\s*is_active:/);
@@ -175,12 +186,22 @@ assert.match(
   adminActions,
   /export async function setManagedStaffActiveAction[\s\S]*requireStaffAdmin\(\)/,
 );
+assert.match(
+  adminActions,
+  /export async function transferMasterOwnerAction[\s\S]*requireStaffAdmin\(\)/,
+);
+assert.match(
+  adminActions,
+  /export async function transferMasterOwnerAction[\s\S]*p_actor_staff_id:\s*actor\.id/,
+);
 
 const queries = readFileSync(resolve("src/foundation/staff/queries.ts"), "utf8");
 assert.match(queries, /export async function listStaffProfilesForAdmin/);
 assert.match(queries, /export async function listStaffRoles/);
 assert.match(queries, /export async function countActiveOwners/);
 assert.match(queries, /createServiceClient/);
+assert.match(queries, /isMasterOwner: Boolean\(row\.is_master_owner\)/);
+assert.match(queries, /is_master_owner,/);
 
 const settingsPage = readFileSync(
   resolve("src/app/(app)/settings/page.tsx"),
@@ -201,6 +222,7 @@ assert.match(staffPage, /requireStaff/);
 assert.match(staffPage, /canManageStaff/);
 assert.match(staffPage, /redirect\("\/settings"\)/);
 assert.match(staffPage, /listStaffProfilesForAdmin/);
+assert.match(staffPage, /actorIsMasterOwner=\{actor\.isMasterOwner\}/);
 assert.doesNotMatch(staffPage, /password reset|Passkey/);
 
 const createForm = readFileSync(
@@ -208,6 +230,8 @@ const createForm = readFileSync(
   "utf8",
 );
 assert.match(createForm, /createStaffAccountAction/);
+assert.match(createForm, /actorIsMasterOwner/);
+assert.match(createForm, /role\.code !== "owner"/);
 assert.match(createForm, /name="password"/);
 assert.match(createForm, /name="confirmPassword"/);
 assert.doesNotMatch(createForm, /localStorage/);
@@ -219,8 +243,13 @@ const directory = readFileSync(
 assert.match(directory, /updateManagedStaffUsernameAction/);
 assert.match(directory, /updateManagedStaffRoleAction/);
 assert.match(directory, /setManagedStaffActiveAction/);
+assert.match(directory, /transferMasterOwnerAction/);
 assert.match(directory, /Confirm deactivate/);
+assert.match(directory, /Transfer Master Owner/);
+assert.match(directory, /Confirm transfer/);
+assert.match(directory, /Master Owner/);
 assert.match(directory, /member\.role\.name/);
+assert.match(directory, /member\.isMasterOwner/);
 assert.doesNotMatch(directory, /type="email".*admin|Change email|Reset password/);
 
 const profileActions = readFileSync(
@@ -263,5 +292,228 @@ const workspaces = readFileSync(
   "utf8",
 );
 assert.match(workspaces, /management:[\s\S]*available: false/);
+
+const types = readFileSync(resolve("src/types/staff.ts"), "utf8");
+assert.match(types, /isMasterOwner: boolean/);
+assert.doesNotMatch(types, /role.*=.*"master/);
+
+assert.equal(
+  staffAdminCreateRoleError({
+    actorIsMasterOwner: false,
+    roleCode: "owner",
+  }),
+  STAFF_ADMIN_COPY.cannotCreateOwner,
+);
+assert.equal(
+  staffAdminCreateRoleError({
+    actorIsMasterOwner: false,
+    roleCode: "bakery",
+  }),
+  null,
+);
+assert.equal(
+  staffAdminCreateRoleError({
+    actorIsMasterOwner: true,
+    roleCode: "owner",
+  }),
+  null,
+);
+
+assert.equal(
+  staffAdminRoleChangeError({
+    actorStaffId: "owner-1",
+    targetStaffId: "bakery-1",
+    targetIsActiveOwner: false,
+    nextRoleIsOwner: true,
+    activeOwnerCount: 2,
+    actorIsMasterOwner: false,
+    targetRoleIsOwner: false,
+  }),
+  STAFF_ADMIN_COPY.cannotPromoteToOwner,
+);
+assert.equal(
+  staffAdminRoleChangeError({
+    actorStaffId: "master-1",
+    targetStaffId: "bakery-1",
+    targetIsActiveOwner: false,
+    nextRoleIsOwner: true,
+    activeOwnerCount: 2,
+    actorIsMasterOwner: true,
+    targetRoleIsOwner: false,
+  }),
+  null,
+);
+assert.equal(
+  staffAdminRoleChangeError({
+    actorStaffId: "owner-1",
+    targetStaffId: "master-1",
+    targetIsActiveOwner: true,
+    nextRoleIsOwner: false,
+    activeOwnerCount: 2,
+    actorIsMasterOwner: false,
+    targetIsMasterOwner: true,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotDemoteMaster,
+);
+assert.equal(
+  staffAdminRoleChangeError({
+    actorStaffId: "master-1",
+    targetStaffId: "master-1",
+    targetIsActiveOwner: true,
+    nextRoleIsOwner: false,
+    activeOwnerCount: 2,
+    actorIsMasterOwner: true,
+    targetIsMasterOwner: true,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotDemoteSelf,
+);
+assert.equal(
+  staffAdminRoleChangeError({
+    actorStaffId: "master-1",
+    targetStaffId: "owner-2",
+    targetIsActiveOwner: true,
+    nextRoleIsOwner: false,
+    activeOwnerCount: 2,
+    actorIsMasterOwner: true,
+    targetIsMasterOwner: false,
+    targetRoleIsOwner: true,
+  }),
+  null,
+);
+
+assert.equal(
+  staffAdminDeactivateError({
+    actorStaffId: "owner-1",
+    targetStaffId: "master-1",
+    targetIsActiveOwner: true,
+    activeOwnerCount: 2,
+    targetIsMasterOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotDeactivateMaster,
+);
+assert.equal(
+  staffAdminDeactivateError({
+    actorStaffId: "master-1",
+    targetStaffId: "master-1",
+    targetIsActiveOwner: true,
+    activeOwnerCount: 2,
+    targetIsMasterOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotDeactivateSelf,
+);
+assert.equal(
+  staffAdminDeactivateError({
+    actorStaffId: "master-1",
+    targetStaffId: "owner-2",
+    targetIsActiveOwner: true,
+    activeOwnerCount: 2,
+    targetIsMasterOwner: false,
+  }),
+  null,
+);
+
+assert.equal(
+  staffAdminUsernameChangeError({
+    actorStaffId: "owner-1",
+    targetStaffId: "master-1",
+    targetIsMasterOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotChangeMaster,
+);
+assert.equal(
+  staffAdminUsernameChangeError({
+    actorStaffId: "master-1",
+    targetStaffId: "bakery-1",
+    targetIsMasterOwner: false,
+  }),
+  null,
+);
+
+assert.equal(
+  staffAdminTransferError({
+    actorStaffId: "owner-1",
+    targetStaffId: "owner-2",
+    actorIsMasterOwner: false,
+    targetIsActive: true,
+    targetIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotTransfer,
+);
+assert.equal(
+  staffAdminTransferError({
+    actorStaffId: "master-1",
+    targetStaffId: "master-1",
+    actorIsMasterOwner: true,
+    targetIsActive: true,
+    targetIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotTransferToSelf,
+);
+assert.equal(
+  staffAdminTransferError({
+    actorStaffId: "master-1",
+    targetStaffId: "bakery-1",
+    actorIsMasterOwner: true,
+    targetIsActive: true,
+    targetIsOwner: false,
+  }),
+  STAFF_ADMIN_COPY.transferTargetMustBeActiveOwner,
+);
+assert.equal(
+  staffAdminTransferError({
+    actorStaffId: "master-1",
+    targetStaffId: "owner-2",
+    actorIsMasterOwner: true,
+    targetIsActive: false,
+    targetIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.transferTargetMustBeActiveOwner,
+);
+assert.equal(
+  staffAdminTransferError({
+    actorStaffId: "master-1",
+    targetStaffId: "owner-2",
+    actorIsMasterOwner: true,
+    targetIsActive: true,
+    targetIsOwner: true,
+  }),
+  null,
+);
+
+const migration = readFileSync(
+  resolve("supabase/migrations/20260911120000_staff_master_owner.sql"),
+  "utf8",
+);
+assert.match(migration, /is_master_owner boolean not null default false/);
+assert.match(migration, /staff_profiles_one_master_owner_idx/);
+assert.match(migration, /where is_master_owner = true/);
+assert.match(migration, /create or replace function public\.transfer_master_owner/);
+assert.match(migration, /security definer/);
+assert.match(migration, /set search_path = public/);
+assert.match(migration, /for update/);
+assert.match(migration, /revoke all on function public\.transfer_master_owner/);
+assert.match(migration, /from public, anon, authenticated/);
+assert.match(migration, /grant execute on function public\.transfer_master_owner/);
+assert.match(migration, /to service_role/);
+assert.match(migration, /app\.allow_master_transfer/);
+assert.match(migration, /Master Owner must remain active/);
+assert.match(migration, /Master Owner must have the Owner role/);
+assert.doesNotMatch(migration, /ownerdev/);
+assert.doesNotMatch(migration, /role\s*=\s*'master_owner'/);
+assert.doesNotMatch(
+  migration,
+  /update public\.staff_profiles\s+set is_master_owner = true\s+where username/i,
+);
+assert.doesNotMatch(migration, /alter role/);
+
+const sessionSource = readFileSync(
+  resolve("src/foundation/auth/session.ts"),
+  "utf8",
+);
+assert.match(sessionSource, /getStaffByAuthUserId/);
+assert.doesNotMatch(sessionSource, /isMasterOwner:/);
+assert.doesNotMatch(sessionSource, /user_metadata/);
 
 console.log("test-staff-admin: PASS");

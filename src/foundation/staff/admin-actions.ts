@@ -7,8 +7,10 @@ import {
   STAFF_ADMIN_COPY,
   isStaffRoleCode,
   staffAdminActorError,
+  staffAdminCreateRoleError,
   staffAdminDeactivateError,
   staffAdminRoleChangeError,
+  staffAdminTransferError,
   staffAdminUsernameChangeError,
 } from "@/foundation/staff/admin-guards";
 import { mapPasswordUpdateError } from "@/foundation/staff/password-update";
@@ -116,6 +118,14 @@ export async function createStaffAccountAction(
     return { error: STAFF_ADMIN_COPY.invalidRole, success: false };
   }
 
+  const createRoleError = staffAdminCreateRoleError({
+    actorIsMasterOwner: actorResult.staff.isMasterOwner,
+    roleCode,
+  });
+  if (createRoleError) {
+    return { error: createRoleError, success: false };
+  }
+
   if (!email || !isValidEmail(email)) {
     return { error: STAFF_ADMIN_COPY.invalidEmail, success: false };
   }
@@ -165,6 +175,7 @@ export async function createStaffAccountAction(
     display_name: displayName,
     role_id: role.id,
     is_active: true,
+    is_master_owner: false,
   });
 
   if (profileError) {
@@ -191,14 +202,6 @@ export async function updateManagedStaffUsernameAction(
   const targetId = String(formData.get("staffId") ?? "").trim();
   const username = normalizeStaffUsername(String(formData.get("username") ?? ""));
 
-  const ownUsernameError = staffAdminUsernameChangeError({
-    actorStaffId: actor.id,
-    targetStaffId: targetId,
-  });
-  if (ownUsernameError) {
-    return { error: ownUsernameError, success: false };
-  }
-
   const usernameError = validateStaffUsername(username);
   if (usernameError) {
     return { error: usernameError, success: false };
@@ -207,6 +210,15 @@ export async function updateManagedStaffUsernameAction(
   const target = await getStaffProfileByIdForAdmin(targetId);
   if (!target) {
     return { error: STAFF_ADMIN_COPY.notFound, success: false };
+  }
+
+  const ownUsernameError = staffAdminUsernameChangeError({
+    actorStaffId: actor.id,
+    targetStaffId: target.id,
+    targetIsMasterOwner: target.isMasterOwner,
+  });
+  if (ownUsernameError) {
+    return { error: ownUsernameError, success: false };
   }
 
   if (staffUsernamesMatch(username, target.username)) {
@@ -271,6 +283,9 @@ export async function updateManagedStaffRoleAction(
     targetIsActiveOwner: target.isActive && target.role.code === "owner",
     nextRoleIsOwner: role.code === "owner",
     activeOwnerCount,
+    actorIsMasterOwner: actor.isMasterOwner,
+    targetIsMasterOwner: target.isMasterOwner,
+    targetRoleIsOwner: target.role.code === "owner",
   });
   if (roleError) {
     return { error: roleError, success: false };
@@ -321,6 +336,7 @@ export async function setManagedStaffActiveAction(
       targetStaffId: target.id,
       targetIsActiveOwner: target.isActive && target.role.code === "owner",
       activeOwnerCount,
+      targetIsMasterOwner: target.isMasterOwner,
     });
     if (deactivateError) {
       return { error: deactivateError, success: false };
@@ -337,6 +353,70 @@ export async function setManagedStaffActiveAction(
 
   if (profileError) {
     return { error: STAFF_ADMIN_COPY.updateFailed, success: false };
+  }
+
+  revalidateStaffAdmin();
+  return { error: null, success: true };
+}
+
+function mapTransferRpcError(error: unknown): string {
+  const message =
+    error && typeof error === "object" && "message" in error
+      ? String(error.message)
+      : "";
+
+  if (message.includes("Cannot transfer Master Owner to yourself")) {
+    return STAFF_ADMIN_COPY.cannotTransferToSelf;
+  }
+  if (message.includes("Transfer target must be an active Owner")) {
+    return STAFF_ADMIN_COPY.transferTargetMustBeActiveOwner;
+  }
+  if (
+    message.includes("Not authorized to transfer Master Owner") ||
+    message.includes("Staff actor not found") ||
+    message.includes("Staff actor is required")
+  ) {
+    return STAFF_ADMIN_COPY.cannotTransfer;
+  }
+  if (message.includes("Staff member not found")) {
+    return STAFF_ADMIN_COPY.notFound;
+  }
+
+  return STAFF_ADMIN_COPY.updateFailed;
+}
+
+export async function transferMasterOwnerAction(
+  formData: FormData,
+): Promise<StaffAdminActionResult> {
+  const actorResult = await requireStaffAdmin();
+  if (!actorResult.ok) return actorResult.result;
+  const actor = actorResult.staff;
+  const targetId = String(formData.get("staffId") ?? "").trim();
+
+  const target = await getStaffProfileByIdForAdmin(targetId);
+  if (!target) {
+    return { error: STAFF_ADMIN_COPY.notFound, success: false };
+  }
+
+  const transferError = staffAdminTransferError({
+    actorStaffId: actor.id,
+    targetStaffId: target.id,
+    actorIsMasterOwner: actor.isMasterOwner,
+    targetIsActive: target.isActive,
+    targetIsOwner: target.role.code === "owner",
+  });
+  if (transferError) {
+    return { error: transferError, success: false };
+  }
+
+  const admin = createServiceClient();
+  const { error: rpcError } = await admin.rpc("transfer_master_owner", {
+    p_actor_staff_id: actor.id,
+    p_new_master_staff_id: target.id,
+  });
+
+  if (rpcError) {
+    return { error: mapTransferRpcError(rpcError), success: false };
   }
 
   revalidateStaffAdmin();

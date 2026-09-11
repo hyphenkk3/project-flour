@@ -8,15 +8,22 @@ import { STAFF_USERNAME_COPY } from "@/foundation/staff/username";
 import type { Role } from "@/types/staff";
 
 type StaffAdminCreateFormProps = {
+  actorIsMasterOwner: boolean;
   roles: Role[];
 };
 
-export function StaffAdminCreateForm({ roles }: StaffAdminCreateFormProps) {
+export function StaffAdminCreateForm({
+  actorIsMasterOwner,
+  roles,
+}: StaffAdminCreateFormProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const createRoles = actorIsMasterOwner
+    ? roles
+    : roles.filter((role) => role.code !== "owner");
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -102,7 +109,7 @@ export function StaffAdminCreateForm({ roles }: StaffAdminCreateFormProps) {
               name="role"
               required
             >
-              {roles.map((role) => (
+              {createRoles.map((role) => (
                 <option key={role.id} value={role.code}>
                   {role.name}
                 </option>

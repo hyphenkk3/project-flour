@@ -40,8 +40,12 @@ export default async function StaffAdminPage() {
         </p>
       </div>
 
-      <StaffAdminCreateForm roles={roles} />
+      <StaffAdminCreateForm
+        actorIsMasterOwner={actor.isMasterOwner}
+        roles={roles}
+      />
       <StaffAdminDirectory
+        actorIsMasterOwner={actor.isMasterOwner}
         actorStaffId={actor.id}
         roles={roles}
         staff={staff}

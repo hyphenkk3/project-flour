@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   setManagedStaffActiveAction,
+  transferMasterOwnerAction,
   updateManagedStaffRoleAction,
   updateManagedStaffUsernameAction,
 } from "@/foundation/staff/admin-actions";
@@ -15,15 +16,17 @@ import {
   validateStaffUsername,
 } from "@/foundation/staff/username";
 import type { StaffAdminListItem } from "@/foundation/staff/queries";
-import type { Role } from "@/types/staff";
+import type { Role, RoleCode } from "@/types/staff";
 
 type StaffAdminDirectoryProps = {
+  actorIsMasterOwner: boolean;
   actorStaffId: string;
   roles: Role[];
   staff: StaffAdminListItem[];
 };
 
 export function StaffAdminDirectory({
+  actorIsMasterOwner,
   actorStaffId,
   roles,
   staff,
@@ -37,6 +40,7 @@ export function StaffAdminDirectory({
         <ul className="space-y-3">
           {staff.map((member) => (
             <StaffAdminMemberCard
+              actorIsMasterOwner={actorIsMasterOwner}
               actorStaffId={actorStaffId}
               key={member.id}
               member={member}
@@ -50,20 +54,36 @@ export function StaffAdminDirectory({
 }
 
 function StaffAdminMemberCard({
+  actorIsMasterOwner,
   actorStaffId,
   member,
   roles,
 }: {
+  actorIsMasterOwner: boolean;
   actorStaffId: string;
   member: StaffAdminListItem;
   roles: Role[];
 }) {
   const router = useRouter();
   const isSelf = member.id === actorStaffId;
+  const masterLocked = member.isMasterOwner;
+  const controlsDisabled = isSelf || masterLocked;
+  const canTransferMaster =
+    actorIsMasterOwner &&
+    !isSelf &&
+    !member.isMasterOwner &&
+    member.isActive &&
+    member.role.code === "owner";
+  const roleOptions = roles.filter((role) => {
+    if (role.code !== "owner") return true;
+    if (actorIsMasterOwner) return true;
+    return member.role.code === "owner";
+  });
   const [username, setUsername] = useState(member.username);
   const [roleCode, setRoleCode] = useState(member.role.code);
   const [saving, setSaving] = useState(false);
   const [confirmingDeactivate, setConfirmingDeactivate] = useState(false);
+  const [confirmingTransfer, setConfirmingTransfer] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,6 +99,7 @@ function StaffAdminMemberCard({
       setError(result.error);
     } else {
       setConfirmingDeactivate(false);
+      setConfirmingTransfer(false);
       router.refresh();
     }
     setSaving(false);
@@ -124,12 +145,26 @@ function StaffAdminMemberCard({
     }
   }
 
+  async function transferMaster() {
+    const formData = new FormData();
+    formData.set("staffId", member.id);
+    const result = await run(() => transferMasterOwnerAction(formData));
+    if (!result.error) {
+      setMessage(STAFF_ADMIN_COPY.transferSuccess);
+    }
+  }
+
   return (
     <li className="border-fog rounded-xl border bg-white p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-ink text-sm font-medium">
             {member.displayName}
+            {member.isMasterOwner ? (
+              <span className="text-signal ml-2 text-xs font-medium">
+                Master Owner
+              </span>
+            ) : null}
             {isSelf ? (
               <span className="text-signal ml-2 text-xs font-medium">You</span>
             ) : null}
@@ -156,7 +191,7 @@ function StaffAdminMemberCard({
           <div className="flex flex-col gap-2 sm:flex-row">
             <input
               className="border-fog text-ink min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm outline-none transition focus:border-signal focus:ring-2 focus:ring-signal/10 disabled:opacity-60"
-              disabled={saving || isSelf}
+              disabled={saving || controlsDisabled}
               onChange={(event) => setUsername(event.target.value)}
               spellCheck={false}
               type="text"
@@ -164,7 +199,7 @@ function StaffAdminMemberCard({
             />
             <button
               className="border-fog text-ink rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-60"
-              disabled={saving || isSelf || !usernameChanged}
+              disabled={saving || controlsDisabled || !usernameChanged}
               onClick={() => void saveUsername()}
               type="button"
             >
@@ -173,6 +208,8 @@ function StaffAdminMemberCard({
           </div>
           {isSelf ? (
             <span>{STAFF_ADMIN_COPY.cannotEditOwnUsername}</span>
+          ) : masterLocked ? (
+            <span>{STAFF_ADMIN_COPY.cannotChangeMaster}</span>
           ) : (
             <span>{STAFF_USERNAME_COPY.helper}</span>
           )}
@@ -183,11 +220,11 @@ function StaffAdminMemberCard({
           <div className="flex flex-col gap-2 sm:flex-row">
             <select
               className="border-fog text-ink min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm outline-none transition focus:border-signal focus:ring-2 focus:ring-signal/10 disabled:opacity-60"
-              disabled={saving || isSelf}
-              onChange={(event) => setRoleCode(event.target.value as typeof roleCode)}
+              disabled={saving || controlsDisabled}
+              onChange={(event) => setRoleCode(event.target.value as RoleCode)}
               value={roleCode}
             >
-              {roles.map((role) => (
+              {roleOptions.map((role) => (
                 <option key={role.id} value={role.code}>
                   {role.name}
                 </option>
@@ -195,7 +232,7 @@ function StaffAdminMemberCard({
             </select>
             <button
               className="border-fog text-ink rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-60"
-              disabled={saving || isSelf || !roleChanged}
+              disabled={saving || controlsDisabled || !roleChanged}
               onClick={() => void saveRole()}
               type="button"
             >
@@ -205,8 +242,8 @@ function StaffAdminMemberCard({
         </label>
       </div>
 
-      <div className="mt-4">
-        {isSelf ? null : confirmingDeactivate && member.isActive ? (
+      <div className="mt-4 flex flex-col gap-3">
+        {!isSelf && confirmingDeactivate && member.isActive && !masterLocked ? (
           <div className="flex flex-wrap gap-2">
             <button
               className="bg-ink text-mist rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-60"
@@ -225,13 +262,14 @@ function StaffAdminMemberCard({
               Cancel
             </button>
           </div>
-        ) : (
+        ) : !isSelf ? (
           <button
             className="border-fog text-ink rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-60"
-            disabled={saving || isSelf}
+            disabled={saving || masterLocked}
             onClick={() => {
               if (member.isActive) {
                 setConfirmingDeactivate(true);
+                setConfirmingTransfer(false);
                 setError(null);
                 return;
               }
@@ -241,7 +279,49 @@ function StaffAdminMemberCard({
           >
             {member.isActive ? "Deactivate" : "Reactivate"}
           </button>
-        )}
+        ) : null}
+
+        {canTransferMaster ? (
+          confirmingTransfer ? (
+            <div className="space-y-2">
+              <p className="text-skyline text-xs">
+                {member.displayName} will become the Master Owner. This account
+                will become an ordinary Owner.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="bg-ink text-mist rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-60"
+                  disabled={saving}
+                  onClick={() => void transferMaster()}
+                  type="button"
+                >
+                  Confirm transfer
+                </button>
+                <button
+                  className="border-fog text-ink rounded-lg border px-3 py-2 text-xs font-medium"
+                  disabled={saving}
+                  onClick={() => setConfirmingTransfer(false)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              className="border-fog text-ink rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-60"
+              disabled={saving}
+              onClick={() => {
+                setConfirmingTransfer(true);
+                setConfirmingDeactivate(false);
+                setError(null);
+              }}
+              type="button"
+            >
+              Transfer Master Owner
+            </button>
+          )
+        ) : null}
       </div>
 
       {message ? (

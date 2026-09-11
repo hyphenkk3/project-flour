@@ -18,6 +18,7 @@ type StaffProfileRow = {
   display_name: string;
   role_id: string;
   is_active: boolean;
+  is_master_owner: boolean;
   roles: RoleRow | RoleRow[];
 };
 
@@ -46,6 +47,7 @@ function mapStaffProfile(row: StaffProfileRow): StaffProfile {
     displayName: row.display_name,
     roleId: row.role_id,
     isActive: row.is_active,
+    isMasterOwner: Boolean(row.is_master_owner),
     role,
   };
 }
@@ -58,6 +60,7 @@ const staffSelect = `
   display_name,
   role_id,
   is_active,
+  is_master_owner,
   roles!inner (
     id,
     code,
@@ -115,6 +118,7 @@ export type StaffAdminListItem = {
   email: string | null;
   displayName: string;
   isActive: boolean;
+  isMasterOwner: boolean;
   role: Role;
 };
 
@@ -125,6 +129,7 @@ function toAdminListItem(staff: StaffProfile): StaffAdminListItem {
     email: staff.email,
     displayName: staff.displayName,
     isActive: staff.isActive,
+    isMasterOwner: staff.isMasterOwner,
     role: staff.role,
   };
 }
