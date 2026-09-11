@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { AUTH_FETCH_TIMEOUT_MS } from "@/lib/supabase/fetch-timeout";
+import { STAFF_ROLE_CODES } from "@/foundation/staff/admin-guards";
 import type { Role, RoleCode, StaffProfile } from "@/types/staff";
 
 type RoleRow = {
@@ -106,4 +107,113 @@ export async function getAuthEmailForUserId(authUserId: string) {
   }
 
   return data.user.email ?? null;
+}
+
+export type StaffAdminListItem = {
+  id: string;
+  username: string;
+  email: string | null;
+  displayName: string;
+  isActive: boolean;
+  role: Role;
+};
+
+function toAdminListItem(staff: StaffProfile): StaffAdminListItem {
+  return {
+    id: staff.id,
+    username: staff.username,
+    email: staff.email,
+    displayName: staff.displayName,
+    isActive: staff.isActive,
+    role: staff.role,
+  };
+}
+
+export async function listStaffProfilesForAdmin(): Promise<StaffAdminListItem[]> {
+  const admin = createServiceClient();
+  const { data, error } = await admin
+    .from("staff_profiles")
+    .select(staffSelect)
+    .order("display_name", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? [])
+    .map((row) => toAdminListItem(mapStaffProfile(row as unknown as StaffProfileRow)))
+    .sort((left, right) => {
+      if (left.isActive !== right.isActive) {
+        return left.isActive ? -1 : 1;
+      }
+      return left.displayName.localeCompare(right.displayName);
+    });
+}
+
+export async function listStaffRoles(): Promise<Role[]> {
+  const admin = createServiceClient();
+  const { data, error } = await admin
+    .from("roles")
+    .select("id, code, name")
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? [])
+    .filter((row): row is { id: string; code: RoleCode; name: string } =>
+      typeof row.id === "string" &&
+      typeof row.code === "string" &&
+      typeof row.name === "string" &&
+      (STAFF_ROLE_CODES as readonly string[]).includes(row.code),
+    )
+    .map((row) => ({
+      id: row.id,
+      code: row.code,
+      name: row.name,
+    }));
+}
+
+export async function getStaffProfileByIdForAdmin(staffId: string) {
+  const admin = createServiceClient();
+  const { data, error } = await admin
+    .from("staff_profiles")
+    .select(staffSelect)
+    .eq("id", staffId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data ? mapStaffProfile(data as unknown as StaffProfileRow) : null;
+}
+
+export async function countActiveOwners(): Promise<number> {
+  const admin = createServiceClient();
+  const { data: ownerRole, error: roleError } = await admin
+    .from("roles")
+    .select("id")
+    .eq("code", "owner")
+    .maybeSingle();
+
+  if (roleError) {
+    throw roleError;
+  }
+  if (!ownerRole?.id) {
+    return 0;
+  }
+
+  const { count, error } = await admin
+    .from("staff_profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("role_id", ownerRole.id)
+    .eq("is_active", true);
+
+  if (error) {
+    throw error;
+  }
+
+  return count ?? 0;
 }

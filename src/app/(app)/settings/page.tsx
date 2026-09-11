@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireStaff } from "@/foundation/auth/session";
 import { canManageStaff } from "@/foundation/navigation/access";
 import { getNotificationDefinitionsForRole } from "@/foundation/staff/notification-preferences";
@@ -82,13 +83,12 @@ export default async function SettingsPage() {
             Manage Whitebird staff accounts and access.
           </p>
 
-          <div className="border-fog bg-mist mt-4 rounded-lg border p-4">
-            <p className="text-ink text-sm font-medium">Staff accounts</p>
-            <p className="text-skyline mt-1 text-xs">
-              Staff creation, role assignment, and account management will be
-              available here.
-            </p>
-          </div>
+          <Link
+            className="bg-signal mt-4 inline-flex rounded-lg px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90"
+            href="/settings/staff"
+          >
+            Open staff accounts
+          </Link>
         </section>
       )}
     </main>
