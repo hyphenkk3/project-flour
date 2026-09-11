@@ -102,6 +102,7 @@ const profileActions = readFileSync(
 assert.match(profileActions, /export async function updateStaffEmailAction/);
 assert.match(profileActions, /email_confirm:\s*true/);
 assert.match(profileActions, /export async function updateStaffUsernameAction/);
+assert.match(profileActions, /export async function updateStaffDisplayNameAction/);
 assert.match(profileActions, /export async function updateStaffPasswordAction/);
 assert.match(profileActions, /await requireStaff\(\)/);
 assert.match(
@@ -142,6 +143,62 @@ assert.doesNotMatch(
 assert.doesNotMatch(
   profileActions,
   /updateStaffPasswordAction[\s\S]*redirect\("\/login"\)/,
+);
+assert.match(
+  profileActions,
+  /updateStaffDisplayNameAction[\s\S]*requireStaff\(\)/,
+);
+assert.match(
+  profileActions,
+  /updateStaffDisplayNameAction[\s\S]*formData\.get\("displayName"\)/,
+);
+assert.match(
+  profileActions,
+  /updateStaffDisplayNameAction[\s\S]*\.trim\(\)/,
+);
+assert.match(
+  profileActions,
+  /updateStaffDisplayNameAction[\s\S]*Please enter a display name/,
+);
+assert.match(
+  profileActions,
+  /updateStaffDisplayNameAction[\s\S]*update\(\{\s*display_name:/,
+);
+assert.match(
+  profileActions,
+  /updateStaffDisplayNameAction[\s\S]*\.eq\("id", staff\.id\)/,
+);
+assert.match(
+  profileActions,
+  /updateStaffDisplayNameAction[\s\S]*\.eq\("auth_user_id", staff\.authUserId\)/,
+);
+assert.match(
+  profileActions,
+  /updateStaffDisplayNameAction[\s\S]*revalidatePath\("\/settings"\)/,
+);
+assert.doesNotMatch(
+  profileActions,
+  /updateStaffDisplayNameAction[\s\S]*updateUserById/,
+);
+assert.doesNotMatch(
+  profileActions,
+  /updateStaffDisplayNameAction[\s\S]*user_metadata/,
+);
+assert.doesNotMatch(
+  profileActions,
+  /updateStaffDisplayNameAction[\s\S]*username,/,
+);
+assert.doesNotMatch(
+  profileActions,
+  /updateStaffDisplayNameAction[\s\S]*\n\s*email,/,
+);
+assert.doesNotMatch(
+  profileActions,
+  /updateStaffDisplayNameAction[\s\S]*role_id/,
+);
+assert.doesNotMatch(
+  profileActions,
+  /updateStaffDisplayNameAction[\s\S]*auth_user_id:/,
 );
 assert.doesNotMatch(profileActions, /formData\.get\("staffId"\)/);
 assert.doesNotMatch(profileActions, /formData\.get\("staff_id"\)/);
@@ -185,8 +242,23 @@ const settingsPage = readFileSync(
 assert.match(settingsPage, /requireStaff/);
 assert.match(
   settingsPage,
+  /StaffDisplayNameForm initialDisplayName=\{staff\.displayName\}/,
+);
+assert.match(
+  settingsPage,
   /StaffUsernameForm initialUsername=\{staff\.username\}/,
 );
+
+const displayNameForm = readFileSync(
+  resolve("src/components/settings/StaffDisplayNameForm.tsx"),
+  "utf8",
+);
+assert.match(displayNameForm, /updateStaffDisplayNameAction/);
+assert.match(displayNameForm, /initialDisplayName/);
+assert.match(displayNameForm, /Save display name/);
+assert.match(displayNameForm, /router\.refresh\(\)/);
+assert.doesNotMatch(displayNameForm, /staffId|staff_id|authUserId/);
+assert.doesNotMatch(displayNameForm, /updateStaffUsernameAction|updateStaffEmailAction|updateStaffPasswordAction/);
 assert.match(settingsPage, /StaffProfileForm initialEmail=\{staff\.email/);
 assert.match(settingsPage, /StaffPasskeySettings/);
 assert.match(settingsPage, /StaffPasswordSettings/);

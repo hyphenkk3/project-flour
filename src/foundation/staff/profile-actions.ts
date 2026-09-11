@@ -141,6 +141,40 @@ export async function updateStaffUsernameAction(
   return { error: null, success: true };
 }
 
+export async function updateStaffDisplayNameAction(
+  formData: FormData,
+): Promise<{ error: string | null; success: boolean }> {
+  const staff = await requireStaff();
+  const displayName = String(formData.get("displayName") ?? "").trim();
+
+  if (!displayName) {
+    return { error: "Please enter a display name.", success: false };
+  }
+
+  if (displayName === staff.displayName.trim()) {
+    return { error: null, success: true };
+  }
+
+  const admin = createServiceClient();
+  const { error: profileError } = await admin
+    .from("staff_profiles")
+    .update({
+      display_name: displayName,
+    })
+    .eq("id", staff.id)
+    .eq("auth_user_id", staff.authUserId);
+
+  if (profileError) {
+    return {
+      error: "That display name couldn't be updated. Please try again.",
+      success: false,
+    };
+  }
+
+  revalidatePath("/settings");
+  return { error: null, success: true };
+}
+
 export async function updateStaffPasswordAction(
   formData: FormData,
 ): Promise<{ error: string | null; success: boolean }> {

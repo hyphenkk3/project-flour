@@ -6,6 +6,7 @@ import { loadStaffNotificationPreferences } from "@/foundation/staff/notificatio
 import { NotificationPreferences } from "@/components/settings/NotificationPreferences";
 import { StaffPasskeySettings } from "@/components/settings/StaffPasskeySettings";
 import { StaffPasswordSettings } from "@/components/settings/StaffPasswordSettings";
+import { StaffDisplayNameForm } from "@/components/settings/StaffDisplayNameForm";
 import { StaffProfileForm } from "@/components/settings/StaffProfileForm";
 import { StaffUsernameForm } from "@/components/settings/StaffUsernameForm";
 
@@ -36,11 +37,8 @@ export default async function SettingsPage() {
         </div>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div>
-            <p className="text-skyline text-xs">Display name</p>
-            <p className="text-ink mt-1 text-sm font-medium">
-              {staff.displayName}
-            </p>
+          <div className="md:col-span-2">
+            <StaffDisplayNameForm initialDisplayName={staff.displayName} />
           </div>
 
           <div className="md:col-span-2">
