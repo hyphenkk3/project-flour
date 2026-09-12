@@ -19,6 +19,7 @@ type StaffProfileRow = {
   role_id: string;
   is_active: boolean;
   is_master_owner: boolean;
+  must_change_password: boolean;
   roles: RoleRow | RoleRow[];
 };
 
@@ -48,6 +49,7 @@ function mapStaffProfile(row: StaffProfileRow): StaffProfile {
     roleId: row.role_id,
     isActive: row.is_active,
     isMasterOwner: Boolean(row.is_master_owner),
+    mustChangePassword: Boolean(row.must_change_password),
     role,
   };
 }
@@ -61,6 +63,7 @@ const staffSelect = `
   role_id,
   is_active,
   is_master_owner,
+  must_change_password,
   roles!inner (
     id,
     code,

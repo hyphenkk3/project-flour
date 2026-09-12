@@ -31,6 +31,19 @@ export const STAFF_ADMIN_COPY = {
   roleSuccess: "Role updated successfully.",
   deactivated: "Staff account deactivated.",
   reactivated: "Staff account reactivated.",
+  cannotResetOwnPassword: "Change your own password in Settings.",
+  resetConfirm:
+    "Their current password will stop working. They will receive a temporary password and must choose a new password after signing in.",
+  resetSuccess: "Password reset successfully.",
+  resetHandoff:
+    "Give this temporary password to the staff member. They will be required to create a new password after signing in.",
+  resetFailed: "That password couldn't be reset. Please try again.",
+  resetFlagFailed:
+    "Unable to prepare the account for a password reset. Please try again.",
+  resetUncertain:
+    "The password reset could not be confirmed. The staff member may be required to create a new password before continuing.",
+  resetSessionWarning:
+    "The temporary password is ready, but existing sessions could not be signed out. Ask the staff member to sign in with the temporary password.",
 } as const;
 
 export const STAFF_ROLE_CODES: readonly RoleCode[] = [
@@ -176,6 +189,29 @@ export function staffAdminUsernameChangeError(input: {
 }): string | null {
   if (input.actorStaffId === input.targetStaffId) {
     return STAFF_ADMIN_COPY.cannotEditOwnUsername;
+  }
+  if (input.targetIsMasterOwner) {
+    return STAFF_ADMIN_COPY.cannotChangeMaster;
+  }
+  return staffAdminOwnerMutationError({
+    actorRole: input.actorRole,
+    targetRoleIsOwner: input.targetRoleIsOwner,
+    targetIsMasterOwner: input.targetIsMasterOwner,
+  });
+}
+
+export function staffAdminPasswordResetError(input: {
+  actorStaffId: string;
+  targetStaffId: string;
+  actorRole: RoleCode;
+  targetRoleIsOwner: boolean;
+  targetIsMasterOwner?: boolean;
+}): string | null {
+  if (!canManageStaff(input.actorRole)) {
+    return STAFF_ADMIN_COPY.unauthorized;
+  }
+  if (input.actorStaffId === input.targetStaffId) {
+    return STAFF_ADMIN_COPY.cannotResetOwnPassword;
   }
   if (input.targetIsMasterOwner) {
     return STAFF_ADMIN_COPY.cannotChangeMaster;

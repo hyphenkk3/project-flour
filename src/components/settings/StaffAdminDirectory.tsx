@@ -8,6 +8,7 @@ import {
   updateManagedStaffRoleAction,
   updateManagedStaffUsernameAction,
 } from "@/foundation/staff/admin-actions";
+import { resetManagedStaffPasswordAction } from "@/foundation/staff/admin-password-actions";
 import {
   STAFF_ADMIN_COPY,
   canManageOwnerStaff,
@@ -84,6 +85,7 @@ function StaffAdminMemberCard({
     !member.isMasterOwner &&
     member.isActive &&
     member.role.code === "owner";
+  const canResetPassword = !isSelf && !masterLocked && !ownerLocked;
   const roleOptions = roles.filter((role) => {
     if (role.code !== "owner") return true;
     if (!canManageOwnerStaff(actorRole)) {
@@ -97,7 +99,14 @@ function StaffAdminMemberCard({
   const [saving, setSaving] = useState(false);
   const [confirmingDeactivate, setConfirmingDeactivate] = useState(false);
   const [confirmingTransfer, setConfirmingTransfer] = useState(false);
+  const [confirmingReset, setConfirmingReset] = useState(false);
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(
+    null,
+  );
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const usernameChanged = !staffUsernamesMatch(username, member.username);
@@ -113,6 +122,7 @@ function StaffAdminMemberCard({
     } else {
       setConfirmingDeactivate(false);
       setConfirmingTransfer(false);
+      setConfirmingReset(false);
       router.refresh();
     }
     setSaving(false);
@@ -165,6 +175,49 @@ function StaffAdminMemberCard({
     if (!result.error) {
       setMessage(STAFF_ADMIN_COPY.transferSuccess);
     }
+  }
+
+  async function resetPassword() {
+    setSaving(true);
+    setMessage(null);
+    setWarning(null);
+    setError(null);
+    setCopied(false);
+    setPasswordVisible(false);
+
+    const formData = new FormData();
+    formData.set("staffId", member.id);
+    const result = await resetManagedStaffPasswordAction(formData);
+
+    if (result.temporaryPassword) {
+      setTemporaryPassword(result.temporaryPassword);
+      setConfirmingReset(false);
+    }
+
+    if (result.warning) {
+      setWarning(result.warning);
+    }
+
+    if (result.error) {
+      setError(result.error);
+    } else if (result.success) {
+      setMessage(STAFF_ADMIN_COPY.resetSuccess);
+    }
+
+    setSaving(false);
+  }
+
+  async function copyTemporaryPassword() {
+    if (!temporaryPassword) return;
+    await navigator.clipboard.writeText(temporaryPassword);
+    setCopied(true);
+  }
+
+  function dismissTemporaryPassword() {
+    setTemporaryPassword(null);
+    setPasswordVisible(false);
+    setCopied(false);
+    setWarning(null);
   }
 
   return (
@@ -294,6 +347,7 @@ function StaffAdminMemberCard({
               if (member.isActive) {
                 setConfirmingDeactivate(true);
                 setConfirmingTransfer(false);
+                setConfirmingReset(false);
                 setError(null);
                 return;
               }
@@ -338,6 +392,7 @@ function StaffAdminMemberCard({
               onClick={() => {
                 setConfirmingTransfer(true);
                 setConfirmingDeactivate(false);
+                setConfirmingReset(false);
                 setError(null);
               }}
               type="button"
@@ -346,11 +401,95 @@ function StaffAdminMemberCard({
             </button>
           )
         ) : null}
+
+        {canResetPassword && temporaryPassword ? (
+          <div className="border-fog space-y-3 rounded-lg border p-3">
+            <p className="text-ink text-sm font-medium">
+              {STAFF_ADMIN_COPY.resetSuccess}
+            </p>
+            <p className="text-skyline text-xs">Temporary password</p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                className="border-fog text-ink min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 font-mono text-sm"
+                readOnly
+                type={passwordVisible ? "text" : "password"}
+                value={temporaryPassword}
+              />
+              <button
+                className="border-fog text-ink rounded-lg border px-3 py-2 text-xs font-medium"
+                onClick={() => setPasswordVisible((visible) => !visible)}
+                type="button"
+              >
+                {passwordVisible ? "Hide" : "Show"}
+              </button>
+              <button
+                className="border-fog text-ink rounded-lg border px-3 py-2 text-xs font-medium"
+                onClick={() => void copyTemporaryPassword()}
+                type="button"
+              >
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <p className="text-skyline text-xs">{STAFF_ADMIN_COPY.resetHandoff}</p>
+            <button
+              className="border-fog text-ink rounded-lg border px-3 py-2 text-xs font-medium"
+              onClick={dismissTemporaryPassword}
+              type="button"
+            >
+              Done
+            </button>
+          </div>
+        ) : canResetPassword && confirmingReset ? (
+          <div className="space-y-2">
+            <p className="text-ink text-sm font-medium">
+              Reset password for {member.displayName}?
+            </p>
+            <p className="text-skyline text-xs">{STAFF_ADMIN_COPY.resetConfirm}</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="bg-ink text-mist rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-60"
+                disabled={saving}
+                onClick={() => void resetPassword()}
+                type="button"
+              >
+                Confirm reset
+              </button>
+              <button
+                className="border-fog text-ink rounded-lg border px-3 py-2 text-xs font-medium"
+                disabled={saving}
+                onClick={() => setConfirmingReset(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : canResetPassword ? (
+          <button
+            className="border-fog text-ink rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-60"
+            disabled={saving}
+            onClick={() => {
+              setConfirmingReset(true);
+              setConfirmingDeactivate(false);
+              setConfirmingTransfer(false);
+              setError(null);
+              setMessage(null);
+            }}
+            type="button"
+          >
+            Reset password
+          </button>
+        ) : null}
       </div>
 
-      {message ? (
+      {message && !temporaryPassword ? (
         <p className="mt-3 text-sm text-signal" role="status">
           {message}
+        </p>
+      ) : null}
+      {warning ? (
+        <p className="mt-3 text-sm text-amber-700" role="status">
+          {warning}
         </p>
       ) : null}
       {error ? (

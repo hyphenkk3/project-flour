@@ -38,6 +38,25 @@ export function validatePasswordChangeInput(input: {
   return null;
 }
 
+export function validateForcedPasswordChangeInput(input: {
+  newPassword: string;
+  confirmPassword: string;
+}): string | null {
+  if (input.newPassword.length === 0 || input.confirmPassword.length === 0) {
+    return STAFF_PASSWORD_COPY.blank;
+  }
+
+  if (input.newPassword !== input.confirmPassword) {
+    return STAFF_PASSWORD_COPY.mismatch;
+  }
+
+  if (input.newPassword.length < 6) {
+    return STAFF_PASSWORD_COPY.weak;
+  }
+
+  return null;
+}
+
 function readString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }

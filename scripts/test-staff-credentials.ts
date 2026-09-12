@@ -12,6 +12,7 @@ import { resolve } from "node:path";
 import {
   STAFF_PASSWORD_COPY,
   mapPasswordUpdateError,
+  validateForcedPasswordChangeInput,
   validatePasswordChangeInput,
 } from "@/foundation/staff/password-update";
 import {
@@ -135,6 +136,22 @@ assert.match(profileActions, /auth\.updateUser/);
 assert.doesNotMatch(
   profileActions,
   /updateStaffPasswordAction[\s\S]*createServiceClient/,
+);
+assert.doesNotMatch(profileActions, /must_change_password/);
+
+assert.equal(
+  validateForcedPasswordChangeInput({
+    newPassword: "new-secret",
+    confirmPassword: "new-secret",
+  }),
+  null,
+);
+assert.equal(
+  validateForcedPasswordChangeInput({
+    newPassword: "short",
+    confirmPassword: "short",
+  }),
+  STAFF_PASSWORD_COPY.weak,
 );
 assert.doesNotMatch(
   profileActions,

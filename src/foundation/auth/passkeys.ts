@@ -1,3 +1,7 @@
+import { isNextRedirectError } from "@/foundation/auth/next-redirect";
+
+export { isNextRedirectError };
+
 export const PASSKEY_COPY = {
   cancelledSignIn: "Passkey sign-in was cancelled.",
   cancelledSetup: "Passkey setup was cancelled.",
@@ -65,21 +69,6 @@ export function passkeySignInMessage(kind: PasskeyFailureKind): string {
   if (kind === "cancelled") return PASSKEY_COPY.cancelledSignIn;
   if (kind === "unsupported") return PASSKEY_COPY.unsupported;
   return PASSKEY_COPY.failedSignIn;
-}
-
-/**
- * Next.js `redirect()` throws a special error. Catching it in the Passkey
- * login UI must not be treated as an authentication failure.
- */
-export function isNextRedirectError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-
-  if ("digest" in error && typeof error.digest === "string") {
-    return error.digest.startsWith("NEXT_REDIRECT");
-  }
-
-  const message = extractMessage(error);
-  return message === "NEXT_REDIRECT" || message.startsWith("NEXT_REDIRECT");
 }
 
 /**

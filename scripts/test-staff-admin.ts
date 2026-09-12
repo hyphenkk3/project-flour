@@ -19,6 +19,7 @@ import {
   staffAdminCreateRoleError,
   staffAdminDeactivateError,
   staffAdminOwnerMutationError,
+  staffAdminPasswordResetError,
   staffAdminRoleChangeError,
   staffAdminTransferError,
   staffAdminUsernameChangeError,
@@ -258,7 +259,9 @@ assert.match(queries, /export async function listStaffRoles/);
 assert.match(queries, /export async function countActiveOwners/);
 assert.match(queries, /createServiceClient/);
 assert.match(queries, /isMasterOwner: Boolean\(row\.is_master_owner\)/);
+assert.match(queries, /mustChangePassword: Boolean\(row\.must_change_password\)/);
 assert.match(queries, /is_master_owner,/);
+assert.match(queries, /must_change_password,/);
 
 const settingsPage = readFileSync(
   resolve("src/app/(app)/settings/page.tsx"),
@@ -311,8 +314,13 @@ assert.match(directory, /member\.isMasterOwner/);
 assert.match(directory, /actorRole/);
 assert.match(directory, /ownerLocked/);
 assert.match(directory, /canManageOwnerStaff/);
-assert.match(directory, /cannotManageOwner/);
-assert.doesNotMatch(directory, /type="email".*admin|Change email|Reset password/);
+assert.match(directory, /resetManagedStaffPasswordAction/);
+assert.match(directory, /Reset password/);
+assert.match(directory, /canResetPassword/);
+assert.match(directory, /temporaryPassword/);
+assert.doesNotMatch(directory, /localStorage|sessionStorage/);
+assert.doesNotMatch(directory, /createServiceClient|SUPABASE_SERVICE_ROLE_KEY/);
+assert.doesNotMatch(directory, /type="email".*admin|Change email/);
 
 const profileActions = readFileSync(
   resolve("src/foundation/staff/profile-actions.ts"),
@@ -357,6 +365,7 @@ assert.match(workspaces, /management:[\s\S]*available: false/);
 
 const types = readFileSync(resolve("src/types/staff.ts"), "utf8");
 assert.match(types, /isMasterOwner: boolean/);
+assert.match(types, /mustChangePassword: boolean/);
 assert.doesNotMatch(types, /role.*=.*"master/);
 
 assert.equal(
@@ -867,6 +876,151 @@ assert.equal(
     targetRoleIsOwner: true,
   }),
   STAFF_ADMIN_COPY.cannotManageOwner,
+);
+
+assert.equal(
+  staffAdminPasswordResetError({
+    actorStaffId: "master-1",
+    targetStaffId: "bakery-1",
+    actorRole: "owner",
+    targetRoleIsOwner: false,
+  }),
+  null,
+);
+assert.equal(
+  staffAdminPasswordResetError({
+    actorStaffId: "master-1",
+    targetStaffId: "owner-2",
+    actorRole: "owner",
+    targetIsMasterOwner: false,
+    targetRoleIsOwner: true,
+  }),
+  null,
+);
+assert.equal(
+  staffAdminPasswordResetError({
+    actorStaffId: "master-1",
+    targetStaffId: "master-1",
+    actorRole: "owner",
+    targetIsMasterOwner: true,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotResetOwnPassword,
+);
+assert.equal(
+  staffAdminPasswordResetError({
+    actorStaffId: "owner-2",
+    targetStaffId: "master-1",
+    actorRole: "owner",
+    targetIsMasterOwner: true,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotChangeMaster,
+);
+assert.equal(
+  staffAdminPasswordResetError({
+    actorStaffId: "owner-1",
+    targetStaffId: "bakery-1",
+    actorRole: "owner",
+    targetRoleIsOwner: false,
+  }),
+  null,
+);
+assert.equal(
+  staffAdminPasswordResetError({
+    actorStaffId: "owner-1",
+    targetStaffId: "owner-2",
+    actorRole: "owner",
+    targetIsMasterOwner: false,
+    targetRoleIsOwner: true,
+  }),
+  null,
+);
+assert.equal(
+  staffAdminPasswordResetError({
+    actorStaffId: "owner-1",
+    targetStaffId: "owner-1",
+    actorRole: "owner",
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotResetOwnPassword,
+);
+assert.equal(
+  staffAdminPasswordResetError({
+    actorStaffId: "manager-1",
+    targetStaffId: "bakery-1",
+    actorRole: "manager",
+    targetRoleIsOwner: false,
+  }),
+  null,
+);
+assert.equal(
+  staffAdminPasswordResetError({
+    actorStaffId: "manager-1",
+    targetStaffId: "owner-2",
+    actorRole: "manager",
+    targetIsMasterOwner: false,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotManageOwner,
+);
+assert.equal(
+  staffAdminPasswordResetError({
+    actorStaffId: "manager-1",
+    targetStaffId: "master-1",
+    actorRole: "manager",
+    targetIsMasterOwner: true,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotChangeMaster,
+);
+assert.equal(
+  staffAdminPasswordResetError({
+    actorStaffId: "manager-1",
+    targetStaffId: "manager-1",
+    actorRole: "manager",
+    targetRoleIsOwner: false,
+  }),
+  STAFF_ADMIN_COPY.cannotResetOwnPassword,
+);
+assert.equal(
+  staffAdminPasswordResetError({
+    actorStaffId: "unknown-1",
+    targetStaffId: "bakery-1",
+    actorRole: missingActorRole,
+    targetRoleIsOwner: false,
+  }),
+  STAFF_ADMIN_COPY.unauthorized,
+);
+assert.equal(
+  staffAdminPasswordResetError({
+    actorStaffId: "unknown-1",
+    targetStaffId: "owner-2",
+    actorRole: missingActorRole,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.unauthorized,
+);
+assert.equal(
+  staffAdminPasswordResetError({
+    actorStaffId: "unknown-1",
+    targetStaffId: "owner-2",
+    actorRole: invalidActorRole,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.unauthorized,
+);
+assert.equal(
+  staffAdminActorError("bakery"),
+  STAFF_ADMIN_COPY.unauthorized,
+);
+assert.equal(
+  staffAdminActorError("collection"),
+  STAFF_ADMIN_COPY.unauthorized,
+);
+assert.equal(
+  staffAdminActorError("customer_operations"),
+  STAFF_ADMIN_COPY.unauthorized,
 );
 
 const guardsSource = readFileSync(

@@ -16,5 +16,6 @@ export type StaffProfile = {
   roleId: string;
   isActive: boolean;
   isMasterOwner: boolean;
+  mustChangePassword: boolean;
   role: Role;
 };

@@ -124,6 +124,8 @@ const actionsSource = readFileSync(
   "utf8",
 );
 assert.match(actionsSource, /resolvePostLoginDestination/);
+assert.match(actionsSource, /STAFF_FORCED_PASSWORD_CHANGE_PATH/);
+assert.match(actionsSource, /mustChangePassword/);
 assert.doesNotMatch(
   actionsSource,
   /roleCode === ["']owner["']\s*\?\s*["']\/owner["']/,

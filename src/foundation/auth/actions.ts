@@ -7,6 +7,7 @@ import {
   sanitizePostLoginPath,
 } from "@/foundation/auth/post-login-destination";
 import { getSessionStaff } from "@/foundation/auth/session";
+import { STAFF_FORCED_PASSWORD_CHANGE_PATH } from "@/foundation/staff/forced-password-change";
 import {
   findStaffByUsername,
   getAuthEmailForUserId,
@@ -37,6 +38,7 @@ export async function loginAction(
   }
 
   let roleCode: RoleCode | null = null;
+  let mustChangePassword = false;
 
   try {
     const staff = await findStaffByUsername(username);
@@ -46,6 +48,7 @@ export async function loginAction(
     }
 
     roleCode = staff.role.code;
+    mustChangePassword = staff.mustChangePassword;
 
     const authEmail = await getAuthEmailForUserId(staff.authUserId);
 
@@ -68,6 +71,10 @@ export async function loginAction(
 
   if (!roleCode) {
     return { error: genericLoginError };
+  }
+
+  if (mustChangePassword) {
+    redirect(STAFF_FORCED_PASSWORD_CHANGE_PATH);
   }
 
   redirect(resolvePostLoginDestination(roleCode, requestedNext));
@@ -93,6 +100,13 @@ export async function completePasskeyLoginAction(
 
   if (!staff) {
     return { ok: false, error: PASSKEY_COPY.failedSignIn };
+  }
+
+  if (staff.mustChangePassword) {
+    return {
+      ok: true,
+      destination: STAFF_FORCED_PASSWORD_CHANGE_PATH,
+    };
   }
 
   return {

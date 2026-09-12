@@ -97,8 +97,13 @@ assert.match(actionsSource, /signInWithPassword/);
 assert.match(actionsSource, /completePasskeyLoginAction/);
 assert.match(actionsSource, /getSessionStaff/);
 assert.match(actionsSource, /resolvePostLoginDestination/);
+assert.match(actionsSource, /staff\.mustChangePassword/);
+assert.match(actionsSource, /STAFF_FORCED_PASSWORD_CHANGE_PATH/);
 assert.match(actionsSource, /ok:\s*true/);
-assert.match(actionsSource, /destination:\s*resolvePostLoginDestination/);
+assert.match(
+  actionsSource,
+  /completePasskeyLoginAction[\s\S]*resolvePostLoginDestination/,
+);
 assert.doesNotMatch(actionsSource, /signInWithPasskey/);
 assert.doesNotMatch(
   actionsSource,
