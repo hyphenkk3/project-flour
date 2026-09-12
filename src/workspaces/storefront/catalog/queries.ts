@@ -568,6 +568,62 @@ export async function getStorefrontOfferedCakeById(
   return cakes.find((cake) => cake.id === id) ?? null;
 }
 
+/** Trim, drop empties, keep first-seen order. Cart edit and targeted loads. */
+export function requestedStorefrontCakeIds(
+  cakeIds: readonly string[],
+): string[] {
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const value of cakeIds) {
+    const id = value.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
+/** Map loaded cakes onto the requested ID list; missing IDs are omitted. */
+export function selectStorefrontCakesByRequestedIds(
+  requestedIds: readonly string[],
+  loaded: readonly StorefrontCake[],
+): StorefrontCake[] {
+  const byId = new Map(loaded.map((cake) => [cake.id, cake]));
+  return requestedStorefrontCakeIds(requestedIds).flatMap((id) => {
+    const cake = byId.get(id);
+    return cake ? [cake] : [];
+  });
+}
+
+/**
+ * Live storefront cakes for a small ID set (cart size/photo editor).
+ * Uses the same public `library_cakes` RLS as browse; does not load the
+ * full published catalogue.
+ */
+export async function listStorefrontCakesByIds(
+  cakeIds: readonly string[],
+): Promise<StorefrontCake[]> {
+  const ids = requestedStorefrontCakeIds(cakeIds);
+  if (ids.length === 0) return [];
+
+  const supabase = await createClient();
+  const data = await withCakePhotoSelectFallback(
+    (photoSelect, includeAssignments, includeTags) =>
+      supabase
+        .from("library_cakes")
+        .select(
+          libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags),
+        )
+        .in("id", ids),
+  );
+
+  const loaded = ((data ?? []) as unknown as LibraryCakeEmbed[])
+    .map(mapStorefrontCake)
+    .filter((cake) => cake.sizes.length > 0);
+
+  return selectStorefrontCakesByRequestedIds(ids, loaded);
+}
+
 /** Library cake by id when offerable (staff workspace). Not collection-gated. */
 export async function getAvailableCakeById(
   id: string,

@@ -18,6 +18,11 @@ import {
 } from "@/workspaces/storefront/cart/cart-order-summary";
 import { formatPreorderRequirement } from "@/workspaces/storefront/catalog/pricing";
 import {
+  requestedStorefrontCakeIds,
+  selectStorefrontCakesByRequestedIds,
+} from "@/workspaces/storefront/catalog/queries";
+import type { StorefrontCake } from "@/types/storefront";
+import {
   PREORDER_DRAFT_KEY,
   emptyPreorderDraft,
   readPreorderDraft,
@@ -333,6 +338,118 @@ assert.doesNotMatch(
 assert.doesNotMatch(
   readSrc("src/workspaces/storefront/extra/StorefrontExtraOrderPage.tsx"),
   /StorefrontCartShell/,
+);
+
+const cartActionsSrc = readSrc("src/workspaces/storefront/cart/actions.ts");
+assert.doesNotMatch(cartActionsSrc, /listBrowsePublishedCakes/);
+assert.match(cartActionsSrc, /listStorefrontCakesByIds/);
+
+const browseQueriesSrc = readSrc(
+  "src/workspaces/storefront/catalog/queries.ts",
+);
+const targetedStart = browseQueriesSrc.indexOf(
+  "export async function listStorefrontCakesByIds",
+);
+assert.ok(targetedStart >= 0, "listStorefrontCakesByIds must exist");
+const targetedNext = browseQueriesSrc.indexOf(
+  "\nexport async function",
+  targetedStart + 1,
+);
+const targetedBody = browseQueriesSrc.slice(
+  targetedStart,
+  targetedNext === -1 ? undefined : targetedNext,
+);
+assert.match(targetedBody, /\.in\(\s*"id"/);
+assert.match(targetedBody, /library_cakes/);
+assert.doesNotMatch(targetedBody, /listBrowsePublishedCakes/);
+assert.doesNotMatch(targetedBody, /collection_cakes/);
+
+function cartCake(
+  id: string,
+  extras: Partial<StorefrontCake> = {},
+): StorefrontCake {
+  return {
+    id,
+    name: id,
+    description: null,
+    categoryId: null,
+    categoryName: null,
+    categoryActive: true,
+    categorySortOrder: 0,
+    categories: [],
+    image: `https://example.com/${id}.jpg`,
+    photos: [
+      {
+        id: `${id}-photo`,
+        url: `https://example.com/${id}.jpg`,
+        altText: id,
+        sortOrder: 0,
+        cakeSizeId: `${id}-6`,
+        isDefault: true,
+      },
+    ],
+    sharingGuide: null,
+    allergens: [],
+    sizes: [
+      {
+        id: `${id}-6`,
+        cakeId: id,
+        size: '6"',
+        price: 120,
+        sortOrder: 0,
+        preorderDays: 2,
+      },
+      {
+        id: `${id}-8`,
+        cakeId: id,
+        size: '8"',
+        price: 180,
+        sortOrder: 1,
+        preorderDays: 3,
+      },
+    ],
+    ...extras,
+  };
+}
+
+assert.deepEqual(requestedStorefrontCakeIds([]), []);
+assert.deepEqual(requestedStorefrontCakeIds(["", "  "]), []);
+assert.deepEqual(requestedStorefrontCakeIds(["avo"]), ["avo"]);
+assert.deepEqual(
+  requestedStorefrontCakeIds(["  avo  ", "berry", "avo", "", "berry"]),
+  ["avo", "berry"],
+);
+
+const avocadoLive = cartCake("avocado");
+const berryLive = cartCake("berry");
+const extraLive = cartCake("extra");
+
+assert.deepEqual(selectStorefrontCakesByRequestedIds([], [avocadoLive]), []);
+assert.deepEqual(selectStorefrontCakesByRequestedIds(["avocado"], [avocadoLive, berryLive]), [
+  avocadoLive,
+]);
+assert.deepEqual(
+  selectStorefrontCakesByRequestedIds(
+    ["berry", "avocado", "missing", "berry"],
+    [avocadoLive, berryLive, extraLive],
+  ).map((cake) => cake.id),
+  ["berry", "avocado"],
+);
+
+const liveChoices = draftItemSizeChoices(
+  avocado,
+  selectStorefrontCakesByRequestedIds(["avocado"], [avocadoLive])[0],
+);
+assert.equal(liveChoices.length, 2);
+assert.equal(liveChoices[0]?.id, "avocado-6");
+assert.equal(liveChoices[1]?.id, "avocado-8");
+assert.equal(liveChoices[0]?.imageUrl, "https://example.com/avocado.jpg");
+assert.equal(
+  draftItemShowsSizeEditor(
+    avocado,
+    selectStorefrontCakesByRequestedIds(["avocado"], [avocadoLive])[0],
+  ),
+  true,
 );
 
 const orderFiles = existsSync(resolve(process.cwd(), "src/app/order"))
