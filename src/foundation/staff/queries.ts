@@ -18,6 +18,7 @@ type StaffProfileRow = {
   display_name: string;
   role_id: string;
   is_active: boolean;
+  archived_at: string | null;
   is_master_owner: boolean;
   must_change_password: boolean;
   roles: RoleRow | RoleRow[];
@@ -48,6 +49,7 @@ function mapStaffProfile(row: StaffProfileRow): StaffProfile {
     displayName: row.display_name,
     roleId: row.role_id,
     isActive: row.is_active,
+    archivedAt: row.archived_at ?? null,
     isMasterOwner: Boolean(row.is_master_owner),
     mustChangePassword: Boolean(row.must_change_password),
     role,
@@ -62,6 +64,7 @@ const staffSelect = `
   display_name,
   role_id,
   is_active,
+  archived_at,
   is_master_owner,
   must_change_password,
   roles!inner (
@@ -121,9 +124,44 @@ export type StaffAdminListItem = {
   email: string | null;
   displayName: string;
   isActive: boolean;
+  archivedAt: string | null;
   isMasterOwner: boolean;
   role: Role;
 };
+
+export function isStaffArchived(
+  archivedAt: string | null | undefined,
+): boolean {
+  return Boolean(archivedAt);
+}
+
+export function partitionStaffForAdmin(staff: StaffAdminListItem[]): {
+  current: StaffAdminListItem[];
+  archived: StaffAdminListItem[];
+} {
+  const current: StaffAdminListItem[] = [];
+  const archived: StaffAdminListItem[] = [];
+
+  for (const member of staff) {
+    if (isStaffArchived(member.archivedAt)) {
+      archived.push(member);
+    } else {
+      current.push(member);
+    }
+  }
+
+  current.sort((left, right) => {
+    if (left.isActive !== right.isActive) {
+      return left.isActive ? -1 : 1;
+    }
+    return left.displayName.localeCompare(right.displayName);
+  });
+  archived.sort((left, right) =>
+    left.displayName.localeCompare(right.displayName),
+  );
+
+  return { current, archived };
+}
 
 function toAdminListItem(staff: StaffProfile): StaffAdminListItem {
   return {
@@ -132,6 +170,7 @@ function toAdminListItem(staff: StaffProfile): StaffAdminListItem {
     email: staff.email,
     displayName: staff.displayName,
     isActive: staff.isActive,
+    archivedAt: staff.archivedAt,
     isMasterOwner: staff.isMasterOwner,
     role: staff.role,
   };
@@ -142,6 +181,7 @@ export async function listStaffProfilesForAdmin(): Promise<StaffAdminListItem[]>
   const { data, error } = await admin
     .from("staff_profiles")
     .select(staffSelect)
+    .is("archived_at", null)
     .order("display_name", { ascending: true });
 
   if (error) {
@@ -156,6 +196,25 @@ export async function listStaffProfilesForAdmin(): Promise<StaffAdminListItem[]>
       }
       return left.displayName.localeCompare(right.displayName);
     });
+}
+
+export async function listArchivedStaffProfilesForAdmin(): Promise<
+  StaffAdminListItem[]
+> {
+  const admin = createServiceClient();
+  const { data, error } = await admin
+    .from("staff_profiles")
+    .select(staffSelect)
+    .not("archived_at", "is", null)
+    .order("display_name", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map((row) =>
+    toAdminListItem(mapStaffProfile(row as unknown as StaffProfileRow)),
+  );
 }
 
 export async function listStaffRoles(): Promise<Role[]> {

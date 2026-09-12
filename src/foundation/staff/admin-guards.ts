@@ -31,6 +31,25 @@ export const STAFF_ADMIN_COPY = {
   roleSuccess: "Role updated successfully.",
   deactivated: "Staff account deactivated.",
   reactivated: "Staff account reactivated.",
+  cannotArchiveSelf: "Cannot archive yourself.",
+  cannotArchiveMaster: "The Master Owner account cannot be archived.",
+  archiveRequiresDeactivated:
+    "Deactivate this staff member before archiving.",
+  alreadyArchived: "That staff member is already archived.",
+  notArchived: "That staff member is not archived.",
+  restoreBeforeReactivate:
+    "Restore this staff member before reactivating.",
+  cannotResetArchivedPassword:
+    "Restore this staff member before resetting their password.",
+  archived: "Staff account archived.",
+  restored: "Staff account restored to Deactivated.",
+  archiveConfirm:
+    "Archive this staff member? They will remain in Whitebird for historical records but will no longer be able to sign in.",
+  restoreConfirm:
+    "Restore this staff member? They will return to Deactivated status and must be reactivated before they can sign in.",
+  archivedStatus: "This staff member is archived and cannot sign in.",
+  archiveSessionWarning:
+    "The staff member is archived, but existing sessions could not be signed out.",
   cannotResetOwnPassword: "Change your own password in Settings.",
   resetConfirm:
     "Their current password will stop working. They will receive a temporary password and must choose a new password after signing in.",
@@ -206,6 +225,7 @@ export function staffAdminPasswordResetError(input: {
   actorRole: RoleCode;
   targetRoleIsOwner: boolean;
   targetIsMasterOwner?: boolean;
+  targetIsArchived?: boolean;
 }): string | null {
   if (!canManageStaff(input.actorRole)) {
     return STAFF_ADMIN_COPY.unauthorized;
@@ -216,11 +236,79 @@ export function staffAdminPasswordResetError(input: {
   if (input.targetIsMasterOwner) {
     return STAFF_ADMIN_COPY.cannotChangeMaster;
   }
+  if (input.targetIsArchived) {
+    return STAFF_ADMIN_COPY.cannotResetArchivedPassword;
+  }
   return staffAdminOwnerMutationError({
     actorRole: input.actorRole,
     targetRoleIsOwner: input.targetRoleIsOwner,
     targetIsMasterOwner: input.targetIsMasterOwner,
   });
+}
+
+export function staffAdminArchiveError(input: {
+  actorStaffId: string;
+  targetStaffId: string;
+  actorRole: RoleCode;
+  targetRoleIsOwner: boolean;
+  targetIsMasterOwner?: boolean;
+  targetIsActive: boolean;
+  targetIsArchived: boolean;
+  targetIsActiveOwner: boolean;
+  activeOwnerCount: number;
+}): string | null {
+  if (input.actorStaffId === input.targetStaffId) {
+    return STAFF_ADMIN_COPY.cannotArchiveSelf;
+  }
+  if (input.targetIsMasterOwner) {
+    return STAFF_ADMIN_COPY.cannotArchiveMaster;
+  }
+  const ownerMutationError = staffAdminOwnerMutationError({
+    actorRole: input.actorRole,
+    targetRoleIsOwner: input.targetRoleIsOwner,
+    targetIsMasterOwner: input.targetIsMasterOwner,
+  });
+  if (ownerMutationError) {
+    return ownerMutationError;
+  }
+  if (input.targetIsArchived !== false) {
+    return STAFF_ADMIN_COPY.alreadyArchived;
+  }
+  if (input.targetIsActive !== false) {
+    return STAFF_ADMIN_COPY.archiveRequiresDeactivated;
+  }
+  if (input.targetIsActiveOwner && input.activeOwnerCount <= 1) {
+    return STAFF_ADMIN_COPY.lastOwner;
+  }
+  return null;
+}
+
+export function staffAdminRestoreError(input: {
+  actorStaffId: string;
+  targetStaffId: string;
+  actorRole: RoleCode;
+  targetRoleIsOwner: boolean;
+  targetIsMasterOwner?: boolean;
+  targetIsArchived: boolean;
+}): string | null {
+  if (input.actorStaffId === input.targetStaffId) {
+    return STAFF_ADMIN_COPY.cannotArchiveSelf;
+  }
+  if (input.targetIsMasterOwner) {
+    return STAFF_ADMIN_COPY.cannotArchiveMaster;
+  }
+  const ownerMutationError = staffAdminOwnerMutationError({
+    actorRole: input.actorRole,
+    targetRoleIsOwner: input.targetRoleIsOwner,
+    targetIsMasterOwner: input.targetIsMasterOwner,
+  });
+  if (ownerMutationError) {
+    return ownerMutationError;
+  }
+  if (input.targetIsArchived !== true) {
+    return STAFF_ADMIN_COPY.notArchived;
+  }
+  return null;
 }
 
 export function staffAdminTransferError(input: {

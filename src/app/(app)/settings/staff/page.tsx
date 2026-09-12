@@ -5,6 +5,7 @@ import { StaffAdminDirectory } from "@/components/settings/StaffAdminDirectory";
 import { requireStaff } from "@/foundation/auth/session";
 import { canManageStaff } from "@/foundation/navigation/access";
 import {
+  listArchivedStaffProfilesForAdmin,
   listStaffProfilesForAdmin,
   listStaffRoles,
 } from "@/foundation/staff/queries";
@@ -17,8 +18,9 @@ export default async function StaffAdminPage() {
     redirect("/settings");
   }
 
-  const [staff, roles] = await Promise.all([
+  const [staff, archivedStaff, roles] = await Promise.all([
     listStaffProfilesForAdmin(),
+    listArchivedStaffProfilesForAdmin(),
     listStaffRoles(),
   ]);
 
@@ -50,6 +52,7 @@ export default async function StaffAdminPage() {
         actorStaffId={actor.id}
         roles={roles}
         staff={staff}
+        archivedStaff={archivedStaff}
       />
     </main>
   );

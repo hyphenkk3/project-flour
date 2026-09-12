@@ -163,7 +163,7 @@ const resetActions = readFileSync(
 assert.match(resetActions, /export async function resetManagedStaffPasswordAction/);
 assert.match(resetActions, /requireStaff\(\)/);
 assert.match(resetActions, /canManageStaff/);
-assert.match(resetActions, /staffAdminPasswordResetError/);
+assert.match(resetActions, /targetIsArchived:\s*Boolean\(target\.archivedAt\)/);
 assert.match(resetActions, /actorRole:\s*actor\.role\.code/);
 assert.match(resetActions, /getStaffProfileByIdForAdmin\(targetId\)/);
 assert.match(resetActions, /generateTemporaryStaffPassword/);

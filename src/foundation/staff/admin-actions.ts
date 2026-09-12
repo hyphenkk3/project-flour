@@ -8,8 +8,10 @@ import {
   isStaffRoleCode,
   staffAdminActivateError,
   staffAdminActorError,
+  staffAdminArchiveError,
   staffAdminCreateRoleError,
   staffAdminDeactivateError,
+  staffAdminRestoreError,
   staffAdminRoleChangeError,
   staffAdminTransferError,
   staffAdminUsernameChangeError,
@@ -35,6 +37,7 @@ import type { StaffProfile } from "@/types/staff";
 export type StaffAdminActionResult = {
   error: string | null;
   success: boolean;
+  warning?: string | null;
 };
 
 function revalidateStaffAdmin() {
@@ -334,6 +337,12 @@ export async function setManagedStaffActiveAction(
   }
 
   if (nextActive) {
+    if (target.archivedAt) {
+      return {
+        error: STAFF_ADMIN_COPY.restoreBeforeReactivate,
+        success: false,
+      };
+    }
     const activateError = staffAdminActivateError({
       actorRole: actor.role.code,
       targetRoleIsOwner: target.role.code === "owner",
@@ -363,6 +372,137 @@ export async function setManagedStaffActiveAction(
     .from("staff_profiles")
     .update({
       is_active: nextActive,
+    })
+    .eq("id", target.id);
+
+  if (profileError) {
+    return { error: STAFF_ADMIN_COPY.updateFailed, success: false };
+  }
+
+  revalidateStaffAdmin();
+  return { error: null, success: true };
+}
+
+async function signOutStaffGlobally(
+  admin: ReturnType<typeof createServiceClient>,
+  authUserId: string,
+): Promise<{ error: string | null }> {
+  const { error } = await admin.auth.admin.signOut(authUserId, "global");
+  if (!error) {
+    return { error: null };
+  }
+
+  const retry = await admin.auth.admin.signOut(authUserId, "global");
+  return { error: retry.error?.message ?? error.message };
+}
+
+async function clearStaffOperationalDesignations(
+  admin: ReturnType<typeof createServiceClient>,
+  staffId: string,
+): Promise<{ error: string | null }> {
+  const { error } = await admin
+    .from("staff_operational_designations")
+    .delete()
+    .eq("staff_id", staffId);
+
+  if (!error) {
+    return { error: null };
+  }
+
+  const retry = await admin
+    .from("staff_operational_designations")
+    .delete()
+    .eq("staff_id", staffId);
+
+  return { error: retry.error?.message ?? error.message };
+}
+
+export async function archiveManagedStaffAction(
+  formData: FormData,
+): Promise<StaffAdminActionResult> {
+  const actorResult = await requireStaffAdmin();
+  if (!actorResult.ok) return actorResult.result;
+  const actor = actorResult.staff;
+  const targetId = String(formData.get("staffId") ?? "").trim();
+
+  const target = await getStaffProfileByIdForAdmin(targetId);
+  if (!target) {
+    return { error: STAFF_ADMIN_COPY.notFound, success: false };
+  }
+
+  const activeOwnerCount = await countActiveOwners();
+  const archiveError = staffAdminArchiveError({
+    actorStaffId: actor.id,
+    targetStaffId: target.id,
+    actorRole: actor.role.code,
+    targetRoleIsOwner: target.role.code === "owner",
+    targetIsMasterOwner: target.isMasterOwner,
+    targetIsActive: target.isActive,
+    targetIsArchived: Boolean(target.archivedAt),
+    targetIsActiveOwner: target.isActive && target.role.code === "owner",
+    activeOwnerCount,
+  });
+  if (archiveError) {
+    return { error: archiveError, success: false };
+  }
+
+  const admin = createServiceClient();
+  const { error: profileError } = await admin
+    .from("staff_profiles")
+    .update({
+      is_active: false,
+      archived_at: new Date().toISOString(),
+    })
+    .eq("id", target.id);
+
+  if (profileError) {
+    return { error: STAFF_ADMIN_COPY.updateFailed, success: false };
+  }
+
+  await clearStaffOperationalDesignations(admin, target.id);
+
+  const signOutResult = await signOutStaffGlobally(admin, target.authUserId);
+  revalidateStaffAdmin();
+  return {
+    error: null,
+    success: true,
+    warning: signOutResult.error
+      ? STAFF_ADMIN_COPY.archiveSessionWarning
+      : null,
+  };
+}
+
+export async function restoreManagedStaffAction(
+  formData: FormData,
+): Promise<StaffAdminActionResult> {
+  const actorResult = await requireStaffAdmin();
+  if (!actorResult.ok) return actorResult.result;
+  const actor = actorResult.staff;
+  const targetId = String(formData.get("staffId") ?? "").trim();
+
+  const target = await getStaffProfileByIdForAdmin(targetId);
+  if (!target) {
+    return { error: STAFF_ADMIN_COPY.notFound, success: false };
+  }
+
+  const restoreError = staffAdminRestoreError({
+    actorStaffId: actor.id,
+    targetStaffId: target.id,
+    actorRole: actor.role.code,
+    targetRoleIsOwner: target.role.code === "owner",
+    targetIsMasterOwner: target.isMasterOwner,
+    targetIsArchived: Boolean(target.archivedAt),
+  });
+  if (restoreError) {
+    return { error: restoreError, success: false };
+  }
+
+  const admin = createServiceClient();
+  const { error: profileError } = await admin
+    .from("staff_profiles")
+    .update({
+      is_active: false,
+      archived_at: null,
     })
     .eq("id", target.id);
 

@@ -134,6 +134,7 @@ export async function resetManagedStaffPasswordAction(
     actorRole: actor.role.code,
     targetRoleIsOwner: target.role.code === "owner",
     targetIsMasterOwner: target.isMasterOwner,
+    targetIsArchived: Boolean(target.archivedAt),
   });
   if (resetError) {
     return emptyResetResult(resetError);

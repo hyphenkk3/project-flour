@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
+  archiveManagedStaffAction,
+  restoreManagedStaffAction,
   setManagedStaffActiveAction,
   transferMasterOwnerAction,
   updateManagedStaffRoleAction,
@@ -28,7 +30,18 @@ type StaffAdminDirectoryProps = {
   actorStaffId: string;
   roles: Role[];
   staff: StaffAdminListItem[];
+  archivedStaff: StaffAdminListItem[];
 };
+
+function formatArchivedOn(archivedAt: string): string {
+  const date = new Date(archivedAt);
+  if (Number.isNaN(date.getTime())) return "Archived";
+  return `Archived ${date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })}`;
+}
 
 export function StaffAdminDirectory({
   actorIsMasterOwner,
@@ -36,27 +49,65 @@ export function StaffAdminDirectory({
   actorStaffId,
   roles,
   staff,
+  archivedStaff,
 }: StaffAdminDirectoryProps) {
   return (
-    <section className="space-y-3">
-      <h3 className="text-ink text-sm font-semibold">Staff</h3>
-      {staff.length === 0 ? (
-        <p className="text-skyline text-sm">No staff accounts yet.</p>
-      ) : (
-        <ul className="space-y-3">
-          {staff.map((member) => (
-            <StaffAdminMemberCard
-              actorIsMasterOwner={actorIsMasterOwner}
-              actorRole={actorRole}
-              actorStaffId={actorStaffId}
-              key={member.id}
-              member={member}
-              roles={roles}
-            />
-          ))}
-        </ul>
-      )}
-    </section>
+    <div className="space-y-8">
+      <section className="space-y-3">
+        <h3 className="text-ink text-sm font-semibold">Staff</h3>
+        {staff.length === 0 ? (
+          <p className="text-skyline text-sm">No staff accounts yet.</p>
+        ) : (
+          <ul className="space-y-3">
+            {staff.map((member) => (
+              <StaffAdminMemberCard
+                actorIsMasterOwner={actorIsMasterOwner}
+                actorRole={actorRole}
+                actorStaffId={actorStaffId}
+                key={member.id}
+                member={member}
+                roles={roles}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <details className="group">
+          <summary className="text-skyline hover:text-ink cursor-pointer list-none text-sm font-medium">
+            <span className="inline-flex items-center gap-2">
+              <span className="group-open:hidden">▸</span>
+              <span className="hidden group-open:inline">▾</span>
+              Archived Staff
+              {archivedStaff.length > 0 ? (
+                <span className="text-xs font-normal">
+                  ({archivedStaff.length})
+                </span>
+              ) : null}
+            </span>
+          </summary>
+          <p className="text-skyline mt-2 text-xs">
+            Archived staff remain in Whitebird for historical records and cannot
+            sign in.
+          </p>
+          {archivedStaff.length === 0 ? (
+            <p className="text-skyline mt-3 text-sm">No archived staff.</p>
+          ) : (
+            <ul className="mt-3 space-y-3">
+              {archivedStaff.map((member) => (
+                <ArchivedStaffCard
+                  actorRole={actorRole}
+                  actorStaffId={actorStaffId}
+                  key={member.id}
+                  member={member}
+                />
+              ))}
+            </ul>
+          )}
+        </details>
+      </section>
+    </div>
   );
 }
 
@@ -85,7 +136,10 @@ function StaffAdminMemberCard({
     !member.isMasterOwner &&
     member.isActive &&
     member.role.code === "owner";
-  const canResetPassword = !isSelf && !masterLocked && !ownerLocked;
+  const canResetPassword =
+    !isSelf && !masterLocked && !ownerLocked && !member.archivedAt;
+  const canArchive =
+    !isSelf && !masterLocked && !ownerLocked && !member.isActive;
   const roleOptions = roles.filter((role) => {
     if (role.code !== "owner") return true;
     if (!canManageOwnerStaff(actorRole)) {
@@ -98,6 +152,7 @@ function StaffAdminMemberCard({
   const [roleCode, setRoleCode] = useState(member.role.code);
   const [saving, setSaving] = useState(false);
   const [confirmingDeactivate, setConfirmingDeactivate] = useState(false);
+  const [confirmingArchive, setConfirmingArchive] = useState(false);
   const [confirmingTransfer, setConfirmingTransfer] = useState(false);
   const [confirmingReset, setConfirmingReset] = useState(false);
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(
@@ -112,15 +167,22 @@ function StaffAdminMemberCard({
   const usernameChanged = !staffUsernamesMatch(username, member.username);
   const roleChanged = roleCode !== member.role.code;
 
-  async function run(action: () => Promise<{ error: string | null }>) {
+  async function run(
+    action: () => Promise<{ error: string | null; warning?: string | null }>,
+  ) {
     setSaving(true);
     setMessage(null);
+    setWarning(null);
     setError(null);
     const result = await action();
+    if (result.warning) {
+      setWarning(result.warning);
+    }
     if (result.error) {
       setError(result.error);
     } else {
       setConfirmingDeactivate(false);
+      setConfirmingArchive(false);
       setConfirmingTransfer(false);
       setConfirmingReset(false);
       router.refresh();
@@ -165,6 +227,18 @@ function StaffAdminMemberCard({
           ? STAFF_ADMIN_COPY.reactivated
           : STAFF_ADMIN_COPY.deactivated,
       );
+    }
+  }
+
+  async function archiveStaff() {
+    const formData = new FormData();
+    formData.set("staffId", member.id);
+    const result = await run(() => archiveManagedStaffAction(formData));
+    if (result.warning) {
+      setWarning(result.warning);
+    }
+    if (!result.error) {
+      setMessage(STAFF_ADMIN_COPY.archived);
     }
   }
 
@@ -346,6 +420,7 @@ function StaffAdminMemberCard({
             onClick={() => {
               if (member.isActive) {
                 setConfirmingDeactivate(true);
+                setConfirmingArchive(false);
                 setConfirmingTransfer(false);
                 setConfirmingReset(false);
                 setError(null);
@@ -357,6 +432,52 @@ function StaffAdminMemberCard({
           >
             {member.isActive ? "Deactivate" : "Reactivate"}
           </button>
+        ) : null}
+
+        {canArchive ? (
+          confirmingArchive ? (
+            <div className="space-y-2">
+              <p className="text-ink text-sm font-medium">
+                Archive {member.displayName}?
+              </p>
+              <p className="text-skyline text-xs">
+                {STAFF_ADMIN_COPY.archiveConfirm}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="bg-ink text-mist rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-60"
+                  disabled={saving}
+                  onClick={() => void archiveStaff()}
+                  type="button"
+                >
+                  Confirm archive
+                </button>
+                <button
+                  className="border-fog text-ink rounded-lg border px-3 py-2 text-xs font-medium"
+                  disabled={saving}
+                  onClick={() => setConfirmingArchive(false)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              className="border-fog text-ink rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-60"
+              disabled={saving}
+              onClick={() => {
+                setConfirmingArchive(true);
+                setConfirmingDeactivate(false);
+                setConfirmingTransfer(false);
+                setConfirmingReset(false);
+                setError(null);
+              }}
+              type="button"
+            >
+              Archive
+            </button>
+          )
         ) : null}
 
         {canTransferMaster ? (
@@ -392,6 +513,7 @@ function StaffAdminMemberCard({
               onClick={() => {
                 setConfirmingTransfer(true);
                 setConfirmingDeactivate(false);
+                setConfirmingArchive(false);
                 setConfirmingReset(false);
                 setError(null);
               }}
@@ -471,6 +593,7 @@ function StaffAdminMemberCard({
             onClick={() => {
               setConfirmingReset(true);
               setConfirmingDeactivate(false);
+              setConfirmingArchive(false);
               setConfirmingTransfer(false);
               setError(null);
               setMessage(null);
@@ -490,6 +613,111 @@ function StaffAdminMemberCard({
       {warning ? (
         <p className="mt-3 text-sm text-amber-700" role="status">
           {warning}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mt-3 text-sm text-red-600" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
+function ArchivedStaffCard({
+  actorRole,
+  actorStaffId,
+  member,
+}: {
+  actorRole: RoleCode;
+  actorStaffId: string;
+  member: StaffAdminListItem;
+}) {
+  const router = useRouter();
+  const isSelf = member.id === actorStaffId;
+  const ownerLocked =
+    member.role.code === "owner" && !canManageOwnerStaff(actorRole);
+  const canRestore = !isSelf && !member.isMasterOwner && !ownerLocked;
+  const [saving, setSaving] = useState(false);
+  const [confirmingRestore, setConfirmingRestore] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function restoreStaff() {
+    setSaving(true);
+    setMessage(null);
+    setError(null);
+    const formData = new FormData();
+    formData.set("staffId", member.id);
+    const result = await restoreManagedStaffAction(formData);
+    if (result.error) {
+      setError(result.error);
+    } else {
+      setConfirmingRestore(false);
+      setMessage(STAFF_ADMIN_COPY.restored);
+      router.refresh();
+    }
+    setSaving(false);
+  }
+
+  return (
+    <li className="border-fog rounded-xl border border-dashed bg-slate-50 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-ink text-sm font-medium">{member.displayName}</p>
+          <p className="text-skyline mt-0.5 text-xs">
+            @{member.username} · {member.role.name}
+          </p>
+          <p className="text-skyline mt-1 text-xs">{member.email ?? "No email"}</p>
+          <p className="text-skyline mt-2 text-xs">
+            {member.archivedAt
+              ? formatArchivedOn(member.archivedAt)
+              : "Archived"}
+          </p>
+        </div>
+        <p className="text-xs font-medium text-slate-600">Archived</p>
+      </div>
+      <p className="text-skyline mt-3 text-xs">{STAFF_ADMIN_COPY.archivedStatus}</p>
+      {canRestore ? (
+        confirmingRestore ? (
+          <div className="mt-4 space-y-2">
+            <p className="text-skyline text-xs">{STAFF_ADMIN_COPY.restoreConfirm}</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="bg-ink text-mist rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-60"
+                disabled={saving}
+                onClick={() => void restoreStaff()}
+                type="button"
+              >
+                Confirm restore
+              </button>
+              <button
+                className="border-fog text-ink rounded-lg border bg-white px-3 py-2 text-xs font-medium"
+                disabled={saving}
+                onClick={() => setConfirmingRestore(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            className="border-fog text-ink mt-4 rounded-lg border bg-white px-3 py-2 text-xs font-medium disabled:opacity-60"
+            disabled={saving}
+            onClick={() => {
+              setConfirmingRestore(true);
+              setError(null);
+            }}
+            type="button"
+          >
+            Restore
+          </button>
+        )
+      ) : null}
+      {message ? (
+        <p className="mt-3 text-sm text-signal" role="status">
+          {message}
         </p>
       ) : null}
       {error ? (

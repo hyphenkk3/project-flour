@@ -190,7 +190,7 @@ assert.match(adminActions, /countActiveOwners/);
 assert.match(adminActions, /actorRole:\s*actor\.role\.code/);
 assert.equal(
   adminActions.match(/actorRole:\s*actor\.role\.code/g)?.length,
-  4,
+  6,
 );
 assert.match(adminActions, /staffAdminActivateError/);
 assert.match(adminActions, /auth\.admin\.createUser/);
@@ -202,10 +202,14 @@ assert.match(adminActions, /staffAdminCreateRoleError/);
 assert.match(adminActions, /updateManagedStaffUsernameAction/);
 assert.match(adminActions, /updateManagedStaffRoleAction/);
 assert.match(adminActions, /setManagedStaffActiveAction/);
+assert.match(adminActions, /archiveManagedStaffAction/);
+assert.match(adminActions, /restoreManagedStaffAction/);
 assert.match(adminActions, /transferMasterOwnerAction/);
 assert.match(adminActions, /transfer_master_owner/);
 assert.match(adminActions, /p_actor_staff_id:\s*actor\.id/);
 assert.match(adminActions, /staffAdminDeactivateError/);
+assert.match(adminActions, /staffAdminArchiveError/);
+assert.match(adminActions, /staffAdminRestoreError/);
 assert.match(adminActions, /staffAdminRoleChangeError/);
 assert.match(adminActions, /staffAdminTransferError/);
 assert.doesNotMatch(adminActions, /formData\.get\("isMasterOwner"\)/);
@@ -246,6 +250,14 @@ assert.match(
 );
 assert.match(
   adminActions,
+  /export async function archiveManagedStaffAction[\s\S]*requireStaffAdmin\(\)/,
+);
+assert.match(
+  adminActions,
+  /export async function restoreManagedStaffAction[\s\S]*requireStaffAdmin\(\)/,
+);
+assert.match(
+  adminActions,
   /export async function transferMasterOwnerAction[\s\S]*requireStaffAdmin\(\)/,
 );
 assert.match(
@@ -262,6 +274,11 @@ assert.match(queries, /isMasterOwner: Boolean\(row\.is_master_owner\)/);
 assert.match(queries, /mustChangePassword: Boolean\(row\.must_change_password\)/);
 assert.match(queries, /is_master_owner,/);
 assert.match(queries, /must_change_password,/);
+assert.match(queries, /archived_at,/);
+assert.match(queries, /archivedAt: row\.archived_at \?\? null/);
+assert.match(queries, /export async function listArchivedStaffProfilesForAdmin/);
+assert.match(queries, /\.is\("archived_at", null\)/);
+assert.match(queries, /\.not\("archived_at", "is", null\)/);
 
 const settingsPage = readFileSync(
   resolve("src/app/(app)/settings/page.tsx"),
@@ -282,6 +299,8 @@ assert.match(staffPage, /requireStaff/);
 assert.match(staffPage, /canManageStaff/);
 assert.match(staffPage, /redirect\("\/settings"\)/);
 assert.match(staffPage, /listStaffProfilesForAdmin/);
+assert.match(staffPage, /listArchivedStaffProfilesForAdmin/);
+assert.match(staffPage, /archivedStaff=\{archivedStaff\}/);
 assert.match(staffPage, /actorIsMasterOwner=\{actor\.isMasterOwner\}/);
 assert.match(staffPage, /actorRole=\{actor\.role\.code\}/);
 assert.doesNotMatch(staffPage, /password reset|Passkey/);
@@ -315,8 +334,14 @@ assert.match(directory, /actorRole/);
 assert.match(directory, /ownerLocked/);
 assert.match(directory, /canManageOwnerStaff/);
 assert.match(directory, /resetManagedStaffPasswordAction/);
+assert.match(directory, /archiveManagedStaffAction/);
+assert.match(directory, /restoreManagedStaffAction/);
 assert.match(directory, /Reset password/);
 assert.match(directory, /canResetPassword/);
+assert.match(directory, /canArchive/);
+assert.match(directory, /Archived Staff/);
+assert.match(directory, /Confirm archive/);
+assert.match(directory, /Confirm restore/);
 assert.match(directory, /temporaryPassword/);
 assert.doesNotMatch(directory, /localStorage|sessionStorage/);
 assert.doesNotMatch(directory, /createServiceClient|SUPABASE_SERVICE_ROLE_KEY/);
@@ -366,6 +391,7 @@ assert.match(workspaces, /management:[\s\S]*available: false/);
 const types = readFileSync(resolve("src/types/staff.ts"), "utf8");
 assert.match(types, /isMasterOwner: boolean/);
 assert.match(types, /mustChangePassword: boolean/);
+assert.match(types, /archivedAt: string \| null/);
 assert.doesNotMatch(types, /role.*=.*"master/);
 
 assert.equal(
@@ -1009,6 +1035,16 @@ assert.equal(
     targetRoleIsOwner: true,
   }),
   STAFF_ADMIN_COPY.unauthorized,
+);
+assert.equal(
+  staffAdminPasswordResetError({
+    actorStaffId: "owner-1",
+    targetStaffId: "bakery-1",
+    actorRole: "owner",
+    targetRoleIsOwner: false,
+    targetIsArchived: true,
+  }),
+  STAFF_ADMIN_COPY.cannotResetArchivedPassword,
 );
 assert.equal(
   staffAdminActorError("bakery"),
