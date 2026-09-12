@@ -66,16 +66,23 @@ assert.match(cardSrc, /View cake/);
 assert.match(cardSrc, /overflow-hidden/);
 assert.match(
   addButtonSrc,
-  /inline-flex min-h-11 w-full items-center justify-center rounded-md px-4 text-sm font-medium/,
+  /inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-md px-4 text-sm font-medium/,
 );
 assert.match(addButtonSrc, /onClick=\{\(\) => setOpen\(true\)\}/);
 assert.match(addButtonSrc, /<AddToOrderSheet/);
 assert.match(addButtonSrc, /cake=\{cake\}/);
-assert.match(addButtonSrc, /createPortal/);
-assert.match(addButtonSrc, /document\.body/);
-assert.match(addButtonSrc, /role="dialog"/);
-assert.match(addButtonSrc, /fixed inset-0 z-50/);
-assert.match(addButtonSrc, /absolute inset-x-0 bottom-0 z-\[60\]/);
+assert.match(addButtonSrc, /from "@\/workspaces\/storefront\/StorefrontOverlay"/);
+assert.match(addButtonSrc, /<StorefrontOverlay/);
+assert.match(addButtonSrc, /labelledBy=\{titleId\}/);
+assert.match(addButtonSrc, /max-h-\[100dvh\]/);
+assert.match(addButtonSrc, /md:max-h-\[calc\(100dvh-5rem\)\]/);
+assert.match(
+  addButtonSrc,
+  /flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto/,
+);
+assert.doesNotMatch(addButtonSrc, /from "react-dom"/);
+assert.doesNotMatch(addButtonSrc, /createPortal/);
+assert.doesNotMatch(addButtonSrc, /role="dialog"/);
 assert.doesNotMatch(addButtonSrc, /dismissFromBackdrop/);
 assert.doesNotMatch(addButtonSrc, /allowDismissRef/);
 assert.doesNotMatch(addButtonSrc, /showModal/);

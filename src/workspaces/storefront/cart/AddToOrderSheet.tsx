@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import { createPortal } from "react-dom";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
+import { StorefrontOverlay } from "@/workspaces/storefront/StorefrontOverlay";
 import type { StorefrontCake } from "@/types/storefront";
 import { isFullMonthPickupScope } from "@/engines/menu/customer-browse";
 import { storefrontPhotoForSize } from "@/workspaces/storefront/catalog/cake-photo-map";
@@ -52,13 +52,6 @@ export function AddToOrderSheet({
 
   const selected = cake.sizes.find((size) => size.id === sizeId);
   const photo = storefrontPhotoForSize(cake.photos, sizeId);
-  const defaultSizeId = initialSizeId || cake.sizes[0]?.id || "";
-
-  useEffect(() => {
-    if (!open) return;
-    setSizeId(defaultSizeId);
-    setQuantity(1);
-  }, [open, defaultSizeId]);
 
   function addToOrder() {
     if (!selected) return;
@@ -96,17 +89,13 @@ export function AddToOrderSheet({
 
   if (!open) return null;
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 animate-storefront-fade">
-      <div aria-hidden className="bg-ink/40 absolute inset-0" />
-      <div
-        aria-labelledby={titleId}
-        aria-modal="true"
-        className="border-fog bg-mist text-ink absolute inset-x-0 bottom-0 z-[60] max-h-[100dvh] w-full overflow-y-auto rounded-t-lg border md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:max-w-md md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-lg"
-        role="dialog"
-      >
+  return (
+    <StorefrontOverlay
+      labelledBy={titleId}
+      panelClassName="border-fog bg-mist text-ink flex max-h-[100dvh] min-h-0 w-full flex-col overflow-hidden rounded-t-lg border md:max-h-[calc(100dvh-5rem)] md:max-w-md md:rounded-lg"
+    >
       <form
-        className="flex flex-col gap-5 px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:px-6 md:pt-5 md:pb-6"
+        className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:px-6 md:pt-5 md:pb-6"
         onSubmit={(event) => {
           event.preventDefault();
           addToOrder();
@@ -126,7 +115,7 @@ export function AddToOrderSheet({
           </div>
           <button
             aria-label="Close"
-            className="text-skyline hover:text-ink inline-flex min-h-11 min-w-11 items-center justify-center text-sm font-medium"
+            className="text-skyline hover:text-ink inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center text-sm font-medium"
             onClick={onClose}
             type="button"
           >
@@ -228,21 +217,19 @@ export function AddToOrderSheet({
         </div>
 
         <button
-          className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200 disabled:opacity-50"
+          className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200 disabled:opacity-50"
           disabled={!selected}
           type="submit"
         >
           Add
         </button>
       </form>
-      </div>
-    </div>,
-    document.body,
+    </StorefrontOverlay>
   );
 }
 
 const defaultAddToOrderButtonClassName =
-  "bg-ink text-mist hover:bg-skyline inline-flex min-h-11 w-full items-center justify-center rounded-md px-4 text-sm font-medium transition duration-200 disabled:opacity-50";
+  "bg-ink text-mist hover:bg-skyline inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-md px-4 text-sm font-medium transition duration-200 disabled:opacity-50";
 
 type AddToOrderButtonProps = {
   cake: StorefrontCake;
@@ -289,6 +276,7 @@ export function AddToOrderButton({
       <AddToOrderSheet
         cake={cake}
         initialSizeId={initialSizeId}
+        key={open ? `open:${cake.id}:${initialSizeId ?? ""}` : "closed"}
         onAdded={() => {
           setOpen(false);
           setAdded(true);
