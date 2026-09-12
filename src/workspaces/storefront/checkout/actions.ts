@@ -46,11 +46,16 @@ import {
 import type { StorefrontCake, StorefrontCollection } from "@/types/storefront";
 import { createClient } from "@/lib/supabase/server";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
+import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
   cakePickupDateBounds,
   cartExcludedPickupDates,
   cartPickupDateBounds,
+  enumerateYmdInclusive,
+  isFullMonthPickupScope,
   latestOrderableCataloguePickupEnd,
+  monthOverlapsDateRange,
+  resolveCheckoutPickupScope,
 } from "@/engines/menu/customer-browse";
 import {
   getStorefrontCollectionForPickupDate,
@@ -60,7 +65,10 @@ import {
   listOrderableMonthlyCatalogues,
   unpublishedCataloguePreorderMessage,
 } from "@/workspaces/storefront/catalog/queries";
-import { isPickupOrdersClosed } from "@/workspaces/storefront/checkout/order-availability";
+import {
+  isPickupOrdersClosed,
+  listClosedPickupOrderDates,
+} from "@/workspaces/storefront/checkout/order-availability";
 import { parseRequiredPhysicalReceipt } from "@/workspaces/storefront/checkout/preorder-draft";
 import { setGuestPreorderReceiptCookie } from "@/workspaces/storefront/checkout/receipt";
 import { customerNameValidationError } from "@/engines/orders/customer-name";
@@ -617,23 +625,33 @@ export async function loadCartDateCapacityAvailability(input: {
   }
 }
 
-export async function resolveCartPickupDateBounds(
-  cakeIds: readonly string[],
-): Promise<{ min: string; max: string; excludedDates: string[] } | null> {
+function ymdQuery(value: string | null | undefined): string | null {
+  const key = value?.trim().slice(0, 10) ?? "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : null;
+}
+
+type CartPickupBounds = {
+  min: string;
+  max: string;
+  excludedDates: string[];
+};
+
+function cartPickupBoundsFromSources(input: {
+  cakeIds: readonly string[];
+  catalogues: ReadonlyArray<{ month: string | null }>;
+  specials: ReadonlyArray<{ startDate: string; endDate: string }>;
+  memberships: Awaited<ReturnType<typeof getCustomerCakePickupMemberships>>;
+}): CartPickupBounds | null {
+  if (input.cakeIds.length === 0) return null;
   const earliest = earliestPickupDateYmd();
-  const [catalogues, specials] = await Promise.all([
-    listOrderableMonthlyCatalogues(),
-    listCustomerSpecialCatalogues(),
-  ]);
   const globalMax = latestOrderableCataloguePickupEnd(
-    catalogues.map((catalogue) => catalogue.month ?? ""),
+    input.catalogues.map((catalogue) => catalogue.month ?? ""),
   );
-  const activeSpecialWindows = specials.map((special) => ({
+  const activeSpecialWindows = input.specials.map((special) => ({
     from: special.startDate,
     to: special.endDate,
   }));
-  const memberships = await getCustomerCakePickupMemberships(cakeIds);
-  const perCake = memberships.map((membership) =>
+  const perCake = input.memberships.map((membership) =>
     cakePickupDateBounds(
       membership.monthlyMonths,
       membership.specialWindows,
@@ -645,11 +663,125 @@ export async function resolveCartPickupDateBounds(
   return {
     ...bounds,
     excludedDates: cartExcludedPickupDates(
-      memberships,
+      input.memberships,
       activeSpecialWindows,
       bounds.min,
       bounds.max,
       earliest,
     ),
   };
+}
+
+export type CheckoutCalendarContext = {
+  cartPickupBounds: CartPickupBounds | null;
+  closedDates: string[];
+  entrySpecialUnavailableDates: string[];
+  hoursSnapshot: OperatingHoursSnapshot;
+  maxPickupDate: string | null;
+  minPickupDate: string;
+  pickupScopeConstrainsBounds: boolean;
+  suggestedPickupDate: string;
+};
+
+/**
+ * Hours, closed dates, catalogue bounds, and cart date window in one round-trip.
+ * Catalogues, specials, hours, and cake memberships load in parallel.
+ * Closed dates wait only for the resolved pickup range.
+ */
+export async function loadCheckoutCalendarContext(input: {
+  cakeIds?: readonly string[];
+  fromQuery?: string | null;
+  pickupQuery?: string | null;
+  toQuery?: string | null;
+}): Promise<CheckoutCalendarContext> {
+  const cakeIds = [...new Set((input.cakeIds ?? []).map((id) => id.trim()).filter(Boolean))];
+  const earliest = earliestPickupDateYmd();
+  const [catalogues, specials, hoursSnapshot, memberships] = await Promise.all([
+    listOrderableMonthlyCatalogues(),
+    listCustomerSpecialCatalogues(),
+    loadOperatingHoursSnapshot(),
+    cakeIds.length > 0
+      ? getCustomerCakePickupMemberships(cakeIds)
+      : Promise.resolve([]),
+  ]);
+  const globalMax = latestOrderableCataloguePickupEnd(
+    catalogues.map((catalogue) => catalogue.month ?? ""),
+  );
+  const scopeFrom = ymdQuery(input.fromQuery);
+  const scopeTo = ymdQuery(input.toQuery);
+  const scope = resolveCheckoutPickupScope({
+    earliest,
+    globalMax,
+    scopeFrom,
+    scopeTo,
+  });
+  const pickupFromQuery = ymdQuery(input.pickupQuery);
+  const suggestedPickupDate =
+    pickupFromQuery &&
+    pickupFromQuery >= scope.minPickupDate &&
+    (!scope.maxPickupDate || pickupFromQuery <= scope.maxPickupDate)
+      ? pickupFromQuery
+      : scope.suggestedPickupDate;
+  const cartPickupBounds = cartPickupBoundsFromSources({
+    cakeIds,
+    catalogues,
+    memberships,
+    specials,
+  });
+  let rangeMin = scope.minPickupDate;
+  let rangeMax = scope.maxPickupDate ?? scope.minPickupDate;
+  if (cartPickupBounds) {
+    if (cartPickupBounds.min < rangeMin) rangeMin = cartPickupBounds.min;
+    if (cartPickupBounds.max > rangeMax) rangeMax = cartPickupBounds.max;
+  }
+  const closedDates = await listClosedPickupOrderDates(rangeMin, rangeMax);
+  const entrySpecialUnavailableDates =
+    scopeFrom &&
+    scopeTo &&
+    isFullMonthPickupScope(scopeFrom, scopeTo)
+      ? [
+          ...new Set(
+            specials
+              .filter((special) =>
+                monthOverlapsDateRange(
+                  scopeFrom,
+                  special.startDate,
+                  special.endDate,
+                ),
+              )
+              .flatMap((special) =>
+                enumerateYmdInclusive(special.startDate, special.endDate),
+              ),
+          ),
+        ].sort()
+      : [];
+
+  return {
+    cartPickupBounds,
+    closedDates,
+    entrySpecialUnavailableDates,
+    hoursSnapshot,
+    maxPickupDate: scope.maxPickupDate,
+    minPickupDate: scope.minPickupDate,
+    pickupScopeConstrainsBounds: scope.scopeConstrainsBounds,
+    suggestedPickupDate: suggestedPickupDate ?? earliest,
+  };
+}
+
+export async function resolveCartPickupDateBounds(
+  cakeIds: readonly string[],
+): Promise<CartPickupBounds | null> {
+  const ids = [...new Set(cakeIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) return null;
+  const [catalogues, specials, memberships] = await Promise.all([
+    listOrderableMonthlyCatalogues(),
+    listCustomerSpecialCatalogues(),
+    getCustomerCakePickupMemberships(ids),
+  ]);
+  return cartPickupBoundsFromSources({
+    cakeIds: ids,
+    catalogues,
+    memberships,
+    specials,
+  });
 }

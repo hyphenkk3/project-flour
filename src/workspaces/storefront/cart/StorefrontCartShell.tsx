@@ -256,7 +256,6 @@ function OrderSummary({
           <Link
             className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200"
             href={checkoutHref}
-            onClick={onContinue}
           >
             Change Collection Date
           </Link>
@@ -287,7 +286,6 @@ function OrderSummary({
             <Link
               className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200"
               href={checkoutHref}
-              onClick={onContinue}
             >
               View My Order
             </Link>

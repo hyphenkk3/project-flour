@@ -99,9 +99,9 @@ const summarySrc = readFileSync(
   "utf8",
 );
 assert.match(summarySrc, /\+ Add another cake/);
-assert.match(summarySrc, /\{addingCake \?/);
+assert.match(summarySrc, /addingCake \?/);
 assert.doesNotMatch(
-  summarySrc.split("{addingCake ?")[0] ?? "",
+  summarySrc.split("addingCake ?")[0] ?? "",
   /\{cakes\.map\(/,
 );
 assert.match(summarySrc, /\{cakes\.map\(/);

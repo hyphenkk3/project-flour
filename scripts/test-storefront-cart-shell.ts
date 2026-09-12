@@ -180,7 +180,17 @@ assert.match(cartSrc, /md:hidden/);
 assert.match(cartSrc, /h-dvh/);
 assert.doesNotMatch(cartSrc, /85dvh/);
 assert.match(cartSrc, /View My Order/);
+const viewMyOrderLink = cartSrc.slice(
+  cartSrc.lastIndexOf(
+    "<Link",
+    cartSrc.indexOf("View My Order\n            </Link>"),
+  ),
+  cartSrc.indexOf("View My Order\n            </Link>") + 40,
+);
+assert.match(viewMyOrderLink, /href=\{checkoutHref\}/);
+assert.doesNotMatch(viewMyOrderLink, /onClick=\{onContinue\}/);
 assert.match(cartSrc, /Continue Ordering/);
+assert.match(cartSrc, /href=\{continueHref\}/);
 assert.match(cartSrc, /continueOrderingHref/);
 assert.match(cartSrc, /preorderCheckoutHref/);
 assert.match(cartSrc, /View Order →/);

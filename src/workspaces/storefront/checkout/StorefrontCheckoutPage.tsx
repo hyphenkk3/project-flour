@@ -1,19 +1,9 @@
 import { earliestPickupDateYmd } from "@/engines/business-calendar/pickup-slots";
 import {
   CUSTOMER_PICKUP_DATE_CAKE_NOTICE,
-  enumerateYmdInclusive,
-  isFullMonthPickupScope,
-  latestOrderableCataloguePickupEnd,
-  monthOverlapsDateRange,
   resolveCheckoutPickupScope,
 } from "@/engines/menu/customer-browse";
-import {
-  listCustomerSpecialCatalogues,
-  listOrderableMonthlyCatalogues,
-} from "@/workspaces/storefront/catalog/queries";
-import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import { GuestCheckoutForm } from "@/workspaces/storefront/checkout/GuestCheckoutForm";
-import { listClosedPickupOrderDates } from "@/workspaces/storefront/checkout/order-availability";
 import { StorefrontHomeLink } from "@/workspaces/storefront/StorefrontBrand";
 
 export const dynamic = "force-dynamic";
@@ -29,26 +19,19 @@ type StorefrontCheckoutPageProps = {
   toQuery?: string | null;
 };
 
-export async function StorefrontCheckoutPage({
+export function StorefrontCheckoutPage({
   pickupQuery = null,
   fromQuery = null,
   toQuery = null,
 }: StorefrontCheckoutPageProps) {
   const fromDate = earliestPickupDateYmd();
-  const [catalogues, specials] = await Promise.all([
-    listOrderableMonthlyCatalogues(),
-    listCustomerSpecialCatalogues(),
-  ]);
-  const catalogueMaxPickup = latestOrderableCataloguePickupEnd(
-    catalogues.map((catalogue) => catalogue.month ?? ""),
-  );
   const scopeFrom = ymdQuery(fromQuery);
   const scopeTo = ymdQuery(toQuery);
   const scope = resolveCheckoutPickupScope({
     earliest: fromDate,
+    globalMax: null,
     scopeFrom,
     scopeTo,
-    globalMax: catalogueMaxPickup,
   });
   const pickupFromQuery = ymdQuery(pickupQuery);
   const suggestedPickupDate =
@@ -57,34 +40,6 @@ export async function StorefrontCheckoutPage({
     (!scope.maxPickupDate || pickupFromQuery <= scope.maxPickupDate)
       ? pickupFromQuery
       : scope.suggestedPickupDate;
-  const toDate = scope.maxPickupDate ?? scope.minPickupDate;
-  const closedDates = await listClosedPickupOrderDates(
-    scope.minPickupDate,
-    toDate,
-  );
-  const hoursSnapshot = await loadOperatingHoursSnapshot();
-
-  /** Special-menu dates blocked for monthly-collection entry (empty cart). */
-  const entrySpecialUnavailableDates =
-    scopeFrom &&
-    scopeTo &&
-    isFullMonthPickupScope(scopeFrom, scopeTo)
-      ? [
-          ...new Set(
-            specials
-              .filter((special) =>
-                monthOverlapsDateRange(
-                  scopeFrom,
-                  special.startDate,
-                  special.endDate,
-                ),
-              )
-              .flatMap((special) =>
-                enumerateYmdInclusive(special.startDate, special.endDate),
-              ),
-          ),
-        ].sort()
-      : [];
 
   return (
     <main className="bg-paper mx-auto min-h-screen max-w-5xl px-5 py-10 sm:px-6">
@@ -96,9 +51,6 @@ export async function StorefrontCheckoutPage({
       </p>
       <div className="mt-10">
         <GuestCheckoutForm
-          closedDates={closedDates}
-          entrySpecialUnavailableDates={entrySpecialUnavailableDates}
-          hoursSnapshot={hoursSnapshot}
           maxPickupDate={scope.maxPickupDate}
           minPickupDate={scope.minPickupDate}
           pickupScopeConstrainsBounds={scope.scopeConstrainsBounds}

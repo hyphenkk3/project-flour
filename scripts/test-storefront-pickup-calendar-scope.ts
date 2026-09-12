@@ -185,7 +185,7 @@ assert.doesNotMatch(
 );
 
 const formSrc = readSrc("src/workspaces/storefront/checkout/GuestCheckoutForm.tsx");
-assert.match(formSrc, /resolveCartPickupDateBounds/);
+assert.match(formSrc, /loadCheckoutCalendarContext/);
 assert.match(formSrc, /effectivePickupBounds/);
 assert.match(formSrc, /pickupScopeFrom/);
 assert.match(formSrc, /entrySpecialUnavailableDates/);
