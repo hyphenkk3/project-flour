@@ -6,6 +6,7 @@ import { canManageStaff } from "@/foundation/navigation/access";
 import {
   STAFF_ADMIN_COPY,
   isStaffRoleCode,
+  staffAdminActivateError,
   staffAdminActorError,
   staffAdminCreateRoleError,
   staffAdminDeactivateError,
@@ -216,6 +217,8 @@ export async function updateManagedStaffUsernameAction(
     actorStaffId: actor.id,
     targetStaffId: target.id,
     targetIsMasterOwner: target.isMasterOwner,
+    actorRole: actor.role.code,
+    targetRoleIsOwner: target.role.code === "owner",
   });
   if (ownUsernameError) {
     return { error: ownUsernameError, success: false };
@@ -286,6 +289,7 @@ export async function updateManagedStaffRoleAction(
     actorIsMasterOwner: actor.isMasterOwner,
     targetIsMasterOwner: target.isMasterOwner,
     targetRoleIsOwner: target.role.code === "owner",
+    actorRole: actor.role.code,
   });
   if (roleError) {
     return { error: roleError, success: false };
@@ -329,7 +333,16 @@ export async function setManagedStaffActiveAction(
     return { error: null, success: true };
   }
 
-  if (!nextActive) {
+  if (nextActive) {
+    const activateError = staffAdminActivateError({
+      actorRole: actor.role.code,
+      targetRoleIsOwner: target.role.code === "owner",
+      targetIsMasterOwner: target.isMasterOwner,
+    });
+    if (activateError) {
+      return { error: activateError, success: false };
+    }
+  } else {
     const activeOwnerCount = await countActiveOwners();
     const deactivateError = staffAdminDeactivateError({
       actorStaffId: actor.id,
@@ -337,6 +350,8 @@ export async function setManagedStaffActiveAction(
       targetIsActiveOwner: target.isActive && target.role.code === "owner",
       activeOwnerCount,
       targetIsMasterOwner: target.isMasterOwner,
+      actorRole: actor.role.code,
+      targetRoleIsOwner: target.role.code === "owner",
     });
     if (deactivateError) {
       return { error: deactivateError, success: false };

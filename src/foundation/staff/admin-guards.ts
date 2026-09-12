@@ -13,6 +13,7 @@ export const STAFF_ADMIN_COPY = {
   cannotDemoteMaster: "The Master Owner account cannot change role.",
   cannotDeactivateMaster: "The Master Owner account cannot be deactivated.",
   cannotChangeMaster: "The Master Owner account cannot be changed here.",
+  cannotManageOwner: "Managers cannot change Owner accounts.",
   cannotTransfer: "Only the Master Owner can transfer Master Owner status.",
   cannotTransferToSelf: "Cannot transfer Master Owner to yourself.",
   transferTargetMustBeActiveOwner: "Transfer target must be an active Owner.",
@@ -49,6 +50,34 @@ export function staffAdminActorError(role: RoleCode): string | null {
   return null;
 }
 
+export function canManageOwnerStaff(role: RoleCode): boolean {
+  return role === "owner";
+}
+
+/**
+ * Only Owner (including Master Owner) may mutate Owner accounts.
+ *
+ * actorRole is required. A missing or non-Owner actorRole is fail-closed:
+ * Owner targets are rejected instead of silently allowed.
+ */
+export function staffAdminOwnerMutationError(input: {
+  actorRole: RoleCode;
+  targetRoleIsOwner: boolean;
+  targetIsMasterOwner?: boolean;
+}): string | null {
+  if (canManageOwnerStaff(input.actorRole)) {
+    return null;
+  }
+  if (input.targetIsMasterOwner) {
+    return STAFF_ADMIN_COPY.cannotChangeMaster;
+  }
+  // Fail closed: missing/invalid targetRoleIsOwner must not allow Owner mutation.
+  if (input.targetRoleIsOwner !== false) {
+    return STAFF_ADMIN_COPY.cannotManageOwner;
+  }
+  return null;
+}
+
 export function staffAdminCreateRoleError(input: {
   actorIsMasterOwner: boolean;
   roleCode: RoleCode;
@@ -64,6 +93,8 @@ export function staffAdminDeactivateError(input: {
   targetStaffId: string;
   targetIsActiveOwner: boolean;
   activeOwnerCount: number;
+  actorRole: RoleCode;
+  targetRoleIsOwner: boolean;
   targetIsMasterOwner?: boolean;
 }): string | null {
   if (input.actorStaffId === input.targetStaffId) {
@@ -72,10 +103,26 @@ export function staffAdminDeactivateError(input: {
   if (input.targetIsMasterOwner) {
     return STAFF_ADMIN_COPY.cannotDeactivateMaster;
   }
+  const ownerMutationError = staffAdminOwnerMutationError({
+    actorRole: input.actorRole,
+    targetRoleIsOwner: input.targetRoleIsOwner,
+    targetIsMasterOwner: input.targetIsMasterOwner,
+  });
+  if (ownerMutationError) {
+    return ownerMutationError;
+  }
   if (input.targetIsActiveOwner && input.activeOwnerCount <= 1) {
     return STAFF_ADMIN_COPY.lastOwner;
   }
   return null;
+}
+
+export function staffAdminActivateError(input: {
+  actorRole: RoleCode;
+  targetRoleIsOwner: boolean;
+  targetIsMasterOwner?: boolean;
+}): string | null {
+  return staffAdminOwnerMutationError(input);
 }
 
 export function staffAdminRoleChangeError(input: {
@@ -84,19 +131,28 @@ export function staffAdminRoleChangeError(input: {
   targetIsActiveOwner: boolean;
   nextRoleIsOwner: boolean;
   activeOwnerCount: number;
+  actorRole: RoleCode;
+  targetRoleIsOwner: boolean;
   actorIsMasterOwner?: boolean;
   targetIsMasterOwner?: boolean;
-  targetRoleIsOwner?: boolean;
 }): string | null {
   const actorIsMasterOwner = input.actorIsMasterOwner ?? false;
   const targetIsMasterOwner = input.targetIsMasterOwner ?? false;
-  const targetRoleIsOwner = input.targetRoleIsOwner ?? input.targetIsActiveOwner;
+  const targetRoleIsOwner = input.targetRoleIsOwner;
 
   if (input.actorStaffId === input.targetStaffId && !input.nextRoleIsOwner) {
     return STAFF_ADMIN_COPY.cannotDemoteSelf;
   }
   if (targetIsMasterOwner && !input.nextRoleIsOwner) {
     return STAFF_ADMIN_COPY.cannotDemoteMaster;
+  }
+  const ownerMutationError = staffAdminOwnerMutationError({
+    actorRole: input.actorRole,
+    targetRoleIsOwner,
+    targetIsMasterOwner,
+  });
+  if (ownerMutationError) {
+    return ownerMutationError;
   }
   if (input.nextRoleIsOwner && !actorIsMasterOwner && !targetRoleIsOwner) {
     return STAFF_ADMIN_COPY.cannotPromoteToOwner;
@@ -114,6 +170,8 @@ export function staffAdminRoleChangeError(input: {
 export function staffAdminUsernameChangeError(input: {
   actorStaffId: string;
   targetStaffId: string;
+  actorRole: RoleCode;
+  targetRoleIsOwner: boolean;
   targetIsMasterOwner?: boolean;
 }): string | null {
   if (input.actorStaffId === input.targetStaffId) {
@@ -122,7 +180,11 @@ export function staffAdminUsernameChangeError(input: {
   if (input.targetIsMasterOwner) {
     return STAFF_ADMIN_COPY.cannotChangeMaster;
   }
-  return null;
+  return staffAdminOwnerMutationError({
+    actorRole: input.actorRole,
+    targetRoleIsOwner: input.targetRoleIsOwner,
+    targetIsMasterOwner: input.targetIsMasterOwner,
+  });
 }
 
 export function staffAdminTransferError(input: {

@@ -8,7 +8,10 @@ import {
   updateManagedStaffRoleAction,
   updateManagedStaffUsernameAction,
 } from "@/foundation/staff/admin-actions";
-import { STAFF_ADMIN_COPY } from "@/foundation/staff/admin-guards";
+import {
+  STAFF_ADMIN_COPY,
+  canManageOwnerStaff,
+} from "@/foundation/staff/admin-guards";
 import {
   STAFF_USERNAME_COPY,
   normalizeStaffUsername,
@@ -20,6 +23,7 @@ import type { Role, RoleCode } from "@/types/staff";
 
 type StaffAdminDirectoryProps = {
   actorIsMasterOwner: boolean;
+  actorRole: RoleCode;
   actorStaffId: string;
   roles: Role[];
   staff: StaffAdminListItem[];
@@ -27,6 +31,7 @@ type StaffAdminDirectoryProps = {
 
 export function StaffAdminDirectory({
   actorIsMasterOwner,
+  actorRole,
   actorStaffId,
   roles,
   staff,
@@ -41,6 +46,7 @@ export function StaffAdminDirectory({
           {staff.map((member) => (
             <StaffAdminMemberCard
               actorIsMasterOwner={actorIsMasterOwner}
+              actorRole={actorRole}
               actorStaffId={actorStaffId}
               key={member.id}
               member={member}
@@ -55,11 +61,13 @@ export function StaffAdminDirectory({
 
 function StaffAdminMemberCard({
   actorIsMasterOwner,
+  actorRole,
   actorStaffId,
   member,
   roles,
 }: {
   actorIsMasterOwner: boolean;
+  actorRole: RoleCode;
   actorStaffId: string;
   member: StaffAdminListItem;
   roles: Role[];
@@ -67,7 +75,9 @@ function StaffAdminMemberCard({
   const router = useRouter();
   const isSelf = member.id === actorStaffId;
   const masterLocked = member.isMasterOwner;
-  const controlsDisabled = isSelf || masterLocked;
+  const ownerLocked =
+    member.role.code === "owner" && !canManageOwnerStaff(actorRole);
+  const controlsDisabled = isSelf || masterLocked || ownerLocked;
   const canTransferMaster =
     actorIsMasterOwner &&
     !isSelf &&
@@ -76,6 +86,9 @@ function StaffAdminMemberCard({
     member.role.code === "owner";
   const roleOptions = roles.filter((role) => {
     if (role.code !== "owner") return true;
+    if (!canManageOwnerStaff(actorRole)) {
+      return member.role.code === "owner";
+    }
     if (actorIsMasterOwner) return true;
     return member.role.code === "owner";
   });
@@ -210,6 +223,8 @@ function StaffAdminMemberCard({
             <span>{STAFF_ADMIN_COPY.cannotEditOwnUsername}</span>
           ) : masterLocked ? (
             <span>{STAFF_ADMIN_COPY.cannotChangeMaster}</span>
+          ) : ownerLocked ? (
+            <span>{STAFF_ADMIN_COPY.cannotManageOwner}</span>
           ) : (
             <span>{STAFF_USERNAME_COPY.helper}</span>
           )}
@@ -239,11 +254,20 @@ function StaffAdminMemberCard({
               Save role
             </button>
           </div>
+          {masterLocked ? (
+            <span>{STAFF_ADMIN_COPY.cannotDemoteMaster}</span>
+          ) : ownerLocked ? (
+            <span>{STAFF_ADMIN_COPY.cannotManageOwner}</span>
+          ) : null}
         </label>
       </div>
 
       <div className="mt-4 flex flex-col gap-3">
-        {!isSelf && confirmingDeactivate && member.isActive && !masterLocked ? (
+        {!isSelf &&
+        confirmingDeactivate &&
+        member.isActive &&
+        !masterLocked &&
+        !ownerLocked ? (
           <div className="flex flex-wrap gap-2">
             <button
               className="bg-ink text-mist rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-60"
@@ -265,7 +289,7 @@ function StaffAdminMemberCard({
         ) : !isSelf ? (
           <button
             className="border-fog text-ink rounded-lg border px-3 py-2 text-xs font-medium disabled:opacity-60"
-            disabled={saving || masterLocked}
+            disabled={saving || masterLocked || ownerLocked}
             onClick={() => {
               if (member.isActive) {
                 setConfirmingDeactivate(true);

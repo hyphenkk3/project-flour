@@ -46,6 +46,7 @@ export default async function StaffAdminPage() {
       />
       <StaffAdminDirectory
         actorIsMasterOwner={actor.isMasterOwner}
+        actorRole={actor.role.code}
         actorStaffId={actor.id}
         roles={roles}
         staff={staff}

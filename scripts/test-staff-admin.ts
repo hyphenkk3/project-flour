@@ -1,5 +1,5 @@
 /**
- * Owner-only staff administration.
+ * Staff administration permission model.
  * Run: npx tsx scripts/test-staff-admin.ts
  *
  * Live Auth create/login and last-owner races are not executed here.
@@ -12,21 +12,29 @@ import { resolve } from "node:path";
 import { canManageStaff } from "@/foundation/navigation/access";
 import {
   STAFF_ADMIN_COPY,
+  canManageOwnerStaff,
   isStaffRoleCode,
+  staffAdminActivateError,
   staffAdminActorError,
   staffAdminCreateRoleError,
   staffAdminDeactivateError,
+  staffAdminOwnerMutationError,
   staffAdminRoleChangeError,
   staffAdminTransferError,
   staffAdminUsernameChangeError,
 } from "@/foundation/staff/admin-guards";
+import type { RoleCode } from "@/types/staff";
 
 assert.equal(canManageStaff("owner"), true);
-assert.equal(canManageStaff("manager"), false);
+assert.equal(canManageStaff("manager"), true);
 assert.equal(canManageStaff("customer_operations"), false);
 assert.equal(canManageStaff("bakery"), false);
 assert.equal(canManageStaff("collection"), false);
+assert.equal(canManageOwnerStaff("owner"), true);
+assert.equal(canManageOwnerStaff("manager"), false);
+assert.equal(canManageOwnerStaff("bakery"), false);
 assert.equal(staffAdminActorError("owner"), null);
+assert.equal(staffAdminActorError("manager"), null);
 assert.equal(staffAdminActorError("bakery"), STAFF_ADMIN_COPY.unauthorized);
 assert.equal(isStaffRoleCode("bakery"), true);
 assert.equal(isStaffRoleCode("admin"), false);
@@ -37,6 +45,8 @@ assert.equal(
     targetStaffId: "owner-1",
     targetIsActiveOwner: true,
     activeOwnerCount: 3,
+    actorRole: "owner",
+    targetRoleIsOwner: true,
   }),
   STAFF_ADMIN_COPY.cannotDeactivateSelf,
 );
@@ -46,6 +56,31 @@ assert.equal(
     targetStaffId: "owner-2",
     targetIsActiveOwner: true,
     activeOwnerCount: 1,
+    actorRole: "owner",
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.lastOwner,
+);
+assert.equal(
+  staffAdminDeactivateError({
+    actorStaffId: "owner-1",
+    targetStaffId: "owner-2",
+    targetIsActiveOwner: true,
+    activeOwnerCount: 1,
+    actorRole: "owner",
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.lastOwner,
+);
+assert.equal(
+  staffAdminRoleChangeError({
+    actorStaffId: "owner-1",
+    targetStaffId: "owner-2",
+    targetIsActiveOwner: true,
+    nextRoleIsOwner: false,
+    activeOwnerCount: 1,
+    actorRole: "owner",
+    targetRoleIsOwner: true,
   }),
   STAFF_ADMIN_COPY.lastOwner,
 );
@@ -55,6 +90,8 @@ assert.equal(
     targetStaffId: "bakery-1",
     targetIsActiveOwner: false,
     activeOwnerCount: 1,
+    actorRole: "owner",
+    targetRoleIsOwner: false,
   }),
   null,
 );
@@ -66,6 +103,8 @@ assert.equal(
     targetIsActiveOwner: true,
     nextRoleIsOwner: false,
     activeOwnerCount: 3,
+    actorRole: "owner",
+    targetRoleIsOwner: true,
   }),
   STAFF_ADMIN_COPY.cannotDemoteSelf,
 );
@@ -76,6 +115,8 @@ assert.equal(
     targetIsActiveOwner: true,
     nextRoleIsOwner: false,
     activeOwnerCount: 1,
+    actorRole: "owner",
+    targetRoleIsOwner: true,
   }),
   STAFF_ADMIN_COPY.lastOwner,
 );
@@ -86,6 +127,8 @@ assert.equal(
     targetIsActiveOwner: false,
     nextRoleIsOwner: false,
     activeOwnerCount: 1,
+    actorRole: "owner",
+    targetRoleIsOwner: false,
   }),
   null,
 );
@@ -93,6 +136,8 @@ assert.equal(
   staffAdminUsernameChangeError({
     actorStaffId: "owner-1",
     targetStaffId: "owner-1",
+    actorRole: "owner",
+    targetRoleIsOwner: true,
   }),
   STAFF_ADMIN_COPY.cannotEditOwnUsername,
 );
@@ -100,6 +145,8 @@ assert.equal(
   staffAdminUsernameChangeError({
     actorStaffId: "owner-1",
     targetStaffId: "bakery-1",
+    actorRole: "owner",
+    targetRoleIsOwner: false,
   }),
   null,
 );
@@ -111,6 +158,8 @@ assert.equal(
     targetIsActiveOwner: true,
     nextRoleIsOwner: false,
     activeOwnerCount: 2,
+    actorRole: "owner",
+    targetRoleIsOwner: true,
   }),
   null,
 );
@@ -120,6 +169,8 @@ assert.equal(
     targetStaffId: "owner-2",
     targetIsActiveOwner: true,
     activeOwnerCount: 2,
+    actorRole: "owner",
+    targetRoleIsOwner: true,
   }),
   null,
 );
@@ -135,6 +186,12 @@ assert.match(adminActions, /STAFF_ADMIN_COPY\.unauthorized/);
 assert.match(adminActions, /validateStaffUsername/);
 assert.match(adminActions, /findStaffByUsername/);
 assert.match(adminActions, /countActiveOwners/);
+assert.match(adminActions, /actorRole:\s*actor\.role\.code/);
+assert.equal(
+  adminActions.match(/actorRole:\s*actor\.role\.code/g)?.length,
+  4,
+);
+assert.match(adminActions, /staffAdminActivateError/);
 assert.match(adminActions, /auth\.admin\.createUser/);
 assert.match(adminActions, /email_confirm:\s*true/);
 assert.match(adminActions, /auth\.admin\.deleteUser/);
@@ -223,6 +280,7 @@ assert.match(staffPage, /canManageStaff/);
 assert.match(staffPage, /redirect\("\/settings"\)/);
 assert.match(staffPage, /listStaffProfilesForAdmin/);
 assert.match(staffPage, /actorIsMasterOwner=\{actor\.isMasterOwner\}/);
+assert.match(staffPage, /actorRole=\{actor\.role\.code\}/);
 assert.doesNotMatch(staffPage, /password reset|Passkey/);
 
 const createForm = readFileSync(
@@ -250,6 +308,10 @@ assert.match(directory, /Confirm transfer/);
 assert.match(directory, /Master Owner/);
 assert.match(directory, /member\.role\.name/);
 assert.match(directory, /member\.isMasterOwner/);
+assert.match(directory, /actorRole/);
+assert.match(directory, /ownerLocked/);
+assert.match(directory, /canManageOwnerStaff/);
+assert.match(directory, /cannotManageOwner/);
 assert.doesNotMatch(directory, /type="email".*admin|Change email|Reset password/);
 
 const profileActions = readFileSync(
@@ -327,6 +389,7 @@ assert.equal(
     nextRoleIsOwner: true,
     activeOwnerCount: 2,
     actorIsMasterOwner: false,
+    actorRole: "owner",
     targetRoleIsOwner: false,
   }),
   STAFF_ADMIN_COPY.cannotPromoteToOwner,
@@ -339,6 +402,7 @@ assert.equal(
     nextRoleIsOwner: true,
     activeOwnerCount: 2,
     actorIsMasterOwner: true,
+    actorRole: "owner",
     targetRoleIsOwner: false,
   }),
   null,
@@ -351,6 +415,7 @@ assert.equal(
     nextRoleIsOwner: false,
     activeOwnerCount: 2,
     actorIsMasterOwner: false,
+    actorRole: "owner",
     targetIsMasterOwner: true,
     targetRoleIsOwner: true,
   }),
@@ -364,6 +429,7 @@ assert.equal(
     nextRoleIsOwner: false,
     activeOwnerCount: 2,
     actorIsMasterOwner: true,
+    actorRole: "owner",
     targetIsMasterOwner: true,
     targetRoleIsOwner: true,
   }),
@@ -377,6 +443,7 @@ assert.equal(
     nextRoleIsOwner: false,
     activeOwnerCount: 2,
     actorIsMasterOwner: true,
+    actorRole: "owner",
     targetIsMasterOwner: false,
     targetRoleIsOwner: true,
   }),
@@ -389,7 +456,9 @@ assert.equal(
     targetStaffId: "master-1",
     targetIsActiveOwner: true,
     activeOwnerCount: 2,
+    actorRole: "owner",
     targetIsMasterOwner: true,
+    targetRoleIsOwner: true,
   }),
   STAFF_ADMIN_COPY.cannotDeactivateMaster,
 );
@@ -399,7 +468,9 @@ assert.equal(
     targetStaffId: "master-1",
     targetIsActiveOwner: true,
     activeOwnerCount: 2,
+    actorRole: "owner",
     targetIsMasterOwner: true,
+    targetRoleIsOwner: true,
   }),
   STAFF_ADMIN_COPY.cannotDeactivateSelf,
 );
@@ -409,7 +480,9 @@ assert.equal(
     targetStaffId: "owner-2",
     targetIsActiveOwner: true,
     activeOwnerCount: 2,
+    actorRole: "owner",
     targetIsMasterOwner: false,
+    targetRoleIsOwner: true,
   }),
   null,
 );
@@ -418,7 +491,9 @@ assert.equal(
   staffAdminUsernameChangeError({
     actorStaffId: "owner-1",
     targetStaffId: "master-1",
+    actorRole: "owner",
     targetIsMasterOwner: true,
+    targetRoleIsOwner: true,
   }),
   STAFF_ADMIN_COPY.cannotChangeMaster,
 );
@@ -426,7 +501,9 @@ assert.equal(
   staffAdminUsernameChangeError({
     actorStaffId: "master-1",
     targetStaffId: "bakery-1",
+    actorRole: "owner",
     targetIsMasterOwner: false,
+    targetRoleIsOwner: false,
   }),
   null,
 );
@@ -481,6 +558,324 @@ assert.equal(
   }),
   null,
 );
+
+assert.equal(
+  staffAdminUsernameChangeError({
+    actorStaffId: "master-1",
+    targetStaffId: "bakery-1",
+    actorRole: "owner",
+    targetIsMasterOwner: false,
+    targetRoleIsOwner: false,
+  }),
+  null,
+);
+assert.equal(
+  staffAdminRoleChangeError({
+    actorStaffId: "master-1",
+    targetStaffId: "bakery-1",
+    targetIsActiveOwner: false,
+    nextRoleIsOwner: false,
+    activeOwnerCount: 2,
+    actorIsMasterOwner: true,
+    actorRole: "owner",
+    targetRoleIsOwner: false,
+  }),
+  null,
+);
+assert.equal(
+  staffAdminUsernameChangeError({
+    actorStaffId: "master-1",
+    targetStaffId: "owner-2",
+    actorRole: "owner",
+    targetIsMasterOwner: false,
+    targetRoleIsOwner: true,
+  }),
+  null,
+);
+assert.equal(
+  staffAdminRoleChangeError({
+    actorStaffId: "owner-1",
+    targetStaffId: "bakery-1",
+    targetIsActiveOwner: false,
+    nextRoleIsOwner: false,
+    activeOwnerCount: 2,
+    actorIsMasterOwner: false,
+    actorRole: "owner",
+    targetRoleIsOwner: false,
+  }),
+  null,
+);
+assert.equal(
+  staffAdminUsernameChangeError({
+    actorStaffId: "owner-1",
+    targetStaffId: "owner-2",
+    actorRole: "owner",
+    targetIsMasterOwner: false,
+    targetRoleIsOwner: true,
+  }),
+  null,
+);
+
+assert.equal(
+  staffAdminCreateRoleError({
+    actorIsMasterOwner: false,
+    roleCode: "manager",
+  }),
+  null,
+);
+assert.equal(
+  staffAdminCreateRoleError({
+    actorIsMasterOwner: false,
+    roleCode: "owner",
+  }),
+  STAFF_ADMIN_COPY.cannotCreateOwner,
+);
+assert.equal(
+  staffAdminUsernameChangeError({
+    actorStaffId: "manager-1",
+    targetStaffId: "bakery-1",
+    actorRole: "manager",
+    targetRoleIsOwner: false,
+  }),
+  null,
+);
+assert.equal(
+  staffAdminRoleChangeError({
+    actorStaffId: "manager-1",
+    targetStaffId: "bakery-1",
+    targetIsActiveOwner: false,
+    nextRoleIsOwner: false,
+    activeOwnerCount: 2,
+    actorIsMasterOwner: false,
+    actorRole: "manager",
+    targetRoleIsOwner: false,
+  }),
+  null,
+);
+assert.equal(
+  staffAdminDeactivateError({
+    actorStaffId: "manager-1",
+    targetStaffId: "bakery-1",
+    targetIsActiveOwner: false,
+    activeOwnerCount: 2,
+    actorRole: "manager",
+    targetRoleIsOwner: false,
+  }),
+  null,
+);
+assert.equal(
+  staffAdminUsernameChangeError({
+    actorStaffId: "manager-1",
+    targetStaffId: "owner-2",
+    actorRole: "manager",
+    targetIsMasterOwner: false,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotManageOwner,
+);
+assert.equal(
+  staffAdminRoleChangeError({
+    actorStaffId: "manager-1",
+    targetStaffId: "owner-2",
+    targetIsActiveOwner: true,
+    nextRoleIsOwner: false,
+    activeOwnerCount: 2,
+    actorIsMasterOwner: false,
+    actorRole: "manager",
+    targetIsMasterOwner: false,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotManageOwner,
+);
+assert.equal(
+  staffAdminRoleChangeError({
+    actorStaffId: "manager-1",
+    targetStaffId: "bakery-1",
+    targetIsActiveOwner: false,
+    nextRoleIsOwner: true,
+    activeOwnerCount: 2,
+    actorIsMasterOwner: false,
+    actorRole: "manager",
+    targetRoleIsOwner: false,
+  }),
+  STAFF_ADMIN_COPY.cannotPromoteToOwner,
+);
+assert.equal(
+  staffAdminDeactivateError({
+    actorStaffId: "manager-1",
+    targetStaffId: "owner-2",
+    targetIsActiveOwner: true,
+    activeOwnerCount: 2,
+    actorRole: "manager",
+    targetIsMasterOwner: false,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotManageOwner,
+);
+assert.equal(
+  staffAdminActivateError({
+    actorRole: "manager",
+    targetRoleIsOwner: true,
+    targetIsMasterOwner: false,
+  }),
+  STAFF_ADMIN_COPY.cannotManageOwner,
+);
+assert.equal(
+  staffAdminActivateError({
+    actorRole: "owner",
+    targetRoleIsOwner: true,
+    targetIsMasterOwner: false,
+  }),
+  null,
+);
+assert.equal(
+  staffAdminUsernameChangeError({
+    actorStaffId: "manager-1",
+    targetStaffId: "master-1",
+    actorRole: "manager",
+    targetIsMasterOwner: true,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotChangeMaster,
+);
+assert.equal(
+  staffAdminRoleChangeError({
+    actorStaffId: "manager-1",
+    targetStaffId: "master-1",
+    targetIsActiveOwner: true,
+    nextRoleIsOwner: false,
+    activeOwnerCount: 2,
+    actorIsMasterOwner: false,
+    actorRole: "manager",
+    targetIsMasterOwner: true,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotDemoteMaster,
+);
+assert.equal(
+  staffAdminRoleChangeError({
+    actorStaffId: "manager-1",
+    targetStaffId: "master-1",
+    targetIsActiveOwner: true,
+    nextRoleIsOwner: true,
+    activeOwnerCount: 2,
+    actorIsMasterOwner: false,
+    actorRole: "manager",
+    targetIsMasterOwner: true,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotChangeMaster,
+);
+assert.equal(
+  staffAdminDeactivateError({
+    actorStaffId: "manager-1",
+    targetStaffId: "master-1",
+    targetIsActiveOwner: true,
+    activeOwnerCount: 2,
+    actorRole: "manager",
+    targetIsMasterOwner: true,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotDeactivateMaster,
+);
+assert.equal(
+  staffAdminActivateError({
+    actorRole: "manager",
+    targetRoleIsOwner: true,
+    targetIsMasterOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotChangeMaster,
+);
+assert.equal(
+  staffAdminTransferError({
+    actorStaffId: "manager-1",
+    targetStaffId: "owner-2",
+    actorIsMasterOwner: false,
+    targetIsActive: true,
+    targetIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotTransfer,
+);
+
+const missingActorRole = undefined as unknown as RoleCode;
+const invalidActorRole = "admin" as RoleCode;
+assert.equal(
+  staffAdminOwnerMutationError({
+    actorRole: missingActorRole,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotManageOwner,
+);
+assert.equal(
+  staffAdminOwnerMutationError({
+    actorRole: invalidActorRole,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotManageOwner,
+);
+assert.equal(
+  staffAdminOwnerMutationError({
+    actorRole: "manager",
+    targetRoleIsOwner: undefined as unknown as boolean,
+  }),
+  STAFF_ADMIN_COPY.cannotManageOwner,
+);
+assert.equal(
+  staffAdminUsernameChangeError({
+    actorStaffId: "unknown-1",
+    targetStaffId: "owner-2",
+    actorRole: missingActorRole,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotManageOwner,
+);
+assert.equal(
+  staffAdminRoleChangeError({
+    actorStaffId: "unknown-1",
+    targetStaffId: "owner-2",
+    targetIsActiveOwner: true,
+    nextRoleIsOwner: false,
+    activeOwnerCount: 2,
+    actorRole: missingActorRole,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotManageOwner,
+);
+assert.equal(
+  staffAdminDeactivateError({
+    actorStaffId: "unknown-1",
+    targetStaffId: "owner-2",
+    targetIsActiveOwner: true,
+    activeOwnerCount: 2,
+    actorRole: missingActorRole,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotManageOwner,
+);
+assert.equal(
+  staffAdminActivateError({
+    actorRole: missingActorRole,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotManageOwner,
+);
+assert.equal(
+  staffAdminUsernameChangeError({
+    actorStaffId: "unknown-1",
+    targetStaffId: "owner-2",
+    actorRole: invalidActorRole,
+    targetRoleIsOwner: true,
+  }),
+  STAFF_ADMIN_COPY.cannotManageOwner,
+);
+
+const guardsSource = readFileSync(
+  resolve("src/foundation/staff/admin-guards.ts"),
+  "utf8",
+);
+assert.match(guardsSource, /actorRole: RoleCode;/);
+assert.doesNotMatch(guardsSource, /actorRole\?:/);
+assert.match(guardsSource, /targetRoleIsOwner !== false/);
 
 const migration = readFileSync(
   resolve("supabase/migrations/20260911120000_staff_master_owner.sql"),

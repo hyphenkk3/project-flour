@@ -55,10 +55,13 @@ export function canAccessSettings(_role: RoleCode): boolean {
 }
 
 /**
- * Staff account management is restricted to Owner.
+ * Staff account administration.
+ *
+ * Owner and Manager may access Staff Management. Mutation of Owner
+ * accounts remains Owner-only via staff admin guards.
  */
 export function canManageStaff(role: RoleCode): boolean {
-  return role === "owner";
+  return role === "owner" || role === "manager";
 }
 
 /**
