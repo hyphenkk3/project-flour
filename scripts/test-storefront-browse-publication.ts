@@ -127,8 +127,13 @@ const browseFn = queriesSrc.slice(
   queriesSrc.indexOf("export async function listBrowsePublishedCakes"),
   queriesSrc.indexOf("export async function getBrowsePublishedCakeById"),
 );
+const detailStart = queriesSrc.indexOf(
+  "export async function getBrowsePublishedCakeById",
+);
+const detailNext = queriesSrc.indexOf("\nexport async function", detailStart + 1);
 const detailByIdFn = queriesSrc.slice(
-  queriesSrc.indexOf("export async function getBrowsePublishedCakeById"),
+  detailStart,
+  detailNext === -1 ? undefined : detailNext,
 );
 
 assert.match(browseFn, /isCurrentlyCustomerOrderable/);
@@ -144,11 +149,16 @@ assert.match(browseFn, /cake\.sizes\.length === 0/);
 assert.doesNotMatch(browseFn, /isCatalogueExpired/);
 assert.doesNotMatch(browseFn, /engines\/preorder/);
 assert.doesNotMatch(browseFn, /capacity/i);
-assert.match(
+assert.doesNotMatch(
   detailByIdFn,
   /listBrowsePublishedCakes\(\)/,
-  "J. cake detail uses the same Browse publication set",
+  "J. cake detail must not load the full Browse catalogue",
 );
+assert.doesNotMatch(detailByIdFn, /listHomepagePopularCakes\(\)/);
+assert.match(detailByIdFn, /\.eq\(\s*"id"/);
+assert.match(detailByIdFn, /library_cakes/);
+assert.match(detailByIdFn, /library_cake_id/);
+assert.match(detailByIdFn, /resolveBrowsePublishedCake/);
 
 assert.match(
   queriesSrc,

@@ -427,6 +427,116 @@ function isOfferableStatus(status: string): boolean {
   return status === "active" || status === "seasonal";
 }
 
+export type BrowsePublicationCatalogue = {
+  id: string;
+  month: string | null;
+  purpose: string | null;
+  status: string;
+  end_date: string | null;
+  website_override: boolean | null;
+  show_in_past_menu?: boolean | null;
+};
+
+function browseCatalogueKind(
+  row: BrowsePublicationCatalogue,
+  todayYmd: string,
+): "current" | "historical" | "none" {
+  const catalogue = {
+    purpose: row.purpose ?? "monthly",
+    status: row.status,
+    month: row.month ? String(row.month).slice(0, 10) : null,
+    endDate: row.end_date ? String(row.end_date).slice(0, 10) : null,
+    websiteOverride: row.website_override === true,
+    showInPastMenu: row.show_in_past_menu === true,
+  };
+  if (isCurrentlyCustomerOrderable(catalogue, todayYmd)) return "current";
+  if (isCustomerFacingHistoricalCatalogue(catalogue)) return "historical";
+  return "none";
+}
+
+/**
+ * Same Browse publication rules as listBrowsePublishedCakes, for one cake.
+ * Popular-cakes merchandising remains the fallback when no catalogue qualifies.
+ */
+export function resolveBrowsePublishedCake(input: {
+  cake: StorefrontCake;
+  cakeStatus: string;
+  catalogues: readonly BrowsePublicationCatalogue[];
+  showInPopularCakes?: boolean | null;
+  todayYmd?: string;
+}): BrowseStorefrontCake | null {
+  if (input.cake.sizes.length === 0) return null;
+
+  const todayYmd = input.todayYmd ?? toBusinessDateKey();
+  const todayYm = businessYearMonth(todayYmd) ?? todayYmd.slice(0, 7);
+  let published = false;
+  let currentlyOffered = false;
+  const monthlyMonths: string[] = [];
+
+  for (const row of input.catalogues) {
+    const kind = browseCatalogueKind(row, todayYmd);
+    if (kind === "none") continue;
+    if (kind === "current") {
+      if (!isOfferableStatus(input.cakeStatus)) continue;
+      published = true;
+      currentlyOffered = true;
+      if ((row.purpose ?? "monthly") === "monthly" && row.month) {
+        monthlyMonths.push(String(row.month).slice(0, 10));
+      }
+      continue;
+    }
+    published = true;
+  }
+
+  if (published) {
+    return {
+      ...input.cake,
+      currentlyOffered,
+      availabilityNote: currentlyOffered
+        ? browseCakeAvailabilityNote(todayYm, monthlyMonths)
+        : BROWSE_CURRENTLY_UNAVAILABLE_NOTE,
+    };
+  }
+
+  if (input.showInPopularCakes === true) {
+    return {
+      ...input.cake,
+      currentlyOffered: true,
+      availabilityNote: null,
+    };
+  }
+
+  return null;
+}
+
+async function listBrowsePublicationCataloguesByIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  collectionIds: readonly string[],
+): Promise<BrowsePublicationCatalogue[]> {
+  if (collectionIds.length === 0) return [];
+
+  const withHistoryFlag = await supabase
+    .from("collections")
+    .select(
+      "id, month, purpose, status, end_date, website_override, show_in_past_menu",
+    )
+    .in("id", collectionIds);
+  const cataloguesQuery = (withHistoryFlag.error?.message ?? "").includes(
+    "show_in_past_menu",
+  )
+    ? await supabase
+        .from("collections")
+        .select("id, month, purpose, status, end_date, website_override")
+        .in("id", collectionIds)
+    : withHistoryFlag;
+
+  if (cataloguesQuery.error) {
+    throw new Error(cataloguesQuery.error.message);
+  }
+
+  return (cataloguesQuery.data ?? []) as BrowsePublicationCatalogue[];
+}
+
 type CurrentCollectionRpcRow = {
   id: string;
   name: string;
@@ -1057,18 +1167,57 @@ export async function listBrowsePublishedCakes(
 
 export async function getBrowsePublishedCakeById(
   id: string,
+  todayYmd: string = toBusinessDateKey(),
 ): Promise<BrowseStorefrontCake | null> {
-  const cakes = await listBrowsePublishedCakes();
-  const published = cakes.find((cake) => cake.id === id) ?? null;
-  if (published) return published;
-  const popular = await listHomepagePopularCakes();
-  const merchandised = popular.find((cake) => cake.id === id);
-  if (!merchandised) return null;
-  return {
-    ...merchandised,
-    availabilityNote: null,
-    currentlyOffered: true,
-  };
+  if (!id) return null;
+
+  const supabase = await createClient();
+  const data = await withCakePhotoSelectFallback(
+    (photoSelect, includeAssignments, includeTags) =>
+      supabase
+        .from("library_cakes")
+        .select(
+          `
+      show_in_popular_cakes,
+      ${libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags)}
+    `,
+        )
+        .eq("id", id)
+        .maybeSingle(),
+  );
+  if (!data) return null;
+
+  const row = data as unknown as LibraryCakeEmbed;
+  const cake = mapStorefrontCake(row);
+
+  const { data: memberships, error: membershipError } = await supabase
+    .from("collection_cakes")
+    .select("collection_id")
+    .eq("library_cake_id", id)
+    .eq("available", true);
+
+  if (membershipError) {
+    throw new Error(membershipError.message);
+  }
+
+  const collectionIds = [
+    ...new Set(
+      ((memberships ?? []) as Array<{ collection_id?: string | null }>)
+        .map((membership) => membership.collection_id)
+        .filter((collectionId): collectionId is string => Boolean(collectionId)),
+    ),
+  ];
+
+  return resolveBrowsePublishedCake({
+    cake,
+    cakeStatus: row.status,
+    catalogues: await listBrowsePublicationCataloguesByIds(
+      supabase,
+      collectionIds,
+    ),
+    showInPopularCakes: row.show_in_popular_cakes === true,
+    todayYmd,
+  });
 }
 
 /**
