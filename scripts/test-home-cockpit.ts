@@ -6,7 +6,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { getNavigationForRole } from "@/foundation/navigation/workspaces";
-import { canAccessOperationsBoard } from "@/engines/orders/delivery-finance-capabilities";
+import {
+  buildGuestOrderWorkspaceCapabilities,
+  canAccessOperationsBoard,
+} from "@/engines/orders/delivery-finance-capabilities";
+import type { RoleCode } from "@/types/staff";
 import { canAccessCollectionWorkspace } from "@/engines/collection/capabilities";
 import { canAccessBakeryWorkspace } from "@/engines/bakery/capabilities";
 import {
@@ -561,6 +565,10 @@ assert.match(pageSrc, /dineInCollection/);
 assert.match(pageSrc, /listBakeryBoardOrders/);
 assert.match(pageSrc, /listPendingOperationsApprovals/);
 assert.match(pageSrc, /homePendingApprovalsHref/);
+assert.match(
+  pageSrc,
+  /canPrepareConfirmation:\s*capabilities\.canPrepareConfirmation/,
+);
 assert.doesNotMatch(pageSrc, /canUseOwnerBoardTools/);
 assert.doesNotMatch(pageSrc, /Propose EXTRA/);
 assert.doesNotMatch(pageSrc, /Mark Ready/);
@@ -616,6 +624,10 @@ assert.match(modelSrc, /partitionOwnerOperationsTodayOrders/);
 assert.match(modelSrc, /appendPrepareConfirmationInbox/);
 assert.match(modelSrc, /deriveOwnerAttention/);
 assert.match(modelSrc, /homeQuickLinksFromNavigation/);
+assert.match(modelSrc, /canPrepareConfirmation/);
+assert.match(modelSrc, /homeVisibleAttentionReasons/);
+assert.doesNotMatch(modelSrc, /role === "bakery"/);
+assert.doesNotMatch(modelSrc, /role === "collection"/);
 
 assert.ok(
   model.attentionPreview.some((item) => item.id === "e"),
@@ -731,6 +743,123 @@ assert.ok(
   );
 }
 
+{
+  const mixedAttentionOrders = [
+    listItem({
+      id: "sub-home",
+      pickupDate: "2026-08-15",
+      status: "submitted",
+      orderNumber: "WB-SUB",
+      customerName: "Submitted Guest",
+    }),
+    listItem({
+      id: "pay-home",
+      pickupDate: "2026-08-15",
+      status: "awaiting_payment",
+      orderNumber: "WB-PAY-HOME",
+      customerName: "Payment Guest",
+    }),
+    listItem({
+      id: "conf-home",
+      pickupDate: "2026-08-15",
+      status: "pending_confirmation",
+      orderNumber: "WB-CONF-HOME",
+      customerName: "Confirm Guest",
+    }),
+  ];
+
+  function homeAttentionForRole(role: RoleCode) {
+    const capabilities = buildGuestOrderWorkspaceCapabilities({
+      role,
+      staffId: `${role}-home-attention`,
+    });
+    return {
+      capabilities,
+      model: buildHomeCockpitModel({
+        orders: mixedAttentionOrders,
+        readyCollection: [],
+        completedCollection: [],
+        bakeryOrders: [],
+        pendingApprovals: [],
+        navigation: getNavigationForRole(role),
+        canPrepareConfirmation: capabilities.canPrepareConfirmation,
+        now,
+      }),
+    };
+  }
+
+  const operatorRoles: RoleCode[] = [
+    "owner",
+    "manager",
+    "customer_operations",
+  ];
+  for (const role of operatorRoles) {
+    const { capabilities, model: roleModel } = homeAttentionForRole(role);
+    assert.equal(
+      capabilities.canPrepareConfirmation,
+      true,
+      `${role} can prepare confirmation`,
+    );
+    assert.equal(
+      roleModel.attentionGroups.find((group) => group.key === "prepare_confirmation")
+        ?.count,
+      1,
+      `${role} Home shows Confirmation not prepared`,
+    );
+    assert.equal(
+      roleModel.attentionGroups.find((group) => group.key === "payment_needed")
+        ?.count,
+      1,
+      `${role} Home keeps Payment needed`,
+    );
+    assert.equal(
+      roleModel.attentionGroups.find(
+        (group) => group.key === "awaiting_customer_confirmation",
+      )?.count,
+      1,
+      `${role} Home keeps Waiting for customer confirmation`,
+    );
+    assert.equal(roleModel.summary.needAttention, 3);
+    assert.ok(roleModel.attentionPreview.some((item) => item.id === "sub-home"));
+  }
+
+  for (const role of ["bakery", "collection"] as const) {
+    const { capabilities, model: roleModel } = homeAttentionForRole(role);
+    assert.equal(
+      capabilities.canPrepareConfirmation,
+      false,
+      `${role} cannot prepare confirmation`,
+    );
+    assert.equal(
+      roleModel.attentionGroups.some(
+        (group) => group.key === "prepare_confirmation",
+      ),
+      false,
+      `${role} Home hides Confirmation not prepared`,
+    );
+    assert.equal(
+      roleModel.attentionGroups.find((group) => group.key === "payment_needed")
+        ?.count,
+      1,
+      `${role} Home keeps Payment needed`,
+    );
+    assert.equal(
+      roleModel.attentionGroups.find(
+        (group) => group.key === "awaiting_customer_confirmation",
+      )?.count,
+      1,
+      `${role} Home keeps Waiting for customer confirmation`,
+    );
+    assert.equal(roleModel.summary.needAttention, 2);
+    assert.equal(
+      roleModel.attentionPreview.some((item) => item.id === "sub-home"),
+      false,
+    );
+    assert.ok(roleModel.attentionPreview.some((item) => item.id === "pay-home"));
+    assert.ok(roleModel.attentionPreview.some((item) => item.id === "conf-home"));
+  }
+}
+
 assert.equal(GUEST_ORDERS_LIVE_POLL_MS, 30_000);
 assert.equal(
   isGuestOrderLiveEvent({ id: "new-preorder", customer_id: null }),
@@ -764,5 +893,7 @@ assert.match(operationsLiveSrc, /postgres_changes/);
 assert.match(operationsLiveSrc, /listGuestOrdersAction/);
 assert.match(operationsLiveSrc, /GUEST_ORDERS_LIVE_POLL_MS/);
 assert.match(operationsLiveSrc, /isGuestOrderLiveEvent/);
+assert.match(operationsLiveSrc, /appendPrepareConfirmationInbox/);
+assert.doesNotMatch(operationsLiveSrc, /canPrepareConfirmation/);
 
 console.log("PASS Home cockpit");

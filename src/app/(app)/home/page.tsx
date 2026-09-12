@@ -90,6 +90,7 @@ export default async function HomePage() {
     bakeryOrders,
     pendingApprovals: visiblePendingApprovals,
     navigation,
+    canPrepareConfirmation: capabilities.canPrepareConfirmation,
   });
 
   return (

@@ -8,6 +8,8 @@ import {
   deriveOwnerAttention,
   ownerAttentionInputFromOrder,
   partitionOwnerOperationsTodayOrders,
+  type OwnerAttentionOrderInput,
+  type OwnerAttentionReason,
   type OwnerAttentionReasonKey,
 } from "@/engines/operations/owner-attention";
 import { operationsTodayYmd } from "@/engines/operations/order-board";
@@ -124,6 +126,20 @@ export function homeQuickLinksFromNavigation(
   return navigation.filter((item) => QUICK_LINK_IDS.has(item.id));
 }
 
+/**
+ * Home-only presentation. Operations Today still uses the full engine inbox.
+ * Confirmation-not-prepared is hidden when the viewer cannot prepare it.
+ */
+function homeVisibleAttentionReasons(
+  order: OwnerAttentionOrderInput,
+  now: Date,
+  canPrepareConfirmation: boolean,
+): OwnerAttentionReason[] {
+  const reasons = deriveOwnerAttention(order, now);
+  if (canPrepareConfirmation) return reasons;
+  return reasons.filter((reason) => reason.key !== "prepare_confirmation");
+}
+
 function dineInHandoffPreview(
   order: CollectionBoardOrder,
 ): HomeDineInHandoffPreview {
@@ -146,9 +162,15 @@ export function buildHomeCockpitModel(input: {
   bakeryOrders: BakeryBoardOrder[];
   pendingApprovals: OperationsApprovalRecord[];
   navigation: WorkspaceNavItem[];
+  /**
+   * From GuestOrderWorkspaceCapabilities.canPrepareConfirmation.
+   * Defaults to true so operator Home / existing callers stay unchanged.
+   */
+  canPrepareConfirmation?: boolean;
   now?: Date;
 }): HomeCockpitModel {
   const now = input.now ?? new Date();
+  const canPrepareConfirmation = input.canPrepareConfirmation ?? true;
   const todayYmd = operationsTodayYmd(now);
   const todayOrders = input.orders.filter(
     (order) => order.pickupDate === todayYmd,
@@ -208,6 +230,12 @@ export function buildHomeCockpitModel(input: {
       }) === "ready",
   ).length;
 
+  const visibleNeedsAttention = buckets.needsAttention.filter(
+    (order) =>
+      homeVisibleAttentionReasons(order, now, canPrepareConfirmation).length >
+      0,
+  );
+
   const summary: HomeTodaySummary = {
     ordersToday: todayOrders.length,
     pickupsToday,
@@ -215,14 +243,18 @@ export function buildHomeCockpitModel(input: {
     dineInsToday,
     ready,
     completed: buckets.completed.length,
-    needAttention: buckets.needsAttention.length,
+    needAttention: visibleNeedsAttention.length,
     pendingApprovals: input.pendingApprovals.length,
   };
 
   const attentionCounts = new Map<OwnerAttentionReasonKey, number>();
   const attentionLabels = new Map<OwnerAttentionReasonKey, string>();
-  for (const order of buckets.needsAttention) {
-    const reasons = deriveOwnerAttention(order, now);
+  for (const order of visibleNeedsAttention) {
+    const reasons = homeVisibleAttentionReasons(
+      order,
+      now,
+      canPrepareConfirmation,
+    );
     for (const reason of reasons) {
       attentionCounts.set(
         reason.key,
@@ -246,10 +278,14 @@ export function buildHomeCockpitModel(input: {
     },
   );
 
-  const attentionPreview: HomeAttentionPreview[] = buckets.needsAttention
+  const attentionPreview: HomeAttentionPreview[] = visibleNeedsAttention
     .slice(0, 5)
     .map((order) => {
-      const reasons = deriveOwnerAttention(order, now);
+      const reasons = homeVisibleAttentionReasons(
+        order,
+        now,
+        canPrepareConfirmation,
+      );
       return {
         id: order.id,
         orderNumber: order.orderNumber ?? "",
