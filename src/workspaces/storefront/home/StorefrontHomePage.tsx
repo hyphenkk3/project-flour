@@ -42,6 +42,7 @@ import { HomeMoreCollections } from "@/workspaces/storefront/home/HomeMoreCollec
 import { HomeOrderSummary } from "@/workspaces/storefront/home/HomeOrderSummary";
 import { HomePopularCakes } from "@/workspaces/storefront/home/HomePopularCakes";
 import { HomeVisitFooter } from "@/workspaces/storefront/home/HomeVisitFooter";
+import { StorefrontCakePrefetch } from "@/workspaces/storefront/home/StorefrontCakePrefetch";
 import type { StorefrontCake } from "@/types/storefront";
 
 export const dynamic = "force-dynamic";
@@ -249,6 +250,12 @@ export async function StorefrontHomePage() {
       />
 
       <HomeFreshPicksSection picks={picks} />
+      <StorefrontCakePrefetch
+        excludeIds={popular.map((cake) => cake.id)}
+        hrefs={featured.flatMap((collection) =>
+          Object.values(collection.cakeHrefs),
+        )}
+      />
       {featured.map((collection) => (
         <HomeFeaturedCollection
           cakeHrefs={collection.cakeHrefs}

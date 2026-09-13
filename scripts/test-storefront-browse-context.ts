@@ -56,9 +56,15 @@ const detailSrc = readSrc(
 );
 assert.match(detailSrc, /getBrowsePublishedCakeById/);
 assert.match(detailSrc, /StorefrontCakeDetailView/);
-assert.match(detailSrc, /fromCollection \? "\/order" : "\/browse"/);
+assert.match(detailSrc, /CakeDetailPickupScope/);
 assert.doesNotMatch(detailSrc, /router\.push/);
 assert.doesNotMatch(detailSrc, /writePreorderDraft/);
+
+const pickupScopeSrc = readSrc(
+  "src/workspaces/storefront/catalog/CakeDetailPickupScope.tsx",
+);
+assert.match(pickupScopeSrc, /fromCollection \? "\/order" : "\/browse"/);
+assert.match(pickupScopeSrc, /useSearchParams/);
 
 const extraSrc = readSrc("src/workspaces/storefront/home/StorefrontExtraPage.tsx");
 assert.match(extraSrc, /Fresh Picks/);

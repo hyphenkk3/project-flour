@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireStaff } from "@/foundation/auth/session";
 import { canManageLibrary } from "@/foundation/navigation/access";
 import { createClient } from "@/lib/supabase/server";
+import { revalidateStorefrontPublishedCakeCache } from "@/workspaces/storefront/catalog/published-cake-cache";
 import type {
   LibraryCakeInput,
   LibraryCakeSizeInput,
@@ -509,6 +510,7 @@ export async function createCakeAction(
 
   revalidatePath("/library/cakes");
   revalidatePath("/");
+  revalidateStorefrontPublishedCakeCache(data.id);
   redirect(`/library/cakes/${data.id}`);
 }
 
@@ -601,6 +603,7 @@ export async function updateCakeAction(
   revalidatePath(`/library/cakes/${id}`);
   revalidatePath(`/library/cakes/${id}/edit`);
   revalidatePath("/");
+  revalidateStorefrontPublishedCakeCache(id);
   redirect(`/library/cakes/${id}`);
 }
 
@@ -670,6 +673,7 @@ export async function updateCakePopularCakesFromLibraryAction(
   revalidatePath(`/library/cakes/${cakeId}`);
   revalidatePath(`/library/cakes/${cakeId}/edit`);
   revalidatePath("/");
+  revalidateStorefrontPublishedCakeCache(cakeId);
   return { error: null };
 }
 
@@ -682,5 +686,6 @@ export async function deleteCakeAction(id: string): Promise<void> {
   }
   revalidatePath("/library/cakes");
   revalidatePath("/");
+  revalidateStorefrontPublishedCakeCache(id);
   redirect("/library/cakes");
 }

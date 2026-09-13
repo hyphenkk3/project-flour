@@ -58,15 +58,20 @@ assert.doesNotMatch(pageSrc, /StorefrontCakeDetailLoading/);
 
 const queriesSrc = readSrc(detailQuery);
 const detailFnStart = queriesSrc.indexOf(
-  "export async function getBrowsePublishedCakeById",
+  "async function loadLibraryCakeDisplayById",
 );
 assert.ok(detailFnStart >= 0);
-const detailFnNext = queriesSrc.indexOf("\nexport async function", detailFnStart + 1);
+const detailFnNext = queriesSrc.indexOf(
+  "\nexport async function listHomepagePopularCakes",
+  detailFnStart + 1,
+);
 const detailFn = queriesSrc.slice(
   detailFnStart,
   detailFnNext === -1 ? undefined : detailFnNext,
 );
 assert.match(detailFn, /\.eq\(\s*"id"/);
+assert.match(detailFn, /createPublicClient/);
+assert.match(detailFn, /loadLiveCakeCommercialState/);
 assert.doesNotMatch(detailFn, /listBrowsePublishedCakes/);
 
 console.log("PASS storefront cake detail loading shell");

@@ -7,18 +7,9 @@ export const metadata: Metadata = {
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ pickup?: string; from?: string; to?: string }>;
 };
 
-export default async function CakePage({ params, searchParams }: PageProps) {
+export default async function CakePage({ params }: PageProps) {
   const { id } = await params;
-  const query = await searchParams;
-  return (
-    <StorefrontCakeDetail
-      cakeId={id}
-      pickupScopeFrom={query.from ?? null}
-      pickupScopePickup={query.pickup ?? null}
-      pickupScopeTo={query.to ?? null}
-    />
-  );
+  return <StorefrontCakeDetail cakeId={id} />;
 }

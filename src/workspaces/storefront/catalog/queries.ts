@@ -27,7 +27,12 @@ import {
   formatBusinessMonthYear,
   toBusinessDateKey,
 } from "@/lib/dates";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createPublicClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
+import {
+  STOREFRONT_PUBLISHED_CAKES_CACHE_TAG,
+  storefrontCakeCacheTag,
+} from "@/workspaces/storefront/catalog/published-cake-cache";
 import type {
   StorefrontCake,
   StorefrontCakePhoto,
@@ -509,8 +514,12 @@ export function resolveBrowsePublishedCake(input: {
   return null;
 }
 
+type StorefrontSupabaseClient =
+  | Awaited<ReturnType<typeof createClient>>
+  | ReturnType<typeof createPublicClient>;
+
 async function listBrowsePublicationCataloguesByIds(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: StorefrontSupabaseClient,
   collectionIds: readonly string[],
 ): Promise<BrowsePublicationCatalogue[]> {
   if (collectionIds.length === 0) return [];
@@ -535,6 +544,85 @@ async function listBrowsePublicationCataloguesByIds(
   }
 
   return (cataloguesQuery.data ?? []) as BrowsePublicationCatalogue[];
+}
+
+type CakeMembershipCatalogueRow = {
+  collection_id?: string | null;
+  collections?:
+    | BrowsePublicationCatalogue
+    | BrowsePublicationCatalogue[]
+    | null;
+};
+
+async function listCakePublicationCatalogues(
+  supabase: StorefrontSupabaseClient,
+  cakeId: string,
+): Promise<BrowsePublicationCatalogue[]> {
+  const nestedSelect = `
+      collection_id,
+      collections (
+        id,
+        month,
+        purpose,
+        status,
+        end_date,
+        website_override,
+        show_in_past_menu
+      )
+    `;
+  const nestedSelectLegacy = `
+      collection_id,
+      collections (
+        id,
+        month,
+        purpose,
+        status,
+        end_date,
+        website_override
+      )
+    `;
+
+  const withHistory = await supabase
+    .from("collection_cakes")
+    .select(nestedSelect)
+    .eq("library_cake_id", cakeId)
+    .eq("available", true);
+
+  const memberships = (withHistory.error?.message ?? "").includes(
+    "show_in_past_menu",
+  )
+    ? await supabase
+        .from("collection_cakes")
+        .select(nestedSelectLegacy)
+        .eq("library_cake_id", cakeId)
+        .eq("available", true)
+    : withHistory;
+
+  if (!memberships.error) {
+    return ((memberships.data ?? []) as CakeMembershipCatalogueRow[])
+      .map((row) => unwrapOne(row.collections))
+      .filter((row): row is BrowsePublicationCatalogue => Boolean(row));
+  }
+
+  const { data, error } = await supabase
+    .from("collection_cakes")
+    .select("collection_id")
+    .eq("library_cake_id", cakeId)
+    .eq("available", true);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const collectionIds = [
+    ...new Set(
+      ((data ?? []) as Array<{ collection_id?: string | null }>)
+        .map((membership) => membership.collection_id)
+        .filter((collectionId): collectionId is string => Boolean(collectionId)),
+    ),
+  ];
+
+  return listBrowsePublicationCataloguesByIds(supabase, collectionIds);
 }
 
 type CurrentCollectionRpcRow = {
@@ -1165,13 +1253,56 @@ export async function listBrowsePublishedCakes(
     });
 }
 
-export async function getBrowsePublishedCakeById(
-  id: string,
-  todayYmd: string = toBusinessDateKey(),
-): Promise<BrowseStorefrontCake | null> {
-  if (!id) return null;
+type LiveCakeCommercialRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  sharing_guide: string | null;
+  allergens: string[] | null;
+  show_in_popular_cakes?: boolean | null;
+  library_cake_sizes: LibraryCakeEmbed["library_cake_sizes"];
+};
 
-  const supabase = await createClient();
+const LIVE_CAKE_COMMERCIAL_SELECT = `
+      id,
+      name,
+      description,
+      status,
+      sharing_guide,
+      allergens,
+      show_in_popular_cakes,
+      library_cake_sizes (
+        id,
+        cake_id,
+        label,
+        price,
+        sort_order,
+        preorder_days
+      )
+    `;
+
+const LIVE_CAKE_COMMERCIAL_SELECT_LEGACY = `
+      id,
+      name,
+      description,
+      status,
+      sharing_guide,
+      allergens,
+      library_cake_sizes (
+        id,
+        cake_id,
+        label,
+        price,
+        sort_order,
+        preorder_days
+      )
+    `;
+
+async function loadLibraryCakeDisplayById(
+  id: string,
+): Promise<LibraryCakeEmbed | null> {
+  const supabase = createPublicClient();
   const data = await withCakePhotoSelectFallback(
     (photoSelect, includeAssignments, includeTags) =>
       supabase
@@ -1185,39 +1316,89 @@ export async function getBrowsePublishedCakeById(
         .eq("id", id)
         .maybeSingle(),
   );
-  if (!data) return null;
+  return data ? (data as unknown as LibraryCakeEmbed) : null;
+}
 
-  const row = data as unknown as LibraryCakeEmbed;
-  const cake = mapStorefrontCake(row);
+async function loadCachedLibraryCakeDisplay(
+  id: string,
+): Promise<LibraryCakeEmbed | null> {
+  return unstable_cache(
+    () => loadLibraryCakeDisplayById(id),
+    ["browse-cake-display", id],
+    {
+      revalidate: 30,
+      tags: [STOREFRONT_PUBLISHED_CAKES_CACHE_TAG, storefrontCakeCacheTag(id)],
+    },
+  )();
+}
 
-  const { data: memberships, error: membershipError } = await supabase
-    .from("collection_cakes")
-    .select("collection_id")
-    .eq("library_cake_id", id)
-    .eq("available", true);
-
-  if (membershipError) {
-    throw new Error(membershipError.message);
+async function loadLiveCakeCommercialState(
+  id: string,
+): Promise<LiveCakeCommercialRow | null> {
+  const supabase = createPublicClient();
+  const withPopular = await supabase
+    .from("library_cakes")
+    .select(LIVE_CAKE_COMMERCIAL_SELECT)
+    .eq("id", id)
+    .maybeSingle();
+  const result = (withPopular.error?.message ?? "").includes(
+    "show_in_popular_cakes",
+  )
+    ? await supabase
+        .from("library_cakes")
+        .select(LIVE_CAKE_COMMERCIAL_SELECT_LEGACY)
+        .eq("id", id)
+        .maybeSingle()
+    : withPopular;
+  if (result.error) {
+    throw new Error(result.error.message);
   }
+  return (result.data as LiveCakeCommercialRow | null) ?? null;
+}
 
-  const collectionIds = [
-    ...new Set(
-      ((memberships ?? []) as Array<{ collection_id?: string | null }>)
-        .map((membership) => membership.collection_id)
-        .filter((collectionId): collectionId is string => Boolean(collectionId)),
-    ),
-  ];
+async function loadBrowsePublishedCakeById(
+  id: string,
+  todayYmd: string,
+): Promise<BrowseStorefrontCake | null> {
+  const supabase = createPublicClient();
+  const [display, commercial, catalogues] = await Promise.all([
+    loadCachedLibraryCakeDisplay(id),
+    loadLiveCakeCommercialState(id),
+    listCakePublicationCatalogues(supabase, id),
+  ]);
+  if (!commercial) return null;
+
+  const row: LibraryCakeEmbed = {
+    ...(display ?? {
+      id: commercial.id,
+      name: commercial.name,
+      description: commercial.description,
+      status: commercial.status,
+      sharing_guide: commercial.sharing_guide,
+      allergens: commercial.allergens,
+      library_cake_sizes: commercial.library_cake_sizes,
+      library_cake_photos: [],
+    }),
+    status: commercial.status,
+    show_in_popular_cakes: commercial.show_in_popular_cakes === true,
+    library_cake_sizes: commercial.library_cake_sizes,
+  };
 
   return resolveBrowsePublishedCake({
-    cake,
-    cakeStatus: row.status,
-    catalogues: await listBrowsePublicationCataloguesByIds(
-      supabase,
-      collectionIds,
-    ),
-    showInPopularCakes: row.show_in_popular_cakes === true,
+    cake: mapStorefrontCake(row),
+    cakeStatus: commercial.status,
+    catalogues,
+    showInPopularCakes: commercial.show_in_popular_cakes === true,
     todayYmd,
   });
+}
+
+export async function getBrowsePublishedCakeById(
+  id: string,
+  todayYmd: string = toBusinessDateKey(),
+): Promise<BrowseStorefrontCake | null> {
+  if (!id) return null;
+  return loadBrowsePublishedCakeById(id, todayYmd);
 }
 
 /**

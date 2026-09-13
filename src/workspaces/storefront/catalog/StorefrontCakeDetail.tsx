@@ -1,36 +1,53 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CUSTOMER_PICKUP_DATE_CAKE_NOTICE } from "@/engines/menu/customer-browse";
+import { CakeDetailPickupScope } from "@/workspaces/storefront/catalog/CakeDetailPickupScope";
 import { StorefrontCakeDetailView } from "@/workspaces/storefront/catalog/StorefrontCakeDetailView";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
 import { getBrowsePublishedCakeById } from "@/workspaces/storefront/catalog/queries";
 import { StorefrontHomeLink } from "@/workspaces/storefront/StorefrontBrand";
-
-export const dynamic = "force-dynamic";
+import type { StorefrontCake } from "@/types/storefront";
 
 type CakeDetailProps = {
   cakeId: string;
-  pickupScopeFrom?: string | null;
-  pickupScopeTo?: string | null;
-  pickupScopePickup?: string | null;
 };
 
-export async function StorefrontCakeDetail({
-  cakeId,
-  pickupScopeFrom = null,
-  pickupScopeTo = null,
-  pickupScopePickup = null,
-}: CakeDetailProps) {
+function CakeDetailFallback({
+  availabilityNote,
+  cake,
+  hideAddToOrder,
+}: {
+  availabilityNote?: string | null;
+  cake: StorefrontCake;
+  hideAddToOrder: boolean;
+}) {
+  return (
+    <>
+      <Link
+        className="text-skyline hover:text-ink text-sm font-medium"
+        href="/browse"
+      >
+        ← Browse Cakes
+      </Link>
+      <StorefrontCakeDetailView
+        availabilityNote={availabilityNote}
+        cake={cake}
+        hideAddToOrder={hideAddToOrder}
+        pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
+      />
+    </>
+  );
+}
+
+export async function StorefrontCakeDetail({ cakeId }: CakeDetailProps) {
   const cake = await getBrowsePublishedCakeById(cakeId);
 
   if (!cake) {
     notFound();
   }
 
-  const from = pickupScopeFrom?.trim().slice(0, 10) ?? "";
-  const to = pickupScopeTo?.trim().slice(0, 10) ?? "";
-  const fromCollection =
-    /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to);
+  const hideAddToOrder = cake.currentlyOffered === false;
 
   return (
     <main className="bg-paper mx-auto min-h-screen max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
@@ -38,22 +55,22 @@ export async function StorefrontCakeDetail({
 
       <PreorderInProgressBar />
 
-      <Link
-        className="text-skyline hover:text-ink text-sm font-medium"
-        href={fromCollection ? "/order" : "/browse"}
+      <Suspense
+        fallback={
+          <CakeDetailFallback
+            availabilityNote={cake.availabilityNote}
+            cake={cake}
+            hideAddToOrder={hideAddToOrder}
+          />
+        }
       >
-        {fromCollection ? "← Choose your collection" : "← Browse Cakes"}
-      </Link>
-
-      <StorefrontCakeDetailView
-        availabilityNote={cake.availabilityNote}
-        cake={cake}
-        hideAddToOrder={cake.currentlyOffered === false}
-        pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
-        pickupScopeFrom={pickupScopeFrom}
-        pickupScopePickup={pickupScopePickup}
-        pickupScopeTo={pickupScopeTo}
-      />
+        <CakeDetailPickupScope
+          availabilityNote={cake.availabilityNote}
+          cake={cake}
+          hideAddToOrder={hideAddToOrder}
+          pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
+        />
+      </Suspense>
     </main>
   );
 }

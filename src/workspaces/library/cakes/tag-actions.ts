@@ -13,6 +13,7 @@ import { canManageLibrary } from "@/foundation/navigation/access";
 import { createClient } from "@/lib/supabase/server";
 import type { LibraryActionState } from "@/workspaces/library/action-state";
 import { listCakeTags } from "@/workspaces/library/cakes/queries";
+import { revalidateStorefrontPublishedCakeCache } from "@/workspaces/storefront/catalog/published-cake-cache";
 
 async function requireLibraryStaff() {
   const staff = await requireStaff();
@@ -26,6 +27,7 @@ function revalidateCakeTags() {
   revalidatePath("/library", "layout");
   revalidatePath("/browse");
   revalidatePath("/");
+  revalidateStorefrontPublishedCakeCache();
 }
 
 export async function createCakeTagAction(

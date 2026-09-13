@@ -36,3 +36,24 @@ export async function createClient(options?: CreateClientOptions) {
     },
   });
 }
+
+/**
+ * Cookie-free anon client for public catalogue reads.
+ * Does not call cookies(), so the query can run in a cacheable Server Component path.
+ */
+export function createPublicClient(options?: CreateClientOptions) {
+  const { url, anonKey } = getSupabaseEnv();
+  const timeoutMs = options?.timeoutMs ?? DATA_FETCH_TIMEOUT_MS;
+
+  return createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return [];
+      },
+      setAll() {},
+    },
+    global: {
+      fetch: fetchWithTimeout(timeoutMs),
+    },
+  });
+}

@@ -13,6 +13,7 @@ import {
 import type { LibraryCakePhoto } from "@/types/library-cake";
 import type { LibraryActionState } from "@/workspaces/library/action-state";
 import { getCakeById } from "@/workspaces/library/cakes/queries";
+import { revalidateStorefrontPublishedCakeCache } from "@/workspaces/storefront/catalog/published-cake-cache";
 import {
   LIBRARY_CAKE_PHOTO_BUCKET,
   isMissingCakePhotoSchema,
@@ -46,6 +47,7 @@ function revalidateCake(cakeId: string) {
   revalidatePath(`/library/cakes/${cakeId}/edit`);
   revalidatePath("/browse");
   revalidatePath(`/cakes/${cakeId}`);
+  revalidateStorefrontPublishedCakeCache(cakeId);
 }
 
 function toResolvable(photos: LibraryCakePhoto[]): ResolvableCakePhoto[] {

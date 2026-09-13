@@ -125,16 +125,26 @@ assert.equal(
 const queriesSrc = readSrc("src/workspaces/storefront/catalog/queries.ts");
 const browseFn = queriesSrc.slice(
   queriesSrc.indexOf("export async function listBrowsePublishedCakes"),
-  queriesSrc.indexOf("export async function getBrowsePublishedCakeById"),
+  queriesSrc.indexOf("type LiveCakeCommercialRow"),
 );
 const detailStart = queriesSrc.indexOf(
-  "export async function getBrowsePublishedCakeById",
+  "async function loadLibraryCakeDisplayById",
 );
-const detailNext = queriesSrc.indexOf("\nexport async function", detailStart + 1);
-const detailByIdFn = queriesSrc.slice(
-  detailStart,
-  detailNext === -1 ? undefined : detailNext,
+const detailNext = queriesSrc.indexOf(
+  "\nexport async function listHomepagePopularCakes",
+  detailStart + 1,
 );
+const membershipFn = queriesSrc.slice(
+  queriesSrc.indexOf("async function listCakePublicationCatalogues"),
+  queriesSrc.indexOf("type CurrentCollectionRpcRow"),
+);
+const detailByIdFn =
+  membershipFn +
+  "\n" +
+  queriesSrc.slice(
+    detailStart,
+    detailNext === -1 ? undefined : detailNext,
+  );
 
 assert.match(browseFn, /isCurrentlyCustomerOrderable/);
 assert.match(browseFn, /website_override/);

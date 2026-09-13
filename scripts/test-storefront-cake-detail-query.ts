@@ -214,18 +214,25 @@ assert.equal(
 );
 
 const queriesSrc = readSrc("src/workspaces/storefront/catalog/queries.ts");
+const membershipFn = queriesSrc.slice(
+  queriesSrc.indexOf("async function listCakePublicationCatalogues"),
+  queriesSrc.indexOf("type CurrentCollectionRpcRow"),
+);
 const detailStart = queriesSrc.indexOf(
-  "export async function getBrowsePublishedCakeById",
+  "async function loadLibraryCakeDisplayById",
 );
 assert.ok(detailStart >= 0);
 const detailNext = queriesSrc.indexOf(
-  "\nexport async function",
+  "\nexport async function listHomepagePopularCakes",
   detailStart + 1,
 );
-const detailFn = queriesSrc.slice(
-  detailStart,
-  detailNext === -1 ? undefined : detailNext,
-);
+const detailFn =
+  membershipFn +
+  "\n" +
+  queriesSrc.slice(
+    detailStart,
+    detailNext === -1 ? undefined : detailNext,
+  );
 assert.doesNotMatch(detailFn, /listBrowsePublishedCakes/);
 assert.doesNotMatch(detailFn, /listHomepagePopularCakes/);
 assert.doesNotMatch(detailFn, /\.find\(/);
@@ -235,11 +242,45 @@ assert.match(detailFn, /library_cake_id/);
 assert.match(detailFn, /maybeSingle/);
 assert.match(detailFn, /resolveBrowsePublishedCake/);
 assert.match(detailFn, /withCakePhotoSelectFallback/);
+assert.match(detailFn, /createPublicClient/);
+assert.match(detailFn, /Promise\.all/);
+assert.match(detailFn, /unstable_cache/);
+assert.match(detailFn, /\["browse-cake-display"/);
+assert.match(detailFn, /loadLiveCakeCommercialState/);
+assert.match(detailFn, /listCakePublicationCatalogues/);
+assert.doesNotMatch(detailFn, /\["browse-published-cake-by-id"/);
+assert.doesNotMatch(detailFn, /await createClient\(/);
+assert.doesNotMatch(detailFn, /cookies\(/);
 
 const detailPageSrc = readSrc(
   "src/workspaces/storefront/catalog/StorefrontCakeDetail.tsx",
 );
 assert.match(detailPageSrc, /getBrowsePublishedCakeById/);
 assert.match(detailPageSrc, /notFound\(\)/);
+assert.doesNotMatch(detailPageSrc, /force-dynamic/);
+
+const cardSrc = readSrc(
+  "src/workspaces/storefront/catalog/StorefrontCakeCard.tsx",
+);
+assert.match(cardSrc, /prefetch=\{false\}/);
+
+const popularSrc = readSrc(
+  "src/workspaces/storefront/home/HomePopularCakes.tsx",
+);
+assert.match(popularSrc, /prefetch/);
+
+const homeSrc = readSrc(
+  "src/workspaces/storefront/home/StorefrontHomePage.tsx",
+);
+assert.match(homeSrc, /StorefrontCakePrefetch/);
+assert.match(
+  readSrc("src/workspaces/storefront/home/StorefrontCakePrefetch.tsx"),
+  /prefetch/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/home/StorefrontCakePrefetch.tsx"),
+  /HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX_LG/,
+);
+assert.match(homeSrc, /excludeIds=\{popular\.map/);
 
 console.log("PASS storefront cake detail query");

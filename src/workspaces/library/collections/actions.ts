@@ -14,6 +14,7 @@ import { requireStaff } from "@/foundation/auth/session";
 import { canManageLibrary } from "@/foundation/navigation/access";
 import { toBusinessDateKey } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
+import { revalidateStorefrontPublishedCakeCache } from "@/workspaces/storefront/catalog/published-cake-cache";
 import type { LibraryActionState } from "@/workspaces/library/action-state";
 import {
   CATALOGUE_ARCHIVED_QUERY,
@@ -396,6 +397,7 @@ function revalidateCollectionPaths(collectionId: string) {
   revalidatePath("/order");
   revalidatePath("/browse");
   revalidatePath("/cakes");
+  revalidateStorefrontPublishedCakeCache();
 }
 
 function isMissingDisplayOrderColumn(message: string): boolean {
