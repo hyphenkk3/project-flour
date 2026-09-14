@@ -7,9 +7,10 @@ export const metadata: Metadata = {
 
 type PageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function CakePage({ params }: PageProps) {
+export default async function CakePage({ params, searchParams }: PageProps) {
   const { id } = await params;
-  return <StorefrontCakeDetail cakeId={id} />;
+  return <StorefrontCakeDetail cakeId={id} searchParams={searchParams} />;
 }

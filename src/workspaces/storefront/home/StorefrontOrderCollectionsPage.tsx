@@ -20,8 +20,6 @@ import {
 } from "@/workspaces/storefront/catalog/queries";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
 
-export const dynamic = "force-dynamic";
-
 type CollectionChoiceCardProps = {
   title: string;
   description: string;

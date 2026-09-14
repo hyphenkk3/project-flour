@@ -7,7 +7,7 @@ export function storefrontCakeCacheTag(cakeId: string): string {
   return `storefront-cake-${cakeId}`;
 }
 
-/** Busts cached public cake *display* payloads (photos, copy, categories, tags). Publication, offerability, sizes, and prices are resolved live and do not depend on this cache. */
+/** Busts cached public cake *display* and homepage merchandising payloads. Live orderability, checkout offers, sizes/prices used for ordering, and Fresh Pick stock do not depend on this cache. */
 export function revalidateStorefrontPublishedCakeCache(cakeId?: string): void {
   revalidateTag(STOREFRONT_PUBLISHED_CAKES_CACHE_TAG, "max");
   if (cakeId) {

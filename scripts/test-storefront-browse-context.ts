@@ -69,7 +69,7 @@ const pickupScopeSrc = readSrc(
   "src/workspaces/storefront/catalog/CakeDetailPickupScope.tsx",
 );
 assert.match(pickupScopeSrc, /fromCollection \? "\/order" : "\/browse"/);
-assert.match(pickupScopeSrc, /useSearchParams/);
+assert.doesNotMatch(pickupScopeSrc, /useSearchParams/);
 assert.match(pickupScopeSrc, /getStoredCakeEntryScopeSnapshot/);
 assert.match(pickupScopeSrc, /resolveCakeDetailPickupScope/);
 

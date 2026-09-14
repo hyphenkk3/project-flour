@@ -26,8 +26,7 @@ import {
 } from "@/workspaces/storefront/catalog/queries";
 import { StorefrontHomeLink } from "@/workspaces/storefront/StorefrontBrand";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
-
-export const dynamic = "force-dynamic";
+import { Suspense } from "react";
 
 type StorefrontCollectionCakesPageProps = {
   collectionId: string;
@@ -50,18 +49,49 @@ function scopedCheckoutHref(
   });
 }
 
-export async function StorefrontCollectionCakesPage({
+export function StorefrontCollectionCakesPage({
   collectionId,
 }: StorefrontCollectionCakesPageProps) {
-  const monthly = await getOrderableMonthlyCatalogueById(collectionId);
-  const special = monthly
-    ? null
-    : await getCustomerSpecialCatalogueById(collectionId);
+  return (
+    <main className="bg-paper mx-auto min-h-screen max-w-5xl px-5 py-4 sm:px-6 sm:py-10">
+      <StorefrontHomeLink />
+      <Suspense fallback={<CollectionCakesFallback />}>
+        <CollectionCakesBody collectionId={collectionId} />
+      </Suspense>
+      <PreorderInProgressBar />
+    </main>
+  );
+}
+
+function CollectionCakesFallback() {
+  return (
+    <div aria-busy="true" className="mt-6">
+      <p className="sr-only" role="status">
+        Loading collection
+      </p>
+      <div className="bg-fog mt-3 h-8 w-48 rounded-sm" />
+      <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="bg-fog aspect-[4/3] rounded-[10px]" />
+        <div className="bg-fog aspect-[4/3] rounded-[10px]" />
+        <div className="bg-fog aspect-[4/3] rounded-[10px]" />
+      </div>
+    </div>
+  );
+}
+
+async function CollectionCakesBody({
+  collectionId,
+}: StorefrontCollectionCakesPageProps) {
+  const [monthly, specialCandidate, cakes, specials] = await Promise.all([
+    getOrderableMonthlyCatalogueById(collectionId),
+    getCustomerSpecialCatalogueById(collectionId),
+    listAvailableCakes(collectionId),
+    listCustomerSpecialCatalogues(),
+  ]);
+  const special = monthly ? null : specialCandidate;
   if (!monthly?.month && !special) {
     notFound();
   }
-
-  const cakes = await listAvailableCakes(monthly?.id ?? special!.id);
   const earliest = earliestPickupDateYmd();
   const todayYm =
     businessYearMonth(toBusinessDateKey()) ?? toBusinessDateKey().slice(0, 7);
@@ -93,7 +123,6 @@ export async function StorefrontCollectionCakesPage({
         pickup: suggestedPickup,
       };
     }
-    const specials = await listCustomerSpecialCatalogues();
     if (
       specials.some((item) =>
         monthOverlapsDateRange(monthly.month!, item.startDate, item.endDate),
@@ -143,8 +172,7 @@ export async function StorefrontCollectionCakesPage({
         );
 
   return (
-    <main className="bg-paper mx-auto min-h-screen max-w-5xl px-5 py-4 sm:px-6 sm:py-10">
-      <StorefrontHomeLink />
+    <>
       <Link
         className="text-skyline hover:text-ink mt-3 inline-block text-sm font-medium sm:mt-6"
         href="/order"
@@ -200,7 +228,6 @@ export async function StorefrontCollectionCakesPage({
         </Link>
         <StorefrontHomeLink />
       </div>
-      <PreorderInProgressBar />
-    </main>
+    </>
   );
 }

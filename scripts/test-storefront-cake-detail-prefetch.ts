@@ -61,6 +61,42 @@ assert.deepEqual(calls, [canonical]);
 assert.equal(wasCakeDetailPrefetchedForTests(canonical), true);
 
 resetCakeDetailPrefetchStateForTests();
+const inflightCalls: string[] = [];
+assert.equal(
+  prefetchCanonicalCakeDetail("/cakes/one", () => {
+    inflightCalls.push("one");
+    return new Promise(() => {});
+  }),
+  true,
+);
+assert.equal(
+  prefetchCanonicalCakeDetail("/cakes/two", () => {
+    inflightCalls.push("two");
+    return new Promise(() => {});
+  }),
+  true,
+);
+assert.equal(
+  prefetchCanonicalCakeDetail("/cakes/three", () => {
+    inflightCalls.push("three");
+  }),
+  false,
+  "non-urgent prefetch is capped",
+);
+assert.equal(
+  prefetchCanonicalCakeDetail(
+    "/cakes/three",
+    () => {
+      inflightCalls.push("three-urgent");
+    },
+    { urgent: true },
+  ),
+  true,
+  "pointerdown prefetch is not capped",
+);
+assert.deepEqual(inflightCalls, ["one", "two", "three-urgent"]);
+
+resetCakeDetailPrefetchStateForTests();
 assert.equal(wasCakeDetailPrefetchedForTests(canonical), false);
 assert.equal(
   prefetchCanonicalCakeDetail("/cakes/other", () => {}),
@@ -86,7 +122,9 @@ assert.match(linkSrc, /prefetch=\{intent && canonical \? true : false\}/);
 assert.match(linkSrc, /onPointerDown/);
 assert.match(linkSrc, /onPointerEnter/);
 assert.match(linkSrc, /canonicalCakeDetailPath/);
-assert.doesNotMatch(linkSrc, /router\.prefetch/);
+assert.match(linkSrc, /prefetchCanonicalCakeDetail/);
+assert.match(linkSrc, /router\.prefetch/);
+assert.match(linkSrc, /urgent:\s*true/);
 
 const homeSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontHomePage.tsx",
@@ -118,6 +156,6 @@ const pickupSrc = readSrc(
 );
 assert.match(pickupSrc, /resolveCakeDetailPickupScope/);
 assert.match(pickupSrc, /getStoredCakeEntryScopeSnapshot/);
-assert.match(pickupSrc, /useSearchParams/);
+assert.doesNotMatch(pickupSrc, /useSearchParams/);
 
 console.log("PASS storefront cake detail prefetch");

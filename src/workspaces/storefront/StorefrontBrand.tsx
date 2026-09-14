@@ -11,6 +11,7 @@ export function StorefrontHomeLink() {
       <Link
         className="text-skyline hover:text-ink text-sm font-medium transition-colors duration-200"
         href="/"
+        prefetch
       >
         ← Whitebird
       </Link>

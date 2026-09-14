@@ -56,6 +56,9 @@ import {
 
 export { formatRm, startingPrice };
 
+/** Short merchandising TTL. Not used for checkout offers, orderability, or Fresh Pick stock. */
+const STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS = 30;
+
 type CategoryEmbed = {
   id: string;
   name: string;
@@ -314,6 +317,11 @@ function libraryCakeEmbedSelect(
         ${photoSelect}
       )
   `;
+}
+
+/** Homepage Popular/Featured cards: name, photo, sizes (display price + preorder). */
+function homepageCakeCardEmbedSelect(photoSelect: string): string {
+  return libraryCakeEmbedSelect(photoSelect, false, false, true);
 }
 
 async function withCakePhotoSelectFallback<T>(
@@ -666,7 +674,7 @@ export function unpublishedCataloguePreorderMessage(pickupYmd: string): string {
  * Customer *ordering* must use getStorefrontCollectionForPickupDate.
  */
 export async function getCurrentCollection(): Promise<StorefrontCollection | null> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data, error } = await supabase.rpc("storefront_current_collection");
 
   if (error) {
@@ -681,7 +689,7 @@ export async function getStorefrontCollectionForPickupDate(
 ): Promise<StorefrontCollection | null> {
   const key = pickupYmd.trim().slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data, error } = await supabase.rpc(
     "storefront_collection_for_pickup_date",
     { p_pickup_date: key },
@@ -695,7 +703,7 @@ export async function getStorefrontCollectionForPickupDate(
 export async function listAvailableCakes(
   collectionId: string,
 ): Promise<StorefrontCake[]> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const data = await withCakePhotoSelectFallback((photoSelect, includeAssignments, includeTags) =>
     supabase
       .from("collection_cakes")
@@ -724,19 +732,19 @@ export async function listAvailableCakes(
  * Owner-curated homepage preview for one collection.
  * Empty when nothing is explicitly selected — never infers first-N cakes.
  */
-export async function listHomepageCollectionPreviewCakes(
+async function loadHomepageCollectionPreviewCakes(
   collectionId: string,
 ): Promise<StorefrontCake[]> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   try {
-    const data = await withCakePhotoSelectFallback((photoSelect, includeAssignments, includeTags) =>
+    const data = await withCakePhotoSelectFallback((photoSelect) =>
       supabase
         .from("collection_cakes")
         .select(
           `
       homepage_sort_order,
       library_cakes (
-        ${libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags)}
+        ${homepageCakeCardEmbedSelect(photoSelect)}
       )
     `,
         )
@@ -757,6 +765,24 @@ export async function listHomepageCollectionPreviewCakes(
   } catch {
     return [];
   }
+}
+
+const readCachedHomepageCollectionPreviewCakes = cache((collectionId: string) =>
+  unstable_cache(
+    () => loadHomepageCollectionPreviewCakes(collectionId),
+    ["homepage-collection-preview", collectionId],
+    {
+      revalidate: STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS,
+      tags: [STOREFRONT_PUBLISHED_CAKES_CACHE_TAG],
+    },
+  )(),
+);
+
+export async function listHomepageCollectionPreviewCakes(
+  collectionId: string,
+): Promise<StorefrontCake[]> {
+  if (!collectionId) return [];
+  return readCachedHomepageCollectionPreviewCakes(collectionId);
 }
 
 /**
@@ -879,11 +905,11 @@ type ActiveCollectionRow = {
 };
 
 /** Active monthly catalogues customers may currently preorder from. */
-export async function listOrderableMonthlyCatalogues(
-  todayYmd: string = toBusinessDateKey(),
+async function loadOrderableMonthlyCatalogues(
+  todayYmd: string,
 ): Promise<StorefrontCollection[]> {
   const todayYm = businessYearMonth(todayYmd) ?? todayYmd.slice(0, 7);
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const withOrder = await supabase
     .from("collections")
     .select("id, name, month, purpose, status, display_order")
@@ -912,6 +938,23 @@ export async function listOrderableMonthlyCatalogues(
       ),
     )
     .map((row) => mapCollection(row));
+}
+
+const readCachedOrderableMonthlyCatalogues = cache((todayYmd: string) =>
+  unstable_cache(
+    () => loadOrderableMonthlyCatalogues(todayYmd),
+    ["orderable-monthly-catalogues", todayYmd],
+    {
+      revalidate: STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS,
+      tags: [STOREFRONT_PUBLISHED_CAKES_CACHE_TAG],
+    },
+  )(),
+);
+
+export async function listOrderableMonthlyCatalogues(
+  todayYmd: string = toBusinessDateKey(),
+): Promise<StorefrontCollection[]> {
+  return readCachedOrderableMonthlyCatalogues(todayYmd);
 }
 
 export async function getOrderableMonthlyCatalogueById(
@@ -961,10 +1004,10 @@ function mapSpecialCatalogue(
 }
 
 /** Active special catalogues published as the customer website override. */
-export async function listCustomerSpecialCatalogues(
-  todayYmd: string = toBusinessDateKey(),
+async function loadCustomerSpecialCatalogues(
+  todayYmd: string,
 ): Promise<StorefrontSpecialCatalogue[]> {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const withOrder = await supabase
     .from("collections")
     .select(
@@ -1005,6 +1048,23 @@ export async function listCustomerSpecialCatalogues(
         todayYmd,
       ),
     );
+}
+
+const readCachedCustomerSpecialCatalogues = cache((todayYmd: string) =>
+  unstable_cache(
+    () => loadCustomerSpecialCatalogues(todayYmd),
+    ["customer-special-catalogues", todayYmd],
+    {
+      revalidate: STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS,
+      tags: [STOREFRONT_PUBLISHED_CAKES_CACHE_TAG],
+    },
+  )(),
+);
+
+export async function listCustomerSpecialCatalogues(
+  todayYmd: string = toBusinessDateKey(),
+): Promise<StorefrontSpecialCatalogue[]> {
+  return readCachedCustomerSpecialCatalogues(todayYmd);
 }
 
 export async function getCustomerSpecialCatalogueById(
@@ -1128,8 +1188,14 @@ export async function getHistoricalCatalogueById(
 export async function listBrowsePublishedCakes(
   todayYmd: string = toBusinessDateKey(),
 ): Promise<BrowseStorefrontCake[]> {
+  return readCachedBrowsePublishedCakes(todayYmd);
+}
+
+async function loadBrowsePublishedCakes(
+  todayYmd: string,
+): Promise<BrowseStorefrontCake[]> {
   const todayYm = businessYearMonth(todayYmd) ?? todayYmd.slice(0, 7);
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const withHistoryFlag = await supabase
     .from("collections")
     .select(
@@ -1258,6 +1324,17 @@ export async function listBrowsePublishedCakes(
       };
     });
 }
+
+const readCachedBrowsePublishedCakes = cache((todayYmd: string) =>
+  unstable_cache(
+    () => loadBrowsePublishedCakes(todayYmd),
+    ["browse-published-cakes", todayYmd],
+    {
+      revalidate: STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS,
+      tags: [STOREFRONT_PUBLISHED_CAKES_CACHE_TAG],
+    },
+  )(),
+);
 
 type LiveCakeCommercialRow = {
   id: string;
@@ -1392,6 +1469,24 @@ export function mergeBrowseCakeDisplay(
   };
 }
 
+/** Cached display only — never used to enable Add to Order or show live prices. */
+export function browseCakePreviewFromDisplay(
+  id: string,
+  display: LibraryCakeEmbed | null,
+): BrowseStorefrontCake | null {
+  if (!display) return null;
+  const mapped = mapStorefrontCake({
+    ...display,
+    library_cake_sizes: [],
+  });
+  return {
+    ...mapped,
+    id,
+    currentlyOffered: false,
+    availabilityNote: null,
+  };
+}
+
 async function loadBrowsePublishedCakeById(
   id: string,
   todayYmd: string,
@@ -1436,17 +1531,17 @@ export async function getBrowsePublishedCakeById(
  * Owner-curated homepage Popular Cakes. Explicit Library selection only.
  * Independent of catalogues, sales, and inferred ranking.
  */
-export async function listHomepagePopularCakes(): Promise<StorefrontCake[]> {
+async function loadHomepagePopularCakes(): Promise<StorefrontCake[]> {
   try {
-    const supabase = await createClient();
-    const data = await withCakePhotoSelectFallback((photoSelect, includeAssignments, includeTags) =>
+    const supabase = createPublicClient();
+    const data = await withCakePhotoSelectFallback((photoSelect) =>
       supabase
         .from("library_cakes")
         .select(
           `
       show_in_popular_cakes,
       popular_cakes_sort_order,
-      ${libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags)}
+      ${homepageCakeCardEmbedSelect(photoSelect)}
     `,
         )
         .eq("show_in_popular_cakes", true),
@@ -1487,4 +1582,15 @@ export async function listHomepagePopularCakes(): Promise<StorefrontCake[]> {
   } catch {
     return [];
   }
+}
+
+const readCachedHomepagePopularCakes = cache(() =>
+  unstable_cache(loadHomepagePopularCakes, ["homepage-popular-cakes"], {
+    revalidate: STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS,
+    tags: [STOREFRONT_PUBLISHED_CAKES_CACHE_TAG],
+  })(),
+);
+
+export async function listHomepagePopularCakes(): Promise<StorefrontCake[]> {
+  return readCachedHomepagePopularCakes();
 }

@@ -232,20 +232,22 @@ assert.match(browseSrc, /CakeEntryScopeClearOnUnscopedCakeClick/);
 
 const pageSrc = readSrc("src/app/cakes/[id]/page.tsx");
 assert.match(pageSrc, /params: Promise<\{ id: string \}>/);
-assert.doesNotMatch(pageSrc, /searchParams/);
+assert.match(pageSrc, /searchParams/);
 assert.doesNotMatch(pageSrc, /cookies\(/);
 
 const detailSrc = readSrc(
   "src/workspaces/storefront/catalog/StorefrontCakeDetail.tsx",
 );
 assert.match(detailSrc, /getBrowsePublishedCakeById/);
-assert.doesNotMatch(detailSrc, /searchParams/);
+assert.match(detailSrc, /searchParams/);
 assert.doesNotMatch(detailSrc, /cookies\(/);
+assert.doesNotMatch(detailSrc, /useSearchParams/);
 
 const pickupScopeSrc = readSrc(
   "src/workspaces/storefront/catalog/CakeDetailPickupScope.tsx",
 );
-assert.match(pickupScopeSrc, /useSearchParams/);
+assert.doesNotMatch(pickupScopeSrc, /useSearchParams/);
+assert.match(pickupScopeSrc, /urlFrom/);
 assert.match(pickupScopeSrc, /getStoredCakeEntryScopeSnapshot/);
 assert.match(pickupScopeSrc, /useSyncExternalStore/);
 assert.doesNotMatch(pickupScopeSrc, /cookies\(/);

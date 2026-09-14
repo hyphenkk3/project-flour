@@ -43,11 +43,12 @@ export function wasCakeDetailPrefetchedForTests(path: string): boolean {
 export function prefetchCanonicalCakeDetail(
   href: string,
   prefetch: (path: string) => void | Promise<unknown>,
+  options?: { urgent?: boolean },
 ): boolean {
   const path = canonicalCakeDetailPath(href);
   if (!path) return false;
   if (prefetched.has(path) || inflight.has(path)) return false;
-  if (inflight.size >= MAX_INFLIGHT) return false;
+  if (!options?.urgent && inflight.size >= MAX_INFLIGHT) return false;
 
   inflight.add(path);
   prefetched.add(path);

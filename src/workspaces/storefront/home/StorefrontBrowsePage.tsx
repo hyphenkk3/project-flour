@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { BrowseCakeCatalogue } from "@/workspaces/storefront/catalog/BrowseCakeCatalogue";
 import { CakeEntryScopeClearOnUnscopedCakeClick } from "@/workspaces/storefront/catalog/CakeEntryScopeCapture";
@@ -8,11 +9,34 @@ import {
 } from "@/workspaces/storefront/StorefrontBrand";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
 
-export const dynamic = "force-dynamic";
+function BrowseCatalogueFallback() {
+  return (
+    <section aria-busy="true" className="mt-8">
+      <p className="sr-only" role="status">
+        Loading cakes
+      </p>
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="bg-fog aspect-[4/3] rounded-[10px]" />
+        <div className="bg-fog aspect-[4/3] rounded-[10px]" />
+        <div className="bg-fog aspect-[4/3] rounded-[10px]" />
+      </div>
+    </section>
+  );
+}
 
-export async function StorefrontBrowsePage() {
+async function BrowseCatalogueIsland() {
   const cakes = await listBrowsePublishedCakes();
+  return (
+    <section aria-labelledby="browse-cakes-heading" className="mt-8 sm:mt-8">
+      <h2 className="sr-only" id="browse-cakes-heading">
+        All cakes
+      </h2>
+      <BrowseCakeCatalogue cakes={cakes} />
+    </section>
+  );
+}
 
+export function StorefrontBrowsePage() {
   return (
     <main className="bg-paper mx-auto min-h-screen max-w-5xl px-5 py-4 sm:px-6 sm:py-10">
       <CakeEntryScopeClearOnUnscopedCakeClick />
@@ -40,12 +64,9 @@ export async function StorefrontBrowsePage() {
         </Link>
       </p>
 
-      <section aria-labelledby="browse-cakes-heading" className="mt-8 sm:mt-8">
-        <h2 className="sr-only" id="browse-cakes-heading">
-          All cakes
-        </h2>
-        <BrowseCakeCatalogue cakes={cakes} />
-      </section>
+      <Suspense fallback={<BrowseCatalogueFallback />}>
+        <BrowseCatalogueIsland />
+      </Suspense>
 
       <p className="mt-10">
         <StorefrontHomeLink />

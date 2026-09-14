@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { earliestPickupDateYmd } from "@/engines/business-calendar/pickup-slots";
 import {
@@ -49,8 +50,6 @@ import { HomePopularCakes } from "@/workspaces/storefront/home/HomePopularCakes"
 import { HomeVisitFooter } from "@/workspaces/storefront/home/HomeVisitFooter";
 import { StorefrontCakePrefetch } from "@/workspaces/storefront/home/StorefrontCakePrefetch";
 import type { StorefrontCake } from "@/types/storefront";
-
-export const dynamic = "force-dynamic";
 
 function monthDisplayName(monthYmd: string): string {
   return orderCollectionHeadline(monthYmd).replace(/ \d{4}/, "");
@@ -149,24 +148,115 @@ function featuredCopy(input: {
   };
 }
 
-export async function StorefrontHomePage() {
+function HomeHeroHeader() {
+  return (
+    <header className="px-6 pt-2 sm:px-10 md:pt-5">
+      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 md:grid md:grid-cols-[1fr_auto_1fr] md:items-baseline">
+        <p className={storefrontKickerClass}>Whitebird</p>
+        <div className="md:hidden">
+          <HomeMobileNav />
+        </div>
+        <nav className="text-skyline hidden flex-wrap items-center justify-center gap-x-5 gap-y-1 text-sm md:flex">
+          <Link
+            className="hover:text-ink transition-colors duration-200"
+            href="/order"
+          >
+            Order
+          </Link>
+          <Link
+            className="hover:text-ink transition-colors duration-200"
+            href="/browse"
+          >
+            Browse Cakes
+          </Link>
+          <Link
+            className="hover:text-ink transition-colors duration-200"
+            href="/extra"
+          >
+            Fresh Picks
+          </Link>
+          <Link
+            className="hover:text-ink transition-colors duration-200"
+            href="/faq"
+          >
+            FAQ
+          </Link>
+        </nav>
+        <span aria-hidden="true" className="hidden md:block" />
+      </div>
+    </header>
+  );
+}
+
+function HomeFreshPicksFallback() {
+  return (
+    <section aria-busy="true" className="px-6 pt-4 pb-2 sm:px-10 md:pt-8">
+      <div className="mx-auto w-full max-w-6xl">
+        <p className={storefrontKickerClass}>Last-minute</p>
+        <h2 className="font-display text-ink mt-2 text-[1.45rem] tracking-tight">
+          Fresh Picks
+        </h2>
+        <div className="bg-fog mt-4 h-[5.5rem] w-[5.5rem] rounded-[10px] lg:h-[10.5rem] lg:w-[10.5rem]" />
+      </div>
+    </section>
+  );
+}
+
+function HomeMerchandisingFallback() {
+  return (
+    <section aria-busy="true" className="border-ink/[0.1] mt-8 border-t px-6 pt-8 sm:px-10">
+      <div className="mx-auto flex w-full max-w-6xl gap-3">
+        <div className="bg-fog h-24 w-24 shrink-0 rounded-[10px] lg:h-[10.5rem] lg:w-[10.5rem]" />
+        <div className="bg-fog h-24 w-24 shrink-0 rounded-[10px] lg:h-[10.5rem] lg:w-[10.5rem]" />
+        <div className="bg-fog h-24 w-24 shrink-0 rounded-[10px] lg:h-[10.5rem] lg:w-[10.5rem]" />
+      </div>
+    </section>
+  );
+}
+
+export function StorefrontHomePage() {
+  return (
+    <main className="bg-paper min-h-dvh overflow-x-clip">
+      <StorefrontTheme />
+      <HomeHero header={<HomeHeroHeader />} orderPanel={<HomeOrderSummary />} />
+
+      <Suspense fallback={<HomeFreshPicksFallback />}>
+        <HomeFreshPicksIsland />
+      </Suspense>
+      <CakeEntryScopeClearOnUnscopedCakeClick />
+      <Suspense fallback={<HomeMerchandisingFallback />}>
+        <HomeMerchandisingIsland />
+      </Suspense>
+
+      <PreorderInProgressBar desktopRail={false} />
+    </main>
+  );
+}
+
+async function HomeFreshPicksIsland() {
+  const rawPicks = await listStorefrontAvailableExtra();
+  const picks = sortHomepageFreshPicks(rawPicks);
+  return <HomeFreshPicksSection picks={picks} />;
+}
+
+async function HomeMerchandisingIsland() {
   const todayYmd = toBusinessDateKey();
   const todayYm = businessYearMonth(todayYmd) ?? todayYmd.slice(0, 7);
-  const [rawPicks, popular, catalogues, specials] = await Promise.all([
-    listStorefrontAvailableExtra(),
-    listHomepagePopularCakes(),
+  const popularPromise = listHomepagePopularCakes();
+  const [catalogues, specials] = await Promise.all([
     listOrderableMonthlyCatalogues(todayYmd),
     listCustomerSpecialCatalogues(todayYmd),
   ]);
-  const picks = sortHomepageFreshPicks(rawPicks);
   const selection = selectHomepageFeaturedCollections({
     todayYearMonth: todayYm,
     specials,
     monthlies: catalogues,
   });
 
-  const featured = await Promise.all(
-    selection.featured.map(async (candidate) => {
+  const [popular, featured] = await Promise.all([
+    popularPromise,
+    Promise.all(
+      selection.featured.map(async (candidate) => {
       const monthly =
         catalogues.find((catalogue) => catalogue.id === candidate.id) ?? null;
       const special =
@@ -193,8 +283,9 @@ export async function StorefrontHomePage() {
         cakeScopes: cakeEntries.scopes,
         ...copy,
       };
-    }),
-  );
+      }),
+    ),
+  ]);
 
   const more = selection.more.map((candidate) => {
     const monthly =
@@ -214,51 +305,7 @@ export async function StorefrontHomePage() {
   });
 
   return (
-    <main className="bg-paper min-h-dvh overflow-x-clip">
-      <StorefrontTheme />
-      <HomeHero
-        header={
-          <header className="px-6 pt-2 sm:px-10 md:pt-5">
-            <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 md:grid md:grid-cols-[1fr_auto_1fr] md:items-baseline">
-              <p className={storefrontKickerClass}>Whitebird</p>
-              <div className="md:hidden">
-                <HomeMobileNav />
-              </div>
-              <nav className="text-skyline hidden flex-wrap items-center justify-center gap-x-5 gap-y-1 text-sm md:flex">
-                <Link
-                  className="hover:text-ink transition-colors duration-200"
-                  href="/order"
-                >
-                  Order
-                </Link>
-                <Link
-                  className="hover:text-ink transition-colors duration-200"
-                  href="/browse"
-                >
-                  Browse Cakes
-                </Link>
-                <Link
-                  className="hover:text-ink transition-colors duration-200"
-                  href="/extra"
-                >
-                  Fresh Picks
-                </Link>
-                <Link
-                  className="hover:text-ink transition-colors duration-200"
-                  href="/faq"
-                >
-                  FAQ
-                </Link>
-              </nav>
-              <span aria-hidden="true" className="hidden md:block" />
-            </div>
-          </header>
-        }
-        orderPanel={<HomeOrderSummary />}
-      />
-
-      <HomeFreshPicksSection picks={picks} />
-      <CakeEntryScopeClearOnUnscopedCakeClick />
+    <>
       <StorefrontCakePrefetch
         excludeIds={popular.map((cake) => cake.id)}
         hrefs={featured.flatMap((collection) =>
@@ -292,8 +339,6 @@ export async function StorefrontHomePage() {
           <StorefrontStaffSignIn />
         </div>
       </div>
-
-      <PreorderInProgressBar desktopRail={false} />
-    </main>
+    </>
   );
 }

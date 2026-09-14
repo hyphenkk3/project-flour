@@ -1,8 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef, type PointerEvent, type ReactNode } from "react";
-import { canonicalCakeDetailPath } from "@/workspaces/storefront/catalog/cake-detail-prefetch";
+import {
+  canonicalCakeDetailPath,
+  prefetchCanonicalCakeDetail,
+} from "@/workspaces/storefront/catalog/cake-detail-prefetch";
 
 const HOVER_PREFETCH_MS = 120;
 
@@ -24,10 +28,23 @@ export function StorefrontCakeDetailLink({
   intent,
   onIntent,
 }: StorefrontCakeDetailLinkProps) {
+  const router = useRouter();
   const canonical = canonicalCakeDetailPath(href);
   const hoverTimer = useRef<number>(0);
 
+  function startPrefetch() {
+    if (!canonical) return;
+    prefetchCanonicalCakeDetail(
+      href,
+      (path) => {
+        void router.prefetch(path);
+      },
+      { urgent: true },
+    );
+  }
+
   function markIntent() {
+    startPrefetch();
     if (!canonical || intent) return;
     onIntent();
   }

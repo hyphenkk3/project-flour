@@ -10,7 +10,8 @@ import {
 import { resolveCakePhoto } from "@/engines/menu/cake-photos";
 import { extraCustomerVisiblePickupDates } from "@/engines/extra/extra-pickup";
 import { toBusinessDateKey } from "@/lib/dates";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/server";
+import { connection } from "next/server";
 import { isMissingCakePhotoSchema } from "@/workspaces/library/cakes/photo-storage";
 import {
   mapStorefrontCakePhoto,
@@ -95,7 +96,7 @@ function daysFromRemainingPickup(
 }
 
 async function extraPhotosByCake(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: ReturnType<typeof createPublicClient>,
   cakeIds: string[],
 ): Promise<Map<string, ReturnType<typeof mapStorefrontCakePhoto>[]>> {
   const photosByCake = new Map<
@@ -127,7 +128,7 @@ async function extraPhotosByCake(
 }
 
 async function extraDescriptionsByCake(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: ReturnType<typeof createPublicClient>,
   cakeIds: string[],
 ): Promise<Map<string, string | null>> {
   const descriptions = new Map<string, string | null>();
@@ -144,7 +145,7 @@ async function extraDescriptionsByCake(
 }
 
 async function extraPricesBySize(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: ReturnType<typeof createPublicClient>,
   sizeIds: string[],
 ): Promise<Map<string, number>> {
   const prices = new Map<string, number>();
@@ -164,7 +165,7 @@ async function extraPricesBySize(
 }
 
 async function extraListingDetails(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: ReturnType<typeof createPublicClient>,
   rows: ExtraRow[],
 ): Promise<{
   photosByCake: Map<string, ReturnType<typeof mapStorefrontCakePhoto>[]>;
@@ -242,9 +243,10 @@ function mapPick(
 export async function listStorefrontAvailableExtra(): Promise<
   StorefrontExtraPick[]
 > {
+  await connection();
   try {
     const todayYmd = toBusinessDateKey();
-    const supabase = await createClient();
+    const supabase = createPublicClient();
     const { data, error } = await supabase
       .from("extra_stock")
       .select(
@@ -295,9 +297,10 @@ export async function getStorefrontExtraById(
 ): Promise<StorefrontExtraPick | null> {
   const id = extraId.trim();
   if (!id) return null;
+  await connection();
   try {
     const todayYmd = toBusinessDateKey();
-    const supabase = await createClient();
+    const supabase = createPublicClient();
     const { data, error } = await supabase
       .from("extra_stock")
       .select(

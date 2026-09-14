@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
-import { useSearchParams } from "next/navigation";
 import type { StorefrontCake } from "@/types/storefront";
 import {
   getStoredCakeEntryScopeSnapshot,
@@ -16,6 +15,9 @@ type CakeDetailPickupScopeProps = {
   cake: StorefrontCake;
   hideAddToOrder?: boolean;
   pickupDateNotice?: string | null;
+  urlFrom?: string | null;
+  urlPickup?: string | null;
+  urlTo?: string | null;
 };
 
 export function CakeDetailPickupScope({
@@ -23,8 +25,10 @@ export function CakeDetailPickupScope({
   cake,
   hideAddToOrder = false,
   pickupDateNotice,
+  urlFrom = null,
+  urlPickup = null,
+  urlTo = null,
 }: CakeDetailPickupScopeProps) {
-  const query = useSearchParams();
   const cakeId = cake.id;
   const stored = useSyncExternalStore(
     subscribeCakeEntryScope,
@@ -33,7 +37,14 @@ export function CakeDetailPickupScope({
   );
   const scope = resolveCakeDetailPickupScope({
     cakeId,
-    searchParams: query,
+    searchParams: {
+      get(name: string) {
+        if (name === "from") return urlFrom;
+        if (name === "to") return urlTo;
+        if (name === "pickup") return urlPickup;
+        return null;
+      },
+    },
     stored,
   });
   const fromCollection = scope != null;
@@ -43,6 +54,7 @@ export function CakeDetailPickupScope({
       <Link
         className="text-skyline hover:text-ink text-sm font-medium"
         href={fromCollection ? "/order" : "/browse"}
+        prefetch
       >
         {fromCollection ? "← Choose your collection" : "← Browse Cakes"}
       </Link>

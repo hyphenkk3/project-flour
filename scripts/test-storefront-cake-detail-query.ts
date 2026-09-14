@@ -11,6 +11,7 @@ import { BROWSE_CURRENTLY_UNAVAILABLE_NOTE } from "@/engines/menu/homepage-colle
 import type { StorefrontCake } from "@/types/storefront";
 import { startingPrice } from "@/workspaces/storefront/catalog/pricing";
 import {
+  browseCakePreviewFromDisplay,
   mergeBrowseCakeDisplay,
   resolveBrowsePublishedCake,
   type BrowsePublicationCatalogue,
@@ -200,6 +201,40 @@ assert.equal(mergedDisplay.currentlyOffered, true);
 assert.equal(mergedDisplay.photos[0]?.url, "https://example.com/hero.jpg");
 assert.equal(mergedDisplay.categories[0]?.name, "Cream");
 
+const preview = browseCakePreviewFromDisplay(avocado.id, {
+  id: avocado.id,
+  name: "Stale display name",
+  description: "stale",
+  status: "draft",
+  sharing_guide: null,
+  allergens: [],
+  library_cake_sizes: [
+    {
+      id: "stale-size",
+      cake_id: avocado.id,
+      label: '99"',
+      price: 1,
+      sort_order: 0,
+      preorder_days: 9,
+    },
+  ],
+  library_cake_photos: [
+    {
+      id: "photo-1",
+      image_url: "https://example.com/hero.jpg",
+      alt_text: "Hero",
+      sort_order: 0,
+      cake_size_id: `${avocado.id}-6`,
+      is_default: true,
+    },
+  ],
+  library_cake_category_assignments: [],
+});
+assert.equal(preview?.name, "Stale display name");
+assert.equal(preview?.photos[0]?.url, "https://example.com/hero.jpg");
+assert.equal(preview?.sizes.length, 0, "preview never carries cached prices");
+assert.equal(preview?.currentlyOffered, false, "preview never enables Add to Order");
+
 assert.equal(
   resolveBrowsePublishedCake({
     cake: avocado,
@@ -323,9 +358,12 @@ const detailPageSrc = readSrc(
 assert.match(detailPageSrc, /getBrowsePublishedCakeById/);
 assert.match(detailPageSrc, /getBrowseCakeDisplayById/);
 assert.match(detailPageSrc, /mergeBrowseCakeDisplay/);
+assert.match(detailPageSrc, /browseCakePreviewFromDisplay/);
 assert.match(detailPageSrc, /CakeDetailWithDisplay/);
 assert.match(detailPageSrc, /notFound\(\)/);
+assert.match(detailPageSrc, /hideAddToOrder=\{cake\.currentlyOffered === false\}/);
 assert.doesNotMatch(detailPageSrc, /force-dynamic/);
+assert.doesNotMatch(detailPageSrc, /useSearchParams/);
 
 const cardSrc = readSrc(
   "src/workspaces/storefront/catalog/StorefrontCakeCard.tsx",
@@ -341,7 +379,8 @@ const detailLinkSrc = readSrc(
 assert.match(detailLinkSrc, /prefetch=\{intent && canonical \? true : false\}/);
 assert.match(detailLinkSrc, /canonicalCakeDetailPath/);
 assert.match(detailLinkSrc, /onPointerDown/);
-assert.doesNotMatch(detailLinkSrc, /router\.prefetch/);
+assert.match(detailLinkSrc, /prefetchCanonicalCakeDetail/);
+assert.match(detailLinkSrc, /router\.prefetch/);
 
 const popularSrc = readSrc(
   "src/workspaces/storefront/home/HomePopularCakes.tsx",
@@ -361,5 +400,7 @@ assert.match(
   /HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX_LG/,
 );
 assert.match(homeSrc, /excludeIds=\{popular\.map/);
+assert.match(homeSrc, /Suspense/);
+assert.doesNotMatch(homeSrc, /force-dynamic/);
 
 console.log("PASS storefront cake detail query");
