@@ -28,6 +28,7 @@ import {
   toBusinessDateKey,
 } from "@/lib/dates";
 import { createClient, createPublicClient } from "@/lib/supabase/server";
+import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import {
   STOREFRONT_PUBLISHED_CAKES_CACHE_TAG,
@@ -253,6 +254,7 @@ function libraryCakeEmbedSelect(
   photoSelect: string,
   includeAssignments = true,
   includeTags = true,
+  includeSizes = true,
 ): string {
   const assignmentSelect = includeAssignments
     ? `
@@ -280,6 +282,17 @@ function libraryCakeEmbedSelect(
         )
       ),`
     : "";
+  const sizeSelect = includeSizes
+    ? `
+      library_cake_sizes (
+        id,
+        cake_id,
+        label,
+        price,
+        sort_order,
+        preorder_days
+      ),`
+    : "";
   return `
       id,
       name,
@@ -296,14 +309,7 @@ function libraryCakeEmbedSelect(
       ),
       ${assignmentSelect}
       ${tagSelect}
-      library_cake_sizes (
-        id,
-        cake_id,
-        label,
-        price,
-        sort_order,
-        preorder_days
-      ),
+      ${sizeSelect}
       library_cake_photos (
         ${photoSelect}
       )
@@ -1310,7 +1316,7 @@ async function loadLibraryCakeDisplayById(
         .select(
           `
       show_in_popular_cakes,
-      ${libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags)}
+      ${libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags, false)}
     `,
         )
         .eq("id", id)
@@ -1333,9 +1339,9 @@ async function loadCachedLibraryCakeDisplay(
 }
 
 async function loadLiveCakeCommercialState(
+  supabase: ReturnType<typeof createPublicClient>,
   id: string,
 ): Promise<LiveCakeCommercialRow | null> {
-  const supabase = createPublicClient();
   const withPopular = await supabase
     .from("library_cakes")
     .select(LIVE_CAKE_COMMERCIAL_SELECT)
@@ -1356,32 +1362,57 @@ async function loadLiveCakeCommercialState(
   return (result.data as LiveCakeCommercialRow | null) ?? null;
 }
 
+const readCachedLibraryCakeDisplay = cache(loadCachedLibraryCakeDisplay);
+
+export async function getBrowseCakeDisplayById(
+  id: string,
+): Promise<LibraryCakeEmbed | null> {
+  return readCachedLibraryCakeDisplay(id);
+}
+
+export function mergeBrowseCakeDisplay(
+  cake: BrowseStorefrontCake,
+  display: LibraryCakeEmbed | null,
+): BrowseStorefrontCake {
+  if (!display) return cake;
+  const mapped = mapStorefrontCake({
+    ...display,
+    library_cake_sizes: [],
+  });
+  return {
+    ...cake,
+    photos: mapped.photos,
+    image: mapped.image,
+    categories: mapped.categories,
+    categoryId: mapped.categoryId,
+    categoryName: mapped.categoryName,
+    categoryActive: mapped.categoryActive,
+    categorySortOrder: mapped.categorySortOrder,
+    tags: mapped.tags,
+  };
+}
+
 async function loadBrowsePublishedCakeById(
   id: string,
   todayYmd: string,
 ): Promise<BrowseStorefrontCake | null> {
   const supabase = createPublicClient();
-  const [display, commercial, catalogues] = await Promise.all([
-    loadCachedLibraryCakeDisplay(id),
-    loadLiveCakeCommercialState(id),
+  void readCachedLibraryCakeDisplay(id);
+  const [commercial, catalogues] = await Promise.all([
+    loadLiveCakeCommercialState(supabase, id),
     listCakePublicationCatalogues(supabase, id),
   ]);
   if (!commercial) return null;
 
   const row: LibraryCakeEmbed = {
-    ...(display ?? {
-      id: commercial.id,
-      name: commercial.name,
-      description: commercial.description,
-      status: commercial.status,
-      sharing_guide: commercial.sharing_guide,
-      allergens: commercial.allergens,
-      library_cake_sizes: commercial.library_cake_sizes,
-      library_cake_photos: [],
-    }),
+    id: commercial.id,
+    name: commercial.name,
+    description: commercial.description,
     status: commercial.status,
-    show_in_popular_cakes: commercial.show_in_popular_cakes === true,
+    sharing_guide: commercial.sharing_guide,
+    allergens: commercial.allergens,
     library_cake_sizes: commercial.library_cake_sizes,
+    library_cake_photos: [],
   };
 
   return resolveBrowsePublishedCake({

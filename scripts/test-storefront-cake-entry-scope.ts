@@ -218,8 +218,9 @@ assert.doesNotMatch(popularSrc, /collectionScopedCakeHref/);
 const cardSrc = readSrc(
   "src/workspaces/storefront/catalog/StorefrontCakeCard.tsx",
 );
-assert.match(cardSrc, /prefetch=\{false\}/);
+assert.match(cardSrc, /StorefrontCakeDetailLink/);
 assert.match(cardSrc, /detailHref \?\? `\/cakes\/\$\{cake\.id\}`/);
+assert.doesNotMatch(cardSrc, /prefetch=\{false\}/);
 
 const browseSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontBrowsePage.tsx",

@@ -5,7 +5,12 @@ import { CUSTOMER_PICKUP_DATE_CAKE_NOTICE } from "@/engines/menu/customer-browse
 import { CakeDetailPickupScope } from "@/workspaces/storefront/catalog/CakeDetailPickupScope";
 import { StorefrontCakeDetailView } from "@/workspaces/storefront/catalog/StorefrontCakeDetailView";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
-import { getBrowsePublishedCakeById } from "@/workspaces/storefront/catalog/queries";
+import {
+  getBrowseCakeDisplayById,
+  getBrowsePublishedCakeById,
+  mergeBrowseCakeDisplay,
+  type BrowseStorefrontCake,
+} from "@/workspaces/storefront/catalog/queries";
 import { StorefrontHomeLink } from "@/workspaces/storefront/StorefrontBrand";
 import type { StorefrontCake } from "@/types/storefront";
 
@@ -16,11 +21,9 @@ type CakeDetailProps = {
 function CakeDetailFallback({
   availabilityNote,
   cake,
-  hideAddToOrder,
 }: {
   availabilityNote?: string | null;
   cake: StorefrontCake;
-  hideAddToOrder: boolean;
 }) {
   return (
     <>
@@ -33,10 +36,39 @@ function CakeDetailFallback({
       <StorefrontCakeDetailView
         availabilityNote={availabilityNote}
         cake={cake}
-        hideAddToOrder={hideAddToOrder}
+        hideAddToOrder
         pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
       />
     </>
+  );
+}
+
+async function CakeDetailWithDisplay({
+  cake,
+  hideAddToOrder,
+}: {
+  cake: BrowseStorefrontCake;
+  hideAddToOrder: boolean;
+}) {
+  const display = await getBrowseCakeDisplayById(cake.id);
+  const merged = mergeBrowseCakeDisplay(cake, display);
+
+  return (
+    <Suspense
+      fallback={
+        <CakeDetailFallback
+          availabilityNote={merged.availabilityNote}
+          cake={merged}
+        />
+      }
+    >
+      <CakeDetailPickupScope
+        availabilityNote={merged.availabilityNote}
+        cake={merged}
+        hideAddToOrder={hideAddToOrder}
+        pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
+      />
+    </Suspense>
   );
 }
 
@@ -46,8 +78,6 @@ export async function StorefrontCakeDetail({ cakeId }: CakeDetailProps) {
   if (!cake) {
     notFound();
   }
-
-  const hideAddToOrder = cake.currentlyOffered === false;
 
   return (
     <main className="bg-paper mx-auto min-h-screen max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
@@ -60,15 +90,12 @@ export async function StorefrontCakeDetail({ cakeId }: CakeDetailProps) {
           <CakeDetailFallback
             availabilityNote={cake.availabilityNote}
             cake={cake}
-            hideAddToOrder={hideAddToOrder}
           />
         }
       >
-        <CakeDetailPickupScope
-          availabilityNote={cake.availabilityNote}
+        <CakeDetailWithDisplay
           cake={cake}
-          hideAddToOrder={hideAddToOrder}
-          pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
+          hideAddToOrder={cake.currentlyOffered === false}
         />
       </Suspense>
     </main>

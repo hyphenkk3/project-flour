@@ -1,5 +1,9 @@
-import Link from "next/link";
+"use client";
+
+import { useState } from "react";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
+import { canonicalCakeDetailPath } from "@/workspaces/storefront/catalog/cake-detail-prefetch";
+import { StorefrontCakeDetailLink } from "@/workspaces/storefront/catalog/StorefrontCakeDetailLink";
 import { BROWSE_CURRENTLY_UNAVAILABLE_NOTE } from "@/engines/menu/homepage-collection-preview";
 import type { StorefrontCake } from "@/types/storefront";
 import { AddToOrderButton, type AddToOrderPickupScope } from "@/workspaces/storefront/cart/AddToOrderSheet";
@@ -52,6 +56,13 @@ export function StorefrontCakeCard({
   const imageUrl = cake.image ?? hero?.url ?? null;
   const imageAlt = hero?.altText || cake.name;
   const href = detailHref ?? `/cakes/${cake.id}`;
+  const canonical = canonicalCakeDetailPath(href);
+  const [detailIntent, setDetailIntent] = useState(false);
+
+  function markDetailIntent() {
+    if (!canonical || detailIntent) return;
+    setDetailIntent(true);
+  }
 
   return (
     <article className="flex h-full flex-col overflow-hidden">
@@ -70,11 +81,12 @@ export function StorefrontCakeCard({
             </div>
           )
         ) : (
-          <Link
+          <StorefrontCakeDetailLink
             aria-label={`View ${cake.name}`}
             className="absolute inset-0"
             href={href}
-            prefetch={false}
+            intent={detailIntent}
+            onIntent={markDetailIntent}
           >
             {imageUrl ? (
               <CakePhotoImage
@@ -88,7 +100,7 @@ export function StorefrontCakeCard({
                 Photo coming soon
               </div>
             )}
-          </Link>
+          </StorefrontCakeDetailLink>
         )}
         {preorder && preorderTone ? (
           <p
@@ -110,13 +122,14 @@ export function StorefrontCakeCard({
             {hideOrderCta ? (
               cake.name
             ) : (
-              <Link
+              <StorefrontCakeDetailLink
                 className="hover:text-skyline transition-colors duration-200"
                 href={href}
-                prefetch={false}
+                intent={detailIntent}
+                onIntent={markDetailIntent}
               >
                 {cake.name}
-              </Link>
+              </StorefrontCakeDetailLink>
             )}
           </h2>
           {preorder ? (
@@ -160,13 +173,14 @@ export function StorefrontCakeCard({
                 pickupScope={pickupScope}
               />
             )}
-            <Link
+            <StorefrontCakeDetailLink
               className="text-skyline hover:text-ink hidden min-h-11 w-full items-center justify-center text-sm font-medium transition-colors duration-200 sm:inline-flex"
               href={href}
-              prefetch={false}
+              intent={detailIntent}
+              onIntent={markDetailIntent}
             >
               View cake
-            </Link>
+            </StorefrontCakeDetailLink>
           </div>
         )}
       </div>

@@ -11,6 +11,7 @@ import { BROWSE_CURRENTLY_UNAVAILABLE_NOTE } from "@/engines/menu/homepage-colle
 import type { StorefrontCake } from "@/types/storefront";
 import { startingPrice } from "@/workspaces/storefront/catalog/pricing";
 import {
+  mergeBrowseCakeDisplay,
   resolveBrowsePublishedCake,
   type BrowsePublicationCatalogue,
 } from "@/workspaces/storefront/catalog/queries";
@@ -137,6 +138,68 @@ assert.equal(published?.image, "https://example.com/avocado.jpg");
 assert.equal(published?.categories[0]?.name, "Cream");
 assert.equal(published?.tags?.[0]?.name, "Bestseller");
 
+const coreWithoutDisplay = resolveBrowsePublishedCake({
+  cake: {
+    ...avocado,
+    photos: [],
+    image: null,
+    categories: [],
+    categoryId: null,
+    categoryName: null,
+    tags: [],
+  },
+  cakeStatus: "active",
+  catalogues: [currentMonthly],
+  todayYmd: TODAY,
+});
+assert.equal(coreWithoutDisplay?.currentlyOffered, true);
+assert.equal(coreWithoutDisplay?.sizes[0]?.price, 128);
+const mergedDisplay = mergeBrowseCakeDisplay(coreWithoutDisplay!, {
+  id: avocado.id,
+  name: "Stale display name",
+  description: "stale",
+  status: "draft",
+  sharing_guide: null,
+  allergens: [],
+  library_cake_sizes: [
+    {
+      id: "stale-size",
+      cake_id: avocado.id,
+      label: '99"',
+      price: 1,
+      sort_order: 0,
+      preorder_days: 9,
+    },
+  ],
+  library_cake_photos: [
+    {
+      id: "photo-1",
+      image_url: "https://example.com/hero.jpg",
+      alt_text: "Hero",
+      sort_order: 0,
+      cake_size_id: `${avocado.id}-6`,
+      is_default: true,
+    },
+  ],
+  library_cake_category_assignments: [
+    {
+      category_id: "cat-cream",
+      sort_order: 1,
+      library_cake_categories: {
+        id: "cat-cream",
+        name: "Cream",
+        is_active: true,
+        sort_order: 1,
+      },
+    },
+  ],
+});
+assert.equal(mergedDisplay.name, "Avocado", "live commercial name stays authoritative");
+assert.equal(mergedDisplay.sizes[0]?.price, 128, "live prices stay authoritative");
+assert.equal(mergedDisplay.currentlyOffered, true);
+assert.equal(mergedDisplay.photos[0]?.url, "https://example.com/hero.jpg");
+assert.equal(mergedDisplay.categories[0]?.name, "Cream");
+
 assert.equal(
   resolveBrowsePublishedCake({
     cake: avocado,
@@ -248,6 +311,8 @@ assert.match(detailFn, /unstable_cache/);
 assert.match(detailFn, /\["browse-cake-display"/);
 assert.match(detailFn, /loadLiveCakeCommercialState/);
 assert.match(detailFn, /listCakePublicationCatalogues/);
+assert.match(detailFn, /void readCachedLibraryCakeDisplay/);
+assert.match(detailFn, /mergeBrowseCakeDisplay/);
 assert.doesNotMatch(detailFn, /\["browse-published-cake-by-id"/);
 assert.doesNotMatch(detailFn, /await createClient\(/);
 assert.doesNotMatch(detailFn, /cookies\(/);
@@ -256,13 +321,27 @@ const detailPageSrc = readSrc(
   "src/workspaces/storefront/catalog/StorefrontCakeDetail.tsx",
 );
 assert.match(detailPageSrc, /getBrowsePublishedCakeById/);
+assert.match(detailPageSrc, /getBrowseCakeDisplayById/);
+assert.match(detailPageSrc, /mergeBrowseCakeDisplay/);
+assert.match(detailPageSrc, /CakeDetailWithDisplay/);
 assert.match(detailPageSrc, /notFound\(\)/);
 assert.doesNotMatch(detailPageSrc, /force-dynamic/);
 
 const cardSrc = readSrc(
   "src/workspaces/storefront/catalog/StorefrontCakeCard.tsx",
 );
-assert.match(cardSrc, /prefetch=\{false\}/);
+assert.match(cardSrc, /StorefrontCakeDetailLink/);
+assert.doesNotMatch(cardSrc, /prefetch=\{false\}/);
+assert.match(cardSrc, /detailIntent/);
+assert.equal((cardSrc.match(/onIntent=\{markDetailIntent\}/g) ?? []).length, 3);
+
+const detailLinkSrc = readSrc(
+  "src/workspaces/storefront/catalog/StorefrontCakeDetailLink.tsx",
+);
+assert.match(detailLinkSrc, /prefetch=\{intent && canonical \? true : false\}/);
+assert.match(detailLinkSrc, /canonicalCakeDetailPath/);
+assert.match(detailLinkSrc, /onPointerDown/);
+assert.doesNotMatch(detailLinkSrc, /router\.prefetch/);
 
 const popularSrc = readSrc(
   "src/workspaces/storefront/home/HomePopularCakes.tsx",
