@@ -12,12 +12,18 @@ import {
   storefrontCakeDetailHref,
 } from "@/engines/menu/customer-browse";
 import {
+  CAKE_DETAIL_BROWSE_BACK,
+  CAKE_DETAIL_HOME_BACK,
   CAKE_ENTRY_SCOPE_STORAGE_KEY,
   cakeIdFromHref,
   clearStoredCakeEntryScope,
   parseCakeDetailPickupSearchParams,
+  parseCollectionId,
+  parseCollectionName,
   readStoredCakeEntryScope,
+  resolveCakeDetailBackNav,
   resolveCakeDetailPickupScope,
+  storefrontCollectionCakesPath,
   writeStoredCakeEntryScope,
 } from "@/workspaces/storefront/catalog/cake-entry-scope";
 
@@ -193,10 +199,197 @@ withDraftStorage(() => {
   assert.equal(window.sessionStorage.getItem(CAKE_ENTRY_SCOPE_STORAGE_KEY), null);
 });
 
+const COLLECTION_ID = "aed91d7f-1d7e-4597-88c3-29da661bbae9";
+const COLLECTION_NAME = "September 2026 Collection";
+
+assert.equal(
+  storefrontCollectionCakesPath(COLLECTION_ID),
+  `/order/collection/${COLLECTION_ID}`,
+);
+assert.equal(parseCollectionId(COLLECTION_ID), COLLECTION_ID);
+assert.equal(parseCollectionId("../secret"), null);
+assert.equal(parseCollectionId("short"), null);
+assert.equal(parseCollectionName(COLLECTION_NAME), COLLECTION_NAME);
+assert.equal(parseCollectionName("  September   2026 Collection  "), COLLECTION_NAME);
+assert.equal(parseCollectionName("<script>"), null);
+assert.equal(parseCollectionName(""), null);
+
+assert.deepEqual(
+  resolveCakeDetailBackNav(null),
+  CAKE_DETAIL_HOME_BACK,
+  "direct canonical cake detail falls back to Home",
+);
+assert.deepEqual(
+  resolveCakeDetailBackNav(stored),
+  CAKE_DETAIL_HOME_BACK,
+  "pickup-only stored scope (Home featured) falls back to Home",
+);
+assert.deepEqual(
+  resolveCakeDetailBackNav({
+    ...stored,
+    origin: "home",
+  }),
+  CAKE_DETAIL_HOME_BACK,
+);
+assert.deepEqual(
+  resolveCakeDetailBackNav({
+    ...stored,
+    origin: "browse",
+  }),
+  CAKE_DETAIL_BROWSE_BACK,
+);
+assert.deepEqual(
+  resolveCakeDetailBackNav({
+    ...stored,
+    origin: "collection",
+    collectionId: COLLECTION_ID,
+    collectionName: COLLECTION_NAME,
+  }),
+  {
+    href: `/order/collection/${COLLECTION_ID}`,
+    label: `← ${COLLECTION_NAME}`,
+  },
+);
+assert.deepEqual(
+  resolveCakeDetailBackNav({
+    ...stored,
+    cakeId: "other-cake",
+    origin: "collection",
+    collectionId: COLLECTION_ID,
+    collectionName: COLLECTION_NAME,
+  }),
+  {
+    href: `/order/collection/${COLLECTION_ID}`,
+    label: `← ${COLLECTION_NAME}`,
+  },
+  "back-nav helper does not cake-match; snapshot matching happens at read time",
+);
+
+withDraftStorage(() => {
+  writeStoredCakeEntryScope({
+    cakeId: CAKE_ID,
+    from: "2026-09-01",
+    to: "2026-09-30",
+    pickup: "2026-09-01",
+    origin: "collection",
+    collectionId: COLLECTION_ID,
+    collectionName: COLLECTION_NAME,
+  });
+  const read = readStoredCakeEntryScope(CAKE_ID);
+  assert.equal(read?.origin, "collection");
+  assert.equal(read?.collectionId, COLLECTION_ID);
+  assert.equal(read?.collectionName, COLLECTION_NAME);
+  assert.equal(read?.from, "2026-09-01");
+  assert.deepEqual(resolveCakeDetailBackNav(read), {
+    href: `/order/collection/${COLLECTION_ID}`,
+    label: `← ${COLLECTION_NAME}`,
+  });
+  assert.deepEqual(
+    resolveCakeDetailPickupScope({
+      cakeId: CAKE_ID,
+      searchParams: new URLSearchParams(),
+      stored: read,
+    }),
+    {
+      from: "2026-09-01",
+      to: "2026-09-30",
+      pickup: "2026-09-01",
+    },
+    "collection origin keeps pickup dates",
+  );
+  assert.equal(readStoredCakeEntryScope("other-cake"), null);
+});
+
+withDraftStorage(() => {
+  writeStoredCakeEntryScope({
+    cakeId: CAKE_ID,
+    origin: "browse",
+  });
+  const read = readStoredCakeEntryScope(CAKE_ID);
+  assert.equal(read?.origin, "browse");
+  assert.deepEqual(resolveCakeDetailBackNav(read), CAKE_DETAIL_BROWSE_BACK);
+  assert.equal(
+    resolveCakeDetailPickupScope({
+      cakeId: CAKE_ID,
+      searchParams: new URLSearchParams(),
+      stored: read,
+    }),
+    null,
+    "browse origin does not invent a pickup window",
+  );
+});
+
+withDraftStorage(() => {
+  writeStoredCakeEntryScope({
+    cakeId: CAKE_ID,
+    from: "2026-09-01",
+    to: "2026-09-30",
+    pickup: "2026-09-01",
+    origin: "collection",
+    collectionId: COLLECTION_ID,
+    collectionName: COLLECTION_NAME,
+  });
+  writeStoredCakeEntryScope({
+    cakeId: CAKE_ID,
+    origin: "browse",
+  });
+  const read = readStoredCakeEntryScope(CAKE_ID);
+  assert.equal(read?.origin, "browse");
+  assert.equal(read?.collectionId, undefined);
+  assert.deepEqual(resolveCakeDetailBackNav(read), CAKE_DETAIL_BROWSE_BACK);
+});
+
+withDraftStorage(() => {
+  window.sessionStorage.setItem(
+    CAKE_ENTRY_SCOPE_STORAGE_KEY,
+    "{not-json",
+  );
+  assert.equal(readStoredCakeEntryScope(CAKE_ID), null);
+  assert.deepEqual(resolveCakeDetailBackNav(null), CAKE_DETAIL_HOME_BACK);
+});
+
+withDraftStorage(() => {
+  window.sessionStorage.setItem(
+    CAKE_ENTRY_SCOPE_STORAGE_KEY,
+    JSON.stringify({
+      cakeId: CAKE_ID,
+      from: "2026-09-01",
+      to: "2026-09-30",
+      pickup: "2026-09-01",
+      origin: "collection",
+      collectionId: "../nope",
+      collectionName: COLLECTION_NAME,
+      capturedAt: Date.now(),
+    }),
+  );
+  const read = readStoredCakeEntryScope(CAKE_ID);
+  assert.equal(read?.origin, undefined);
+  assert.equal(read?.from, "2026-09-01");
+  assert.deepEqual(resolveCakeDetailBackNav(read), CAKE_DETAIL_HOME_BACK);
+});
+
+withDraftStorage(() => {
+  window.sessionStorage.setItem(
+    CAKE_ENTRY_SCOPE_STORAGE_KEY,
+    JSON.stringify({
+      cakeId: CAKE_ID,
+      from: "2026-09-01",
+      to: "2026-09-30",
+      pickup: "2026-09-01",
+      origin: "collection",
+      collectionId: COLLECTION_ID,
+      collectionName: COLLECTION_NAME,
+      capturedAt: Date.now() - 31 * 60 * 1000,
+    }),
+  );
+  assert.equal(readStoredCakeEntryScope(CAKE_ID), null);
+});
+
 const homeSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
 assert.match(homeSrc, /storefrontCakeDetailHref/);
 assert.match(homeSrc, /CakeEntryScopeCapture/);
 assert.doesNotMatch(homeSrc, /collectionScopedCakeHref/);
+assert.doesNotMatch(homeSrc, /origin: "collection"/);
 assert.doesNotMatch(homeSrc, /\/cakes\/\$\{[^}]+\}\?/);
 
 const collectionSrc = readSrc(
@@ -204,6 +397,9 @@ const collectionSrc = readSrc(
 );
 assert.match(collectionSrc, /storefrontCakeDetailHref/);
 assert.match(collectionSrc, /CakeEntryScopeCapture/);
+assert.match(collectionSrc, /origin: "collection"/);
+assert.match(collectionSrc, /collectionId/);
+assert.match(collectionSrc, /collectionName: headline/);
 assert.doesNotMatch(collectionSrc, /collectionScopedCakeHref/);
 assert.doesNotMatch(collectionSrc, /\/cakes\/\$\{[^}]+\}\?/);
 
@@ -227,7 +423,8 @@ const browseSrc = readSrc(
 );
 assert.match(browseSrc, /listBrowsePublishedCakes/);
 assert.doesNotMatch(browseSrc, /detailHrefs/);
-assert.doesNotMatch(browseSrc, /CakeEntryScopeCapture scopes/);
+assert.match(browseSrc, /CakeEntryScopeCapture scopes=\{cakeScopes\}/);
+assert.match(browseSrc, /origin: "browse"/);
 assert.match(browseSrc, /CakeEntryScopeClearOnUnscopedCakeClick/);
 
 const pageSrc = readSrc("src/app/cakes/[id]/page.tsx");
@@ -240,6 +437,8 @@ const detailSrc = readSrc(
 );
 assert.match(detailSrc, /getBrowsePublishedCakeById/);
 assert.match(detailSrc, /searchParams/);
+assert.match(detailSrc, /CakeDetailBackNav/);
+assert.doesNotMatch(detailSrc, /StorefrontHomeLink/);
 assert.doesNotMatch(detailSrc, /cookies\(/);
 assert.doesNotMatch(detailSrc, /useSearchParams/);
 
@@ -247,10 +446,21 @@ const pickupScopeSrc = readSrc(
   "src/workspaces/storefront/catalog/CakeDetailPickupScope.tsx",
 );
 assert.doesNotMatch(pickupScopeSrc, /useSearchParams/);
+assert.doesNotMatch(pickupScopeSrc, /fromCollection/);
+assert.doesNotMatch(pickupScopeSrc, /Choose your collection/);
+assert.doesNotMatch(pickupScopeSrc, /Browse Cakes/);
 assert.match(pickupScopeSrc, /urlFrom/);
 assert.match(pickupScopeSrc, /getStoredCakeEntryScopeSnapshot/);
 assert.match(pickupScopeSrc, /useSyncExternalStore/);
 assert.doesNotMatch(pickupScopeSrc, /cookies\(/);
+
+const backNavSrc = readSrc(
+  "src/workspaces/storefront/catalog/CakeDetailBackNav.tsx",
+);
+assert.match(backNavSrc, /resolveCakeDetailBackNav/);
+assert.match(backNavSrc, /getStoredCakeEntryScopeSnapshot/);
+assert.doesNotMatch(backNavSrc, /useSearchParams/);
+assert.doesNotMatch(backNavSrc, /Choose your collection/);
 
 const captureSrc = readSrc(
   "src/workspaces/storefront/catalog/CakeEntryScopeCapture.tsx",

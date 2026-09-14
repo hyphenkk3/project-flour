@@ -1,7 +1,7 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CUSTOMER_PICKUP_DATE_CAKE_NOTICE } from "@/engines/menu/customer-browse";
+import { CakeDetailBackNav } from "@/workspaces/storefront/catalog/CakeDetailBackNav";
 import { CakeDetailPickupScope } from "@/workspaces/storefront/catalog/CakeDetailPickupScope";
 import { StorefrontCakeDetailView } from "@/workspaces/storefront/catalog/StorefrontCakeDetailView";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
@@ -11,7 +11,6 @@ import {
   getBrowsePublishedCakeById,
   mergeBrowseCakeDisplay,
 } from "@/workspaces/storefront/catalog/queries";
-import { StorefrontHomeLink } from "@/workspaces/storefront/StorefrontBrand";
 import type { StorefrontCake } from "@/types/storefront";
 
 type CakeDetailSearchParams = Promise<
@@ -39,21 +38,12 @@ function CakeDetailFallback({
   cake: StorefrontCake;
 }) {
   return (
-    <>
-      <Link
-        className="text-skyline hover:text-ink text-sm font-medium"
-        href="/browse"
-        prefetch
-      >
-        ← Browse Cakes
-      </Link>
-      <StorefrontCakeDetailView
-        availabilityNote={availabilityNote}
-        cake={cake}
-        hideAddToOrder
-        pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
-      />
-    </>
+    <StorefrontCakeDetailView
+      availabilityNote={availabilityNote}
+      cake={cake}
+      hideAddToOrder
+      pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
+    />
   );
 }
 
@@ -141,7 +131,7 @@ export function StorefrontCakeDetail({
 }: CakeDetailProps) {
   return (
     <main className="bg-paper mx-auto min-h-screen max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
-      <StorefrontHomeLink />
+      <CakeDetailBackNav cakeId={cakeId} />
 
       <PreorderInProgressBar />
 

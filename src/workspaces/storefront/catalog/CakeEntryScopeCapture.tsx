@@ -6,12 +6,12 @@ import {
   cakeIdFromHref,
   clearStoredCakeEntryScope,
   writeStoredCakeEntryScope,
-  type CakeEntryPickupScope,
+  type CakeEntryCaptureScope,
 } from "@/workspaces/storefront/catalog/cake-entry-scope";
 
 type CakeEntryScopeCaptureProps = {
   children: ReactNode;
-  scopes: Readonly<Record<string, CakeEntryPickupScope>>;
+  scopes: Readonly<Record<string, CakeEntryCaptureScope>>;
 };
 
 function hrefFromAnchor(anchor: Element): string | null {
@@ -21,7 +21,7 @@ function hrefFromAnchor(anchor: Element): string | null {
 
 function persistScopeFromEvent(
   event: Event,
-  scopes: Readonly<Record<string, CakeEntryPickupScope>>,
+  scopes: Readonly<Record<string, CakeEntryCaptureScope>>,
 ): void {
   const target = event.target;
   if (!(target instanceof Element)) return;
@@ -38,6 +38,9 @@ function persistScopeFromEvent(
     from: scope.from,
     to: scope.to,
     pickup: scope.pickup,
+    origin: scope.origin,
+    collectionId: scope.collectionId,
+    collectionName: scope.collectionName,
   });
 }
 
@@ -73,7 +76,7 @@ export function CakeEntryScopeCapture({
   );
 }
 
-/** Drops leftover collection scope when a non-collection cake link is used. */
+/** Drops leftover collection/browse scope when a non-captured cake link is used. */
 export function CakeEntryScopeClearOnUnscopedCakeClick() {
   useEffect(() => {
     function onClick(event: Event) {
@@ -86,8 +89,12 @@ export function CakeEntryScopeClearOnUnscopedCakeClick() {
       if (anchor.closest(`[${CAKE_ENTRY_SCOPE_MARKER}]`)) return;
       clearStoredCakeEntryScope();
     }
+    document.addEventListener("pointerdown", onClick, true);
     document.addEventListener("click", onClick, true);
-    return () => document.removeEventListener("click", onClick, true);
+    return () => {
+      document.removeEventListener("pointerdown", onClick, true);
+      document.removeEventListener("click", onClick, true);
+    };
   }, []);
   return null;
 }

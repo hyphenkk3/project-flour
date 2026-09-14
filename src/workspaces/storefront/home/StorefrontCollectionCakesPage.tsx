@@ -167,6 +167,9 @@ async function CollectionCakesBody({
               from: scope.from,
               to: scope.to,
               pickup: scope.pickup,
+              origin: "collection" as const,
+              collectionId,
+              collectionName: headline,
             },
           ]),
         );

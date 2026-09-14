@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import type { StorefrontCake } from "@/types/storefront";
 import {
@@ -47,26 +46,16 @@ export function CakeDetailPickupScope({
     },
     stored,
   });
-  const fromCollection = scope != null;
 
   return (
-    <>
-      <Link
-        className="text-skyline hover:text-ink text-sm font-medium"
-        href={fromCollection ? "/order" : "/browse"}
-        prefetch
-      >
-        {fromCollection ? "← Choose your collection" : "← Browse Cakes"}
-      </Link>
-      <StorefrontCakeDetailView
-        availabilityNote={availabilityNote}
-        cake={cake}
-        hideAddToOrder={hideAddToOrder}
-        pickupDateNotice={pickupDateNotice}
-        pickupScopeFrom={scope?.from ?? null}
-        pickupScopePickup={scope?.pickup ?? null}
-        pickupScopeTo={scope?.to ?? null}
-      />
-    </>
+    <StorefrontCakeDetailView
+      availabilityNote={availabilityNote}
+      cake={cake}
+      hideAddToOrder={hideAddToOrder}
+      pickupDateNotice={pickupDateNotice}
+      pickupScopeFrom={scope?.from ?? null}
+      pickupScopePickup={scope?.pickup ?? null}
+      pickupScopeTo={scope?.to ?? null}
+    />
   );
 }

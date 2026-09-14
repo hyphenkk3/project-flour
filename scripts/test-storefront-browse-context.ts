@@ -27,8 +27,9 @@ const browseSrc = readSrc(
 assert.match(browseSrc, /listBrowsePublishedCakes/);
 assert.match(browseSrc, /BrowseCakeCatalogue/);
 assert.match(browseSrc, /href="\/order"/);
+assert.match(browseSrc, /CakeEntryScopeCapture scopes=\{cakeScopes\}/);
+assert.match(browseSrc, /origin: "browse"/);
 assert.match(browseSrc, /CakeEntryScopeClearOnUnscopedCakeClick/);
-assert.doesNotMatch(browseSrc, /CakeEntryScopeCapture scopes/);
 assert.doesNotMatch(browseSrc, /writePreorderDraft/);
 
 const orderSrc = readSrc(
@@ -62,13 +63,17 @@ const detailSrc = readSrc(
 assert.match(detailSrc, /getBrowsePublishedCakeById/);
 assert.match(detailSrc, /StorefrontCakeDetailView/);
 assert.match(detailSrc, /CakeDetailPickupScope/);
+assert.match(detailSrc, /CakeDetailBackNav/);
+assert.doesNotMatch(detailSrc, /StorefrontHomeLink/);
 assert.doesNotMatch(detailSrc, /router\.push/);
 assert.doesNotMatch(detailSrc, /writePreorderDraft/);
 
 const pickupScopeSrc = readSrc(
   "src/workspaces/storefront/catalog/CakeDetailPickupScope.tsx",
 );
-assert.match(pickupScopeSrc, /fromCollection \? "\/order" : "\/browse"/);
+assert.match(pickupScopeSrc, /resolveCakeDetailPickupScope/);
+assert.doesNotMatch(pickupScopeSrc, /fromCollection \? "\/order" : "\/browse"/);
+assert.doesNotMatch(pickupScopeSrc, /Choose your collection/);
 assert.doesNotMatch(pickupScopeSrc, /useSearchParams/);
 assert.match(pickupScopeSrc, /getStoredCakeEntryScopeSnapshot/);
 assert.match(pickupScopeSrc, /resolveCakeDetailPickupScope/);

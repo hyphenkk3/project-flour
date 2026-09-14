@@ -1,7 +1,10 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { BrowseCakeCatalogue } from "@/workspaces/storefront/catalog/BrowseCakeCatalogue";
-import { CakeEntryScopeClearOnUnscopedCakeClick } from "@/workspaces/storefront/catalog/CakeEntryScopeCapture";
+import {
+  CakeEntryScopeCapture,
+  CakeEntryScopeClearOnUnscopedCakeClick,
+} from "@/workspaces/storefront/catalog/CakeEntryScopeCapture";
 import { listBrowsePublishedCakes } from "@/workspaces/storefront/catalog/queries";
 import {
   StorefrontHomeLink,
@@ -26,12 +29,17 @@ function BrowseCatalogueFallback() {
 
 async function BrowseCatalogueIsland() {
   const cakes = await listBrowsePublishedCakes();
+  const cakeScopes = Object.fromEntries(
+    cakes.map((cake) => [cake.id, { origin: "browse" as const }]),
+  );
   return (
     <section aria-labelledby="browse-cakes-heading" className="mt-8 sm:mt-8">
       <h2 className="sr-only" id="browse-cakes-heading">
         All cakes
       </h2>
-      <BrowseCakeCatalogue cakes={cakes} />
+      <CakeEntryScopeCapture scopes={cakeScopes}>
+        <BrowseCakeCatalogue cakes={cakes} />
+      </CakeEntryScopeCapture>
     </section>
   );
 }
