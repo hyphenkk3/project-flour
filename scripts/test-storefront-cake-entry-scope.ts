@@ -25,6 +25,7 @@ import {
   resolveCakeDetailBackNav,
   resolveCakeDetailPickupScope,
   resolveCollectionBrowseRestore,
+  resolveListingBrowseRestore,
   storefrontCollectionCakesPath,
   writeStoredCakeEntryScope,
 } from "@/workspaces/storefront/catalog/cake-entry-scope";
@@ -439,6 +440,101 @@ assert.equal(
 );
 assert.equal(
   resolveCollectionBrowseRestore({
+    stored: { ...stored, origin: "home", scrollY: 1200 },
+    collectionId: COLLECTION_ID,
+  }),
+  null,
+  "home does not inherit collection restoration state",
+);
+
+const homeRestoreStored = {
+  ...stored,
+  origin: "home" as const,
+  scrollY: 1200,
+};
+assert.deepEqual(
+  resolveListingBrowseRestore({
+    stored: homeRestoreStored,
+    origin: "home",
+  }),
+  {
+    cakeId: CAKE_ID,
+    origin: "home",
+    scrollY: 1200,
+  },
+);
+assert.equal(
+  resolveListingBrowseRestore({
+    stored: homeRestoreStored,
+    origin: "browse",
+  }),
+  null,
+  "browse does not consume a home listing position",
+);
+assert.equal(
+  resolveListingBrowseRestore({
+    stored: homeRestoreStored,
+    origin: "collection",
+    collectionId: COLLECTION_ID,
+  }),
+  null,
+  "collection does not consume a home listing position",
+);
+assert.equal(
+  resolveListingBrowseRestore({
+    stored: null,
+    origin: "home",
+  }),
+  null,
+  "direct cake visits do not invent listing restore state",
+);
+
+const browseRestoreStored = {
+  cakeId: CAKE_ID,
+  from: "",
+  to: "",
+  pickup: null,
+  capturedAt: Date.now(),
+  origin: "browse" as const,
+  scrollY: 400,
+};
+assert.deepEqual(
+  resolveListingBrowseRestore({
+    stored: browseRestoreStored,
+    origin: "browse",
+  }),
+  {
+    cakeId: CAKE_ID,
+    origin: "browse",
+    scrollY: 400,
+  },
+);
+assert.equal(
+  resolveListingBrowseRestore({
+    stored: browseRestoreStored,
+    origin: "home",
+  }),
+  null,
+  "home does not consume a browse listing position",
+);
+assert.equal(
+  resolveListingBrowseRestore({
+    stored: collectionRestore,
+    origin: "home",
+  }),
+  null,
+  "home does not consume a collection listing position",
+);
+assert.equal(
+  resolveListingBrowseRestore({
+    stored: collectionRestore,
+    origin: "browse",
+  }),
+  null,
+  "browse does not consume a collection listing position",
+);
+assert.equal(
+  resolveCollectionBrowseRestore({
     stored: {
       ...collectionRestore,
       scrollY: -40,
@@ -486,6 +582,71 @@ withDraftStorage(() => {
       collectionId: COLLECTION_ID,
     }),
     null,
+  );
+});
+
+withDraftStorage(() => {
+  writeStoredCakeEntryScope({
+    cakeId: CAKE_ID,
+    origin: "home",
+    scrollY: 1200,
+  });
+  const home = readStoredCakeEntryScope(CAKE_ID);
+  assert.equal(home?.origin, "home");
+  assert.equal(home?.scrollY, 1200);
+  assert.deepEqual(
+    resolveListingBrowseRestore({ stored: home, origin: "home" }),
+    {
+      cakeId: CAKE_ID,
+      origin: "home",
+      scrollY: 1200,
+    },
+  );
+  assert.equal(
+    resolveCollectionBrowseRestore({
+      stored: home,
+      collectionId: COLLECTION_ID,
+    }),
+    null,
+  );
+  writeStoredCakeEntryScope({
+    cakeId: CAKE_ID,
+    origin: "browse",
+    scrollY: 400,
+  });
+  const browse = readStoredCakeEntryScope(CAKE_ID);
+  assert.equal(browse?.origin, "browse");
+  assert.equal(browse?.scrollY, 400);
+  assert.equal(
+    resolveListingBrowseRestore({ stored: browse, origin: "home" }),
+    null,
+    "later browse capture does not restore onto Home",
+  );
+  assert.deepEqual(
+    resolveListingBrowseRestore({ stored: browse, origin: "browse" }),
+    {
+      cakeId: CAKE_ID,
+      origin: "browse",
+      scrollY: 400,
+    },
+  );
+});
+
+withDraftStorage(() => {
+  writeStoredCakeEntryScope({
+    cakeId: CAKE_ID,
+    from: "2026-09-01",
+    to: "2026-09-30",
+    pickup: "2026-09-01",
+    scrollY: 1200,
+  });
+  const pickupOnly = readStoredCakeEntryScope(CAKE_ID);
+  assert.equal(pickupOnly?.origin, undefined);
+  assert.equal(pickupOnly?.scrollY, undefined);
+  assert.equal(
+    resolveListingBrowseRestore({ stored: pickupOnly, origin: "home" }),
+    null,
+    "pickup-only records without a listing origin do not restore scroll",
   );
 });
 
@@ -543,6 +704,9 @@ withDraftStorage(() => {
 const homeSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
 assert.match(homeSrc, /storefrontCakeDetailHref/);
 assert.match(homeSrc, /CakeEntryScopeCapture/);
+assert.match(homeSrc, /origin: "home"/);
+assert.match(homeSrc, /StorefrontListingRestore origin="home"/);
+assert.match(homeSrc, /<HomePopularCakes cakes=\{popular\} \/>/);
 assert.doesNotMatch(homeSrc, /collectionScopedCakeHref/);
 assert.doesNotMatch(homeSrc, /origin: "collection"/);
 assert.doesNotMatch(homeSrc, /\/cakes\/\$\{[^}]+\}\?/);
@@ -581,6 +745,7 @@ assert.match(browseSrc, /listBrowsePublishedCakes/);
 assert.doesNotMatch(browseSrc, /detailHrefs/);
 assert.match(browseSrc, /CakeEntryScopeCapture scopes=\{cakeScopes\}/);
 assert.match(browseSrc, /origin: "browse"/);
+assert.match(browseSrc, /StorefrontListingRestore origin="browse"/);
 assert.match(browseSrc, /CakeEntryScopeClearOnUnscopedCakeClick/);
 
 const pageSrc = readSrc("src/app/cakes/[id]/page.tsx");
@@ -624,15 +789,28 @@ const captureSrc = readSrc(
 assert.doesNotMatch(captureSrc, /document\.cookie/);
 assert.doesNotMatch(captureSrc, /localStorage/);
 assert.match(captureSrc, /readWindowScrollY/);
-assert.match(captureSrc, /origin === "collection"/);
+assert.match(captureSrc, /scope\.origin \? readWindowScrollY/);
+assert.doesNotMatch(captureSrc, /origin === "collection"/);
+assert.doesNotMatch(captureSrc, /setTimeout/);
 
 const restoreSrc = readSrc(
   "src/workspaces/storefront/catalog/CollectionBrowseRestore.tsx",
 );
-assert.match(restoreSrc, /getStoredCollectionBrowseRestore/);
-assert.match(restoreSrc, /useLayoutEffect/);
-assert.match(restoreSrc, /requestAnimationFrame/);
+assert.match(restoreSrc, /StorefrontListingRestore/);
+assert.match(restoreSrc, /origin="collection"/);
 assert.doesNotMatch(restoreSrc, /setTimeout/);
 assert.doesNotMatch(restoreSrc, /history\.scrollRestoration/);
+
+const listingRestoreSrc = readSrc(
+  "src/workspaces/storefront/catalog/StorefrontListingRestore.tsx",
+);
+assert.match(listingRestoreSrc, /getStoredListingBrowseRestore/);
+assert.match(listingRestoreSrc, /useLayoutEffect/);
+assert.match(listingRestoreSrc, /requestAnimationFrame/);
+assert.match(listingRestoreSrc, /querySelectorAll/);
+assert.match(listingRestoreSrc, /chooseListingRestoreCard/);
+assert.doesNotMatch(listingRestoreSrc, /setTimeout/);
+assert.doesNotMatch(listingRestoreSrc, /history\.scrollRestoration/);
+assert.doesNotMatch(listingRestoreSrc, /localStorage/);
 
 console.log("PASS storefront cake entry scope");

@@ -42,7 +42,7 @@ function persistScopeFromEvent(
     origin: scope.origin,
     collectionId: scope.collectionId,
     collectionName: scope.collectionName,
-    scrollY: scope.origin === "collection" ? readWindowScrollY() : null,
+    scrollY: scope.origin ? readWindowScrollY() : null,
   });
 }
 

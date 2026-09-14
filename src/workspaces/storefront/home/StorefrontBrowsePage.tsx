@@ -5,6 +5,7 @@ import {
   CakeEntryScopeCapture,
   CakeEntryScopeClearOnUnscopedCakeClick,
 } from "@/workspaces/storefront/catalog/CakeEntryScopeCapture";
+import { StorefrontListingRestore } from "@/workspaces/storefront/catalog/StorefrontListingRestore";
 import { listBrowsePublishedCakes } from "@/workspaces/storefront/catalog/queries";
 import {
   StorefrontHomeLink,
@@ -39,6 +40,7 @@ async function BrowseCatalogueIsland() {
       </h2>
       <CakeEntryScopeCapture scopes={cakeScopes}>
         <BrowseCakeCatalogue cakes={cakes} />
+        <StorefrontListingRestore origin="browse" />
       </CakeEntryScopeCapture>
     </section>
   );

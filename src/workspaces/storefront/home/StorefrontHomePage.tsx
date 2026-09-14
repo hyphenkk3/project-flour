@@ -33,7 +33,8 @@ import {
   CakeEntryScopeCapture,
   CakeEntryScopeClearOnUnscopedCakeClick,
 } from "@/workspaces/storefront/catalog/CakeEntryScopeCapture";
-import type { CakeEntryPickupScope } from "@/workspaces/storefront/catalog/cake-entry-scope";
+import type { CakeEntryCaptureScope } from "@/workspaces/storefront/catalog/cake-entry-scope";
+import { StorefrontListingRestore } from "@/workspaces/storefront/catalog/StorefrontListingRestore";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
 import { listStorefrontAvailableExtra } from "@/workspaces/storefront/extra/queries";
 import {
@@ -63,7 +64,7 @@ function collectionCakeEntries(input: {
   cakes: readonly StorefrontCake[];
 }): {
   hrefs: Record<string, string>;
-  scopes: Record<string, CakeEntryPickupScope>;
+  scopes: Record<string, CakeEntryCaptureScope>;
 } {
   const earliest = earliestPickupDateYmd();
   let from = "";
@@ -84,7 +85,12 @@ function collectionCakeEntries(input: {
     return { hrefs: {}, scopes: {} };
   }
 
-  const scope: CakeEntryPickupScope = { from, to, pickup };
+  const scope: CakeEntryCaptureScope = {
+    from,
+    to,
+    pickup,
+    origin: "home",
+  };
   return {
     hrefs: Object.fromEntries(
       input.cakes.map((cake) => [cake.id, storefrontCakeDetailHref(cake.id)]),
@@ -328,7 +334,14 @@ async function HomeMerchandisingIsland() {
           />
         </CakeEntryScopeCapture>
       ))}
-      <HomePopularCakes cakes={popular} />
+      <CakeEntryScopeCapture
+        scopes={Object.fromEntries(
+          popular.map((cake) => [cake.id, { origin: "home" as const }]),
+        )}
+      >
+        <HomePopularCakes cakes={popular} />
+      </CakeEntryScopeCapture>
+      <StorefrontListingRestore origin="home" />
       <HomeMoreCollections items={more} />
       <HomeBrowseAllCakes />
 

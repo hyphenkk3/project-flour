@@ -45,6 +45,13 @@ export type CakeEntryScopeRecord = CakeEntryPickupScope & {
   scrollY?: number;
 };
 
+export type ListingBrowseRestore = {
+  cakeId: string;
+  origin: CakeEntryOriginKind;
+  collectionId?: string;
+  scrollY: number | null;
+};
+
 export type CollectionBrowseRestore = {
   cakeId: string;
   collectionId: string;
@@ -212,23 +219,48 @@ export function resolveCakeDetailBackNav(
   return CAKE_DETAIL_HOME_BACK;
 }
 
-export function resolveCollectionBrowseRestore(input: {
+export function resolveListingBrowseRestore(input: {
   stored: CakeEntryScopeRecord | null;
-  collectionId: string;
+  origin: CakeEntryOriginKind;
+  collectionId?: string;
   cakeId?: string;
-}): CollectionBrowseRestore | null {
+}): ListingBrowseRestore | null {
   const stored = input.stored;
-  const collectionId = parseCollectionId(input.collectionId);
-  if (!stored || !collectionId) return null;
-  if (stored.origin !== "collection") return null;
-  if (stored.collectionId !== collectionId) return null;
+  if (!stored) return null;
+  if (stored.origin !== input.origin) return null;
+  if (input.origin === "collection") {
+    const collectionId = parseCollectionId(input.collectionId);
+    if (!collectionId || stored.collectionId !== collectionId) return null;
+  }
   if (input.cakeId && stored.cakeId !== input.cakeId) return null;
   const scrollY = parseCollectionScrollY(stored.scrollY ?? null);
   if (scrollY == null && !stored.cakeId) return null;
   return {
     cakeId: stored.cakeId,
-    collectionId,
+    origin: input.origin,
+    ...(input.origin === "collection" && stored.collectionId
+      ? { collectionId: stored.collectionId }
+      : {}),
     scrollY,
+  };
+}
+
+export function resolveCollectionBrowseRestore(input: {
+  stored: CakeEntryScopeRecord | null;
+  collectionId: string;
+  cakeId?: string;
+}): CollectionBrowseRestore | null {
+  const listing = resolveListingBrowseRestore({
+    stored: input.stored,
+    origin: "collection",
+    collectionId: input.collectionId,
+    cakeId: input.cakeId,
+  });
+  if (!listing?.collectionId) return null;
+  return {
+    cakeId: listing.cakeId,
+    collectionId: listing.collectionId,
+    scrollY: listing.scrollY,
   };
 }
 
@@ -329,6 +361,17 @@ export function getStoredCakeEntryScopeSnapshot(
   return record;
 }
 
+export function getStoredListingBrowseRestore(input: {
+  origin: CakeEntryOriginKind;
+  collectionId?: string;
+}): ListingBrowseRestore | null {
+  return resolveListingBrowseRestore({
+    stored: peekStoredRecord(),
+    origin: input.origin,
+    collectionId: input.collectionId,
+  });
+}
+
 export function getStoredCollectionBrowseRestore(
   collectionId: string,
 ): CollectionBrowseRestore | null {
@@ -360,10 +403,9 @@ export function writeStoredCakeEntryScope(input: {
   );
   if (!hasPickup && !originFields.origin) return;
   const pickupRaw = readYmd(input.pickup ?? "");
-  const scrollY =
-    originFields.origin === "collection"
-      ? parseCollectionScrollY(input.scrollY ?? null)
-      : null;
+  const scrollY = originFields.origin
+    ? parseCollectionScrollY(input.scrollY ?? null)
+    : null;
   const record: CakeEntryScopeRecord = {
     cakeId: input.cakeId,
     from: hasPickup ? from : "",
