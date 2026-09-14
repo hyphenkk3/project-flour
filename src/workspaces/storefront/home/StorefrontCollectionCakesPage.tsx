@@ -18,6 +18,7 @@ import {
 import { businessYearMonth, toBusinessDateKey } from "@/lib/dates";
 import { BrowseCakeCatalogue } from "@/workspaces/storefront/catalog/BrowseCakeCatalogue";
 import { CakeEntryScopeCapture } from "@/workspaces/storefront/catalog/CakeEntryScopeCapture";
+import { CollectionBrowseRestore } from "@/workspaces/storefront/catalog/CollectionBrowseRestore";
 import {
   getCustomerSpecialCatalogueById,
   getOrderableMonthlyCatalogueById,
@@ -213,6 +214,7 @@ async function CollectionCakesBody({
                 : null
             }
           />
+          <CollectionBrowseRestore collectionId={collectionId} />
         </CakeEntryScopeCapture>
       </section>
 

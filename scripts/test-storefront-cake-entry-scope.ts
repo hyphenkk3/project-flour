@@ -20,9 +20,11 @@ import {
   parseCakeDetailPickupSearchParams,
   parseCollectionId,
   parseCollectionName,
+  parseCollectionScrollY,
   readStoredCakeEntryScope,
   resolveCakeDetailBackNav,
   resolveCakeDetailPickupScope,
+  resolveCollectionBrowseRestore,
   storefrontCollectionCakesPath,
   writeStoredCakeEntryScope,
 } from "@/workspaces/storefront/catalog/cake-entry-scope";
@@ -385,6 +387,159 @@ withDraftStorage(() => {
   assert.equal(readStoredCakeEntryScope(CAKE_ID), null);
 });
 
+assert.equal(parseCollectionScrollY(420), 420);
+assert.equal(parseCollectionScrollY(0), 0);
+assert.equal(parseCollectionScrollY(-1), null);
+assert.equal(parseCollectionScrollY(Number.NaN), null);
+assert.equal(parseCollectionScrollY("420"), null);
+
+const collectionRestore = {
+  ...stored,
+  origin: "collection" as const,
+  collectionId: COLLECTION_ID,
+  collectionName: COLLECTION_NAME,
+  scrollY: 640,
+};
+
+assert.deepEqual(
+  resolveCollectionBrowseRestore({
+    stored: collectionRestore,
+    collectionId: COLLECTION_ID,
+  }),
+  {
+    cakeId: CAKE_ID,
+    collectionId: COLLECTION_ID,
+    scrollY: 640,
+  },
+);
+assert.equal(
+  resolveCollectionBrowseRestore({
+    stored: collectionRestore,
+    collectionId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  }),
+  null,
+  "wrong collection does not consume the position",
+);
+assert.equal(
+  resolveCollectionBrowseRestore({
+    stored: collectionRestore,
+    collectionId: COLLECTION_ID,
+    cakeId: "other-cake",
+  }),
+  null,
+  "wrong cake does not consume the position",
+);
+assert.equal(
+  resolveCollectionBrowseRestore({
+    stored: { ...stored, origin: "browse", scrollY: 640 },
+    collectionId: COLLECTION_ID,
+  }),
+  null,
+  "browse does not inherit collection restoration state",
+);
+assert.equal(
+  resolveCollectionBrowseRestore({
+    stored: {
+      ...collectionRestore,
+      scrollY: -40,
+    },
+    collectionId: COLLECTION_ID,
+  })?.scrollY,
+  null,
+  "malformed scrollY is ignored; cake id can still be used as an anchor",
+);
+
+withDraftStorage(() => {
+  writeStoredCakeEntryScope({
+    cakeId: CAKE_ID,
+    from: "2026-09-01",
+    to: "2026-09-30",
+    pickup: "2026-09-01",
+    origin: "collection",
+    collectionId: COLLECTION_ID,
+    collectionName: COLLECTION_NAME,
+    scrollY: 640,
+  });
+  const read = readStoredCakeEntryScope(CAKE_ID);
+  assert.equal(read?.scrollY, 640);
+  assert.equal(read?.collectionId, COLLECTION_ID);
+  assert.deepEqual(
+    resolveCollectionBrowseRestore({
+      stored: read,
+      collectionId: COLLECTION_ID,
+    }),
+    {
+      cakeId: CAKE_ID,
+      collectionId: COLLECTION_ID,
+      scrollY: 640,
+    },
+  );
+  writeStoredCakeEntryScope({
+    cakeId: CAKE_ID,
+    origin: "browse",
+  });
+  const browse = readStoredCakeEntryScope(CAKE_ID);
+  assert.equal(browse?.scrollY, undefined);
+  assert.equal(
+    resolveCollectionBrowseRestore({
+      stored: browse,
+      collectionId: COLLECTION_ID,
+    }),
+    null,
+  );
+});
+
+withDraftStorage(() => {
+  window.sessionStorage.setItem(
+    CAKE_ENTRY_SCOPE_STORAGE_KEY,
+    JSON.stringify({
+      cakeId: CAKE_ID,
+      from: "2026-09-01",
+      to: "2026-09-30",
+      pickup: "2026-09-01",
+      origin: "collection",
+      collectionId: COLLECTION_ID,
+      collectionName: COLLECTION_NAME,
+      scrollY: 640,
+      capturedAt: Date.now() - 31 * 60 * 1000,
+    }),
+  );
+  assert.equal(readStoredCakeEntryScope(CAKE_ID), null);
+  assert.equal(
+    resolveCollectionBrowseRestore({
+      stored: readStoredCakeEntryScope(CAKE_ID),
+      collectionId: COLLECTION_ID,
+    }),
+    null,
+  );
+});
+
+withDraftStorage(() => {
+  window.sessionStorage.setItem(
+    CAKE_ENTRY_SCOPE_STORAGE_KEY,
+    JSON.stringify({
+      cakeId: CAKE_ID,
+      from: "2026-09-01",
+      to: "2026-09-30",
+      pickup: "2026-09-01",
+      origin: "collection",
+      collectionId: COLLECTION_ID,
+      collectionName: COLLECTION_NAME,
+      scrollY: "640",
+      capturedAt: Date.now(),
+    }),
+  );
+  const read = readStoredCakeEntryScope(CAKE_ID);
+  assert.equal(read?.scrollY, undefined);
+  assert.equal(
+    resolveCollectionBrowseRestore({
+      stored: read,
+      collectionId: COLLECTION_ID,
+    })?.scrollY,
+    null,
+  );
+});
+
 const homeSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
 assert.match(homeSrc, /storefrontCakeDetailHref/);
 assert.match(homeSrc, /CakeEntryScopeCapture/);
@@ -400,6 +555,7 @@ assert.match(collectionSrc, /CakeEntryScopeCapture/);
 assert.match(collectionSrc, /origin: "collection"/);
 assert.match(collectionSrc, /collectionId/);
 assert.match(collectionSrc, /collectionName: headline/);
+assert.match(collectionSrc, /CollectionBrowseRestore/);
 assert.doesNotMatch(collectionSrc, /collectionScopedCakeHref/);
 assert.doesNotMatch(collectionSrc, /\/cakes\/\$\{[^}]+\}\?/);
 
@@ -467,5 +623,16 @@ const captureSrc = readSrc(
 );
 assert.doesNotMatch(captureSrc, /document\.cookie/);
 assert.doesNotMatch(captureSrc, /localStorage/);
+assert.match(captureSrc, /readWindowScrollY/);
+assert.match(captureSrc, /origin === "collection"/);
+
+const restoreSrc = readSrc(
+  "src/workspaces/storefront/catalog/CollectionBrowseRestore.tsx",
+);
+assert.match(restoreSrc, /getStoredCollectionBrowseRestore/);
+assert.match(restoreSrc, /useLayoutEffect/);
+assert.match(restoreSrc, /requestAnimationFrame/);
+assert.doesNotMatch(restoreSrc, /setTimeout/);
+assert.doesNotMatch(restoreSrc, /history\.scrollRestoration/);
 
 console.log("PASS storefront cake entry scope");

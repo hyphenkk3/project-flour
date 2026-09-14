@@ -17,6 +17,7 @@ const MAX_AGE_MS = 30 * 60 * 1000;
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const COLLECTION_ID = /^[A-Za-z0-9_-]{8,80}$/;
 const COLLECTION_NAME_MAX = 80;
+const MAX_COLLECTION_SCROLL_Y = 200_000;
 
 export type CakeEntryOriginKind = "browse" | "collection" | "home";
 
@@ -41,6 +42,13 @@ export type CakeEntryScopeRecord = CakeEntryPickupScope & {
   origin?: CakeEntryOriginKind;
   collectionId?: string;
   collectionName?: string;
+  scrollY?: number;
+};
+
+export type CollectionBrowseRestore = {
+  cakeId: string;
+  collectionId: string;
+  scrollY: number | null;
 };
 
 export type CakeDetailBackNav = {
@@ -82,6 +90,32 @@ export function parseCollectionName(
 
 export function storefrontCollectionCakesPath(collectionId: string): string {
   return `/order/collection/${collectionId}`;
+}
+
+export function parseCollectionScrollY(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  if (value < 0 || value > MAX_COLLECTION_SCROLL_Y) return null;
+  return value;
+}
+
+export function readWindowScrollY(): number | null {
+  if (typeof window === "undefined") return null;
+  const scrolling = document.scrollingElement;
+  const y = window.scrollY || scrolling?.scrollTop || 0;
+  return parseCollectionScrollY(y) ?? parseCollectionScrollY(0);
+}
+
+export function writeWindowScrollY(scrollY: number): void {
+  if (typeof window === "undefined") return;
+  const y = parseCollectionScrollY(scrollY);
+  if (y == null) return;
+  const scrolling = document.scrollingElement;
+  if (scrolling) scrolling.scrollTop = y;
+  window.scrollTo(0, y);
+}
+
+export function collectionCakeAnchorSelector(cakeId: string): string {
+  return `a[href="/cakes/${cakeId}"]`;
 }
 
 export function cakeIdFromHref(href: string): string | null {
@@ -178,6 +212,26 @@ export function resolveCakeDetailBackNav(
   return CAKE_DETAIL_HOME_BACK;
 }
 
+export function resolveCollectionBrowseRestore(input: {
+  stored: CakeEntryScopeRecord | null;
+  collectionId: string;
+  cakeId?: string;
+}): CollectionBrowseRestore | null {
+  const stored = input.stored;
+  const collectionId = parseCollectionId(input.collectionId);
+  if (!stored || !collectionId) return null;
+  if (stored.origin !== "collection") return null;
+  if (stored.collectionId !== collectionId) return null;
+  if (input.cakeId && stored.cakeId !== input.cakeId) return null;
+  const scrollY = parseCollectionScrollY(stored.scrollY ?? null);
+  if (scrollY == null && !stored.cakeId) return null;
+  return {
+    cakeId: stored.cakeId,
+    collectionId,
+    scrollY,
+  };
+}
+
 function parseRecord(raw: string): CakeEntryScopeRecord | null {
   try {
     const data = JSON.parse(raw) as Partial<CakeEntryScopeRecord>;
@@ -196,6 +250,7 @@ function parseRecord(raw: string): CakeEntryScopeRecord | null {
       data.collectionName,
     );
     if (!isYmd(from) && !isYmd(to) && !originFields.origin) return null;
+    const scrollY = parseCollectionScrollY(data.scrollY);
     return {
       cakeId: data.cakeId,
       from,
@@ -203,6 +258,7 @@ function parseRecord(raw: string): CakeEntryScopeRecord | null {
       pickup,
       capturedAt: data.capturedAt,
       ...originFields,
+      ...(scrollY == null ? {} : { scrollY }),
     };
   } catch {
     return null;
@@ -273,6 +329,15 @@ export function getStoredCakeEntryScopeSnapshot(
   return record;
 }
 
+export function getStoredCollectionBrowseRestore(
+  collectionId: string,
+): CollectionBrowseRestore | null {
+  return resolveCollectionBrowseRestore({
+    stored: peekStoredRecord(),
+    collectionId,
+  });
+}
+
 export function writeStoredCakeEntryScope(input: {
   cakeId: string;
   from?: string;
@@ -281,6 +346,7 @@ export function writeStoredCakeEntryScope(input: {
   origin?: CakeEntryOriginKind;
   collectionId?: string;
   collectionName?: string;
+  scrollY?: number | null;
 }): void {
   if (typeof window === "undefined") return;
   if (!input.cakeId) return;
@@ -294,6 +360,10 @@ export function writeStoredCakeEntryScope(input: {
   );
   if (!hasPickup && !originFields.origin) return;
   const pickupRaw = readYmd(input.pickup ?? "");
+  const scrollY =
+    originFields.origin === "collection"
+      ? parseCollectionScrollY(input.scrollY ?? null)
+      : null;
   const record: CakeEntryScopeRecord = {
     cakeId: input.cakeId,
     from: hasPickup ? from : "",
@@ -301,6 +371,7 @@ export function writeStoredCakeEntryScope(input: {
     pickup: hasPickup && isYmd(pickupRaw) ? pickupRaw : null,
     capturedAt: Date.now(),
     ...originFields,
+    ...(scrollY == null ? {} : { scrollY }),
   };
   try {
     window.sessionStorage.setItem(

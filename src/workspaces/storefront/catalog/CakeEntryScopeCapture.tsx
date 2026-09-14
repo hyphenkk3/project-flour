@@ -5,6 +5,7 @@ import {
   CAKE_ENTRY_SCOPE_MARKER,
   cakeIdFromHref,
   clearStoredCakeEntryScope,
+  readWindowScrollY,
   writeStoredCakeEntryScope,
   type CakeEntryCaptureScope,
 } from "@/workspaces/storefront/catalog/cake-entry-scope";
@@ -41,6 +42,7 @@ function persistScopeFromEvent(
     origin: scope.origin,
     collectionId: scope.collectionId,
     collectionName: scope.collectionName,
+    scrollY: scope.origin === "collection" ? readWindowScrollY() : null,
   });
 }
 
