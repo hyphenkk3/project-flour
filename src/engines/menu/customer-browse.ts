@@ -656,6 +656,11 @@ export function collectionScopedCheckoutHref(input: {
   return `/order/checkout?${params.toString()}`;
 }
 
+export function storefrontCakeDetailHref(cakeId: string): string {
+  return `/cakes/${cakeId}`;
+}
+
+/** Shared/bookmarked collection cake URLs. In-app collection links stay canonical. */
 export function collectionScopedCakeHref(input: {
   cakeId: string;
   pickupDate: string | null;
@@ -668,5 +673,5 @@ export function collectionScopedCakeHref(input: {
   }
   params.set("from", input.from);
   params.set("to", input.to);
-  return `/cakes/${input.cakeId}?${params.toString()}`;
+  return `${storefrontCakeDetailHref(input.cakeId)}?${params.toString()}`;
 }

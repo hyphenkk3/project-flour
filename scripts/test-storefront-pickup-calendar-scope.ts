@@ -215,6 +215,11 @@ assert.match(draftSrc, /pickupScopeFrom/);
 const collectionSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontCollectionCakesPage.tsx",
 );
-assert.match(collectionSrc, /collectionScopedCakeHref/);
+assert.match(collectionSrc, /storefrontCakeDetailHref/);
+assert.doesNotMatch(collectionSrc, /collectionScopedCakeHref/);
+
+const scopedHrefSrc = readSrc("src/engines/menu/customer-browse.ts");
+assert.match(scopedHrefSrc, /export function collectionScopedCakeHref/);
+assert.match(scopedHrefSrc, /export function storefrontCakeDetailHref/);
 
 console.log("PASS storefront pickup calendar scope");

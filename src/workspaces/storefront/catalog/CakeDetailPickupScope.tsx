@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useSyncExternalStore } from "react";
 import { useSearchParams } from "next/navigation";
 import type { StorefrontCake } from "@/types/storefront";
+import {
+  getStoredCakeEntryScopeSnapshot,
+  resolveCakeDetailPickupScope,
+  subscribeCakeEntryScope,
+} from "@/workspaces/storefront/catalog/cake-entry-scope";
 import { StorefrontCakeDetailView } from "@/workspaces/storefront/catalog/StorefrontCakeDetailView";
-
-function readYmd(value: string | null): string {
-  return value?.trim().slice(0, 10) ?? "";
-}
 
 type CakeDetailPickupScopeProps = {
   availabilityNote?: string | null;
@@ -23,11 +25,18 @@ export function CakeDetailPickupScope({
   pickupDateNotice,
 }: CakeDetailPickupScopeProps) {
   const query = useSearchParams();
-  const from = readYmd(query.get("from"));
-  const to = readYmd(query.get("to"));
-  const pickup = readYmd(query.get("pickup"));
-  const fromCollection =
-    /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to);
+  const cakeId = cake.id;
+  const stored = useSyncExternalStore(
+    subscribeCakeEntryScope,
+    () => getStoredCakeEntryScopeSnapshot(cakeId),
+    () => null,
+  );
+  const scope = resolveCakeDetailPickupScope({
+    cakeId,
+    searchParams: query,
+    stored,
+  });
+  const fromCollection = scope != null;
 
   return (
     <>
@@ -42,9 +51,9 @@ export function CakeDetailPickupScope({
         cake={cake}
         hideAddToOrder={hideAddToOrder}
         pickupDateNotice={pickupDateNotice}
-        pickupScopeFrom={from || null}
-        pickupScopePickup={pickup || null}
-        pickupScopeTo={to || null}
+        pickupScopeFrom={scope?.from ?? null}
+        pickupScopePickup={scope?.pickup ?? null}
+        pickupScopeTo={scope?.to ?? null}
       />
     </>
   );

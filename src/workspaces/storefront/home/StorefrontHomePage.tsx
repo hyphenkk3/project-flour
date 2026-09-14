@@ -4,10 +4,10 @@ import {
   SPECIAL_MENU_DESCRIPTION,
   SPECIAL_MENU_HEADING,
   catalogueMonthPickupBounds,
-  collectionScopedCakeHref,
   customerSpecialMenuPeriodLabel,
   orderCollectionHeadline,
   orderCollectionPickupCopy,
+  storefrontCakeDetailHref,
   suggestedPickupDateForCatalogueMonth,
 } from "@/engines/menu/customer-browse";
 import { sortHomepageFreshPicks } from "@/engines/extra/customer-fresh-picks";
@@ -28,6 +28,11 @@ import {
   listOrderableMonthlyCatalogues,
   type StorefrontSpecialCatalogue,
 } from "@/workspaces/storefront/catalog/queries";
+import {
+  CakeEntryScopeCapture,
+  CakeEntryScopeClearOnUnscopedCakeClick,
+} from "@/workspaces/storefront/catalog/CakeEntryScopeCapture";
+import type { CakeEntryPickupScope } from "@/workspaces/storefront/catalog/cake-entry-scope";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
 import { listStorefrontAvailableExtra } from "@/workspaces/storefront/extra/queries";
 import {
@@ -51,13 +56,16 @@ function monthDisplayName(monthYmd: string): string {
   return orderCollectionHeadline(monthYmd).replace(/ \d{4}/, "");
 }
 
-function collectionCakeHrefs(input: {
+function collectionCakeEntries(input: {
   kind: HomepageFeaturedKind;
   month: string | null;
   startDate?: string;
   endDate?: string;
   cakes: readonly StorefrontCake[];
-}): Record<string, string> {
+}): {
+  hrefs: Record<string, string>;
+  scopes: Record<string, CakeEntryPickupScope>;
+} {
   const earliest = earliestPickupDateYmd();
   let from = "";
   let to = "";
@@ -69,25 +77,23 @@ function collectionCakeHrefs(input: {
     pickup = input.startDate;
   } else if (input.month) {
     const bounds = catalogueMonthPickupBounds(input.month);
-    if (!bounds) return {};
+    if (!bounds) return { hrefs: {}, scopes: {} };
     from = bounds.from;
     to = bounds.to;
     pickup = suggestedPickupDateForCatalogueMonth(input.month, earliest);
   } else {
-    return {};
+    return { hrefs: {}, scopes: {} };
   }
 
-  return Object.fromEntries(
-    input.cakes.map((cake) => [
-      cake.id,
-      collectionScopedCakeHref({
-        cakeId: cake.id,
-        from,
-        pickupDate: pickup,
-        to,
-      }),
-    ]),
-  );
+  const scope: CakeEntryPickupScope = { from, to, pickup };
+  return {
+    hrefs: Object.fromEntries(
+      input.cakes.map((cake) => [cake.id, storefrontCakeDetailHref(cake.id)]),
+    ),
+    scopes: Object.fromEntries(
+      input.cakes.map((cake) => [cake.id, scope]),
+    ),
+  };
 }
 
 function featuredCopy(input: {
@@ -172,17 +178,19 @@ export async function StorefrontHomePage() {
         todayYm,
         special: special ?? undefined,
       });
+      const cakeEntries = collectionCakeEntries({
+        kind: candidate.kind,
+        month: monthly?.month ?? null,
+        startDate: special?.startDate,
+        endDate: special?.endDate,
+        cakes,
+      });
       return {
         id: candidate.id,
         href: `/order/collection/${candidate.id}`,
         cakes,
-        cakeHrefs: collectionCakeHrefs({
-          kind: candidate.kind,
-          month: monthly?.month ?? null,
-          startDate: special?.startDate,
-          endDate: special?.endDate,
-          cakes,
-        }),
+        cakeHrefs: cakeEntries.hrefs,
+        cakeScopes: cakeEntries.scopes,
         ...copy,
       };
     }),
@@ -250,6 +258,7 @@ export async function StorefrontHomePage() {
       />
 
       <HomeFreshPicksSection picks={picks} />
+      <CakeEntryScopeClearOnUnscopedCakeClick />
       <StorefrontCakePrefetch
         excludeIds={popular.map((cake) => cake.id)}
         hrefs={featured.flatMap((collection) =>
@@ -257,16 +266,20 @@ export async function StorefrontHomePage() {
         )}
       />
       {featured.map((collection) => (
-        <HomeFeaturedCollection
-          cakeHrefs={collection.cakeHrefs}
-          cakes={collection.cakes}
-          description={collection.description}
-          heading={collection.heading}
+        <CakeEntryScopeCapture
           key={collection.id}
-          kicker={collection.kicker}
-          viewAllHref={collection.href}
-          viewAllLabel={collection.viewAllLabel}
-        />
+          scopes={collection.cakeScopes}
+        >
+          <HomeFeaturedCollection
+            cakeHrefs={collection.cakeHrefs}
+            cakes={collection.cakes}
+            description={collection.description}
+            heading={collection.heading}
+            kicker={collection.kicker}
+            viewAllHref={collection.href}
+            viewAllLabel={collection.viewAllLabel}
+          />
+        </CakeEntryScopeCapture>
       ))}
       <HomePopularCakes cakes={popular} />
       <HomeMoreCollections items={more} />

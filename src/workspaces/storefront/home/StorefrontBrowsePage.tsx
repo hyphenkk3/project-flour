@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BrowseCakeCatalogue } from "@/workspaces/storefront/catalog/BrowseCakeCatalogue";
+import { CakeEntryScopeClearOnUnscopedCakeClick } from "@/workspaces/storefront/catalog/CakeEntryScopeCapture";
 import { listBrowsePublishedCakes } from "@/workspaces/storefront/catalog/queries";
 import {
   StorefrontHomeLink,
@@ -14,6 +15,7 @@ export async function StorefrontBrowsePage() {
 
   return (
     <main className="bg-paper mx-auto min-h-screen max-w-5xl px-5 py-4 sm:px-6 sm:py-10">
+      <CakeEntryScopeClearOnUnscopedCakeClick />
       <StorefrontHomeLink />
       <h1 className="font-display text-ink mt-3 text-2xl tracking-tight sm:mt-8 sm:text-4xl">
         Browse Cakes

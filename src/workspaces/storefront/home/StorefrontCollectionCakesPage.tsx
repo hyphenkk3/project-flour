@@ -7,16 +7,17 @@ import {
   SPECIAL_PERIOD_CAKES_NOTE,
   catalogueMonthPickupBounds,
   clampCustomerPickupWindow,
-  collectionScopedCakeHref,
   collectionScopedCheckoutHref,
   customerSpecialMenuPeriodLabel,
   monthOverlapsDateRange,
   orderCollectionHeadline,
   orderCollectionPickupCopy,
+  storefrontCakeDetailHref,
   suggestedPickupDateForCatalogueMonth,
 } from "@/engines/menu/customer-browse";
 import { businessYearMonth, toBusinessDateKey } from "@/lib/dates";
 import { BrowseCakeCatalogue } from "@/workspaces/storefront/catalog/BrowseCakeCatalogue";
+import { CakeEntryScopeCapture } from "@/workspaces/storefront/catalog/CakeEntryScopeCapture";
 import {
   getCustomerSpecialCatalogueById,
   getOrderableMonthlyCatalogueById,
@@ -125,14 +126,19 @@ export async function StorefrontCollectionCakesPage({
     scope == null
       ? undefined
       : Object.fromEntries(
+          cakes.map((cake) => [cake.id, storefrontCakeDetailHref(cake.id)]),
+        );
+  const cakeScopes =
+    scope == null
+      ? {}
+      : Object.fromEntries(
           cakes.map((cake) => [
             cake.id,
-            collectionScopedCakeHref({
-              cakeId: cake.id,
+            {
               from: scope.from,
-              pickupDate: scope.pickup,
               to: scope.to,
-            }),
+              pickup: scope.pickup,
+            },
           ]),
         );
 
@@ -161,20 +167,22 @@ export async function StorefrontCollectionCakesPage({
         <h2 className="sr-only" id="collection-cakes-heading">
           Cakes in this collection
         </h2>
-        <BrowseCakeCatalogue
-          cakes={cakes}
-          detailHrefs={detailHrefs}
-          emptyMessage="No cakes are listed in this collection yet."
-          pickupScope={
-            scope
-              ? {
-                  from: scope.from,
-                  to: scope.to,
-                  pickup: scope.pickup,
-                }
-              : null
-          }
-        />
+        <CakeEntryScopeCapture scopes={cakeScopes}>
+          <BrowseCakeCatalogue
+            cakes={cakes}
+            detailHrefs={detailHrefs}
+            emptyMessage="No cakes are listed in this collection yet."
+            pickupScope={
+              scope
+                ? {
+                    from: scope.from,
+                    to: scope.to,
+                    pickup: scope.pickup,
+                  }
+                : null
+            }
+          />
+        </CakeEntryScopeCapture>
       </section>
 
       <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3">
