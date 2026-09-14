@@ -18,6 +18,7 @@ type CheckoutOrderSummaryProps = {
   offerLabel: string | null;
   loadingOffer: boolean;
   unavailableMessage: string | null;
+  cakePickupAvailabilityNotes?: Record<string, string>;
   catalogueReady: boolean;
   addingCake: boolean;
   addSizeByCake: Record<string, string>;
@@ -39,6 +40,7 @@ export function CheckoutOrderSummary({
   offerLabel,
   loadingOffer,
   unavailableMessage,
+  cakePickupAvailabilityNotes = {},
   catalogueReady,
   addingCake,
   addSizeByCake,
@@ -172,6 +174,11 @@ export function CheckoutOrderSummary({
                       {preorder ? (
                         <p className="text-skyline mt-2 text-[11px] font-semibold tracking-[0.14em] uppercase">
                           {preorder}
+                        </p>
+                      ) : null}
+                      {cakePickupAvailabilityNotes[item.cakeId] ? (
+                        <p className="text-status-danger mt-2 text-sm font-semibold leading-snug">
+                          {cakePickupAvailabilityNotes[item.cakeId]}
                         </p>
                       ) : null}
                     </div>

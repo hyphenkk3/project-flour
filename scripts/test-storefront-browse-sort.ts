@@ -290,6 +290,6 @@ const browseFn = queriesSrc.slice(
   queriesSrc.indexOf("export async function listBrowsePublishedCakes"),
   queriesSrc.indexOf("export async function getBrowsePublishedCakeById"),
 );
-assert.match(browseFn, /localeCompare\(b\.name, "en"\)/);
+assert.match(browseFn, /sortBrowsePublicationCakes/);
 
 console.log("PASS storefront browse sort");

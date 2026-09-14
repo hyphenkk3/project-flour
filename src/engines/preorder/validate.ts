@@ -2,6 +2,7 @@ import { addCalendarDays } from "@/engines/preorder/business-date";
 import { cartEarliestCollectionDate } from "@/engines/preorder/lead";
 import { CUSTOMER_DATE_CAPACITY_SEARCH_DAYS } from "@/engines/preorder/capacity";
 import { formatShortBusinessDate } from "@/lib/dates";
+import { CART_PICKUP_INCOMPATIBLE_REVIEW_MESSAGE } from "@/engines/preorder/cart-pickup-compatibility";
 import {
   FULLY_BOOKED_CUSTOMER_LABEL,
   JOIN_WAITING_LIST_CUSTOMER_LABEL,
@@ -197,6 +198,9 @@ export function customerCollectionDateMessage(
     return "Please choose a valid date and time.";
   }
   if (reason.code === "not_in_catalogue") {
+    if (lines.length > 0) {
+      return CART_PICKUP_INCOMPATIBLE_REVIEW_MESSAGE;
+    }
     return "Please add at least one cake from the catalogue for that pickup date.";
   }
   if (reason.code === "fully_booked") {

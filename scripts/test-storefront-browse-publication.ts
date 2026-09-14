@@ -152,7 +152,7 @@ assert.match(browseFn, /browseCakeAvailabilityNote/);
 assert.match(browseFn, /isCustomerFacingHistoricalCatalogue/);
 assert.match(browseFn, /BROWSE_CURRENTLY_UNAVAILABLE_NOTE/);
 assert.match(browseFn, /currentlyOffered/);
-assert.match(browseFn, /localeCompare\(b\.name, "en"\)/);
+assert.match(browseFn, /sortBrowsePublicationCakes/);
 assert.match(browseFn, /cakeById\.set/);
 assert.match(browseFn, /isOfferableStatus/);
 assert.match(browseFn, /cake\.sizes\.length === 0/);

@@ -58,12 +58,17 @@ import {
   resolveCheckoutPickupScope,
 } from "@/engines/menu/customer-browse";
 import {
+  CART_PICKUP_INCOMPATIBLE_REVIEW_MESSAGE,
+  evaluateCartPickupCompatibility,
+} from "@/engines/preorder/cart-pickup-compatibility";
+import {
   getStorefrontCollectionForPickupDate,
   getCustomerCakePickupMemberships,
   listAvailableCakes,
   listCustomerSpecialCatalogues,
   listOrderableMonthlyCatalogues,
   unpublishedCataloguePreorderMessage,
+  type CakePickupMembership,
 } from "@/workspaces/storefront/catalog/queries";
 import {
   isPickupOrdersClosed,
@@ -340,9 +345,27 @@ export async function submitGuestPreorderAction(
     const cake = offered.find((entry) => entry.id === item.cake_id);
     const size = cake?.sizes.find((entry) => entry.id === item.cake_size_id);
     if (!cake || !size) {
+      const [memberships, specials, catalogues] = await Promise.all([
+        getCustomerCakePickupMemberships(items.map((item) => item.cake_id)),
+        listCustomerSpecialCatalogues(),
+        listOrderableMonthlyCatalogues(),
+      ]);
+      const compatibility = evaluateCartPickupCompatibility({
+        cakes: memberships,
+        selectedYmd: pickupDate,
+        earliestYmd: earliestPickupDateYmd(),
+        activeSpecialWindows: specials.map((special) => ({
+          from: special.startDate,
+          to: special.endDate,
+        })),
+        globalMax: latestOrderableCataloguePickupEnd(
+          catalogues.map((catalogue) => catalogue.month ?? ""),
+        ),
+      });
       return {
         error:
-          "Please add at least one cake from the catalogue for that pickup date.",
+          compatibility.dateLevelMessage ??
+          CART_PICKUP_INCOMPATIBLE_REVIEW_MESSAGE,
       };
     }
   }
@@ -674,6 +697,9 @@ function cartPickupBoundsFromSources(input: {
 
 export type CheckoutCalendarContext = {
   cartPickupBounds: CartPickupBounds | null;
+  cakePickupMemberships: CakePickupMembership[];
+  activeSpecialWindows: Array<{ from: string; to: string }>;
+  earliestPickupYmd: string;
   closedDates: string[];
   entrySpecialUnavailableDates: string[];
   hoursSnapshot: OperatingHoursSnapshot;
@@ -758,6 +784,12 @@ export async function loadCheckoutCalendarContext(input: {
 
   return {
     cartPickupBounds,
+    cakePickupMemberships: memberships,
+    activeSpecialWindows: specials.map((special) => ({
+      from: special.startDate,
+      to: special.endDate,
+    })),
+    earliestPickupYmd: earliest,
     closedDates,
     entrySpecialUnavailableDates,
     hoursSnapshot,

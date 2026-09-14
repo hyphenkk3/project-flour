@@ -17,6 +17,7 @@ import {
   isCustomerOrderableMonthlyMonth,
   isCustomerPastMenuVisible,
 } from "@/engines/menu/customer-browse";
+import { sortBrowsePublicationCakes } from "@/engines/menu/browse-publication-order";
 import {
   BROWSE_CURRENTLY_UNAVAILABLE_NOTE,
   takeHomepageCollectionPreviewCakes,
@@ -1285,6 +1286,16 @@ async function loadBrowsePublishedCakes(
   const cakeById = new Map<string, StorefrontCake>();
   const monthsByCakeId = new Map<string, string[]>();
   const currentlyOfferedIds = new Set<string>();
+  const latestMonthly = currentlyOrderable
+    .filter((row) => row.purpose === "monthly" && row.month)
+    .sort((left, right) =>
+      String(right.month)
+        .slice(0, 7)
+        .localeCompare(String(left.month).slice(0, 7)),
+    )[0];
+  const latestMonthlyId = latestMonthly?.id ?? null;
+  const inLatestIds = new Set<string>();
+  const latestSortByCakeId = new Map<string, number>();
 
   for (const row of (data ?? []) as unknown as CatalogRow[]) {
     const embed = unwrapOne(row.library_cakes);
@@ -1306,15 +1317,20 @@ async function loadBrowsePublishedCakes(
         monthsByCakeId.set(cake.id, months);
       }
     }
+    if (latestMonthlyId && collectionId === latestMonthlyId) {
+      inLatestIds.add(cake.id);
+      latestSortByCakeId.set(cake.id, row.sort_order);
+    }
   }
 
-  return [...cakeById.values()]
-    .sort((a, b) => a.name.localeCompare(b.name, "en"))
-    .map((cake) => {
+  return sortBrowsePublicationCakes(
+    [...cakeById.values()].map((cake) => {
       const currentlyOffered = currentlyOfferedIds.has(cake.id);
       return {
         ...cake,
         currentlyOffered,
+        inLatestCollection: inLatestIds.has(cake.id),
+        latestCollectionSortOrder: latestSortByCakeId.get(cake.id) ?? null,
         availabilityNote: currentlyOffered
           ? browseCakeAvailabilityNote(
               todayYm,
@@ -1322,7 +1338,8 @@ async function loadBrowsePublishedCakes(
             )
           : BROWSE_CURRENTLY_UNAVAILABLE_NOTE,
       };
-    });
+    }),
+  );
 }
 
 const readCachedBrowsePublishedCakes = cache((todayYmd: string) =>

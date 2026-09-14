@@ -40,12 +40,17 @@ import {
 } from "@/engines/preorder/lead";
 import type { PreorderCartLine } from "@/engines/preorder/types";
 import {
+  cakePickupAvailabilityNotesById,
+  evaluateCartPickupCompatibility,
+} from "@/engines/preorder/cart-pickup-compatibility";
+import {
   customerCollectionDateMessage,
   customerFullyBookedDateMessage,
   customerSelectedDateInvalidatedMessage,
   evaluateCollectionDate,
   findNextValidCollectionDate,
 } from "@/engines/preorder/validate";
+import type { CakePickupMembership } from "@/workspaces/storefront/catalog/queries";
 import {
   customerFulfilmentHoursNotice,
   DINE_IN_RESERVATION_INCLUDED_NOTICE,
@@ -301,6 +306,16 @@ export function GuestCheckoutForm({
     max: string;
     excludedDates: string[];
   } | null>(null);
+  const [cakePickupMemberships, setCakePickupMemberships] = useState<
+    CakePickupMembership[]
+  >([]);
+  const [activeSpecialWindows, setActiveSpecialWindows] = useState<
+    ReadonlyArray<{ from: string; to: string }>
+  >([]);
+  const [calendarEarliestYmd, setCalendarEarliestYmd] = useState(
+    emptyCartEarliestCollectionDate(),
+  );
+  const [loadedCakeIdsKey, setLoadedCakeIdsKey] = useState("");
   const [closedDates, setClosedDates] = useState<readonly string[]>([]);
   const [entrySpecialUnavailableDates, setEntrySpecialUnavailableDates] =
     useState<readonly string[]>([]);
@@ -452,6 +467,10 @@ export function GuestCheckoutForm({
         setLiveMaxPickupDate(context.maxPickupDate);
         setLiveScopeConstrainsBounds(context.pickupScopeConstrainsBounds);
         setCartPickupBounds(context.cartPickupBounds);
+        setCakePickupMemberships(context.cakePickupMemberships);
+        setActiveSpecialWindows(context.activeSpecialWindows);
+        setCalendarEarliestYmd(context.earliestPickupYmd);
+        setLoadedCakeIdsKey(cakeIds.join(","));
         setCalendarError(null);
         setCalendarReady(true);
       },
@@ -681,6 +700,45 @@ export function GuestCheckoutForm({
     () => toPreorderLines(items, cakes),
     [cakes, items],
   );
+  const pickupMembershipsPending =
+    items.length > 0 && cakeIdsKey !== loadedCakeIdsKey;
+  const pickupCompatibility = useMemo(() => {
+    if (pickupMembershipsPending) return null;
+    const uniqueIds = [...new Set(items.map((item) => item.cakeId))];
+    const membershipById = new Map(
+      cakePickupMemberships.map((membership) => [
+        membership.cakeId,
+        membership,
+      ]),
+    );
+    if (uniqueIds.some((cakeId) => !membershipById.has(cakeId))) {
+      return null;
+    }
+    const memberships = uniqueIds.flatMap((cakeId) => {
+      const membership = membershipById.get(cakeId);
+      return membership ? [membership] : [];
+    });
+    return evaluateCartPickupCompatibility({
+      cakes: memberships,
+      selectedYmd: fields.pickupDate,
+      earliestYmd: calendarEarliestYmd,
+      activeSpecialWindows,
+      globalMax:
+        (liveMaxPickupDate ?? maxPickupDate)?.trim().slice(0, 10) ?? null,
+    });
+  }, [
+    activeSpecialWindows,
+    cakePickupMemberships,
+    calendarEarliestYmd,
+    fields.pickupDate,
+    items,
+    liveMaxPickupDate,
+    maxPickupDate,
+    pickupMembershipsPending,
+  ]);
+  const cakePickupAvailabilityNotes = pickupCompatibility
+    ? cakePickupAvailabilityNotesById(pickupCompatibility)
+    : {};
   const collectionDateEvaluation = useMemo(() => {
     const selectedYmd = fields.pickupDate.trim().slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedYmd) || calendarPending) {
@@ -694,11 +752,13 @@ export function GuestCheckoutForm({
         : fields.fulfilmentMethod === "delivery"
           ? getDeliverySlotsForDate(selectedYmd, hoursSnapshot)
           : getPickupSlotsForDate(selectedYmd, hoursSnapshot);
-    const inCatalogue = checkoutDraftItemsInCatalogue(
-      items,
-      cakes,
-      liveOfferPending,
-    );
+    const cakesAllowedForDate =
+      pickupCompatibility?.hasCommonPickupDate === true &&
+      (pickupCompatibility?.cakes.every((cake) => cake.allowed) ?? false);
+    const inCatalogue =
+      pickupMembershipsPending ||
+      (cakesAllowedForDate &&
+        checkoutDraftItemsInCatalogue(items, cakes, liveOfferPending));
     const selectedCapacity = activeCartCapacity.fullyBookedDates.includes(selectedYmd)
       ? {
           fullyBooked: true as const,
@@ -736,8 +796,9 @@ export function GuestCheckoutForm({
       capacity: selectedCapacity,
     });
   }, [
+    activeCartCapacity.blockingCakeNamesByDate,
+    activeCartCapacity.fullyBookedDates,
     calendarPending,
-    cartCapacity,
     cakes,
     closedDates,
     effectivePickupBounds.max,
@@ -746,7 +807,10 @@ export function GuestCheckoutForm({
     hoursSnapshot,
     items,
     liveOfferPending,
+    pickupCompatibility,
+    pickupMembershipsPending,
     preorderLines,
+    waitingListPickerDates,
   ]);
   const selectedDateInvalidated = Boolean(
     collectionDateEvaluation &&
@@ -758,9 +822,16 @@ export function GuestCheckoutForm({
   const collectionDateMessageRaw = collectionDateEvaluation
     ? customerCollectionDateMessage(collectionDateEvaluation, preorderLines)
     : null;
-  const collectionDateMessage = selectedDateInvalidated
-    ? customerSelectedDateInvalidatedMessage(collectionDateMessageRaw)
-    : collectionDateMessageRaw;
+  const collectionDateMessage =
+    pickupCompatibility?.dateLevelMessage ??
+    (selectedDateInvalidated
+      ? customerSelectedDateInvalidatedMessage(collectionDateMessageRaw)
+      : collectionDateMessageRaw);
+  const dateValidationMessage =
+    pickupCompatibility?.dateLevelMessage ??
+    (collectionDateEvaluation && !collectionDateEvaluation.valid
+      ? collectionDateMessage
+      : null);
 
   function patchFields(patch: Partial<PreorderDraftFields>) {
     setFields((current) => ({ ...current, ...patch }));
@@ -993,10 +1064,12 @@ export function GuestCheckoutForm({
     : null;
   const preorderLabel = draftStrongestPreorder(items).label;
   const collectionDateInvalid = Boolean(
-    collectionDateEvaluation && !collectionDateEvaluation.valid,
+    (collectionDateEvaluation && !collectionDateEvaluation.valid) ||
+      pickupCompatibility?.dateLevelMessage,
   );
   const submitBlocked =
     calendarPending ||
+    pickupMembershipsPending ||
     Boolean(calendarError) ||
     liveOfferPending ||
     !catalogueReady ||
@@ -1083,6 +1156,11 @@ export function GuestCheckoutForm({
             />
           </div>
         ) : null}
+        {pickupMembershipsPending && !calendarPending ? (
+          <p className="text-skyline mt-3 text-sm leading-relaxed">
+            Confirming cake availability for this order…
+          </p>
+        ) : null}
         {calendarError ? (
           <p className="text-status-danger mt-4 text-sm leading-relaxed" role="status">
             {calendarError}
@@ -1107,12 +1185,10 @@ export function GuestCheckoutForm({
                   .join(", ")}.`}
           </p>
         ) : null}
-        {collectionDateMessage &&
-        collectionDateEvaluation &&
-        !collectionDateEvaluation.valid ? (
-          <p className="text-status-danger mt-4 text-sm leading-relaxed" role="status">
-            {collectionDateMessage}
-          </p>
+        {dateValidationMessage ? (
+          <div className="mt-4">
+            <FormError message={dateValidationMessage} />
+          </div>
         ) : null}
         {showJoinWaitingList ? (
           <p className="text-ink mt-4 text-sm leading-relaxed">
@@ -1632,6 +1708,7 @@ export function GuestCheckoutForm({
         <CheckoutOrderSummary
           addSizeByCake={addSizeByCake}
           addingCake={addingCake}
+          cakePickupAvailabilityNotes={cakePickupAvailabilityNotes}
           cakes={cakes}
           catalogueReady={catalogueReady}
           earliestLabel={earliestLabel}

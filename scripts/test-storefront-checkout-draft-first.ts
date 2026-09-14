@@ -153,6 +153,7 @@ assert.equal(draftSizes[0]?.id, "size-6");
 assert.equal(draftSizes[0]?.price, 135);
 
 assert.match(summarySrc, /draftItemSizeChoices/);
+assert.match(summarySrc, /cakePickupAvailabilityNotes/);
 assert.match(summarySrc, /item\.cakeName/);
 assert.match(summarySrc, /item\.imageUrl/);
 assert.match(summarySrc, /item\.unitPrice \* item\.quantity/);

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { BrowseCakeCatalogue } from "@/workspaces/storefront/catalog/BrowseCakeCatalogue";
+import { CakePhotoDisclaimer } from "@/workspaces/storefront/catalog/CakePhotoDisclaimer";
 import {
   CakeEntryScopeCapture,
   CakeEntryScopeClearOnUnscopedCakeClick,
@@ -65,6 +66,7 @@ export function StorefrontBrowsePage() {
           choose.
         </span>
       </p>
+      <CakePhotoDisclaimer className="mt-3 max-w-xl sm:mt-4" />
       <p className="mt-1.5 sm:mt-3">
         <Link
           className="text-ink hover:text-skyline text-sm font-medium transition-colors duration-200"

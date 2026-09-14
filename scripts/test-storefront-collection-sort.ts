@@ -217,6 +217,7 @@ const availableFn = queriesSrc.slice(
   queriesSrc.indexOf("export async function listAvailableCakes"),
   queriesSrc.indexOf("export async function getStorefrontOfferedCakeById"),
 );
+assert.doesNotMatch(availableFn, /sortBrowsePublicationCakes/);
 assert.match(availableFn, /\.eq\("collection_id", collectionId\)/);
 assert.match(availableFn, /\.order\("sort_order"/);
 

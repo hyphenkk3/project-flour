@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { StorefrontCake } from "@/types/storefront";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import { CakeDetailPurchasePanel } from "@/workspaces/storefront/catalog/CakeDetailPurchasePanel";
+import { CakePhotoDisclaimer } from "@/workspaces/storefront/catalog/CakePhotoDisclaimer";
 import {
   storefrontPhotoForSize,
   storefrontPhotoGallery,
@@ -70,6 +71,7 @@ export function StorefrontCakeDetailView({
             ))}
           </ul>
         ) : null}
+        <CakePhotoDisclaimer className="max-w-xl" />
       </div>
 
       <CakeDetailPurchasePanel

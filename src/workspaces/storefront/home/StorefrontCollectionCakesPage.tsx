@@ -17,6 +17,7 @@ import {
 } from "@/engines/menu/customer-browse";
 import { businessYearMonth, toBusinessDateKey } from "@/lib/dates";
 import { BrowseCakeCatalogue } from "@/workspaces/storefront/catalog/BrowseCakeCatalogue";
+import { CakePhotoDisclaimer } from "@/workspaces/storefront/catalog/CakePhotoDisclaimer";
 import { CakeEntryScopeCapture } from "@/workspaces/storefront/catalog/CakeEntryScopeCapture";
 import { CollectionBrowseRestore } from "@/workspaces/storefront/catalog/CollectionBrowseRestore";
 import {
@@ -194,6 +195,7 @@ async function CollectionCakesBody({
           {note}
         </p>
       ) : null}
+      <CakePhotoDisclaimer className="mt-3 max-w-xl" />
 
       <section aria-labelledby="collection-cakes-heading" className="mt-6 sm:mt-8">
         <h2 className="sr-only" id="collection-cakes-heading">

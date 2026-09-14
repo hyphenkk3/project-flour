@@ -246,6 +246,7 @@ const checkoutSrc = readSrc(
   "src/workspaces/storefront/checkout/GuestCheckoutForm.tsx",
 );
 assert.match(checkoutSrc, /evaluateCollectionDate/);
+assert.match(checkoutSrc, /evaluateCartPickupCompatibility/);
 assert.match(checkoutSrc, /customerCollectionDateMessage/);
 assert.match(checkoutSrc, /loadCartDateCapacityAvailability/);
 assert.match(checkoutSrc, /Join Waiting List/);
