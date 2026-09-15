@@ -156,6 +156,9 @@ assert.match(browseFn, /sortBrowsePublicationCakes/);
 assert.match(browseFn, /cakeById\.set/);
 assert.match(browseFn, /isOfferableStatus/);
 assert.match(browseFn, /cake\.sizes\.length === 0/);
+assert.match(browseFn, /from\("library_cakes"\)/);
+assert.match(browseFn, /\.in\("status", \["active", "seasonal"\]\)/);
+assert.match(browseFn, /cakeById\.has/);
 assert.doesNotMatch(browseFn, /isCatalogueExpired/);
 assert.doesNotMatch(browseFn, /engines\/preorder/);
 assert.doesNotMatch(browseFn, /capacity/i);
@@ -172,9 +175,10 @@ assert.match(detailByIdFn, /resolveBrowsePublishedCake/);
 
 assert.match(
   queriesSrc,
-  /status === "active" \|\| status === "seasonal"/,
+  /isLiveLibraryCakeStatus/,
   "F. draft/retired remain excluded at cake mapping",
 );
+assert.match(queriesSrc, /isBrowseDiscoverableLibraryCake/);
 
 const detailSrc = readSrc(
   "src/workspaces/storefront/catalog/StorefrontCakeDetail.tsx",

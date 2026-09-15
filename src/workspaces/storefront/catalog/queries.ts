@@ -19,6 +19,10 @@ import {
 } from "@/engines/menu/customer-browse";
 import { sortBrowsePublicationCakes } from "@/engines/menu/browse-publication-order";
 import {
+  isBrowseDiscoverableLibraryCake,
+  isLiveLibraryCakeStatus,
+} from "@/engines/menu/browse-visibility";
+import {
   BROWSE_CURRENTLY_UNAVAILABLE_NOTE,
   takeHomepageCollectionPreviewCakes,
   isCustomerFacingHistoricalCatalogue,
@@ -444,7 +448,7 @@ export function mapStorefrontCake(row: LibraryCakeEmbed): StorefrontCake {
 }
 
 function isOfferableStatus(status: string): boolean {
-  return status === "active" || status === "seasonal";
+  return isLiveLibraryCakeStatus(status);
 }
 
 export type BrowsePublicationCatalogue = {
@@ -476,7 +480,8 @@ function browseCatalogueKind(
 
 /**
  * Same Browse publication rules as listBrowsePublishedCakes, for one cake.
- * Popular-cakes merchandising remains the fallback when no catalogue qualifies.
+ * Live Library cakes (active / seasonal) are discoverable without membership.
+ * Popular Cakes is merchandising only and never implies currentlyOffered.
  */
 export function resolveBrowsePublishedCake(input: {
   cake: StorefrontCake;
@@ -489,7 +494,7 @@ export function resolveBrowsePublishedCake(input: {
 
   const todayYmd = input.todayYmd ?? toBusinessDateKey();
   const todayYm = businessYearMonth(todayYmd) ?? todayYmd.slice(0, 7);
-  let published = false;
+  let hasQualifyingCustomerFacingCatalogue = false;
   let currentlyOffered = false;
   const monthlyMonths: string[] = [];
 
@@ -498,35 +503,33 @@ export function resolveBrowsePublishedCake(input: {
     if (kind === "none") continue;
     if (kind === "current") {
       if (!isOfferableStatus(input.cakeStatus)) continue;
-      published = true;
+      hasQualifyingCustomerFacingCatalogue = true;
       currentlyOffered = true;
       if ((row.purpose ?? "monthly") === "monthly" && row.month) {
         monthlyMonths.push(String(row.month).slice(0, 10));
       }
       continue;
     }
-    published = true;
+    hasQualifyingCustomerFacingCatalogue = true;
   }
 
-  if (published) {
-    return {
-      ...input.cake,
-      currentlyOffered,
-      availabilityNote: currentlyOffered
-        ? browseCakeAvailabilityNote(todayYm, monthlyMonths)
-        : BROWSE_CURRENTLY_UNAVAILABLE_NOTE,
-    };
+  if (
+    !isBrowseDiscoverableLibraryCake({
+      status: input.cakeStatus,
+      sizeCount: input.cake.sizes.length,
+      hasQualifyingCustomerFacingCatalogue,
+    })
+  ) {
+    return null;
   }
 
-  if (input.showInPopularCakes === true) {
-    return {
-      ...input.cake,
-      currentlyOffered: true,
-      availabilityNote: null,
-    };
-  }
-
-  return null;
+  return {
+    ...input.cake,
+    currentlyOffered,
+    availabilityNote: currentlyOffered
+      ? browseCakeAvailabilityNote(todayYm, monthlyMonths)
+      : BROWSE_CURRENTLY_UNAVAILABLE_NOTE,
+  };
 }
 
 type StorefrontSupabaseClient =
@@ -1181,10 +1184,10 @@ export async function getHistoricalCatalogueById(
 }
 
 /**
- * Discovery: cakes Whitebird has offered on the customer storefront.
- * Currently orderable cakes keep existing notes (e.g. Available from Oct).
- * Historical offerings that are not currently offered show
- * "Currently unavailable". Not checkout authority.
+ * Discovery: customer-facing Browse cakes.
+ * Collection membership supplies currently-orderable / historical context.
+ * Live Library cakes (active / seasonal) remain discoverable without membership.
+ * Not checkout authority.
  */
 export async function listBrowsePublishedCakes(
   todayYmd: string = toBusinessDateKey(),
@@ -1255,9 +1258,6 @@ async function loadBrowsePublishedCakes(
     ...currentlyOrderable.map((row) => row.id),
     ...historical.map((row) => row.id),
   ];
-  if (catalogueIds.length === 0) {
-    return [];
-  }
 
   const currentlyOrderableIds = new Set(currentlyOrderable.map((row) => row.id));
   const monthlyMonthById = new Map<string, string>();
@@ -1265,23 +1265,6 @@ async function loadBrowsePublishedCakes(
     if (row.purpose !== "monthly" || !row.month) continue;
     monthlyMonthById.set(row.id, String(row.month).slice(0, 10));
   }
-
-  const data = await withCakePhotoSelectFallback((photoSelect, includeAssignments, includeTags) =>
-    supabase
-      .from("collection_cakes")
-      .select(
-        `
-      collection_id,
-      sort_order,
-      library_cakes (
-        ${libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags)}
-      )
-    `,
-      )
-      .eq("available", true)
-      .in("collection_id", catalogueIds)
-      .order("sort_order", { ascending: true }),
-  );
 
   const cakeById = new Map<string, StorefrontCake>();
   const monthsByCakeId = new Map<string, string[]>();
@@ -1297,30 +1280,68 @@ async function loadBrowsePublishedCakes(
   const inLatestIds = new Set<string>();
   const latestSortByCakeId = new Map<string, number>();
 
-  for (const row of (data ?? []) as unknown as CatalogRow[]) {
-    const embed = unwrapOne(row.library_cakes);
-    if (!embed) continue;
-    const collectionId = row.collection_id;
-    const inCurrent =
-      typeof collectionId === "string" &&
-      currentlyOrderableIds.has(collectionId);
-    if (inCurrent && !isOfferableStatus(embed.status)) continue;
+  if (catalogueIds.length > 0) {
+    const data = await withCakePhotoSelectFallback(
+      (photoSelect, includeAssignments, includeTags) =>
+        supabase
+          .from("collection_cakes")
+          .select(
+            `
+      collection_id,
+      sort_order,
+      library_cakes (
+        ${libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags)}
+      )
+    `,
+          )
+          .eq("available", true)
+          .in("collection_id", catalogueIds)
+          .order("sort_order", { ascending: true }),
+    );
+
+    for (const row of (data ?? []) as unknown as CatalogRow[]) {
+      const embed = unwrapOne(row.library_cakes);
+      if (!embed) continue;
+      const collectionId = row.collection_id;
+      const inCurrent =
+        typeof collectionId === "string" &&
+        currentlyOrderableIds.has(collectionId);
+      if (inCurrent && !isOfferableStatus(embed.status)) continue;
+      const cake = mapStorefrontCake(embed);
+      if (cake.sizes.length === 0) continue;
+      cakeById.set(cake.id, cake);
+      if (inCurrent) {
+        currentlyOfferedIds.add(cake.id);
+        const month = monthlyMonthById.get(collectionId);
+        if (month) {
+          const months = monthsByCakeId.get(cake.id) ?? [];
+          months.push(month);
+          monthsByCakeId.set(cake.id, months);
+        }
+      }
+      if (latestMonthlyId && collectionId === latestMonthlyId) {
+        inLatestIds.add(cake.id);
+        latestSortByCakeId.set(cake.id, row.sort_order);
+      }
+    }
+  }
+
+  const liveLibraryRows = await withCakePhotoSelectFallback(
+    (photoSelect, includeAssignments, includeTags) =>
+      supabase
+        .from("library_cakes")
+        .select(
+          libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags),
+        )
+        .in("status", ["active", "seasonal"]),
+  );
+
+  for (const embed of (liveLibraryRows ?? []) as unknown as LibraryCakeEmbed[]) {
+    if (cakeById.has(embed.id)) continue;
+    if (!isOfferableStatus(embed.status)) continue;
     const cake = mapStorefrontCake(embed);
     if (cake.sizes.length === 0) continue;
     cakeById.set(cake.id, cake);
-    if (inCurrent) {
-      currentlyOfferedIds.add(cake.id);
-      const month = monthlyMonthById.get(collectionId);
-      if (month) {
-        const months = monthsByCakeId.get(cake.id) ?? [];
-        months.push(month);
-        monthsByCakeId.set(cake.id, months);
-      }
-    }
-    if (latestMonthlyId && collectionId === latestMonthlyId) {
-      inLatestIds.add(cake.id);
-      latestSortByCakeId.set(cake.id, row.sort_order);
-    }
   }
 
   return sortBrowsePublicationCakes(

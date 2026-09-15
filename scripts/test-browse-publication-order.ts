@@ -168,6 +168,35 @@ assert.doesNotMatch(
 assert.match(browseFn, /collection_cakes/);
 assert.doesNotMatch(browseFn, /Refreshing Lemon/);
 assert.doesNotMatch(browseFn, /cake-categories/);
+assert.match(browseFn, /from\("library_cakes"\)/);
+assert.match(browseFn, /cakeById\.has/);
+
+const liveUnavailable = {
+  id: "lemon-nc",
+  name: "Refreshing Lemon",
+  currentlyOffered: false,
+  inLatestCollection: false,
+  latestCollectionSortOrder: null as number | null,
+  sizes: [],
+};
+const decadentUnavailable = {
+  id: "decadent-nc",
+  name: "Decadent Chocolate (Dark Chocolate, Slightly Sweeter)",
+  currentlyOffered: false,
+  inLatestCollection: false,
+  latestCollectionSortOrder: null,
+  sizes: [],
+};
+assert.deepEqual(
+  sortBrowsePublicationCakes([
+    decadentUnavailable,
+    octoberSecond,
+    liveUnavailable,
+    unavailable,
+  ]).map((cake) => cake.id),
+  ["oct-b", "old", "decadent-nc", "lemon-nc"],
+  "14. no-collection live cakes stay in the existing unavailable group",
+);
 
 const popularFn = queriesSrc.slice(
   queriesSrc.indexOf("async function loadHomepagePopularCakes"),

@@ -235,26 +235,45 @@ assert.equal(preview?.photos[0]?.url, "https://example.com/hero.jpg");
 assert.equal(preview?.sizes.length, 0, "preview never carries cached prices");
 assert.equal(preview?.currentlyOffered, false, "preview never enables Add to Order");
 
+const liveNoCollection = resolveBrowsePublishedCake({
+  cake: avocado,
+  cakeStatus: "active",
+  catalogues: [],
+  todayYmd: TODAY,
+});
+assert.equal(liveNoCollection?.id, "avocado");
 assert.equal(
-  resolveBrowsePublishedCake({
-    cake: avocado,
-    cakeStatus: "active",
-    catalogues: [],
-    todayYmd: TODAY,
-  }),
-  null,
-  "nonexistent / no public membership returns null",
+  liveNoCollection?.currentlyOffered,
+  false,
+  "live Library cake with no membership is discoverable, not orderable",
+);
+assert.equal(
+  liveNoCollection?.availabilityNote,
+  BROWSE_CURRENTLY_UNAVAILABLE_NOTE,
+);
+
+const staffOnlyLive = resolveBrowsePublishedCake({
+  cake: avocado,
+  cakeStatus: "active",
+  catalogues: [staffOnlySpecial],
+  todayYmd: TODAY,
+});
+assert.equal(staffOnlyLive?.id, "avocado");
+assert.equal(
+  staffOnlyLive?.currentlyOffered,
+  false,
+  "staff-only special does not make a live cake currently orderable",
 );
 
 assert.equal(
   resolveBrowsePublishedCake({
     cake: avocado,
-    cakeStatus: "active",
-    catalogues: [staffOnlySpecial],
+    cakeStatus: "draft",
+    catalogues: [],
     todayYmd: TODAY,
   }),
   null,
-  "unpublished / staff-only special remains excluded",
+  "draft cakes remain excluded from Cake Detail",
 );
 
 const historical = resolveBrowsePublishedCake({
@@ -287,8 +306,12 @@ const popularOnly = resolveBrowsePublishedCake({
   todayYmd: TODAY,
 });
 assert.equal(popularOnly?.id, "avocado");
-assert.equal(popularOnly?.currentlyOffered, true);
-assert.equal(popularOnly?.availabilityNote, null);
+assert.equal(
+  popularOnly?.currentlyOffered,
+  false,
+  "Popular Cakes is merchandising, not currentlyOffered",
+);
+assert.equal(popularOnly?.availabilityNote, BROWSE_CURRENTLY_UNAVAILABLE_NOTE);
 
 const futureOnly = resolveBrowsePublishedCake({
   cake: avocado,
@@ -298,6 +321,19 @@ const futureOnly = resolveBrowsePublishedCake({
 });
 assert.equal(futureOnly?.currentlyOffered, true);
 assert.equal(futureOnly?.availabilityNote, "Available from Sep");
+
+const lemonDetail = resolveBrowsePublishedCake({
+  cake: cake("aecba146-e10c-4d69-b165-3afb02611f90", {
+    name: "Refreshing Lemon",
+  }),
+  cakeStatus: "active",
+  catalogues: [],
+  showInPopularCakes: false,
+  todayYmd: TODAY,
+});
+assert.equal(lemonDetail?.name, "Refreshing Lemon");
+assert.equal(lemonDetail?.currentlyOffered, false);
+assert.equal(lemonDetail?.availabilityNote, BROWSE_CURRENTLY_UNAVAILABLE_NOTE);
 
 assert.equal(
   resolveBrowsePublishedCake({
