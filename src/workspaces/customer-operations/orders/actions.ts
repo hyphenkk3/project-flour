@@ -6,10 +6,10 @@ import { canCreateStaffAssistedOrder } from "@/engines/orders/delivery-finance-c
 import { requireStaff } from "@/foundation/auth/session";
 import { canAccessWorkspace } from "@/foundation/navigation/access";
 import { createClient } from "@/lib/supabase/server";
+import { addBusinessCalendarDays } from "@/lib/dates";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
-import {
-  normalizeOwnerCreateFulfilmentMethod,
-} from "@/engines/orders/fulfilment";
+import { earliestPickupDateYmd } from "@/engines/business-calendar/pickup-slots";
+import { parseCustomerWebsiteFulfilmentMethod } from "@/engines/orders/fulfilment";
 import type {
   FulfilmentMethod,
   OrderInput,
@@ -27,8 +27,11 @@ import { ownerOrderWorkspaceHref } from "@/workspaces/owner/navigation/return-to
 import { isStaffGuestOrderSource } from "@/workspaces/owner/orders/labels";
 import {
   parseDeliveryDraftFromForm,
+  parseDineInDraftFromForm,
   parseStaffPreorderItemsFromForm,
 } from "@/workspaces/owner/orders/staff-preorder-form";
+import { listClosedPickupOrderDates } from "@/workspaces/storefront/checkout/order-availability";
+import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 
 export type OrderActionState = {
   error: string | null;
@@ -191,10 +194,15 @@ export async function createOrderAction(
   const pickupDate = String(formData.get("pickup_date") ?? "").trim();
   const pickupTime = String(formData.get("pickup_time") ?? "").trim();
   const items = parseStaffPreorderItemsFromForm(formData);
-  const fulfilmentMethod = normalizeOwnerCreateFulfilmentMethod(
+  const fulfilmentMethod = parseCustomerWebsiteFulfilmentMethod(
     String(formData.get("fulfilment_method") ?? ""),
   );
   const deliveryDraft = parseDeliveryDraftFromForm(formData);
+  const dineInDraft = parseDineInDraftFromForm(formData);
+  const hoursSnapshot = await loadOperatingHoursSnapshot();
+  const earliest = earliestPickupDateYmd();
+  const rangeMax = addBusinessCalendarDays(earliest, 120) ?? earliest;
+  const closedDates = await listClosedPickupOrderDates(earliest, rangeMax);
 
   const created = await createStaffGuestPreorderRecord({
     actorStaffId: staff.id,
@@ -214,6 +222,10 @@ export async function createOrderAction(
     internalNotes: emptyToNull(formData.get("internal_notes")),
     fulfilmentMethod,
     delivery: deliveryDraft,
+    dineIn: dineInDraft,
+    slotPolicy: "customer-slots",
+    closedDates,
+    hoursSnapshot,
   });
 
   if ("error" in created) {

@@ -1,4 +1,8 @@
 import {
+  defaultAssistedDineInDraft,
+  type AssistedDineInDraft,
+} from "@/engines/orders/assisted-fulfilment";
+import {
   defaultDeliveryCreateDraft,
   type DeliveryCreateDraft,
 } from "@/engines/orders/fulfilment";
@@ -36,6 +40,36 @@ export function parseStaffPreorderItemsFromForm(
       );
   } catch {
     return [];
+  }
+}
+
+export function parseDineInDraftFromForm(
+  formData: FormData,
+): AssistedDineInDraft {
+  const named: AssistedDineInDraft = {
+    reservationTime: String(formData.get("reservation_time") ?? "").trim(),
+    venue: String(formData.get("dine_in_venue") ?? "").trim(),
+    guestCount: String(formData.get("guest_count") ?? "").trim(),
+    reservationNote: String(formData.get("reservation_note") ?? "").trim(),
+  };
+  const raw = String(formData.get("dine_in_json") ?? "").trim();
+  if (!raw) {
+    return named.reservationTime || named.venue || named.guestCount
+      ? named
+      : defaultAssistedDineInDraft();
+  }
+  try {
+    const parsed = JSON.parse(raw) as Partial<AssistedDineInDraft>;
+    return {
+      reservationTime:
+        named.reservationTime || String(parsed.reservationTime ?? "").trim(),
+      venue: named.venue || String(parsed.venue ?? "").trim(),
+      guestCount: named.guestCount || String(parsed.guestCount ?? "").trim(),
+      reservationNote:
+        named.reservationNote || String(parsed.reservationNote ?? "").trim(),
+    };
+  } catch {
+    return named;
   }
 }
 

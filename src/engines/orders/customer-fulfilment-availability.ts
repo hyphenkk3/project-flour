@@ -3,8 +3,11 @@
  * Composes existing pickup, dine-in, and delivery calendars — no second calendar.
  */
 
-import { getDeliverySchedule } from "@/engines/business-calendar/delivery-hours";
-import { getDineInSchedule } from "@/engines/business-calendar/dine-in-hours";
+import { getDeliverySchedule, getDeliverySlotsForDate } from "@/engines/business-calendar/delivery-hours";
+import {
+  getDineInSchedule,
+  getDineInSlotsForDate,
+} from "@/engines/business-calendar/dine-in-hours";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import {
   customerHoursNoticeFromSnapshot,
@@ -14,6 +17,7 @@ import {
   customerPickupSlotsForDate,
   isPickupOrdersClosed,
 } from "@/engines/business-calendar/order-availability";
+import type { PickupSlot } from "@/engines/business-calendar/pickup-slots";
 import type { CustomerWebsiteFulfilmentMethod } from "@/engines/orders/fulfilment";
 
 export type CustomerFulfilmentAvailability = {
@@ -84,6 +88,23 @@ export function customerDeliveryAvailability(
     return { available: false, reason: "Unavailable" };
   }
   return { available: true, reason: null };
+}
+
+/** Website and CO slot lists for a method — same calendars, no channel-specific grids. */
+export function customerFulfilmentSlotsForDate(
+  method: CustomerWebsiteFulfilmentMethod,
+  dateYmd: string,
+  closedDates: readonly string[],
+  snapshot: OperatingHoursSnapshot = OPERATING_HOURS_SEED,
+): PickupSlot[] {
+  if (!dateYmd || isPickupOrdersClosed(dateYmd, closedDates)) return [];
+  if (method === "delivery") {
+    return getDeliverySlotsForDate(dateYmd, snapshot);
+  }
+  if (method === "dine_in") {
+    return getDineInSlotsForDate(dateYmd, snapshot);
+  }
+  return customerPickupSlotsForDate(dateYmd, closedDates, snapshot);
 }
 
 export function customerFulfilmentAvailability(

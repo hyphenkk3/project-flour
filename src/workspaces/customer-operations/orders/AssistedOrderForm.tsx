@@ -12,10 +12,13 @@ import {
   FormTextarea,
 } from "@/components/ui/form";
 import {
+  defaultAssistedDineInDraft,
+  type AssistedDineInDraft,
+} from "@/engines/orders/assisted-fulfilment";
+import {
   defaultDeliveryCreateDraft,
-  defaultOwnerCreateFulfilmentMethod,
+  type CustomerWebsiteFulfilmentMethod,
   type DeliveryCreateDraft,
-  type OwnerCreateFulfilmentMethod,
 } from "@/engines/orders/fulfilment";
 import type { Customer } from "@/types/customer";
 import type { StorefrontCake } from "@/types/storefront";
@@ -24,8 +27,8 @@ import {
   createOrderAction,
   type OrderActionState,
 } from "@/workspaces/customer-operations/orders/actions";
+import { AssistedOrderFulfilmentFields } from "@/workspaces/customer-operations/orders/AssistedOrderFulfilmentFields";
 import { STAFF_GUEST_ORDER_SOURCES } from "@/workspaces/owner/orders/labels";
-import { OrderFulfilmentCreateFields } from "@/workspaces/owner/orders/OrderFulfilmentCreateFields";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 
@@ -40,6 +43,7 @@ type AssistedOrderFormProps = {
   customers: Customer[];
   cakes: StorefrontCake[];
   defaultCustomerId?: string;
+  closedDates?: readonly string[];
   hoursSnapshot?: OperatingHoursSnapshot;
 };
 
@@ -59,6 +63,7 @@ export function AssistedOrderForm({
   customers,
   cakes,
   defaultCustomerId,
+  closedDates = [],
   hoursSnapshot = OPERATING_HOURS_SEED,
 }: AssistedOrderFormProps) {
   const [state, formAction, pending] = useActionState(
@@ -67,9 +72,12 @@ export function AssistedOrderForm({
   );
   const [customerId, setCustomerId] = useState(defaultCustomerId ?? "");
   const [fulfilmentMethod, setFulfilmentMethod] =
-    useState<OwnerCreateFulfilmentMethod>(defaultOwnerCreateFulfilmentMethod);
+    useState<CustomerWebsiteFulfilmentMethod>("pickup");
   const [deliveryDraft, setDeliveryDraft] = useState<DeliveryCreateDraft>(
     defaultDeliveryCreateDraft,
+  );
+  const [dineInDraft, setDineInDraft] = useState<AssistedDineInDraft>(
+    defaultAssistedDineInDraft,
   );
   const [items, setItems] = useState<CakeLine[]>(() => [
     initialCakeLine(cakes),
@@ -85,6 +93,7 @@ export function AssistedOrderForm({
     () => JSON.stringify(deliveryDraft),
     [deliveryDraft],
   );
+  const dineInJson = useMemo(() => JSON.stringify(dineInDraft), [dineInDraft]);
 
   function updateCakeLine(key: string, patch: Partial<CakeLine>) {
     setItems((current) =>
@@ -116,6 +125,7 @@ export function AssistedOrderForm({
       <input name="items_json" type="hidden" value={itemsJson} />
       <input name="fulfilment_method" type="hidden" value={fulfilmentMethod} />
       <input name="delivery_json" type="hidden" value={deliveryJson} />
+      <input name="dine_in_json" type="hidden" value={dineInJson} />
 
       <FormField
         help="The customer's name and phone are copied onto the order. The CRM record is not written onto the operational order."
@@ -163,13 +173,16 @@ export function AssistedOrderForm({
         </FormSelect>
       </FormField>
 
-      <OrderFulfilmentCreateFields
+      <AssistedOrderFulfilmentFields
+        closedDates={closedDates}
         customerName={customerName}
         customerPhone={customerPhone}
         delivery={deliveryDraft}
+        dineIn={dineInDraft}
         hoursSnapshot={hoursSnapshot}
         method={fulfilmentMethod}
         onDeliveryChange={setDeliveryDraft}
+        onDineInChange={setDineInDraft}
         onMethodChange={setFulfilmentMethod}
       />
 

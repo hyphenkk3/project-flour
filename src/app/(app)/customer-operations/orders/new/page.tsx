@@ -5,6 +5,9 @@ import { listCustomers } from "@/workspaces/customer-operations/customers/querie
 import { AssistedOrderForm } from "@/workspaces/customer-operations/orders/AssistedOrderForm";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import { listOfferableLibraryCakes } from "@/workspaces/storefront/catalog/queries";
+import { listClosedPickupOrderDates } from "@/workspaces/storefront/checkout/order-availability";
+import { earliestPickupDateYmd } from "@/engines/business-calendar/pickup-slots";
+import { addBusinessCalendarDays } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +19,13 @@ export default async function NewOrderPage({
   searchParams,
 }: NewOrderPageProps) {
   const params = await searchParams;
-  const [customers, cakes, hoursSnapshot] = await Promise.all([
+  const earliest = earliestPickupDateYmd();
+  const rangeMax = addBusinessCalendarDays(earliest, 120) ?? earliest;
+  const [customers, cakes, hoursSnapshot, closedDates] = await Promise.all([
     listCustomers(),
     listOfferableLibraryCakes(),
     loadOperatingHoursSnapshot(),
+    listClosedPickupOrderDates(earliest, rangeMax),
   ]);
 
   return (
@@ -55,6 +61,7 @@ export default async function NewOrderPage({
       ) : (
         <AssistedOrderForm
           cakes={cakes}
+          closedDates={closedDates}
           customers={customers}
           defaultCustomerId={params.customerId}
           hoursSnapshot={hoursSnapshot}

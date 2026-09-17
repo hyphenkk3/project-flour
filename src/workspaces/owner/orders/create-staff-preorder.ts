@@ -1,8 +1,18 @@
+import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
+import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import { isValidClockPickupTime } from "@/engines/business-calendar/pickup-slots";
+import {
+  buildAssistedFulfilmentRpcParams,
+  defaultAssistedDineInDraft,
+  validateAssistedOrderFulfilment,
+  type AssistedDineInDraft,
+} from "@/engines/orders/assisted-fulfilment";
 import {
   buildCreateStaffFulfilmentRpcParams,
   normalizeOwnerCreateFulfilmentMethod,
+  parseCustomerWebsiteFulfilmentMethod,
   validateOwnerCreateFulfilment,
+  type CustomerWebsiteFulfilmentMethod,
   type DeliveryCreateDraft,
   type OwnerCreateFulfilmentMethod,
 } from "@/engines/orders/fulfilment";
@@ -34,8 +44,17 @@ export type CreateStaffGuestPreorderInput = {
   bakeryAttentionNote?: string | null;
   customerNotes: string | null;
   internalNotes: string | null;
-  fulfilmentMethod: OwnerCreateFulfilmentMethod;
+  fulfilmentMethod: OwnerCreateFulfilmentMethod | CustomerWebsiteFulfilmentMethod;
   delivery: DeliveryCreateDraft;
+  /**
+   * Default `owner-clock` is an Owner-authorized exception: any valid clock
+   * time, including times outside customer slots. Customer Operations must pass
+   * `customer-slots` so assisted create uses Whole Cake canonical calendars.
+   */
+  slotPolicy?: "owner-clock" | "customer-slots";
+  dineIn?: AssistedDineInDraft;
+  closedDates?: readonly string[];
+  hoursSnapshot?: OperatingHoursSnapshot;
 };
 
 export async function createStaffGuestPreorderRecord(
@@ -57,25 +76,60 @@ export async function createStaffGuestPreorderRecord(
     };
   }
 
-  const fulfilmentMethod = normalizeOwnerCreateFulfilmentMethod(
-    input.fulfilmentMethod,
-  );
-  const fulfilmentError = validateOwnerCreateFulfilment({
-    method: fulfilmentMethod,
-    pickupDate: input.pickupDate,
-    pickupTime: input.pickupTime,
-    delivery: input.delivery,
-  });
-  if (fulfilmentError) {
-    return { error: fulfilmentError };
-  }
-  if (!isValidClockPickupTime(input.pickupTime)) {
-    return {
-      error:
-        fulfilmentMethod === "delivery"
-          ? "Please enter a valid delivery clock time."
-          : "Please enter a valid pickup clock time.",
-    };
+  const slotPolicy = input.slotPolicy ?? "owner-clock";
+  const dineIn = input.dineIn ?? defaultAssistedDineInDraft();
+  let fulfilmentRpc: {
+    p_fulfilment_method: CustomerWebsiteFulfilmentMethod | OwnerCreateFulfilmentMethod;
+    p_delivery: ReturnType<typeof buildCreateStaffFulfilmentRpcParams>["p_delivery"];
+    p_dine_in?: ReturnType<typeof buildAssistedFulfilmentRpcParams>["p_dine_in"];
+  };
+
+  if (slotPolicy === "customer-slots") {
+    const fulfilmentMethod = parseCustomerWebsiteFulfilmentMethod(
+      input.fulfilmentMethod,
+    );
+    const fulfilmentError = validateAssistedOrderFulfilment({
+      method: fulfilmentMethod,
+      dateYmd: input.pickupDate,
+      timeValue: input.pickupTime,
+      delivery: input.delivery,
+      dineIn,
+      closedDates: input.closedDates,
+      hoursSnapshot: input.hoursSnapshot ?? OPERATING_HOURS_SEED,
+    });
+    if (fulfilmentError) {
+      return { error: fulfilmentError };
+    }
+    fulfilmentRpc = buildAssistedFulfilmentRpcParams({
+      method: fulfilmentMethod,
+      delivery: input.delivery,
+      dineIn,
+    });
+  } else {
+    const fulfilmentMethod = normalizeOwnerCreateFulfilmentMethod(
+      input.fulfilmentMethod,
+    );
+    const fulfilmentError = validateOwnerCreateFulfilment({
+      method: fulfilmentMethod,
+      pickupDate: input.pickupDate,
+      pickupTime: input.pickupTime,
+      delivery: input.delivery,
+    });
+    if (fulfilmentError) {
+      return { error: fulfilmentError };
+    }
+    if (!isValidClockPickupTime(input.pickupTime)) {
+      return {
+        error:
+          fulfilmentMethod === "delivery"
+            ? "Please enter a valid delivery clock time."
+            : "Please enter a valid pickup clock time.",
+      };
+    }
+    fulfilmentRpc = buildCreateStaffFulfilmentRpcParams({
+      method: fulfilmentMethod,
+      delivery: input.delivery,
+    });
   }
   if (input.items.length === 0) {
     return { error: "Please add at least one cake." };
@@ -97,13 +151,8 @@ export async function createStaffGuestPreorderRecord(
     }
   }
 
-  const fulfilmentRpc = buildCreateStaffFulfilmentRpcParams({
-    method: fulfilmentMethod,
-    delivery: input.delivery,
-  });
-
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("create_staff_guest_preorder", {
+  const rpcArgs: Record<string, unknown> = {
     p_actor_staff_id: input.actorStaffId,
     p_customer_name: guestName,
     p_phone: input.guestPhone,
@@ -129,7 +178,15 @@ export async function createStaffGuestPreorderRecord(
     p_internal_notes: input.internalNotes,
     p_fulfilment_method: fulfilmentRpc.p_fulfilment_method,
     p_delivery: fulfilmentRpc.p_delivery,
-  });
+  };
+  if (fulfilmentRpc.p_fulfilment_method === "dine_in") {
+    rpcArgs.p_dine_in = fulfilmentRpc.p_dine_in;
+  }
+
+  const { data, error } = await supabase.rpc(
+    "create_staff_guest_preorder",
+    rpcArgs,
+  );
 
   if (error) {
     return { error: error.message };

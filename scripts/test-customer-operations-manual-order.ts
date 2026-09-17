@@ -117,10 +117,13 @@ assert.match(actions, /isStaffGuestOrderSource/);
 assert.match(createHelper, /create_staff_guest_preorder/);
 assert.doesNotMatch(createHelper, /customer_id/);
 
-// P. Pickup date/time
-assert.match(form, /OrderFulfilmentCreateFields/);
+// P. Canonical fulfilment slots (not Owner free clock)
+assert.match(form, /AssistedOrderFulfilmentFields/);
+assert.doesNotMatch(form, /OrderFulfilmentCreateFields/);
 assert.match(createHelper, /p_pickup_date: input.pickupDate/);
 assert.match(createHelper, /p_pickup_time: input.pickupTime/);
+assert.match(createHelper, /slotPolicy: "customer-slots"|slotPolicy \?\? "owner-clock"/);
+assert.match(actions, /slotPolicy: "customer-slots"/);
 
 // Q / R. Discoverable operational order + Guest Order Workspace handoff
 assert.match(queries, /\.is\("customer_id", null\)/);
