@@ -99,7 +99,9 @@ export async function OwnerOrderDetail({
       ? withCalendarReturnPositionFlag(back.href)
       : back.label === "Approval History"
         ? withApprovalHistoryReturnPositionFlag(back.href)
-        : back.label === "Approvals" || back.label === "Home"
+        : back.label === "Approvals" ||
+            back.label === "Home" ||
+            back.label === "Customer profile"
           ? back.href
           : capabilities.canAccessOperationsBoard
             ? back.href
@@ -110,7 +112,8 @@ export async function OwnerOrderDetail({
     back.label === "Whole Cake Calendar" ||
     back.label === "Approval History" ||
     back.label === "Approvals" ||
-    back.label === "Home"
+    back.label === "Home" ||
+    back.label === "Customer profile"
       ? back.label
       : capabilities.canAccessOperationsBoard
         ? "Operations"

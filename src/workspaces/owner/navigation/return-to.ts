@@ -26,6 +26,22 @@ function isSafeRelativeOwnerPath(value: string): boolean {
   return true;
 }
 
+const CUSTOMER_PROFILE_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function parseCustomerOperationsProfilePath(
+  pathname: string,
+): OwnerReturnContext | null {
+  const prefix = "/customer-operations/customers/";
+  if (!pathname.startsWith(prefix)) return null;
+  const id = pathname.slice(prefix.length);
+  if (!CUSTOMER_PROFILE_ID.test(id)) return null;
+  return {
+    href: `${prefix}${id}`,
+    label: "Customer profile",
+  };
+}
+
 function pathnameOf(value: string): { pathname: string; search: string } {
   const qIndex = value.indexOf("?");
   const pathname = qIndex >= 0 ? value.slice(0, qIndex) : value;
@@ -41,6 +57,7 @@ function pathnameOf(value: string): { pathname: string; search: string } {
  * Validate returnTo for Owner Order Workspace.
  * Accepted destinations:
  * - Home (`/home`) — Home cockpit deep-links into Order Workspace
+ * - Customer Operations profile (`/customer-operations/customers/{uuid}`)
  * - Operations (`/owner`, optionally with approved board query params)
  * - Whole Cake Calendar (with approved params)
  * - Approvals inbox (`/owner/approvals`)
@@ -68,6 +85,11 @@ export function resolveOwnerReturnTo(
 
   if (pathname === "/home") {
     return { href: "/home", label: "Home" };
+  }
+
+  const customerProfile = parseCustomerOperationsProfilePath(pathname);
+  if (customerProfile) {
+    return customerProfile;
   }
 
   if (pathname === "/owner/calendar") {

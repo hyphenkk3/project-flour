@@ -12,6 +12,87 @@ export function normalizePhone(
   return digits.length > 0 ? digits : null;
 }
 
+/**
+ * Minimum digits before matching a CRM phone to a guest order.
+ * Shorter values are too ambiguous (last-four, extensions).
+ */
+export const GUEST_PHONE_MATCH_MIN_DIGITS = 8;
+
+/**
+ * Malaysian mobile numbers are stored both as local `0…` and international
+ * `60…` / `+60…`. Guest orders keep the typed display string; CRM rows keep
+ * digits-only `phone_normalized`. These keys let both forms match.
+ *
+ * Built on {@link normalizePhone} — does not replace it.
+ */
+export function malaysiaPhoneEquivalenceKeys(
+  value: string | null | undefined,
+): string[] {
+  const digits = /^\d+$/.test(value ?? "")
+    ? (value as string)
+    : normalizePhone(value);
+  if (!digits) {
+    return [];
+  }
+
+  const keys = new Set<string>([digits]);
+
+  if (digits.startsWith("60") && digits.length >= 10) {
+    keys.add(`0${digits.slice(2)}`);
+  }
+
+  if (digits.startsWith("0") && digits.length >= 9) {
+    keys.add(`60${digits.slice(1)}`);
+  }
+
+  if (
+    !digits.startsWith("0") &&
+    !digits.startsWith("60") &&
+    digits.length >= 9 &&
+    digits.length <= 11
+  ) {
+    keys.add(`0${digits}`);
+    keys.add(`60${digits}`);
+  }
+
+  return [...keys];
+}
+
+export function isPhoneSpecificEnoughForGuestMatch(
+  value: string | null | undefined,
+): boolean {
+  const digits = normalizePhone(value);
+  return digits !== null && digits.length >= GUEST_PHONE_MATCH_MIN_DIGITS;
+}
+
+/**
+ * True when a CRM phone and a guest `orders.guest_phone` represent the same
+ * number after digit-stripping and Malaysian 0 / +60 equivalence.
+ */
+export function phonesMatchForCustomerHistory(
+  customerPhone: string | null | undefined,
+  guestPhone: string | null | undefined,
+): boolean {
+  if (!isPhoneSpecificEnoughForGuestMatch(customerPhone)) {
+    return false;
+  }
+  if (!isPhoneSpecificEnoughForGuestMatch(guestPhone)) {
+    return false;
+  }
+
+  const customerKeys = malaysiaPhoneEquivalenceKeys(customerPhone);
+  const guestKeys = malaysiaPhoneEquivalenceKeys(guestPhone);
+  return customerKeys.some((key) => guestKeys.includes(key));
+}
+
+/** POSIX regex: digits in order with optional non-digit separators between. */
+export function digitsToFlexiblePhoneRegex(digits: string): string {
+  if (!/^\d+$/.test(digits)) {
+    return "";
+  }
+  return digits.split("").join("\\D*");
+}
+
 /** Trimmed display phone; empty becomes null. */
 export function displayPhone(value: string | null | undefined): string | null {
   if (!value) {

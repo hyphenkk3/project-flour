@@ -2,7 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EmptyState } from "@/components/shell/EmptyState";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { loadMalaysiaPreorderBusinessDate } from "@/engines/preorder/server";
+import { CustomerHistoryPanel, CustomerHistoryUnavailable } from "@/workspaces/customer-operations/customers/CustomerHistoryPanel";
 import { DeleteAddressButton } from "@/workspaces/customer-operations/customers/DeleteAddressButton";
+import { loadCustomerOrderHistory } from "@/workspaces/customer-operations/customers/history-queries";
 import {
   customerIdentityLabel,
   customerInitials,
@@ -33,6 +36,21 @@ export default async function CustomerProfilePage({
   }
 
   const addresses = await listCustomerAddresses(customer.id);
+  const todayYmd = await loadMalaysiaPreorderBusinessDate();
+
+  let history = null;
+  let historyError = false;
+  try {
+    history = await loadCustomerOrderHistory({
+      customerId: customer.id,
+      phoneNormalized: customer.phoneNormalized,
+      phoneNumber: customer.phoneNumber,
+      todayYmd,
+    });
+  } catch {
+    historyError = true;
+  }
+
   const identity = customerIdentityLabel(
     customer.fullName,
     customer.phoneNumber,
@@ -191,16 +209,14 @@ export default async function CustomerProfilePage({
         <p>Updated · {formatCustomerDate(customer.updatedAt)}</p>
       </section>
 
-      <section className="space-y-2">
-        <div className="border-fog rounded-xl border border-dashed bg-white/50 px-4 py-3">
-          <h3 className="text-ink text-sm font-medium">Orders</h3>
-          <p className="text-skyline mt-1 text-sm">Coming in V0.3</p>
-        </div>
-        <div className="border-fog rounded-xl border border-dashed bg-white/50 px-4 py-3">
-          <h3 className="text-ink text-sm font-medium">Timeline</h3>
-          <p className="text-skyline mt-1 text-sm">Coming in V0.3</p>
-        </div>
-      </section>
+      {historyError ? (
+        <CustomerHistoryUnavailable message="Order history could not be loaded. Try again, or open the order from Operations." />
+      ) : history ? (
+        <CustomerHistoryPanel
+          customerId={customer.id}
+          history={history}
+        />
+      ) : null}
     </div>
   );
 }

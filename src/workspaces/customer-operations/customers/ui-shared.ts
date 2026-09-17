@@ -1,3 +1,5 @@
+import { malaysiaPhoneEquivalenceKeys } from "@/workspaces/customer-operations/customers/normalize";
+
 const fieldClass =
   "w-full rounded-lg border border-fog bg-white px-3 py-3 text-base text-ink outline-none focus:border-signal min-h-12";
 
@@ -70,6 +72,7 @@ export function matchesCustomerQuery(
   if (qDigits.length > 0) {
     const normalized = customer.phoneNormalized ?? "";
     const displayDigits = (customer.phoneNumber ?? "").replace(/\D/g, "");
+    const storedDigits = normalized || displayDigits;
 
     if (normalized.includes(qDigits) || displayDigits.includes(qDigits)) {
       return true;
@@ -80,6 +83,14 @@ export function matchesCustomerQuery(
       (normalized.endsWith(qDigits) || displayDigits.endsWith(qDigits))
     ) {
       return true;
+    }
+
+    if (qDigits.length >= 8 && storedDigits.length >= 8) {
+      const storedKeys = malaysiaPhoneEquivalenceKeys(storedDigits);
+      const queryKeys = malaysiaPhoneEquivalenceKeys(qDigits);
+      if (queryKeys.some((key) => storedKeys.includes(key))) {
+        return true;
+      }
     }
   }
 
