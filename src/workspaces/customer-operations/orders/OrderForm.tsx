@@ -14,7 +14,6 @@ import {
 import type { Customer } from "@/types/customer";
 import type { OrderDetail } from "@/types/order";
 import {
-  createOrderAction,
   updateOrderAction,
   type OrderActionState,
 } from "@/workspaces/customer-operations/orders/actions";
@@ -24,26 +23,19 @@ import {
 } from "@/workspaces/customer-operations/orders/status";
 
 type OrderFormProps = {
-  mode: "create" | "edit";
   customers: Customer[];
-  order?: OrderDetail;
+  order: OrderDetail;
   cancelHref: string;
-  defaultCustomerId?: string;
 };
 
 const initialState: OrderActionState = { error: null };
 
 export function OrderForm({
-  mode,
   customers,
   order,
   cancelHref,
-  defaultCustomerId,
 }: OrderFormProps) {
-  const action =
-    mode === "create"
-      ? createOrderAction
-      : updateOrderAction.bind(null, order!.id);
+  const action = updateOrderAction.bind(null, order.id);
 
   const [state, formAction, pending] = useActionState(action, initialState);
 
@@ -55,7 +47,7 @@ export function OrderForm({
         label="Customer"
       >
         <FormSelect
-          defaultValue={order?.customerId ?? defaultCustomerId ?? ""}
+          defaultValue={order.customerId ?? ""}
           id="customer_id"
           name="customer_id"
           required
@@ -139,9 +131,7 @@ export function OrderForm({
       <FormError message={state.error} />
 
       <FormActions>
-        <FormSubmitButton pending={pending}>
-          {mode === "create" ? "Create order" : "Save changes"}
-        </FormSubmitButton>
+        <FormSubmitButton pending={pending}>Save changes</FormSubmitButton>
         <Link
           className="border-fog text-ink inline-flex min-h-12 items-center justify-center rounded-lg border bg-white px-5 text-sm font-medium"
           href={cancelHref}

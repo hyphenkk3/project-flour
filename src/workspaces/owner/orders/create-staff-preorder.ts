@@ -1,0 +1,147 @@
+import { isValidClockPickupTime } from "@/engines/business-calendar/pickup-slots";
+import {
+  buildCreateStaffFulfilmentRpcParams,
+  normalizeOwnerCreateFulfilmentMethod,
+  validateOwnerCreateFulfilment,
+  type DeliveryCreateDraft,
+  type OwnerCreateFulfilmentMethod,
+} from "@/engines/orders/fulfilment";
+import type { PaidAddonMutationPayload } from "@/engines/orders/paid-addons";
+import { createClient } from "@/lib/supabase/server";
+import { isStaffGuestOrderSource } from "@/workspaces/owner/orders/labels";
+import type { StaffPreorderFormItem } from "@/workspaces/owner/orders/staff-preorder-form";
+import { listOfferableLibraryCakes } from "@/workspaces/storefront/catalog/queries";
+
+export type CreateStaffGuestPreorderInput = {
+  actorStaffId: string;
+  guestName: string;
+  guestPhone: string | null;
+  guestEmail: string | null;
+  orderSource: string;
+  crewOrder?: boolean;
+  pickupDate: string;
+  pickupTime: string;
+  items: StaffPreorderFormItem[];
+  complimentary?: Array<{
+    type_id: string | null;
+    name: string;
+    quantity: number;
+    sort_order: number;
+  }>;
+  paidAddons?: PaidAddonMutationPayload[];
+  includeReceipt?: boolean;
+  needsBakeryAttention?: boolean;
+  bakeryAttentionNote?: string | null;
+  customerNotes: string | null;
+  internalNotes: string | null;
+  fulfilmentMethod: OwnerCreateFulfilmentMethod;
+  delivery: DeliveryCreateDraft;
+};
+
+export async function createStaffGuestPreorderRecord(
+  input: CreateStaffGuestPreorderInput,
+): Promise<{ orderId: string } | { error: string }> {
+  const guestName = input.guestName.trim();
+  if (!guestName) {
+    return { error: "Please enter the customer name." };
+  }
+  if (!isStaffGuestOrderSource(input.orderSource)) {
+    return { error: "Please choose a valid order source." };
+  }
+  if (
+    input.guestEmail &&
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.guestEmail)
+  ) {
+    return {
+      error: "Please enter a valid email address, or leave email blank.",
+    };
+  }
+
+  const fulfilmentMethod = normalizeOwnerCreateFulfilmentMethod(
+    input.fulfilmentMethod,
+  );
+  const fulfilmentError = validateOwnerCreateFulfilment({
+    method: fulfilmentMethod,
+    pickupDate: input.pickupDate,
+    pickupTime: input.pickupTime,
+    delivery: input.delivery,
+  });
+  if (fulfilmentError) {
+    return { error: fulfilmentError };
+  }
+  if (!isValidClockPickupTime(input.pickupTime)) {
+    return {
+      error:
+        fulfilmentMethod === "delivery"
+          ? "Please enter a valid delivery clock time."
+          : "Please enter a valid pickup clock time.",
+    };
+  }
+  if (input.items.length === 0) {
+    return { error: "Please add at least one cake." };
+  }
+
+  const cakes = await listOfferableLibraryCakes();
+  for (const draft of input.items) {
+    const cake = cakes.find((entry) => entry.id === draft.cakeId);
+    if (!cake) {
+      return {
+        error: "One of the cakes is not available in the Library.",
+      };
+    }
+    const size = cake.sizes.find((entry) => entry.id === draft.cakeSizeId);
+    if (!size) {
+      return {
+        error: `Please choose a valid size for ${cake.name}.`,
+      };
+    }
+  }
+
+  const fulfilmentRpc = buildCreateStaffFulfilmentRpcParams({
+    method: fulfilmentMethod,
+    delivery: input.delivery,
+  });
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("create_staff_guest_preorder", {
+    p_actor_staff_id: input.actorStaffId,
+    p_customer_name: guestName,
+    p_phone: input.guestPhone,
+    p_email: input.guestEmail,
+    p_order_source: input.orderSource,
+    p_crew_order: Boolean(input.crewOrder),
+    p_pickup_date: input.pickupDate,
+    p_pickup_time: input.pickupTime,
+    p_pickup_instruction: null,
+    p_items: input.items.map((item) => ({
+      cake_id: item.cakeId,
+      cake_size_id: item.cakeSizeId,
+      quantity: item.quantity,
+    })),
+    p_complimentary: input.complimentary ?? [],
+    p_paid_addons: input.paidAddons ?? [],
+    p_include_receipt: Boolean(input.includeReceipt),
+    p_needs_bakery_attention: Boolean(input.needsBakeryAttention),
+    p_bakery_attention_note: input.needsBakeryAttention
+      ? input.bakeryAttentionNote
+      : null,
+    p_customer_notes: input.customerNotes,
+    p_internal_notes: input.internalNotes,
+    p_fulfilment_method: fulfilmentRpc.p_fulfilment_method,
+    p_delivery: fulfilmentRpc.p_delivery,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  const orderId =
+    data && typeof data === "object" && "id" in data
+      ? String((data as { id: string }).id)
+      : null;
+  if (!orderId) {
+    return { error: "Order was created but could not be opened." };
+  }
+
+  return { orderId };
+}

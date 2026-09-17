@@ -42,7 +42,7 @@ export type OrderCustomerSummary = {
 };
 
 export type OrderListItem = Order & {
-  customer: OrderCustomerSummary;
+  customer: OrderCustomerSummary | null;
 };
 
 export type OrderDetail = OrderListItem & {

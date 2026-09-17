@@ -58,6 +58,7 @@ function pathnameOf(value: string): { pathname: string; search: string } {
  * Accepted destinations:
  * - Home (`/home`) — Home cockpit deep-links into Order Workspace
  * - Customer Operations profile (`/customer-operations/customers/{uuid}`)
+ * - Customer Operations Orders list (`/customer-operations/orders`)
  * - Operations (`/owner`, optionally with approved board query params)
  * - Whole Cake Calendar (with approved params)
  * - Approvals inbox (`/owner/approvals`)
@@ -85,6 +86,13 @@ export function resolveOwnerReturnTo(
 
   if (pathname === "/home") {
     return { href: "/home", label: "Home" };
+  }
+
+  if (pathname === "/customer-operations/orders") {
+    return {
+      href: "/customer-operations/orders",
+      label: "Orders",
+    };
   }
 
   const customerProfile = parseCustomerOperationsProfilePath(pathname);

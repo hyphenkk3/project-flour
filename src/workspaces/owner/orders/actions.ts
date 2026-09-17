@@ -28,8 +28,12 @@ import {
   fulfilmentTimelineSummary,
   normalizeOwnerCreateFulfilmentMethod,
   validateOwnerCreateFulfilment,
-  type DeliveryCreateDraft,
 } from "@/engines/orders/fulfilment";
+import { createStaffGuestPreorderRecord } from "@/workspaces/owner/orders/create-staff-preorder";
+import {
+  parseDeliveryDraftFromForm,
+  parseStaffPreorderItemsFromForm,
+} from "@/workspaces/owner/orders/staff-preorder-form";
 import { isWithinTwoDayChangeCutoff } from "@/engines/operations/approvals";
 import {
   canCancelGuestOrder,
@@ -260,37 +264,7 @@ async function afterDiscountMutation(input: {
   return markPendingConfirmationStaleIfAmountChanged(input);
 }
 
-function parseItemsFromForm(formData: FormData): Array<{
-  cakeId: string;
-  cakeSizeId: string;
-  quantity: number;
-}> {
-  const raw = String(formData.get("items_json") ?? "").trim();
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw) as Array<{
-      cakeId?: string;
-      cakeSizeId?: string;
-      quantity?: number;
-    }>;
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map((item) => ({
-        cakeId: String(item.cakeId ?? "").trim(),
-        cakeSizeId: String(item.cakeSizeId ?? "").trim(),
-        quantity: Number(item.quantity ?? 0),
-      }))
-      .filter(
-        (item) =>
-          item.cakeId &&
-          item.cakeSizeId &&
-          Number.isInteger(item.quantity) &&
-          item.quantity >= 1,
-      );
-  } catch {
-    return [];
-  }
-}
+const parseItemsFromForm = parseStaffPreorderItemsFromForm;
 
 function parseComplimentaryFromForm(formData: FormData): Array<{
   typeId: string | null;
@@ -365,31 +339,6 @@ function parsePaidAddonsMutationFromForm(
   }
 }
 
-function parseDeliveryDraftFromForm(formData: FormData): DeliveryCreateDraft {
-  const raw = String(formData.get("delivery_json") ?? "").trim();
-  if (!raw) return defaultDeliveryCreateDraft();
-  try {
-    const parsed = JSON.parse(raw) as Partial<DeliveryCreateDraft>;
-    return {
-      recipientName: String(parsed.recipientName ?? ""),
-      recipientPhone: String(parsed.recipientPhone ?? ""),
-      addressLine1: String(parsed.addressLine1 ?? ""),
-      addressLine2: String(parsed.addressLine2 ?? ""),
-      postcode: String(parsed.postcode ?? ""),
-      city: String(parsed.city ?? ""),
-      state: String(parsed.state ?? ""),
-      recipientNotifyPreference:
-        parsed.recipientNotifyPreference === "inform_recipient" ||
-        parsed.recipientNotifyPreference === "do_not_inform_recipient"
-          ? parsed.recipientNotifyPreference
-          : null,
-      sameAsCustomer: Boolean(parsed.sameAsCustomer),
-    };
-  } catch {
-    return defaultDeliveryCreateDraft();
-  }
-}
-
 export async function createStaffGuestOrderAction(
   _prev: CreateStaffGuestOrderState,
   formData: FormData,
@@ -419,79 +368,17 @@ export async function createStaffGuestOrderAction(
   );
   const deliveryDraft = parseDeliveryDraftFromForm(formData);
 
-  if (!guestName) {
-    return { error: "Please enter the customer name." };
-  }
-  if (!isStaffGuestOrderSource(orderSource)) {
-    return { error: "Please choose a valid order source." };
-  }
-  if (guestEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail)) {
-    return {
-      error: "Please enter a valid email address, or leave email blank.",
-    };
-  }
-
-  const fulfilmentError = validateOwnerCreateFulfilment({
-    method: fulfilmentMethod,
+  const created = await createStaffGuestPreorderRecord({
+    actorStaffId: staff.id,
+    guestName,
+    guestPhone: guestPhone || null,
+    guestEmail: guestEmail || null,
+    orderSource,
+    crewOrder,
     pickupDate,
     pickupTime,
-    delivery: deliveryDraft,
-  });
-  if (fulfilmentError) {
-    return { error: fulfilmentError };
-  }
-  if (!isValidClockPickupTime(pickupTime)) {
-    return {
-      error:
-        fulfilmentMethod === "delivery"
-          ? "Please enter a valid delivery clock time."
-          : "Please enter a valid pickup clock time.",
-    };
-  }
-  if (draftItems.length === 0) {
-    return { error: "Please add at least one cake." };
-  }
-
-  const cakes = await listOfferableLibraryCakes();
-
-  for (const draft of draftItems) {
-    const cake = cakes.find((entry) => entry.id === draft.cakeId);
-    if (!cake) {
-      return {
-        error: "One of the cakes is not available in the Library.",
-      };
-    }
-    const size = cake.sizes.find((entry) => entry.id === draft.cakeSizeId);
-    if (!size) {
-      return {
-        error: `Please choose a valid size for ${cake.name}.`,
-      };
-    }
-  }
-
-  const fulfilmentRpc = buildCreateStaffFulfilmentRpcParams({
-    method: fulfilmentMethod,
-    delivery: deliveryDraft,
-  });
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("create_staff_guest_preorder", {
-    p_actor_staff_id: staff.id,
-    p_customer_name: guestName,
-    p_phone: guestPhone || null,
-    p_email: guestEmail || null,
-    p_order_source: orderSource,
-    p_crew_order: crewOrder,
-    p_pickup_date: pickupDate,
-    p_pickup_time: pickupTime,
-    /** Free-text pickup instruction retired from Owner UI — new orders leave null. */
-    p_pickup_instruction: null,
-    p_items: draftItems.map((item) => ({
-      cake_id: item.cakeId,
-      cake_size_id: item.cakeSizeId,
-      quantity: item.quantity,
-    })),
-    p_complimentary: draftComplimentary
+    items: draftItems,
+    complimentary: draftComplimentary
       .filter((item) => item.quantity > 0)
       .map((item) => ({
         type_id: item.typeId,
@@ -499,32 +386,24 @@ export async function createStaffGuestOrderAction(
         quantity: item.quantity,
         sort_order: item.sortOrder,
       })),
-    p_paid_addons: draftPaidAddons,
-    p_include_receipt: includeReceipt,
-    p_needs_bakery_attention: needsAttention,
-    p_bakery_attention_note: needsAttention ? attentionNote || null : null,
-    p_customer_notes: customerNotes || null,
-    p_internal_notes: internalNotes || null,
-    p_fulfilment_method: fulfilmentRpc.p_fulfilment_method,
-    p_delivery: fulfilmentRpc.p_delivery,
+    paidAddons: draftPaidAddons,
+    includeReceipt,
+    needsBakeryAttention: needsAttention,
+    bakeryAttentionNote: needsAttention ? attentionNote || null : null,
+    customerNotes: customerNotes || null,
+    internalNotes: internalNotes || null,
+    fulfilmentMethod,
+    delivery: deliveryDraft,
   });
 
-  if (error) {
-    return { error: error.message };
-  }
-
-  const orderId =
-    data && typeof data === "object" && "id" in data
-      ? String((data as { id: string }).id)
-      : null;
-  if (!orderId) {
-    return { error: "Order was created but could not be opened." };
+  if ("error" in created) {
+    return { error: created.error };
   }
 
   scheduleStaffNotificationDispatch();
   revalidatePath("/owner");
-  revalidatePath(`/owner/orders/${orderId}`);
-  redirect(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${created.orderId}`);
+  redirect(`/owner/orders/${created.orderId}`);
 }
 
 export async function saveOrderWorkspaceAction(

@@ -2,27 +2,40 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { canCreateStaffAssistedOrder } from "@/engines/orders/delivery-finance-capabilities";
 import { requireStaff } from "@/foundation/auth/session";
 import { canAccessWorkspace } from "@/foundation/navigation/access";
 import { createClient } from "@/lib/supabase/server";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
+import {
+  normalizeOwnerCreateFulfilmentMethod,
+} from "@/engines/orders/fulfilment";
 import type {
   FulfilmentMethod,
   OrderInput,
   OrderStatus,
   PaymentStatus,
 } from "@/types/order";
-import { allocateOrderNumber } from "@/workspaces/customer-operations/orders/queries";
+import { getCustomerById } from "@/workspaces/customer-operations/customers/queries";
+import { guestSnapshotFromCrmCustomer } from "@/workspaces/customer-operations/orders/guest-snapshot";
 import {
   FULFILMENT_METHODS,
   normalizePickupTime,
 } from "@/workspaces/customer-operations/orders/status";
+import { createStaffGuestPreorderRecord } from "@/workspaces/owner/orders/create-staff-preorder";
+import { ownerOrderWorkspaceHref } from "@/workspaces/owner/navigation/return-to";
+import { isStaffGuestOrderSource } from "@/workspaces/owner/orders/labels";
+import {
+  parseDeliveryDraftFromForm,
+  parseStaffPreorderItemsFromForm,
+} from "@/workspaces/owner/orders/staff-preorder-form";
 
 export type OrderActionState = {
   error: string | null;
 };
 
 const emptyState: OrderActionState = { error: null };
+const CO_ORDERS_RETURN = "/customer-operations/orders";
 
 async function requireCustomerOperationsStaff() {
   const staff = await requireStaff();
@@ -31,6 +44,17 @@ async function requireCustomerOperationsStaff() {
     redirect("/home");
   }
 
+  return staff;
+}
+
+async function requireAssistedOrderCreator() {
+  const staff = await requireStaff();
+  if (
+    !canCreateStaffAssistedOrder(staff.role.code) ||
+    !canAccessWorkspace(staff.role.code, "customer_operations")
+  ) {
+    redirect("/home");
+  }
   return staff;
 }
 
@@ -143,40 +167,64 @@ export async function createOrderAction(
   _prev: OrderActionState,
   formData: FormData,
 ): Promise<OrderActionState> {
-  const staff = await requireCustomerOperationsStaff();
-  const parsed = parseOrderInput(formData);
-
-  if (typeof parsed === "string") {
-    return { error: parsed };
+  const staff = await requireAssistedOrderCreator();
+  const customerId = String(formData.get("customer_id") ?? "").trim();
+  if (!customerId) {
+    return { error: "Select a customer." };
   }
 
-  const orderNumber = await allocateOrderNumber();
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("orders")
-    .insert({
-      order_number: orderNumber,
-      customer_id: parsed.customerId,
-      fulfilment_method: parsed.fulfilmentMethod,
-      pickup_date: parsed.pickupDate,
-      pickup_time: parsed.pickupTime,
-      status: "submitted" satisfies OrderStatus,
-      payment_status: "unpaid" satisfies PaymentStatus,
-      internal_notes: parsed.internalNotes,
-      customer_notes: parsed.customerNotes,
-      created_by: staff.id,
-      updated_by: staff.id,
-    })
-    .select("id")
-    .single();
+  const customer = await getCustomerById(customerId);
+  if (!customer) {
+    return { error: "Select a customer." };
+  }
 
-  if (error || !data) {
-    return { error: "Unable to create order." };
+  const snapshot = guestSnapshotFromCrmCustomer(customer);
+  if (!snapshot.guestName) {
+    return { error: "Select a customer." };
+  }
+
+  const orderSource = String(formData.get("order_source") ?? "").trim();
+  if (!isStaffGuestOrderSource(orderSource)) {
+    return { error: "Please choose a valid order source." };
+  }
+
+  const pickupDate = String(formData.get("pickup_date") ?? "").trim();
+  const pickupTime = String(formData.get("pickup_time") ?? "").trim();
+  const items = parseStaffPreorderItemsFromForm(formData);
+  const fulfilmentMethod = normalizeOwnerCreateFulfilmentMethod(
+    String(formData.get("fulfilment_method") ?? ""),
+  );
+  const deliveryDraft = parseDeliveryDraftFromForm(formData);
+
+  const created = await createStaffGuestPreorderRecord({
+    actorStaffId: staff.id,
+    guestName: snapshot.guestName,
+    guestPhone: snapshot.guestPhone,
+    guestEmail: null,
+    orderSource,
+    pickupDate,
+    pickupTime,
+    items,
+    complimentary: [],
+    paidAddons: [],
+    includeReceipt: false,
+    needsBakeryAttention: false,
+    bakeryAttentionNote: null,
+    customerNotes: emptyToNull(formData.get("customer_notes")),
+    internalNotes: emptyToNull(formData.get("internal_notes")),
+    fulfilmentMethod,
+    delivery: deliveryDraft,
+  });
+
+  if ("error" in created) {
+    return { error: created.error };
   }
 
   scheduleStaffNotificationDispatch();
-  revalidateOrderPaths(data.id);
-  redirect(`/customer-operations/orders/${data.id}`);
+  revalidatePath("/customer-operations/orders");
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${created.orderId}`);
+  redirect(ownerOrderWorkspaceHref(created.orderId, CO_ORDERS_RETURN));
 }
 
 export async function updateOrderAction(

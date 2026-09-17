@@ -2,6 +2,7 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDateTime } from "@/lib/dates";
 import type { OrderListItem } from "@/types/order";
+import { ownerOrderWorkspaceHref } from "@/workspaces/owner/navigation/return-to";
 import {
   formatOrderDate,
   fulfilmentMethodLabel,
@@ -10,16 +11,25 @@ import {
   paymentStatusLabel,
   paymentStatusTone,
 } from "@/workspaces/customer-operations/orders/status";
+import {
+  workspaceScheduleDateLabel,
+} from "@/engines/orders/fulfilment";
 
 type OrderCardProps = {
   order: OrderListItem;
 };
 
+export function orderDisplayName(order: OrderListItem): string {
+  return order.customer?.fullName ?? order.guestName ?? "Customer";
+}
+
 export function OrderCard({ order }: OrderCardProps) {
+  const dateLabel = workspaceScheduleDateLabel(order.fulfilmentMethod);
+
   return (
     <Link
       className="border-fog hover:border-signal block rounded-2xl border bg-white p-4 shadow-sm transition"
-      href={`/customer-operations/orders/${order.id}`}
+      href={ownerOrderWorkspaceHref(order.id, "/customer-operations/orders")}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
@@ -27,7 +37,7 @@ export function OrderCard({ order }: OrderCardProps) {
             {order.orderNumber}
           </p>
           <p className="text-ink mt-1 truncate text-sm font-medium">
-            {order.customer.fullName}
+            {orderDisplayName(order)}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -44,8 +54,10 @@ export function OrderCard({ order }: OrderCardProps) {
 
       <dl className="text-skyline mt-3 grid gap-1 text-sm sm:grid-cols-2">
         <div>
-          <dt className="sr-only">Pickup date</dt>
-          <dd>Pickup · {formatOrderDate(order.pickupDate)}</dd>
+          <dt className="sr-only">{dateLabel}</dt>
+          <dd>
+            {dateLabel} · {formatOrderDate(order.pickupDate)}
+          </dd>
         </div>
         <div>
           <dt className="sr-only">Fulfilment</dt>

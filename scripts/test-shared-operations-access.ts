@@ -9,6 +9,7 @@ import {
   buildGuestOrderWorkspaceCapabilities,
   canAccessGuestOrderWorkspace,
   canAccessOperationsBoard,
+  canCreateStaffAssistedOrder,
   canViewWholeCakeCalendar,
 } from "@/engines/orders/delivery-finance-capabilities";
 import {
@@ -20,6 +21,12 @@ import { getNavigationForRole } from "@/foundation/navigation/workspaces";
 import { canAccessWorkspace } from "@/foundation/navigation/access";
 import { deriveOwnerAttention } from "@/engines/operations/owner-attention";
 import { OWNER_ORDER_PAYMENT_SECTION_ID } from "@/engines/operations/owner-attention";
+
+assert.equal(canCreateStaffAssistedOrder("owner"), true);
+assert.equal(canCreateStaffAssistedOrder("manager"), true);
+assert.equal(canCreateStaffAssistedOrder("customer_operations"), true);
+assert.equal(canCreateStaffAssistedOrder("bakery"), false);
+assert.equal(canCreateStaffAssistedOrder("collection"), false);
 
 assert.equal(canAccessOperationsBoard("owner"), true);
 assert.equal(canAccessOperationsBoard("customer_operations"), true);
@@ -62,6 +69,7 @@ assert.equal(owner.canOverridePickupMonth, true);
 assert.equal(owner.canManageDiscounts, true);
 assert.equal(owner.canOverrideDiscountEligibility, true);
 assert.equal(owner.canUseOwnerBoardTools, true);
+assert.equal(owner.canCreateStaffAssistedOrder, true);
 assert.equal(owner.canRequestOperationsApproval, false);
 assert.equal(owner.canRequestCrossMonthPickupApproval, false);
 assert.equal(owner.canReviewOperationsApprovals, true);
@@ -88,6 +96,7 @@ assert.equal(co.canManagePayments, true);
 assert.equal(co.canExtendPaymentDeadline, false);
 assert.equal(co.canResolveFeeRequests, false);
 assert.equal(co.canUseOwnerBoardTools, false);
+assert.equal(co.canCreateStaffAssistedOrder, true);
 assert.equal(co.canManageOrderMessages, true);
 assert.equal(co.canOperateCollectionControls, true);
 assert.equal(co.canViewWholeCakeCalendar, true);
@@ -109,6 +118,7 @@ assert.equal(manager.canOverridePickupMonth, false);
 assert.equal(manager.canRequestOperationsApproval, false);
 assert.equal(manager.canRequestCrossMonthPickupApproval, true);
 assert.equal(manager.canUseOwnerBoardTools, false);
+assert.equal(manager.canCreateStaffAssistedOrder, true);
 assert.equal(manager.canResolveFeeRequests, true);
 assert.equal(manager.canViewWholeCakeCalendar, true);
 assert.equal(manager.canManageOrderMessages, true);
@@ -133,6 +143,7 @@ const bakery = buildGuestOrderWorkspaceCapabilities({
   staffId: "bakery-1",
 });
 assert.equal(bakery.canAccessOperationsBoard, false);
+assert.equal(bakery.canCreateStaffAssistedOrder, false);
 assert.equal(bakery.canRecordPayment, false);
 assert.equal(bakery.canCancelGuestOrder, false);
 assert.equal(bakery.canDuplicateGuestOrder, false);

@@ -146,7 +146,7 @@ export function OrderStatusActions({ order }: OrderStatusActionsProps) {
 
       <ConfirmDialog
         confirmLabel="Confirm order"
-        description={`Confirm ${order.orderNumber} for ${order.customer.fullName}?`}
+        description={`Confirm ${order.orderNumber} for ${order.customer?.fullName ?? order.guestName ?? "this customer"}?`}
         onCancel={() => setDialog(null)}
         onConfirm={() =>
           runAction(() => confirmOrderAction(order.id), "Order confirmed")

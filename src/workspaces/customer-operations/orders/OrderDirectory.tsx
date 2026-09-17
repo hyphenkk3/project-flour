@@ -88,7 +88,7 @@ export function OrderDirectory({ orders }: OrderDirectoryProps) {
           description={
             hasQuery
               ? "Try a different order number or customer name."
-              : "Create an order to start Order Operations."
+              : "Create an assisted order to start."
           }
           title={hasQuery ? "No orders match your search." : "No orders yet."}
         />

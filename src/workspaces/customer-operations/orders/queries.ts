@@ -7,6 +7,7 @@ import type {
   OrderStatus,
   PaymentStatus,
 } from "@/types/order";
+import { STAFF_GUEST_ORDER_SOURCES } from "@/workspaces/owner/orders/labels";
 
 type CustomerEmbed = {
   id: string;
@@ -73,17 +74,16 @@ function mapOrder(row: OrderRow): Order {
 
 function mapOrderListItem(row: OrderRow): OrderListItem {
   const customer = unwrapOne(row.customers);
-  if (!customer) {
-    throw new Error(`Order ${row.order_number} is missing a customer.`);
-  }
 
   return {
     ...mapOrder(row),
-    customer: {
-      id: customer.id,
-      fullName: customer.full_name,
-      phoneNumber: customer.phone_number,
-    },
+    customer: customer
+      ? {
+          id: customer.id,
+          fullName: customer.full_name,
+          phoneNumber: customer.phone_number,
+        }
+      : null,
   };
 }
 
@@ -97,6 +97,18 @@ function mapOrderDetail(row: OrderRow): OrderDetail {
     updatedByName: updatedStaff?.display_name ?? null,
   };
 }
+
+const STAFF_ASSISTED_SOURCES = STAFF_GUEST_ORDER_SOURCES.map(
+  (source) => source.value,
+);
+
+const OPERATIONAL_STATUSES = [
+  "submitted",
+  "pending_confirmation",
+  "awaiting_payment",
+  "paid",
+  "cancelled",
+] as const;
 
 const listSelect = `
   id,
@@ -115,16 +127,16 @@ const listSelect = `
   created_by,
   updated_by,
   created_at,
-  updated_at,
-  customers!inner (
-    id,
-    full_name,
-    phone_number
-  )
+  updated_at
 `;
 
 const detailSelect = `
   ${listSelect},
+  customers!inner (
+    id,
+    full_name,
+    phone_number
+  ),
   created_staff:staff_profiles!created_by (
     id,
     display_name
@@ -140,6 +152,9 @@ export async function listOrders(): Promise<OrderListItem[]> {
   const { data, error } = await supabase
     .from("orders")
     .select(listSelect)
+    .is("customer_id", null)
+    .in("order_source", [...STAFF_ASSISTED_SOURCES])
+    .in("status", [...OPERATIONAL_STATUSES])
     .order("updated_at", { ascending: false });
 
   if (error) {

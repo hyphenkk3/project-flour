@@ -376,7 +376,8 @@ assert.equal(
   const back = resolveOwnerReturnTo(profileHref);
   assert.equal(back.href, profileHref);
   assert.equal(back.label, "Customer profile");
-  assert.equal(resolveOwnerReturnTo("/customer-operations/orders").href, "/owner");
+  assert.equal(resolveOwnerReturnTo("/customer-operations/orders").href, "/customer-operations/orders");
+  assert.equal(resolveOwnerReturnTo("/customer-operations/orders").label, "Orders");
   assert.equal(
     resolveOwnerReturnTo("/customer-operations/customers/not-a-uuid").href,
     "/owner",

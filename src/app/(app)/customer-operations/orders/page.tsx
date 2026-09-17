@@ -50,7 +50,7 @@ export default function OrdersPage() {
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <PageHeader
-          description="Create and manage Whitebird orders."
+          description="Create assisted orders for customers who need help placing an order. Servicing continues in the existing order workspace."
           title="Orders"
         />
         <Link

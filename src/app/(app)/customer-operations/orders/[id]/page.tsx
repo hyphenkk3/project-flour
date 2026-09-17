@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
 import {
   Breadcrumb,
@@ -11,6 +11,8 @@ import {
 import { formatDateTime } from "@/lib/dates";
 import { getOrderById } from "@/workspaces/customer-operations/orders/queries";
 import { OrderStatusActions } from "@/workspaces/customer-operations/orders/OrderStatusActions";
+import { getGuestOrderListItem } from "@/workspaces/owner/orders/queries";
+import { ownerOrderWorkspaceHref } from "@/workspaces/owner/navigation/return-to";
 import {
   formatOrderDate,
   formatOrderTime,
@@ -34,6 +36,10 @@ export default async function OrderDetailPage({
   const order = await getOrderById(id);
 
   if (!order) {
+    const guest = await getGuestOrderListItem(id);
+    if (guest) {
+      redirect(ownerOrderWorkspaceHref(id, "/customer-operations/orders"));
+    }
     notFound();
   }
 
@@ -119,17 +125,19 @@ export default async function OrderDetailPage({
       <PageSection title="Customer">
         <PagePanel>
           <p className="text-ink text-sm font-medium">
-            {order.customer.fullName}
+            {order.customer?.fullName ?? order.guestName ?? "Customer"}
           </p>
           <p className="text-skyline mt-1 text-sm">
-            {order.customer.phoneNumber ?? "No phone on file"}
+            {order.customer?.phoneNumber ?? "No phone on file"}
           </p>
-          <Link
-            className="text-signal mt-3 inline-flex min-h-11 items-center text-sm font-medium"
-            href={`/customer-operations/customers/${order.customer.id}`}
-          >
-            Open customer profile
-          </Link>
+          {order.customer ? (
+            <Link
+              className="text-signal mt-3 inline-flex min-h-11 items-center text-sm font-medium"
+              href={`/customer-operations/customers/${order.customer.id}`}
+            >
+              Open customer profile
+            </Link>
+          ) : null}
         </PagePanel>
       </PageSection>
 

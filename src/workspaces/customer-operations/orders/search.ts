@@ -25,7 +25,10 @@ export function matchesOrderQuery(
         }
         break;
       case "customerName":
-        if (order.customer.fullName.toLowerCase().includes(q)) {
+        if (order.customer?.fullName.toLowerCase().includes(q)) {
+          return true;
+        }
+        if ((order.guestName ?? "").toLowerCase().includes(q)) {
           return true;
         }
         break;
@@ -64,8 +67,8 @@ export function sortOrders(
         right = b.orderNumber;
         break;
       case "customerName":
-        left = a.customer.fullName.toLowerCase();
-        right = b.customer.fullName.toLowerCase();
+        left = (a.customer?.fullName ?? a.guestName ?? "").toLowerCase();
+        right = (b.customer?.fullName ?? b.guestName ?? "").toLowerCase();
         break;
     }
 

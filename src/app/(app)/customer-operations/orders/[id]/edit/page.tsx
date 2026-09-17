@@ -1,9 +1,11 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Breadcrumb, BreadcrumbTrail } from "@/components/ui/Breadcrumb";
 import { listCustomers } from "@/workspaces/customer-operations/customers/queries";
 import { getOrderById } from "@/workspaces/customer-operations/orders/queries";
 import { OrderForm } from "@/workspaces/customer-operations/orders/OrderForm";
+import { getGuestOrderListItem } from "@/workspaces/owner/orders/queries";
+import { ownerOrderWorkspaceHref } from "@/workspaces/owner/navigation/return-to";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +21,10 @@ export default async function EditOrderPage({ params }: EditOrderPageProps) {
   ]);
 
   if (!order) {
+    const guest = await getGuestOrderListItem(id);
+    if (guest) {
+      redirect(ownerOrderWorkspaceHref(id, "/customer-operations/orders"));
+    }
     notFound();
   }
 
@@ -50,7 +56,6 @@ export default async function EditOrderPage({ params }: EditOrderPageProps) {
       <OrderForm
         cancelHref={`/customer-operations/orders/${order.id}`}
         customers={customers}
-        mode="edit"
         order={order}
       />
     </div>

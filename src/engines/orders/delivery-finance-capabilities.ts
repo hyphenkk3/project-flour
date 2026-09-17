@@ -22,6 +22,12 @@ export type GuestOrderWorkspaceCapabilities = {
    */
   canUseOwnerBoardTools: boolean;
   /**
+   * CRM-assisted / staff-manual order creation
+   * (Owner + Manager + Customer Operations).
+   * Independent of Owner-only Operations "+ New Order".
+   */
+  canCreateStaffAssistedOrder: boolean;
+  /**
    * Normal Edit Order / save workspace
    * (Owner + Manager + Customer Operations).
    * Manager direct-saves inside D−1/D−0; CO uses late_order_edit approval.
@@ -129,6 +135,15 @@ export function canAccessGuestOrderWorkspace(role: RoleCode): boolean {
   );
 }
 
+/** Manual / CRM-assisted operational order creation. Not Bakery or Collection. */
+export function canCreateStaffAssistedOrder(role: RoleCode): boolean {
+  return (
+    role === "owner" ||
+    role === "manager" ||
+    role === "customer_operations"
+  );
+}
+
 /** Whole Cake Calendar page + read / navigate actions. */
 export function canViewWholeCakeCalendar(role: RoleCode): boolean {
   return (
@@ -167,6 +182,7 @@ export function buildGuestOrderWorkspaceCapabilities(input: {
     canAccessGuestOrderWorkspace: canAccess,
     canAccessOperationsBoard: canAccessOperationsBoard(role),
     canUseOwnerBoardTools: isOwner,
+    canCreateStaffAssistedOrder: isRoutineOrderOperator,
     canEditOrderWorkspace: isRoutineOrderOperator,
     canOverridePickupMonth: isOwner,
     canEnableDeliveryFinance: isOwner,
