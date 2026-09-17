@@ -400,7 +400,7 @@ const extraFormSrc = readSrc(
 );
 assert.match(extraFormSrc, /name="extra_stock_id"/);
 assert.match(extraFormSrc, /value=\{extra\.id\}/);
-assert.match(extraFormSrc, /extraCustomerVisiblePickupDates/);
+assert.match(extraFormSrc, /extraCustomerVisibleFulfilmentDates/);
 assert.match(extraFormSrc, /FRESH_PICKS_ADD_TO_CART_CTA/);
 
 const boardSrc = readSrc("src/workspaces/extra/ExtraBoard.tsx");

@@ -101,11 +101,11 @@ assert.equal(
 );
 
 // 2. Fresh Pick uses its own date configuration
-assert.match(extraFormSrc, /extraCustomerVisiblePickupDates/);
+assert.match(extraFormSrc, /extraCustomerVisibleFulfilmentDates/);
 assert.match(extraFormSrc, /FRESH_PICKS_FIXED_DATES_NOTE/);
 assert.equal(
   FRESH_PICKS_FIXED_DATES_NOTE,
-  "Pickup dates are fixed for this Fresh Pick.",
+  "Dates are fixed for this Fresh Pick.",
 );
 assert.doesNotMatch(extraPickupSrc, /preorder_days/);
 assert.doesNotMatch(extraPickupSrc, /engines\/preorder/);
@@ -195,8 +195,8 @@ assert.match(extraActionsSrc, /getStorefrontExtraById/);
 
 // Pickup-window errors stay pickup-window errors
 assert.equal(
-  extraSubmitCustomerError("Please choose a valid pickup time for that date."),
-  "Please choose a valid pickup time for that date.",
+  extraSubmitCustomerError("Please choose a valid fulfilment time for that date."),
+  "Please choose a valid fulfilment time for that date.",
 );
 
 // 9. Multiple Fresh Picks: independent extra_stock.id units, never merged by cake+size
@@ -297,7 +297,7 @@ assert.match(
 );
 
 // 17. Server submission revalidates availability
-assert.match(extraActionsSrc, /isValidExtraCustomerPickup/);
+assert.match(extraActionsSrc, /isValidExtraCustomerFulfilment/);
 assert.match(extraActionsSrc, /getStorefrontExtraById/);
 assert.match(extraCartRpcSrc, /stock_row\.lifecycle <> 'confirmed'/);
 assert.match(extraCartRpcSrc, /stock_row\.sold_at is not null/);

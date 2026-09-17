@@ -1,9 +1,17 @@
-import { isValidExtraCustomerPickup } from "@/engines/extra/extra-pickup";
+import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
   FRESH_PICKS_ALREADY_IN_CART,
   FRESH_PICKS_CART_PICKUP_MISMATCH,
   FRESH_PICKS_CART_UNAVAILABLE_FOR_PICKUP,
 } from "@/engines/extra/customer-fresh-picks";
+import { isValidExtraCustomerFulfilment } from "@/engines/extra/fresh-picks-fulfilment";
+import type { FreshPicksPreparationConfig } from "@/engines/extra/fresh-picks-preparation";
+import {
+  OWNER_DELIVERY_CITY,
+  OWNER_DELIVERY_STATE,
+  parseCustomerWebsiteFulfilmentMethod,
+  type CustomerWebsiteFulfilmentMethod,
+} from "@/engines/orders/fulfilment";
 import type { PhysicalReceiptChoice } from "@/workspaces/storefront/checkout/preorder-draft";
 
 export const FRESH_PICK_CART_KEY = "whitebird-fresh-pick-cart-v1";
@@ -23,6 +31,21 @@ export type FreshPickCartItem = {
 export type FreshPickCart = {
   pickupDate: string;
   pickupTime: string;
+  fulfilmentMethod: CustomerWebsiteFulfilmentMethod;
+  pickupAvailableFromAt: string;
+  orderCutoffAt: string;
+  dineInVenue: string;
+  guestCount: string;
+  reservationNote: string;
+  recipientName: string;
+  recipientPhone: string;
+  addressLine1: string;
+  addressLine2: string;
+  postcode: string;
+  city: string;
+  state: string;
+  recipientNotifyPreference: string;
+  sameAsCustomer: boolean;
   items: FreshPickCartItem[];
   customerName: string;
   phone: string;
@@ -42,8 +65,15 @@ export type FreshPickCartAddInput = {
   imageUrl: string | null;
   pickupDate: string;
   pickupTime: string;
+  fulfilmentMethod?: CustomerWebsiteFulfilmentMethod;
   pickupAvailableFromAt: string;
   orderCutoffAt: string;
+};
+
+export type FreshPickCartValidationContext = {
+  now?: Date;
+  snapshot?: OperatingHoursSnapshot;
+  config?: FreshPicksPreparationConfig;
 };
 
 export type FreshPickCartAddResult =
@@ -54,6 +84,21 @@ export function emptyFreshPickCart(): FreshPickCart {
   return {
     pickupDate: "",
     pickupTime: "",
+    fulfilmentMethod: "pickup",
+    pickupAvailableFromAt: "",
+    orderCutoffAt: "",
+    dineInVenue: "",
+    guestCount: "",
+    reservationNote: "",
+    recipientName: "",
+    recipientPhone: "",
+    addressLine1: "",
+    addressLine2: "",
+    postcode: "",
+    city: OWNER_DELIVERY_CITY,
+    state: OWNER_DELIVERY_STATE,
+    recipientNotifyPreference: "",
+    sameAsCustomer: true,
     items: [],
     customerName: "",
     phone: "",
@@ -125,9 +170,28 @@ export function parseFreshPickCart(value: unknown): FreshPickCart | null {
   const pickupDate = String(row.pickupDate ?? "").trim().slice(0, 10);
   const pickupTime = String(row.pickupTime ?? "").trim().slice(0, 5);
   const receipt = String(row.includeReceiptChoice ?? "");
+  const empty = emptyFreshPickCart();
   return {
+    ...empty,
     pickupDate: isYmd(pickupDate) ? pickupDate : items[0]?.pickupDate ?? "",
     pickupTime: isHm(pickupTime) ? pickupTime : items[0]?.pickupTime ?? "",
+    fulfilmentMethod: parseCustomerWebsiteFulfilmentMethod(
+      String(row.fulfilmentMethod ?? "pickup"),
+    ),
+    pickupAvailableFromAt: String(row.pickupAvailableFromAt ?? ""),
+    orderCutoffAt: String(row.orderCutoffAt ?? ""),
+    dineInVenue: String(row.dineInVenue ?? ""),
+    guestCount: String(row.guestCount ?? ""),
+    reservationNote: String(row.reservationNote ?? ""),
+    recipientName: String(row.recipientName ?? ""),
+    recipientPhone: String(row.recipientPhone ?? ""),
+    addressLine1: String(row.addressLine1 ?? ""),
+    addressLine2: String(row.addressLine2 ?? ""),
+    postcode: String(row.postcode ?? ""),
+    city: String(row.city ?? OWNER_DELIVERY_CITY) || OWNER_DELIVERY_CITY,
+    state: String(row.state ?? OWNER_DELIVERY_STATE) || OWNER_DELIVERY_STATE,
+    recipientNotifyPreference: String(row.recipientNotifyPreference ?? ""),
+    sameAsCustomer: row.sameAsCustomer !== false,
     items,
     customerName: String(row.customerName ?? ""),
     phone: String(row.phone ?? ""),
@@ -218,19 +282,26 @@ export function freshPickCartTotal(cart: FreshPickCart | null): number {
   return cart.items.reduce((sum, item) => sum + (item.unitPrice ?? 0), 0);
 }
 
-export function extraIsValidForCartPickup(input: {
-  pickupDate: string;
-  pickupTime: string;
-  pickupAvailableFromAt: string;
-  orderCutoffAt: string;
-  now?: Date;
-}): boolean {
-  return isValidExtraCustomerPickup({
-    pickupDate: input.pickupDate,
-    pickupTime: input.pickupTime,
+export function extraIsValidForCartPickup(
+  input: {
+    pickupDate: string;
+    pickupTime: string;
+    pickupAvailableFromAt: string;
+    orderCutoffAt: string;
+    fulfilmentMethod?: CustomerWebsiteFulfilmentMethod;
+    now?: Date;
+  },
+  context: FreshPickCartValidationContext = {},
+): boolean {
+  return isValidExtraCustomerFulfilment({
+    method: parseCustomerWebsiteFulfilmentMethod(input.fulfilmentMethod),
+    fulfilmentDate: input.pickupDate,
+    fulfilmentTime: input.pickupTime,
     pickupAvailableFromAt: input.pickupAvailableFromAt,
     orderCutoffAt: input.orderCutoffAt,
-    now: input.now,
+    now: input.now ?? context.now,
+    snapshot: context.snapshot,
+    config: context.config,
   });
 }
 
@@ -238,21 +309,29 @@ export function addFreshPickToCart(
   cart: FreshPickCart | null,
   input: FreshPickCartAddInput,
   now?: Date,
+  context: FreshPickCartValidationContext = {},
 ): FreshPickCartAddResult {
   const extraStockId = input.extraStockId.trim();
+  const fulfilmentMethod = parseCustomerWebsiteFulfilmentMethod(
+    input.fulfilmentMethod,
+  );
   if (!extraStockId) {
     return { ok: false, error: "Extra is required" };
   }
   if (
-    !extraIsValidForCartPickup({
-      pickupDate: input.pickupDate,
-      pickupTime: input.pickupTime,
-      pickupAvailableFromAt: input.pickupAvailableFromAt,
-      orderCutoffAt: input.orderCutoffAt,
-      now,
-    })
+    !extraIsValidForCartPickup(
+      {
+        pickupDate: input.pickupDate,
+        pickupTime: input.pickupTime,
+        pickupAvailableFromAt: input.pickupAvailableFromAt,
+        orderCutoffAt: input.orderCutoffAt,
+        fulfilmentMethod,
+        now,
+      },
+      context,
+    )
   ) {
-    return { ok: false, error: "Please choose a valid pickup time for that date." };
+    return { ok: false, error: "Please choose a valid fulfilment time for that date." };
   }
 
   const current = cart ?? emptyFreshPickCart();
@@ -263,18 +342,23 @@ export function addFreshPickToCart(
   if (current.items.length > 0) {
     if (
       current.pickupDate !== input.pickupDate ||
-      current.pickupTime !== input.pickupTime
+      current.pickupTime !== input.pickupTime ||
+      current.fulfilmentMethod !== fulfilmentMethod
     ) {
       return { ok: false, error: FRESH_PICKS_CART_PICKUP_MISMATCH };
     }
     if (
-      !extraIsValidForCartPickup({
-        pickupDate: current.pickupDate,
-        pickupTime: current.pickupTime,
-        pickupAvailableFromAt: input.pickupAvailableFromAt,
-        orderCutoffAt: input.orderCutoffAt,
-        now,
-      })
+      !extraIsValidForCartPickup(
+        {
+          pickupDate: current.pickupDate,
+          pickupTime: current.pickupTime,
+          pickupAvailableFromAt: input.pickupAvailableFromAt,
+          orderCutoffAt: input.orderCutoffAt,
+          fulfilmentMethod: current.fulfilmentMethod,
+          now,
+        },
+        context,
+      )
     ) {
       return { ok: false, error: FRESH_PICKS_CART_UNAVAILABLE_FOR_PICKUP };
     }
@@ -293,6 +377,14 @@ export function addFreshPickToCart(
     ...current,
     pickupDate: current.items.length > 0 ? current.pickupDate : input.pickupDate,
     pickupTime: current.items.length > 0 ? current.pickupTime : input.pickupTime,
+    fulfilmentMethod:
+      current.items.length > 0 ? current.fulfilmentMethod : fulfilmentMethod,
+    pickupAvailableFromAt:
+      current.items.length > 0
+        ? current.pickupAvailableFromAt
+        : input.pickupAvailableFromAt,
+    orderCutoffAt:
+      current.items.length > 0 ? current.orderCutoffAt : input.orderCutoffAt,
     items: [...current.items, item],
   };
   return { ok: true, cart: next, added: true };
@@ -311,7 +403,7 @@ export function removeFreshPickFromCart(
 
 export function patchFreshPickCart(
   cart: FreshPickCart,
-  patch: Partial<Omit<FreshPickCart, "items" | "pickupDate" | "pickupTime">>,
+  patch: Partial<Omit<FreshPickCart, "items">>,
 ): FreshPickCart {
   return { ...cart, ...patch };
 }

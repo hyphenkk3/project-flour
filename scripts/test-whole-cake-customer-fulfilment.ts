@@ -105,10 +105,10 @@ assert.doesNotMatch(
   /\{cakes\.map\(/,
 );
 assert.match(summarySrc, /\{cakes\.map\(/);
-assert.doesNotMatch(extraSrc, /fulfilment_method/);
-assert.doesNotMatch(extraSrc, /Dine-in/);
+assert.match(extraSrc, /FulfilmentMethodChooser/);
+assert.match(extraSrc, /Dine-in/);
 assert.match(extraActionsSrc, /submit_guest_extra_order/);
-assert.doesNotMatch(extraActionsSrc, /p_fulfilment_method/);
+assert.match(extraActionsSrc, /p_fulfilment_method/);
 assert.match(checkoutActionsSrc, /p_fulfilment_method/);
 assert.match(checkoutActionsSrc, /p_dine_in/);
 assert.match(checkoutActionsSrc, /p_delivery/);

@@ -45,6 +45,9 @@ function none(date: string, time: string) {
 both(MON, "17:00");
 both(TUE, "17:00");
 both(THU, "17:00");
+both(THU, "16:15");
+both(THU, "16:45");
+none(THU, "16:10");
 both(FRI, "17:00");
 none(MON, "17:30");
 none(TUE, "17:30");

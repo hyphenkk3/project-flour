@@ -20,6 +20,9 @@ import type { PickupSlot } from "@/engines/business-calendar/pickup-slots";
 export const DINE_IN_VENUES = ["hyphen", "whitebird"] as const;
 export type DineInVenue = (typeof DINE_IN_VENUES)[number];
 
+/** Shared customer dine-in reservation grid. Pickup/delivery stay on 30 minutes. */
+export const DINE_IN_SLOT_MINUTES = 15;
+
 /** Cake serving may be the reservation start, or up to 60 minutes later. */
 export const DINE_IN_CAKE_SERVING_WINDOW_MINUTES = 60;
 
@@ -60,9 +63,13 @@ export function availableDineInVenues(
   const hours = defaultSnapshot(snapshot);
   const time = timeValue.trim().slice(0, 5);
   const dineIn = resolveOperatingHours(hours, "dine_in", dateYmd);
-  if (!isTimeWithinHours(dineIn, time)) return [];
+  if (!isTimeWithinHours(dineIn, time, DINE_IN_SLOT_MINUTES)) return [];
   return DINE_IN_VENUES.filter((venue) =>
-    isTimeWithinHours(resolveOperatingHours(hours, venue, dateYmd), time),
+    isTimeWithinHours(
+      resolveOperatingHours(hours, venue, dateYmd),
+      time,
+      DINE_IN_SLOT_MINUTES,
+    ),
   );
 }
 
@@ -85,7 +92,7 @@ export function resolveDineInSchedule(
   }
   const hours = defaultSnapshot(snapshot);
   const dineIn = resolveOperatingHours(hours, "dine_in", dateYmd);
-  const openTimes = slotsWithinHours(dineIn).filter(
+  const openTimes = slotsWithinHours(dineIn, DINE_IN_SLOT_MINUTES).filter(
     (slot) => availableDineInVenues(dateYmd, slot, hours).length > 0,
   );
   if (openTimes.length === 0) {

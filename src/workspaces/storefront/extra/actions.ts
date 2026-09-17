@@ -1,7 +1,21 @@
 "use server";
 
+import {
+  isDineInVenueAvailable,
+  parseDineInVenue,
+  parseGuestCount,
+} from "@/engines/business-calendar/dine-in-hours";
 import { extraCartItemUnavailableMessage, extraSubmitCustomerError } from "@/engines/extra/customer-fresh-picks";
-import { isValidExtraCustomerPickup } from "@/engines/extra/extra-pickup";
+import { isValidExtraCustomerFulfilment } from "@/engines/extra/fresh-picks-fulfilment";
+import {
+  buildCreateStaffFulfilmentRpcParams,
+  OWNER_DELIVERY_CITY,
+  OWNER_DELIVERY_STATE,
+  normalizeRecipientNotifyPreference,
+  parseCustomerWebsiteFulfilmentMethod,
+  validateOwnerCreateFulfilment,
+  type DeliveryCreateDraft,
+} from "@/engines/orders/fulfilment";
 import {
   customerComplimentaryMutationPayload,
   customerPaidAddonMutationPayload,
@@ -15,8 +29,10 @@ import { createClient } from "@/lib/supabase/server";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import { getStorefrontCollectionForPickupDate } from "@/workspaces/storefront/catalog/queries";
 import { parseRequiredPhysicalReceipt } from "@/workspaces/storefront/checkout/preorder-draft";
+import { loadFreshPicksPreparationConfig } from "@/workspaces/storefront/extra/config";
 import { getStorefrontExtraById } from "@/workspaces/storefront/extra/queries";
 import { setGuestPreorderReceiptCookie } from "@/workspaces/storefront/checkout/receipt";
+import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 
 export type ExtraOrderState = {
   error: string | null;
@@ -103,6 +119,9 @@ export async function submitGuestExtraOrderAction(
   );
   const pickupDate = String(formData.get("pickup_date") ?? "").trim();
   const pickupTime = String(formData.get("pickup_time") ?? "").trim();
+  const fulfilmentMethod = parseCustomerWebsiteFulfilmentMethod(
+    String(formData.get("fulfilment_method") ?? ""),
+  );
   const notes = String(formData.get("notes") ?? "").trim();
   const submittedComplimentaryCodes = formData
     .getAll("complimentary_code")
@@ -128,6 +147,8 @@ export async function submitGuestExtraOrderAction(
     };
   }
 
+  const hoursSnapshot = await loadOperatingHoursSnapshot();
+  const preparationConfig = await loadFreshPicksPreparationConfig();
   const extras = [];
   for (const [index, extraStockId] of extraStockIds.entries()) {
     const extra = await getStorefrontExtraById(extraStockId);
@@ -141,16 +162,88 @@ export async function submitGuestExtraOrderAction(
     if (
       !pickupDate ||
       !pickupTime ||
-      !isValidExtraCustomerPickup({
-        pickupDate,
-        pickupTime,
+      !isValidExtraCustomerFulfilment({
+        method: fulfilmentMethod,
+        fulfilmentDate: pickupDate,
+        fulfilmentTime: pickupTime,
         pickupAvailableFromAt: extra.pickupAvailableFromAt,
         orderCutoffAt: extra.pickupThroughAt,
+        snapshot: hoursSnapshot,
+        config: preparationConfig,
       })
     ) {
-      return { error: "Please choose a valid pickup time for that date." };
+      return { error: "Please choose a valid fulfilment time for that date." };
     }
     extras.push(extra);
+  }
+
+  let dineInPayload: Record<string, unknown> | null = null;
+  let deliveryPayload: Record<string, unknown> | null = null;
+  if (fulfilmentMethod === "dine_in") {
+    const reservationTime = pickupTime;
+    const guestCount = parseGuestCount(formData.get("guest_count"));
+    if (guestCount == null) {
+      return { error: "Please enter how many guests are dining in." };
+    }
+    const dineInVenue = parseDineInVenue(formData.get("dine_in_venue"));
+    if (dineInVenue == null) {
+      return { error: "Please choose where you would like to sit." };
+    }
+    if (
+      !isDineInVenueAvailable(
+        pickupDate,
+        reservationTime,
+        dineInVenue,
+        hoursSnapshot,
+      )
+    ) {
+      return {
+        error: "Please choose a valid dine-in venue for that date and time.",
+      };
+    }
+    dineInPayload = {
+      venue: dineInVenue,
+      guest_count: guestCount,
+      reservation_time: reservationTime,
+      reservation_note:
+        String(formData.get("reservation_note") ?? "").trim() || null,
+    };
+  } else if (fulfilmentMethod === "delivery") {
+    const sameAsCustomer =
+      String(formData.get("same_as_customer") ?? "") === "on" ||
+      String(formData.get("same_as_customer") ?? "") === "true";
+    const deliveryDraft: DeliveryCreateDraft = {
+      recipientName: sameAsCustomer
+        ? customerName
+        : String(formData.get("recipient_name") ?? ""),
+      recipientPhone: sameAsCustomer
+        ? phone
+        : String(formData.get("recipient_phone") ?? ""),
+      addressLine1: String(formData.get("address_line_1") ?? ""),
+      addressLine2: String(formData.get("address_line_2") ?? ""),
+      postcode: String(formData.get("postcode") ?? ""),
+      city: String(formData.get("city") ?? "") || OWNER_DELIVERY_CITY,
+      state: String(formData.get("state") ?? "") || OWNER_DELIVERY_STATE,
+      recipientNotifyPreference: sameAsCustomer
+        ? "inform_recipient"
+        : normalizeRecipientNotifyPreference(
+            String(formData.get("recipient_notify_preference") ?? ""),
+          ),
+      sameAsCustomer,
+    };
+    const deliveryError = validateOwnerCreateFulfilment({
+      method: "delivery",
+      pickupDate,
+      pickupTime,
+      delivery: deliveryDraft,
+    });
+    if (deliveryError) {
+      return { error: deliveryError };
+    }
+    deliveryPayload = buildCreateStaffFulfilmentRpcParams({
+      method: "delivery",
+      delivery: deliveryDraft,
+    }).p_delivery;
   }
 
   const { complimentaryOptions, paidAddonOptions } =
@@ -194,6 +287,9 @@ export async function submitGuestExtraOrderAction(
     p_include_receipt: includeReceipt,
     p_complimentary: complimentary,
     p_paid_addons: paidAddons,
+    p_fulfilment_method: fulfilmentMethod,
+    p_delivery: deliveryPayload,
+    p_dine_in: dineInPayload,
   });
 
   if (error) {

@@ -3,11 +3,10 @@
  * Independent of monthly catalogues.
  */
 
+import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import { isExtraAvailable, type ExtraLifecycle } from "@/engines/extra/availability";
-import {
-  extraCustomerPickupSlotsForDate,
-  type ExtraPickupWindow,
-} from "@/engines/extra/extra-pickup";
+import { extraActionableFulfilmentDays } from "@/engines/extra/fresh-picks-fulfilment";
+import type { FreshPicksPreparationConfig } from "@/engines/extra/fresh-picks-preparation";
 import { addBusinessCalendarDays, formatShortBusinessDate } from "@/lib/dates";
 
 export type FreshPickDay = "today" | "tomorrow";
@@ -102,10 +101,10 @@ export const FRESH_PICKS_ALREADY_IN_CART =
   "This Fresh Pick is already in your order.";
 
 export const FRESH_PICKS_CART_PICKUP_MISMATCH =
-  "Your Fresh Pick order already has a pickup time. Choose that same pickup, or remove items from your cart.";
+  "Your Fresh Pick order already has a fulfilment time. Choose that same fulfilment, or remove items from your cart.";
 
 export const FRESH_PICKS_CART_UNAVAILABLE_FOR_PICKUP =
-  "This Fresh Pick is not available for your current pickup time. Remove other items or choose a different Fresh Pick.";
+  "This Fresh Pick is not available for your current fulfilment time. Remove other items or choose a different Fresh Pick.";
 
 export const FRESH_PICKS_NAME_HELP = "Nickname / English name and surname";
 
@@ -113,7 +112,7 @@ export const FRESH_PICKS_WHATSAPP_NOTE =
   "Please ensure the WhatsApp number is correct as we will contact you regarding your order.";
 
 export const FRESH_PICKS_FIXED_DATES_NOTE =
-  "Pickup dates are fixed for this Fresh Pick.";
+  "Dates are fixed for this Fresh Pick.";
 
 export const FRESH_PICKS_SOLD_OUT = "Sold Out";
 
@@ -161,26 +160,10 @@ export function extraActionableFreshPickDays(input: {
   orderCutoffAt: string | null;
   todayYmd: string;
   now?: Date;
+  snapshot?: OperatingHoursSnapshot;
+  config?: FreshPicksPreparationConfig;
 }): FreshPickDay[] {
-  if (!input.pickupAvailableFromAt || !input.orderCutoffAt) return [];
-  const window: ExtraPickupWindow = {
-    pickupAvailableFromAt: input.pickupAvailableFromAt,
-    orderCutoffAt: input.orderCutoffAt,
-  };
-  const now = input.now ?? new Date();
-  const today = input.todayYmd.trim().slice(0, 10);
-  const days: FreshPickDay[] = [];
-  if (extraCustomerPickupSlotsForDate(today, window, now).length > 0) {
-    days.push("today");
-  }
-  const tomorrow = addBusinessCalendarDays(today, 1);
-  if (
-    tomorrow &&
-    extraCustomerPickupSlotsForDate(tomorrow, window, now).length > 0
-  ) {
-    days.push("tomorrow");
-  }
-  return days;
+  return extraActionableFulfilmentDays(input);
 }
 
 /**

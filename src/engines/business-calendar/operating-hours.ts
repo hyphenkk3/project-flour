@@ -85,9 +85,14 @@ export function addMinutes(hm: string, amount: number): string | null {
   return minutesToHm(Math.min(23 * 60 + 30, start + amount));
 }
 
-export function isThirtyMinuteGrid(hm: string): boolean {
+export function isClockOnMinuteGrid(hm: string, stepMinutes: number): boolean {
+  if (!Number.isInteger(stepMinutes) || stepMinutes <= 0) return false;
   const minutes = hmToMinutes(hm);
-  return minutes != null && minutes % 30 === 0;
+  return minutes != null && minutes % stepMinutes === 0;
+}
+
+export function isThirtyMinuteGrid(hm: string): boolean {
+  return isClockOnMinuteGrid(hm, 30);
 }
 
 export function formatClock12h(hm: string): string {
@@ -168,10 +173,11 @@ export function resolveOperatingHours(
 export function isTimeWithinHours(
   row: ResolvedOperatingHours,
   timeHm: string,
+  stepMinutes = 30,
 ): boolean {
   if (!row.enabled || !row.opensAt) return false;
   const time = timeHm.trim().slice(0, 5);
-  if (!isThirtyMinuteGrid(time)) return false;
+  if (!isClockOnMinuteGrid(time, stepMinutes)) return false;
   const last = customerLastBookable(row);
   if (!last) return false;
   const t = hmToMinutes(time);
@@ -181,11 +187,14 @@ export function isTimeWithinHours(
   return t >= start && t <= end;
 }
 
-export function slotsWithinHours(row: ResolvedOperatingHours): string[] {
+export function slotsWithinHours(
+  row: ResolvedOperatingHours,
+  stepMinutes = 30,
+): string[] {
   if (!row.enabled || !row.opensAt) return [];
   const last = customerLastBookable(row);
   if (!last) return [];
-  return rangeSlotsInclusive(row.opensAt, last);
+  return rangeSlotsInclusive(row.opensAt, last, stepMinutes);
 }
 
 export function copyWeeklyDayToDate(

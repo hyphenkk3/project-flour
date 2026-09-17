@@ -90,6 +90,16 @@ for (const example of examples) {
     window,
     lateAfternoon,
   ).map((slot) => slot.value);
+  assert.equal(todaySlots.length, 0, "16:00:00 is too late for same-day Fresh Picks");
+}
+
+{
+  const justBeforeCutoff = malaysiaNow("15:59:59");
+  const todaySlots = extraCustomerPickupSlotsForDate(
+    MONDAY,
+    window,
+    justBeforeCutoff,
+  ).map((slot) => slot.value);
   assert.equal(todaySlots[0], "17:00");
   assert.equal(todaySlots.includes("16:00"), false);
   assert.equal(todaySlots.includes("16:30"), false);
@@ -135,17 +145,18 @@ for (const example of examples) {
 
 const extraPickupSrc = readSrc("src/engines/extra/extra-pickup.ts");
 assert.match(extraPickupSrc, /EXTRA_SAME_DAY_PICKUP_LEAD_MS/);
-assert.match(extraPickupSrc, /extraCustomerSlotFloorMs/);
-assert.match(extraPickupSrc, /dateYmd === toBusinessDateKey\(now\)/);
+assert.match(extraPickupSrc, /slotPassesFreshPicksLead/);
+assert.match(extraPickupSrc, /isFreshPicksFulfilmentDateToday/);
 
 const extraActionsSrc = readSrc("src/workspaces/storefront/extra/actions.ts");
-assert.match(extraActionsSrc, /isValidExtraCustomerPickup/);
+assert.match(extraActionsSrc, /isValidExtraCustomerFulfilment/);
 assert.doesNotMatch(extraActionsSrc, /now:/);
 
 const extraFormSrc = readSrc(
   "src/workspaces/storefront/extra/GuestExtraOrderForm.tsx",
 );
-assert.match(extraFormSrc, /extraCustomerPickupSlotsForDate/);
+assert.match(extraFormSrc, /extraCustomerVisibleFulfilmentDates/);
+assert.match(extraFormSrc, /freshPicksMethodAvailability/);
 
 const checkoutSlotsSrc = readSrc(
   "src/engines/business-calendar/pickup-slots.ts",

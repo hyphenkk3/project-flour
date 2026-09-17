@@ -32,6 +32,7 @@ const day = "2026-08-20";
 const dineInBase = {
   customerId: null as string | null,
   pickupDate: day,
+  reservationDate: day,
   selectedPickupDate: day,
   status: "paid",
   fulfilmentMethod: "dine_in",
@@ -212,14 +213,13 @@ for (const role of [
   assert.equal(caps.canMarkCollected, true, `${role} complete`);
   assert.equal(caps.canUndoCollected, true, `${role} undo`);
 }
-assert.equal(canAccessCollectionWorkspace("bakery"), false);
+assert.equal(canAccessCollectionWorkspace("bakery"), true);
 
 const extraSrc = readFileSync(
   resolve("src/workspaces/storefront/extra/GuestExtraOrderForm.tsx"),
   "utf8",
 );
-assert.doesNotMatch(extraSrc, /dine_in/);
-assert.doesNotMatch(extraSrc, /Delivery/);
+assert.doesNotMatch(extraSrc, /submit_guest_preorder/);
 
 const navSrc = readFileSync(
   resolve("src/workspaces/collection/CollectionWorkspaceNav.tsx"),

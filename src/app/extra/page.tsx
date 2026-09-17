@@ -4,7 +4,7 @@ import { StorefrontExtraPage } from "@/workspaces/storefront/home/StorefrontExtr
 export const metadata: Metadata = {
   title: "Fresh Picks",
   description:
-    "Extra cakes available today or tomorrow. Limited quantities, available for pickup during the stated window.",
+    "Extra cakes available today or tomorrow. Limited quantities, available for pickup, dine-in, or delivery during the stated window.",
 };
 
 export default function ExtraPage() {

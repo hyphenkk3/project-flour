@@ -1,9 +1,16 @@
 import { StorefrontHomeLink } from "@/workspaces/storefront/StorefrontBrand";
+import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import { GuestExtraCheckoutForm } from "@/workspaces/storefront/extra/GuestExtraCheckoutForm";
+import { loadFreshPicksPreparationConfig } from "@/workspaces/storefront/extra/config";
 
 export const dynamic = "force-dynamic";
 
-export function StorefrontExtraCheckoutPage() {
+export async function StorefrontExtraCheckoutPage() {
+  const [hoursSnapshot, preparationConfig] = await Promise.all([
+    loadOperatingHoursSnapshot(),
+    loadFreshPicksPreparationConfig(),
+  ]);
+
   return (
     <main className="bg-paper mx-auto min-h-screen max-w-5xl px-5 py-10 sm:px-6">
       <StorefrontHomeLink />
@@ -15,7 +22,10 @@ export function StorefrontExtraCheckoutPage() {
         with you after submission.
       </p>
       <div className="mt-10 max-w-lg">
-        <GuestExtraCheckoutForm />
+        <GuestExtraCheckoutForm
+          hoursSnapshot={hoursSnapshot}
+          preparationConfig={preparationConfig}
+        />
       </div>
     </main>
   );

@@ -10,6 +10,14 @@ import {
   getEffectivePickupSchedule,
 } from "@/engines/business-calendar/pickup-schedule";
 import { extraPickupThroughIso } from "@/engines/extra/fresh-picks-time";
+import {
+  DEFAULT_FRESH_PICKS_PREPARATION_CONFIG,
+  DEFAULT_FRESH_PICKS_SAME_DAY_LEAD_MINUTES,
+  isFreshPicksFulfilmentDateToday,
+  isFreshPicksSameDayCutoffPassed,
+  slotPassesFreshPicksLead,
+  type FreshPicksPreparationConfig,
+} from "@/engines/extra/fresh-picks-preparation";
 import { addBusinessCalendarDays, toBusinessDateKey } from "@/lib/dates";
 import type { PickupSlot } from "@/engines/business-calendar/pickup-slots";
 
@@ -19,16 +27,14 @@ export type ExtraPickupWindow = {
   orderCutoffAt: string;
 };
 
-/** Same-day Fresh Pick only: earliest pickup is now + this lead, then the next 30-minute slot. */
-export const EXTRA_SAME_DAY_PICKUP_LEAD_MS = 60 * 60 * 1000;
+/** Default same-day pickup lead. Prefer FreshPicksPreparationConfig.leadMinutes. */
+export const EXTRA_SAME_DAY_PICKUP_LEAD_MS =
+  DEFAULT_FRESH_PICKS_SAME_DAY_LEAD_MINUTES * 60 * 1000;
 
-function extraCustomerSlotFloorMs(dateYmd: string, now: Date): number {
-  const nowMs = now.getTime();
-  if (dateYmd === toBusinessDateKey(now)) {
-    return nowMs + EXTRA_SAME_DAY_PICKUP_LEAD_MS;
-  }
-  return nowMs;
-}
+export type ExtraPickupSlotOptions = {
+  /** When false, skip cutoff + lead so callers can explain why a method is gone. */
+  applySameDayPreparation?: boolean;
+};
 
 export function extraPickupDates(input: ExtraPickupWindow): string[] {
   const fromYmd = toBusinessDateKey(input.pickupAvailableFromAt);
@@ -58,15 +64,40 @@ export function extraPickupWindowsShareDate(
   return extraPickupDates(a).some((ymd) => allowed.has(ymd));
 }
 
+function extraOperatingPickupSlotsForDate(
+  dateYmd: string,
+  input: ExtraPickupWindow,
+  snapshot: OperatingHoursSnapshot,
+): PickupSlot[] {
+  if (!extraPickupDates(input).includes(dateYmd)) return [];
+  const schedule = getEffectivePickupSchedule(dateYmd, snapshot);
+  if (schedule.status !== "open") return [];
+  const fromMs = Date.parse(input.pickupAvailableFromAt);
+  if (!Number.isFinite(fromMs)) return [];
+  return schedule.selectableSlots
+    .filter((value) => {
+      const iso = extraPickupThroughIso(dateYmd, value);
+      if (!iso) return false;
+      return Date.parse(iso) >= fromMs;
+    })
+    .map((value) => ({
+      value,
+      label: formatPickupClockLabel(value),
+    }));
+}
+
 /** Pickup dates that still have remaining bakery operating-hour slots (Malaysia time). */
 export function extraOrderablePickupDates(
   input: ExtraPickupWindow,
   now?: Date,
   snapshot: OperatingHoursSnapshot = OPERATING_HOURS_SEED,
+  config: FreshPicksPreparationConfig = DEFAULT_FRESH_PICKS_PREPARATION_CONFIG,
 ): string[] {
   const when = now ?? new Date();
   return extraPickupDates(input).filter(
-    (ymd) => extraCustomerPickupSlotsForDate(ymd, input, when, snapshot).length > 0,
+    (ymd) =>
+      extraCustomerPickupSlotsForDate(ymd, input, when, snapshot, config)
+        .length > 0,
   );
 }
 
@@ -81,10 +112,11 @@ export function extraCustomerVisiblePickupDates(
   input: ExtraPickupWindow,
   now?: Date,
   snapshot: OperatingHoursSnapshot = OPERATING_HOURS_SEED,
+  config: FreshPicksPreparationConfig = DEFAULT_FRESH_PICKS_PREPARATION_CONFIG,
 ): string[] {
   const when = now ?? new Date();
   const todayYmd = toBusinessDateKey(when);
-  const upcoming = extraOrderablePickupDates(input, when, snapshot).filter(
+  const upcoming = extraOrderablePickupDates(input, when, snapshot, config).filter(
     (ymd) => ymd >= todayYmd,
   );
   if (upcoming.length === 0) return [];
@@ -98,27 +130,28 @@ export function extraCustomerPickupSlotsForDate(
   input: ExtraPickupWindow,
   now?: Date,
   snapshot: OperatingHoursSnapshot = OPERATING_HOURS_SEED,
+  config: FreshPicksPreparationConfig = DEFAULT_FRESH_PICKS_PREPARATION_CONFIG,
+  options: ExtraPickupSlotOptions = {},
 ): PickupSlot[] {
-  if (!extraPickupDates(input).includes(dateYmd)) return [];
-  const schedule = getEffectivePickupSchedule(dateYmd, snapshot);
-  if (schedule.status !== "open") return [];
+  const applySameDayPreparation = options.applySameDayPreparation !== false;
+  const slots = extraOperatingPickupSlotsForDate(dateYmd, input, snapshot);
+  if (!applySameDayPreparation) return slots;
   const when = now ?? new Date();
-  const fromMs = Date.parse(input.pickupAvailableFromAt);
-  const earliestMs = extraCustomerSlotFloorMs(dateYmd, when);
-  return schedule.selectableSlots
-    .filter((value) => {
-      const iso = extraPickupThroughIso(dateYmd, value);
-      if (!iso) return false;
-      const ms = Date.parse(iso);
-      // Pickup is not truncated at the order cutoff.
-      // Same-day Fresh Pick: now + 1 hour, rounded up by remaining 30-minute slots.
-      // Later dates keep configured bakery slots (past-now slots still hidden).
-      return ms >= fromMs && ms >= earliestMs;
-    })
-    .map((value) => ({
-      value,
-      label: formatPickupClockLabel(value),
-    }));
+  if (
+    isFreshPicksFulfilmentDateToday(dateYmd, when) &&
+    isFreshPicksSameDayCutoffPassed(when, config)
+  ) {
+    return [];
+  }
+  return slots.filter((slot) =>
+    slotPassesFreshPicksLead({
+      dateYmd,
+      timeHm: slot.value,
+      now: when,
+      config,
+      comparison: "inclusive",
+    }),
+  );
 }
 
 export function isValidExtraCustomerPickup(input: {
@@ -127,13 +160,22 @@ export function isValidExtraCustomerPickup(input: {
   pickupAvailableFromAt: string;
   orderCutoffAt: string;
   now?: Date;
+  snapshot?: OperatingHoursSnapshot;
+  config?: FreshPicksPreparationConfig;
 }): boolean {
   const window: ExtraPickupWindow = {
     pickupAvailableFromAt: input.pickupAvailableFromAt,
     orderCutoffAt: input.orderCutoffAt,
   };
+  const snapshot = input.snapshot ?? OPERATING_HOURS_SEED;
+  const config = input.config ?? DEFAULT_FRESH_PICKS_PREPARATION_CONFIG;
   if (
-    !extraCustomerVisiblePickupDates(window, input.now).includes(input.pickupDate)
+    !extraCustomerVisiblePickupDates(
+      window,
+      input.now,
+      snapshot,
+      config,
+    ).includes(input.pickupDate)
   ) {
     return false;
   }
@@ -141,5 +183,7 @@ export function isValidExtraCustomerPickup(input: {
     input.pickupDate,
     window,
     input.now,
+    snapshot,
+    config,
   ).some((slot) => slot.value === input.pickupTime);
 }

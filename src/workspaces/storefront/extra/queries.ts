@@ -7,18 +7,22 @@ import {
   sortCustomerFreshPicksByAvailabilityDay,
   type FreshPickDay,
 } from "@/engines/extra/customer-fresh-picks";
+import { extraCustomerVisibleFulfilmentDates } from "@/engines/extra/fresh-picks-fulfilment";
+import type { FreshPicksPreparationConfig } from "@/engines/extra/fresh-picks-preparation";
 import { resolveCakePhoto } from "@/engines/menu/cake-photos";
-import { extraCustomerVisiblePickupDates } from "@/engines/extra/extra-pickup";
+import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import { toBusinessDateKey } from "@/lib/dates";
 import { createPublicClient } from "@/lib/supabase/server";
 import { connection } from "next/server";
 import { isMissingCakePhotoSchema } from "@/workspaces/library/cakes/photo-storage";
+import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import {
   mapStorefrontCakePhoto,
   STOREFRONT_CAKE_PHOTO_SELECT,
   STOREFRONT_CAKE_PHOTO_SELECT_LEGACY,
   type StorefrontCakePhotoRow,
 } from "@/workspaces/storefront/catalog/cake-photo-map";
+import { loadFreshPicksPreparationConfig } from "@/workspaces/storefront/extra/config";
 
 export type StorefrontExtraPick = {
   id: string;
@@ -86,12 +90,16 @@ function daysFromRemainingPickup(
   pickupThroughAt: string | null,
   todayYmd: string,
   now: Date,
+  snapshot: OperatingHoursSnapshot,
+  config: FreshPicksPreparationConfig,
 ): FreshPickDay[] {
   return extraActionableFreshPickDays({
     pickupAvailableFromAt,
     orderCutoffAt: pickupThroughAt,
     todayYmd,
     now,
+    snapshot,
+    config,
   });
 }
 
@@ -201,12 +209,16 @@ function mapPick(
   photosByCake: Map<string, ReturnType<typeof mapStorefrontCakePhoto>[]>,
   unitPrice: number | null,
   description: string | null,
+  snapshot: OperatingHoursSnapshot,
+  config: FreshPicksPreparationConfig,
 ): StorefrontExtraPick | null {
   const days = daysFromRemainingPickup(
     row.pickup_available_from_at,
     row.pickup_through_at,
     todayYmd,
     now,
+    snapshot,
+    config,
   );
   const day = days[0];
   if (!day) return null;
@@ -264,7 +276,11 @@ export async function listStorefrontAvailableExtra(): Promise<
     const live = ((data ?? []) as ExtraRow[]).filter((row) =>
       publishedNow(row, now),
     );
-    const details = await extraListingDetails(supabase, live);
+    const [details, hoursSnapshot, config] = await Promise.all([
+      extraListingDetails(supabase, live),
+      loadOperatingHoursSnapshot(),
+      loadFreshPicksPreparationConfig(),
+    ]);
     const units = live
       .map((row) =>
         mapPick(
@@ -278,6 +294,8 @@ export async function listStorefrontAvailableExtra(): Promise<
           row.library_cake_id
             ? (details.descriptionByCake.get(row.library_cake_id) ?? null)
             : null,
+          hoursSnapshot,
+          config,
         ),
       )
       .filter((pick): pick is StorefrontExtraPick => pick != null);
@@ -313,19 +331,25 @@ export async function getStorefrontExtraById(
     const row = data as ExtraRow;
     if (!publishedNow(row, now)) return null;
     if (!row.pickup_available_from_at || !row.pickup_through_at) return null;
+    const [hoursSnapshot, config, details] = await Promise.all([
+      loadOperatingHoursSnapshot(),
+      loadFreshPicksPreparationConfig(),
+      extraListingDetails(supabase, [row]),
+    ]);
     if (
-      extraCustomerVisiblePickupDates(
-        {
+      extraCustomerVisibleFulfilmentDates({
+        window: {
           pickupAvailableFromAt: row.pickup_available_from_at,
           orderCutoffAt: row.pickup_through_at,
         },
         now,
-      ).length === 0
+        snapshot: hoursSnapshot,
+        config,
+      }).length === 0
     ) {
       return null;
     }
 
-    const details = await extraListingDetails(supabase, [row]);
     return mapPick(
       row,
       todayYmd,
@@ -337,6 +361,8 @@ export async function getStorefrontExtraById(
       row.library_cake_id
         ? (details.descriptionByCake.get(row.library_cake_id) ?? null)
         : null,
+      hoursSnapshot,
+      config,
     );
   } catch {
     return null;

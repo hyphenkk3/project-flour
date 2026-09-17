@@ -869,7 +869,7 @@ const extraCheckoutSrc = readFileSync(
   "utf8",
 );
 assert.doesNotMatch(extraFormSrc, /submitGuestExtraOrder/);
-assert.match(extraFormSrc, /extraCustomerVisiblePickupDates/);
+assert.match(extraFormSrc, /extraCustomerVisibleFulfilmentDates/);
 assert.match(extraFormSrc, /name="extra_stock_id"/);
 assert.match(extraFormSrc, /value=\{extra\.id\}/);
 assert.match(extraCheckoutSrc, /name="customer_name"/);
@@ -879,7 +879,7 @@ assert.match(extraCheckoutSrc, /name="notes"/);
 assert.doesNotMatch(extraCheckoutSrc, /email_submission_receipt_requested/);
 assert.match(extraFormSrc, /name="pickup_date"/);
 assert.match(extraFormSrc, /name="pickup_time"/);
-assert.match(extraFormSrc, /extraCustomerPickupSlotsForDate/);
+assert.match(extraFormSrc, /freshPicksMethodAvailability/);
 assert.match(extraFormSrc, /htmlFor="pickup_date"/);
 assert.match(extraFormSrc, /htmlFor="pickup_time"/);
 assert.match(extraCheckoutSrc, /name="include_receipt"/);

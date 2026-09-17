@@ -29,7 +29,8 @@ export async function StorefrontExtraPage() {
         </h1>
         <p className="text-skyline mt-3 max-w-xl text-[0.95rem] leading-relaxed">
           Extra cakes available today or tomorrow.
-          Limited quantities, available for pickup during the stated window.
+          Limited quantities, available for pickup, dine-in, or delivery
+          during the stated window.
         </p>
 
         {picks.length === 0 ? (

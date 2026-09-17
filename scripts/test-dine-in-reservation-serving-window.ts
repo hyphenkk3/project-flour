@@ -1,5 +1,5 @@
 /**
- * Dine-in reservation start vs cake serving window (30-minute grid, max 60 minutes).
+ * Dine-in reservation start vs cake serving window (15-minute grid, max 60 minutes).
  * Run: npx tsx scripts/test-dine-in-reservation-serving-window.ts
  */
 import assert from "node:assert/strict";
@@ -36,7 +36,13 @@ assert.equal(isCakeServingWithinReservationWindow("15:00", "16:00"), true);
 assert.equal(isCakeServingWithinReservationWindow("15:00", "16:30"), false);
 assert.equal(isCakeServingWithinReservationWindow("15:00", "14:30"), false);
 
-assert.deepEqual(servingValues("14:00"), ["14:00", "14:30", "15:00"]);
+assert.deepEqual(servingValues("14:00"), [
+  "14:00",
+  "14:15",
+  "14:30",
+  "14:45",
+  "15:00",
+]);
 assert.ok(servingValues("14:30").includes("15:30"));
 assert.ok(!servingValues("14:00").includes("15:30"));
 assert.ok(!servingValues("15:00").includes("16:30"));
@@ -120,8 +126,8 @@ const extraSrc = readFileSync(
   resolve("src/workspaces/storefront/extra/GuestExtraOrderForm.tsx"),
   "utf8",
 );
-assert.doesNotMatch(extraSrc, /fulfilment_method/);
-assert.doesNotMatch(extraSrc, /reservation_time/);
+assert.match(extraSrc, /FulfilmentMethodChooser/);
+assert.match(extraSrc, /Dine-in reservation time/);
 
 const actionsSrc = readFileSync(
   resolve("src/workspaces/storefront/checkout/actions.ts"),

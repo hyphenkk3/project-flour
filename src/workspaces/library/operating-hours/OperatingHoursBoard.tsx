@@ -31,7 +31,7 @@ const CAPABILITY_COPY: Record<
   },
   delivery: {
     title: "Delivery",
-    help: "Whole Cake delivery window. Extra / Fresh Picks stay pickup-only.",
+    help: "Whole Cake and Fresh Picks delivery window.",
     showUsual: false,
   },
   dine_in: {

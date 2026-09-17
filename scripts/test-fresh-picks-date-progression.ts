@@ -255,11 +255,11 @@ const checkoutSrc = readSrc(
 );
 
 assert.match(extraPickupSrc, /extraCustomerVisiblePickupDates/);
-assert.match(extraFormSrc, /extraCustomerVisiblePickupDates/);
+assert.match(extraFormSrc, /extraCustomerVisibleFulfilmentDates/);
 assert.match(extraFormSrc, /FRESH_PICKS_FIXED_DATES_NOTE/);
 assert.doesNotMatch(extraFormSrc, /extraOrderablePickupDates/);
 assert.match(extraQueriesSrc, /extraActionableFreshPickDays/);
-assert.match(extraQueriesSrc, /extraCustomerVisiblePickupDates/);
+assert.match(extraQueriesSrc, /extraCustomerVisibleFulfilmentDates/);
 assert.match(extraPageSrc, /freshPickAvailabilityDateLabel/);
 assert.match(extraPageSrc, /freshPickAvailabilityLabel\(pick\.days\)/);
 assert.match(extraCardSrc, /homepageFreshPicksAvailabilityLines/);

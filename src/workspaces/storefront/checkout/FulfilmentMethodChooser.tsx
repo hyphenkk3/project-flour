@@ -17,12 +17,25 @@ const METHODS: Array<{
   { value: "delivery", label: "Delivery" },
 ];
 
+export type FulfilmentChooserState = {
+  available: boolean;
+  reason: string | null;
+  detail?: string | null;
+};
+
 type FulfilmentMethodChooserProps = {
   dateYmd: string;
   closedDates: readonly string[];
   value: CustomerWebsiteFulfilmentMethod;
   onChange: (value: CustomerWebsiteFulfilmentMethod) => void;
   hoursSnapshot?: OperatingHoursSnapshot;
+  /** When set, skip whole-cake calendars (Fresh Picks overlay). */
+  methodStates?: Record<CustomerWebsiteFulfilmentMethod, FulfilmentChooserState>;
+  /**
+   * Whole-cake checkout submits this radio group.
+   * Fresh Picks checkout uses a single hidden fulfilment_method instead.
+   */
+  includeFieldName?: boolean;
 };
 
 function optionClass(available: boolean, selected: boolean): string {
@@ -41,12 +54,12 @@ export function FulfilmentMethodChooser({
   value,
   onChange,
   hoursSnapshot = OPERATING_HOURS_SEED,
+  methodStates,
+  includeFieldName = true,
 }: FulfilmentMethodChooserProps) {
-  const availability = customerFulfilmentAvailability(
-    dateYmd,
-    closedDates,
-    hoursSnapshot,
-  );
+  const availability =
+    methodStates ??
+    customerFulfilmentAvailability(dateYmd, closedDates, hoursSnapshot);
 
   return (
     <fieldset className="space-y-2">
@@ -55,7 +68,9 @@ export function FulfilmentMethodChooser({
       </legend>
       <div className="grid gap-2 sm:grid-cols-3">
         {METHODS.map((method) => {
-          const state: CustomerFulfilmentAvailability = availability[method.value];
+          const state: CustomerFulfilmentAvailability & {
+            detail?: string | null;
+          } = availability[method.value];
           return (
             <label
               className={`flex min-h-12 items-start gap-3 rounded-lg border px-3 py-2 text-sm ${optionClass(state.available, value === method.value)}`}
@@ -65,16 +80,21 @@ export function FulfilmentMethodChooser({
                 checked={state.available && value === method.value}
                 className="mt-1 size-4 accent-[var(--color-signal)] disabled:cursor-not-allowed"
                 disabled={!state.available}
-                name="fulfilment_method"
+                name={includeFieldName ? "fulfilment_method" : undefined}
                 onChange={() => {
                   if (state.available) onChange(method.value);
                 }}
-                required={state.available && value === method.value}
+                required={
+                  includeFieldName && state.available && value === method.value
+                }
                 type="radio"
                 value={method.value}
               />
               <span>
                 <span className="block font-medium">{method.label}</span>
+                {state.available && state.detail ? (
+                  <span className="mt-0.5 block text-xs">{state.detail}</span>
+                ) : null}
                 {!state.available && state.reason ? (
                   <span className="mt-0.5 block text-xs">{state.reason}</span>
                 ) : null}

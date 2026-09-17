@@ -117,7 +117,7 @@ const tomorrowOnly = addFreshPickToCart(cart, {
 assert.equal(tomorrowOnly.ok, false);
 assert.equal(
   !tomorrowOnly.ok && tomorrowOnly.error,
-  "Please choose a valid pickup time for that date.",
+  "Please choose a valid fulfilment time for that date.",
 );
 
 assert.equal(
@@ -146,6 +146,7 @@ const parsed = parseFreshPickCart({
   ],
 });
 assert.equal(parsed?.items[0]?.extraStockId, "extra-avocado-a");
+assert.equal(parsed?.fulfilmentMethod, "pickup");
 assert.equal(freshPickCartHasItems(parsed), true);
 
 const removed = removeFreshPickFromCart(parsed!, "extra-avocado-a");
@@ -408,7 +409,8 @@ assert.doesNotMatch(extraFormSrc, /sold_at/);
 assert.doesNotMatch(extraFormSrc, /submit_guest_extra_order/);
 assert.match(extraFormSrc, /FRESH_PICKS_ADDED_CONFIRMATION/);
 assert.match(extraFormSrc, /name="extra_stock_id"/);
-assert.match(extraFormSrc, /extraCustomerPickupSlotsForDate/);
+assert.match(extraFormSrc, /extraCustomerVisibleFulfilmentDates/);
+assert.match(extraFormSrc, /freshPicksMethodAvailability/);
 
 assert.match(extraCheckoutSrc, /submitGuestExtraOrderAction/);
 assert.match(extraCheckoutSrc, /CheckoutConfirmPrompt/);
@@ -421,7 +423,7 @@ assert.match(extraActionsSrc, /getAll\("extra_stock_id"\)/);
 assert.match(extraActionsSrc, /p_extra_stock_ids: extraStockIds/);
 assert.match(extraActionsSrc, /getStorefrontExtraById/);
 assert.match(extraActionsSrc, /extraCartItemUnavailableMessage/);
-assert.match(extraActionsSrc, /isValidExtraCustomerPickup/);
+assert.match(extraActionsSrc, /isValidExtraCustomerFulfilment/);
 assert.doesNotMatch(extraActionsSrc, /libraryCakeId/);
 assert.doesNotMatch(extraActionsSrc, /production_capacity/);
 
@@ -487,8 +489,10 @@ assert.match(rpcSrc, /cut_into_slices_at is not null/);
 assert.match(rpcSrc, /add column if not exists order_id/);
 assert.doesNotMatch(rpcSrc, /production_capacity/);
 
-assert.match(extraPickupSrc, /EXTRA_SAME_DAY_PICKUP_LEAD_MS = 60 \* 60 \* 1000/);
-assert.match(extraFormSrc, /extraCustomerPickupSlotsForDate/);
+assert.match(extraPickupSrc, /EXTRA_SAME_DAY_PICKUP_LEAD_MS/);
+assert.match(extraPickupSrc, /DEFAULT_FRESH_PICKS_SAME_DAY_LEAD_MINUTES/);
+assert.match(extraFormSrc, /extraCustomerVisibleFulfilmentDates/);
+assert.match(extraFormSrc, /freshPicksMethodAvailability/);
 assert.doesNotMatch(extraPickupSrc, /getPickupSlotsForDate/);
 
 assert.match(successSrc, /ClearFreshPickCartOnSuccess/);

@@ -10,7 +10,7 @@ import {
   type CustomerComplimentaryOption,
   type CustomerPaidAddonOption,
 } from "@/engines/orders/customer-preorder-options";
-import { workspaceFulfilmentSectionTitle } from "@/engines/orders/fulfilment";
+import { workspaceFulfilmentSectionTitle, type CustomerWebsiteFulfilmentMethod } from "@/engines/orders/fulfilment";
 import { formatShortBusinessDate } from "@/lib/dates";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
@@ -126,6 +126,8 @@ export function buildExtraCheckoutConfirmSnapshot(input: {
   unitPrice: number | null;
   pickupDate: string;
   pickupTime: string;
+  fulfilmentMethod?: CustomerWebsiteFulfilmentMethod;
+  fulfilmentDetails?: string[];
   customerName: string;
   customerPhone: string;
   notes: string;
@@ -183,8 +185,10 @@ export function buildExtraCheckoutConfirmSnapshot(input: {
     collectionDate:
       formatShortBusinessDate(input.pickupDate) || input.pickupDate,
     collectionTime: formatPickupTime(input.pickupTime),
-    fulfilmentLabel: workspaceFulfilmentSectionTitle("pickup"),
-    fulfilmentDetails: [],
+    fulfilmentLabel: workspaceFulfilmentSectionTitle(
+      input.fulfilmentMethod ?? "pickup",
+    ),
+    fulfilmentDetails: input.fulfilmentDetails ?? [],
     customerName: input.customerName.trim(),
     customerPhone: input.customerPhone.trim(),
     notes: input.notes.trim(),
