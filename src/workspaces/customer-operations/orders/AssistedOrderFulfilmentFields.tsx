@@ -2,8 +2,15 @@
 
 import { useState } from "react";
 import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
-import { FormField, FormInput, FormRadioGroup, FormTextarea } from "@/components/ui/form";
 import {
+  FormCheckbox,
+  FormField,
+  FormInput,
+  FormRadioGroup,
+  FormTextarea,
+} from "@/components/ui/form";
+import {
+  DINE_IN_VENUES,
   cakeServingSlotsForReservation,
   dineInVenueLabel,
   resolveDineInVenueForPair,
@@ -42,6 +49,7 @@ type AssistedOrderFulfilmentFieldsProps = {
   customerPhone: string;
   closedDates?: readonly string[];
   hoursSnapshot?: OperatingHoursSnapshot;
+  canOverrideCustomerFulfilmentSchedule?: boolean;
 };
 
 export function AssistedOrderFulfilmentFields({
@@ -55,14 +63,18 @@ export function AssistedOrderFulfilmentFields({
   customerPhone,
   closedDates = [],
   hoursSnapshot = OPERATING_HOURS_SEED,
+  canOverrideCustomerFulfilmentSchedule = false,
 }: AssistedOrderFulfilmentFieldsProps) {
   const [selectedDate, setSelectedDate] = useState("");
   const [servingTime, setServingTime] = useState("");
+  const [specialArrangement, setSpecialArrangement] = useState(false);
   const isDelivery = method === "delivery";
   const isDineIn = method === "dine_in";
   const showNotifyChoice = !delivery.sameAsCustomer;
   const dateLabel = workspaceScheduleDateLabel(method);
   const timeLabel = workspaceScheduleTimeLabel(method);
+  const useSpecialSchedule =
+    canOverrideCustomerFulfilmentSchedule && specialArrangement;
 
   function patchDelivery(patch: Partial<DeliveryCreateDraft>) {
     let next: DeliveryCreateDraft = { ...delivery, ...patch };
@@ -123,109 +135,199 @@ export function AssistedOrderFulfilmentFields({
         </div>
       </fieldset>
 
+      {canOverrideCustomerFulfilmentSchedule ? (
+        <FormCheckbox
+          checked={specialArrangement}
+          help="Normal customer dates and times remain the default. Use this only for an Owner special arrangement outside those slots, including after cutoff."
+          label="Special arrangement (custom date/time)"
+          name="owner_special_arrangement"
+          onChange={(event) => {
+            const next = event.target.checked;
+            setSpecialArrangement(next);
+            if (next) return;
+            setSelectedDate("");
+            setServingTime("");
+            onDineInChange({
+              ...dineIn,
+              reservationTime: "",
+              venue: "",
+            });
+          }}
+          value="1"
+        />
+      ) : null}
+
       {isDineIn ? (
         <>
           <p className="text-ink text-sm leading-relaxed">
             {DINE_IN_RESERVATION_INCLUDED_NOTICE}
           </p>
-          <PickupSlotFields
-            closedDates={closedDates}
-            dateLabel={dateLabel}
-            hoursSnapshot={hoursSnapshot}
-            key={`assisted-dine-in-reservation-${method}`}
-            onDateChange={(date) => {
-              setSelectedDate(date);
-              setServingTime("");
-              onDineInChange({
-                ...dineIn,
-                reservationTime: "",
-                venue: "",
-              });
-            }}
-            onTimeChange={(reservationTime) => {
-              const servingOptions = cakeServingSlotsForReservation(
-                selectedDate,
-                reservationTime,
-                hoursSnapshot,
-              );
-              const nextServing = servingOptions.some(
-                (slot) => slot.value === servingTime,
-              )
-                ? servingTime
-                : "";
-              setServingTime(nextServing);
-              onDineInChange({
-                ...dineIn,
-                reservationTime,
-                venue: nextServing
-                  ? resolveDineInVenueForPair(
-                      selectedDate,
+          {useSpecialSchedule ? (
+            <>
+              <FormField htmlFor="pickup_date" label={dateLabel}>
+                <FormInput
+                  id="pickup_date"
+                  name="pickup_date"
+                  onChange={(event) => {
+                    const date = event.target.value;
+                    setSelectedDate(date);
+                    setServingTime("");
+                    onDineInChange({
+                      ...dineIn,
+                      reservationTime: "",
+                      venue: "",
+                    });
+                  }}
+                  required
+                  type="date"
+                  value={selectedDate}
+                />
+              </FormField>
+              <FormField
+                help="Custom reservation clock time for this special arrangement."
+                htmlFor="reservation_time"
+                label="Dine-in reservation time"
+              >
+                <FormInput
+                  id="reservation_time"
+                  name="reservation_time"
+                  onChange={(event) => {
+                    const reservationTime = event.target.value;
+                    onDineInChange({
+                      ...dineIn,
                       reservationTime,
-                      nextServing,
-                      dineIn.venue,
-                      hoursSnapshot,
-                    )
-                  : "",
-              });
-            }}
-            slotsForDate={(date, closed) =>
-              customerFulfilmentSlotsForDate(
-                "dine_in",
-                date,
-                closed,
-                hoursSnapshot,
-              )
-            }
-            timeHelp="Choose when the table reservation should start."
-            timeId="reservation_time"
-            timeLabel="Dine-in reservation time"
-            timeName="reservation_time"
-          />
-          {dineIn.reservationTime ? (
-            <PickupSlotFields
-              closedDates={closedDates}
-              defaultDate={selectedDate}
-              defaultTime={servingTime}
-              hoursSnapshot={hoursSnapshot}
-              includeFieldNames
-              key={`assisted-dine-in-serving-${dineIn.reservationTime}`}
-              onTimeChange={(nextServing) => {
-                setServingTime(nextServing);
-                onDineInChange({
-                  ...dineIn,
-                  venue: resolveDineInVenueForPair(
+                      venue: "",
+                    });
+                  }}
+                  required
+                  type="time"
+                  value={dineIn.reservationTime}
+                />
+              </FormField>
+              <FormField
+                help="Cake serving time must be within 1 hour of the reservation time."
+                htmlFor="pickup_time"
+                label="Cake serving time"
+              >
+                <FormInput
+                  id="pickup_time"
+                  name="pickup_time"
+                  onChange={(event) => setServingTime(event.target.value)}
+                  required
+                  type="time"
+                  value={servingTime}
+                />
+              </FormField>
+            </>
+          ) : (
+            <>
+              <PickupSlotFields
+                closedDates={closedDates}
+                dateLabel={dateLabel}
+                hoursSnapshot={hoursSnapshot}
+                key={`assisted-dine-in-reservation-${method}`}
+                onDateChange={(date) => {
+                  setSelectedDate(date);
+                  setServingTime("");
+                  onDineInChange({
+                    ...dineIn,
+                    reservationTime: "",
+                    venue: "",
+                  });
+                }}
+                onTimeChange={(reservationTime) => {
+                  const servingOptions = cakeServingSlotsForReservation(
                     selectedDate,
-                    dineIn.reservationTime,
-                    nextServing,
-                    dineIn.venue,
+                    reservationTime,
                     hoursSnapshot,
-                  ),
-                });
-              }}
-              showDate={false}
-              slotsForDate={(date, closed) =>
-                isPickupOrdersClosed(date, closed)
-                  ? []
-                  : cakeServingSlotsForReservation(
-                      date,
-                      dineIn.reservationTime,
-                      hoursSnapshot,
-                    )
-              }
-              timeHelp="Cake serving time must be within 1 hour of the reservation time."
-              timeLabel="Cake serving time"
-            />
-          ) : null}
-          {selectedDate && dineIn.reservationTime && servingTime ? (
+                  );
+                  const nextServing = servingOptions.some(
+                    (slot) => slot.value === servingTime,
+                  )
+                    ? servingTime
+                    : "";
+                  setServingTime(nextServing);
+                  onDineInChange({
+                    ...dineIn,
+                    reservationTime,
+                    venue: nextServing
+                      ? resolveDineInVenueForPair(
+                          selectedDate,
+                          reservationTime,
+                          nextServing,
+                          dineIn.venue,
+                          hoursSnapshot,
+                        )
+                      : "",
+                  });
+                }}
+                slotsForDate={(date, closed) =>
+                  customerFulfilmentSlotsForDate(
+                    "dine_in",
+                    date,
+                    closed,
+                    hoursSnapshot,
+                  )
+                }
+                timeHelp="Choose when the table reservation should start."
+                timeId="reservation_time"
+                timeLabel="Dine-in reservation time"
+                timeName="reservation_time"
+              />
+              {dineIn.reservationTime ? (
+                <PickupSlotFields
+                  closedDates={closedDates}
+                  defaultDate={selectedDate}
+                  defaultTime={servingTime}
+                  hoursSnapshot={hoursSnapshot}
+                  includeFieldNames
+                  key={`assisted-dine-in-serving-${dineIn.reservationTime}`}
+                  onTimeChange={(nextServing) => {
+                    setServingTime(nextServing);
+                    onDineInChange({
+                      ...dineIn,
+                      venue: resolveDineInVenueForPair(
+                        selectedDate,
+                        dineIn.reservationTime,
+                        nextServing,
+                        dineIn.venue,
+                        hoursSnapshot,
+                      ),
+                    });
+                  }}
+                  showDate={false}
+                  slotsForDate={(date, closed) =>
+                    isPickupOrdersClosed(date, closed)
+                      ? []
+                      : cakeServingSlotsForReservation(
+                          date,
+                          dineIn.reservationTime,
+                          hoursSnapshot,
+                        )
+                  }
+                  timeHelp="Cake serving time must be within 1 hour of the reservation time."
+                  timeLabel="Cake serving time"
+                />
+              ) : null}
+            </>
+          )}
+          {((useSpecialSchedule && Boolean(selectedDate)) ||
+            (!useSpecialSchedule &&
+              Boolean(selectedDate) &&
+              Boolean(dineIn.reservationTime) &&
+              Boolean(servingTime))) ? (
             <FormRadioGroup
               legend="Where would you like to sit?"
               name="dine_in_venue"
               onChange={(value) => onDineInChange({ ...dineIn, venue: value })}
-              options={venuesForReservationAndServing(
-                selectedDate,
-                dineIn.reservationTime,
-                servingTime,
-                hoursSnapshot,
+              options={(useSpecialSchedule
+                ? [...DINE_IN_VENUES]
+                : venuesForReservationAndServing(
+                    selectedDate,
+                    dineIn.reservationTime,
+                    servingTime,
+                    hoursSnapshot,
+                  )
               ).map((venue) => ({
                 value: venue,
                 label: dineInVenueLabel(venue),
@@ -268,6 +370,33 @@ export function AssistedOrderFulfilmentFields({
             />
           </FormField>
         </>
+      ) : useSpecialSchedule ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField htmlFor="pickup_date" label={dateLabel}>
+            <FormInput
+              id="pickup_date"
+              name="pickup_date"
+              onChange={(event) => setSelectedDate(event.target.value)}
+              required
+              type="date"
+              value={selectedDate}
+            />
+          </FormField>
+          <FormField
+            help="Custom clock time for this special arrangement."
+            htmlFor="pickup_time"
+            label={timeLabel}
+          >
+            <FormInput
+              id="pickup_time"
+              name="pickup_time"
+              onChange={(event) => setServingTime(event.target.value)}
+              required
+              type="time"
+              value={servingTime}
+            />
+          </FormField>
+        </div>
       ) : (
         <PickupSlotFields
           closedDates={closedDates}

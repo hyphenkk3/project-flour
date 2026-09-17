@@ -9,6 +9,10 @@ import { createClient } from "@/lib/supabase/server";
 import { addBusinessCalendarDays } from "@/lib/dates";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import { earliestPickupDateYmd } from "@/engines/business-calendar/pickup-slots";
+import {
+  assistedCreateSlotPolicy,
+  parseOwnerSpecialArrangementFlag,
+} from "@/engines/orders/assisted-fulfilment";
 import { parseCustomerWebsiteFulfilmentMethod } from "@/engines/orders/fulfilment";
 import type {
   FulfilmentMethod,
@@ -223,7 +227,12 @@ export async function createOrderAction(
     fulfilmentMethod,
     delivery: deliveryDraft,
     dineIn: dineInDraft,
-    slotPolicy: "customer-slots",
+    slotPolicy: assistedCreateSlotPolicy({
+      actorRole: staff.role.code,
+      ownerSpecialArrangement: parseOwnerSpecialArrangementFlag(
+        formData.get("owner_special_arrangement"),
+      ),
+    }),
     closedDates,
     hoursSnapshot,
   });

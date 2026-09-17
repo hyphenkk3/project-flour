@@ -38,6 +38,11 @@ export type GuestOrderWorkspaceCapabilities = {
    * Not granted with normal Edit Order.
    */
   canOverridePickupMonth: boolean;
+  /**
+   * Owner-authorized special arrangement: custom fulfilment date/time
+   * outside customer slots / cutoff. Not granted to Manager or CO staff.
+   */
+  canOverrideCustomerFulfilmentSchedule: boolean;
   /** Enable Delivery Charges on historical finance-disabled Delivery. */
   canEnableDeliveryFinance: boolean;
   /** Quote / re-quote normal Delivery Fee (> RM0). */
@@ -144,6 +149,11 @@ export function canCreateStaffAssistedOrder(role: RoleCode): boolean {
   );
 }
 
+/** Owner-only special-arrangement date/time outside customer slots. */
+export function canOverrideCustomerFulfilmentSchedule(role: RoleCode): boolean {
+  return role === "owner";
+}
+
 /** Whole Cake Calendar page + read / navigate actions. */
 export function canViewWholeCakeCalendar(role: RoleCode): boolean {
   return (
@@ -185,6 +195,7 @@ export function buildGuestOrderWorkspaceCapabilities(input: {
     canCreateStaffAssistedOrder: isRoutineOrderOperator,
     canEditOrderWorkspace: isRoutineOrderOperator,
     canOverridePickupMonth: isOwner,
+    canOverrideCustomerFulfilmentSchedule: isOwner,
     canEnableDeliveryFinance: isOwner,
     canQuoteDeliveryFee: isOwner || isManager || isCounter,
     canDirectFeeExceptions: feeExceptionAuthority,

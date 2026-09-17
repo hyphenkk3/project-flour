@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   canCreateStaffAssistedOrder,
+  canOverrideCustomerFulfilmentSchedule,
   buildGuestOrderWorkspaceCapabilities,
 } from "@/engines/orders/delivery-finance-capabilities";
 import { guestSnapshotFromCrmCustomer } from "@/workspaces/customer-operations/orders/guest-snapshot";
@@ -123,7 +124,9 @@ assert.doesNotMatch(form, /OrderFulfilmentCreateFields/);
 assert.match(createHelper, /p_pickup_date: input.pickupDate/);
 assert.match(createHelper, /p_pickup_time: input.pickupTime/);
 assert.match(createHelper, /slotPolicy: "customer-slots"|slotPolicy \?\? "owner-clock"/);
-assert.match(actions, /slotPolicy: "customer-slots"/);
+assert.match(actions, /assistedCreateSlotPolicy/);
+assert.match(actions, /owner_special_arrangement/);
+assert.doesNotMatch(actions, /slotPolicy: "customer-slots"/);
 
 // Q / R. Discoverable operational order + Guest Order Workspace handoff
 assert.match(queries, /\.is\("customer_id", null\)/);
@@ -141,6 +144,9 @@ assert.equal(canCreateStaffAssistedOrder("manager"), true);
 assert.equal(canCreateStaffAssistedOrder("customer_operations"), true);
 assert.equal(canCreateStaffAssistedOrder("bakery"), false);
 assert.equal(canCreateStaffAssistedOrder("collection"), false);
+assert.equal(canOverrideCustomerFulfilmentSchedule("owner"), true);
+assert.equal(canOverrideCustomerFulfilmentSchedule("manager"), false);
+assert.equal(canOverrideCustomerFulfilmentSchedule("customer_operations"), false);
 assert.equal(canAccessWorkspace("bakery", "customer_operations"), false);
 assert.equal(canAccessWorkspace("collection", "customer_operations"), false);
 assert.match(actions, /canCreateStaffAssistedOrder/);

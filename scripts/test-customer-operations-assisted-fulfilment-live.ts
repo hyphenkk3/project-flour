@@ -151,6 +151,155 @@ async function main() {
     check(pickup.data.fulfilment_method === "pickup", "pickup method persisted");
     check(String(pickup.data.pickup_date).startsWith(dateYmd), "pickup date persisted");
 
+    const overridePickup = await admin.rpc("create_staff_guest_preorder", {
+      p_actor_staff_id: staff.id,
+      p_customer_name: "CO Owner Override Pickup",
+      p_phone: "0111000011",
+      p_email: null,
+      p_order_source: "whatsapp",
+      p_crew_order: false,
+      p_pickup_date: dateYmd,
+      p_pickup_time: "14:15",
+      p_pickup_instruction: null,
+      p_items: [item],
+      p_complimentary: [],
+      p_include_receipt: false,
+      p_needs_bakery_attention: false,
+      p_bakery_attention_note: null,
+      p_customer_notes: null,
+      p_internal_notes: "CO owner override pickup live",
+      p_paid_addons: [],
+      p_fulfilment_method: "pickup",
+      p_delivery: null,
+    });
+    if (overridePickup.error || !overridePickup.data?.id) {
+      throw new Error(
+        overridePickup.error?.message ?? "owner override pickup create failed",
+      );
+    }
+    cleanupOrderIds.push(overridePickup.data.id);
+    check(
+      String(overridePickup.data.pickup_time).startsWith("14:15"),
+      "owner override pickup time persisted",
+    );
+
+    const overrideDelivery = await admin.rpc("create_staff_guest_preorder", {
+      p_actor_staff_id: staff.id,
+      p_customer_name: "CO Owner Override Delivery",
+      p_phone: "0111000012",
+      p_email: null,
+      p_order_source: "whatsapp",
+      p_crew_order: false,
+      p_pickup_date: dateYmd,
+      p_pickup_time: "14:15",
+      p_pickup_instruction: null,
+      p_items: [item],
+      p_complimentary: [],
+      p_include_receipt: false,
+      p_needs_bakery_attention: false,
+      p_bakery_attention_note: null,
+      p_customer_notes: null,
+      p_internal_notes: "CO owner override delivery live",
+      p_paid_addons: [],
+      p_fulfilment_method: "delivery",
+      p_delivery: {
+        recipient_name: "Override Recipient",
+        recipient_phone: "0111000012",
+        address_line_1: "2 Jalan Test",
+        address_line_2: null,
+        postcode: "88000",
+        city: "Kota Kinabalu",
+        state: "Sabah",
+        recipient_notify_preference: "inform_recipient",
+      },
+    });
+    if (overrideDelivery.error || !overrideDelivery.data?.id) {
+      throw new Error(
+        overrideDelivery.error?.message ?? "owner override delivery create failed",
+      );
+    }
+    cleanupOrderIds.push(overrideDelivery.data.id);
+    check(
+      overrideDelivery.data.fulfilment_method === "delivery",
+      "owner override delivery method persisted",
+    );
+    check(
+      String(overrideDelivery.data.pickup_time).startsWith("14:15"),
+      "owner override delivery time persisted",
+    );
+
+    const missingDelivery = await admin.rpc("create_staff_guest_preorder", {
+      p_actor_staff_id: staff.id,
+      p_customer_name: "CO Owner Override Delivery Invalid",
+      p_phone: "0111000014",
+      p_email: null,
+      p_order_source: "whatsapp",
+      p_crew_order: false,
+      p_pickup_date: dateYmd,
+      p_pickup_time: "14:15",
+      p_pickup_instruction: null,
+      p_items: [item],
+      p_complimentary: [],
+      p_include_receipt: false,
+      p_needs_bakery_attention: false,
+      p_bakery_attention_note: null,
+      p_customer_notes: null,
+      p_internal_notes: "should fail",
+      p_paid_addons: [],
+      p_fulfilment_method: "delivery",
+      p_delivery: null,
+    });
+    if (missingDelivery.data?.id) cleanupOrderIds.push(missingDelivery.data.id);
+    check(Boolean(missingDelivery.error), "owner override delivery still requires details");
+
+    const beforeEarliest =
+      addBusinessCalendarDays(earliestPickupDateYmd(), -1) ?? dateYmd;
+    let thuBefore = beforeEarliest;
+    for (let i = 0; i < 14; i += 1) {
+      if (weekdayOf(thuBefore) === 4) break;
+      thuBefore = addBusinessCalendarDays(thuBefore, -1) ?? thuBefore;
+    }
+    check(thuBefore < earliestPickupDateYmd(), "override dine-in date is before earliest");
+    const overrideDineSlots = getDineInSlotsForDate(thuBefore, OPERATING_HOURS_SEED);
+    const overrideReservation = overrideDineSlots[4]?.value ?? "14:00";
+    const overrideDineIn = await admin.rpc("create_staff_guest_preorder", {
+      p_actor_staff_id: staff.id,
+      p_customer_name: "CO Owner Override Dine-in",
+      p_phone: "0111000013",
+      p_email: null,
+      p_order_source: "whatsapp",
+      p_crew_order: false,
+      p_pickup_date: thuBefore,
+      p_pickup_time: overrideReservation,
+      p_pickup_instruction: null,
+      p_items: [item],
+      p_complimentary: [],
+      p_include_receipt: false,
+      p_needs_bakery_attention: false,
+      p_bakery_attention_note: null,
+      p_customer_notes: null,
+      p_internal_notes: "CO owner override dine-in live",
+      p_paid_addons: [],
+      p_fulfilment_method: "dine_in",
+      p_delivery: null,
+      p_dine_in: {
+        venue: "whitebird",
+        guest_count: 2,
+        reservation_time: overrideReservation,
+        reservation_note: null,
+      },
+    });
+    if (overrideDineIn.error || !overrideDineIn.data?.id) {
+      throw new Error(
+        overrideDineIn.error?.message ?? "owner override dine-in create failed",
+      );
+    }
+    cleanupOrderIds.push(overrideDineIn.data.id);
+    check(
+      overrideDineIn.data.fulfilment_method === "dine_in",
+      "owner override dine-in method persisted",
+    );
+
     const delivery = await admin.rpc("create_staff_guest_preorder", {
       p_actor_staff_id: staff.id,
       p_customer_name: "CO Delivery Parity",

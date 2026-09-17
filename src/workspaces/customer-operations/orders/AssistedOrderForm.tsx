@@ -45,6 +45,7 @@ type AssistedOrderFormProps = {
   defaultCustomerId?: string;
   closedDates?: readonly string[];
   hoursSnapshot?: OperatingHoursSnapshot;
+  canOverrideCustomerFulfilmentSchedule?: boolean;
 };
 
 const initialState: OrderActionState = { error: null };
@@ -65,6 +66,7 @@ export function AssistedOrderForm({
   defaultCustomerId,
   closedDates = [],
   hoursSnapshot = OPERATING_HOURS_SEED,
+  canOverrideCustomerFulfilmentSchedule = false,
 }: AssistedOrderFormProps) {
   const [state, formAction, pending] = useActionState(
     createOrderAction,
@@ -174,6 +176,9 @@ export function AssistedOrderForm({
       </FormField>
 
       <AssistedOrderFulfilmentFields
+        canOverrideCustomerFulfilmentSchedule={
+          canOverrideCustomerFulfilmentSchedule
+        }
         closedDates={closedDates}
         customerName={customerName}
         customerPhone={customerPhone}

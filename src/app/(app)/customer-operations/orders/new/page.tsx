@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Breadcrumb, BreadcrumbTrail } from "@/components/ui/Breadcrumb";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { requireStaff } from "@/foundation/auth/session";
+import { canOverrideCustomerFulfilmentSchedule } from "@/engines/orders/delivery-finance-capabilities";
 import { listCustomers } from "@/workspaces/customer-operations/customers/queries";
 import { AssistedOrderForm } from "@/workspaces/customer-operations/orders/AssistedOrderForm";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
@@ -19,6 +21,7 @@ export default async function NewOrderPage({
   searchParams,
 }: NewOrderPageProps) {
   const params = await searchParams;
+  const staff = await requireStaff();
   const earliest = earliestPickupDateYmd();
   const rangeMax = addBusinessCalendarDays(earliest, 120) ?? earliest;
   const [customers, cakes, hoursSnapshot, closedDates] = await Promise.all([
@@ -61,6 +64,9 @@ export default async function NewOrderPage({
       ) : (
         <AssistedOrderForm
           cakes={cakes}
+          canOverrideCustomerFulfilmentSchedule={canOverrideCustomerFulfilmentSchedule(
+            staff.role.code,
+          )}
           closedDates={closedDates}
           customers={customers}
           defaultCustomerId={params.customerId}

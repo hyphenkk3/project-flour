@@ -21,8 +21,15 @@ import {
 } from "@/engines/business-calendar/pickup-slots";
 import {
   defaultAssistedDineInDraft,
+  assistedCreateSlotPolicy,
+  parseOwnerSpecialArrangementFlag,
   validateAssistedOrderFulfilment,
+  validateAssistedOwnerOverrideFulfilment,
 } from "@/engines/orders/assisted-fulfilment";
+import {
+  canOverrideCustomerFulfilmentSchedule,
+  buildGuestOrderWorkspaceCapabilities,
+} from "@/engines/orders/delivery-finance-capabilities";
 import { customerFulfilmentSlotsForDate } from "@/engines/orders/customer-fulfilment-availability";
 import {
   defaultDeliveryCreateDraft,
@@ -51,11 +58,25 @@ function nextWeekdayOnOrAfter(ymd: string, weekday: number): string {
   return ymd;
 }
 
+function previousWeekdayOnOrBefore(ymd: string, weekday: number): string {
+  let current = ymd;
+  for (let i = 0; i < 14; i += 1) {
+    if (weekdayOf(current) === weekday) return current;
+    current = addBusinessCalendarDays(current, -1) ?? current;
+  }
+  return ymd;
+}
+
 const earliest = earliestPickupDateYmd();
 const THU = nextWeekdayOnOrAfter(earliest, 4);
 const WED = nextWeekdayOnOrAfter(earliest, 3);
+const beforeEarliest =
+  addBusinessCalendarDays(earliest, -1) ?? "2020-01-01";
+const THU_BEFORE = previousWeekdayOnOrBefore(beforeEarliest, 4);
 assert.equal(weekdayOf(THU), 4);
 assert.equal(weekdayOf(WED), 3);
+assert.equal(weekdayOf(THU_BEFORE), 4);
+assert.ok(THU_BEFORE < earliest, "override date is before customer earliest");
 
 const emptyDelivery = defaultDeliveryCreateDraft();
 const emptyDineIn = defaultAssistedDineInDraft();
@@ -322,16 +343,24 @@ assert.match(form, /workspaceScheduleTimeLabel/);
 assert.match(form, /name="dine_in_venue"/);
 assert.match(form, /name="guest_count"/);
 assert.match(form, /timeName="reservation_time"/);
+assert.match(form, /canOverrideCustomerFulfilmentSchedule/);
+assert.match(form, /owner_special_arrangement/);
+assert.match(form, /Special arrangement \(custom date\/time\)/);
+assert.match(form, /type="time"/);
 assert.doesNotMatch(form, /Pickup = 30|Delivery = 30|Dine-in = 15/);
 assert.doesNotMatch(form, /stepMinutes\s*=\s*15/);
 assert.doesNotMatch(assistedForm, /OrderFulfilmentCreateFields/);
 assert.match(assistedForm, /AssistedOrderFulfilmentFields/);
-assert.match(actions, /slotPolicy: "customer-slots"/);
+assert.match(assistedForm, /canOverrideCustomerFulfilmentSchedule/);
+assert.match(actions, /assistedCreateSlotPolicy/);
+assert.match(actions, /owner_special_arrangement/);
+assert.doesNotMatch(actions, /slotPolicy: "customer-slots"/);
 assert.match(actions, /parseCustomerWebsiteFulfilmentMethod/);
 assert.match(helper, /p_dine_in/);
 assert.match(helper, /slotPolicy \?\? "owner-clock"/);
 assert.match(helper, /isValidClockPickupTime/);
 assert.match(helper, /Owner-authorized exception/);
+assert.match(helper, /validateAssistedOwnerOverrideFulfilment/);
 assert.match(ownerForm, /OrderFulfilmentCreateFields/);
 assert.doesNotMatch(ownerForm, /slotPolicy/);
 assert.match(ownerCreateFields, /OwnerPickupFields/);
@@ -348,7 +377,6 @@ const ownerPickupFields = read("src/components/ui/OwnerPickupFields.tsx");
 assert.match(ownerPickupFields, /__custom__/);
 assert.match(ownerPickupFields, /Custom time for special arrangements/);
 assert.doesNotMatch(form, /OwnerPickupFields/);
-assert.doesNotMatch(form, /type="time"/);
 assert.doesNotMatch(assistedForm, /OwnerPickupFields/);
 assert.match(checkoutActions, /isValidPickupSlot/);
 assert.match(checkoutActions, /isValidDeliverySlot/);
@@ -367,5 +395,150 @@ assert.equal(
   ownerOrderWorkspaceHref("order-1", "/customer-operations/orders"),
   "/owner/orders/order-1?returnTo=%2Fcustomer-operations%2Forders",
 );
+
+assert.equal(canOverrideCustomerFulfilmentSchedule("owner"), true);
+assert.equal(canOverrideCustomerFulfilmentSchedule("manager"), false);
+assert.equal(canOverrideCustomerFulfilmentSchedule("customer_operations"), false);
+assert.equal(
+  buildGuestOrderWorkspaceCapabilities({ role: "owner", staffId: "o" })
+    .canOverrideCustomerFulfilmentSchedule,
+  true,
+);
+assert.equal(
+  buildGuestOrderWorkspaceCapabilities({ role: "manager", staffId: "m" })
+    .canOverrideCustomerFulfilmentSchedule,
+  false,
+);
+assert.equal(
+  buildGuestOrderWorkspaceCapabilities({
+    role: "customer_operations",
+    staffId: "c",
+  }).canOverrideCustomerFulfilmentSchedule,
+  false,
+);
+
+assert.equal(parseOwnerSpecialArrangementFlag("1"), true);
+assert.equal(parseOwnerSpecialArrangementFlag(""), false);
+assert.equal(
+  assistedCreateSlotPolicy({
+    actorRole: "owner",
+    ownerSpecialArrangement: true,
+  }),
+  "owner-clock",
+);
+assert.equal(
+  assistedCreateSlotPolicy({
+    actorRole: "owner",
+    ownerSpecialArrangement: false,
+  }),
+  "customer-slots",
+);
+assert.equal(
+  assistedCreateSlotPolicy({
+    actorRole: "manager",
+    ownerSpecialArrangement: true,
+  }),
+  "customer-slots",
+);
+assert.equal(
+  assistedCreateSlotPolicy({
+    actorRole: "customer_operations",
+    ownerSpecialArrangement: true,
+  }),
+  "customer-slots",
+);
+
+const dineInSlotsBefore = customerFulfilmentSlotsForDate(
+  "dine_in",
+  THU_BEFORE,
+  [],
+  OPERATING_HOURS_SEED,
+);
+assert.ok(dineInSlotsBefore.length > 1, "dine-in slots exist before earliest");
+const dineBeforeReservation =
+  dineInSlotsBefore[4]?.value ?? dineInSlotsBefore[0]?.value ?? "14:00";
+const dineBeforeDraft = {
+  ...emptyDineIn,
+  reservationTime: dineBeforeReservation,
+  venue: "whitebird",
+  guestCount: "2",
+};
+
+assert.equal(
+  validateAssistedOwnerOverrideFulfilment({
+    method: "pickup",
+    dateYmd: THU_BEFORE,
+    timeValue: "14:15",
+    delivery: emptyDelivery,
+    dineIn: emptyDineIn,
+  }),
+  null,
+);
+assert.match(
+  validateAssistedOrderFulfilment({
+    method: "pickup",
+    dateYmd: THU_BEFORE,
+    timeValue: pickupTime,
+    delivery: emptyDelivery,
+    dineIn: emptyDineIn,
+  }) ?? "",
+  /valid date and time|pickup date and time/,
+);
+assert.equal(
+  validateAssistedOwnerOverrideFulfilment({
+    method: "delivery",
+    dateYmd: THU,
+    timeValue: "14:15",
+    delivery: completeDelivery,
+    dineIn: emptyDineIn,
+  }),
+  null,
+);
+assert.match(
+  validateAssistedOwnerOverrideFulfilment({
+    method: "delivery",
+    dateYmd: THU,
+    timeValue: "14:15",
+    delivery: emptyDelivery,
+    dineIn: emptyDineIn,
+  }) ?? "",
+  /recipient name/,
+);
+assert.equal(
+  validateAssistedOwnerOverrideFulfilment({
+    method: "dine_in",
+    dateYmd: THU_BEFORE,
+    timeValue: dineBeforeReservation,
+    delivery: emptyDelivery,
+    dineIn: dineBeforeDraft,
+  }),
+  null,
+);
+assert.match(
+  validateAssistedOwnerOverrideFulfilment({
+    method: "dine_in",
+    dateYmd: THU_BEFORE,
+    timeValue: dineBeforeReservation,
+    delivery: emptyDelivery,
+    dineIn: { ...dineBeforeDraft, venue: "" },
+  }) ?? "",
+  /sit/,
+);
+assert.match(
+  validateAssistedOwnerOverrideFulfilment({
+    method: "dine_in",
+    dateYmd: THU_BEFORE,
+    timeValue: dineBeforeReservation,
+    delivery: emptyDelivery,
+    dineIn: { ...dineBeforeDraft, guestCount: "0" },
+  }) ?? "",
+  /guests/,
+);
+
+const newPage = read(
+  "src/app/(app)/customer-operations/orders/new/page.tsx",
+);
+assert.match(newPage, /canOverrideCustomerFulfilmentSchedule/);
+assert.match(newPage, /requireStaff/);
 
 console.log("PASS customer operations assisted fulfilment");

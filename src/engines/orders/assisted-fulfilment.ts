@@ -1,7 +1,7 @@
 /**
  * Customer Operations assisted-order fulfilment.
  * Reuses Whole Cake customer calendars and Owner delivery-detail validation.
- * Does not invent CO-specific slot intervals or Owner clock-time exceptions.
+ * Owner special-arrangement date/time is an explicit higher-authority exception.
  */
 
 import { isValidDeliverySlot } from "@/engines/business-calendar/delivery-hours";
@@ -20,8 +20,10 @@ import {
 } from "@/engines/business-calendar/order-availability";
 import {
   earliestPickupDateYmd,
+  isValidClockPickupTime,
   isValidPickupSlot,
 } from "@/engines/business-calendar/pickup-slots";
+import { canOverrideCustomerFulfilmentSchedule } from "@/engines/orders/delivery-finance-capabilities";
 import {
   buildCreateStaffFulfilmentRpcParams,
   parseCustomerWebsiteFulfilmentMethod,
@@ -30,6 +32,7 @@ import {
   type DeliveryCreateDraft,
   type DeliveryCreateRpcPayload,
 } from "@/engines/orders/fulfilment";
+import type { RoleCode } from "@/types/staff";
 
 export const ASSISTED_ORDER_FULFILMENT_OPTIONS = [
   { value: "pickup" as const, label: "Pickup" },
@@ -108,6 +111,104 @@ export function buildAssistedFulfilmentRpcParams(input: {
     p_delivery: null,
     p_dine_in: null,
   };
+}
+
+export function parseOwnerSpecialArrangementFlag(value: unknown): boolean {
+  const raw = String(value ?? "").trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "on" || raw === "yes";
+}
+
+/**
+ * Canonical customer slots unless the actor is Owner and explicitly opted
+ * into a special-arrangement custom date/time.
+ */
+export function assistedCreateSlotPolicy(input: {
+  actorRole: RoleCode;
+  ownerSpecialArrangement: boolean;
+}): "owner-clock" | "customer-slots" {
+  if (
+    canOverrideCustomerFulfilmentSchedule(input.actorRole) &&
+    input.ownerSpecialArrangement
+  ) {
+    return "owner-clock";
+  }
+  return "customer-slots";
+}
+
+/**
+ * Owner special arrangement: skip customer earliest/slot/cutoff checks.
+ * Delivery details and dine-in reservation structure remain required.
+ * Dine-in times must still be persistable on the existing reservation grid.
+ */
+export function validateAssistedOwnerOverrideFulfilment(input: {
+  method: string | null | undefined;
+  dateYmd: string;
+  timeValue: string;
+  delivery: DeliveryCreateDraft;
+  dineIn: AssistedDineInDraft;
+  hoursSnapshot?: OperatingHoursSnapshot;
+}): string | null {
+  const method = parseCustomerWebsiteFulfilmentMethod(input.method);
+  const dateYmd = input.dateYmd.trim();
+  const timeValue = input.timeValue.trim().slice(0, 5);
+  const snapshot = input.hoursSnapshot ?? OPERATING_HOURS_SEED;
+
+  if (!dateYmd || !timeValue) {
+    if (method === "pickup") {
+      return "Please choose a pickup date and time.";
+    }
+    if (method === "delivery") {
+      return "Please choose a delivery date and time.";
+    }
+    return "Please choose a date and time.";
+  }
+
+  if (method === "pickup") {
+    if (!isValidClockPickupTime(timeValue)) {
+      return "Please enter a valid pickup clock time.";
+    }
+    return null;
+  }
+
+  if (method === "delivery") {
+    if (!isValidClockPickupTime(timeValue)) {
+      return "Please enter a valid delivery clock time.";
+    }
+    return validateOwnerCreateFulfilment({
+      method: "delivery",
+      pickupDate: dateYmd,
+      pickupTime: timeValue,
+      delivery: input.delivery,
+    });
+  }
+
+  const reservationTime = input.dineIn.reservationTime.trim().slice(0, 5);
+  if (!reservationTime || !isValidClockPickupTime(reservationTime)) {
+    return "Please choose a dine-in reservation time.";
+  }
+  if (!isValidClockPickupTime(timeValue)) {
+    return "Please choose a cake serving time.";
+  }
+  const guestCount = parseGuestCount(input.dineIn.guestCount);
+  if (guestCount == null) {
+    return "Please enter how many guests are dining in.";
+  }
+  const venue = parseDineInVenue(input.dineIn.venue);
+  if (venue == null) {
+    return "Please choose where you would like to sit.";
+  }
+  if (
+    !isValidDineInReservationPair({
+      dateYmd,
+      reservationTime,
+      servingTime: timeValue,
+      venue,
+      snapshot,
+    })
+  ) {
+    return "Cake serving time must be within 1 hour of the reservation time, and the venue must be available for both times.";
+  }
+  return null;
 }
 
 export function validateAssistedOrderFulfilment(input: {

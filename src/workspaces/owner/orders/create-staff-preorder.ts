@@ -5,6 +5,7 @@ import {
   buildAssistedFulfilmentRpcParams,
   defaultAssistedDineInDraft,
   validateAssistedOrderFulfilment,
+  validateAssistedOwnerOverrideFulfilment,
   type AssistedDineInDraft,
 } from "@/engines/orders/assisted-fulfilment";
 import {
@@ -48,8 +49,9 @@ export type CreateStaffGuestPreorderInput = {
   delivery: DeliveryCreateDraft;
   /**
    * Default `owner-clock` is an Owner-authorized exception: any valid clock
-   * time, including times outside customer slots. Customer Operations must pass
-   * `customer-slots` so assisted create uses Whole Cake canonical calendars.
+   * time, including times outside customer slots. Manager / Customer Operations
+   * staff must pass `customer-slots`. Owner on the assisted form may pass
+   * `owner-clock` only for an explicit special arrangement.
    */
   slotPolicy?: "owner-clock" | "customer-slots";
   dineIn?: AssistedDineInDraft;
@@ -106,30 +108,52 @@ export async function createStaffGuestPreorderRecord(
       dineIn,
     });
   } else {
-    const fulfilmentMethod = normalizeOwnerCreateFulfilmentMethod(
+    const websiteMethod = parseCustomerWebsiteFulfilmentMethod(
       input.fulfilmentMethod,
     );
-    const fulfilmentError = validateOwnerCreateFulfilment({
-      method: fulfilmentMethod,
-      pickupDate: input.pickupDate,
-      pickupTime: input.pickupTime,
-      delivery: input.delivery,
-    });
-    if (fulfilmentError) {
-      return { error: fulfilmentError };
+    if (websiteMethod === "dine_in") {
+      const fulfilmentError = validateAssistedOwnerOverrideFulfilment({
+        method: "dine_in",
+        dateYmd: input.pickupDate,
+        timeValue: input.pickupTime,
+        delivery: input.delivery,
+        dineIn,
+        hoursSnapshot: input.hoursSnapshot ?? OPERATING_HOURS_SEED,
+      });
+      if (fulfilmentError) {
+        return { error: fulfilmentError };
+      }
+      fulfilmentRpc = buildAssistedFulfilmentRpcParams({
+        method: "dine_in",
+        delivery: input.delivery,
+        dineIn,
+      });
+    } else {
+      const fulfilmentMethod = normalizeOwnerCreateFulfilmentMethod(
+        input.fulfilmentMethod,
+      );
+      const fulfilmentError = validateOwnerCreateFulfilment({
+        method: fulfilmentMethod,
+        pickupDate: input.pickupDate,
+        pickupTime: input.pickupTime,
+        delivery: input.delivery,
+      });
+      if (fulfilmentError) {
+        return { error: fulfilmentError };
+      }
+      if (!isValidClockPickupTime(input.pickupTime)) {
+        return {
+          error:
+            fulfilmentMethod === "delivery"
+              ? "Please enter a valid delivery clock time."
+              : "Please enter a valid pickup clock time.",
+        };
+      }
+      fulfilmentRpc = buildCreateStaffFulfilmentRpcParams({
+        method: fulfilmentMethod,
+        delivery: input.delivery,
+      });
     }
-    if (!isValidClockPickupTime(input.pickupTime)) {
-      return {
-        error:
-          fulfilmentMethod === "delivery"
-            ? "Please enter a valid delivery clock time."
-            : "Please enter a valid pickup clock time.",
-      };
-    }
-    fulfilmentRpc = buildCreateStaffFulfilmentRpcParams({
-      method: fulfilmentMethod,
-      delivery: input.delivery,
-    });
   }
   if (input.items.length === 0) {
     return { error: "Please add at least one cake." };
