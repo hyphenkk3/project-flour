@@ -19,6 +19,14 @@ export type ExtraStockUnit = {
   pickupThroughAt: string | null;
   soldAt: string | null;
   cutIntoSlicesAt: string | null;
+  walkInHeldAt: string | null;
+  walkInHeldUntil: string | null;
+  walkInHeldBy: string | null;
+  walkInHeldByName: string | null;
+  walkInHoldExtendedAt: string | null;
+  walkInHoldReminderSentAt: string | null;
+  /** Derived: active walk-in hold (walk_in_held_until >= now). */
+  walkInHeld: boolean;
   assignedOrderId: string | null;
   assignedOrderNumber: string | null;
   assignedGuestName: string | null;
@@ -33,7 +41,7 @@ export type ExtraStockUnit = {
   rejectedBy: string | null;
   rejectedByName: string | null;
   rejectReason: string | null;
-  /** Derived: confirmed, unsold, now <= order cutoff. */
+  /** Derived: confirmed, unsold, uncut, now <= order cutoff, not actively held. */
   available: boolean;
 };
 

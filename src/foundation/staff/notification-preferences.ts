@@ -7,7 +7,8 @@ export type StaffNotificationCode =
   | "order_cancelled"
   | "order_edited"
   | "approval_required"
-  | "last_minute";
+  | "last_minute"
+  | "fresh_pick_walk_in_hold_reminder";
 
 export type StaffNotificationWebMode = "transient" | "persistent";
 
@@ -59,6 +60,11 @@ export const STAFF_NOTIFICATION_DEFINITIONS: readonly StaffNotificationDefinitio
     code: "last_minute",
     label: "Last Minute",
     description: "Urgent last-minute order activity requiring quick action.",
+  },
+  {
+    code: "fresh_pick_walk_in_hold_reminder",
+    label: "Fresh Pick walk-in hold",
+    description: "When a Fresh Pick walk-in hold is about to expire.",
   },
 ];
 

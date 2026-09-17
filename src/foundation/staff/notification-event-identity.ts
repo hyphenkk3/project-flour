@@ -22,6 +22,7 @@ export const STAFF_NOTIFICATION_AUTHORITATIVE_SOURCES = {
   order_confirmed: "order_timeline_events.insert.customer_confirmed",
   order_edited: "order_timeline_events.insert.order_updated",
   approval_required: "operations_approval_requests.insert.pending",
+  fresh_pick_walk_in_hold_reminder: "extra_stock.walk_in_hold.reminder",
 } as const satisfies Record<StaffNotificationCode, string>;
 
 /**

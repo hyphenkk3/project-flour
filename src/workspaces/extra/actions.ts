@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/foundation/auth/session";
 import { canAccessBakeryWorkspace } from "@/engines/bakery/capabilities";
 import { buildExtraWorkspaceCapabilities } from "@/engines/extra/capabilities";
+import { canAccessWorkspace } from "@/foundation/navigation/access";
 import { evaluateExtraConfirm } from "@/engines/extra/fresh-picks-eligibility";
 import { normalizeExtraRejectReason } from "@/engines/extra/reject-reason";
 import { toBusinessDateKey } from "@/lib/dates";
@@ -24,6 +25,24 @@ async function requireExtraStaff() {
   return staff;
 }
 
+async function requireWalkInHoldStaff() {
+  const staff = await requireStaff();
+  const caps = buildExtraWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canViewWalkInHold) {
+    throw new Error("Walk-in Hold is not available for this role.");
+  }
+  if (
+    !canAccessBakeryWorkspace(staff.role.code) &&
+    !canAccessWorkspace(staff.role.code, "customer_operations")
+  ) {
+    throw new Error("Walk-in Hold is not available for this role.");
+  }
+  return staff;
+}
+
 function revalidateExtraPaths() {
   revalidatePath("/bakery");
   revalidatePath("/bakery/extra");
@@ -31,6 +50,7 @@ function revalidateExtraPaths() {
   revalidatePath("/extra", "layout");
   revalidatePath("/");
   revalidatePath("/owner/calendar");
+  revalidatePath("/customer-operations/fresh-picks");
 }
 
 function evaluateFreshPickConfirm(input: {
@@ -390,6 +410,78 @@ export async function cutExtraStockIntoSlicesAction(
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("cut_extra_stock_into_slices", {
+    p_extra_stock_id: extraStockId,
+    p_actor_staff_id: staff.id,
+  });
+  if (error) {
+    return { error: error.message };
+  }
+  revalidateExtraPaths();
+  return { error: null };
+}
+
+export async function holdExtraStockWalkInAction(
+  extraStockId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireWalkInHoldStaff();
+  const caps = buildExtraWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canCreateWalkInHold) {
+    return { error: "Not authorized to place a walk-in hold." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("hold_extra_stock_walk_in", {
+    p_extra_stock_id: extraStockId,
+    p_actor_staff_id: staff.id,
+  });
+  if (error) {
+    return { error: error.message };
+  }
+  revalidateExtraPaths();
+  return { error: null };
+}
+
+export async function extendExtraWalkInHoldAction(
+  extraStockId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireWalkInHoldStaff();
+  const caps = buildExtraWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canExtendWalkInHold) {
+    return { error: "Not authorized to extend a walk-in hold." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("extend_extra_stock_walk_in_hold", {
+    p_extra_stock_id: extraStockId,
+    p_actor_staff_id: staff.id,
+  });
+  if (error) {
+    return { error: error.message };
+  }
+  revalidateExtraPaths();
+  return { error: null };
+}
+
+export async function releaseExtraWalkInHoldAction(
+  extraStockId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireWalkInHoldStaff();
+  const caps = buildExtraWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canReleaseWalkInHold) {
+    return { error: "Not authorized to release a walk-in hold." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("release_extra_stock_walk_in_hold", {
     p_extra_stock_id: extraStockId,
     p_actor_staff_id: staff.id,
   });

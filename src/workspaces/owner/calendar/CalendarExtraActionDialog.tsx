@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, useTransition } from "react";
 import type { CalendarExtraMarker } from "@/engines/extra/calendar-visibility";
 import { extraCalendarBadgeStatus } from "@/engines/extra/calendar-visibility";
 import { formatExtraPickupThroughClock } from "@/engines/extra/fresh-picks-time";
+import { isExtraWalkInHeld } from "@/engines/extra/walk-in-hold";
 import { formatBusinessCalendarDate, toBusinessDateKey } from "@/lib/dates";
 import { unconfirmExtraStockAction } from "@/workspaces/extra/actions";
 
@@ -51,10 +52,13 @@ export function CalendarExtraActionDialog({
   const [error, setError] = useState<string | null>(null);
   const open = extra != null;
   const confirmed = extra?.lifecycle === "confirmed";
-  const canAssign = Boolean(confirmed && canAssignExtraToOrder);
-  const canMove = Boolean(confirmed && canMoveExtraWindow);
-  const canCut = Boolean(confirmed && canCutExtraIntoSlices);
-  const canUnconfirm = Boolean(confirmed && canUnconfirmExtra);
+  const held = extra
+    ? isExtraWalkInHeld({ walkInHeldUntil: extra.walkInHeldUntil })
+    : false;
+  const canAssign = Boolean(confirmed && canAssignExtraToOrder && !held);
+  const canMove = Boolean(confirmed && canMoveExtraWindow && !held);
+  const canCut = Boolean(confirmed && canCutExtraIntoSlices && !held);
+  const canUnconfirm = Boolean(confirmed && canUnconfirmExtra && !held);
   const hasMutations = canAssign || canMove || canCut || canUnconfirm;
 
   useEffect(() => {
@@ -124,6 +128,12 @@ export function CalendarExtraActionDialog({
             <p className="text-skyline text-sm">{extra.sizeLabel}</p>
             <p className="text-ink text-sm">{windowLabel}</p>
             <p className="text-skyline text-sm">{status}</p>
+            {held && extra?.walkInHeldUntil ? (
+              <p className="text-ink text-sm font-medium">
+                On walk-in hold until{" "}
+                {formatExtraPickupThroughClock(extra.walkInHeldUntil)}
+              </p>
+            ) : null}
           </div>
           {hasMutations ? (
             <div className="flex flex-col gap-2">

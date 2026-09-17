@@ -85,6 +85,7 @@ assert.deepEqual(codes, [
   "order_edited",
   "approval_required",
   "last_minute",
+  "fresh_pick_walk_in_hold_reminder",
 ]);
 
 assert.equal(
@@ -114,6 +115,10 @@ assert.equal(
 assert.equal(
   STAFF_NOTIFICATION_AUTHORITATIVE_SOURCES.last_minute,
   "orders.order_source.last_minute",
+);
+assert.equal(
+  STAFF_NOTIFICATION_AUTHORITATIVE_SOURCES.fresh_pick_walk_in_hold_reminder,
+  "extra_stock.walk_in_hold.reminder",
 );
 
 const sql = read(

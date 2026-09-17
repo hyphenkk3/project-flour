@@ -8,6 +8,7 @@ import {
   countBakeryExtraProposalsAwaitingReview,
   isBakeryExtraProposalActionable,
   isExtraAvailable,
+  isExtraConfirmedOnOffer,
   isExtraExpiredConfirmed,
 } from "@/engines/extra/availability";
 import { buildExtraWorkspaceCapabilities } from "@/engines/extra/capabilities";
@@ -72,6 +73,47 @@ assert.equal(
 );
 
 assert.equal(
+  isExtraConfirmedOnOffer({
+    lifecycle: "confirmed",
+    pickupThroughAt: through,
+    now: new Date("2026-08-15T14:00:00.000Z"),
+  }),
+  true,
+);
+
+assert.equal(
+  isExtraAvailable({
+    lifecycle: "confirmed",
+    pickupThroughAt: through,
+    walkInHeldUntil: "2026-08-15T14:30:00.000Z",
+    now: new Date("2026-08-15T14:00:00.000Z"),
+  }),
+  false,
+  "active walk-in hold is not publicly available",
+);
+
+assert.equal(
+  isExtraConfirmedOnOffer({
+    lifecycle: "confirmed",
+    pickupThroughAt: through,
+    now: new Date("2026-08-15T14:00:00.000Z"),
+  }),
+  true,
+  "held Extra remains on ExtraBoard Fresh Picks",
+);
+
+assert.equal(
+  isExtraAvailable({
+    lifecycle: "confirmed",
+    pickupThroughAt: through,
+    walkInHeldUntil: "2026-08-15T13:59:59.999Z",
+    now: new Date("2026-08-15T14:00:00.000Z"),
+  }),
+  true,
+  "expired walk-in hold is available without cleanup",
+);
+
+assert.equal(
   isExtraExpiredConfirmed({
     lifecycle: "confirmed",
     pickupThroughAt: through,
@@ -111,6 +153,14 @@ for (const role of ["bakery", "manager", "owner"] as const) {
   assert.equal(caps.canMoveExtraWindow, true, `${role} move`);
   assert.equal(caps.canCutExtraIntoSlices, true, `${role} slice`);
   assert.equal(caps.canCreateConfirmedExtra, true, `${role} create confirmed`);
+  assert.equal(caps.canViewWalkInHold, true, `${role} view walk-in hold`);
+  assert.equal(
+    caps.canCreateWalkInHold,
+    role !== "bakery",
+    `${role} create walk-in hold`,
+  );
+  assert.equal(caps.canExtendWalkInHold, role !== "bakery");
+  assert.equal(caps.canReleaseWalkInHold, role !== "bakery");
   assert.equal(canAccessBakeryWorkspace(role), true);
 }
 
@@ -129,6 +179,18 @@ for (const role of ["collection", "customer_operations"] as const) {
   assert.equal(caps.canMoveExtraWindow, false);
   assert.equal(caps.canCutExtraIntoSlices, false);
   assert.equal(caps.canCreateConfirmedExtra, false);
+  assert.equal(
+    caps.canViewWalkInHold,
+    role === "customer_operations",
+    `${role} walk-in hold view`,
+  );
+  assert.equal(
+    caps.canCreateWalkInHold,
+    role === "customer_operations",
+    `${role} walk-in hold create`,
+  );
+  assert.equal(caps.canExtendWalkInHold, role === "customer_operations");
+  assert.equal(caps.canReleaseWalkInHold, role === "customer_operations");
 }
 
 // Collection / Bakery gates: Bakery may operate Collection desk handoff.

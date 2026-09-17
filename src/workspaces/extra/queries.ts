@@ -2,6 +2,7 @@ import {
   isExtraAvailable,
   type ExtraLifecycle,
 } from "@/engines/extra/availability";
+import { isExtraWalkInHeld } from "@/engines/extra/walk-in-hold";
 import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
 import { createClient } from "@/lib/supabase/server";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
@@ -18,6 +19,11 @@ type ExtraStockRow = {
   pickup_through_at: string | null;
   sold_at: string | null;
   cut_into_slices_at: string | null;
+  walk_in_held_at: string | null;
+  walk_in_held_until: string | null;
+  walk_in_held_by: string | null;
+  walk_in_hold_extended_at: string | null;
+  walk_in_hold_reminder_sent_at: string | null;
   note: string | null;
   proposed_at: string;
   proposed_by: string;
@@ -29,6 +35,7 @@ type ExtraStockRow = {
   proposer?: { display_name: string | null } | null;
   confirmer?: { display_name: string | null } | null;
   rejecter?: { display_name: string | null } | null;
+  holder?: { display_name: string | null } | null;
 };
 
 const EXTRA_SELECT = `
@@ -43,6 +50,11 @@ const EXTRA_SELECT = `
   pickup_through_at,
   sold_at,
   cut_into_slices_at,
+  walk_in_held_at,
+  walk_in_held_until,
+  walk_in_held_by,
+  walk_in_hold_extended_at,
+  walk_in_hold_reminder_sent_at,
   note,
   proposed_at,
   proposed_by,
@@ -53,7 +65,8 @@ const EXTRA_SELECT = `
   reject_reason,
   proposer:staff_profiles!proposed_by ( display_name ),
   confirmer:staff_profiles!confirmed_by ( display_name ),
-  rejecter:staff_profiles!rejected_by ( display_name )
+  rejecter:staff_profiles!rejected_by ( display_name ),
+  holder:staff_profiles!walk_in_held_by ( display_name )
 `;
 
 function staffName(
@@ -80,6 +93,16 @@ export function mapExtraStockRow(
     pickupThroughAt: row.pickup_through_at,
     soldAt: row.sold_at,
     cutIntoSlicesAt: row.cut_into_slices_at,
+    walkInHeldAt: row.walk_in_held_at,
+    walkInHeldUntil: row.walk_in_held_until,
+    walkInHeldBy: row.walk_in_held_by,
+    walkInHeldByName: staffName(row.holder),
+    walkInHoldExtendedAt: row.walk_in_hold_extended_at,
+    walkInHoldReminderSentAt: row.walk_in_hold_reminder_sent_at,
+    walkInHeld: isExtraWalkInHeld({
+      walkInHeldUntil: row.walk_in_held_until,
+      now,
+    }),
     assignedOrderId: null,
     assignedOrderNumber: null,
     assignedGuestName: null,
@@ -99,6 +122,7 @@ export function mapExtraStockRow(
       pickupThroughAt: row.pickup_through_at,
       soldAt: row.sold_at,
       cutIntoSlicesAt: row.cut_into_slices_at,
+      walkInHeldUntil: row.walk_in_held_until,
       now,
     }),
   };

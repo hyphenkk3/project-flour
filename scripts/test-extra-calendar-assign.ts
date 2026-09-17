@@ -183,24 +183,31 @@ const unsold = {
   library_cake_size_id: null,
   sold_at: null as string | null,
 };
-const markerA = mapExtraStockRowToCalendarMarker(unsold);
-const markerB = mapExtraStockRowToCalendarMarker({
-  ...unsold,
-  id: "extra-b",
-});
+const now = new Date("2026-09-10T08:00:00.000Z");
+const markerA = mapExtraStockRowToCalendarMarker(unsold, now);
+const markerB = mapExtraStockRowToCalendarMarker(
+  {
+    ...unsold,
+    id: "extra-b",
+  },
+  now,
+);
 assert.ok(markerA);
 assert.ok(markerB);
 assert.equal(markerA!.id, "extra-a");
 assert.equal(markerB!.id, "extra-b");
 assert.notEqual(markerA!.id, markerB!.id);
 
-const soldA = mapExtraStockRowToCalendarMarker({
-  ...unsold,
-  sold_at: "2026-09-10T08:00:00.000Z",
-});
+const soldA = mapExtraStockRowToCalendarMarker(
+  {
+    ...unsold,
+    sold_at: "2026-09-10T08:00:00.000Z",
+  },
+  now,
+);
 assert.equal(soldA, null, "assigned Extra A leaves calendar independently");
 assert.ok(
-  mapExtraStockRowToCalendarMarker({ ...unsold, id: "extra-b" }),
+  mapExtraStockRowToCalendarMarker({ ...unsold, id: "extra-b" }, now),
   "identical Extra B remains on calendar",
 );
 assert.equal(
@@ -209,6 +216,7 @@ assert.equal(
     preparedOn: "2026-09-10",
     pickupThroughAt: unsold.pickup_through_at,
     soldAt: "2026-09-10T08:00:00.000Z",
+    now,
   }),
   false,
 );
@@ -218,6 +226,7 @@ assert.equal(
     preparedOn: "2026-09-10",
     pickupThroughAt: unsold.pickup_through_at,
     cutIntoSlicesAt: "2026-09-10T08:00:00.000Z",
+    now,
   }),
   false,
 );

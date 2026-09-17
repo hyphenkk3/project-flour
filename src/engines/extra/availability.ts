@@ -4,7 +4,10 @@
  * `pickup_through_at` is the ORDER CUTOFF (new-order window), not last pickup.
  * Inclusive cutoff: new orders while now <= pickup_through_at.
  * Sold (`sold_at`) is independent and hides the Extra without becoming Past.
+ * An active walk-in hold is derived: walk_in_held_until >= now() is unavailable.
  */
+
+import { isExtraWalkInHeld } from "@/engines/extra/walk-in-hold";
 
 export type ExtraLifecycle = "proposed" | "confirmed" | "rejected";
 
@@ -34,7 +37,11 @@ export function bakeryExtraProposalsAwaitingReviewLabel(count: number): string {
   return `${count} EXTRA proposals awaiting review →`;
 }
 
-export function isExtraAvailable(input: {
+/**
+ * Confirmed, unsold, uncut, still within pickup_through_at.
+ * Ignores walk-in hold so ExtraBoard can still show a held Fresh Pick.
+ */
+export function isExtraConfirmedOnOffer(input: {
   lifecycle: ExtraLifecycle;
   pickupThroughAt: string | null;
   soldAt?: string | null;
@@ -51,6 +58,21 @@ export function isExtraAvailable(input: {
   return nowMs <= throughMs;
 }
 
+export function isExtraAvailable(input: {
+  lifecycle: ExtraLifecycle;
+  pickupThroughAt: string | null;
+  soldAt?: string | null;
+  cutIntoSlicesAt?: string | null;
+  walkInHeldUntil?: string | null;
+  now?: Date;
+}): boolean {
+  if (!isExtraConfirmedOnOffer(input)) return false;
+  return !isExtraWalkInHeld({
+    walkInHeldUntil: input.walkInHeldUntil,
+    now: input.now,
+  });
+}
+
 export function isExtraExpiredConfirmed(input: {
   lifecycle: ExtraLifecycle;
   pickupThroughAt: string | null;
@@ -62,7 +84,7 @@ export function isExtraExpiredConfirmed(input: {
   if (input.soldAt) return false;
   if (input.cutIntoSlicesAt) return false;
   if (!input.pickupThroughAt) return false;
-  return !isExtraAvailable({
+  return !isExtraConfirmedOnOffer({
     lifecycle: input.lifecycle,
     pickupThroughAt: input.pickupThroughAt,
     soldAt: input.soldAt,

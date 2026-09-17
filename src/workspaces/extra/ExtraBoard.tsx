@@ -7,7 +7,16 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { FormField, FormTextarea } from "@/components/ui/form";
 import { formatLongBusinessDate } from "@/lib/dates";
 import type { ExtraWorkspaceCapabilities } from "@/engines/extra/capabilities";
-import { isBakeryExtraProposalActionable } from "@/engines/extra/availability";
+import {
+  isBakeryExtraProposalActionable,
+  isExtraConfirmedOnOffer,
+  isExtraExpiredConfirmed,
+} from "@/engines/extra/availability";
+import {
+  EXTRA_WALK_IN_HOLD_EXTENSION_MINUTES,
+  EXTRA_WALK_IN_HOLD_MINUTES,
+  walkInHoldPlaceConfirmDescription,
+} from "@/engines/extra/walk-in-hold";
 import {
   evaluateExtraConfirm,
   extraAvailabilityDayLabel,
@@ -23,11 +32,15 @@ import {
   rejectExtraStockAction,
   unconfirmExtraStockAction,
   undoRejectExtraStockAction,
+  extendExtraWalkInHoldAction,
+  holdExtraStockWalkInAction,
+  releaseExtraWalkInHoldAction,
 } from "@/workspaces/extra/actions";
 import { AssignExtraToOrderDialog } from "@/workspaces/extra/AssignExtraToOrderDialog";
 import { CutExtraIntoSlicesDialog } from "@/workspaces/extra/CutExtraIntoSlicesDialog";
 import { ExtraWindowFields } from "@/workspaces/extra/ExtraWindowFields";
 import { MoveExtraWindowDialog } from "@/workspaces/extra/MoveExtraWindowDialog";
+import { WalkInHoldPanel } from "@/workspaces/extra/WalkInHoldPanel";
 import {
   initialExtraWindow,
   nextExtraWindow,
@@ -41,6 +54,7 @@ type ExtraBoardProps = {
   capabilities: ExtraWorkspaceCapabilities;
   initialMode?: "propose" | "create";
   todayYmd: string;
+  surface?: "full" | "walk-in-hold";
 };
 
 export function ExtraBoard({
@@ -49,6 +63,7 @@ export function ExtraBoard({
   capabilities,
   initialMode = "create",
   todayYmd,
+  surface = "full",
 }: ExtraBoardProps) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +83,13 @@ export function ExtraBoard({
   );
   const [movingUnit, setMovingUnit] = useState<ExtraStockUnit | null>(null);
   const [slicingUnit, setSlicingUnit] = useState<ExtraStockUnit | null>(null);
+  const [holdingUnit, setHoldingUnit] = useState<ExtraStockUnit | null>(null);
+  const [extendingUnit, setExtendingUnit] = useState<ExtraStockUnit | null>(
+    null,
+  );
+  const [releasingUnit, setReleasingUnit] = useState<ExtraStockUnit | null>(
+    null,
+  );
   const [drafts, setDrafts] = useState<Record<string, ExtraWindowDraft>>({});
 
   const proposed = useMemo(
@@ -89,10 +111,7 @@ export function ExtraBoard({
     [proposed, todayYmd],
   );
   const freshPicks = useMemo(
-    () =>
-      units.filter(
-        (u) => u.available && !u.soldAt && !u.cutIntoSlicesAt,
-      ),
+    () => units.filter((u) => isExtraConfirmedOnOffer(u)),
     [units],
   );
   const sold = useMemo(
@@ -105,7 +124,7 @@ export function ExtraBoard({
         (u) =>
           u.lifecycle === "rejected" ||
           Boolean(u.cutIntoSlicesAt) ||
-          (u.lifecycle === "confirmed" && !u.soldAt && !u.available),
+          isExtraExpiredConfirmed(u),
       ),
     [units],
   );
@@ -228,6 +247,10 @@ export function ExtraBoard({
       setError("Cannot undo an Extra that was cut into slices.");
       return;
     }
+    if (unit.walkInHeld) {
+      setError("This Fresh Pick is currently on walk-in hold.");
+      return;
+    }
     setError(null);
     startTransition(async () => {
       const result = await unconfirmExtraStockAction(unit.id);
@@ -268,8 +291,51 @@ export function ExtraBoard({
   }
 
   function openAssign(unit: ExtraStockUnit) {
+    if (unit.walkInHeld) {
+      setError("This Fresh Pick is currently on walk-in hold.");
+      return;
+    }
     setError(null);
     setAssigningUnit(unit);
+  }
+
+  function runPlaceHold() {
+    if (!holdingUnit) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await holdExtraStockWalkInAction(holdingUnit.id);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setHoldingUnit(null);
+    });
+  }
+
+  function runExtendHold() {
+    if (!extendingUnit) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await extendExtraWalkInHoldAction(extendingUnit.id);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setExtendingUnit(null);
+    });
+  }
+
+  function runReleaseHold() {
+    if (!releasingUnit) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await releaseExtraWalkInHoldAction(releasingUnit.id);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setReleasingUnit(null);
+    });
   }
 
   const fieldClass =
@@ -282,17 +348,21 @@ export function ExtraBoard({
   return (
     <main className="mx-auto w-full max-w-3xl px-5 py-7 pb-20 sm:px-8 sm:py-10">
       <p>
-        <Link className="text-skyline hover:text-ink text-sm" href="/bakery">
-          ← Bakery
+        <Link
+          className="text-skyline hover:text-ink text-sm"
+          href={surface === "walk-in-hold" ? "/customer-operations/orders" : "/bakery"}
+        >
+          {surface === "walk-in-hold" ? "← Customer Operations" : "← Bakery"}
         </Link>
       </p>
       <div className="mt-4">
         <h1 className="font-display text-ink text-3xl tracking-tight sm:text-4xl">
-          EXTRA stock
+          {surface === "walk-in-hold" ? "Fresh Picks" : "EXTRA stock"}
         </h1>
         <p className="text-skyline mt-2 text-sm sm:text-base">
-          Fresh Picks are Bakery-confirmed extra cakes for today or tomorrow —
-          separate from the monthly catalogue.
+          {surface === "walk-in-hold"
+            ? "Place, extend, or release a walk-in hold on a confirmed Fresh Pick. Held cakes are unavailable for online sale."
+            : "Fresh Picks are Bakery-confirmed extra cakes for today or tomorrow — separate from the monthly catalogue."}
         </p>
       </div>
 
@@ -302,7 +372,8 @@ export function ExtraBoard({
         </p>
       ) : null}
 
-      {capabilities.canProposeExtra || capabilities.canCreateConfirmedExtra ? (
+      {surface === "full" &&
+      (capabilities.canProposeExtra || capabilities.canCreateConfirmedExtra) ? (
         <section className="border-fog mt-8 rounded-2xl border bg-white p-5">
           <div className="flex flex-wrap gap-2">
             {capabilities.canCreateConfirmedExtra ? (
@@ -421,7 +492,9 @@ export function ExtraBoard({
         </section>
       ) : null}
 
-      <section className="mt-10">
+      {surface === "full" ? (
+        <>
+          <section className="mt-10">
         <h2 className="text-ink text-sm font-semibold tracking-wide uppercase">
           Fresh Picks to confirm
           <span className="text-skyline ml-2 font-normal normal-case">
@@ -560,6 +633,8 @@ export function ExtraBoard({
           </ul>
         </section>
       ) : null}
+        </>
+      ) : null}
 
       <section className="mt-10">
         <h2 className="text-ink text-sm font-semibold tracking-wide uppercase">
@@ -602,6 +677,8 @@ export function ExtraBoard({
                 {unit.note ? (
                   <p className="text-ink mt-2 text-sm">{unit.note}</p>
                 ) : null}
+                {surface === "full" && !unit.walkInHeld ? (
+                  <>
                 <p className="text-skyline mt-3 text-sm">
                   Stop Fresh Pick availability
                 </p>
@@ -619,8 +696,12 @@ export function ExtraBoard({
                   {capabilities.canMoveExtraWindow ? (
                     <button
                       className={btnSecondary}
-                      disabled={pending}
+                      disabled={pending || unit.walkInHeld}
                       onClick={() => {
+                        if (unit.walkInHeld) {
+                          setError("This Fresh Pick is currently on walk-in hold.");
+                          return;
+                        }
                         setError(null);
                         setMovingUnit(unit);
                       }}
@@ -632,8 +713,12 @@ export function ExtraBoard({
                   {capabilities.canCutExtraIntoSlices ? (
                     <button
                       className={btnSecondary}
-                      disabled={pending}
+                      disabled={pending || unit.walkInHeld}
                       onClick={() => {
+                        if (unit.walkInHeld) {
+                          setError("This Fresh Pick is currently on walk-in hold.");
+                          return;
+                        }
                         setError(null);
                         setSlicingUnit(unit);
                       }}
@@ -647,7 +732,7 @@ export function ExtraBoard({
                   <div className="mt-3">
                     <button
                       className={btnSecondary}
-                      disabled={pending}
+                      disabled={pending || unit.walkInHeld}
                       onClick={() => runUnconfirm(unit)}
                       type="button"
                     >
@@ -659,13 +744,32 @@ export function ExtraBoard({
                     </p>
                   </div>
                 ) : null}
+                  </>
+                ) : null}
+                <WalkInHoldPanel
+                  capabilities={capabilities}
+                  pending={pending}
+                  unit={unit}
+                  onExtend={(next) => {
+                    setError(null);
+                    setExtendingUnit(next);
+                  }}
+                  onPlaceHold={(next) => {
+                    setError(null);
+                    setHoldingUnit(next);
+                  }}
+                  onRelease={(next) => {
+                    setError(null);
+                    setReleasingUnit(next);
+                  }}
+                />
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      {sold.length > 0 ? (
+      {surface === "full" && sold.length > 0 ? (
         <section className="mt-10">
           <h2 className="text-ink text-sm font-semibold tracking-wide uppercase">
             Sold
@@ -705,6 +809,7 @@ export function ExtraBoard({
         </section>
       ) : null}
 
+      {surface === "full" ? (
       <section className="mt-10">
         <h2 className="text-ink text-sm font-semibold tracking-wide uppercase">
           Past
@@ -778,6 +883,7 @@ export function ExtraBoard({
           </ul>
         )}
       </section>
+      ) : null}
 
       <ConfirmDialog
         allowDismiss={!pending}
@@ -829,6 +935,52 @@ export function ExtraBoard({
         onClose={() => setSlicingUnit(null)}
         onCut={() => setSlicingUnit(null)}
         open={slicingUnit != null}
+      />
+
+      <ConfirmDialog
+        allowDismiss={!pending}
+        confirmLabel="Place Hold"
+        description={walkInHoldPlaceConfirmDescription(EXTRA_WALK_IN_HOLD_MINUTES)}
+        onCancel={() => {
+          if (pending) return;
+          setHoldingUnit(null);
+        }}
+        onConfirm={runPlaceHold}
+        open={holdingUnit != null}
+        pending={pending}
+        title="Walk-in Hold?"
+      />
+
+      <ConfirmDialog
+        allowDismiss={!pending}
+        confirmLabel={`Extend ${EXTRA_WALK_IN_HOLD_EXTENSION_MINUTES} min`}
+        description={
+          extendingUnit
+            ? `Add ${EXTRA_WALK_IN_HOLD_EXTENSION_MINUTES} minutes to this Walk-in Hold? Only one extension is allowed.`
+            : undefined
+        }
+        onCancel={() => {
+          if (pending) return;
+          setExtendingUnit(null);
+        }}
+        onConfirm={runExtendHold}
+        open={extendingUnit != null}
+        pending={pending}
+        title="Extend walk-in hold?"
+      />
+
+      <ConfirmDialog
+        allowDismiss={!pending}
+        confirmLabel="Release"
+        description="Release this Walk-in Hold? The Fresh Pick will be available for online sale and other staff actions immediately."
+        onCancel={() => {
+          if (pending) return;
+          setReleasingUnit(null);
+        }}
+        onConfirm={runReleaseHold}
+        open={releasingUnit != null}
+        pending={pending}
+        title="Release walk-in hold?"
       />
     </main>
   );

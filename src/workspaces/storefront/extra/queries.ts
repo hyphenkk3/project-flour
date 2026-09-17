@@ -58,6 +58,7 @@ type ExtraRow = {
   confirmed_at: string | null;
   sold_at: string | null;
   cut_into_slices_at?: string | null;
+  walk_in_held_until?: string | null;
 };
 
 type PhotoRow = StorefrontCakePhotoRow & {
@@ -81,6 +82,7 @@ function publishedNow(row: ExtraRow, now: Date): boolean {
     confirmedAt: row.confirmed_at,
     soldAt: row.sold_at,
     cutIntoSlicesAt: row.cut_into_slices_at,
+    walkInHeldUntil: row.walk_in_held_until,
     now,
   });
 }
@@ -262,7 +264,7 @@ export async function listStorefrontAvailableExtra(): Promise<
     const { data, error } = await supabase
       .from("extra_stock")
       .select(
-        "id, lifecycle, cake_name, size_label, library_cake_id, library_cake_size_id, prepared_on, pickup_available_from_at, pickup_through_at, confirmed_at, sold_at, cut_into_slices_at",
+        "id, lifecycle, cake_name, size_label, library_cake_id, library_cake_size_id, prepared_on, pickup_available_from_at, pickup_through_at, confirmed_at, sold_at, cut_into_slices_at, walk_in_held_until",
       )
       .eq("lifecycle", "confirmed")
       .is("sold_at", null)
@@ -322,7 +324,7 @@ export async function getStorefrontExtraById(
     const { data, error } = await supabase
       .from("extra_stock")
       .select(
-        "id, lifecycle, cake_name, size_label, library_cake_id, library_cake_size_id, prepared_on, pickup_available_from_at, pickup_through_at, confirmed_at, sold_at, cut_into_slices_at",
+        "id, lifecycle, cake_name, size_label, library_cake_id, library_cake_size_id, prepared_on, pickup_available_from_at, pickup_through_at, confirmed_at, sold_at, cut_into_slices_at, walk_in_held_until",
       )
       .eq("id", id)
       .maybeSingle();

@@ -112,7 +112,7 @@ function orderDescription(order: NotificationOrderSummary): string {
 export function buildOrderEventNotification(
   code: Exclude<
     StaffNotificationCode,
-    "approval_required" | "last_minute" | "new_order"
+    "approval_required" | "last_minute" | "new_order" | "fresh_pick_walk_in_hold_reminder"
   >,
   order: NotificationOrderSummary,
   eventId: string,

@@ -29,6 +29,7 @@ export type CalendarExtraMarker = {
   validFromYmd: string;
   /** Inclusive last calendar day this EXTRA occupies on the Matrix. */
   validToYmd: string;
+  walkInHeldUntil?: string | null;
 };
 
 export function isExtraActiveOnCalendar(input: {
@@ -146,6 +147,7 @@ export function mapExtraStockRowToCalendarMarker(
     library_cake_size_id: string | null;
     sold_at?: string | null;
     cut_into_slices_at?: string | null;
+    walk_in_held_until?: string | null;
   },
   now?: Date,
 ): CalendarExtraMarker | null {
@@ -184,6 +186,7 @@ export function mapExtraStockRowToCalendarMarker(
     libraryCakeSizeId: row.library_cake_size_id,
     pickupAvailableFromAt: row.pickup_available_from_at,
     pickupThroughAt: row.pickup_through_at,
+    walkInHeldUntil: row.walk_in_held_until ?? null,
     validFromYmd: range.validFromYmd,
     validToYmd: range.validToYmd,
   };

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const ITEMS = [
   { href: "/customer-operations/customers", label: "Customers" },
   { href: "/customer-operations/orders", label: "Orders" },
+  { href: "/customer-operations/fresh-picks", label: "Fresh Picks" },
 ] as const;
 
 type CustomerOperationsNavProps = {

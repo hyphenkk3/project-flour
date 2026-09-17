@@ -2,7 +2,8 @@
  * EXTRA Activation v1 — Bakery physical-stock capabilities.
  * Mutations are Bakery-surface authority (bakery | manager | owner),
  * matching M5 Bakery production coverage — not Owner Ops finance authority.
- * Collection / Customer Operations have no EXTRA mutation rights.
+ * Walk-in Hold is a counter / walk-in action: Owner, Manager, Customer Operations.
+ * Bakery may see held state. Collection has no Walk-in Hold action.
  */
 
 import type { RoleCode } from "@/types/staff";
@@ -34,10 +35,30 @@ export type ExtraWorkspaceCapabilities = {
   canCutExtraIntoSlices: boolean;
   /** Bakery direct-create confirmed Available stock. */
   canCreateConfirmedExtra: boolean;
+  /** See Walk-in Hold state on a Fresh Pick. */
+  canViewWalkInHold: boolean;
+  /** Place a Walk-in Hold on a Fresh Pick. */
+  canCreateWalkInHold: boolean;
+  /** Extend an active Walk-in Hold once. */
+  canExtendWalkInHold: boolean;
+  /** Release an active Walk-in Hold. */
+  canReleaseWalkInHold: boolean;
 };
 
 export function canMutateExtraStock(role: RoleCode): boolean {
   return canAccessBakeryWorkspace(role);
+}
+
+export function canMutateExtraWalkInHold(role: RoleCode): boolean {
+  return (
+    role === "owner" ||
+    role === "manager" ||
+    role === "customer_operations"
+  );
+}
+
+export function canViewExtraWalkInHold(role: RoleCode): boolean {
+  return canMutateExtraWalkInHold(role) || role === "bakery";
 }
 
 export function buildExtraWorkspaceCapabilities(input: {
@@ -46,6 +67,7 @@ export function buildExtraWorkspaceCapabilities(input: {
 }): ExtraWorkspaceCapabilities {
   const canAccess = canAccessBakeryWorkspace(input.role);
   const canMutate = canMutateExtraStock(input.role);
+  const canHold = canMutateExtraWalkInHold(input.role);
   return {
     role: input.role,
     staffId: input.staffId,
@@ -59,5 +81,9 @@ export function buildExtraWorkspaceCapabilities(input: {
     canMoveExtraWindow: canMutate,
     canCutExtraIntoSlices: canMutate,
     canCreateConfirmedExtra: canMutate,
+    canViewWalkInHold: canViewExtraWalkInHold(input.role),
+    canCreateWalkInHold: canHold,
+    canExtendWalkInHold: canHold,
+    canReleaseWalkInHold: canHold,
   };
 }

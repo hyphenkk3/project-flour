@@ -46,6 +46,7 @@ function toneFromCode(
     case "order_cancelled":
     case "approval_required":
     case "last_minute":
+    case "fresh_pick_walk_in_hold_reminder":
       return "warning";
     default:
       return "info";

@@ -33,6 +33,7 @@ export function isPublishedFreshPick(input: {
   confirmedAt?: string | null;
   soldAt?: string | null;
   cutIntoSlicesAt?: string | null;
+  walkInHeldUntil?: string | null;
   preparedOn?: string | null;
   todayYmd?: string;
   now?: Date;
@@ -50,6 +51,7 @@ export function isPublishedFreshPick(input: {
     pickupThroughAt: input.pickupThroughAt,
     soldAt: input.soldAt,
     cutIntoSlicesAt: input.cutIntoSlicesAt,
+    walkInHeldUntil: input.walkInHeldUntil,
     now,
   });
 }
@@ -138,6 +140,7 @@ export function extraSubmitCustomerError(message: string): string {
   if (
     lower.includes("already been sold") ||
     lower.includes("no longer available to order") ||
+    lower.includes("walk-in hold") ||
     lower === "extra is not available" ||
     lower === "extra cake unavailable"
   ) {
