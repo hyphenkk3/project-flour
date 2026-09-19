@@ -10,10 +10,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  attachReceiptItemPhotos,
   guestPreorderReceiptAuthorized,
   receiptCookieSecure,
 } from "@/workspaces/storefront/checkout/receipt";
 import { calculateCommercialSubtotal } from "@/engines/orders/totals";
+import { storefrontPhotoForSize } from "@/workspaces/storefront/catalog/cake-photo-map";
+import type { StorefrontCakePhoto } from "@/types/storefront";
 
 function readSrc(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -85,5 +88,183 @@ assert.match(successSrc, /FRESH_PICKS_SUCCESS_FLOW/);
 
 assert.match(extraActionsSrc, /setGuestPreorderReceiptCookie/);
 assert.match(checkoutActionsSrc, /setGuestPreorderReceiptCookie/);
+
+assert.match(receiptSrc, /cake_id,/);
+assert.match(receiptSrc, /cake_size_id,/);
+assert.match(receiptSrc, /cakeId:/);
+assert.match(receiptSrc, /cakeSizeId:/);
+assert.match(receiptSrc, /library_cake_photos/);
+assert.match(receiptSrc, /mapStorefrontCakePhoto/);
+assert.match(receiptSrc, /storefrontPhotoForSize\(photos, item\.cakeSizeId\)/);
+assert.doesNotMatch(receiptSrc, /resolveCatalogueListingPhoto/);
+assert.doesNotMatch(receiptSrc, /storefrontCatalogueListingPhoto/);
+assert.doesNotMatch(receiptSrc, /resolveCakePhoto\(/);
+
+const extraQueriesSrc = readSrc("src/workspaces/storefront/extra/queries.ts");
+assert.match(
+  extraQueriesSrc,
+  /resolveCakePhoto\(photos, row\.library_cake_size_id\)/,
+);
+assert.doesNotMatch(extraQueriesSrc, /resolveCatalogueListingPhoto/);
+assert.doesNotMatch(extraQueriesSrc, /storefrontCatalogueListingPhoto/);
+
+assert.match(successSrc, /CakePhotoImage/);
+assert.match(successSrc, /item\.imageUrl/);
+assert.match(successSrc, /ORDER_DETAILS_NOTICE_TITLE/);
+assert.match(successSrc, /ORDER_DETAILS_NOTICE_BODY/);
+assert.match(successSrc, /"24 hours"/);
+assert.ok(
+  successSrc.indexOf("{contactLine}") < successSrc.indexOf("<aside"),
+);
+assert.ok(successSrc.indexOf("<aside") < successSrc.indexOf("Order recap"));
+assert.doesNotMatch(successSrc, /resolveCatalogueListingPhoto/);
+assert.doesNotMatch(successSrc, /storefrontCatalogueListingPhoto/);
+
+function photo(
+  partial: Partial<StorefrontCakePhoto> &
+    Pick<StorefrontCakePhoto, "id" | "url" | "cakeSizeId">,
+): StorefrontCakePhoto {
+  return {
+    altText: `${partial.id} alt`,
+    sortOrder: 0,
+    isDefault: false,
+    ...partial,
+  };
+}
+
+const size4 = "size-4";
+const size6 = "size-6";
+const size8 = "size-8";
+const cakePhotos: StorefrontCakePhoto[] = [
+  photo({
+    id: "p4",
+    url: "https://photos.example/4.jpg",
+    cakeSizeId: size4,
+    sortOrder: 1,
+  }),
+  photo({
+    id: "p6",
+    url: "https://photos.example/6.jpg",
+    cakeSizeId: size6,
+    sortOrder: 2,
+    isDefault: true,
+  }),
+  photo({
+    id: "p8",
+    url: "https://photos.example/8.jpg",
+    cakeSizeId: size8,
+    sortOrder: 3,
+  }),
+];
+
+assert.equal(storefrontPhotoForSize(cakePhotos, size4)?.url, "https://photos.example/4.jpg");
+assert.equal(storefrontPhotoForSize(cakePhotos, size6)?.url, "https://photos.example/6.jpg");
+assert.equal(storefrontPhotoForSize(cakePhotos, size8)?.url, "https://photos.example/8.jpg");
+
+const mixed = attachReceiptItemPhotos(
+  [
+    {
+      key: "a",
+      cakeId: "cake-1",
+      cakeSizeId: size4,
+      cakeName: "Avocado",
+      sizeLabel: '4"',
+      quantity: 1,
+      unitPrice: 88,
+    },
+    {
+      key: "b",
+      cakeId: "cake-1",
+      cakeSizeId: size6,
+      cakeName: "Avocado",
+      sizeLabel: '6"',
+      quantity: 1,
+      unitPrice: 135,
+    },
+    {
+      key: "c",
+      cakeId: "cake-1",
+      cakeSizeId: size8,
+      cakeName: "Avocado",
+      sizeLabel: '8"',
+      quantity: 1,
+      unitPrice: 165,
+    },
+  ],
+  new Map([["cake-1", cakePhotos]]),
+);
+assert.equal(mixed[0]?.cakeId, "cake-1");
+assert.equal(mixed[0]?.cakeSizeId, size4);
+assert.equal(mixed[0]?.imageUrl, "https://photos.example/4.jpg");
+assert.equal(mixed[1]?.imageUrl, "https://photos.example/6.jpg");
+assert.equal(mixed[2]?.imageUrl, "https://photos.example/8.jpg");
+assert.equal(mixed[0]?.sizeLabel, '4"');
+assert.equal(mixed[1]?.sizeLabel, '6"');
+assert.equal(mixed[2]?.sizeLabel, '8"');
+
+const missingExact = attachReceiptItemPhotos(
+  [
+    {
+      key: "d",
+      cakeId: "cake-1",
+      cakeSizeId: "size-missing",
+      cakeName: "Avocado",
+      sizeLabel: '10"',
+      quantity: 1,
+      unitPrice: 188,
+    },
+  ],
+  new Map([["cake-1", cakePhotos]]),
+);
+assert.equal(
+  missingExact[0]?.imageUrl,
+  "https://photos.example/6.jpg",
+  "missing exact size follows resolveCakePhoto default fallback",
+);
+
+const noSizePhotos: StorefrontCakePhoto[] = [
+  photo({
+    id: "only",
+    url: "https://photos.example/sort.jpg",
+    cakeSizeId: null,
+    sortOrder: 0,
+    isDefault: false,
+    altText: "sort fallback",
+  }),
+];
+const sortFallback = attachReceiptItemPhotos(
+  [
+    {
+      key: "e",
+      cakeId: "cake-sort",
+      cakeSizeId: "size-unknown",
+      cakeName: "Matcha",
+      sizeLabel: '6"',
+      quantity: 1,
+      unitPrice: 125,
+    },
+  ],
+  new Map([["cake-sort", noSizePhotos]]),
+);
+assert.equal(sortFallback[0]?.imageUrl, "https://photos.example/sort.jpg");
+
+const legacy = attachReceiptItemPhotos(
+  [
+    {
+      key: "legacy",
+      cakeId: null,
+      cakeSizeId: null,
+      cakeName: "Legacy Cake",
+      sizeLabel: '6"',
+      quantity: 1,
+      unitPrice: 100,
+    },
+  ],
+  new Map([["cake-1", cakePhotos]]),
+);
+assert.equal(legacy.length, 1);
+assert.equal(legacy[0]?.cakeName, "Legacy Cake");
+assert.equal(legacy[0]?.imageUrl, null);
+assert.equal(legacy[0]?.imageAlt, null);
 
 console.log("PASS guest preorder receipt loader uses customer_notes");

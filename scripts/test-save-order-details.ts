@@ -13,6 +13,8 @@ import {
   ORDER_DETAILS_CARD_CONTACT,
   ORDER_DETAILS_CARD_FOOTER,
   ORDER_DETAILS_CARD_PAYMENT,
+  ORDER_DETAILS_NOTICE_BODY,
+  ORDER_DETAILS_NOTICE_TITLE,
   ORDER_DETAILS_PNG_HEIGHT,
   ORDER_DETAILS_PNG_WIDTH,
   buildOrderDetailsCardModel,
@@ -22,7 +24,9 @@ import {
   isShareAbortError,
   isShareNotAllowedError,
   isShareUnavailableError,
+  orderDetailsCakeImageUrls,
   orderDetailsFileName,
+  preloadOrderDetailsImages,
   resolveOrderDetailsSavePath,
   shareOrDownloadOrderDetailsImage,
   wrapCanvasText,
@@ -43,17 +47,25 @@ function sampleReceipt(
     items: [
       {
         key: "1",
+        cakeId: "cake-strawberry",
+        cakeSizeId: "size-6",
         cakeName: "Japanese Strawberry",
         sizeLabel: '6"',
         quantity: 1,
         unitPrice: 78,
+        imageUrl: null,
+        imageAlt: null,
       },
       {
         key: "2",
+        cakeId: "cake-pistachio",
+        cakeSizeId: "size-6b",
         cakeName: "Pistachio Raspberry Kiss",
         sizeLabel: '6"',
         quantity: 2,
         unitPrice: 135,
+        imageUrl: null,
+        imageAlt: null,
       },
     ],
     paidAddons: [
@@ -96,6 +108,17 @@ assert.equal(model.brand, "WHITEBIRD");
 assert.equal(model.title, "ORDER RECEIVED");
 assert.equal(model.paymentStatus, ORDER_DETAILS_CARD_PAYMENT);
 assert.equal(model.contactLine, ORDER_DETAILS_CARD_CONTACT);
+assert.equal(model.noticeTitle, "IMPORTANT — PLEASE TAKE NOTE");
+assert.equal(
+  model.noticeBody,
+  "If you do not receive a confirmation from us within 24 hours, please contact us via WhatsApp.",
+);
+assert.equal(model.noticeTitle, ORDER_DETAILS_NOTICE_TITLE);
+assert.equal(model.noticeBody, ORDER_DETAILS_NOTICE_BODY);
+assert.match(model.noticeBody, /24 hours/);
+assert.equal(model.cakes[0]?.imageUrl, null);
+assert.equal(model.addons[0]?.imageUrl, undefined);
+assert.equal(model.complimentary[0]?.imageUrl, undefined);
 assert.equal(model.footer, ORDER_DETAILS_CARD_FOOTER);
 assert.equal(model.orderNumber, "WB-1001");
 assert.equal(model.placedAt, "9 September 2026 · 8:38 AM");
@@ -209,17 +232,50 @@ type DrawnText = { text: string; x: number; y: number };
 function createMockCtx(): {
   ctx: CanvasRenderingContext2D;
   texts: DrawnText[];
+  drawImages: Array<{ x: number; y: number; width: number; height: number }>;
 } {
   const texts: DrawnText[] = [];
+  const drawImages: Array<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }> = [];
   let textAlign = "left";
   const ctx = {
     save() {},
     restore() {},
     fillRect() {},
+    fill() {},
+    clip() {},
     beginPath() {},
+    closePath() {},
     moveTo() {},
     lineTo() {},
+    quadraticCurveTo() {},
+    rect() {},
+    roundRect() {},
     stroke() {},
+    drawImage(
+      _image: unknown,
+      ...args: number[]
+    ) {
+      if (args.length >= 8) {
+        drawImages.push({
+          x: args[4] ?? 0,
+          y: args[5] ?? 0,
+          width: args[6] ?? 0,
+          height: args[7] ?? 0,
+        });
+        return;
+      }
+      drawImages.push({
+        x: args[0] ?? 0,
+        y: args[1] ?? 0,
+        width: args[2] ?? 0,
+        height: args[3] ?? 0,
+      });
+    },
     fillText(text: string, x: number, y: number) {
       texts.push({ text, x, y });
     },
@@ -239,7 +295,7 @@ function createMockCtx(): {
     },
     textBaseline: "alphabetic",
   };
-  return { ctx: ctx as unknown as CanvasRenderingContext2D, texts };
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, texts, drawImages };
 }
 
 function reconstructedLines(texts: DrawnText[]): Array<{ y: number; text: string }> {
@@ -297,6 +353,8 @@ function assertReceiptLayout(
   assert.match(joined, /WHITEBIRD/);
   assert.match(joined, /ORDER DETAILS/);
   assert.match(joined, /YOUR ORDER/);
+  assert.match(joined, /IMPORTANT — PLEASE TAKE NOTE/);
+  assert.match(joined, /24 hours/);
   assert.match(joined, /Order number/);
   assert.match(joined, /Order placed/);
   assert.match(joined, /9 September 2026 · 8:38 AM/);
@@ -327,6 +385,16 @@ function assertReceiptLayout(
     line.text.includes("Please keep this for your reference"),
   );
   assert.ok((footer?.y ?? 0) > 1700);
+  assert.doesNotMatch(footer?.text ?? "", /24 hours/);
+  const noticeLine = lines.find((line) =>
+    line.text.includes("IMPORTANT — PLEASE TAKE NOTE"),
+  );
+  const detailsLine = lines.find((line) => line.text === "ORDER DETAILS");
+  assert.ok(
+    (noticeLine?.y ?? 0) > 0 &&
+      (detailsLine?.y ?? 0) > (noticeLine?.y ?? 9999),
+    "24-hour notice must appear in main content before ORDER DETAILS",
+  );
 }
 
 assertReceiptLayout(sampleReceipt(), {
@@ -548,8 +616,21 @@ const successSrc = readSrc(
   "src/workspaces/storefront/checkout/StorefrontSuccessPage.tsx",
 );
 assert.match(successSrc, /Order Received/);
-assert.match(successSrc, /Payment Pending/);
-assert.match(successSrc, /Whitebird will contact you via WhatsApp/);
+assert.match(successSrc, /ORDER_DETAILS_CARD_PAYMENT/);
+assert.match(successSrc, /ORDER_DETAILS_CARD_CONTACT/);
+assert.match(successSrc, /ORDER_DETAILS_NOTICE_TITLE/);
+assert.match(successSrc, /ORDER_DETAILS_NOTICE_BODY/);
+assert.match(successSrc, /"24 hours"/);
+assert.ok(
+  successSrc.indexOf("{contactLine}") < successSrc.indexOf("<aside"),
+);
+assert.ok(successSrc.indexOf("<aside") < successSrc.indexOf("Order recap"));
+assert.match(successSrc, /CakePhotoImage/);
+assert.match(successSrc, /item\.imageUrl/);
+assert.match(successSrc, /receipt\.items\.map/);
+assert.doesNotMatch(successSrc, /resolveCatalogueListingPhoto/);
+assert.doesNotMatch(successSrc, /storefrontCatalogueListingPhoto/);
+assert.doesNotMatch(successSrc, /status-danger/);
 assert.match(successSrc, /SaveOrderDetailsButton/);
 assert.match(successSrc, /receipt \? <SaveOrderDetailsButton receipt=\{receipt\} \/>/);
 assert.doesNotMatch(successSrc, /receipt && !isFreshPick/);
@@ -563,8 +644,12 @@ assert.match(buttonSrc, /shareOrDownloadOrderDetailsImage/);
 assert.match(buttonSrc, /renderOrderDetailsPng/);
 assert.match(buttonSrc, /ensureStorefrontCanvasFonts/);
 assert.match(buttonSrc, /await ensureStorefrontCanvasFonts/);
+assert.match(buttonSrc, /preloadOrderDetailsImages/);
+assert.match(buttonSrc, /await preloadOrderDetailsImages/);
+assert.match(buttonSrc, /orderDetailsCakeImageUrls/);
 assert.doesNotMatch(buttonSrc, /await renderOrderDetailsPng/);
-assert.match(buttonSrc, /const blob = renderOrderDetailsPng\(model\)/);
+assert.match(buttonSrc, /const blob = renderOrderDetailsPng\(model, images\)/);
+assert.doesNotMatch(buttonSrc, /\/_next\/image/);
 assert.match(buttonSrc, /shareOrDownloadOrderDetailsImage/);
 assert.match(buttonSrc, /result\.action === "preview"/);
 assert.match(buttonSrc, /Press and hold the image to save it/);
@@ -635,8 +720,94 @@ assert.doesNotMatch(cardSrc, /Palatino/);
 assert.doesNotMatch(cardSrc, /Segoe UI/);
 assert.match(receiptSrc, /created_at,/);
 assert.match(receiptSrc, /placedAt:/);
+assert.match(cardSrc, /ORDER_DETAILS_NOTICE_TITLE/);
+assert.match(cardSrc, /ORDER_DETAILS_NOTICE_BODY/);
+assert.match(cardSrc, /preloadOrderDetailsImages/);
+assert.match(cardSrc, /crossOrigin = "anonymous"/);
+assert.match(cardSrc, /drawCakePhoto/);
+assert.match(cardSrc, /ORDER_DETAILS_CAKE_PHOTO_SIZE = 112/);
+assert.doesNotMatch(cardSrc, /resolveCatalogueListingPhoto/);
+assert.doesNotMatch(cardSrc, /storefrontCatalogueListingPhoto/);
 assert.doesNotMatch(cardSrc, /html2canvas/);
 assert.doesNotMatch(cardSrc, /from "resend"/);
+
+const photoModel = buildOrderDetailsCardModel(
+  sampleReceipt({
+    items: [
+      {
+        key: "1",
+        cakeId: "cake-strawberry",
+        cakeSizeId: "size-6",
+        cakeName: "Japanese Strawberry",
+        sizeLabel: '6"',
+        quantity: 1,
+        unitPrice: 78,
+        imageUrl: "https://photos.example/strawberry-6.jpg",
+        imageAlt: "Japanese Strawberry 6 inch",
+      },
+      {
+        key: "2",
+        cakeId: "cake-avocado",
+        cakeSizeId: "size-8",
+        cakeName: "Avocado",
+        sizeLabel: '8"',
+        quantity: 1,
+        unitPrice: 165,
+        imageUrl: "https://photos.example/avocado-8.jpg",
+        imageAlt: "Avocado 8 inch",
+      },
+    ],
+  }),
+);
+assert.equal(
+  photoModel.cakes[0]?.imageUrl,
+  "https://photos.example/strawberry-6.jpg",
+);
+assert.equal(photoModel.cakes[1]?.imageUrl, "https://photos.example/avocado-8.jpg");
+assert.equal(photoModel.addons[0]?.imageUrl, undefined);
+assert.equal(photoModel.complimentary[0]?.imageUrl, undefined);
+assert.deepEqual(orderDetailsCakeImageUrls(photoModel), [
+  "https://photos.example/strawberry-6.jpg",
+  "https://photos.example/avocado-8.jpg",
+]);
+
+const photoCanvas = createMockCtx();
+drawOrderDetailsCard(
+  photoCanvas.ctx,
+  photoModel,
+  new Map([
+    [
+      "https://photos.example/strawberry-6.jpg",
+      { width: 400, height: 400 } as CanvasImageSource,
+    ],
+    [
+      "https://photos.example/avocado-8.jpg",
+      { width: 400, height: 400 } as CanvasImageSource,
+    ],
+  ]),
+);
+assert.equal(photoCanvas.drawImages.length, 2);
+for (const drawn of photoCanvas.drawImages) {
+  assert.ok(drawn.width >= 96 && drawn.width <= 140);
+  assert.equal(drawn.width, drawn.height);
+}
+const photoJoined = reconstructedLines(photoCanvas.texts)
+  .map((line) => line.text)
+  .join("\n");
+assert.match(photoJoined, /Japanese Strawberry/);
+assert.match(photoJoined, /Avocado/);
+assert.match(photoJoined, /6"/);
+assert.match(photoJoined, /8"/);
+
+const omittedPhotoCanvas = createMockCtx();
+drawOrderDetailsCard(omittedPhotoCanvas.ctx, photoModel, new Map());
+assert.equal(omittedPhotoCanvas.drawImages.length, 0);
+assert.match(
+  reconstructedLines(omittedPhotoCanvas.texts)
+    .map((line) => line.text)
+    .join("\n"),
+  /Japanese Strawberry/,
+);
 
 const downloads: string[] = [];
 
@@ -924,6 +1095,21 @@ async function runShareTests() {
   assert.equal(iosNoFileShare.action, "preview");
   assert.equal(iosNoFileShare.objectUrl, "blob:preview-no-files");
   assert.equal(downloads.includes("whitebird-order-WB-no-files.png"), false);
+
+  const loaded = await preloadOrderDetailsImages(
+    [
+      "https://photos.example/ok.jpg",
+      "https://photos.example/fail.jpg",
+      "https://photos.example/ok.jpg",
+    ],
+    async (url) => {
+      if (url.includes("fail")) throw new Error("load failed");
+      return { width: 200, height: 200 } as CanvasImageSource;
+    },
+  );
+  assert.equal(loaded.has("https://photos.example/ok.jpg"), true);
+  assert.equal(loaded.has("https://photos.example/fail.jpg"), false);
+  assert.equal(loaded.size, 1);
 
   assert.equal(
     isIosTouchDevice({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)" }),

@@ -6,7 +6,9 @@ import type { GuestPreorderReceipt } from "@/workspaces/storefront/checkout/rece
 import {
   buildOrderDetailsCardModel,
   ensureStorefrontCanvasFonts,
+  orderDetailsCakeImageUrls,
   orderDetailsFileName,
+  preloadOrderDetailsImages,
   renderOrderDetailsPng,
   shareOrDownloadOrderDetailsImage,
 } from "@/workspaces/storefront/checkout/order-details-card";
@@ -46,7 +48,10 @@ export function SaveOrderDetailsButton({
     try {
       await ensureStorefrontCanvasFonts();
       const model = buildOrderDetailsCardModel(receipt);
-      const blob = renderOrderDetailsPng(model);
+      const images = await preloadOrderDetailsImages(
+        orderDetailsCakeImageUrls(model),
+      );
+      const blob = renderOrderDetailsPng(model, images);
       const result = await shareOrDownloadOrderDetailsImage({
         blob,
         fileName: orderDetailsFileName(receipt.orderNumber),

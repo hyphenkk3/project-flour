@@ -13,7 +13,11 @@ export const ORDER_DETAILS_PNG_WIDTH = 1080;
 export const ORDER_DETAILS_PNG_HEIGHT = 1800;
 export const ORDER_DETAILS_CARD_PAYMENT = "Payment Pending";
 export const ORDER_DETAILS_CARD_CONTACT =
-  "Whitebird will contact you via WhatsApp.";
+  "Whitebird will contact you via WhatsApp to proceed with payment and confirm your order.";
+export const ORDER_DETAILS_NOTICE_TITLE = "IMPORTANT — PLEASE TAKE NOTE";
+export const ORDER_DETAILS_NOTICE_BODY =
+  "If you do not receive a confirmation from us within 24 hours, please contact us via WhatsApp.";
+export const ORDER_DETAILS_CAKE_PHOTO_SIZE = 112;
 
 const PAPER = "#f5f0e9";
 const INK = "#1c1916";
@@ -70,6 +74,8 @@ export type OrderDetailsCardLine = {
   name: string;
   meta: string;
   price: string | null;
+  imageUrl?: string | null;
+  imageAlt?: string | null;
 };
 
 export type OrderDetailsCardRow = {
@@ -82,6 +88,8 @@ export type OrderDetailsCardModel = {
   title: string;
   paymentStatus: string;
   contactLine: string;
+  noticeTitle: string;
+  noticeBody: string;
   orderNumber: string;
   placedAt: string;
   customer: string;
@@ -125,6 +133,8 @@ export function buildOrderDetailsCardModel(
     title: "ORDER RECEIVED",
     paymentStatus: ORDER_DETAILS_CARD_PAYMENT,
     contactLine: ORDER_DETAILS_CARD_CONTACT,
+    noticeTitle: ORDER_DETAILS_NOTICE_TITLE,
+    noticeBody: ORDER_DETAILS_NOTICE_BODY,
     orderNumber: receipt.orderNumber?.trim() || "—",
     placedAt: receipt.placedAt
       ? formatCustomerOrderPlacedAt(receipt.placedAt)
@@ -141,6 +151,8 @@ export function buildOrderDetailsCardModel(
         item.unitPrice != null
           ? formatRm(item.unitPrice * item.quantity)
           : null,
+      imageUrl: item.imageUrl,
+      imageAlt: item.imageAlt,
     })),
     addons: receipt.paidAddons.map((addon) => ({
       name: addon.name,
@@ -437,6 +449,141 @@ function rule(ctx: CanvasRenderingContext2D, y: number): void {
   ctx.stroke();
 }
 
+function pathRoundedRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+): void {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  if (typeof ctx.roundRect === "function") {
+    ctx.roundRect(x, y, width, height, r);
+    return;
+  }
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + width - r, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+  ctx.lineTo(x + width, y + height - r);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  ctx.lineTo(x + r, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function fillTextMarking(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  mark: string,
+): void {
+  const index = text.indexOf(mark);
+  if (index < 0) {
+    ctx.fillStyle = SKYLINE;
+    ctx.fillText(text, x, y);
+    return;
+  }
+  const before = text.slice(0, index);
+  const after = text.slice(index + mark.length);
+  let cursor = x;
+  if (before) {
+    ctx.fillStyle = SKYLINE;
+    ctx.fillText(before, cursor, y);
+    cursor += ctx.measureText(before).width;
+  }
+  ctx.fillStyle = INK;
+  ctx.fillText(mark, cursor, y);
+  cursor += ctx.measureText(mark).width;
+  if (after) {
+    ctx.fillStyle = SKYLINE;
+    ctx.fillText(after, cursor, y);
+  }
+}
+
+function canvasImageNaturalSize(image: CanvasImageSource): {
+  width: number;
+  height: number;
+} {
+  const record = image as {
+    naturalWidth?: number;
+    naturalHeight?: number;
+    width?: number;
+    height?: number;
+  };
+  return {
+    width: Number(record.naturalWidth || record.width || 0),
+    height: Number(record.naturalHeight || record.height || 0),
+  };
+}
+
+function drawCakePhoto(
+  ctx: CanvasRenderingContext2D,
+  image: CanvasImageSource,
+  x: number,
+  y: number,
+  size: number,
+): void {
+  const { width, height } = canvasImageNaturalSize(image);
+  if (!width || !height) return;
+  ctx.save();
+  pathRoundedRect(ctx, x, y, size, size, 16);
+  ctx.clip();
+  const side = Math.min(width, height);
+  const sx = (width - side) / 2;
+  const sy = (height - side) / 2;
+  ctx.drawImage(image, sx, sy, side, side, x, y, size, size);
+  ctx.restore();
+}
+
+export function orderDetailsCakeImageUrls(
+  model: OrderDetailsCardModel,
+): string[] {
+  return [
+    ...new Set(
+      model.cakes
+        .map((line) => line.imageUrl?.trim() ?? "")
+        .filter((url) => url.length > 0),
+    ),
+  ];
+}
+
+export async function loadCanvasImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    if (typeof Image === "undefined") {
+      reject(new Error("Image unavailable"));
+      return;
+    }
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Could not load image"));
+    image.src = url;
+  });
+}
+
+export async function preloadOrderDetailsImages(
+  urls: readonly string[],
+  loadImage: (url: string) => Promise<CanvasImageSource> = loadCanvasImage,
+): Promise<Map<string, CanvasImageSource>> {
+  const unique = [...new Set(urls.map((url) => url.trim()).filter(Boolean))];
+  const loaded = new Map<string, CanvasImageSource>();
+  await Promise.all(
+    unique.map(async (url) => {
+      try {
+        loaded.set(url, await loadImage(url));
+      } catch {
+        // Omit the photo; keep the rest of the order details.
+      }
+    }),
+  );
+  return loaded;
+}
+
 type DrawOp = () => void;
 
 function gapScaleForContent(naturalContent: number, available: number): number {
@@ -453,6 +600,7 @@ function scaledFontPx(size: number, fontScale: number): number {
 export function drawOrderDetailsCard(
   ctx: CanvasRenderingContext2D,
   model: OrderDetailsCardModel,
+  images: ReadonlyMap<string, CanvasImageSource> = new Map(),
 ): { width: number; height: number } {
   const displayFont = storefrontCanvasFontFamily("display");
   const sansFont = storefrontCanvasFontFamily("sans");
@@ -561,6 +709,50 @@ export function drawOrderDetailsCard(
       y += line(24);
     }
 
+    y += block(18);
+    const noticeTitleFont = `500 ${fs(12)}px ${sansFont}`;
+    const noticeBodyFont = `400 ${fs(15)}px ${sansFont}`;
+    const noticePadX = 22;
+    const noticePadY = 20;
+    const noticeInner = CONTENT_WIDTH - noticePadX * 2;
+    const noticeBodyLines = wrap(noticeBodyFont, model.noticeBody, noticeInner);
+    const noticeBoxH =
+      noticePadY +
+      line(18) +
+      Math.max(noticeBodyLines.length, 1) * line(22) +
+      noticePadY;
+    const noticeTop = y;
+    ops.push(() => {
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = FOG;
+      ctx.lineWidth = 1.5;
+      pathRoundedRect(ctx, PAD_X, noticeTop, CONTENT_WIDTH, noticeBoxH, 18);
+      ctx.fill();
+      ctx.stroke();
+    });
+    const noticeTitleY = noticeTop + noticePadY + fs(12);
+    ops.push(() => {
+      ctx.fillStyle = SIGNAL;
+      ctx.font = noticeTitleFont;
+      fillSpacedText(
+        ctx,
+        model.noticeTitle,
+        PAD_X + noticePadX,
+        noticeTitleY,
+        emTracking(fs(12), 0.12),
+      );
+    });
+    let noticeBodyY = noticeTitleY + line(22);
+    for (const bodyLine of noticeBodyLines) {
+      const lineY = noticeBodyY;
+      ops.push(() => {
+        ctx.font = noticeBodyFont;
+        fillTextMarking(ctx, bodyLine, PAD_X + noticePadX, lineY, "24 hours");
+      });
+      noticeBodyY += line(22);
+    }
+    y = noticeTop + noticeBoxH;
+
     y += block(16);
     const afterHero = y;
     ops.push(() => rule(ctx, afterHero));
@@ -622,11 +814,34 @@ export function drawOrderDetailsCard(
 
     for (const [index, entry] of commerce.entries()) {
       const nameFont = entry.kind === "cake" ? cakeNameFont : addonNameFont;
+      const photo =
+        entry.kind === "cake" && entry.line.imageUrl
+          ? images.get(entry.line.imageUrl)
+          : undefined;
+      const hasPhoto = Boolean(photo);
+      const photoSize = Math.round(
+        Math.min(
+          140,
+          Math.max(96, ORDER_DETAILS_CAKE_PHOTO_SIZE * fontScale),
+        ),
+      );
+      const photoGap = 20;
+      const textX = hasPhoto ? PAD_X + photoSize + photoGap : PAD_X;
+      const textWidth = hasPhoto
+        ? CONTENT_WIDTH - photoSize - photoGap
+        : CONTENT_WIDTH;
       const priceWidth = entry.line.price
         ? measure(priceFont, entry.line.price)
         : 0;
-      const nameLines = wrap(nameFont, entry.line.name, CONTENT_WIDTH);
+      const nameLines = wrap(nameFont, entry.line.name, textWidth);
       const startY = y;
+      const photoTop = startY - Math.round(cakeSize * 0.82);
+      if (photo) {
+        const photoForDraw = photo;
+        ops.push(() => {
+          drawCakePhoto(ctx, photoForDraw, PAD_X, photoTop, photoSize);
+        });
+      }
       nameLines.forEach((nameLine, lineIndex) => {
         const lineY = startY + lineIndex * line(entry.kind === "cake" ? 32 : 24);
         ops.push(() => {
@@ -636,12 +851,12 @@ export function drawOrderDetailsCard(
             fillSpacedText(
               ctx,
               nameLine,
-              PAD_X,
+              textX,
               lineY,
               emTracking(cakeSize, -0.02),
             );
           } else {
-            ctx.fillText(nameLine, PAD_X, lineY);
+            ctx.fillText(nameLine, textX, lineY);
           }
         });
       });
@@ -651,14 +866,14 @@ export function drawOrderDetailsCard(
           line(entry.kind === "cake" ? 32 : 24) +
         block(2);
       const metaY = y;
-      const metaMax = CONTENT_WIDTH - (priceWidth ? priceWidth + 16 : 0);
+      const metaMax = textWidth - (priceWidth ? priceWidth + 16 : 0);
       const metaLines = wrap(metaFont, entry.line.meta, metaMax);
       metaLines.forEach((metaLine, lineIndex) => {
         const lineY = metaY + lineIndex * line(20);
         ops.push(() => {
           ctx.fillStyle = SKYLINE;
           ctx.font = metaFont;
-          ctx.fillText(metaLine, PAD_X, lineY);
+          ctx.fillText(metaLine, textX, lineY);
         });
       });
       if (entry.line.price) {
@@ -670,7 +885,9 @@ export function drawOrderDetailsCard(
           ctx.textAlign = "left";
         });
       }
-      y = metaY + Math.max(metaLines.length, 1) * line(20);
+      const textBottom = metaY + Math.max(metaLines.length, 1) * line(20);
+      const photoBottom = hasPhoto ? photoTop + photoSize : textBottom;
+      y = Math.max(textBottom, photoBottom);
       y += index === commerce.length - 1 ? block(6) : block(18);
     }
 
@@ -781,6 +998,7 @@ export function drawOrderDetailsCard(
 
 export function renderOrderDetailsPng(
   model: OrderDetailsCardModel,
+  images: ReadonlyMap<string, CanvasImageSource> = new Map(),
 ): Blob {
   const canvas = document.createElement("canvas");
   canvas.width = ORDER_DETAILS_PNG_WIDTH;
@@ -789,6 +1007,6 @@ export function renderOrderDetailsPng(
   if (!ctx) {
     throw new Error("Could not create the order details image.");
   }
-  drawOrderDetailsCard(ctx, model);
+  drawOrderDetailsCard(ctx, model, images);
   return canvasPngBlob(canvas);
 }

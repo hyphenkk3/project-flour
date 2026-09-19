@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import { formatDdMmYyyy } from "@/lib/dates";
 import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
 import {
@@ -16,6 +17,12 @@ import { ClearPreorderDraftOnSuccess } from "@/workspaces/storefront/checkout/Cl
 import { ClearFreshPickCartOnSuccess } from "@/workspaces/storefront/extra/ClearFreshPickCartOnSuccess";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import { getGuestPreorderReceipt } from "@/workspaces/storefront/checkout/receipt";
+import {
+  ORDER_DETAILS_CARD_CONTACT,
+  ORDER_DETAILS_CARD_PAYMENT,
+  ORDER_DETAILS_NOTICE_BODY,
+  ORDER_DETAILS_NOTICE_TITLE,
+} from "@/workspaces/storefront/checkout/order-details-card";
 import { SaveOrderDetailsButton } from "@/workspaces/storefront/checkout/SaveOrderDetailsButton";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import { storefrontKickerClass } from "@/workspaces/storefront/StorefrontBrand";
@@ -33,6 +40,14 @@ export async function StorefrontSuccessPage({
   const receipt = orderId ? await getGuestPreorderReceipt(orderId) : null;
   const isFreshPick =
     flow === FRESH_PICKS_SUCCESS_FLOW || Boolean(receipt?.isFreshPick);
+  const paymentStatus = isFreshPick
+    ? FRESH_PICKS_SUCCESS_PAYMENT
+    : ORDER_DETAILS_CARD_PAYMENT;
+  const contactLine = isFreshPick
+    ? FRESH_PICKS_SUCCESS_CONTACT
+    : ORDER_DETAILS_CARD_CONTACT;
+  const noticeMark = "24 hours";
+  const noticeMarkAt = ORDER_DETAILS_NOTICE_BODY.indexOf(noticeMark);
 
   return (
     <main className="bg-paper mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-16 sm:px-6">
@@ -44,38 +59,60 @@ export async function StorefrontSuccessPage({
           {isFreshPick ? FRESH_PICKS_SUCCESS_TITLE : "Order Received"}
         </h1>
         <p className="text-skyline mt-4 text-base leading-relaxed">
-          {isFreshPick ? (
-            <>
-              {FRESH_PICKS_SUCCESS_PAYMENT}
-              <br />
-              {FRESH_PICKS_SUCCESS_CONTACT}
-            </>
-          ) : (
-            <>
-              Payment Pending
-              <br />
-              Whitebird will contact you via WhatsApp.
-            </>
-          )}
+          {paymentStatus}
+          <br />
+          {contactLine}
         </p>
       </div>
 
+      <aside
+        aria-label={ORDER_DETAILS_NOTICE_TITLE}
+        className="border-fog mt-8 rounded-xl border bg-white px-4 py-3.5 text-left sm:px-5 sm:py-4"
+      >
+        <p className="text-signal text-[11px] font-semibold tracking-[0.16em] uppercase">
+          {ORDER_DETAILS_NOTICE_TITLE}
+        </p>
+        <p className="text-skyline mt-2 text-sm leading-relaxed sm:text-[15px]">
+          {noticeMarkAt >= 0 ? (
+            <>
+              {ORDER_DETAILS_NOTICE_BODY.slice(0, noticeMarkAt)}
+              <span className="text-ink font-semibold">{noticeMark}</span>
+              {ORDER_DETAILS_NOTICE_BODY.slice(
+                noticeMarkAt + noticeMark.length,
+              )}
+            </>
+          ) : (
+            ORDER_DETAILS_NOTICE_BODY
+          )}
+        </p>
+      </aside>
+
       {receipt ? (
-        <section className="border-fog mt-10 border-t pt-8 text-left">
+        <section className="border-fog mt-8 border-t pt-8 text-left">
           <p className="text-skyline text-[11px] font-medium tracking-[0.18em] uppercase">
             Order recap
           </p>
-          <ul className="mt-3 space-y-2">
+          <ul className="mt-3 space-y-3">
             {receipt.items.map((item) => (
-              <li className="text-ink text-sm" key={item.key}>
-                <span className="font-medium">{item.cakeName}</span>
-                <span className="text-skyline">
-                  {" "}
-                  · {item.sizeLabel} × {item.quantity}
-                  {item.unitPrice != null
-                    ? ` · ${formatRm(item.unitPrice * item.quantity)}`
-                    : ""}
-                </span>
+              <li className="flex items-start gap-3" key={item.key}>
+                {item.imageUrl ? (
+                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] sm:h-[4.5rem] sm:w-[4.5rem]">
+                    <CakePhotoImage
+                      alt={item.imageAlt ?? item.cakeName}
+                      sizes="72px"
+                      src={item.imageUrl}
+                    />
+                  </div>
+                ) : null}
+                <div className="min-w-0 flex-1">
+                  <p className="text-ink text-sm font-medium">{item.cakeName}</p>
+                  <p className="text-skyline text-sm">
+                    {item.sizeLabel} × {item.quantity}
+                    {item.unitPrice != null
+                      ? ` · ${formatRm(item.unitPrice * item.quantity)}`
+                      : ""}
+                  </p>
+                </div>
               </li>
             ))}
             {receipt.paidAddons.map((addon) => (
@@ -184,10 +221,10 @@ export async function StorefrontSuccessPage({
               Order Received
             </p>
             <p className="text-skyline flex items-start gap-2 pl-5">
-              Payment Pending
+              {ORDER_DETAILS_CARD_PAYMENT}
             </p>
             <p className="text-skyline flex items-start gap-2 pl-5">
-              Whitebird will contact you via WhatsApp.
+              {ORDER_DETAILS_CARD_CONTACT}
             </p>
           </>
         )}

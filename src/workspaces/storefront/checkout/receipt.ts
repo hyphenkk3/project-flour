@@ -1,13 +1,26 @@
 import { cookies, headers } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { calculateCommercialSubtotal } from "@/engines/orders/totals";
+import { isMissingCakePhotoSchema } from "@/workspaces/library/cakes/photo-storage";
+import {
+  mapStorefrontCakePhoto,
+  STOREFRONT_CAKE_PHOTO_SELECT,
+  STOREFRONT_CAKE_PHOTO_SELECT_LEGACY,
+  storefrontPhotoForSize,
+  type StorefrontCakePhotoRow,
+} from "@/workspaces/storefront/catalog/cake-photo-map";
+import type { StorefrontCakePhoto } from "@/types/storefront";
 
 export type GuestPreorderReceiptItem = {
   key: string;
+  cakeId: string | null;
+  cakeSizeId: string | null;
   cakeName: string;
   sizeLabel: string;
   quantity: number;
   unitPrice: number | null;
+  imageUrl: string | null;
+  imageAlt: string | null;
 };
 
 export type GuestPreorderReceiptAddon = {
@@ -102,6 +115,58 @@ export async function getGuestPreorderReceipt(
   return loadGuestPreorderReceipt(orderId);
 }
 
+type ReceiptPhotoRow = StorefrontCakePhotoRow & { cake_id: string };
+
+export function attachReceiptItemPhotos(
+  items: ReadonlyArray<Omit<GuestPreorderReceiptItem, "imageUrl" | "imageAlt">>,
+  photosByCake: ReadonlyMap<string, StorefrontCakePhoto[]>,
+): GuestPreorderReceiptItem[] {
+  return items.map((item) => {
+    if (!item.cakeId) {
+      return { ...item, imageUrl: null, imageAlt: null };
+    }
+    const photos = photosByCake.get(item.cakeId) ?? [];
+    const photo = storefrontPhotoForSize(photos, item.cakeSizeId);
+    if (!photo) {
+      return { ...item, imageUrl: null, imageAlt: null };
+    }
+    return {
+      ...item,
+      imageUrl: photo.url,
+      imageAlt: photo.altText ?? item.cakeName,
+    };
+  });
+}
+
+async function loadReceiptCakePhotos(
+  supabase: ReturnType<typeof createServiceClient>,
+  cakeIds: string[],
+): Promise<Map<string, StorefrontCakePhoto[]>> {
+  const photosByCake = new Map<string, StorefrontCakePhoto[]>();
+  if (cakeIds.length === 0) return photosByCake;
+
+  const run = (photoSelect: string) =>
+    supabase
+      .from("library_cake_photos")
+      .select(`cake_id, ${photoSelect}`)
+      .in("cake_id", cakeIds)
+      .order("sort_order", { ascending: true });
+
+  let result = await run(STOREFRONT_CAKE_PHOTO_SELECT);
+  if (result.error && isMissingCakePhotoSchema(result.error.message)) {
+    result = await run(STOREFRONT_CAKE_PHOTO_SELECT_LEGACY);
+  }
+  if (result.error) return photosByCake;
+
+  for (const photo of (result.data ?? []) as unknown as ReceiptPhotoRow[]) {
+    if (!photo.image_url || !photo.cake_id) continue;
+    const list = photosByCake.get(photo.cake_id) ?? [];
+    list.push(mapStorefrontCakePhoto(photo, list.length));
+    photosByCake.set(photo.cake_id, list);
+  }
+  return photosByCake;
+}
+
 /**
  * Loads a guest preorder recap by id (no cookie check).
  * Used only after `guestPreorderReceiptAuthorized`.
@@ -131,6 +196,8 @@ export async function loadGuestPreorderReceipt(
         order_dine_in_reservations ( guest_count, venue, reservation_time ),
         order_items (
           id,
+          cake_id,
+          cake_size_id,
           quantity,
           unit_price,
           cake_name,
@@ -160,9 +227,11 @@ export async function loadGuestPreorderReceipt(
     if (error || !data) return null;
 
     const rows = Array.isArray(data.order_items) ? data.order_items : [];
-    const items: GuestPreorderReceiptItem[] = rows.map((row, index) => {
+    const mappedItems = rows.map((row, index) => {
       const entry = row as {
         id?: string;
+        cake_id?: string | null;
+        cake_size_id?: string | null;
         quantity?: number;
         unit_price?: number | string | null;
         cake_name?: string | null;
@@ -176,14 +245,27 @@ export async function loadGuestPreorderReceipt(
       const size = Array.isArray(sizeRel) ? sizeRel[0] : sizeRel;
       const unitPrice =
         entry.unit_price == null ? null : Number(entry.unit_price);
+      const cakeId = String(entry.cake_id ?? "").trim() || null;
+      const cakeSizeId = String(entry.cake_size_id ?? "").trim() || null;
       return {
         key: entry.id ?? String(index),
+        cakeId,
+        cakeSizeId,
         cakeName: entry.cake_name ?? cake?.name ?? "Cake",
         sizeLabel: entry.size_label ?? size?.label ?? "Size",
         quantity: Number(entry.quantity ?? 1),
         unitPrice,
       };
     });
+    const cakeIds = [
+      ...new Set(
+        mappedItems
+          .map((item) => item.cakeId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const photosByCake = await loadReceiptCakePhotos(supabase, cakeIds);
+    const items = attachReceiptItemPhotos(mappedItems, photosByCake);
 
     const addonRows = Array.isArray(
       (data as { order_paid_addons?: unknown }).order_paid_addons,
