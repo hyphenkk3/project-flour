@@ -51,6 +51,7 @@ function revalidateExtraPaths() {
   revalidatePath("/");
   revalidatePath("/owner/calendar");
   revalidatePath("/customer-operations/fresh-picks");
+  revalidatePath("/home");
 }
 
 function evaluateFreshPickConfirm(input: {

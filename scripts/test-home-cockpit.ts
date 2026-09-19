@@ -557,6 +557,9 @@ assert.equal(
 const pageSrc = readFileSync(resolve("src/app/(app)/home/page.tsx"), "utf8");
 assert.match(pageSrc, /buildHomeCockpitModel/);
 assert.match(pageSrc, /HomeCockpit/);
+assert.match(pageSrc, /listHomeFreshPickUnits/);
+assert.match(pageSrc, /buildExtraWorkspaceCapabilities/);
+assert.match(pageSrc, /canSeeHomeFreshPicks/);
 assert.match(pageSrc, /listGuestOrders/);
 assert.match(pageSrc, /listCollectionBoardOrders/);
 assert.match(pageSrc, /listCollectionCompletedOrders/);
@@ -577,6 +580,7 @@ const uiSrc = readFileSync(
   resolve("src/workspaces/home/HomeCockpit.tsx"),
   "utf8",
 );
+assert.match(uiSrc, /HomeFreshPicksOperations/);
 assert.match(uiSrc, /Needs Attention/);
 assert.match(uiSrc, /Today's Handoffs/);
 assert.match(uiSrc, /Today's Schedule/);

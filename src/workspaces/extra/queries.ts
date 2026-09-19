@@ -1,5 +1,6 @@
 import {
   isExtraAvailable,
+  isExtraConfirmedOnOffer,
   type ExtraLifecycle,
 } from "@/engines/extra/availability";
 import { isExtraWalkInHeld } from "@/engines/extra/walk-in-hold";
@@ -196,6 +197,46 @@ export async function countExtraStockProposed(): Promise<number> {
   }
 
   return count ?? 0;
+}
+
+/**
+ * Home operational Fresh Picks: confirmed, unsold, uncut, still within
+ * order cutoff — including active walk-in holds. Same extra_stock source.
+ */
+export async function listHomeFreshPickUnits(): Promise<ExtraStockUnit[]> {
+  const supabase = await createClient();
+  const now = new Date();
+  const { data, error } = await supabase
+    .from("extra_stock")
+    .select(EXTRA_SELECT)
+    .eq("lifecycle", "confirmed")
+    .is("sold_at", null)
+    .is("cut_into_slices_at", null)
+    .gte("pickup_through_at", now.toISOString())
+    .order("pickup_through_at", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const units = ((data ?? []) as unknown as ExtraStockRow[])
+    .map((row) => mapExtraStockRow(row, now))
+    .filter((unit) =>
+      isExtraConfirmedOnOffer({
+        lifecycle: unit.lifecycle,
+        pickupThroughAt: unit.pickupThroughAt,
+        soldAt: unit.soldAt,
+        cutIntoSlicesAt: unit.cutIntoSlicesAt,
+        now,
+      }),
+    );
+
+  units.sort((a, b) => {
+    if (a.walkInHeld !== b.walkInHeld) return a.walkInHeld ? -1 : 1;
+    return (a.pickupThroughAt ?? "").localeCompare(b.pickupThroughAt ?? "");
+  });
+
+  return units;
 }
 
 export type ExtraAssignableOrder = {

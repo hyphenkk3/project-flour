@@ -7,6 +7,10 @@ import {
 } from "@/engines/orders/delivery-finance-capabilities";
 import { canAccessBakeryWorkspace } from "@/engines/bakery/capabilities";
 import { canAccessCollectionWorkspace } from "@/engines/collection/capabilities";
+import {
+  buildExtraWorkspaceCapabilities,
+  canSeeHomeFreshPicks,
+} from "@/engines/extra/capabilities";
 import { homePendingApprovalsHref, visiblePendingApprovalsForInbox } from "@/engines/operations/approval-ux";
 import { staffHasBakeryPreorderApprover } from "@/workspaces/owner/approvals/designations";
 import { operationsTodayYmd } from "@/engines/operations/order-board";
@@ -18,6 +22,7 @@ import {
   listCollectionCompletedOrders,
   listCollectionDineInOrders,
 } from "@/workspaces/collection/queries";
+import { listHomeFreshPickUnits } from "@/workspaces/extra/queries";
 import { buildHomeCockpitModel } from "@/workspaces/home/cockpit-model";
 import { HomeCockpit } from "@/workspaces/home/HomeCockpit";
 
@@ -46,6 +51,11 @@ export default async function HomePage() {
   const canApprovals =
     capabilities.canReviewOperationsApprovals ||
     capabilities.canRequestOperationsApproval;
+  const extraCapabilities = buildExtraWorkspaceCapabilities({
+    role,
+    staffId: staff.id,
+  });
+  const showHomeFreshPicks = canSeeHomeFreshPicks(extraCapabilities);
 
   const shouldLoadOrders = canOps || canGuestWorkspace || canCollection;
   const shouldLoadApprovals = canApprovals || canOps;
@@ -57,6 +67,7 @@ export default async function HomePage() {
     dineInCollection,
     bakeryOrders,
     pendingApprovals,
+    freshPickUnits,
   ] = await Promise.all([
     shouldLoadOrders ? listGuestOrders() : Promise.resolve([]),
     canCollection
@@ -74,6 +85,7 @@ export default async function HomePage() {
     shouldLoadApprovals
       ? listPendingOperationsApprovals()
       : Promise.resolve([]),
+    showHomeFreshPicks ? listHomeFreshPickUnits() : Promise.resolve([]),
   ]);
 
   const visiblePendingApprovals = visiblePendingApprovalsForInbox(
@@ -102,6 +114,8 @@ export default async function HomePage() {
       canAccessCollection={canCollection}
       canAccessOperations={canOps}
       model={model}
+      extraCapabilities={showHomeFreshPicks ? extraCapabilities : null}
+      freshPickUnits={freshPickUnits}
       preferCalendarScheduleCta={role === "owner"}
       roleName={staff.role.name}
       staffDisplayName={staff.displayName}

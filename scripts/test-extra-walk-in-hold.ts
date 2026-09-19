@@ -9,7 +9,13 @@ import {
   isExtraAvailable,
   isExtraConfirmedOnOffer,
 } from "@/engines/extra/availability";
-import { buildExtraWorkspaceCapabilities } from "@/engines/extra/capabilities";
+import {
+  buildExtraWorkspaceCapabilities,
+  canSeeHomeFreshPicks,
+  extraFreshPickOperationalStatus,
+  extraFreshPickOperationalStatusLabel,
+  extraOperationalActionFlags,
+} from "@/engines/extra/capabilities";
 import {
   extraSubmitCustomerError,
   FRESH_PICKS_SOLD_OUT_MESSAGE,
@@ -19,6 +25,7 @@ import {
   EXTRA_WALK_IN_HOLD_EXTENSION_MINUTES,
   EXTRA_WALK_IN_HOLD_MINUTES,
   EXTRA_WALK_IN_HOLD_REMINDER_LEAD_MINUTES,
+  freshPickHomeSummaryLine,
   isExtraWalkInHeld,
   walkInHoldPlaceConfirmDescription,
 } from "@/engines/extra/walk-in-hold";
@@ -125,6 +132,107 @@ assert.equal(bakery.canExtendWalkInHold, false);
 assert.equal(bakery.canReleaseWalkInHold, false);
 assert.equal(collection.canViewWalkInHold, false);
 assert.equal(collection.canCreateWalkInHold, false);
+
+assert.equal(canSeeHomeFreshPicks(owner), true);
+assert.equal(canSeeHomeFreshPicks(manager), true);
+assert.equal(canSeeHomeFreshPicks(co), true);
+assert.equal(canSeeHomeFreshPicks(bakery), true);
+assert.equal(canSeeHomeFreshPicks(collection), false);
+
+const bakeryOpen = extraOperationalActionFlags({
+  capabilities: bakery,
+  walkInHeld: false,
+});
+assert.equal(bakeryOpen.assign, true);
+assert.equal(bakeryOpen.move, true);
+assert.equal(bakeryOpen.cut, true);
+assert.equal(bakeryOpen.unconfirm, true);
+
+const bakeryHeld = extraOperationalActionFlags({
+  capabilities: bakery,
+  walkInHeld: true,
+});
+assert.equal(bakeryHeld.assign, false);
+assert.equal(bakeryHeld.move, false);
+assert.equal(bakeryHeld.cut, false);
+assert.equal(bakeryHeld.unconfirm, false);
+
+const coOpen = extraOperationalActionFlags({
+  capabilities: co,
+  walkInHeld: false,
+});
+assert.equal(coOpen.assign, false);
+assert.equal(coOpen.move, false);
+assert.equal(coOpen.cut, false);
+assert.equal(coOpen.unconfirm, false);
+
+const ownerHeld = extraOperationalActionFlags({
+  capabilities: owner,
+  walkInHeld: true,
+});
+assert.equal(ownerHeld.assign, false, "held Extra hides bakery mutations");
+
+assert.equal(
+  extraFreshPickOperationalStatusLabel(
+    extraFreshPickOperationalStatus({
+      soldAt: null,
+      cutIntoSlicesAt: null,
+      walkInHeld: true,
+      available: false,
+    }),
+  ),
+  "On walk-in hold",
+);
+assert.equal(
+  extraFreshPickOperationalStatusLabel(
+    extraFreshPickOperationalStatus({
+      soldAt: "2026-09-17T13:00:00.000Z",
+      cutIntoSlicesAt: null,
+      walkInHeld: false,
+      available: false,
+    }),
+  ),
+  "Sold",
+);
+assert.equal(
+  extraFreshPickOperationalStatusLabel(
+    extraFreshPickOperationalStatus({
+      soldAt: null,
+      cutIntoSlicesAt: "2026-09-17T13:00:00.000Z",
+      walkInHeld: false,
+      available: false,
+    }),
+  ),
+  "Cut into slices",
+);
+
+assert.equal(
+  freshPickHomeSummaryLine({
+    preparedOn: "2026-09-17",
+    pickupThroughAt: "2026-09-17T09:30:00.000Z",
+    todayYmd: "2026-09-17",
+  }),
+  "Pickup today · 5:30 PM cutoff",
+);
+
+const boardSrc = readFileSync(
+  resolve("src/workspaces/extra/ExtraBoard.tsx"),
+  "utf8",
+);
+assert.match(boardSrc, /WalkInHoldPanel/);
+assert.match(boardSrc, /AssignExtraToOrderDialog/);
+assert.match(boardSrc, /MoveExtraWindowDialog/);
+assert.match(boardSrc, /CutExtraIntoSlicesDialog/);
+assert.match(boardSrc, /Assign to order/);
+assert.doesNotMatch(boardSrc, /holdingUnit/);
+
+const actionsSrc = readFileSync(
+  resolve("src/workspaces/extra/actions.ts"),
+  "utf8",
+);
+assert.match(actionsSrc, /revalidatePath\("\/home"\)/);
+assert.match(actionsSrc, /requireWalkInHoldStaff/);
+assert.match(actionsSrc, /requireExtraStaff/);
 
 const migration = readFileSync(
   resolve("supabase/migrations/20260917140000_extra_walk_in_hold.sql"),

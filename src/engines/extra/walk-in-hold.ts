@@ -5,6 +5,8 @@
  */
 
 import { formatExtraPickupThroughClock } from "@/engines/extra/fresh-picks-time";
+import { freshPickDay } from "@/engines/extra/customer-fresh-picks";
+import { formatLongBusinessDate } from "@/lib/dates";
 
 export const EXTRA_WALK_IN_HOLD_MINUTES = 15;
 export const EXTRA_WALK_IN_HOLD_EXTENSION_MINUTES = 15;
@@ -34,4 +36,36 @@ export function walkInHoldPlaceConfirmDescription(
   minutes: number = EXTRA_WALK_IN_HOLD_MINUTES,
 ): string {
   return `Place this Fresh Pick on a ${minutes}-minute walk-in hold? It will be unavailable for online sale and other staff actions during the hold.`;
+}
+
+export function walkInHoldExtendConfirmDescription(
+  minutes: number = EXTRA_WALK_IN_HOLD_EXTENSION_MINUTES,
+): string {
+  return `Add ${minutes} minutes to this Walk-in Hold? Only one extension is allowed.`;
+}
+
+export const WALK_IN_HOLD_RELEASE_CONFIRM_DESCRIPTION =
+  "Release this Walk-in Hold? The Fresh Pick will be available for online sale and other staff actions immediately.";
+
+/**
+ * Compact Home / counter line: "Pickup today · 5:30 PM cutoff".
+ */
+export function freshPickHomeSummaryLine(input: {
+  preparedOn: string | null;
+  pickupThroughAt: string | null;
+  todayYmd: string;
+}): string {
+  const day = freshPickDay(input.preparedOn, input.todayYmd);
+  const when =
+    day === "today"
+      ? "today"
+      : day === "tomorrow"
+        ? "tomorrow"
+        : input.preparedOn
+          ? formatLongBusinessDate(input.preparedOn)
+          : "—";
+  const cutoff = input.pickupThroughAt
+    ? formatExtraPickupThroughClock(input.pickupThroughAt)
+    : "—";
+  return `Pickup ${when} · ${cutoff} cutoff`;
 }

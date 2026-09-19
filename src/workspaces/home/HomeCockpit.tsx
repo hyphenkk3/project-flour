@@ -8,8 +8,11 @@ import {
   collectionDateNavHref,
   collectionOrderHref,
 } from "@/workspaces/collection/date";
+import type { ExtraWorkspaceCapabilities } from "@/engines/extra/capabilities";
+import type { ExtraStockUnit } from "@/workspaces/extra/types";
 import type { HomeCockpitModel } from "@/workspaces/home/cockpit-model";
 import type { HomeDineInHandoffPreview } from "@/workspaces/home/cockpit-model";
+import { HomeFreshPicksOperations } from "@/workspaces/home/HomeFreshPicksOperations";
 import { HomeLiveRefresh } from "@/workspaces/home/HomeLiveRefresh";
 import { homeGreetingTitle } from "@/workspaces/home/greeting";
 
@@ -32,6 +35,8 @@ type HomeCockpitProps = {
    * Manager keeps Bakery when bakery access exists.
    */
   preferCalendarScheduleCta?: boolean;
+  extraCapabilities?: ExtraWorkspaceCapabilities | null;
+  freshPickUnits?: ExtraStockUnit[];
 };
 
 function SummaryChip({
@@ -133,6 +138,8 @@ export function HomeCockpit({
   canAccessApprovals,
   pendingApprovalsHref,
   preferCalendarScheduleCta = false,
+  extraCapabilities = null,
+  freshPickUnits = [],
 }: HomeCockpitProps) {
   const { summary, attentionGroups, attentionPreview, handoffs, schedule } =
     model;
@@ -227,6 +234,14 @@ export function HomeCockpit({
           </div>
         )}
       </section>
+
+      {extraCapabilities ? (
+        <HomeFreshPicksOperations
+          capabilities={extraCapabilities}
+          todayYmd={model.todayYmd}
+          units={freshPickUnits}
+        />
+      ) : null}
 
       <section aria-labelledby="home-attention">
         <SectionHeader

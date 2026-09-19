@@ -87,3 +87,68 @@ export function buildExtraWorkspaceCapabilities(input: {
     canReleaseWalkInHold: canHold,
   };
 }
+
+/** Home Fresh Picks section: Extra capabilities remain authoritative. */
+export function canSeeHomeFreshPicks(
+  capabilities: ExtraWorkspaceCapabilities,
+): boolean {
+  return (
+    capabilities.canViewWalkInHold ||
+    capabilities.canAssignExtraToOrder ||
+    capabilities.canMoveExtraWindow ||
+    capabilities.canCutExtraIntoSlices ||
+    capabilities.canUnconfirmExtra
+  );
+}
+
+/**
+ * State-aware Extra mutation buttons for Home / ExtraBoard.
+ * Hold / extend / release stay on WalkInHoldPanel via existing hold capabilities.
+ */
+export function extraOperationalActionFlags(input: {
+  capabilities: ExtraWorkspaceCapabilities;
+  walkInHeld: boolean;
+}): {
+  assign: boolean;
+  move: boolean;
+  cut: boolean;
+  unconfirm: boolean;
+} {
+  const open = !input.walkInHeld;
+  return {
+    assign: input.capabilities.canAssignExtraToOrder && open,
+    move: input.capabilities.canMoveExtraWindow && open,
+    cut: input.capabilities.canCutExtraIntoSlices && open,
+    unconfirm: input.capabilities.canUnconfirmExtra && open,
+  };
+}
+
+export function extraFreshPickOperationalStatus(input: {
+  soldAt: string | null;
+  cutIntoSlicesAt: string | null;
+  walkInHeld: boolean;
+  available: boolean;
+}): "sold" | "sliced" | "held" | "available" | "unavailable" {
+  if (input.soldAt) return "sold";
+  if (input.cutIntoSlicesAt) return "sliced";
+  if (input.walkInHeld) return "held";
+  if (input.available) return "available";
+  return "unavailable";
+}
+
+export function extraFreshPickOperationalStatusLabel(
+  status: ReturnType<typeof extraFreshPickOperationalStatus>,
+): string {
+  switch (status) {
+    case "sold":
+      return "Sold";
+    case "sliced":
+      return "Cut into slices";
+    case "held":
+      return "On walk-in hold";
+    case "available":
+      return "Available";
+    default:
+      return "Unavailable";
+  }
+}

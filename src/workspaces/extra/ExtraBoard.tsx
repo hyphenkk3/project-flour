@@ -13,11 +13,6 @@ import {
   isExtraExpiredConfirmed,
 } from "@/engines/extra/availability";
 import {
-  EXTRA_WALK_IN_HOLD_EXTENSION_MINUTES,
-  EXTRA_WALK_IN_HOLD_MINUTES,
-  walkInHoldPlaceConfirmDescription,
-} from "@/engines/extra/walk-in-hold";
-import {
   evaluateExtraConfirm,
   extraAvailabilityDayLabel,
   extraFreshPickDay,
@@ -32,9 +27,6 @@ import {
   rejectExtraStockAction,
   unconfirmExtraStockAction,
   undoRejectExtraStockAction,
-  extendExtraWalkInHoldAction,
-  holdExtraStockWalkInAction,
-  releaseExtraWalkInHoldAction,
 } from "@/workspaces/extra/actions";
 import { AssignExtraToOrderDialog } from "@/workspaces/extra/AssignExtraToOrderDialog";
 import { CutExtraIntoSlicesDialog } from "@/workspaces/extra/CutExtraIntoSlicesDialog";
@@ -83,13 +75,6 @@ export function ExtraBoard({
   );
   const [movingUnit, setMovingUnit] = useState<ExtraStockUnit | null>(null);
   const [slicingUnit, setSlicingUnit] = useState<ExtraStockUnit | null>(null);
-  const [holdingUnit, setHoldingUnit] = useState<ExtraStockUnit | null>(null);
-  const [extendingUnit, setExtendingUnit] = useState<ExtraStockUnit | null>(
-    null,
-  );
-  const [releasingUnit, setReleasingUnit] = useState<ExtraStockUnit | null>(
-    null,
-  );
   const [drafts, setDrafts] = useState<Record<string, ExtraWindowDraft>>({});
 
   const proposed = useMemo(
@@ -297,45 +282,6 @@ export function ExtraBoard({
     }
     setError(null);
     setAssigningUnit(unit);
-  }
-
-  function runPlaceHold() {
-    if (!holdingUnit) return;
-    setError(null);
-    startTransition(async () => {
-      const result = await holdExtraStockWalkInAction(holdingUnit.id);
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      setHoldingUnit(null);
-    });
-  }
-
-  function runExtendHold() {
-    if (!extendingUnit) return;
-    setError(null);
-    startTransition(async () => {
-      const result = await extendExtraWalkInHoldAction(extendingUnit.id);
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      setExtendingUnit(null);
-    });
-  }
-
-  function runReleaseHold() {
-    if (!releasingUnit) return;
-    setError(null);
-    startTransition(async () => {
-      const result = await releaseExtraWalkInHoldAction(releasingUnit.id);
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      setReleasingUnit(null);
-    });
   }
 
   const fieldClass =
@@ -748,20 +694,8 @@ export function ExtraBoard({
                 ) : null}
                 <WalkInHoldPanel
                   capabilities={capabilities}
-                  pending={pending}
+                  disabled={pending}
                   unit={unit}
-                  onExtend={(next) => {
-                    setError(null);
-                    setExtendingUnit(next);
-                  }}
-                  onPlaceHold={(next) => {
-                    setError(null);
-                    setHoldingUnit(next);
-                  }}
-                  onRelease={(next) => {
-                    setError(null);
-                    setReleasingUnit(next);
-                  }}
                 />
               </li>
             ))}
@@ -935,52 +869,6 @@ export function ExtraBoard({
         onClose={() => setSlicingUnit(null)}
         onCut={() => setSlicingUnit(null)}
         open={slicingUnit != null}
-      />
-
-      <ConfirmDialog
-        allowDismiss={!pending}
-        confirmLabel="Place Hold"
-        description={walkInHoldPlaceConfirmDescription(EXTRA_WALK_IN_HOLD_MINUTES)}
-        onCancel={() => {
-          if (pending) return;
-          setHoldingUnit(null);
-        }}
-        onConfirm={runPlaceHold}
-        open={holdingUnit != null}
-        pending={pending}
-        title="Walk-in Hold?"
-      />
-
-      <ConfirmDialog
-        allowDismiss={!pending}
-        confirmLabel={`Extend ${EXTRA_WALK_IN_HOLD_EXTENSION_MINUTES} min`}
-        description={
-          extendingUnit
-            ? `Add ${EXTRA_WALK_IN_HOLD_EXTENSION_MINUTES} minutes to this Walk-in Hold? Only one extension is allowed.`
-            : undefined
-        }
-        onCancel={() => {
-          if (pending) return;
-          setExtendingUnit(null);
-        }}
-        onConfirm={runExtendHold}
-        open={extendingUnit != null}
-        pending={pending}
-        title="Extend walk-in hold?"
-      />
-
-      <ConfirmDialog
-        allowDismiss={!pending}
-        confirmLabel="Release"
-        description="Release this Walk-in Hold? The Fresh Pick will be available for online sale and other staff actions immediately."
-        onCancel={() => {
-          if (pending) return;
-          setReleasingUnit(null);
-        }}
-        onConfirm={runReleaseHold}
-        open={releasingUnit != null}
-        pending={pending}
-        title="Release walk-in hold?"
       />
     </main>
   );
