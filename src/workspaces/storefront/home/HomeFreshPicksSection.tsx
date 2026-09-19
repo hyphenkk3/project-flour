@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import {
   freshPickAvailabilityDateLabel,
-  freshPickAvailabilityLabel,
+  freshPickCustomerStatusLabel,
 } from "@/engines/extra/customer-fresh-picks";
 import { toBusinessDateKey } from "@/lib/dates";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
@@ -51,33 +51,44 @@ export function HomeFreshPicksSection({ picks }: HomeFreshPicksSectionProps) {
           <div className="max-lg:contents lg:mt-4 lg:overflow-x-auto lg:overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <ul className="mt-4 space-y-4 lg:mt-0 lg:flex lg:w-max lg:gap-8 lg:space-y-0">
             {picks.map((pick) => {
-              const dateLabel = freshPickAvailabilityDateLabel(
-                pick.days,
-                todayYmd,
+              const held = pick.walkInHeld;
+              const dateLabel = held
+                ? null
+                : freshPickAvailabilityDateLabel(pick.days, todayYmd);
+              const status = freshPickCustomerStatusLabel({
+                walkInHeld: held,
+                days: pick.days,
+              });
+              const photo = pick.imageUrl ? (
+                <CakePhotoImage
+                  alt={pick.imageAlt || pick.cakeName}
+                  sizes="(min-width: 1024px) 168px, 88px"
+                  src={pick.imageUrl}
+                />
+              ) : (
+                <span className="text-skyline flex h-full items-center justify-center px-1.5 text-center text-[10px]">
+                  Photo coming soon
+                </span>
               );
               return (
                 <li className="lg:shrink-0" key={pick.id}>
                   <article className="flex gap-3.5">
-                    <Link
-                      aria-label={pick.cakeName}
-                      className="bg-fog relative aspect-square h-[5.5rem] w-[5.5rem] shrink-0 overflow-hidden rounded-[10px] lg:h-[10.5rem] lg:w-[10.5rem]"
-                      href={`/extra/${pick.id}`}
-                    >
-                      {pick.imageUrl ? (
-                        <CakePhotoImage
-                          alt={pick.imageAlt || pick.cakeName}
-                          sizes="(min-width: 1024px) 168px, 88px"
-                          src={pick.imageUrl}
-                        />
-                      ) : (
-                        <span className="text-skyline flex h-full items-center justify-center px-1.5 text-center text-[10px]">
-                          Photo coming soon
-                        </span>
-                      )}
-                    </Link>
+                    {held ? (
+                      <div className="bg-fog relative aspect-square h-[5.5rem] w-[5.5rem] shrink-0 overflow-hidden rounded-[10px] lg:h-[10.5rem] lg:w-[10.5rem]">
+                        {photo}
+                      </div>
+                    ) : (
+                      <Link
+                        aria-label={pick.cakeName}
+                        className="bg-fog relative aspect-square h-[5.5rem] w-[5.5rem] shrink-0 overflow-hidden rounded-[10px] lg:h-[10.5rem] lg:w-[10.5rem]"
+                        href={`/extra/${pick.id}`}
+                      >
+                        {photo}
+                      </Link>
+                    )}
                     <div className="min-w-0 flex-1 py-0.5 lg:max-w-[12.5rem] lg:flex-none">
                       <p className="text-skyline text-[11px] leading-tight">
-                        {freshPickAvailabilityLabel(pick.days)}
+                        {status}
                         {dateLabel ? ` · ${dateLabel}` : ""}
                       </p>
                       <h3 className="font-display text-ink mt-1 line-clamp-2 text-[1.02rem] leading-snug tracking-tight">
@@ -93,12 +104,14 @@ export function HomeFreshPicksSection({ picks }: HomeFreshPicksSectionProps) {
                           {formatRm(pick.unitPrice)}
                         </p>
                       ) : null}
-                      <Link
-                        className="text-ink mt-2 inline-flex items-center text-[13px] font-medium"
-                        href={`/extra/${pick.id}`}
-                      >
-                        Order →
-                      </Link>
+                      {held ? null : (
+                        <Link
+                          className="text-ink mt-2 inline-flex items-center text-[13px] font-medium"
+                          href={`/extra/${pick.id}`}
+                        >
+                          Order →
+                        </Link>
+                      )}
                     </div>
                   </article>
                 </li>

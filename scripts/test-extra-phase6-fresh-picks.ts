@@ -82,7 +82,7 @@ assert.equal(freshPickAvailabilityLabel("tomorrow"), "Available tomorrow");
 assert.match(extraPageSrc, /Fresh Picks/);
 assert.match(extraPageSrc, /FRESH_PICKS_ADD_TO_CART_CTA/);
 assert.match(extraPageSrc, /freshPickAvailabilityDateLabel/);
-assert.match(extraPageSrc, /freshPickAvailabilityLabel\(pick\.days\)/);
+assert.match(extraPageSrc, /freshPickCustomerStatusLabel/);
 assert.match(extraPageSrc, /pick\.description/);
 assert.match(extraPageSrc, /formatRm/);
 assert.match(extraPageSrc, /overflow-hidden rounded-\[10px\]/);

@@ -2,7 +2,7 @@ import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import {
   FRESH_PICKS_SOLD_OUT,
   FRESH_PICKS_UNAVAILABLE_BODY,
-  freshPickAvailabilityLabel,
+  freshPickCustomerStatusLabel,
 } from "@/engines/extra/customer-fresh-picks";
 import {
   StorefrontHomeLink,
@@ -51,7 +51,10 @@ export async function StorefrontExtraOrderPage({
         ) : (
           <>
             <p className="text-signal mt-8 text-[11px] font-medium tracking-[0.18em] uppercase">
-              {freshPickAvailabilityLabel(extra.day)}
+              {freshPickCustomerStatusLabel({
+                walkInHeld: extra.walkInHeld,
+                days: extra.day,
+              })}
             </p>
             <h1 className="font-display text-ink mt-2 text-3xl tracking-tight sm:text-4xl">
               {extra.cakeName}
@@ -67,13 +70,15 @@ export async function StorefrontExtraOrderPage({
                 />
               </div>
             ) : null}
-            <div className="mt-8">
-              <GuestExtraOrderForm
-                extra={extra}
-                hoursSnapshot={hoursSnapshot}
-                preparationConfig={preparationConfig}
-              />
-            </div>
+            {extra.walkInHeld ? null : (
+              <div className="mt-8">
+                <GuestExtraOrderForm
+                  extra={extra}
+                  hoursSnapshot={hoursSnapshot}
+                  preparationConfig={preparationConfig}
+                />
+              </div>
+            )}
           </>
         )}
         <StorefrontStaffSignIn />

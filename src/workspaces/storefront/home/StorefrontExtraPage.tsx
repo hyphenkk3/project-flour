@@ -2,7 +2,7 @@ import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import {
   FRESH_PICKS_ADD_TO_CART_CTA,
   freshPickAvailabilityDateLabel,
-  freshPickAvailabilityLabel,
+  freshPickCustomerStatusLabel,
 } from "@/engines/extra/customer-fresh-picks";
 import { toBusinessDateKey } from "@/lib/dates";
 import {
@@ -45,16 +45,19 @@ export async function StorefrontExtraPage() {
         ) : (
           <ul className="mt-10 space-y-4">
             {picks.map((pick) => {
-              const dateLabel = freshPickAvailabilityDateLabel(
-                pick.days,
-                todayYmd,
-              );
+              const held = pick.walkInHeld;
+              const dateLabel = held
+                ? null
+                : freshPickAvailabilityDateLabel(pick.days, todayYmd);
               return (
                 <li key={pick.id}>
                   <article className="border-fog grid gap-5 border-t pt-6 md:grid-cols-[minmax(0,1fr)_13rem] md:items-start md:gap-8">
                     <div className="order-2 flex flex-col justify-center md:order-1">
                       <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
-                        {freshPickAvailabilityLabel(pick.days)}
+                        {freshPickCustomerStatusLabel({
+                          walkInHeld: held,
+                          days: pick.days,
+                        })}
                       </p>
                       {dateLabel ? (
                         <p className="text-skyline mt-1 text-[11px] font-medium tracking-[0.14em] uppercase">
@@ -77,12 +80,14 @@ export async function StorefrontExtraPage() {
                           {formatRm(pick.unitPrice)}
                         </p>
                       ) : null}
-                      <FreshPickCatalogueAddCta
-                        extraStockIds={pick.extraStockIds}
-                        href={`/extra/${pick.id}`}
-                      >
-                        {FRESH_PICKS_ADD_TO_CART_CTA}
-                      </FreshPickCatalogueAddCta>
+                      {held ? null : (
+                        <FreshPickCatalogueAddCta
+                          extraStockIds={pick.extraStockIds}
+                          href={`/extra/${pick.id}`}
+                        >
+                          {FRESH_PICKS_ADD_TO_CART_CTA}
+                        </FreshPickCatalogueAddCta>
+                      )}
                     </div>
                     <div className="bg-fog relative order-1 aspect-[4/3] overflow-hidden rounded-[10px] md:order-2 md:aspect-auto md:h-[12rem]">
                       {pick.imageUrl ? (

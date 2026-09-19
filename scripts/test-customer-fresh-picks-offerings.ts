@@ -6,10 +6,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  FRESH_PICKS_HELD_LABEL,
   freshPickAvailabilityDateLabel,
   freshPickAvailabilityLabel,
+  freshPickCustomerStatusLabel,
   freshPickOfferingKey,
   groupCustomerFreshPickOfferings,
+  isCustomerOrderableFreshPick,
+  isPublishedFreshPick,
   selectCustomerFreshPickOfferings,
   unionFreshPickAvailabilityDays,
   type FreshPickDay,
@@ -340,6 +344,92 @@ const unitB = groupPick({
 }
 
 {
+  const through = "2026-09-19T15:00:00.000Z";
+  const now = new Date("2026-09-19T14:00:00.000Z");
+  const held = {
+    lifecycle: "confirmed" as const,
+    pickupThroughAt: through,
+    walkInHeldUntil: "2026-09-19T14:15:00.000Z",
+    now,
+  };
+  assert.equal(isPublishedFreshPick(held), true, "held Fresh Pick stays visible");
+  assert.equal(
+    isCustomerOrderableFreshPick(held),
+    false,
+    "held Fresh Pick is not orderable",
+  );
+  assert.equal(
+    isPublishedFreshPick({
+      ...held,
+      walkInHeldUntil: "2026-09-19T13:59:59.000Z",
+    }),
+    true,
+    "expired hold remains visible",
+  );
+  assert.equal(
+    isCustomerOrderableFreshPick({
+      ...held,
+      walkInHeldUntil: "2026-09-19T13:59:59.000Z",
+    }),
+    true,
+    "expired hold is orderable again",
+  );
+  assert.equal(
+    freshPickCustomerStatusLabel({ walkInHeld: true, days: "today" }),
+    FRESH_PICKS_HELD_LABEL,
+  );
+  assert.equal(
+    freshPickCustomerStatusLabel({ walkInHeld: false, days: "today" }),
+    "Available today",
+  );
+}
+
+{
+  const available = groupPick({
+    id: "peanut-open",
+    days: ["today"],
+    walkInHeld: false,
+  });
+  const held = groupPick({
+    id: "peanut-held",
+    days: ["today", "tomorrow"],
+    pickupAvailableFromAt: "2026-09-10T04:00:00.000Z",
+    confirmedAt: "2026-09-10T02:00:00.000Z",
+    walkInHeld: true,
+  });
+  const cards = groupCustomerFreshPickOfferings([held, available]);
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0]?.id, "peanut-open", "orderable unit is the Order target");
+  assert.equal(cards[0]?.walkInHeld, false);
+  assert.deepEqual(cards[0]?.extraStockIds, ["peanut-open"]);
+  assert.deepEqual(cards[0]?.days, ["today"]);
+}
+
+{
+  const heldA = groupPick({
+    id: "peanut-held-a",
+    days: ["today"],
+    walkInHeld: true,
+  });
+  const heldB = groupPick({
+    id: "peanut-held-b",
+    days: ["today"],
+    confirmedAt: "2026-09-10T04:00:00.000Z",
+    walkInHeld: true,
+  });
+  const cards = groupCustomerFreshPickOfferings([heldB, heldA]);
+  assert.equal(cards[0]?.walkInHeld, true, "all-held offering stays visible");
+  assert.deepEqual(cards[0]?.extraStockIds, ["peanut-held-a", "peanut-held-b"]);
+  assert.equal(
+    freshPickCustomerStatusLabel({
+      walkInHeld: cards[0]!.walkInHeld,
+      days: cards[0]!.days,
+    }),
+    "Currently on hold",
+  );
+}
+
+{
   assert.deepEqual(
     unionFreshPickAvailabilityDays([
       { days: ["today"] },
@@ -366,6 +456,9 @@ assert.match(
   extraQueriesSrc,
   /sortCustomerFreshPicksByAvailabilityDay\(picks\)/,
 );
+assert.match(extraQueriesSrc, /isExtraWalkInHeld/);
+assert.match(extraQueriesSrc, /freshPickCustomerStatusLabel/);
+assert.match(extraQueriesSrc, /walkInHeld/);
 assert.doesNotMatch(
   extraQueriesSrc,
   /getStorefrontExtraById[\s\S]*groupCustomerFreshPickOfferings/,
@@ -379,13 +472,15 @@ const extraPageSrc = readSrc(
 );
 assert.match(extraPageSrc, /listStorefrontAvailableExtra/);
 assert.match(extraPageSrc, /FRESH_PICKS_ADD_TO_CART_CTA/);
+assert.match(extraPageSrc, /freshPickCustomerStatusLabel/);
+assert.match(extraPageSrc, /pick\.walkInHeld/);
 assert.match(extraPageSrc, /FreshPickCatalogueAddCta/);
 assert.match(extraPageSrc, /extraStockIds=\{pick\.extraStockIds\}/);
+assert.doesNotMatch(extraPageSrc, /Pickup today/);
 assert.doesNotMatch(extraPageSrc, /1 left/);
 assert.doesNotMatch(extraPageSrc, /2 available/);
-assert.match(extraPageSrc, /freshPickAvailabilityLabel/);
 assert.match(extraPageSrc, /freshPickAvailabilityDateLabel/);
-assert.match(extraPageSrc, /freshPickAvailabilityLabel\(pick\.days\)/);
+assert.doesNotMatch(extraPageSrc, /freshPickAvailabilityLabel\(pick\.days\)/);
 assert.match(extraPageSrc, /pick\.description/);
 assert.match(extraPageSrc, /formatRm/);
 assert.doesNotMatch(extraPageSrc, /×\s*2/);
@@ -402,6 +497,27 @@ assert.match(extraFormSrc, /name="extra_stock_id"/);
 assert.match(extraFormSrc, /value=\{extra\.id\}/);
 assert.match(extraFormSrc, /extraCustomerVisibleFulfilmentDates/);
 assert.match(extraFormSrc, /FRESH_PICKS_ADD_TO_CART_CTA/);
+
+const homeFreshSrc = readSrc(
+  "src/workspaces/storefront/home/HomeFreshPicksSection.tsx",
+);
+assert.match(homeFreshSrc, /freshPickCustomerStatusLabel/);
+assert.match(homeFreshSrc, /Currently on hold|FRESH_PICKS_HELD_LABEL|walkInHeld/);
+assert.match(homeFreshSrc, /Order →/);
+assert.doesNotMatch(homeFreshSrc, /Pickup today/);
+assert.doesNotMatch(homeFreshSrc, /Held by/);
+assert.doesNotMatch(homeFreshSrc, /text-status-danger/);
+
+const extraOrderSrc = readSrc(
+  "src/workspaces/storefront/extra/StorefrontExtraOrderPage.tsx",
+);
+assert.match(extraOrderSrc, /extra\.walkInHeld/);
+assert.match(extraOrderSrc, /GuestExtraOrderForm/);
+assert.doesNotMatch(extraOrderSrc, /walkInHoldCountdownLabel/);
+
+const extraActionsSrc = readSrc("src/workspaces/storefront/extra/actions.ts");
+assert.match(extraActionsSrc, /extra\.walkInHeld/);
+assert.match(extraActionsSrc, /stillAvailable\.walkInHeld/);
 
 const boardSrc = readSrc("src/workspaces/extra/ExtraBoard.tsx");
 assert.doesNotMatch(boardSrc, /selectCustomerFreshPickOfferings/);

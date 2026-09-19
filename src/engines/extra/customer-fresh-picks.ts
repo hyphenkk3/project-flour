@@ -4,7 +4,8 @@
  */
 
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
-import { isExtraAvailable, type ExtraLifecycle } from "@/engines/extra/availability";
+import { isExtraConfirmedOnOffer, type ExtraLifecycle } from "@/engines/extra/availability";
+import { isExtraWalkInHeld } from "@/engines/extra/walk-in-hold";
 import { extraActionableFulfilmentDays } from "@/engines/extra/fresh-picks-fulfilment";
 import type { FreshPicksPreparationConfig } from "@/engines/extra/fresh-picks-preparation";
 import { addBusinessCalendarDays, formatShortBusinessDate } from "@/lib/dates";
@@ -26,7 +27,10 @@ export function freshPickDay(
   return null;
 }
 
-/** Confirmed Extra that customers may see as a Fresh Pick. */
+/**
+ * Confirmed Extra that customers may see as a Fresh Pick.
+ * Active walk-in holds stay visible; they are not orderable.
+ */
 export function isPublishedFreshPick(input: {
   lifecycle: ExtraLifecycle | string;
   pickupThroughAt: string | null;
@@ -46,14 +50,26 @@ export function isPublishedFreshPick(input: {
     const posted = Date.parse(input.confirmedAt);
     if (Number.isFinite(posted) && now.getTime() < posted) return false;
   }
-  return isExtraAvailable({
+  return isExtraConfirmedOnOffer({
     lifecycle: "confirmed",
     pickupThroughAt: input.pickupThroughAt,
     soldAt: input.soldAt,
     cutIntoSlicesAt: input.cutIntoSlicesAt,
-    walkInHeldUntil: input.walkInHeldUntil,
     now,
   });
+}
+
+/** Visible Fresh Pick that customers may currently order. */
+export function isCustomerOrderableFreshPick(
+  input: Parameters<typeof isPublishedFreshPick>[0],
+): boolean {
+  return (
+    isPublishedFreshPick(input) &&
+    !isExtraWalkInHeld({
+      walkInHeldUntil: input.walkInHeldUntil,
+      now: input.now,
+    })
+  );
 }
 
 export function freshPickAvailabilityLabel(
@@ -68,6 +84,17 @@ export function freshPickAvailabilityLabel(
   if (hasTomorrow) return "Available tomorrow";
   if (hasToday) return "Available today";
   return "";
+}
+
+export const FRESH_PICKS_HELD_LABEL = "Currently on hold";
+
+/** Customer card status: held cakes stay listed, but are not orderable. */
+export function freshPickCustomerStatusLabel(input: {
+  walkInHeld: boolean;
+  days: FreshPickDay | readonly FreshPickDay[];
+}): string {
+  if (input.walkInHeld) return FRESH_PICKS_HELD_LABEL;
+  return freshPickAvailabilityLabel(input.days);
 }
 
 /**
@@ -387,6 +414,7 @@ export function selectCustomerFreshPickOfferings<
 export type FreshPickGroupablePick = FreshPickOfferingIdentity & {
   days: readonly FreshPickDay[];
   unitPrice?: number | null;
+  walkInHeld?: boolean;
 };
 
 /**
@@ -431,12 +459,13 @@ function freshPickCoverageRank(days: readonly FreshPickDay[]): number {
 /**
  * One customer-facing offering per cake/size/price. Underlying extra_stock.id
  * values stay listed so cart/checkout can target an exact unit.
- * Availability is the union of remaining members' today/tomorrow days.
- * Representative (card id) prefers the widest remaining window.
+ * Availability is the union of remaining orderable members' today/tomorrow days.
+ * Representative prefers an orderable unit, then the widest remaining window.
+ * If every unit is on walk-in hold, the offering stays visible but not orderable.
  */
 export function groupCustomerFreshPickOfferings<T extends FreshPickGroupablePick>(
   picks: readonly T[],
-): Array<T & { extraStockIds: string[]; days: FreshPickDay[] }> {
+): Array<T & { extraStockIds: string[]; days: FreshPickDay[]; walkInHeld: boolean }> {
   const groups = new Map<string, T[]>();
   const order: string[] = [];
   for (const pick of picks) {
@@ -452,18 +481,23 @@ export function groupCustomerFreshPickOfferings<T extends FreshPickGroupablePick
 
   return order.map((key) => {
     const members = groups.get(key) ?? [];
-    const days = unionFreshPickAvailabilityDays(members);
     const ranked = [...members].sort((left, right) => {
+      const heldDiff =
+        Number(Boolean(left.walkInHeld)) - Number(Boolean(right.walkInHeld));
+      if (heldDiff !== 0) return heldDiff;
       const coverage =
         freshPickCoverageRank(left.days) - freshPickCoverageRank(right.days);
       if (coverage !== 0) return coverage;
       return compareFreshPickRepresentatives(left, right);
     });
-    const representative = ranked[0]!;
+    const orderable = ranked.filter((member) => !member.walkInHeld);
+    const source = orderable.length > 0 ? orderable : ranked;
+    const representative = source[0]!;
     return {
       ...representative,
-      days,
-      extraStockIds: ranked.map((member) => member.id),
+      days: unionFreshPickAvailabilityDays(source),
+      extraStockIds: source.map((member) => member.id),
+      walkInHeld: orderable.length === 0,
     };
   });
 }

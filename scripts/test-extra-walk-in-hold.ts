@@ -19,6 +19,7 @@ import {
 import {
   extraSubmitCustomerError,
   FRESH_PICKS_SOLD_OUT_MESSAGE,
+  isCustomerOrderableFreshPick,
   isPublishedFreshPick,
 } from "@/engines/extra/customer-fresh-picks";
 import {
@@ -85,8 +86,18 @@ assert.equal(
     walkInHeldUntil: "2026-09-17T14:15:00.000Z",
     now,
   }),
+  true,
+  "website catalogue keeps an active hold visible",
+);
+assert.equal(
+  isCustomerOrderableFreshPick({
+    lifecycle: "confirmed",
+    pickupThroughAt: through,
+    walkInHeldUntil: "2026-09-17T14:15:00.000Z",
+    now,
+  }),
   false,
-  "website catalogue hides an active hold",
+  "website catalogue does not let customers order an active hold",
 );
 
 assert.equal(
@@ -98,6 +109,16 @@ assert.equal(
   }),
   true,
   "website catalogue shows an expired hold without cleanup",
+);
+assert.equal(
+  isCustomerOrderableFreshPick({
+    lifecycle: "confirmed",
+    pickupThroughAt: through,
+    walkInHeldUntil: "2026-09-17T13:59:59.000Z",
+    now,
+  }),
+  true,
+  "expired hold is customer-orderable again",
 );
 
 assert.equal(

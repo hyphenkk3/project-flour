@@ -8,7 +8,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { isExtraAvailable } from "@/engines/extra/availability";
-import { isPublishedFreshPick } from "@/engines/extra/customer-fresh-picks";
+import {
+  isCustomerOrderableFreshPick,
+  isPublishedFreshPick,
+} from "@/engines/extra/customer-fresh-picks";
 import {
   defaultExtraOrderCutoffSlot,
   defaultExtraPickupFromSlot,
@@ -326,13 +329,22 @@ async function main() {
       "engine treats active hold as unavailable",
     );
     check(
-      !isPublishedFreshPick({
+      isPublishedFreshPick({
         lifecycle: "confirmed",
         pickupThroughAt: throughIso,
         walkInHeldUntil: held?.walk_in_held_until ?? null,
         now: new Date(),
       }),
-      "website catalogue hides active hold",
+      "website catalogue keeps active hold visible",
+    );
+    check(
+      !isCustomerOrderableFreshPick({
+        lifecycle: "confirmed",
+        pickupThroughAt: throughIso,
+        walkInHeldUntil: held?.walk_in_held_until ?? null,
+        now: new Date(),
+      }),
+      "website catalogue does not let customers order an active hold",
     );
 
     const { error: dupHold } = await admin.rpc("hold_extra_stock_walk_in", {

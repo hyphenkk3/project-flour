@@ -152,7 +152,12 @@ export async function submitGuestExtraOrderAction(
   const extras = [];
   for (const [index, extraStockId] of extraStockIds.entries()) {
     const extra = await getStorefrontExtraById(extraStockId);
-    if (!extra || !extra.pickupAvailableFromAt || !extra.pickupThroughAt) {
+    if (
+      !extra ||
+      extra.walkInHeld ||
+      !extra.pickupAvailableFromAt ||
+      !extra.pickupThroughAt
+    ) {
       return {
         error: extraCartItemUnavailableMessage(
           extra?.cakeName || extraCakeNames[index] || "",
@@ -295,7 +300,7 @@ export async function submitGuestExtraOrderAction(
   if (error) {
     for (const extra of extras) {
       const stillAvailable = await getStorefrontExtraById(extra.id);
-      if (!stillAvailable) {
+      if (!stillAvailable || stillAvailable.walkInHeld) {
         return { error: extraCartItemUnavailableMessage(extra.cakeName) };
       }
     }

@@ -1,6 +1,6 @@
 import {
   extraActionableFreshPickDays,
-  freshPickAvailabilityLabel,
+  freshPickCustomerStatusLabel,
   freshPickProductDescription,
   groupCustomerFreshPickOfferings,
   isPublishedFreshPick,
@@ -9,6 +9,7 @@ import {
 } from "@/engines/extra/customer-fresh-picks";
 import { extraCustomerVisibleFulfilmentDates } from "@/engines/extra/fresh-picks-fulfilment";
 import type { FreshPicksPreparationConfig } from "@/engines/extra/fresh-picks-preparation";
+import { isExtraWalkInHeld } from "@/engines/extra/walk-in-hold";
 import { resolveCakePhoto } from "@/engines/menu/cake-photos";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import { toBusinessDateKey } from "@/lib/dates";
@@ -38,6 +39,7 @@ export type StorefrontExtraPick = {
   day: FreshPickDay;
   days: FreshPickDay[];
   extraStockIds: string[];
+  walkInHeld: boolean;
   availabilityLabel: string;
   imageUrl: string | null;
   imageAlt: string | null;
@@ -228,6 +230,10 @@ function mapPick(
     ? (photosByCake.get(row.library_cake_id) ?? [])
     : [];
   const image = resolveCakePhoto(photos, row.library_cake_size_id);
+  const walkInHeld = isExtraWalkInHeld({
+    walkInHeldUntil: row.walk_in_held_until,
+    now,
+  });
   return {
     id: row.id,
     cakeName: row.cake_name,
@@ -242,7 +248,8 @@ function mapPick(
     day,
     days,
     extraStockIds: [row.id],
-    availabilityLabel: freshPickAvailabilityLabel(days),
+    walkInHeld,
+    availabilityLabel: freshPickCustomerStatusLabel({ walkInHeld, days }),
     imageUrl: image?.url ?? null,
     imageAlt: image?.altText ?? null,
     unitPrice,
@@ -304,7 +311,10 @@ export async function listStorefrontAvailableExtra(): Promise<
     const picks = groupCustomerFreshPickOfferings(units).map((pick) => ({
       ...pick,
       day: pick.days[0] ?? pick.day,
-      availabilityLabel: freshPickAvailabilityLabel(pick.days),
+      availabilityLabel: freshPickCustomerStatusLabel({
+        walkInHeld: pick.walkInHeld,
+        days: pick.days,
+      }),
     }));
     return sortCustomerFreshPicksByAvailabilityDay(picks);
   } catch {
