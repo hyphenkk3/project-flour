@@ -80,11 +80,24 @@ function SectionHeader({
   linkLabel?: string;
   extraLinks?: Array<{ href: string; label: string }>;
 }) {
+  const hasExtraLinks = Boolean(extraLinks?.length);
   return (
-    <div className="mb-3 flex items-end justify-between gap-3">
+    <div
+      className={
+        hasExtraLinks
+          ? "mb-3 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between"
+          : "mb-3 flex items-end justify-between gap-3"
+      }
+    >
       <h2 className="text-ink text-sm font-semibold tracking-wide">{title}</h2>
-      {href || (extraLinks && extraLinks.length > 0) ? (
-        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+      {href || hasExtraLinks ? (
+        <div
+          className={
+            hasExtraLinks
+              ? "flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-x-3 sm:gap-y-1"
+              : "flex flex-wrap items-center justify-end gap-x-3 gap-y-1"
+          }
+        >
           {href && linkLabel ? (
             <Link
               className="text-signal hover:text-ink text-sm font-medium transition"

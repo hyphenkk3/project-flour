@@ -594,6 +594,19 @@ assert.match(uiSrc, /View Operations/);
 assert.match(uiSrc, /View Pickup/);
 assert.match(uiSrc, /View Delivery/);
 assert.match(uiSrc, /View Dine-in/);
+assert.match(
+  uiSrc,
+  /flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between/,
+);
+assert.match(
+  uiSrc,
+  /flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-x-3 sm:gap-y-1/,
+);
+assert.match(uiSrc, /mb-3 flex items-end justify-between gap-3/);
+assert.match(
+  uiSrc,
+  /flex flex-wrap items-center justify-end gap-x-3 gap-y-1/,
+);
 assert.match(uiSrc, /Pickup Ready/);
 assert.match(uiSrc, /Delivery Ready/);
 assert.match(uiSrc, /collectionDateNavHref\(model\.todayYmd, "dine_in"\)/);
