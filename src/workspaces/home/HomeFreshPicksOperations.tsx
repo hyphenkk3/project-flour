@@ -40,6 +40,11 @@ const btnPrimary =
 const btnSecondary =
   "border-fog text-ink hover:bg-mist inline-flex min-h-11 items-center justify-center rounded-xl border bg-white px-4 text-sm font-medium transition disabled:opacity-60";
 
+function homeFreshPicksDesktopGridClass(count: number): string {
+  if (count <= 1) return "lg:max-w-md";
+  return "lg:grid-cols-2";
+}
+
 function extraWorkspaceHref(
   capabilities: ExtraWorkspaceCapabilities,
 ): { href: string; label: string } | null {
@@ -176,7 +181,9 @@ export function HomeFreshPicksOperations({
           more anytime.
         </p>
       ) : (
-        <ul className="grid grid-cols-1 gap-2 lg:grid-cols-4 lg:gap-3">
+        <ul
+          className={`grid grid-cols-1 gap-2 lg:gap-3 ${homeFreshPicksDesktopGridClass(preview.length)}`}
+        >
           {preview.map((unit) => (
             <HomeFreshPickCard
               capabilities={capabilities}
@@ -328,7 +335,7 @@ function HomeFreshPickCard({
         )}
 
         <div
-          className="mt-3 flex flex-wrap items-start gap-2 lg:mt-auto lg:grid lg:grid-cols-3 lg:items-stretch lg:gap-1.5 lg:pt-3 lg:[&>button]:w-full lg:[&>button]:px-2.5 lg:[&>button]:text-center lg:[&>button]:leading-tight lg:[&>details>summary]:w-full lg:[&>details>summary]:px-2.5 lg:[&>details>summary]:text-center"
+          className="mt-3 flex flex-wrap items-start gap-2 lg:mt-auto lg:items-center lg:pt-3 lg:[&>button]:shrink-0 lg:[&>button]:whitespace-nowrap lg:[&>details>summary]:shrink-0 lg:[&>details>summary]:whitespace-nowrap"
           onClick={(event) => event.stopPropagation()}
         >
           {flags.assign ? (
