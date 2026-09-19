@@ -328,7 +328,7 @@ function HomeFreshPickCard({
         )}
 
         <div
-          className="mt-3 flex flex-wrap items-start gap-2 lg:mt-auto lg:pt-3"
+          className="mt-3 flex flex-wrap items-start gap-2 lg:mt-auto lg:grid lg:grid-cols-3 lg:items-stretch lg:gap-1.5 lg:pt-3 lg:[&>button]:w-full lg:[&>button]:px-2.5 lg:[&>button]:text-center lg:[&>button]:leading-tight lg:[&>details>summary]:w-full lg:[&>details>summary]:px-2.5 lg:[&>details>summary]:text-center"
           onClick={(event) => event.stopPropagation()}
         >
           {flags.assign ? (

@@ -230,6 +230,8 @@ assert.match(homeOpsSrc, /customer-operations\/fresh-picks/);
 assert.match(homeOpsSrc, /\/bakery\/extra/);
 assert.match(homeOpsSrc, /CakePhotoImage/);
 assert.match(homeOpsSrc, /lg:grid-cols-4/);
+assert.match(homeOpsSrc, /lg:grid-cols-3/);
+assert.match(homeOpsSrc, /flex flex-wrap items-start gap-2/);
 assert.doesNotMatch(homeOpsSrc, /View Extra/);
 assert.doesNotMatch(homeOpsSrc, /from "@\/workspaces\/extra\/ExtraBoard"/);
 assert.doesNotMatch(homeOpsSrc, /Propose EXTRA/);
