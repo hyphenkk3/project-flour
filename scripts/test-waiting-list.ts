@@ -52,6 +52,13 @@ import { DEFAULT_WAITING_LIST_RESPONSE_MINUTES } from "@/engines/waiting-list/ty
 import { evaluateGuestCartDateCapacity } from "@/engines/preorder/capacity";
 import { evaluateCollectionDate } from "@/engines/preorder/validate";
 import { JOIN_WAITING_LIST_CUSTOMER_LABEL } from "@/engines/preorder/types";
+import {
+  isWaitingListFilterCakeSizePairValid,
+  nextWaitingListFilterSizeId,
+  WAITING_LIST_FILTER_ACTION,
+  WAITING_LIST_SECTION_ID,
+  waitingListFilterSizeOptions,
+} from "@/workspaces/waiting-list/filter";
 
 function readSrc(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -593,5 +600,121 @@ assert.match(convertSql, /create_staff_guest_preorder/);
 assert.match(convertSql, /guest_name/);
 assert.match(convertSql, /guest_phone/);
 assert.match(convertSql, /v_item.pickup_date/);
+
+assert.equal(WAITING_LIST_SECTION_ID, "waiting-list-heading");
+assert.equal(
+  WAITING_LIST_FILTER_ACTION,
+  "/bakery/availability#waiting-list-heading",
+);
+assert.match(boardSrc, /WAITING_LIST_FILTER_ACTION/);
+assert.match(boardSrc, /method="get"/);
+assert.match(boardSrc, /name="month"/);
+assert.match(boardSrc, /name="date"/);
+assert.match(boardSrc, /name="wlCake"/);
+assert.match(boardSrc, /name="wlSize"/);
+assert.match(boardSrc, /name="wlStatus"/);
+assert.match(boardSrc, /id=\{WAITING_LIST_SECTION_ID\}/);
+assert.doesNotMatch(boardSrc, /action="\/bakery\/availability"/);
+
+const filterCakes = [
+  {
+    id: "choc",
+    sizes: [
+      { id: "choc-6", label: '6"' },
+      { id: "choc-8", label: '8"' },
+    ],
+  },
+  {
+    id: "pandan",
+    sizes: [{ id: "pandan-6", label: '6"' }],
+  },
+];
+assert.deepEqual(
+  waitingListFilterSizeOptions(filterCakes, "choc").map((size) => size.id),
+  ["choc-6", "choc-8"],
+);
+assert.deepEqual(waitingListFilterSizeOptions(filterCakes, ""), []);
+assert.equal(
+  nextWaitingListFilterSizeId(waitingListFilterSizeOptions(filterCakes, "choc"), "choc-6"),
+  "choc-6",
+);
+assert.equal(
+  nextWaitingListFilterSizeId(
+    waitingListFilterSizeOptions(filterCakes, "pandan"),
+    "choc-6",
+  ),
+  "",
+);
+assert.equal(
+  nextWaitingListFilterSizeId(waitingListFilterSizeOptions(filterCakes, ""), "choc-6"),
+  "",
+);
+assert.equal(isWaitingListFilterCakeSizePairValid(filterCakes, "choc", "choc-6"), true);
+assert.equal(isWaitingListFilterCakeSizePairValid(filterCakes, "choc", "pandan-6"), false);
+assert.equal(isWaitingListFilterCakeSizePairValid(filterCakes, "choc", ""), true);
+assert.equal(isWaitingListFilterCakeSizePairValid(filterCakes, "", ""), true);
+assert.equal(isWaitingListFilterCakeSizePairValid(filterCakes, "", "choc-6"), false);
+assert.match(boardSrc, /waitingListFilterSizeOptions/);
+assert.match(boardSrc, /nextWaitingListFilterSizeId/);
+
+const queriesSrc = readSrc("src/workspaces/waiting-list/queries.ts");
+assert.match(queriesSrc, /query = query\.eq\("pickup_date", input\.date\)/);
+assert.match(queriesSrc, /query = query\.eq\("library_cake_id", input\.cakeId\)/);
+assert.match(queriesSrc, /query = query\.eq\("library_cake_size_id", input\.sizeId\)/);
+assert.match(queriesSrc, /query = query\.eq\("status", input\.status\)/);
+
+assert.match(sql, /Waiting list is not available for that cake and date/);
+assert.match(sql, /Waiting list is not enabled for that cake and date/);
+assert.match(sql, /Waiting list is not enabled for this collection/);
+
+const insertStart = sql.indexOf(
+  "create or replace function public._waiting_list_insert_request",
+);
+assert.ok(insertStart >= 0);
+const insertEnd = sql.indexOf("\ncreate or replace function public.", insertStart + 1);
+const insertSql = sql.slice(insertStart, insertEnd > insertStart ? insertEnd : undefined);
+assert.doesNotMatch(insertSql, /order_availability/);
+assert.doesNotMatch(insertSql, /is_pickup_orders_closed/);
+assert.match(insertSql, /_waiting_list_matching_capacity/);
+assert.match(insertSql, /v_collection.waiting_list_enabled is not true/);
+assert.match(insertSql, /v_capacity.waiting_list_enabled is not true/);
+
+const closedDate = evaluateCollectionDate({
+  selectedYmd: pickupDate,
+  businessDate: "2026-09-03",
+  lines: [
+    {
+      lineId: `${cakeA}|${sizeM}`,
+      cakeId: cakeA,
+      cakeSizeId: sizeM,
+      cakeName: "Pandan Cake",
+      sizeLabel: "6-inch",
+      quantity: 2,
+      preorderDays: 2,
+    },
+  ],
+  operatingOpen: true,
+  closed: true,
+  inCatalogue: true,
+  capacity: {
+    fullyBooked: true,
+    waitingListEnabled: true,
+    blockingCakeNames: ["Pandan Cake"],
+    selectedYmd: pickupDate,
+    nextAvailableYmd: null,
+  },
+});
+assert.equal(closedDate.valid, false);
+assert.equal(closedDate.reason.code, "orders_closed");
+
+assert.match(boardSrc, /createState\.error/);
+assert.match(boardSrc, /Add customer to waiting list/);
+
+const capacityPanelSrc = readSrc(
+  "src/workspaces/library/order-availability/capacity/ProductionCapacityPanel.tsx",
+);
+assert.match(capacityPanelSrc, /Waiting list requires a production-capacity row/);
+assert.match(capacityPanelSrc, /does not enable the waiting list/);
+assert.match(boardSrc, /Closing customer orders does not enable/);
 
 console.log("PASS waiting list");

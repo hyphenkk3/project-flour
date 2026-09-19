@@ -25,6 +25,12 @@ import {
   setCollectionWaitingListAction,
   setWaitingListItemQuantityAction,
 } from "@/workspaces/waiting-list/actions";
+import {
+  nextWaitingListFilterSizeId,
+  WAITING_LIST_FILTER_ACTION,
+  WAITING_LIST_SECTION_ID,
+  waitingListFilterSizeOptions,
+} from "@/workspaces/waiting-list/filter";
 import type {
   WaitingListBoardRow,
   WaitingListCakeOption,
@@ -147,6 +153,109 @@ function statusLabel(status: string): string {
   return status.replaceAll("_", " ");
 }
 
+function WaitingListFilterForm({
+  cakes,
+  month,
+  dateFilter,
+  cakeFilter,
+  sizeFilter,
+  statusFilter,
+}: {
+  cakes: WaitingListCakeOption[];
+  month: string;
+  dateFilter: string;
+  cakeFilter: string;
+  sizeFilter: string;
+  statusFilter: string;
+}) {
+  const [cakeId, setCakeId] = useState(cakeFilter);
+  const sizeOptions = waitingListFilterSizeOptions(cakes, cakeId);
+  const [sizeId, setSizeId] = useState(() =>
+    nextWaitingListFilterSizeId(
+      waitingListFilterSizeOptions(cakes, cakeFilter),
+      sizeFilter,
+    ),
+  );
+
+  return (
+    <form
+      action={WAITING_LIST_FILTER_ACTION}
+      className="flex flex-wrap items-end gap-3"
+      method="get"
+    >
+      <input name="month" type="hidden" value={month} />
+      <label className="text-ink text-sm font-medium">
+        Collection date
+        <input
+          className={fieldClass}
+          defaultValue={dateFilter}
+          name="date"
+          type="date"
+        />
+      </label>
+      <label className="text-ink text-sm font-medium">
+        Cake
+        <select
+          className={fieldClass}
+          name="wlCake"
+          onChange={(event) => {
+            const nextCakeId = event.target.value;
+            setCakeId(nextCakeId);
+            setSizeId(
+              nextWaitingListFilterSizeId(
+                waitingListFilterSizeOptions(cakes, nextCakeId),
+                sizeId,
+              ),
+            );
+          }}
+          value={cakeId}
+        >
+          <option value="">All cakes</option>
+          {cakes.map((cake) => (
+            <option key={cake.id} value={cake.id}>
+              {cake.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="text-ink text-sm font-medium">
+        Size
+        <select
+          className={fieldClass}
+          name="wlSize"
+          onChange={(event) => setSizeId(event.target.value)}
+          value={sizeId}
+        >
+          <option value="">All sizes</option>
+          {sizeOptions.map((size) => (
+            <option key={size.id} value={size.id}>
+              {size.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="text-ink text-sm font-medium">
+        Status
+        <select
+          className={fieldClass}
+          defaultValue={statusFilter}
+          name="wlStatus"
+        >
+          <option value="">All statuses</option>
+          {WAITING_LIST_ITEM_STATUSES.map((status) => (
+            <option key={status} value={status}>
+              {statusLabel(status)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button className={ghostButtonClass} type="submit">
+        Filter
+      </button>
+    </form>
+  );
+}
+
 export function WaitingListBoard({
   rows,
   cakes,
@@ -221,9 +330,7 @@ export function WaitingListBoard({
     altPending ||
     qtyPending ||
     scopePending;
-  const error =
-    configState.error ??
-    createState.error ??
+  const queueError =
     contactState.error ??
     responseState.error ??
     convertState.error ??
@@ -234,7 +341,6 @@ export function WaitingListBoard({
     qtyState.error ??
     scopeState.error;
 
-  const selectedCake = cakes.find((cake) => cake.id === cakeFilter) ?? cakes[0];
   const [manualCakeId, setManualCakeId] = useState(cakes[0]?.id ?? "");
   const manualCake =
     cakes.find((cake) => cake.id === manualCakeId) ?? cakes[0] ?? null;
@@ -251,18 +357,20 @@ export function WaitingListBoard({
   }, [rows, scan]);
 
   return (
-    <section aria-labelledby="waiting-list-heading" className="space-y-4">
+    <section aria-labelledby={WAITING_LIST_SECTION_ID} className="space-y-4">
       <div>
         <h2
           className="text-ink text-lg font-semibold tracking-tight"
-          id="waiting-list-heading"
+          id={WAITING_LIST_SECTION_ID}
         >
           Waiting list
         </h2>
         <p className="text-skyline mt-1 max-w-2xl text-sm">
           Queue for dates and cakes where Bakery has explicitly allowed waiting-list
           participation. This is not a confirmed order and does not show production
-          capacity numbers.
+          capacity numbers. A production-capacity row with waiting list enabled is
+          required for that cake and date. Closing customer orders does not enable
+          the waiting list.
         </p>
       </div>
 
@@ -314,65 +422,18 @@ export function WaitingListBoard({
               ))}
             </ul>
           )}
+          {configState.error ? <FormError message={configState.error} /> : null}
         </div>
       ) : null}
 
-      <form
-        action="/bakery/availability"
-        className="flex flex-wrap items-end gap-3"
-        method="get"
-      >
-        <input name="month" type="hidden" value={month} />
-        <label className="text-ink text-sm font-medium">
-          Collection date
-          <input
-            className={fieldClass}
-            defaultValue={dateFilter}
-            name="date"
-            type="date"
-          />
-        </label>
-        <label className="text-ink text-sm font-medium">
-          Cake
-          <select className={fieldClass} defaultValue={cakeFilter} name="wlCake">
-            <option value="">All cakes</option>
-            {cakes.map((cake) => (
-              <option key={cake.id} value={cake.id}>
-                {cake.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-ink text-sm font-medium">
-          Size
-          <select className={fieldClass} defaultValue={sizeFilter} name="wlSize">
-            <option value="">All sizes</option>
-            {(selectedCake?.sizes ?? []).map((size) => (
-              <option key={size.id} value={size.id}>
-                {size.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-ink text-sm font-medium">
-          Status
-          <select
-            className={fieldClass}
-            defaultValue={statusFilter}
-            name="wlStatus"
-          >
-            <option value="">All statuses</option>
-            {WAITING_LIST_ITEM_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {statusLabel(status)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button className={ghostButtonClass} type="submit">
-          Filter
-        </button>
-      </form>
+      <WaitingListFilterForm
+        cakeFilter={cakeFilter}
+        cakes={cakes}
+        dateFilter={dateFilter}
+        month={month}
+        sizeFilter={sizeFilter}
+        statusFilter={statusFilter}
+      />
 
       <div className="flex gap-2">
         <button
@@ -391,7 +452,7 @@ export function WaitingListBoard({
         </button>
       </div>
 
-      {error ? <FormError message={error} /> : null}
+      {queueError ? <FormError message={queueError} /> : null}
 
       {grouped.length === 0 ? (
         <p className="text-skyline text-sm">No waiting-list entries for these filters.</p>
@@ -781,6 +842,7 @@ export function WaitingListBoard({
       {canManage && cakes.length > 0 ? (
         <form action={createAction} className="border-fog space-y-3 rounded-xl border bg-white px-4 py-4">
           <p className="text-ink text-sm font-medium">Add customer to waiting list</p>
+          {createState.error ? <FormError message={createState.error} /> : null}
           <p className="text-skyline text-xs">
             Choose a CRM customer to copy their name and WhatsApp, or enter a
             person who is not in CRM. This does not create an order.

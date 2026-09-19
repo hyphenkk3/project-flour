@@ -76,8 +76,11 @@ export function ProductionCapacityPanel({
           Production capacity
         </h2>
         <p className="text-skyline mt-1 max-w-2xl text-sm">
-          Staff only. No capacity row means unrestricted. Capacity 0 is fully
-          booked. Customers never see these numbers.
+          Staff only. No capacity row means unrestricted production, and waiting
+          list is not available for that cake and date. Capacity 0 is fully
+          booked. Enable waiting list on the capacity row. Closing customer
+          orders does not enable the waiting list. Customers never see these
+          numbers.
         </p>
       </div>
 
@@ -109,7 +112,8 @@ export function ProductionCapacityPanel({
       {rows.length === 0 ? (
         <p className="text-skyline text-sm">
           No capacity limits for this date. Production is unrestricted until a
-          row is added.
+          row is added. Waiting list requires a production-capacity row for the
+          cake and date, with waiting list enabled on that row.
         </p>
       ) : (
         <ul className="divide-fog border-fog divide-y overflow-hidden rounded-xl border">
