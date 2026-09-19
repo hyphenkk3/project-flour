@@ -1,10 +1,7 @@
 import Link from "next/link";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import type { StorefrontCake } from "@/types/storefront";
-import {
-  storefrontDefaultPhoto,
-  storefrontPhotoForSize,
-} from "@/workspaces/storefront/catalog/cake-photo-map";
+import { storefrontCatalogueListingPhoto } from "@/workspaces/storefront/catalog/cake-photo-map";
 import {
   cakeCardPreorderLabel,
   formatHomepagePrice,
@@ -37,10 +34,10 @@ export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
           <div className="-mx-6 overflow-x-auto overscroll-x-contain pb-1 sm:-mx-10 lg:mx-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <ul className="flex w-max gap-2.5 px-6 pr-8 sm:px-10 sm:pr-12 lg:pl-0 lg:pr-8">
               {cakes.map((cake) => {
-                const size = cake.sizes[0] ?? null;
-                const photo =
-                  storefrontPhotoForSize(cake.photos, size?.id) ??
-                  storefrontDefaultPhoto(cake.photos);
+                const photo = storefrontCatalogueListingPhoto(
+                  cake.photos,
+                  cake.sizes,
+                );
                 const from = formatHomepagePrice(cake);
                 const preorder = cakeCardPreorderLabel(cake);
                 return (

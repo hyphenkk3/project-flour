@@ -5,10 +5,7 @@ import {
   takeHomepageCollectionPreviewCakes,
 } from "@/engines/menu/homepage-collection-preview";
 import type { StorefrontCake } from "@/types/storefront";
-import {
-  storefrontDefaultPhoto,
-  storefrontPhotoForSize,
-} from "@/workspaces/storefront/catalog/cake-photo-map";
+import { storefrontCatalogueListingPhoto } from "@/workspaces/storefront/catalog/cake-photo-map";
 import {
   cakeCardPreorderLabel,
   formatHomepagePrice,
@@ -58,10 +55,10 @@ export function HomeFeaturedCollection({
           <div className="-mx-6 mt-4 overflow-x-auto overscroll-x-contain sm:-mx-10 lg:mx-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <ul className="flex w-max gap-3 px-6 pr-8 sm:px-10 sm:pr-12 lg:w-full lg:pl-0 lg:pr-0">
               {previewCakes.map((cake, index) => {
-                const size = cake.sizes[0] ?? null;
-                const photo =
-                  storefrontPhotoForSize(cake.photos, size?.id) ??
-                  storefrontDefaultPhoto(cake.photos);
+                const photo = storefrontCatalogueListingPhoto(
+                  cake.photos,
+                  cake.sizes,
+                );
                 const price = formatHomepagePrice(cake);
                 const preorder = cakeCardPreorderLabel(cake);
                 const href = cakeHrefs[cake.id] ?? viewAllHref;

@@ -1,5 +1,9 @@
-import { cakePhotoGallery, resolveCakePhoto } from "@/engines/menu/cake-photos";
-import type { StorefrontCakePhoto } from "@/types/storefront";
+import {
+  cakePhotoGallery,
+  resolveCakePhoto,
+  resolveCatalogueListingPhoto,
+} from "@/engines/menu/cake-photos";
+import type { StorefrontCakePhoto, StorefrontCakeSize } from "@/types/storefront";
 
 export const STOREFRONT_CAKE_PHOTO_SELECT =
   "id, image_url, alt_text, sort_order, cake_size_id, is_default";
@@ -41,6 +45,16 @@ export function storefrontPhotoForSize(
   sizeId?: string | null,
 ): StorefrontCakePhoto | null {
   return resolveCakePhoto(photos, sizeId);
+}
+
+export function storefrontCatalogueListingPhoto(
+  photos: readonly StorefrontCakePhoto[],
+  sizes: readonly Pick<StorefrontCakeSize, "id" | "size">[],
+): StorefrontCakePhoto | null {
+  return resolveCatalogueListingPhoto(
+    photos,
+    sizes.map((size) => ({ id: size.id, label: size.size })),
+  );
 }
 
 export function storefrontPhotoGallery(

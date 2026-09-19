@@ -6,6 +6,9 @@ import {
 /** Conventional presentation size when that size exists on the cake. Not a schema constraint. */
 export const STANDARD_PRESENTATION_SIZE_INCHES = 6;
 
+/** Catalogue listing fallback when no 6" photo exists. Not used by Fresh Picks. */
+export const CATALOGUE_LISTING_FALLBACK_SIZE_INCHES = 4;
+
 export type CakePhotoSizeRef = {
   id: string;
   label: string;
@@ -24,13 +27,30 @@ export function isStandardPresentationSizeLabel(label: string): boolean {
   return cakeSizeNumericValue(label) === STANDARD_PRESENTATION_SIZE_INCHES;
 }
 
+export function isCatalogueListingFallbackSizeLabel(label: string): boolean {
+  return cakeSizeNumericValue(label) === CATALOGUE_LISTING_FALLBACK_SIZE_INCHES;
+}
+
+function sizeIdForInches(
+  sizes: readonly CakePhotoSizeRef[],
+  inches: number,
+): string | null {
+  return (
+    sizes.find((size) => cakeSizeNumericValue(size.label) === inches)?.id ??
+    null
+  );
+}
+
 export function standardPresentationSizeId(
   sizes: readonly CakePhotoSizeRef[],
 ): string | null {
-  return (
-    sizes.find((size) => isStandardPresentationSizeLabel(size.label))?.id ??
-    null
-  );
+  return sizeIdForInches(sizes, STANDARD_PRESENTATION_SIZE_INCHES);
+}
+
+export function catalogueListingFallbackSizeId(
+  sizes: readonly CakePhotoSizeRef[],
+): string | null {
+  return sizeIdForInches(sizes, CATALOGUE_LISTING_FALLBACK_SIZE_INCHES);
 }
 
 export function sortCakePhotos<T extends Pick<ResolvableCakePhoto, "sortOrder" | "id">>(
@@ -71,6 +91,42 @@ export function resolveCakePhoto<T extends ResolvableCakePhoto>(
   if (configured) return configured;
 
   return ordered[0] ?? null;
+}
+
+function exactPhotoForSizeId<T extends ResolvableCakePhoto>(
+  photos: readonly T[],
+  sizeId: string | null,
+): T | null {
+  if (!sizeId) return null;
+  return (
+    usablePhotos(photos).find((photo) => photo.cakeSizeId === sizeId) ?? null
+  );
+}
+
+/**
+ * Customer catalogue/listing cards only. Never used by Fresh Picks.
+ *
+ * 1. Exact 6" photo when that size exists on the cake.
+ * 2. Exact 4" photo when no 6" photo exists.
+ * 3. Existing resolveCakePhoto fallback (configured default, then sort order).
+ */
+export function resolveCatalogueListingPhoto<T extends ResolvableCakePhoto>(
+  photos: readonly T[],
+  sizes: readonly CakePhotoSizeRef[],
+): T | null {
+  const presentation = exactPhotoForSizeId(
+    photos,
+    standardPresentationSizeId(sizes),
+  );
+  if (presentation) return presentation;
+
+  const listingFallback = exactPhotoForSizeId(
+    photos,
+    catalogueListingFallbackSizeId(sizes),
+  );
+  if (listingFallback) return listingFallback;
+
+  return resolveCakePhoto(photos);
 }
 
 /** General/lifestyle photos shown beside the current hero. Size-specific product shots stay off the gallery. */

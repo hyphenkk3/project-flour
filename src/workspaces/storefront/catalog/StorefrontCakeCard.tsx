@@ -7,7 +7,7 @@ import { StorefrontCakeDetailLink } from "@/workspaces/storefront/catalog/Storef
 import { BROWSE_CURRENTLY_UNAVAILABLE_NOTE } from "@/engines/menu/homepage-collection-preview";
 import type { StorefrontCake } from "@/types/storefront";
 import { AddToOrderButton, type AddToOrderPickupScope } from "@/workspaces/storefront/cart/AddToOrderSheet";
-import { storefrontDefaultPhoto } from "@/workspaces/storefront/catalog/cake-photo-map";
+import { storefrontCatalogueListingPhoto } from "@/workspaces/storefront/catalog/cake-photo-map";
 import {
   cakeCardPreorderBadgeTone,
   cakeCardPreorderLabel,
@@ -52,8 +52,8 @@ export function StorefrontCakeCard({
   const tags = storefrontTagLabel(cake);
   const preorder = cakeCardPreorderLabel(cake);
   const preorderTone = cakeCardPreorderBadgeTone(cake);
-  const hero = storefrontDefaultPhoto(cake.photos);
-  const imageUrl = cake.image ?? hero?.url ?? null;
+  const hero = storefrontCatalogueListingPhoto(cake.photos, cake.sizes);
+  const imageUrl = hero?.url ?? null;
   const imageAlt = hero?.altText || cake.name;
   const href = detailHref ?? `/cakes/${cake.id}`;
   const canonical = canonicalCakeDetailPath(href);

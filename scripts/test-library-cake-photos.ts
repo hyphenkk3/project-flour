@@ -8,19 +8,25 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  CATALOGUE_LISTING_FALLBACK_SIZE_INCHES,
   cakePhotoGallery,
   customerPhotoForEachSize,
   fallbackDefaultPhotoId,
   formatCakePhotoCoverageLabel,
   libraryPhotosHaveCoverage,
   resolveCakePhoto,
+  resolveCatalogueListingPhoto,
   shouldAutoDefaultNewPhoto,
+  STANDARD_PRESENTATION_SIZE_INCHES,
   suggestedDefaultPhotoId,
   type ResolvableCakePhoto,
 } from "@/engines/menu/cake-photos";
 import { mapStorefrontCake } from "@/workspaces/storefront/catalog/queries";
 import { legacyCakeCategoryEmbed } from "@/engines/menu/cake-categories";
-import { storefrontPhotoForSize } from "@/workspaces/storefront/catalog/cake-photo-map";
+import {
+  storefrontCatalogueListingPhoto,
+  storefrontPhotoForSize,
+} from "@/workspaces/storefront/catalog/cake-photo-map";
 import {
   libraryCakePhotoObjectPath,
   LIBRARY_CAKE_PHOTO_BUCKET,
@@ -81,6 +87,53 @@ const missing8 = [photo4, photo6];
 assert.equal(resolveCakePhoto(missing8, "size-8")?.id, "p6");
 assert.equal(resolveCakePhoto(missing8, "size-4")?.id, "p4");
 assert.equal(resolveCakePhoto(photos468)?.id, "p6");
+
+assert.equal(STANDARD_PRESENTATION_SIZE_INCHES, 6);
+assert.equal(CATALOGUE_LISTING_FALLBACK_SIZE_INCHES, 4);
+assert.equal(resolveCatalogueListingPhoto(photos468, sizes468)?.id, "p6");
+assert.equal(
+  resolveCatalogueListingPhoto([photo4, photo8], sizes468)?.id,
+  "p4",
+);
+assert.equal(
+  resolveCatalogueListingPhoto([photo6, photo8], sizes468)?.id,
+  "p6",
+);
+assert.equal(resolveCatalogueListingPhoto([photo8], sizes468)?.id, "p8");
+assert.equal(
+  resolveCatalogueListingPhoto(
+    [{ ...photo8, isDefault: true, sortOrder: 0 }, photo4],
+    [size4, size8],
+  )?.id,
+  "p4",
+  "4\" listing photo beats an 8\" configured default",
+);
+assert.equal(
+  resolveCatalogueListingPhoto([{ ...photo8, isDefault: true }], sizes468)?.id,
+  "p8",
+  "8\" may still appear as the existing default fallback",
+);
+assert.equal(
+  resolveCatalogueListingPhoto(
+    [photo({ id: "lifestyle", url: "https://example.test/g.jpg", isDefault: true })],
+    sizes468,
+  )?.id,
+  "lifestyle",
+);
+assert.equal(resolveCatalogueListingPhoto([], sizes468), null);
+assert.equal(
+  storefrontCatalogueListingPhoto(photos468, [
+    { id: "size-4", size: '4"' },
+    { id: "size-6", size: '6"' },
+    { id: "size-8", size: '8"' },
+  ])?.id,
+  "p6",
+);
+assert.equal(
+  resolveCakePhoto(photos468, "size-4")?.id,
+  "p4",
+  "Fresh Pick 4\" inventory still resolves the 4\" photo when a 6\" photo also exists",
+);
 
 assert.equal(suggestedDefaultPhotoId(photos468, sizes468), "p6");
 assert.equal(
@@ -299,6 +352,11 @@ const detailViewSrc = readSrc(
 const cardSrc = readSrc("src/workspaces/storefront/catalog/StorefrontCakeCard.tsx");
 const sheetSrc = readSrc("src/workspaces/storefront/cart/AddToOrderSheet.tsx");
 const extraQuerySrc = readSrc("src/workspaces/storefront/extra/queries.ts");
+const extraStaffQuerySrc = readSrc("src/workspaces/extra/queries.ts");
+const featuredSrc = readSrc(
+  "src/workspaces/storefront/home/HomeFeaturedCollection.tsx",
+);
+const popularSrc = readSrc("src/workspaces/storefront/home/HomePopularCakes.tsx");
 const managerSrc = readSrc("src/workspaces/library/cakes/CakePhotoManager.tsx");
 const photoActionsSrc = readSrc("src/workspaces/library/cakes/photo-actions.ts");
 const cakeActionsSrc = readSrc("src/workspaces/library/cakes/actions.ts");
@@ -309,12 +367,32 @@ const draftSrc = readSrc("src/workspaces/storefront/checkout/preorder-draft.ts")
 const cartSrc = readSrc("src/workspaces/storefront/cart/StorefrontCartShell.tsx");
 
 assert.match(mapSrc, /resolveCakePhoto/);
+assert.match(mapSrc, /storefrontCatalogueListingPhoto/);
 assert.match(detailViewSrc, /storefrontPhotoForSize/);
-assert.match(cardSrc, /storefrontDefaultPhoto/);
+assert.match(cardSrc, /storefrontCatalogueListingPhoto/);
+assert.doesNotMatch(cardSrc, /storefrontDefaultPhoto/);
+assert.doesNotMatch(cardSrc, /cake\.image \?\?/);
 assert.match(sheetSrc, /storefrontPhotoForSize/);
-assert.match(extraQuerySrc, /resolveCakePhoto/);
+assert.doesNotMatch(sheetSrc, /storefrontCatalogueListingPhoto/);
+assert.match(extraQuerySrc, /resolveCakePhoto\(photos, row\.library_cake_size_id\)/);
+assert.match(
+  extraStaffQuerySrc,
+  /resolveCakePhoto\(photos, unit\.libraryCakeSizeId\)/,
+);
+assert.doesNotMatch(extraQuerySrc, /resolveCatalogueListingPhoto/);
+assert.doesNotMatch(extraQuerySrc, /storefrontCatalogueListingPhoto/);
+assert.doesNotMatch(extraStaffQuerySrc, /resolveCatalogueListingPhoto/);
+assert.doesNotMatch(extraStaffQuerySrc, /storefrontCatalogueListingPhoto/);
+assert.match(featuredSrc, /storefrontCatalogueListingPhoto/);
+assert.match(popularSrc, /storefrontCatalogueListingPhoto/);
+assert.doesNotMatch(featuredSrc, /storefrontPhotoForSize/);
+assert.doesNotMatch(popularSrc, /storefrontPhotoForSize/);
+assert.doesNotMatch(featuredSrc, /sizes\[0\]/);
+assert.doesNotMatch(popularSrc, /sizes\[0\]/);
 assert.match(managerSrc, /customerPhotoForEachSize/);
 assert.match(engineSrc, /STANDARD_PRESENTATION_SIZE_INCHES = 6/);
+assert.match(engineSrc, /CATALOGUE_LISTING_FALLBACK_SIZE_INCHES = 4/);
+assert.match(engineSrc, /resolveCatalogueListingPhoto/);
 assert.match(engineSrc, /formatCakePhotoCoverageLabel/);
 assert.doesNotMatch(engineSrc, /is_default.*6"/);
 assert.doesNotMatch(migrationSrc, /6-inch photo is always primary/i);
