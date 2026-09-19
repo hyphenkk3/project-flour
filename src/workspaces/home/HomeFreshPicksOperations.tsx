@@ -41,8 +41,8 @@ const btnSecondary =
   "border-fog text-ink hover:bg-mist inline-flex min-h-11 items-center justify-center rounded-xl border bg-white px-4 text-sm font-medium transition disabled:opacity-60";
 
 function homeFreshPicksDesktopGridClass(count: number): string {
-  if (count <= 1) return "lg:max-w-md";
-  return "lg:grid-cols-2";
+  if (count >= 4) return "lg:grid-cols-4";
+  return "lg:grid-cols-3";
 }
 
 function extraWorkspaceHref(
@@ -335,25 +335,27 @@ function HomeFreshPickCard({
         )}
 
         <div
-          className="mt-3 flex flex-wrap items-start gap-2 lg:mt-auto lg:items-center lg:pt-3 lg:[&>button]:shrink-0 lg:[&>button]:whitespace-nowrap lg:[&>details>summary]:shrink-0 lg:[&>details>summary]:whitespace-nowrap"
+          className="mt-3 flex flex-wrap items-start gap-2 lg:mt-auto lg:flex-col lg:items-start lg:gap-2 lg:pt-3"
           onClick={(event) => event.stopPropagation()}
         >
-          {flags.assign ? (
-            <button
-              className={btnPrimary}
-              disabled={pending}
-              onClick={onAssign}
-              type="button"
-            >
-              Assign to order
-            </button>
-          ) : null}
-          <WalkInHoldPanel
-            capabilities={capabilities}
-            className="contents"
-            layout="actions"
-            unit={unit}
-          />
+          <div className="contents lg:flex lg:flex-wrap lg:items-center lg:gap-2 lg:[&>button]:whitespace-nowrap">
+            {flags.assign ? (
+              <button
+                className={btnPrimary}
+                disabled={pending}
+                onClick={onAssign}
+                type="button"
+              >
+                Assign to order
+              </button>
+            ) : null}
+            <WalkInHoldPanel
+              capabilities={capabilities}
+              className="contents"
+              layout="actions"
+              unit={unit}
+            />
+          </div>
           {hasMore ? (
             <details className="relative">
               <summary

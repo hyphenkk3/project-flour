@@ -230,13 +230,18 @@ assert.match(homeOpsSrc, /customer-operations\/fresh-picks/);
 assert.match(homeOpsSrc, /\/bakery\/extra/);
 assert.match(homeOpsSrc, /CakePhotoImage/);
 assert.match(homeOpsSrc, /grid grid-cols-1 gap-2 lg:gap-3/);
-assert.match(homeOpsSrc, /lg:grid-cols-2/);
-assert.match(homeOpsSrc, /lg:max-w-md/);
+assert.match(homeOpsSrc, /lg:grid-cols-3/);
+assert.match(homeOpsSrc, /lg:grid-cols-4/);
 assert.match(homeOpsSrc, /homeFreshPicksDesktopGridClass/);
 assert.match(homeOpsSrc, /flex flex-wrap items-start gap-2/);
+assert.match(homeOpsSrc, /lg:flex-col lg:items-start lg:gap-2/);
+assert.match(
+  homeOpsSrc,
+  /contents lg:flex lg:flex-wrap lg:items-center lg:gap-2/,
+);
 assert.match(homeOpsSrc, /lg:\[&>button\]:whitespace-nowrap/);
-assert.match(homeOpsSrc, /lg:flex-col/);
-assert.doesNotMatch(homeOpsSrc, /lg:grid-cols-4/);
+assert.doesNotMatch(homeOpsSrc, /lg:grid-cols-2/);
+assert.doesNotMatch(homeOpsSrc, /lg:max-w-md/);
 assert.doesNotMatch(homeOpsSrc, /lg:\[&>button\]:w-full/);
 assert.doesNotMatch(homeOpsSrc, /View Extra/);
 assert.doesNotMatch(homeOpsSrc, /from "@\/workspaces\/extra\/ExtraBoard"/);
