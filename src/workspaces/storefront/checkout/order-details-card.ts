@@ -710,16 +710,18 @@ export function drawOrderDetailsCard(
     }
 
     y += block(18);
-    const noticeTitleFont = `500 ${fs(12)}px ${sansFont}`;
-    const noticeBodyFont = `400 ${fs(15)}px ${sansFont}`;
-    const noticePadX = 22;
-    const noticePadY = 20;
+    const noticeTitleSize = fs(18);
+    const noticeBodySize = fs(23);
+    const noticeTitleFont = `500 ${noticeTitleSize}px ${sansFont}`;
+    const noticeBodyFont = `400 ${noticeBodySize}px ${sansFont}`;
+    const noticePadX = 28;
+    const noticePadY = 30;
     const noticeInner = CONTENT_WIDTH - noticePadX * 2;
     const noticeBodyLines = wrap(noticeBodyFont, model.noticeBody, noticeInner);
     const noticeBoxH =
       noticePadY +
-      line(18) +
-      Math.max(noticeBodyLines.length, 1) * line(22) +
+      line(28) +
+      Math.max(noticeBodyLines.length, 1) * line(32) +
       noticePadY;
     const noticeTop = y;
     ops.push(() => {
@@ -730,7 +732,7 @@ export function drawOrderDetailsCard(
       ctx.fill();
       ctx.stroke();
     });
-    const noticeTitleY = noticeTop + noticePadY + fs(12);
+    const noticeTitleY = noticeTop + noticePadY + noticeTitleSize;
     ops.push(() => {
       ctx.fillStyle = SIGNAL;
       ctx.font = noticeTitleFont;
@@ -739,17 +741,17 @@ export function drawOrderDetailsCard(
         model.noticeTitle,
         PAD_X + noticePadX,
         noticeTitleY,
-        emTracking(fs(12), 0.12),
+        emTracking(noticeTitleSize, 0.12),
       );
     });
-    let noticeBodyY = noticeTitleY + line(22);
+    let noticeBodyY = noticeTitleY + line(32);
     for (const bodyLine of noticeBodyLines) {
       const lineY = noticeBodyY;
       ops.push(() => {
         ctx.font = noticeBodyFont;
         fillTextMarking(ctx, bodyLine, PAD_X + noticePadX, lineY, "24 hours");
       });
-      noticeBodyY += line(22);
+      noticeBodyY += line(32);
     }
     y = noticeTop + noticeBoxH;
 
