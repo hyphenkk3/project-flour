@@ -127,7 +127,7 @@ export async function listWaitingListBoard(input: {
       await Promise.all([
         supabase
           .from("waiting_list_requests")
-          .select("id, guest_name, guest_phone, open_to_alternatives, created_at")
+          .select("id, guest_name, guest_phone, open_to_alternatives, created_at, notes")
           .in("id", requestIds),
         supabase.from("library_cakes").select("id, name").in("id", cakeIds),
         sizeIds.length > 0
@@ -195,6 +195,7 @@ export async function listWaitingListBoard(input: {
             guest_phone?: string;
             open_to_alternatives?: boolean;
             created_at?: string;
+            notes?: string | null;
           }
         | undefined;
       const cakeId = asId((row as { library_cake_id?: string }).library_cake_id);
@@ -227,6 +228,7 @@ export async function listWaitingListBoard(input: {
         ),
         status: String((row as { status?: string }).status ?? "active") as WaitingListItemStatus,
         openToAlternatives: Boolean(request?.open_to_alternatives),
+        notes: String(request?.notes ?? "").trim() || null,
         contactedAt:
           String((row as { contacted_at?: string | null }).contacted_at ?? "") ||
           null,

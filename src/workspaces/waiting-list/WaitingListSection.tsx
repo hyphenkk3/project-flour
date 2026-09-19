@@ -2,10 +2,12 @@ import {
   WAITING_LIST_ITEM_STATUSES,
   type WaitingListItemStatus,
 } from "@/engines/waiting-list/types";
+import { listCustomers } from "@/workspaces/customer-operations/customers/queries";
 import type {
   WaitingListBoardRow,
   WaitingListCakeOption,
   WaitingListCollectionSetting,
+  WaitingListCrmCustomerOption,
 } from "@/workspaces/waiting-list/types";
 import { WaitingListBoard } from "@/workspaces/waiting-list/WaitingListBoard";
 import {
@@ -41,6 +43,7 @@ export async function WaitingListSection({
   let rows: WaitingListBoardRow[] = [];
   let cakes: WaitingListCakeOption[] = [];
   let collections: WaitingListCollectionSetting[] = [];
+  let customers: WaitingListCrmCustomerOption[] = [];
 
   try {
     rows = await listWaitingListBoard({
@@ -71,6 +74,14 @@ export async function WaitingListSection({
     }
   }
 
+  if (canManage) {
+    customers = (await listCustomers()).map((customer) => ({
+      id: customer.id,
+      fullName: customer.fullName,
+      phoneNumber: customer.phoneNumber,
+    }));
+  }
+
   const statusFilter = WAITING_LIST_ITEM_STATUSES.includes(
     status as WaitingListItemStatus,
   )
@@ -83,6 +94,7 @@ export async function WaitingListSection({
       canConfigure={canConfigure}
       canManage={canManage}
       collections={collections}
+      customers={customers}
       dateFilter={date}
       month={month}
       cakeFilter={cakeId}

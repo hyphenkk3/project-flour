@@ -3,8 +3,14 @@
 import { useActionState, useMemo, useState } from "react";
 import { FormError } from "@/components/ui/form";
 import { WAITING_LIST_ITEM_STATUSES } from "@/engines/waiting-list/types";
-import { WAITING_LIST_NAME_HELP, WAITING_LIST_WHATSAPP_NOTE } from "@/engines/waiting-list/phone";
+import {
+  WAITING_LIST_NAME_HELP,
+  WAITING_LIST_WHATSAPP_NOTE,
+  waitingListWhatsAppDigits,
+} from "@/engines/waiting-list/phone";
 import { formatDateTime, formatShortBusinessDate } from "@/lib/dates";
+import { customerIdentityLabel } from "@/workspaces/customer-operations/customers/normalize";
+import { guestSnapshotFromCrmCustomer } from "@/workspaces/customer-operations/orders/guest-snapshot";
 import { libraryActionInitialState } from "@/workspaces/library/action-state";
 import {
   cancelWaitingListItemAction,
@@ -15,6 +21,7 @@ import {
   offerWaitingListAlternativeAction,
   recordWaitingListAlternativeAction,
   recordWaitingListResponseAction,
+  replaceWaitingListItemScopeAction,
   setCollectionWaitingListAction,
   setWaitingListItemQuantityAction,
 } from "@/workspaces/waiting-list/actions";
@@ -22,6 +29,7 @@ import type {
   WaitingListBoardRow,
   WaitingListCakeOption,
   WaitingListCollectionSetting,
+  WaitingListCrmCustomerOption,
 } from "@/workspaces/waiting-list/types";
 
 const ghostButtonClass =
@@ -35,6 +43,7 @@ type WaitingListBoardProps = {
   rows: WaitingListBoardRow[];
   cakes: WaitingListCakeOption[];
   collections: WaitingListCollectionSetting[];
+  customers: WaitingListCrmCustomerOption[];
   dateFilter: string;
   cakeFilter: string;
   statusFilter: string;
@@ -44,6 +53,96 @@ type WaitingListBoardProps = {
   canConfigure: boolean;
 };
 
+function WaitingListScopeForm({
+  row,
+  cakes,
+  action,
+  pending,
+}: {
+  row: WaitingListBoardRow;
+  cakes: WaitingListCakeOption[];
+  action: (formData: FormData) => void;
+  pending: boolean;
+}) {
+  const listedCake = cakes.find((cake) => cake.id === row.cakeId) ?? cakes[0] ?? null;
+  const [cakeId, setCakeId] = useState(listedCake?.id ?? row.cakeId);
+  const cake =
+    cakes.find((entry) => entry.id === cakeId) ??
+    (cakeId === row.cakeId
+      ? {
+          id: row.cakeId,
+          name: row.cakeName,
+          sizes: row.sizeId ? [{ id: row.sizeId, label: row.sizeLabel }] : [],
+        }
+      : listedCake);
+  const sizeOptions = cake?.sizes ?? [];
+  const [sizeId, setSizeId] = useState(
+    row.sizeId && sizeOptions.some((size) => size.id === row.sizeId)
+      ? row.sizeId
+      : (sizeOptions[0]?.id ?? ""),
+  );
+
+  return (
+    <form action={action} className="flex flex-wrap items-end gap-2">
+      <input name="item_id" type="hidden" value={row.itemId} />
+      <label className="text-ink text-sm">
+        Collection date
+        <input
+          className={fieldClass}
+          defaultValue={row.pickupDate}
+          name="pickup_date"
+          required
+          type="date"
+        />
+      </label>
+      <label className="text-ink text-sm">
+        Cake
+        <select
+          className={fieldClass}
+          name="cake_id"
+          onChange={(event) => {
+            const nextId = event.target.value;
+            setCakeId(nextId);
+            const nextCake = cakes.find((entry) => entry.id === nextId);
+            setSizeId(
+              nextCake?.sizes.find((size) => size.id === sizeId)?.id ??
+                nextCake?.sizes[0]?.id ??
+                "",
+            );
+          }}
+          required
+          value={cakeId}
+        >
+          {cakes.map((entry) => (
+            <option key={entry.id} value={entry.id}>
+              {entry.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="text-ink text-sm">
+        Size
+        <select
+          className={fieldClass}
+          name="size_id"
+          onChange={(event) => setSizeId(event.target.value)}
+          required
+          value={sizeId}
+        >
+          {sizeOptions.map((size) => (
+            <option key={size.id} value={size.id}>
+              {size.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button className={ghostButtonClass} disabled={pending} type="submit">
+        Update cake or date
+      </button>
+    </form>
+  );
+}
+
 function statusLabel(status: string): string {
   return status.replaceAll("_", " ");
 }
@@ -52,6 +151,7 @@ export function WaitingListBoard({
   rows,
   cakes,
   collections,
+  customers,
   dateFilter,
   cakeFilter,
   statusFilter,
@@ -61,6 +161,9 @@ export function WaitingListBoard({
   canConfigure,
 }: WaitingListBoardProps) {
   const [scan, setScan] = useState<"date" | "cake">("date");
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [crmCustomerId, setCrmCustomerId] = useState("");
   const [configState, configAction, configPending] = useActionState(
     setCollectionWaitingListAction,
     libraryActionInitialState,
@@ -101,6 +204,10 @@ export function WaitingListBoard({
     setWaitingListItemQuantityAction,
     libraryActionInitialState,
   );
+  const [scopeState, scopeAction, scopePending] = useActionState(
+    replaceWaitingListItemScopeAction,
+    libraryActionInitialState,
+  );
 
   const pending =
     configPending ||
@@ -112,7 +219,8 @@ export function WaitingListBoard({
     cancelPending ||
     offerPending ||
     altPending ||
-    qtyPending;
+    qtyPending ||
+    scopePending;
   const error =
     configState.error ??
     createState.error ??
@@ -123,7 +231,8 @@ export function WaitingListBoard({
     cancelState.error ??
     offerState.error ??
     altState.error ??
-    qtyState.error;
+    qtyState.error ??
+    scopeState.error;
 
   const selectedCake = cakes.find((cake) => cake.id === cakeFilter) ?? cakes[0];
   const [manualCakeId, setManualCakeId] = useState(cakes[0]?.id ?? "");
@@ -326,6 +435,9 @@ export function WaitingListBoard({
                         ? ` · order ${row.convertedOrderNumber}`
                         : ""}
                     </p>
+                    {row.notes ? (
+                      <p className="text-skyline mt-0.5 text-xs">Notes: {row.notes}</p>
+                    ) : null}
                   </div>
 
                   {canManage ? (
@@ -605,29 +717,37 @@ export function WaitingListBoard({
 
                       {row.status === "active" ||
                       row.status === "partially_accepted" ? (
-                        <form
-                          action={qtyAction}
-                          className="flex flex-wrap items-end gap-2"
-                        >
-                          <input name="item_id" type="hidden" value={row.itemId} />
-                          <label className="text-ink text-sm">
-                            Quantity
-                            <input
-                              className="border-fog text-ink ml-2 h-11 w-20 rounded-lg border bg-white px-3 text-sm tabular-nums"
-                              defaultValue={row.quantity}
-                              min={1}
-                              name="quantity"
-                              type="number"
-                            />
-                          </label>
-                          <button
-                            className={ghostButtonClass}
-                            disabled={pending}
-                            type="submit"
+                        <>
+                          <WaitingListScopeForm
+                            action={scopeAction}
+                            cakes={cakes}
+                            pending={pending}
+                            row={row}
+                          />
+                          <form
+                            action={qtyAction}
+                            className="flex flex-wrap items-end gap-2"
                           >
-                            Update quantity
-                          </button>
-                        </form>
+                            <input name="item_id" type="hidden" value={row.itemId} />
+                            <label className="text-ink text-sm">
+                              Quantity
+                              <input
+                                className="border-fog text-ink ml-2 h-11 w-20 rounded-lg border bg-white px-3 text-sm tabular-nums"
+                                defaultValue={row.quantity}
+                                min={1}
+                                name="quantity"
+                                type="number"
+                              />
+                            </label>
+                            <button
+                              className={ghostButtonClass}
+                              disabled={pending}
+                              type="submit"
+                            >
+                              Update quantity
+                            </button>
+                          </form>
+                        </>
                       ) : null}
 
                       {row.status !== "cancelled" &&
@@ -661,12 +781,50 @@ export function WaitingListBoard({
       {canManage && cakes.length > 0 ? (
         <form action={createAction} className="border-fog space-y-3 rounded-xl border bg-white px-4 py-4">
           <p className="text-ink text-sm font-medium">Add customer to waiting list</p>
+          <p className="text-skyline text-xs">
+            Choose a CRM customer to copy their name and WhatsApp, or enter a
+            person who is not in CRM. This does not create an order.
+          </p>
           <p className="text-skyline text-xs">{WAITING_LIST_NAME_HELP}</p>
           <input name="collection_id" type="hidden" value="" />
           <div className="grid gap-3 sm:grid-cols-2">
+            {customers.length > 0 ? (
+              <label className="text-ink sm:col-span-2 text-sm">
+                CRM customer
+                <select
+                  className={fieldClass}
+                  onChange={(event) => {
+                    const nextId = event.target.value;
+                    setCrmCustomerId(nextId);
+                    if (!nextId) return;
+                    const customer = customers.find((entry) => entry.id === nextId);
+                    if (!customer) return;
+                    const snapshot = guestSnapshotFromCrmCustomer(customer);
+                    setGuestName(snapshot.guestName);
+                    setGuestPhone(
+                      waitingListWhatsAppDigits(snapshot.guestPhone ?? ""),
+                    );
+                  }}
+                  value={crmCustomerId}
+                >
+                  <option value="">Not in CRM — enter details</option>
+                  {customers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
+                      {customerIdentityLabel(customer.fullName, customer.phoneNumber)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             <label className="text-ink text-sm">
               Name
-              <input className={fieldClass} name="customer_name" required />
+              <input
+                className={fieldClass}
+                name="customer_name"
+                onChange={(event) => setGuestName(event.target.value)}
+                required
+                value={guestName}
+              />
             </label>
             <label className="text-ink text-sm">
               WhatsApp
@@ -674,9 +832,11 @@ export function WaitingListBoard({
                 className={fieldClass}
                 inputMode="numeric"
                 name="phone"
+                onChange={(event) => setGuestPhone(event.target.value)}
                 pattern="[0-9]*"
                 required
                 type="tel"
+                value={guestPhone}
               />
             </label>
             <p className="text-skyline sm:col-span-2 text-xs">
@@ -738,6 +898,14 @@ export function WaitingListBoard({
                 <option value="no">No</option>
                 <option value="yes">Yes</option>
               </select>
+            </label>
+            <label className="text-ink sm:col-span-2 text-sm">
+              Notes
+              <textarea
+                className="border-fog text-ink mt-1 block min-h-20 w-full rounded-lg border bg-white px-3 py-2 text-sm"
+                name="notes"
+                rows={2}
+              />
             </label>
           </div>
           <button className={inkButtonClass} disabled={pending} type="submit">

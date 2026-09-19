@@ -93,6 +93,7 @@ export async function createStaffWaitingListAction(
   const quantity = Number.parseInt(String(formData.get("quantity") ?? "1"), 10);
   const collectionId = String(formData.get("collection_id") ?? "").trim();
   const openToAlternatives = String(formData.get("open_to_alternatives") ?? "") === "yes";
+  const notes = String(formData.get("notes") ?? "").trim();
   if (!name || !isValidWaitingListWhatsApp(phone)) {
     return { error: "Name and WhatsApp number are required." };
   }
@@ -108,7 +109,7 @@ export async function createStaffWaitingListAction(
     p_open_to_alternatives: openToAlternatives,
     p_items: [{ cake_id: cakeId, cake_size_id: sizeId, quantity }],
     p_collection_id: collectionId || null,
-    p_notes: null,
+    p_notes: notes || null,
   });
   if (error) return { error: error.message };
   revalidateWaitingList();

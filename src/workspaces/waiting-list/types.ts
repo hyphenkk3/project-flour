@@ -16,12 +16,19 @@ export type WaitingListBoardRow = {
   joinedAt: string;
   status: WaitingListItemStatus;
   openToAlternatives: boolean;
+  notes: string | null;
   contactedAt: string | null;
   responseDeadlineAt: string | null;
   convertedOrderId: string | null;
   convertedOrderNumber: string | null;
   actionRequired: boolean;
   offeredQuantity: number | null;
+};
+
+export type WaitingListCrmCustomerOption = {
+  id: string;
+  fullName: string;
+  phoneNumber: string | null;
 };
 
 export type WaitingListCollectionSetting = {

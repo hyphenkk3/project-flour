@@ -547,8 +547,28 @@ assert.match(boardSrc, /Record response/);
 assert.match(boardSrc, /Close remaining request/);
 assert.match(boardSrc, /Offer alternative/);
 assert.match(boardSrc, /Add customer to waiting list/);
+assert.match(boardSrc, /replaceWaitingListItemScopeAction/);
+assert.match(boardSrc, /Update cake or date/);
+assert.match(boardSrc, /guestSnapshotFromCrmCustomer/);
+assert.match(boardSrc, /Not in CRM/);
+assert.match(boardSrc, /name="notes"/);
+assert.doesNotMatch(boardSrc, /name="customer_id"/);
 assert.doesNotMatch(boardSrc, /capacity_quantity/);
 assert.doesNotMatch(boardSrc, /committedQuantity/);
+
+const sectionSrc = readSrc("src/workspaces/waiting-list/WaitingListSection.tsx");
+assert.match(sectionSrc, /listCustomers/);
+assert.match(sectionSrc, /listWaitingListCakeOptions/);
+
+const staffActionsSrc = readSrc("src/workspaces/waiting-list/actions.ts");
+assert.match(staffActionsSrc, /create_staff_waiting_list_request/);
+assert.match(staffActionsSrc, /waiting_list_set_item_quantity/);
+assert.match(staffActionsSrc, /waiting_list_replace_item_scope/);
+assert.match(staffActionsSrc, /waiting_list_cancel_item/);
+assert.match(staffActionsSrc, /p_notes: notes \|\| null/);
+assert.doesNotMatch(staffActionsSrc, /p_customer_id/);
+assert.match(staffActionsSrc, /canManageWaitingList/);
+assert.match(staffActionsSrc, /canConfigureWaitingList/);
 
 const pageSrc = readSrc("src/app/(app)/bakery/availability/page.tsx");
 assert.match(pageSrc, /WaitingListSection/);
