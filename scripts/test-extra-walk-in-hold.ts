@@ -271,4 +271,17 @@ assert.match(
   /This Fresh Pick is currently on walk-in hold\./,
 );
 
+const publicHeldVisible = readFileSync(
+  resolve(
+    "supabase/migrations/20260919120000_extra_stock_public_select_held_visible.sql",
+  ),
+  "utf8",
+);
+assert.match(publicHeldVisible, /extra_stock_public_confirmed_select/);
+assert.doesNotMatch(
+  publicHeldVisible,
+  /walk_in_held_until is null or walk_in_held_until < now\(\)/,
+  "anon catalogue may read an active hold",
+);
+
 console.log("EXTRA walk-in hold engine: PASS");

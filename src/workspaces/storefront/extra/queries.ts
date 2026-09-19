@@ -258,8 +258,9 @@ function mapPick(
 }
 
 /**
- * Bakery-confirmed Extra currently orderable. Matching cake/size/price units
- * share one customer-facing offering; extra_stock.id values stay independent.
+ * Bakery-confirmed Extra currently visible to customers, including active
+ * walk-in holds. Matching cake/size/price units share one offering; extra_stock.id
+ * values stay independent. Held units are listed but not orderable.
  */
 export async function listStorefrontAvailableExtra(): Promise<
   StorefrontExtraPick[]

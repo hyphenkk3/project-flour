@@ -87,7 +87,7 @@ export function HomeFreshPicksSection({ picks }: HomeFreshPicksSectionProps) {
                       </Link>
                     )}
                     <div className="min-w-0 flex-1 py-0.5 lg:max-w-[12.5rem] lg:flex-none">
-                      <p className="text-skyline text-[11px] leading-tight">
+                      <p className="text-ink text-[13px] font-medium leading-snug">
                         {status}
                         {dateLabel ? ` · ${dateLabel}` : ""}
                       </p>
