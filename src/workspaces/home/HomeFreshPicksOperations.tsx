@@ -1,19 +1,27 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import {
-  extraFreshPickOperationalStatus,
-  extraFreshPickOperationalStatusLabel,
   extraOperationalActionFlags,
   type ExtraWorkspaceCapabilities,
 } from "@/engines/extra/capabilities";
 import {
+  formatHomeFreshPickSizePrice,
+  homeFreshPickStatusLabel,
+  previewHomeFreshPicks,
+} from "@/engines/extra/home-fresh-picks";
+import {
   EXTRA_WALK_IN_HOLD_ACTIVE_ERROR,
   freshPickHomeSummaryLine,
+  walkInHoldHomeUntilLine,
 } from "@/engines/extra/walk-in-hold";
-import { unconfirmExtraStockAction } from "@/workspaces/extra/actions";
+import {
+  listHomeFreshPickUnitsAction,
+  unconfirmExtraStockAction,
+} from "@/workspaces/extra/actions";
 import { AssignExtraToOrderDialog } from "@/workspaces/extra/AssignExtraToOrderDialog";
 import { CutExtraIntoSlicesDialog } from "@/workspaces/extra/CutExtraIntoSlicesDialog";
 import { MoveExtraWindowDialog } from "@/workspaces/extra/MoveExtraWindowDialog";
@@ -24,6 +32,7 @@ type HomeFreshPicksOperationsProps = {
   units: ExtraStockUnit[];
   capabilities: ExtraWorkspaceCapabilities;
   todayYmd: string;
+  loadError?: boolean;
 };
 
 const btnPrimary =
@@ -35,24 +44,41 @@ function extraWorkspaceHref(
   capabilities: ExtraWorkspaceCapabilities,
 ): { href: string; label: string } | null {
   if (capabilities.canAccessExtraSurface) {
-    return { href: "/bakery/extra", label: "View Extra →" };
+    return { href: "/bakery/extra", label: "View all →" };
   }
   if (capabilities.canViewWalkInHold) {
     return {
       href: "/customer-operations/fresh-picks",
-      label: "View Fresh Picks →",
+      label: "View all →",
     };
   }
   return null;
 }
 
 export function HomeFreshPicksOperations({
-  units,
+  units: initialUnits,
   capabilities,
   todayYmd,
+  loadError: initialLoadError = false,
 }: HomeFreshPicksOperationsProps) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [view, setView] = useState({
+    units: initialUnits,
+    loadError: initialLoadError,
+    fromProps: initialUnits,
+  });
+  if (view.fromProps !== initialUnits) {
+    setView({
+      units: initialUnits,
+      loadError: initialLoadError,
+      fromProps: initialUnits,
+    });
+  }
+  const units = view.units;
+  const loadError = view.loadError;
+  const [now, setNow] = useState(() => new Date());
   const [assigningUnit, setAssigningUnit] = useState<ExtraStockUnit | null>(
     null,
   );
@@ -60,6 +86,12 @@ export function HomeFreshPicksOperations({
   const [slicingUnit, setSlicingUnit] = useState<ExtraStockUnit | null>(null);
   const [undoingUnit, setUndoingUnit] = useState<ExtraStockUnit | null>(null);
   const extraLink = extraWorkspaceHref(capabilities);
+  const preview = previewHomeFreshPicks(units);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 15_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   function runUnconfirm() {
     if (!undoingUnit) return;
@@ -79,6 +111,24 @@ export function HomeFreshPicksOperations({
     });
   }
 
+  function retryFreshPicks() {
+    setError(null);
+    setLoading(true);
+    startTransition(async () => {
+      const result = await listHomeFreshPickUnitsAction();
+      setLoading(false);
+      if (result.error) {
+        setView((current) => ({ ...current, loadError: true }));
+        return;
+      }
+      setView((current) => ({
+        ...current,
+        loadError: false,
+        units: result.units,
+      }));
+    });
+  }
+
   return (
     <section aria-labelledby="home-fresh-picks">
       <div className="mb-3 flex items-end justify-between gap-3">
@@ -86,7 +136,7 @@ export function HomeFreshPicksOperations({
           className="text-ink text-sm font-semibold tracking-wide"
           id="home-fresh-picks"
         >
-          Fresh Picks
+          Fresh Picks · {units.length}
         </h2>
         {extraLink ? (
           <Link
@@ -104,14 +154,34 @@ export function HomeFreshPicksOperations({
         </p>
       ) : null}
 
-      {units.length === 0 ? (
-        <p className="text-skyline text-sm">No Fresh Picks right now.</p>
+      {loading ? (
+        <p className="text-skyline text-sm">Loading Fresh Picks…</p>
+      ) : loadError ? (
+        <div className="space-y-3">
+          <p className="text-skyline text-sm" role="alert">
+            We couldn&apos;t load Fresh Picks right now.
+          </p>
+          <button
+            className={btnSecondary}
+            disabled={pending}
+            onClick={retryFreshPicks}
+            type="button"
+          >
+            Retry
+          </button>
+        </div>
+      ) : units.length === 0 ? (
+        <p className="text-skyline text-sm">
+          Nothing fresh at the moment. Check back later — the Bakery may add
+          more anytime.
+        </p>
       ) : (
-        <ul className="space-y-2">
-          {units.map((unit) => (
+        <ul className="grid grid-cols-1 gap-2 lg:grid-cols-4 lg:gap-3">
+          {preview.map((unit) => (
             <HomeFreshPickCard
               capabilities={capabilities}
               key={unit.id}
+              now={now}
               pending={pending}
               todayYmd={todayYmd}
               unit={unit}
@@ -178,6 +248,7 @@ function HomeFreshPickCard({
   capabilities,
   todayYmd,
   pending,
+  now,
   onAssign,
   onMove,
   onCut,
@@ -187,6 +258,7 @@ function HomeFreshPickCard({
   capabilities: ExtraWorkspaceCapabilities;
   todayYmd: string;
   pending: boolean;
+  now: Date;
   onAssign: () => void;
   onMove: () => void;
   onCut: () => void;
@@ -196,32 +268,69 @@ function HomeFreshPickCard({
     capabilities,
     walkInHeld: unit.walkInHeld,
   });
-  const status = extraFreshPickOperationalStatus(unit);
-  const statusLabel = extraFreshPickOperationalStatusLabel(status);
+  const statusLabel = homeFreshPickStatusLabel({
+    walkInHeld: unit.walkInHeld,
+    confirmedAt: unit.confirmedAt,
+    now,
+  });
+  const sizePrice = formatHomeFreshPickSizePrice({
+    sizeLabel: unit.sizeLabel,
+    unitPrice: unit.unitPrice,
+  });
   const summary = freshPickHomeSummaryLine({
     preparedOn: unit.preparedOn,
     pickupThroughAt: unit.pickupThroughAt,
     todayYmd,
   });
-  const hasBakeryActions =
-    flags.assign || flags.move || flags.cut || flags.unconfirm;
   const hasMore = flags.move || flags.cut || flags.unconfirm;
+  const photoAlt = unit.imageAlt?.trim() || unit.cakeName;
 
   return (
-    <li className="border-fog rounded-xl border bg-white px-3.5 py-3">
-      <p className="text-ink text-sm font-medium">
-        {unit.cakeName}{" "}
-        <span className="text-skyline font-normal">{unit.sizeLabel}</span>
-      </p>
-      <p className="text-skyline mt-0.5 text-[11px] font-medium tracking-wide uppercase">
-        Fresh Pick · {statusLabel}
-      </p>
-      <p className="text-skyline mt-1 text-sm">{summary}</p>
+    <li
+      className={[
+        "border-fog flex gap-3 rounded-xl border px-3 py-3 lg:flex-col",
+        unit.walkInHeld ? "bg-mist" : "bg-white",
+      ].join(" ")}
+    >
+      <div className="bg-fog relative h-[5.5rem] w-[5.5rem] shrink-0 overflow-hidden rounded-[10px] lg:aspect-square lg:h-auto lg:w-full">
+        {unit.imageUrl ? (
+          <CakePhotoImage
+            alt={photoAlt}
+            sizes="(min-width: 1024px) 180px, 88px"
+            src={unit.imageUrl}
+          />
+        ) : (
+          <span className="text-skyline flex h-full items-center justify-center px-1.5 text-center text-[10px]">
+            Photo coming soon
+          </span>
+        )}
+      </div>
 
-      {unit.walkInHeld || !hasBakeryActions ? (
-        <WalkInHoldPanel capabilities={capabilities} unit={unit} />
-      ) : (
-        <div className="mt-3 flex flex-wrap items-start gap-2">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <p className="text-ink line-clamp-2 text-sm font-medium leading-snug">
+          {unit.cakeName}
+        </p>
+        {sizePrice ? (
+          <p className="text-skyline mt-0.5 text-sm tabular-nums">{sizePrice}</p>
+        ) : null}
+        <p className="text-skyline mt-1 text-[11px] font-medium">{statusLabel}</p>
+        {unit.walkInHeld ? (
+          <>
+            <p className="text-skyline mt-0.5 text-sm">
+              {walkInHoldHomeUntilLine(unit.walkInHeldUntil, now)}
+            </p>
+            <p className="text-skyline mt-0.5 text-sm">
+              Held by {unit.walkInHeldByName?.trim() || "staff"}
+            </p>
+          </>
+        ) : (
+          <p className="text-skyline mt-0.5 text-sm">{summary}</p>
+        )}
+
+        <div
+          className="mt-3 flex flex-wrap items-start gap-2 lg:mt-auto lg:pt-3"
+          onClick={(event) => event.stopPropagation()}
+        >
           {flags.assign ? (
             <button
               className={btnPrimary}
@@ -234,7 +343,8 @@ function HomeFreshPickCard({
           ) : null}
           <WalkInHoldPanel
             capabilities={capabilities}
-            className="inline-flex"
+            className="contents"
+            layout="actions"
             unit={unit}
           />
           {hasMore ? (
@@ -242,9 +352,9 @@ function HomeFreshPickCard({
               <summary
                 className={`${btnSecondary} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
               >
-                More
+                More ▾
               </summary>
-              <div className="border-fog mt-2 flex flex-wrap gap-2 rounded-xl border bg-white p-2">
+              <div className="border-fog absolute left-0 z-20 mt-1 flex min-w-[12.5rem] flex-col gap-1 rounded-xl border bg-white p-2 shadow-lg">
                 {flags.move ? (
                   <button
                     className={btnSecondary}
@@ -279,7 +389,7 @@ function HomeFreshPickCard({
             </details>
           ) : null}
         </div>
-      )}
+      </div>
     </li>
   );
 }

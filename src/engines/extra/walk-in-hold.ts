@@ -32,6 +32,44 @@ export function formatWalkInHoldUntilClock(iso: string | null | undefined): stri
   return formatExtraPickupThroughClock(iso);
 }
 
+function walkInHoldRemainingMs(
+  untilIso: string | null | undefined,
+  now: Date,
+): number | null {
+  const until = untilIso?.trim() ?? "";
+  if (!until) return null;
+  const untilMs = Date.parse(until);
+  if (!Number.isFinite(untilMs)) return null;
+  return untilMs - now.getTime();
+}
+
+/**
+ * Display-only remaining-time copy. Never used to expire inventory.
+ * Final minute stays "Expires soon · 1 min left" — no seconds.
+ */
+export function walkInHoldCountdownLabel(
+  untilIso: string | null | undefined,
+  now: Date = new Date(),
+): string {
+  const remainingMs = walkInHoldRemainingMs(untilIso, now);
+  if (remainingMs == null) return "Expires soon · 1 min left";
+  const remainingMinutes = Math.ceil(remainingMs / 60_000);
+  if (remainingMinutes <= 1) return "Expires soon · 1 min left";
+  return `${remainingMinutes} min left`;
+}
+
+export function walkInHoldHomeUntilLine(
+  untilIso: string | null | undefined,
+  now: Date = new Date(),
+): string {
+  const remainingMs = walkInHoldRemainingMs(untilIso, now);
+  const countdown = walkInHoldCountdownLabel(untilIso, now);
+  if (remainingMs != null && Math.ceil(remainingMs / 60_000) <= 1) {
+    return countdown;
+  }
+  return `Held until ${formatWalkInHoldUntilClock(untilIso)} · ${countdown}`;
+}
+
 export function walkInHoldPlaceConfirmDescription(
   minutes: number = EXTRA_WALK_IN_HOLD_MINUTES,
 ): string {

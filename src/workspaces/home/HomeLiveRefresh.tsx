@@ -41,14 +41,27 @@ export function HomeLiveRefresh() {
           refresh();
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "extra_stock" },
+        () => {
+          refresh();
+        },
+      )
       .subscribe();
 
     const pollId = window.setInterval(() => {
       refresh();
     }, GUEST_ORDERS_LIVE_POLL_MS);
 
+    function onVisibility() {
+      if (document.visibilityState === "visible") refresh();
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
       window.clearInterval(pollId);
+      document.removeEventListener("visibilitychange", onVisibility);
       void supabase.removeChannel(channel);
     };
   }, [refresh]);

@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/foundation/auth/session";
 import { canAccessBakeryWorkspace } from "@/engines/bakery/capabilities";
-import { buildExtraWorkspaceCapabilities } from "@/engines/extra/capabilities";
+import {
+  buildExtraWorkspaceCapabilities,
+  canSeeHomeFreshPicks,
+} from "@/engines/extra/capabilities";
 import { canAccessWorkspace } from "@/foundation/navigation/access";
 import { evaluateExtraConfirm } from "@/engines/extra/fresh-picks-eligibility";
 import { normalizeExtraRejectReason } from "@/engines/extra/reject-reason";
@@ -13,6 +16,7 @@ import {
   findAssignableOrderForExtra,
   listExtraCakeOptions,
   listExtraStockUnits,
+  listHomeFreshPickUnits,
   type ExtraAssignableOrder,
 } from "@/workspaces/extra/queries";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
@@ -78,6 +82,25 @@ export async function listExtraStockUnitsAction(): Promise<ExtraStockUnit[]> {
 export async function listExtraCakeOptionsAction(): Promise<ExtraCakeOption[]> {
   await requireExtraStaff();
   return listExtraCakeOptions();
+}
+
+export async function listHomeFreshPickUnitsAction(): Promise<{
+  units: ExtraStockUnit[];
+  error: string | null;
+}> {
+  const staff = await requireStaff();
+  const caps = buildExtraWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!canSeeHomeFreshPicks(caps)) {
+    return { units: [], error: "Fresh Picks are not available for this role." };
+  }
+  try {
+    return { units: await listHomeFreshPickUnits(), error: null };
+  } catch {
+    return { units: [], error: "We couldn't load Fresh Picks right now." };
+  }
 }
 
 export type ProposeExtraInput = {

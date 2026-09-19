@@ -3,9 +3,12 @@ import {
   isExtraConfirmedOnOffer,
   type ExtraLifecycle,
 } from "@/engines/extra/availability";
+import { compareHomeFreshPickUnits } from "@/engines/extra/home-fresh-picks";
 import { isExtraWalkInHeld } from "@/engines/extra/walk-in-hold";
+import { resolveCakePhoto, type ResolvableCakePhoto } from "@/engines/menu/cake-photos";
 import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
 import { createClient } from "@/lib/supabase/server";
+import { isMissingCakePhotoSchema } from "@/workspaces/library/cakes/photo-storage";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
 
 type ExtraStockRow = {
@@ -129,6 +132,120 @@ export function mapExtraStockRow(
   };
 }
 
+type ExtraPhotoRow = {
+  id?: string | null;
+  cake_id: string;
+  image_url: string;
+  alt_text: string | null;
+  sort_order: number;
+  cake_size_id?: string | null;
+  is_default?: boolean | null;
+};
+
+const EXTRA_PHOTO_SELECT =
+  "id, image_url, alt_text, sort_order, cake_size_id, is_default";
+const EXTRA_PHOTO_SELECT_LEGACY = "image_url, alt_text, sort_order";
+
+function mapExtraCakePhoto(
+  photo: ExtraPhotoRow,
+  index: number,
+): ResolvableCakePhoto & { cakeId: string } {
+  return {
+    id: photo.id?.trim() || `photo-${index}-${photo.sort_order}`,
+    url: photo.image_url,
+    altText: photo.alt_text,
+    sortOrder: photo.sort_order,
+    cakeSizeId: photo.cake_size_id ?? null,
+    isDefault: Boolean(photo.is_default),
+    cakeId: photo.cake_id,
+  };
+}
+
+async function extraPhotosByCake(
+  cakeIds: string[],
+): Promise<Map<string, ResolvableCakePhoto[]>> {
+  const photosByCake = new Map<string, ResolvableCakePhoto[]>();
+  if (cakeIds.length === 0) return photosByCake;
+  const supabase = await createClient();
+  const run = (photoSelect: string) =>
+    supabase
+      .from("library_cake_photos")
+      .select(`cake_id, ${photoSelect}`)
+      .in("cake_id", cakeIds)
+      .order("sort_order", { ascending: true });
+
+  let result = await run(EXTRA_PHOTO_SELECT);
+  if (result.error && isMissingCakePhotoSchema(result.error.message)) {
+    result = await run(EXTRA_PHOTO_SELECT_LEGACY);
+  }
+  if (result.error) return photosByCake;
+
+  for (const photo of (result.data ?? []) as unknown as ExtraPhotoRow[]) {
+    if (!photo.image_url) continue;
+    const mapped = mapExtraCakePhoto(photo, photosByCake.get(photo.cake_id)?.length ?? 0);
+    const list = photosByCake.get(photo.cake_id) ?? [];
+    list.push(mapped);
+    photosByCake.set(photo.cake_id, list);
+  }
+  return photosByCake;
+}
+
+async function extraPricesBySize(sizeIds: string[]): Promise<Map<string, number>> {
+  const prices = new Map<string, number>();
+  if (sizeIds.length === 0) return prices;
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("library_cake_sizes")
+    .select("id, price")
+    .in("id", sizeIds);
+  if (error) return prices;
+  for (const row of (data ?? []) as Array<{ id: string; price: number | string | null }>) {
+    if (row.price == null) continue;
+    const price = Number(row.price);
+    if (!Number.isFinite(price)) continue;
+    prices.set(row.id, price);
+  }
+  return prices;
+}
+
+async function attachHomeFreshPickPresentation(
+  units: ExtraStockUnit[],
+): Promise<ExtraStockUnit[]> {
+  const cakeIds = [
+    ...new Set(
+      units
+        .map((unit) => unit.libraryCakeId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const sizeIds = [
+    ...new Set(
+      units
+        .map((unit) => unit.libraryCakeSizeId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const [photosByCake, priceBySize] = await Promise.all([
+    extraPhotosByCake(cakeIds),
+    extraPricesBySize(sizeIds),
+  ]);
+
+  return units.map((unit) => {
+    const photos = unit.libraryCakeId
+      ? (photosByCake.get(unit.libraryCakeId) ?? [])
+      : [];
+    const image = resolveCakePhoto(photos, unit.libraryCakeSizeId);
+    return {
+      ...unit,
+      imageUrl: image?.url ?? null,
+      imageAlt: image?.altText ?? null,
+      unitPrice: unit.libraryCakeSizeId
+        ? (priceBySize.get(unit.libraryCakeSizeId) ?? null)
+        : null,
+    };
+  });
+}
+
 export async function listExtraStockUnits(): Promise<ExtraStockUnit[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -231,12 +348,8 @@ export async function listHomeFreshPickUnits(): Promise<ExtraStockUnit[]> {
       }),
     );
 
-  units.sort((a, b) => {
-    if (a.walkInHeld !== b.walkInHeld) return a.walkInHeld ? -1 : 1;
-    return (a.pickupThroughAt ?? "").localeCompare(b.pickupThroughAt ?? "");
-  });
-
-  return units;
+  units.sort(compareHomeFreshPickUnits);
+  return attachHomeFreshPickPresentation(units);
 }
 
 export type ExtraAssignableOrder = {

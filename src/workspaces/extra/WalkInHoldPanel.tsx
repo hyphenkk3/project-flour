@@ -23,6 +23,8 @@ type WalkInHoldPanelProps = {
   capabilities: ExtraWorkspaceCapabilities;
   className?: string;
   disabled?: boolean;
+  /** Home cards use actions-only; ExtraBoard keeps the full hold copy. */
+  layout?: "full" | "actions";
 };
 
 const btnSecondary =
@@ -33,6 +35,7 @@ export function WalkInHoldPanel({
   capabilities,
   className,
   disabled = false,
+  layout = "full",
 }: WalkInHoldPanelProps) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -80,13 +83,19 @@ export function WalkInHoldPanel({
   if (!capabilities.canViewWalkInHold) return null;
   if (!unit.walkInHeld && !capabilities.canCreateWalkInHold) return null;
 
+  const actionsOnly = layout === "actions";
   const until = formatWalkInHoldUntilClock(unit.walkInHeldUntil);
   const extended = Boolean(unit.walkInHoldExtendedAt);
   const canMutate =
     capabilities.canExtendWalkInHold || capabilities.canReleaseWalkInHold;
 
   return (
-    <div className={className ?? "mt-3 space-y-2"}>
+    <div
+      className={
+        className ?? (actionsOnly ? "flex flex-wrap gap-2" : "mt-3 space-y-2")
+      }
+      onClick={(event) => event.stopPropagation()}
+    >
       {!unit.walkInHeld ? (
         capabilities.canCreateWalkInHold ? (
           <button
@@ -103,13 +112,17 @@ export function WalkInHoldPanel({
         ) : null
       ) : (
         <>
-          <p className="text-ink text-sm font-medium">Walk-in Hold</p>
-          <p className="text-skyline text-sm">Held until {until}</p>
-          <p className="text-skyline text-sm">
-            Held by {unit.walkInHeldByName?.trim() || "staff"}
-          </p>
+          {actionsOnly ? null : (
+            <>
+              <p className="text-ink text-sm font-medium">Walk-in Hold</p>
+              <p className="text-skyline text-sm">Held until {until}</p>
+              <p className="text-skyline text-sm">
+                Held by {unit.walkInHeldByName?.trim() || "staff"}
+              </p>
+            </>
+          )}
           {canMutate ? (
-            <div className="flex flex-wrap gap-2">
+            <div className={actionsOnly ? "contents" : "flex flex-wrap gap-2"}>
               {capabilities.canExtendWalkInHold ? (
                 <button
                   className={btnSecondary}
@@ -120,7 +133,9 @@ export function WalkInHoldPanel({
                   }}
                   type="button"
                 >
-                  Extend {EXTRA_WALK_IN_HOLD_EXTENSION_MINUTES} min
+                  {actionsOnly
+                    ? "Extend"
+                    : `Extend ${EXTRA_WALK_IN_HOLD_EXTENSION_MINUTES} min`}
                 </button>
               ) : null}
               {capabilities.canReleaseWalkInHold ? (

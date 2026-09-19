@@ -37,6 +37,7 @@ type HomeCockpitProps = {
   preferCalendarScheduleCta?: boolean;
   extraCapabilities?: ExtraWorkspaceCapabilities | null;
   freshPickUnits?: ExtraStockUnit[];
+  freshPickLoadError?: boolean;
 };
 
 function SummaryChip({
@@ -140,6 +141,7 @@ export function HomeCockpit({
   preferCalendarScheduleCta = false,
   extraCapabilities = null,
   freshPickUnits = [],
+  freshPickLoadError = false,
 }: HomeCockpitProps) {
   const { summary, attentionGroups, attentionPreview, handoffs, schedule } =
     model;
@@ -238,6 +240,7 @@ export function HomeCockpit({
       {extraCapabilities ? (
         <HomeFreshPicksOperations
           capabilities={extraCapabilities}
+          loadError={freshPickLoadError}
           todayYmd={model.todayYmd}
           units={freshPickUnits}
         />
