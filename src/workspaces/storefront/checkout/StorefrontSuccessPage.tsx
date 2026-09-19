@@ -20,8 +20,9 @@ import { getGuestPreorderReceipt } from "@/workspaces/storefront/checkout/receip
 import {
   ORDER_DETAILS_CARD_CONTACT,
   ORDER_DETAILS_CARD_PAYMENT,
-  ORDER_DETAILS_NOTICE_BODY,
   ORDER_DETAILS_NOTICE_TITLE,
+  orderDetailsNoticeBody,
+  orderDetailsNoticeMark,
 } from "@/workspaces/storefront/checkout/order-details-card";
 import { SaveOrderDetailsButton } from "@/workspaces/storefront/checkout/SaveOrderDetailsButton";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
@@ -46,8 +47,9 @@ export async function StorefrontSuccessPage({
   const contactLine = isFreshPick
     ? FRESH_PICKS_SUCCESS_CONTACT
     : ORDER_DETAILS_CARD_CONTACT;
-  const noticeMark = "24 hours";
-  const noticeMarkAt = ORDER_DETAILS_NOTICE_BODY.indexOf(noticeMark);
+  const noticeBody = orderDetailsNoticeBody(isFreshPick);
+  const noticeMark = orderDetailsNoticeMark(isFreshPick);
+  const noticeMarkAt = noticeBody.indexOf(noticeMark);
 
   return (
     <main className="bg-paper mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-16 sm:px-6">
@@ -75,14 +77,12 @@ export async function StorefrontSuccessPage({
         <p className="text-skyline mt-2 text-sm leading-relaxed sm:text-[15px]">
           {noticeMarkAt >= 0 ? (
             <>
-              {ORDER_DETAILS_NOTICE_BODY.slice(0, noticeMarkAt)}
+              {noticeBody.slice(0, noticeMarkAt)}
               <span className="text-ink font-semibold">{noticeMark}</span>
-              {ORDER_DETAILS_NOTICE_BODY.slice(
-                noticeMarkAt + noticeMark.length,
-              )}
+              {noticeBody.slice(noticeMarkAt + noticeMark.length)}
             </>
           ) : (
-            ORDER_DETAILS_NOTICE_BODY
+            noticeBody
           )}
         </p>
       </aside>

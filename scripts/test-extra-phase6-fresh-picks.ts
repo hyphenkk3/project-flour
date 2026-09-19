@@ -17,6 +17,8 @@ import {
   FRESH_PICKS_SOLD_OUT_MESSAGE,
   FRESH_PICKS_SUCCESS_CONTACT,
   FRESH_PICKS_SUCCESS_FLOW,
+  FRESH_PICKS_SUCCESS_NOTICE,
+  FRESH_PICKS_SUCCESS_NOTICE_MARK,
   FRESH_PICKS_SUCCESS_PAYMENT,
   FRESH_PICKS_SUCCESS_TITLE,
   FRESH_PICKS_UNAVAILABLE_BODY,
@@ -308,8 +310,14 @@ assert.equal(FRESH_PICKS_SUCCESS_TITLE, "Order Received");
 assert.equal(FRESH_PICKS_SUCCESS_PAYMENT, "Payment Pending");
 assert.equal(
   FRESH_PICKS_SUCCESS_CONTACT,
-  "Whitebird will contact you via WhatsApp.",
+  "Whitebird will contact you via WhatsApp to proceed with payment and confirm your order.",
 );
+assert.equal(
+  FRESH_PICKS_SUCCESS_NOTICE,
+  "If you do not receive a confirmation from us within 30 minutes, please contact us via WhatsApp.",
+);
+assert.equal(FRESH_PICKS_SUCCESS_NOTICE_MARK, "30 minutes");
+assert.doesNotMatch(FRESH_PICKS_SUCCESS_NOTICE, /24 hours/);
 assert.equal(FRESH_PICKS_SUCCESS_FLOW, "fresh-picks");
 assert.match(extraCheckoutSrc, /FRESH_PICKS_SUCCESS_FLOW/);
 assert.match(
@@ -321,6 +329,8 @@ assert.doesNotMatch(extraActionsSrc, /from "next\/navigation"/);
 assert.doesNotMatch(extraActionsSrc, /redirect\(/);
 assert.match(successSrc, /isFreshPick/);
 assert.match(successSrc, /FRESH_PICKS_SUCCESS_TITLE/);
+assert.match(successSrc, /orderDetailsNoticeBody\(isFreshPick\)/);
+assert.match(successSrc, /orderDetailsNoticeMark\(isFreshPick\)/);
 assert.match(successSrc, /ClearPreorderDraftOnSuccess/);
 assert.match(successSrc, /ClearFreshPickCartOnSuccess/);
 assert.match(

@@ -14,6 +14,7 @@ import {
   ORDER_DETAILS_CARD_FOOTER,
   ORDER_DETAILS_CARD_PAYMENT,
   ORDER_DETAILS_NOTICE_BODY,
+  ORDER_DETAILS_NOTICE_MARK,
   ORDER_DETAILS_NOTICE_TITLE,
   ORDER_DETAILS_PNG_HEIGHT,
   ORDER_DETAILS_PNG_WIDTH,
@@ -26,11 +27,17 @@ import {
   isShareUnavailableError,
   orderDetailsCakeImageUrls,
   orderDetailsFileName,
+  orderDetailsNoticeBody,
+  orderDetailsNoticeMark,
   preloadOrderDetailsImages,
   resolveOrderDetailsSavePath,
   shareOrDownloadOrderDetailsImage,
   wrapCanvasText,
 } from "@/workspaces/storefront/checkout/order-details-card";
+import {
+  FRESH_PICKS_SUCCESS_NOTICE,
+  FRESH_PICKS_SUCCESS_NOTICE_MARK,
+} from "@/engines/extra/customer-fresh-picks";
 
 function readSrc(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -115,7 +122,12 @@ assert.equal(
 );
 assert.equal(model.noticeTitle, ORDER_DETAILS_NOTICE_TITLE);
 assert.equal(model.noticeBody, ORDER_DETAILS_NOTICE_BODY);
+assert.equal(model.noticeMark, ORDER_DETAILS_NOTICE_MARK);
 assert.match(model.noticeBody, /24 hours/);
+assert.doesNotMatch(model.noticeBody, /30 minutes/);
+assert.equal(orderDetailsNoticeBody(false), ORDER_DETAILS_NOTICE_BODY);
+assert.equal(orderDetailsNoticeMark(false), "24 hours");
+assert.doesNotMatch(orderDetailsNoticeBody(false), /30 minutes/);
 assert.equal(model.cakes[0]?.imageUrl, null);
 assert.equal(model.addons[0]?.imageUrl, undefined);
 assert.equal(model.complimentary[0]?.imageUrl, undefined);
@@ -179,6 +191,18 @@ assert.equal(freshPickModel.cakes[0]?.meta, '6" × 1');
 assert.equal(freshPickModel.cakes[0]?.price, "RM135");
 assert.equal(freshPickModel.addons[0]?.name, "Birthday Card");
 assert.equal(freshPickModel.complimentary[0]?.name, "Candle");
+assert.equal(freshPickModel.noticeTitle, ORDER_DETAILS_NOTICE_TITLE);
+assert.equal(freshPickModel.noticeBody, FRESH_PICKS_SUCCESS_NOTICE);
+assert.equal(freshPickModel.noticeMark, FRESH_PICKS_SUCCESS_NOTICE_MARK);
+assert.equal(
+  freshPickModel.noticeBody,
+  "If you do not receive a confirmation from us within 30 minutes, please contact us via WhatsApp.",
+);
+assert.match(freshPickModel.noticeBody, /30 minutes/);
+assert.doesNotMatch(freshPickModel.noticeBody, /24 hours/);
+assert.equal(orderDetailsNoticeBody(true), FRESH_PICKS_SUCCESS_NOTICE);
+assert.equal(orderDetailsNoticeMark(true), "30 minutes");
+assert.doesNotMatch(orderDetailsNoticeBody(true), /24 hours/);
 assert.match(freshPickModel.complimentary[0]?.meta ?? "", /Complimentary/);
 assert.equal(freshPickModel.total, "RM138");
 assert.equal(freshPickModel.footer, ORDER_DETAILS_CARD_FOOTER);
@@ -354,7 +378,13 @@ function assertReceiptLayout(
   assert.match(joined, /ORDER DETAILS/);
   assert.match(joined, /YOUR ORDER/);
   assert.match(joined, /IMPORTANT — PLEASE TAKE NOTE/);
-  assert.match(joined, /24 hours/);
+  if (receipt.isFreshPick) {
+    assert.match(joined, /30 minutes/);
+    assert.doesNotMatch(joined, /24 hours/);
+  } else {
+    assert.match(joined, /24 hours/);
+    assert.doesNotMatch(joined, /30 minutes/);
+  }
   assert.match(joined, /Order number/);
   assert.match(joined, /Order placed/);
   assert.match(joined, /9 September 2026 · 8:38 AM/);
@@ -386,6 +416,7 @@ function assertReceiptLayout(
   );
   assert.ok((footer?.y ?? 0) > 1700);
   assert.doesNotMatch(footer?.text ?? "", /24 hours/);
+  assert.doesNotMatch(footer?.text ?? "", /30 minutes/);
   const noticeLine = lines.find((line) =>
     line.text.includes("IMPORTANT — PLEASE TAKE NOTE"),
   );
@@ -619,8 +650,10 @@ assert.match(successSrc, /Order Received/);
 assert.match(successSrc, /ORDER_DETAILS_CARD_PAYMENT/);
 assert.match(successSrc, /ORDER_DETAILS_CARD_CONTACT/);
 assert.match(successSrc, /ORDER_DETAILS_NOTICE_TITLE/);
-assert.match(successSrc, /ORDER_DETAILS_NOTICE_BODY/);
-assert.match(successSrc, /"24 hours"/);
+assert.match(successSrc, /orderDetailsNoticeBody\(isFreshPick\)/);
+assert.match(successSrc, /orderDetailsNoticeMark\(isFreshPick\)/);
+assert.doesNotMatch(successSrc, /const noticeMark = "24 hours"/);
+assert.doesNotMatch(successSrc, /const noticeMark = "30 minutes"/);
 assert.ok(
   successSrc.indexOf("{contactLine}") < successSrc.indexOf("<aside"),
 );
@@ -722,6 +755,9 @@ assert.match(receiptSrc, /created_at,/);
 assert.match(receiptSrc, /placedAt:/);
 assert.match(cardSrc, /ORDER_DETAILS_NOTICE_TITLE/);
 assert.match(cardSrc, /ORDER_DETAILS_NOTICE_BODY/);
+assert.match(cardSrc, /orderDetailsNoticeBody\(receipt\.isFreshPick\)/);
+assert.match(cardSrc, /orderDetailsNoticeMark\(receipt\.isFreshPick\)/);
+assert.match(cardSrc, /model\.noticeMark/);
 assert.match(cardSrc, /preloadOrderDetailsImages/);
 assert.match(cardSrc, /crossOrigin = "anonymous"/);
 assert.match(cardSrc, /drawCakePhoto/);

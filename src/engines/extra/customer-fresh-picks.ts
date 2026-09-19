@@ -158,6 +158,11 @@ export const FRESH_PICKS_SUCCESS_PAYMENT = "Payment Pending";
 export const FRESH_PICKS_SUCCESS_CONTACT =
   "Whitebird will contact you via WhatsApp to proceed with payment and confirm your order.";
 
+export const FRESH_PICKS_SUCCESS_NOTICE =
+  "If you do not receive a confirmation from us within 30 minutes, please contact us via WhatsApp.";
+
+export const FRESH_PICKS_SUCCESS_NOTICE_MARK = "30 minutes";
+
 export const FRESH_PICKS_SUCCESS_FLOW = "fresh-picks";
 
 /** Map Extra RPC / action inventory errors to customer-facing Sold Out copy. */

@@ -14,6 +14,15 @@ import {
   guestPreorderReceiptAuthorized,
   receiptCookieSecure,
 } from "@/workspaces/storefront/checkout/receipt";
+import {
+  ORDER_DETAILS_NOTICE_BODY,
+  orderDetailsNoticeBody,
+  orderDetailsNoticeMark,
+} from "@/workspaces/storefront/checkout/order-details-card";
+import {
+  FRESH_PICKS_SUCCESS_NOTICE,
+  FRESH_PICKS_SUCCESS_NOTICE_MARK,
+} from "@/engines/extra/customer-fresh-picks";
 import { calculateCommercialSubtotal } from "@/engines/orders/totals";
 import { storefrontPhotoForSize } from "@/workspaces/storefront/catalog/cake-photo-map";
 import type { StorefrontCakePhoto } from "@/types/storefront";
@@ -111,8 +120,24 @@ assert.doesNotMatch(extraQueriesSrc, /storefrontCatalogueListingPhoto/);
 assert.match(successSrc, /CakePhotoImage/);
 assert.match(successSrc, /item\.imageUrl/);
 assert.match(successSrc, /ORDER_DETAILS_NOTICE_TITLE/);
-assert.match(successSrc, /ORDER_DETAILS_NOTICE_BODY/);
-assert.match(successSrc, /"24 hours"/);
+assert.match(successSrc, /orderDetailsNoticeBody\(isFreshPick\)/);
+assert.match(successSrc, /orderDetailsNoticeMark\(isFreshPick\)/);
+assert.doesNotMatch(successSrc, /const noticeMark = "24 hours"/);
+assert.doesNotMatch(successSrc, /const noticeMark = "30 minutes"/);
+assert.equal(
+  orderDetailsNoticeBody(false),
+  "If you do not receive a confirmation from us within 24 hours, please contact us via WhatsApp.",
+);
+assert.equal(orderDetailsNoticeBody(false), ORDER_DETAILS_NOTICE_BODY);
+assert.equal(orderDetailsNoticeMark(false), "24 hours");
+assert.doesNotMatch(orderDetailsNoticeBody(false), /30 minutes/);
+assert.equal(
+  orderDetailsNoticeBody(true),
+  "If you do not receive a confirmation from us within 30 minutes, please contact us via WhatsApp.",
+);
+assert.equal(orderDetailsNoticeBody(true), FRESH_PICKS_SUCCESS_NOTICE);
+assert.equal(orderDetailsNoticeMark(true), FRESH_PICKS_SUCCESS_NOTICE_MARK);
+assert.doesNotMatch(orderDetailsNoticeBody(true), /24 hours/);
 assert.ok(
   successSrc.indexOf("{contactLine}") < successSrc.indexOf("<aside"),
 );

@@ -1,4 +1,8 @@
 import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
+import {
+  FRESH_PICKS_SUCCESS_NOTICE,
+  FRESH_PICKS_SUCCESS_NOTICE_MARK,
+} from "@/engines/extra/customer-fresh-picks";
 import { workspaceFulfilmentSectionTitle } from "@/engines/orders/fulfilment";
 import {
   formatCustomerOrderPlacedAt,
@@ -17,6 +21,17 @@ export const ORDER_DETAILS_CARD_CONTACT =
 export const ORDER_DETAILS_NOTICE_TITLE = "IMPORTANT — PLEASE TAKE NOTE";
 export const ORDER_DETAILS_NOTICE_BODY =
   "If you do not receive a confirmation from us within 24 hours, please contact us via WhatsApp.";
+export const ORDER_DETAILS_NOTICE_MARK = "24 hours";
+
+export function orderDetailsNoticeBody(isFreshPick: boolean): string {
+  return isFreshPick ? FRESH_PICKS_SUCCESS_NOTICE : ORDER_DETAILS_NOTICE_BODY;
+}
+
+export function orderDetailsNoticeMark(isFreshPick: boolean): string {
+  return isFreshPick
+    ? FRESH_PICKS_SUCCESS_NOTICE_MARK
+    : ORDER_DETAILS_NOTICE_MARK;
+}
 export const ORDER_DETAILS_CAKE_PHOTO_SIZE = 112;
 
 const PAPER = "#f5f0e9";
@@ -90,6 +105,7 @@ export type OrderDetailsCardModel = {
   contactLine: string;
   noticeTitle: string;
   noticeBody: string;
+  noticeMark: string;
   orderNumber: string;
   placedAt: string;
   customer: string;
@@ -134,7 +150,8 @@ export function buildOrderDetailsCardModel(
     paymentStatus: ORDER_DETAILS_CARD_PAYMENT,
     contactLine: ORDER_DETAILS_CARD_CONTACT,
     noticeTitle: ORDER_DETAILS_NOTICE_TITLE,
-    noticeBody: ORDER_DETAILS_NOTICE_BODY,
+    noticeBody: orderDetailsNoticeBody(receipt.isFreshPick),
+    noticeMark: orderDetailsNoticeMark(receipt.isFreshPick),
     orderNumber: receipt.orderNumber?.trim() || "—",
     placedAt: receipt.placedAt
       ? formatCustomerOrderPlacedAt(receipt.placedAt)
@@ -749,7 +766,7 @@ export function drawOrderDetailsCard(
       const lineY = noticeBodyY;
       ops.push(() => {
         ctx.font = noticeBodyFont;
-        fillTextMarking(ctx, bodyLine, PAD_X + noticePadX, lineY, "24 hours");
+        fillTextMarking(ctx, bodyLine, PAD_X + noticePadX, lineY, model.noticeMark);
       });
       noticeBodyY += line(32);
     }
