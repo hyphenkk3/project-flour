@@ -89,8 +89,12 @@ export function HomeFreshPicksSection({ picks }: HomeFreshPicksSectionProps) {
                     <div className="min-w-0 flex-1 py-0.5 lg:max-w-[12.5rem] lg:flex-none">
                       <p className="text-ink text-[13px] font-medium leading-snug">
                         {status}
-                        {dateLabel ? ` · ${dateLabel}` : ""}
                       </p>
+                      {dateLabel ? (
+                        <p className="text-skyline mt-0.5 text-xs leading-tight whitespace-nowrap">
+                          {dateLabel}
+                        </p>
+                      ) : null}
                       <h3 className="font-display text-ink mt-1 line-clamp-2 text-[1.02rem] leading-snug tracking-tight">
                         {pick.cakeName}
                       </h3>

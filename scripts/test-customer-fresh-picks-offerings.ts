@@ -556,8 +556,10 @@ const homeFreshSrc = readSrc(
 assert.match(homeFreshSrc, /freshPickCustomerStatusLabel/);
 assert.match(homeFreshSrc, /Currently on hold|FRESH_PICKS_HELD_LABEL|walkInHeld/);
 assert.match(homeFreshSrc, /freshPickAvailabilityDateLabel/);
-assert.match(homeFreshSrc, /status\}\s*\{dateLabel \? ` · \$\{dateLabel\}` : ""\}/);
 assert.match(homeFreshSrc, /text-ink text-\[13px\] font-medium leading-snug/);
+assert.match(homeFreshSrc, /dateLabel \? \(/);
+assert.match(homeFreshSrc, /text-skyline mt-0\.5 text-xs leading-tight whitespace-nowrap/);
+assert.doesNotMatch(homeFreshSrc, / · \$\{dateLabel\}/);
 assert.match(homeFreshSrc, /Order →/);
 assert.doesNotMatch(homeFreshSrc, /Pickup today/);
 assert.doesNotMatch(homeFreshSrc, /Held by/);
