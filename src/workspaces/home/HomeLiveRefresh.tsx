@@ -48,6 +48,19 @@ export function HomeLiveRefresh() {
           refresh();
         },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "staff_notification_events",
+        },
+        (payload) => {
+          const code = (payload.new as { code?: string | null }).code;
+          if (code !== "waiting_list_new_request") return;
+          refresh();
+        },
+      )
       .subscribe();
 
     const pollId = window.setInterval(() => {

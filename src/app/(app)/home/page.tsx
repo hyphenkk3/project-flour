@@ -25,6 +25,8 @@ import {
 import { listHomeFreshPickUnits } from "@/workspaces/extra/queries";
 import { buildHomeCockpitModel } from "@/workspaces/home/cockpit-model";
 import { HomeCockpit } from "@/workspaces/home/HomeCockpit";
+import { canViewWaitingList } from "@/engines/waiting-list/capabilities";
+import { listHomeWaitingListAttention } from "@/workspaces/waiting-list/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +79,7 @@ export default async function HomePage() {
     bakeryOrders,
     pendingApprovals,
     freshPicks,
+    waitingListAttention,
   ] = await Promise.all([
     shouldLoadOrders ? listGuestOrders() : Promise.resolve([]),
     canCollection
@@ -95,6 +98,9 @@ export default async function HomePage() {
       ? listPendingOperationsApprovals()
       : Promise.resolve([]),
     loadHomeFreshPicks(showHomeFreshPicks),
+    canViewWaitingList(role)
+      ? listHomeWaitingListAttention()
+      : Promise.resolve(null),
   ]);
 
   const visiblePendingApprovals = visiblePendingApprovalsForInbox(
@@ -126,6 +132,8 @@ export default async function HomePage() {
       extraCapabilities={showHomeFreshPicks ? extraCapabilities : null}
       freshPickLoadError={freshPicks.error}
       freshPickUnits={freshPicks.units}
+      canViewWaitingList={canViewWaitingList(role)}
+      waitingListAttention={waitingListAttention}
       preferCalendarScheduleCta={role === "owner"}
       roleName={staff.role.name}
       staffDisplayName={staff.displayName}

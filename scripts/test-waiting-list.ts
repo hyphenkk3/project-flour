@@ -57,6 +57,7 @@ import {
   nextWaitingListFilterSizeId,
   WAITING_LIST_FILTER_ACTION,
   WAITING_LIST_SECTION_ID,
+  waitingListBoardHref,
   waitingListFilterSizeOptions,
 } from "@/workspaces/waiting-list/filter";
 
@@ -605,6 +606,14 @@ assert.equal(WAITING_LIST_SECTION_ID, "waiting-list-heading");
 assert.equal(
   WAITING_LIST_FILTER_ACTION,
   "/bakery/availability#waiting-list-heading",
+);
+assert.equal(
+  waitingListBoardHref({
+    date: "2026-09-25",
+    cakeId: "cake-1",
+    sizeId: "size-1",
+  }),
+  "/bakery/availability?date=2026-09-25&wlCake=cake-1&wlSize=size-1#waiting-list-heading",
 );
 assert.match(boardSrc, /WAITING_LIST_FILTER_ACTION/);
 assert.match(boardSrc, /method="get"/);

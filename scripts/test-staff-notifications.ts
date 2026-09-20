@@ -17,6 +17,7 @@ import {
   classifyOrderInsert,
   classifyOrderUpdate,
   classifyTimelineInsert,
+  classifyWaitingListRequestInsert,
   isNewOrderNotificationSource,
   notificationChannelsForPreference,
   resolveStaffNotificationPreference,
@@ -86,6 +87,7 @@ assert.deepEqual(codes, [
   "approval_required",
   "last_minute",
   "fresh_pick_walk_in_hold_reminder",
+  "waiting_list_new_request",
 ]);
 
 assert.equal(
@@ -120,6 +122,10 @@ assert.equal(
   STAFF_NOTIFICATION_AUTHORITATIVE_SOURCES.fresh_pick_walk_in_hold_reminder,
   "extra_stock.walk_in_hold.reminder",
 );
+assert.equal(
+  STAFF_NOTIFICATION_AUTHORITATIVE_SOURCES.waiting_list_new_request,
+  "waiting_list_requests.insert.customer",
+);
 
 const sql = read(
   "supabase/migrations/20260903160000_staff_notification_reliability.sql",
@@ -133,6 +139,20 @@ assert.doesNotMatch(sql, /from public\.waiting_list/);
 assert.match(sql, /staff_notification_request_dispatch/);
 assert.match(sql, /net\.http_post/);
 assert.match(sql, /exception/);
+
+const waitingListNotifySql = read(
+  "supabase/migrations/20260920120000_staff_notification_waiting_list_new_request.sql",
+);
+assert.match(waitingListNotifySql, /waiting_list_new_request/);
+assert.match(waitingListNotifySql, /waiting_list_new_request:' \|\| v_request.id/);
+assert.match(waitingListNotifySql, /created_by_staff_id is not null/);
+assert.match(waitingListNotifySql, /constraint trigger/i);
+assert.match(waitingListNotifySql, /initially deferred/i);
+assert.match(waitingListNotifySql, /#waiting-list-heading/);
+assert.match(waitingListNotifySql, /wlCake=/);
+assert.match(waitingListNotifySql, /wlSize=/);
+assert.doesNotMatch(waitingListNotifySql, /_waiting_list_matching_capacity/);
+assert.doesNotMatch(waitingListNotifySql, /waiting_list_enabled is not true/);
 
 const newOrderContentSql = read(
   "supabase/migrations/20260905010000_staff_notification_new_order_content.sql",
@@ -345,6 +365,28 @@ assert.equal(
     status: "approved",
   }).length,
   0,
+);
+
+const customerWaitingList = classifyWaitingListRequestInsert({
+  id: "wl-req-1",
+  createdByStaffId: null,
+});
+assert.equal(customerWaitingList.length, 1);
+assert.equal(customerWaitingList[0]?.code, "waiting_list_new_request");
+assert.equal(
+  customerWaitingList[0]?.eventKey,
+  "waiting_list_new_request:wl-req-1",
+);
+assert.equal(
+  classifyWaitingListRequestInsert({
+    id: "wl-req-1",
+    createdByStaffId: "staff-1",
+  }).length,
+  0,
+);
+assert.equal(
+  staffNotificationEventKey("waiting_list_new_request", "wl-req-1"),
+  staffNotificationEventKey("waiting_list_new_request", "wl-req-1"),
 );
 
 const lastMinuteInsert = classifyOrderInsert({

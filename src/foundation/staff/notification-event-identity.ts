@@ -23,6 +23,7 @@ export const STAFF_NOTIFICATION_AUTHORITATIVE_SOURCES = {
   order_edited: "order_timeline_events.insert.order_updated",
   approval_required: "operations_approval_requests.insert.pending",
   fresh_pick_walk_in_hold_reminder: "extra_stock.walk_in_hold.reminder",
+  waiting_list_new_request: "waiting_list_requests.insert.customer",
 } as const satisfies Record<StaffNotificationCode, string>;
 
 /**
@@ -214,6 +215,25 @@ export function classifyApprovalInsert(
       code: "approval_required",
       orderId: row.orderId ?? null,
       approvalId: row.id,
+    },
+  ];
+}
+
+export type WaitingListNotificationSnapshot = {
+  id: string;
+  createdByStaffId?: string | null;
+};
+
+export function classifyWaitingListRequestInsert(
+  row: WaitingListNotificationSnapshot,
+): StaffNotificationCandidate[] {
+  if (row.createdByStaffId) return [];
+  return [
+    {
+      eventKey: staffNotificationEventKey("waiting_list_new_request", row.id),
+      code: "waiting_list_new_request",
+      orderId: null,
+      approvalId: null,
     },
   ];
 }

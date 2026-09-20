@@ -105,9 +105,11 @@ export function StaffNotificationListener({
             description: row.description?.trim() || "",
             href: row.href ?? undefined,
             actionLabel:
-              row.code === "approval_required" && !row.order_id
-                ? "View approvals"
-                : "View order",
+              row.code === "waiting_list_new_request"
+                ? "View"
+                : row.code === "approval_required" && !row.order_id
+                  ? "View approvals"
+                  : "View order",
             tone: toneFromCode(row.code),
           });
         },

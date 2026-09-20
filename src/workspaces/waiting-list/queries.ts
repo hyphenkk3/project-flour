@@ -1,7 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
-import { parseBusinessDate } from "@/lib/dates";
+import { parseBusinessDate, toBusinessDateKey } from "@/lib/dates";
 import type { WaitingListItemStatus } from "@/engines/waiting-list/types";
+import {
+  parseWaitingListNotificationPayload,
+  waitingListHomePreviewLine,
+  waitingListNotificationHref,
+} from "@/engines/waiting-list/staff-notification";
+import { WAITING_LIST_FILTER_ACTION } from "@/workspaces/waiting-list/filter";
 import type {
+  HomeWaitingListAttention,
   WaitingListBoardRow,
   WaitingListCakeOption,
   WaitingListCollectionSetting,
@@ -248,6 +255,94 @@ export async function listWaitingListBoard(input: {
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (isMissingWaitingList(message)) return [];
+    throw error;
+  }
+}
+
+function isMissingNotification(message: string): boolean {
+  return /staff_notification|schema cache|does not exist/i.test(message);
+}
+
+export async function listHomeWaitingListAttention(): Promise<HomeWaitingListAttention> {
+  const empty: HomeWaitingListAttention = {
+    count: 0,
+    href: WAITING_LIST_FILTER_ACTION,
+    preview: null,
+  };
+  try {
+    const supabase = await createClient();
+    const todayStart = `${toBusinessDateKey()}T00:00:00+08:00`;
+    const { data, error } = await supabase
+      .from("staff_notification_events")
+      .select("id, href, payload, created_at")
+      .eq("code", "waiting_list_new_request")
+      .gte("created_at", todayStart)
+      .order("created_at", { ascending: false });
+    if (error) {
+      if (
+        isMissingNotification(error.message) ||
+        isMissingWaitingList(error.message)
+      ) {
+        return empty;
+      }
+      throw new Error(error.message);
+    }
+    const parsed = (data ?? []).flatMap((row) => {
+      const payload = parseWaitingListNotificationPayload(
+        (row as { payload?: Record<string, unknown> | null }).payload ?? null,
+      );
+      if (!payload) return [];
+      return [
+        {
+          payload,
+          href:
+            String((row as { href?: string | null }).href ?? "").trim() ||
+            waitingListNotificationHref({
+              pickupDate: payload.pickupDate,
+              cakeId: payload.cakeId,
+              sizeId: payload.sizeId,
+            }),
+        },
+      ];
+    });
+    if (parsed.length === 0) return empty;
+
+    const requestIds = [...new Set(parsed.map((row) => row.payload.requestId))];
+    const { data: requests, error: requestError } = await supabase
+      .from("waiting_list_requests")
+      .select("id, status")
+      .in("id", requestIds);
+    if (requestError) {
+      if (isMissingWaitingList(requestError.message)) return empty;
+      throw new Error(requestError.message);
+    }
+    const activeIds = new Set(
+      (requests ?? [])
+        .filter((row) => {
+          const status = String((row as { status?: string }).status ?? "");
+          return status === "active" || status === "partially_converted";
+        })
+        .map((row) => asId((row as { id?: string }).id)),
+    );
+    const visible = parsed.filter((row) => activeIds.has(row.payload.requestId));
+    const first = visible[0];
+    if (!first) return empty;
+
+    return {
+      count: visible.length,
+      href: first.href,
+      preview: {
+        requestId: first.payload.requestId,
+        guestName: first.payload.guestName,
+        line: waitingListHomePreviewLine(first.payload),
+        href: first.href,
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (isMissingNotification(message) || isMissingWaitingList(message)) {
+      return empty;
+    }
     throw error;
   }
 }

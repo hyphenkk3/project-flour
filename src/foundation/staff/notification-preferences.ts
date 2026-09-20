@@ -8,7 +8,8 @@ export type StaffNotificationCode =
   | "order_edited"
   | "approval_required"
   | "last_minute"
-  | "fresh_pick_walk_in_hold_reminder";
+  | "fresh_pick_walk_in_hold_reminder"
+  | "waiting_list_new_request";
 
 export type StaffNotificationWebMode = "transient" | "persistent";
 
@@ -65,6 +66,11 @@ export const STAFF_NOTIFICATION_DEFINITIONS: readonly StaffNotificationDefinitio
     code: "fresh_pick_walk_in_hold_reminder",
     label: "Fresh Pick walk-in hold",
     description: "When a Fresh Pick walk-in hold is about to expire.",
+  },
+  {
+    code: "waiting_list_new_request",
+    label: "New waiting list request",
+    description: "When a customer joins the waiting list.",
   },
 ];
 

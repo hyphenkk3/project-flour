@@ -71,15 +71,16 @@ export function buildStaffNotificationToast(
   mode: StaffNotificationWebMode,
 ): ToastInput {
   const durationMs = notificationDurationMs(mode);
+  const showAction =
+    mode === "persistent" || event.code === "waiting_list_new_request";
 
   return {
     title: event.title,
     description: event.description,
     tone: event.tone ?? "info",
     durationMs,
-    actionHref: mode === "persistent" ? event.href ?? undefined : undefined,
-    actionLabel:
-      mode === "persistent" ? event.actionLabel ?? "View" : undefined,
+    actionHref: showAction ? event.href ?? undefined : undefined,
+    actionLabel: showAction ? event.actionLabel ?? "View" : undefined,
   };
 }
 
@@ -112,7 +113,11 @@ function orderDescription(order: NotificationOrderSummary): string {
 export function buildOrderEventNotification(
   code: Exclude<
     StaffNotificationCode,
-    "approval_required" | "last_minute" | "new_order" | "fresh_pick_walk_in_hold_reminder"
+    | "approval_required"
+    | "last_minute"
+    | "new_order"
+    | "fresh_pick_walk_in_hold_reminder"
+    | "waiting_list_new_request"
   >,
   order: NotificationOrderSummary,
   eventId: string,
@@ -186,6 +191,25 @@ export function buildLastMinuteNotification(
     href: orderHref(order.id),
     actionLabel: "View order",
     tone: "warning",
+  };
+}
+
+export function buildWaitingListNewRequestNotification(
+  input: {
+    eventId: string;
+    href: string;
+    description: string;
+  },
+): StaffNotificationEvent {
+  return {
+    id: input.eventId,
+    code: "waiting_list_new_request",
+    orderId: null,
+    title: "New waiting list request",
+    description: input.description,
+    href: input.href,
+    actionLabel: "View",
+    tone: "info",
   };
 }
 

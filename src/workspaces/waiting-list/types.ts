@@ -43,3 +43,16 @@ export type WaitingListCakeOption = {
   name: string;
   sizes: Array<{ id: string; label: string }>;
 };
+
+export type HomeWaitingListAttentionPreview = {
+  requestId: string;
+  guestName: string;
+  line: string;
+  href: string;
+};
+
+export type HomeWaitingListAttention = {
+  count: number;
+  href: string;
+  preview: HomeWaitingListAttentionPreview | null;
+};

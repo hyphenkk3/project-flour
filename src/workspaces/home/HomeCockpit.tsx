@@ -15,6 +15,7 @@ import type { HomeDineInHandoffPreview } from "@/workspaces/home/cockpit-model";
 import { HomeFreshPicksOperations } from "@/workspaces/home/HomeFreshPicksOperations";
 import { HomeLiveRefresh } from "@/workspaces/home/HomeLiveRefresh";
 import { homeGreetingTitle } from "@/workspaces/home/greeting";
+import type { HomeWaitingListAttention } from "@/workspaces/waiting-list/types";
 
 const HOME_RETURN = "/home";
 const OPERATIONS_TODAY_HREF = "/owner?pickup=today";
@@ -38,6 +39,8 @@ type HomeCockpitProps = {
   extraCapabilities?: ExtraWorkspaceCapabilities | null;
   freshPickUnits?: ExtraStockUnit[];
   freshPickLoadError?: boolean;
+  waitingListAttention?: HomeWaitingListAttention | null;
+  canViewWaitingList?: boolean;
 };
 
 function SummaryChip({
@@ -155,6 +158,8 @@ export function HomeCockpit({
   extraCapabilities = null,
   freshPickUnits = [],
   freshPickLoadError = false,
+  waitingListAttention = null,
+  canViewWaitingList = false,
 }: HomeCockpitProps) {
   const { summary, attentionGroups, attentionPreview, handoffs, schedule } =
     model;
@@ -266,10 +271,36 @@ export function HomeCockpit({
           title="Needs Attention"
         />
         {attentionGroups.length === 0 &&
-        summary.pendingApprovals === 0 ? (
+        summary.pendingApprovals === 0 &&
+        !(canViewWaitingList && waitingListAttention && waitingListAttention.count > 0) ? (
           <p className="text-skyline text-sm">Nothing needs your attention.</p>
         ) : (
           <div className="space-y-2">
+            {canViewWaitingList &&
+            waitingListAttention &&
+            waitingListAttention.count > 0 ? (
+              <Link
+                className="border-fog hover:border-skyline block rounded-xl border bg-white px-3.5 py-3 transition"
+                href={waitingListAttention.href}
+              >
+                <span className="flex items-center justify-between gap-3">
+                  <span className="text-ink text-sm font-medium">Waiting List</span>
+                  <span className="text-signal text-sm font-semibold">
+                    {waitingListAttention.count === 1
+                      ? "1 new customer request"
+                      : `${waitingListAttention.count} new customer requests`}
+                  </span>
+                </span>
+                {waitingListAttention.preview ? (
+                  <span className="text-skyline mt-1 block text-xs">
+                    {waitingListAttention.preview.line}
+                  </span>
+                ) : null}
+                <span className="text-signal mt-2 block text-sm font-medium">
+                  View Waiting List →
+                </span>
+              </Link>
+            ) : null}
             {canAccessApprovals && summary.pendingApprovals > 0 ? (
               <Link
                 className="border-fog hover:border-skyline flex items-center justify-between gap-3 rounded-xl border bg-white px-3.5 py-3 transition"
