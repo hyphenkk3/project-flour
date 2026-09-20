@@ -3,15 +3,19 @@
 import { useRef, useState, useTransition } from "react";
 import { FormError } from "@/components/ui/form";
 import {
+  WAITING_LIST_CONFIRMATION_CONVERT_LABEL,
+  WAITING_LIST_CONFIRMATION_CONVERTED_LABEL,
   WAITING_LIST_CONFIRMATION_EXPIRED_LABEL,
   WAITING_LIST_CONFIRMATION_GENERATE_LABEL,
   WAITING_LIST_CONFIRMATION_INVALIDATED_LABEL,
   WAITING_LIST_CONFIRMATION_ISSUED_LABEL,
   WAITING_LIST_CONFIRMATION_SUBMITTED_LABEL,
+  canConvertWaitingListConfirmation,
   eligibleWaitingListConfirmationItems,
   formatWaitingListConfirmationReviewCopy,
   waitingListConfirmationDeadlineLabel,
   waitingListConfirmationExcludedItems,
+  waitingListConvertedOrderHref,
   type WaitingListConfirmationStaffLink,
 } from "@/engines/waiting-list/confirmation-review";
 import {
@@ -21,7 +25,10 @@ import {
   waitingListConfirmationWhatsAppUrl,
 } from "@/engines/waiting-list/confirmation-whatsapp";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
-import { issueWaitingListConfirmationLinkAction } from "@/workspaces/waiting-list/actions";
+import {
+  convertWaitingListConfirmationAction,
+  issueWaitingListConfirmationLinkAction,
+} from "@/workspaces/waiting-list/actions";
 import type { WaitingListBoardRow } from "@/workspaces/waiting-list/types";
 
 const ghostButtonClass =
@@ -50,9 +57,13 @@ export function WaitingListConfirmationStaffPanel({
   const [rawToken, setRawToken] = useState<string | null>(null);
   const [issuedOverlay, setIssuedOverlay] =
     useState<WaitingListConfirmationStaffLink | null>(null);
-  const [reviewOpen, setReviewOpen] = useState(link?.status === "submitted");
+  const [reviewOpen, setReviewOpen] = useState(
+    link?.status === "submitted" || link?.status === "converted",
+  );
   const [issuing, startIssue] = useTransition();
+  const [converting, startConvert] = useTransition();
   const issuingLock = useRef(false);
+  const convertingLock = useRef(false);
 
   const effectiveLink = issuedOverlay ?? link ?? null;
   const previewItems =
@@ -64,6 +75,10 @@ export function WaitingListConfirmationStaffPanel({
       effectiveLink.status === "expired" ||
       effectiveLink.status === "invalidated") &&
     eligible.length > 0;
+  const canConvert = canConvertWaitingListConfirmation(effectiveLink);
+  const convertedOrderHref = effectiveLink?.convertedOrderId
+    ? waitingListConvertedOrderHref(effectiveLink.convertedOrderId)
+    : "";
 
   const confirmationUrl = rawToken
     ? waitingListConfirmationCustomerUrl(rawToken, siteOrigin())
@@ -108,6 +123,8 @@ export function WaitingListConfirmationStaffPanel({
           expiresAt: result.expiresAt,
           issuedAt: new Date().toISOString(),
           submittedAt: null,
+          convertedOrderId: null,
+          convertedOrderNumber: null,
           items: result.items ?? previewItems,
           review: null,
         });
@@ -144,6 +161,34 @@ export function WaitingListConfirmationStaffPanel({
     void navigator.clipboard
       .writeText(formatWaitingListConfirmationReviewCopy(effectiveLink.review))
       .then(() => markCopied("details"));
+  }
+
+  function handleConvert() {
+    if (convertingLock.current || converting || !canConvert) return;
+    convertingLock.current = true;
+    setError(null);
+    startConvert(async () => {
+      try {
+        const result = await convertWaitingListConfirmationAction(
+          row.requestId,
+        );
+        if (result.error || !result.orderId) {
+          setError(
+            result.error ?? "Could not convert this confirmation to an order.",
+          );
+          return;
+        }
+        setIssuedOverlay({
+          ...(effectiveLink as WaitingListConfirmationStaffLink),
+          status: "converted",
+          convertedOrderId: result.orderId,
+          convertedOrderNumber: result.orderNumber ?? result.orderId,
+        });
+        setReviewOpen(true);
+      } finally {
+        convertingLock.current = false;
+      }
+    });
   }
 
   if (!effectiveLink && eligible.length === 0) {
@@ -187,6 +232,14 @@ export function WaitingListConfirmationStaffPanel({
       {effectiveLink?.status === "submitted" ? (
         <p className="text-ink text-sm">
           {WAITING_LIST_CONFIRMATION_SUBMITTED_LABEL}
+        </p>
+      ) : null}
+      {effectiveLink?.status === "converted" ? (
+        <p className="text-ink text-sm">
+          {WAITING_LIST_CONFIRMATION_CONVERTED_LABEL}
+          {effectiveLink.convertedOrderNumber
+            ? ` · ${effectiveLink.convertedOrderNumber}`
+            : ""}
         </p>
       ) : null}
       {effectiveLink?.status === "expired" ? (
@@ -250,7 +303,9 @@ export function WaitingListConfirmationStaffPanel({
           </>
         ) : null}
 
-        {effectiveLink?.status === "submitted" && effectiveLink.review ? (
+        {(effectiveLink?.status === "submitted" ||
+          effectiveLink?.status === "converted") &&
+        effectiveLink.review ? (
           <>
             <button
               className={ghostButtonClass}
@@ -267,6 +322,28 @@ export function WaitingListConfirmationStaffPanel({
               {copied === "details" ? "Copied" : "Copy details"}
             </button>
           </>
+        ) : null}
+
+        {canConvert ? (
+          <button
+            className={inkButtonClass}
+            disabled={converting}
+            onClick={handleConvert}
+            type="button"
+          >
+            {converting
+              ? "Converting…"
+              : WAITING_LIST_CONFIRMATION_CONVERT_LABEL}
+          </button>
+        ) : null}
+
+        {effectiveLink?.status === "converted" && convertedOrderHref ? (
+          <a className={ghostButtonClass} href={convertedOrderHref}>
+            Open order
+            {effectiveLink.convertedOrderNumber
+              ? ` ${effectiveLink.convertedOrderNumber}`
+              : ""}
+          </a>
         ) : null}
       </div>
 

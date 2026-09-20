@@ -13,7 +13,11 @@ import {
 import { parseBusinessDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
-import { issueWaitingListConfirmationLink } from "@/workspaces/waiting-list/confirmation-link";
+import {
+  convertWaitingListConfirmation,
+  issueWaitingListConfirmationLink,
+} from "@/workspaces/waiting-list/confirmation-link";
+import { waitingListConvertConfirmationError } from "@/engines/waiting-list/confirmation-review";
 import type { LibraryActionState } from "@/workspaces/library/action-state";
 
 function revalidateWaitingList() {
@@ -332,6 +336,28 @@ export async function issueWaitingListConfirmationLinkAction(
     confirmationPath: result.confirmationPath,
     expiresAt: result.expiresAt,
     items: result.items,
+  };
+}
+
+export async function convertWaitingListConfirmationAction(
+  requestId: string,
+): Promise<{
+  error: string | null;
+  orderId?: string;
+  orderNumber?: string;
+  alreadyConverted?: boolean;
+}> {
+  const result = await convertWaitingListConfirmation(requestId);
+  if (!("orderId" in result)) {
+    return { error: waitingListConvertConfirmationError(result.error) };
+  }
+  scheduleStaffNotificationDispatch();
+  revalidateWaitingList();
+  return {
+    error: null,
+    orderId: result.orderId,
+    orderNumber: result.orderNumber,
+    alreadyConverted: result.alreadyConverted,
   };
 }
 

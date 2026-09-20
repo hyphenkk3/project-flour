@@ -7,6 +7,7 @@ export const WAITING_LIST_CONFIRMATION_LINK_STATUSES = [
   "submitted",
   "expired",
   "invalidated",
+  "converted",
 ] as const;
 
 export type WaitingListConfirmationLinkStatus =

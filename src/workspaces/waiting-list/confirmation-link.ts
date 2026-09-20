@@ -199,3 +199,51 @@ export async function invalidateWaitingListConfirmationLinks(
   const count = Number(data ?? 0);
   return { count: Number.isFinite(count) ? count : 0 };
 }
+
+export type ConvertWaitingListConfirmationResult = {
+  orderId: string;
+  orderNumber: string;
+  alreadyConverted: boolean;
+};
+
+/**
+ * Staff conversion of a submitted confirmation into one real order.
+ * The browser sends only requestId. Server reloads confirmation, snapshot,
+ * holds, fulfilment, and catalogue prices.
+ */
+export async function convertWaitingListConfirmation(
+  requestId: string,
+): Promise<
+  ConvertWaitingListConfirmationResult | IssueWaitingListConfirmationLinkError
+> {
+  const staff = await requireStaff();
+  if (!canManageWaitingList(staff.role.code)) {
+    return { error: "Not authorized to manage the waiting list." };
+  }
+  const id = requestId.trim();
+  if (!id) {
+    return { error: "Waiting-list request is required." };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
+    "waiting_list_convert_confirmation",
+    {
+      p_actor_staff_id: staff.id,
+      p_request_id: id,
+    },
+  );
+  if (error) {
+    return { error: error.message };
+  }
+  const payload = data as Record<string, unknown> | null;
+  const orderId = asTrimmed(payload?.order_id ?? payload?.orderId);
+  const orderNumber = asTrimmed(payload?.order_number ?? payload?.orderNumber);
+  if (!orderId || !orderNumber) {
+    return { error: "Could not convert this confirmation to an order." };
+  }
+  return {
+    orderId,
+    orderNumber,
+    alreadyConverted: payload?.already_converted === true,
+  };
+}

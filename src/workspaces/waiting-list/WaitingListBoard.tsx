@@ -26,6 +26,7 @@ import {
   setWaitingListItemQuantityAction,
 } from "@/workspaces/waiting-list/actions";
 import {
+  WAITING_LIST_CONFIRMATION_CONVERTED_LABEL,
   WAITING_LIST_CONFIRMATION_EXPIRED_LABEL,
   WAITING_LIST_CONFIRMATION_INVALIDATED_LABEL,
   WAITING_LIST_CONFIRMATION_ISSUED_LABEL,
@@ -522,7 +523,14 @@ export function WaitingListBoard({
                           .join(" · ")}
                       </p>
                     ) : null}
-                    {row.confirmationLink?.status === "submitted" ? (
+                    {row.confirmationLink?.status === "converted" ? (
+                      <p className="text-ink mt-1 text-xs font-medium">
+                        {WAITING_LIST_CONFIRMATION_CONVERTED_LABEL}
+                        {row.confirmationLink.convertedOrderNumber
+                          ? ` · ${row.confirmationLink.convertedOrderNumber}`
+                          : ""}
+                      </p>
+                    ) : row.confirmationLink?.status === "submitted" ? (
                       <p className="text-ink mt-1 text-xs font-medium">
                         {WAITING_LIST_CONFIRMATION_SUBMITTED_LABEL}
                       </p>

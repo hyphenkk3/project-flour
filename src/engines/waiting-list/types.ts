@@ -67,7 +67,8 @@ export type WaitingListEventType =
   | "capacity_action_required"
   | "confirmation_link_issued"
   | "confirmation_link_invalidated"
-  | "confirmation_link_submitted";
+  | "confirmation_link_submitted"
+  | "confirmation_link_converted";
 
 export type WaitingListQueueScope = {
   pickupDate: string;

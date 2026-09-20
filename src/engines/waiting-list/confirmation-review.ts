@@ -16,9 +16,11 @@ import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 
 export const WAITING_LIST_CONFIRMATION_GENERATE_LABEL =
   "Generate Confirmation Link";
+export const WAITING_LIST_CONFIRMATION_CONVERT_LABEL = "Convert to Order";
 export const WAITING_LIST_CONFIRMATION_ISSUED_LABEL = "Confirmation link sent";
 export const WAITING_LIST_CONFIRMATION_SUBMITTED_LABEL =
   "Customer details received";
+export const WAITING_LIST_CONFIRMATION_CONVERTED_LABEL = "Converted to Order";
 export const WAITING_LIST_CONFIRMATION_EXPIRED_LABEL =
   "Confirmation link expired";
 export const WAITING_LIST_CONFIRMATION_INVALIDATED_LABEL =
@@ -96,9 +98,68 @@ export type WaitingListConfirmationStaffLink = {
   expiresAt: string;
   issuedAt: string;
   submittedAt: string | null;
+  convertedOrderId: string | null;
+  convertedOrderNumber: string | null;
   items: WaitingListConfirmationDisplayItem[];
   review: WaitingListConfirmationReview | null;
 };
+
+export function waitingListConvertedOrderHref(orderId: string): string {
+  return `/bakery/orders/${orderId}`;
+}
+
+export function canConvertWaitingListConfirmation(
+  link: WaitingListConfirmationStaffLink | null | undefined,
+): boolean {
+  return Boolean(
+    link &&
+      link.status === "submitted" &&
+      link.review &&
+      !link.convertedOrderId,
+  );
+}
+
+const WAITING_LIST_CONVERT_SAFE_ERRORS = [
+  "Waiting-list request is required",
+  "Waiting-list request not found",
+  "Confirmation link not found",
+  "This confirmation link has expired",
+  "This confirmation link has been invalidated",
+  "This confirmation has not been submitted",
+  "Customer details are missing",
+  "This confirmation has already been converted",
+  "This waiting-list request is no longer convertible",
+  "This confirmation no longer matches the waiting-list items",
+  "Offered quantity is no longer available",
+  "Hold no longer valid",
+  "Invalid fulfilment data",
+  "Not authorized to manage the waiting list",
+] as const;
+
+export const WAITING_LIST_CONVERT_GENERIC_ERROR =
+  "Could not convert this confirmation to an order.";
+
+export function waitingListConvertConfirmationError(
+  message: string | null | undefined,
+): string {
+  const text = String(message ?? "").trim();
+  if (!text) return WAITING_LIST_CONVERT_GENERIC_ERROR;
+  const known = WAITING_LIST_CONVERT_SAFE_ERRORS.find((entry) =>
+    text.includes(entry),
+  );
+  if (known) return known;
+  if (
+    /cake is not available/i.test(text) ||
+    /cake size is not available/i.test(text) ||
+    /paid add-on/i.test(text) ||
+    /complimentary/i.test(text) ||
+    /catalogue/i.test(text) ||
+    /library/i.test(text)
+  ) {
+    return "Pricing or catalogue details no longer match.";
+  }
+  return WAITING_LIST_CONVERT_GENERIC_ERROR;
+}
 
 function asTrimmed(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -112,6 +173,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 export function waitingListConfirmationLinkStatusLabel(
   status: WaitingListConfirmationLinkStatus | string,
 ): string {
+  if (status === "converted") return WAITING_LIST_CONFIRMATION_CONVERTED_LABEL;
   if (status === "submitted") return WAITING_LIST_CONFIRMATION_SUBMITTED_LABEL;
   if (status === "expired") return WAITING_LIST_CONFIRMATION_EXPIRED_LABEL;
   if (status === "invalidated")
@@ -427,13 +489,19 @@ export function parseStaffWaitingListConfirmationLinks(
       status !== "issued" &&
       status !== "submitted" &&
       status !== "expired" &&
-      status !== "invalidated"
+      status !== "invalidated" &&
+      status !== "converted"
     ) {
       return [];
     }
     const items = parseWaitingListConfirmationDisplayItems(entry.items);
+    const convertedOrderId =
+      asTrimmed(entry.converted_order_id ?? entry.convertedOrderId) || null;
+    const convertedOrderNumber =
+      asTrimmed(entry.converted_order_number ?? entry.convertedOrderNumber) ||
+      null;
     const review =
-      status === "submitted"
+      status === "submitted" || status === "converted"
         ? parseWaitingListConfirmationReview({
             payload: entry.submitted_payload ?? entry.submittedPayload,
             items,
@@ -448,6 +516,8 @@ export function parseStaffWaitingListConfirmationLinks(
         expiresAt,
         issuedAt: asTrimmed(entry.issued_at ?? entry.issuedAt),
         submittedAt: asTrimmed(entry.submitted_at ?? entry.submittedAt) || null,
+        convertedOrderId,
+        convertedOrderNumber,
         items,
         review,
       },
