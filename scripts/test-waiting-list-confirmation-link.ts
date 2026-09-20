@@ -2,7 +2,7 @@
  * Phase A — Waiting List confirmation-link foundation (static).
  * Run: npx tsx scripts/test-waiting-list-confirmation-link.ts
  *
- * Does not create waiting-list rows, orders, or a confirmation page.
+ * Engine + source assertions. Does not create waiting-list rows or orders.
  */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -240,10 +240,6 @@ assert.match(sql, /constraint waiting_list_confirmation_links_status_check/);
 assert.match(sql, /'issued', 'submitted', 'expired', 'invalidated'/);
 assert.match(sql, /issued_by_staff_id uuid not null/);
 assert.match(sql, /expires_at timestamptz not null/);
-assert.equal(
-  existsSync(resolve(process.cwd(), "src/app/order/waiting-list/confirm")),
-  false,
-);
 assert.doesNotMatch(readSrc("src/workspaces/waiting-list/actions.ts"), /issueWaitingListConfirmationLink/);
 assert.doesNotMatch(
   readSrc("src/workspaces/waiting-list/WaitingListBoard.tsx"),
