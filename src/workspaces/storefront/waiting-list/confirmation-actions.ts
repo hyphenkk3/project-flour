@@ -1,6 +1,5 @@
 "use server";
 
-import { ORDERS_CLOSED_RPC_MESSAGE } from "@/engines/business-calendar/order-availability";
 import { isValidDeliverySlot } from "@/engines/business-calendar/delivery-hours";
 import {
   isValidDineInReservationPair,
@@ -45,7 +44,6 @@ import {
   loadCheckoutCalendarContext,
   loadCheckoutPickupOffer,
 } from "@/workspaces/storefront/checkout/actions";
-import { isPickupOrdersClosed } from "@/workspaces/storefront/checkout/order-availability";
 import { createClient } from "@/lib/supabase/server";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import type { CustomerWebsiteFulfilmentMethod } from "@/engines/orders/fulfilment";
@@ -64,7 +62,6 @@ export type WaitingListConfirmationPageModel =
       guestPhone: string;
       pickupDate: string;
       items: WaitingListConfirmationDisplayItem[];
-      closedDates: string[];
       hoursSnapshot: OperatingHoursSnapshot;
       complimentaryOptions: CustomerComplimentaryOption[];
       paidAddonOptions: CustomerPaidAddonOption[];
@@ -200,7 +197,6 @@ export async function loadWaitingListConfirmationPage(
     guestPhone: asTrimmed(payload.guest_phone),
     pickupDate,
     items,
-    closedDates: calendar.closedDates,
     hoursSnapshot: calendar.hoursSnapshot,
     complimentaryOptions: offer.complimentaryOptions,
     paidAddonOptions: offer.paidAddonOptions,
@@ -252,9 +248,6 @@ export async function submitWaitingListConfirmationAction(
   }
   if (!pickupDate || pickupDate !== requestedDate) {
     return { error: "Please keep the requested collection date." };
-  }
-  if (await isPickupOrdersClosed(pickupDate)) {
-    return { error: ORDERS_CLOSED_RPC_MESSAGE };
   }
 
   let guestCount: number | null = null;

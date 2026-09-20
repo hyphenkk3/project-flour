@@ -44,7 +44,6 @@ export async function WaitingListConfirmationPage({
       <div className="mt-10">
         {model.kind === "form" ? (
           <WaitingListConfirmationForm
-            closedDates={model.closedDates}
             complimentaryOptions={model.complimentaryOptions}
             expiresAt={model.expiresAt}
             guestName={model.guestName}

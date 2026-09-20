@@ -14,6 +14,7 @@ import { customerFulfilmentSlotsForDate } from "@/engines/orders/customer-fulfil
 import { hashWaitingListConfirmationToken } from "@/engines/waiting-list/confirmation-link";
 import {
   WAITING_LIST_CONFIRMATION_ALREADY_TITLE,
+  WAITING_LIST_CONFIRMATION_CLOSED_DATES,
   WAITING_LIST_CONFIRMATION_DEADLINE_HELP,
   WAITING_LIST_CONFIRMATION_EXPIRED_CONTACT,
   WAITING_LIST_CONFIRMATION_EXPIRED_TITLE,
@@ -31,6 +32,9 @@ function readSrc(rel: string): string {
 
 const submitSql = readSrc(
   "supabase/migrations/20260920190000_waiting_list_confirmation_submit.sql",
+);
+const closedDateSql = readSrc(
+  "supabase/migrations/20260920210000_waiting_list_confirmation_closed_date.sql",
 );
 const actionSrc = readSrc(
   "src/workspaces/storefront/waiting-list/confirmation-actions.ts",
@@ -56,7 +60,7 @@ const submitStart = submitSql.indexOf(
 assert.ok(lookupStart >= 0);
 assert.ok(submitStart >= 0);
 const lookupSql = submitSql.slice(lookupStart, submitStart);
-const submitFnSql = submitSql.slice(submitStart);
+const submitFnSql = closedDateSql;
 
 const snapshot = [
   {
@@ -171,20 +175,38 @@ assert.match(actionSrc, /isValidDineInReservationPair/);
 assert.match(formSrc, /customerFulfilmentSlotsForDate/);
 assert.match(formSrc, /FulfilmentMethodChooser/);
 assert.match(formSrc, /PickupSlotFields/);
-assert.match(submitFnSql, /is_valid_public_pickup_slot/);
 assert.match(submitFnSql, /is_valid_delivery_slot/);
 assert.match(submitFnSql, /is_valid_dine_in_slot/);
 assert.match(submitFnSql, /is_valid_dine_in_serving_window/);
 assert.match(submitFnSql, /is_valid_dine_in_venue/);
+assert.match(submitFnSql, /_pickup_slot_in_weekly_hours/);
+assert.doesNotMatch(submitFnSql, /is_valid_public_pickup_slot\s*\(/);
 assert.equal(typeof isValidPickupSlot, "function");
 assert.equal(typeof isValidDeliverySlot, "function");
 assert.equal(typeof isValidDineInSlot, "function");
 assert.equal(typeof customerFulfilmentSlotsForDate, "function");
 
-// 13. Orders-closed date blocks submission.
-assert.match(actionSrc, /isPickupOrdersClosed/);
-assert.match(submitFnSql, /is_pickup_orders_closed\(v_date\)/);
-assert.match(submitFnSql, /Orders are closed for that pickup date/);
+// 13. Orders-closed overlay does NOT block Waiting List confirmation.
+assert.doesNotMatch(actionSrc, /isPickupOrdersClosed/);
+assert.doesNotMatch(actionSrc, /ORDERS_CLOSED_RPC_MESSAGE/);
+assert.doesNotMatch(submitFnSql, /is_pickup_orders_closed\s*\(/);
+assert.doesNotMatch(submitFnSql, /Orders are closed for that pickup date/);
+assert.match(formSrc, /WAITING_LIST_CONFIRMATION_CLOSED_DATES/);
+assert.equal(WAITING_LIST_CONFIRMATION_CLOSED_DATES.length, 0);
+assert.doesNotMatch(formSrc, /isPickupOrdersClosed/);
+assert.doesNotMatch(formSrc, /closedDates=\{closedDates\}/);
+assert.doesNotMatch(formSrc, /closedDates=\{model\.closedDates\}/);
+assert.doesNotMatch(pageSrc, /closedDates=/);
+
+// Normal checkout still blocks closed dates.
+const checkoutActionsSrc = readSrc(
+  "src/workspaces/storefront/checkout/actions.ts",
+);
+const checkoutFormSrc = readSrc(
+  "src/workspaces/storefront/checkout/GuestCheckoutForm.tsx",
+);
+assert.match(checkoutActionsSrc, /await isPickupOrdersClosed\(pickupDate\)/);
+assert.match(checkoutFormSrc, /isPickupOrdersClosed/);
 
 // 14–15. Opened Wednesday / method-specific hours come from existing loaders.
 assert.match(actionSrc, /loadCheckoutCalendarContext/);
@@ -272,5 +294,13 @@ const historical = [
 for (const rel of historical) {
   assert.doesNotMatch(readSrc(rel), /submit_waiting_list_confirmation/);
 }
+assert.match(
+  readSrc("supabase/migrations/20260920140000_guest_waiting_list_closed_date.sql"),
+  /is_pickup_orders_closed\(p_pickup_date\)/,
+);
+assert.match(
+  readSrc("supabase/migrations/20260920160000_guest_waiting_list_multi_item.sql"),
+  /is_pickup_orders_closed\(p_pickup_date\)/,
+);
 
 console.log("waiting-list customer confirmation tests passed");

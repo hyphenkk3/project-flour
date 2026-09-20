@@ -790,6 +790,6 @@ const capacityPanelSrc = readSrc(
 );
 assert.match(capacityPanelSrc, /Waiting list requires a production-capacity row/);
 assert.match(capacityPanelSrc, /does not enable the waiting list/);
-assert.match(boardSrc, /Closing customer orders does not enable/);
+assert.match(boardSrc, /Closing\s+customer orders does not enable/);
 
 console.log("PASS waiting list");

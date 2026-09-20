@@ -19,7 +19,6 @@ import {
   resolveDineInVenueForPair,
   venuesForReservationAndServing,
 } from "@/engines/business-calendar/dine-in-hours";
-import { isPickupOrdersClosed } from "@/engines/business-calendar/order-availability";
 import {
   CUSTOMER_NAME_HELP,
   CUSTOMER_NAME_SPACE_HINT,
@@ -50,6 +49,7 @@ import {
   type CustomerPaidAddonOption,
 } from "@/engines/orders/customer-preorder-options";
 import {
+  WAITING_LIST_CONFIRMATION_CLOSED_DATES,
   WAITING_LIST_CONFIRMATION_DATE_LOCKED_HELP,
   WAITING_LIST_CONFIRMATION_DEADLINE_HELP,
   WAITING_LIST_CONFIRMATION_SUCCESS_BODY,
@@ -75,7 +75,6 @@ type WaitingListConfirmationFormProps = {
   guestPhone: string;
   pickupDate: string;
   items: WaitingListConfirmationDisplayItem[];
-  closedDates: string[];
   hoursSnapshot: OperatingHoursSnapshot;
   complimentaryOptions: CustomerComplimentaryOption[];
   paidAddonOptions: CustomerPaidAddonOption[];
@@ -91,7 +90,6 @@ export function WaitingListConfirmationForm({
   guestPhone,
   pickupDate,
   items,
-  closedDates,
   hoursSnapshot,
   complimentaryOptions,
   paidAddonOptions,
@@ -109,7 +107,7 @@ export function WaitingListConfirmationForm({
     useState<CustomerWebsiteFulfilmentMethod>(() =>
       firstAvailableCustomerFulfilment(
         pickupDate,
-        closedDates,
+        WAITING_LIST_CONFIRMATION_CLOSED_DATES,
         "pickup",
         hoursSnapshot,
       ),
@@ -212,7 +210,7 @@ export function WaitingListConfirmationForm({
         title="Fulfilment"
       >
         <FulfilmentMethodChooser
-          closedDates={closedDates}
+          closedDates={WAITING_LIST_CONFIRMATION_CLOSED_DATES}
           dateYmd={pickupDate}
           hoursSnapshot={hoursSnapshot}
           onChange={(value) => {
@@ -229,7 +227,7 @@ export function WaitingListConfirmationForm({
               {DINE_IN_RESERVATION_INCLUDED_NOTICE}
             </p>
             <PickupSlotFields
-              closedDates={closedDates}
+              closedDates={WAITING_LIST_CONFIRMATION_CLOSED_DATES}
               dateLabel="Dine-in date"
               defaultDate={pickupDate}
               defaultTime={reservationTime}
@@ -279,7 +277,7 @@ export function WaitingListConfirmationForm({
             <input name="reservation_time" type="hidden" value={reservationTime} />
             {reservationTime ? (
               <PickupSlotFields
-                closedDates={closedDates}
+                closedDates={WAITING_LIST_CONFIRMATION_CLOSED_DATES}
                 defaultDate={pickupDate}
                 defaultTime={pickupTime}
                 hoursSnapshot={hoursSnapshot}
@@ -298,14 +296,12 @@ export function WaitingListConfirmationForm({
                   );
                 }}
                 showDate={false}
-                slotsForDate={(date, closed) =>
-                  isPickupOrdersClosed(date, closed)
-                    ? []
-                    : cakeServingSlotsForReservation(
-                        date,
-                        reservationTime,
-                        hoursSnapshot,
-                      )
+                slotsForDate={(date) =>
+                  cakeServingSlotsForReservation(
+                    date,
+                    reservationTime,
+                    hoursSnapshot,
+                  )
                 }
                 timeHelp="Choose when you would like your cake served. Cake serving time must be within 1 hour of your reservation time."
                 timeLabel="Cake serving time"
@@ -358,7 +354,7 @@ export function WaitingListConfirmationForm({
           </>
         ) : (
           <PickupSlotFields
-            closedDates={closedDates}
+            closedDates={WAITING_LIST_CONFIRMATION_CLOSED_DATES}
             dateLabel={workspaceScheduleDateLabel(fulfilmentMethod)}
             defaultDate={pickupDate}
             defaultTime={pickupTime}

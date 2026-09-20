@@ -9,6 +9,14 @@ export const WAITING_LIST_CONFIRMATION_DEADLINE_HELP =
 export const WAITING_LIST_CONFIRMATION_DATE_LOCKED_HELP =
   "Collection date is the date of your Waiting List request and cannot be changed here.";
 
+/**
+ * Waiting List confirmation ignores the storefront `orders_closed` overlay.
+ * Method/slot availability still comes from the existing operating-hours
+ * snapshot and method-specific validators. Normal checkout continues to pass
+ * the real closed-date list into the same helpers.
+ */
+export const WAITING_LIST_CONFIRMATION_CLOSED_DATES: readonly string[] = [];
+
 export const WAITING_LIST_CONFIRMATION_SUCCESS_TITLE =
   "Thank you — we've received your confirmation.";
 
