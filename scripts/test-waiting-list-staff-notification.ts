@@ -84,6 +84,17 @@ const description = waitingListNotificationDescription({
   quantity: 2,
 });
 assert.equal(description, `ycwee · Chocolate D'Amour · 6" · 25 Sep · Qty 2`);
+assert.equal(
+  waitingListNotificationDescription({
+    guestName: "ycwee",
+    cakeName: "Chocolate D'Amour",
+    sizeLabel: '6"',
+    pickupDate: "2026-09-25",
+    quantity: 1,
+    extraItemCount: 1,
+  }),
+  `ycwee · Chocolate D'Amour · 6" · 25 Sep · Qty 1 · + 1 more`,
+);
 
 const payload = parseWaitingListNotificationPayload({
   requestId,
@@ -173,6 +184,7 @@ assert.doesNotMatch(
 
 const boardSrc = readSrc("src/workspaces/waiting-list/WaitingListBoard.tsx");
 assert.match(boardSrc, /WAITING_LIST_FILTER_ACTION/);
+assert.match(boardSrc, /Also on this request/);
 assert.equal(
   WAITING_LIST_FILTER_ACTION,
   "/bakery/availability#waiting-list-heading",

@@ -109,14 +109,26 @@ export async function listWaitingListBoard(input: {
     const requestIds = [
       ...new Set(rows.map((row) => asId((row as { request_id?: string }).request_id))),
     ].filter(Boolean);
+    const { data: requestItemRows } = requestIds.length
+      ? await supabase
+          .from("waiting_list_items")
+          .select(
+            "id, request_id, library_cake_id, library_cake_size_id, quantity, created_at",
+          )
+          .in("request_id", requestIds)
+          .order("created_at", { ascending: true })
+      : { data: [] as unknown[] };
+    const siblingRows = requestItemRows ?? [];
     const cakeIds = [
       ...new Set(
-        rows.map((row) => asId((row as { library_cake_id?: string }).library_cake_id)),
+        [...rows, ...siblingRows].map((row) =>
+          asId((row as { library_cake_id?: string }).library_cake_id),
+        ),
       ),
     ].filter(Boolean);
     const sizeIds = [
       ...new Set(
-        rows.map((row) =>
+        [...rows, ...siblingRows].map((row) =>
           asId((row as { library_cake_size_id?: string | null }).library_cake_size_id),
         ),
       ),
@@ -192,6 +204,30 @@ export async function listWaitingListBoard(input: {
         String((row as { order_number?: string }).order_number ?? ""),
       ]),
     );
+    const requestItemsByRequest = new Map<
+      string,
+      Array<{
+        itemId: string;
+        cakeName: string;
+        sizeLabel: string;
+        quantity: number;
+      }>
+    >();
+    for (const sibling of siblingRows) {
+      const requestId = asId((sibling as { request_id?: string }).request_id);
+      const cakeId = asId((sibling as { library_cake_id?: string }).library_cake_id);
+      const sizeId = asId(
+        (sibling as { library_cake_size_id?: string | null }).library_cake_size_id,
+      );
+      const list = requestItemsByRequest.get(requestId) ?? [];
+      list.push({
+        itemId: asId((sibling as { id?: string }).id),
+        cakeName: cakeById.get(cakeId) ?? "Cake",
+        sizeLabel: sizeById.get(sizeId) ?? "Size",
+        quantity: Number((sibling as { quantity?: number }).quantity ?? 0),
+      });
+      requestItemsByRequest.set(requestId, list);
+    }
 
     return rows.map((row) => {
       const itemId = asId((row as { id?: string }).id);
@@ -250,6 +286,14 @@ export async function listWaitingListBoard(input: {
           : null,
         actionRequired: actionRequired.has(itemId),
         offeredQuantity: holdByItem.get(itemId) ?? null,
+        requestItems: requestItemsByRequest.get(requestId) ?? [
+          {
+            itemId,
+            cakeName: cakeById.get(cakeId) ?? "Cake",
+            sizeLabel: sizeById.get(sizeId) ?? "Size",
+            quantity: Number((row as { quantity?: number }).quantity ?? 0),
+          },
+        ],
       };
     });
   } catch (error) {
@@ -334,7 +378,10 @@ export async function listHomeWaitingListAttention(): Promise<HomeWaitingListAtt
       preview: {
         requestId: first.payload.requestId,
         guestName: first.payload.guestName,
-        line: waitingListHomePreviewLine(first.payload),
+        line: waitingListHomePreviewLine({
+          ...first.payload,
+          extraItemCount: Math.max(0, first.payload.itemCount - 1),
+        }),
         href: first.href,
       },
     };

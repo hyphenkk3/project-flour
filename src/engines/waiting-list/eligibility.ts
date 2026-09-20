@@ -123,3 +123,35 @@ export function waitingListEligibleCartLines<
 export function waitingListCartLineKey(cakeId: string, sizeId: string): string {
   return `${cakeId}|${sizeId}`;
 }
+
+export type WaitingListRequestItemInput = {
+  cakeId: string;
+  sizeId: string;
+  quantity: number;
+};
+
+/**
+ * Merge duplicate cake/size lines and drop zero quantities.
+ * Does not cap quantity by production capacity.
+ */
+export function consolidateWaitingListRequestItems<
+  T extends WaitingListRequestItemInput,
+>(items: readonly T[]): T[] {
+  const merged = new Map<string, T>();
+  for (const item of items) {
+    const cakeId = item.cakeId.trim();
+    const sizeId = item.sizeId.trim();
+    const quantity = Math.floor(Number(item.quantity));
+    if (!cakeId || !sizeId || !Number.isFinite(quantity) || quantity < 1) {
+      continue;
+    }
+    const key = waitingListCartLineKey(cakeId, sizeId);
+    const existing = merged.get(key);
+    if (existing) {
+      merged.set(key, { ...existing, quantity: existing.quantity + quantity });
+      continue;
+    }
+    merged.set(key, { ...item, cakeId, sizeId, quantity });
+  }
+  return [...merged.values()];
+}

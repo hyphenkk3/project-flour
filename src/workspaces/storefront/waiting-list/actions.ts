@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { consolidateWaitingListRequestItems } from "@/engines/waiting-list/eligibility";
 import {
   isValidWaitingListWhatsApp,
   waitingListWhatsAppDigits,
@@ -68,8 +69,22 @@ export async function submitGuestWaitingListAction(
   } catch {
     return { error: "At least one cake is required." };
   }
-  if (items.some((item) => !item.cake_id || !item.cake_size_id || item.quantity < 1)) {
+  if (items.some((item) => !item.cake_id || !item.cake_size_id)) {
     return { error: "Each waiting-list item needs a cake, size, and quantity." };
+  }
+  items = consolidateWaitingListRequestItems(
+    items.map((item) => ({
+      cakeId: item.cake_id,
+      sizeId: item.cake_size_id,
+      quantity: item.quantity,
+    })),
+  ).map((item) => ({
+    cake_id: item.cakeId,
+    cake_size_id: item.sizeId,
+    quantity: item.quantity,
+  }));
+  if (items.length === 0) {
+    return { error: "At least one cake is required." };
   }
 
   const supabase = await createClient();

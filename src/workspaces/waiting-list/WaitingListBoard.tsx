@@ -479,6 +479,18 @@ export function WaitingListBoard({
                       qty {row.quantity} · remaining {row.remainingQuantity} · #
                       {row.queuePosition} · {statusLabel(row.status)}
                     </p>
+                    {row.requestItems.length > 1 ? (
+                      <p className="text-skyline mt-0.5 text-xs">
+                        Also on this request:{" "}
+                        {row.requestItems
+                          .filter((item) => item.itemId !== row.itemId)
+                          .map(
+                            (item) =>
+                              `${item.cakeName} · ${item.sizeLabel} × ${item.quantity}`,
+                          )
+                          .join(" · ")}
+                      </p>
+                    ) : null}
                     <p className="text-skyline mt-0.5 text-xs">
                       {formatShortBusinessDate(row.pickupDate)} · joined{" "}
                       {row.joinedAt ? formatDateTime(row.joinedAt) : "—"} ·

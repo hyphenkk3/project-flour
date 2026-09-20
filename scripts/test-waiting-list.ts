@@ -22,6 +22,7 @@ import {
   canViewWaitingList,
 } from "@/engines/waiting-list/capabilities";
 import {
+  consolidateWaitingListRequestItems,
   isCustomerWaitingListJoinable,
   isWaitingListOffered,
   waitingListEligibleCartLines,
@@ -538,6 +539,8 @@ assert.match(joinSrc, /WAITING_LIST_REQUEST_NOT_ORDER/);
 assert.match(joinSrc, /WAITING_LIST_NAME_HELP/);
 assert.match(joinSrc, /WAITING_LIST_WHATSAPP_NOTE/);
 assert.match(joinSrc, /open_to_alternatives/);
+assert.match(joinSrc, /waitingListOtherFlavoursQuestion/);
+assert.match(joinSrc, /consolidateWaitingListRequestItems/);
 assert.doesNotMatch(joinSrc, /payment/i);
 assert.doesNotMatch(joinSrc, /queue_position/);
 
@@ -714,9 +717,42 @@ const closedDateSql = readSrc(
 assert.match(closedDateSql, /is_pickup_orders_closed\(p_pickup_date\)/);
 assert.match(closedDateSql, /_guest_preorder_item_fully_booked/);
 assert.match(closedDateSql, /p_actor_staff_id is null/);
+assert.doesNotMatch(closedDateSql, /jsonb_agg/);
+assert.doesNotMatch(closedDateSql, /collection_cakes/);
 assert.match(insertSql, /_waiting_list_matching_capacity/);
 assert.match(insertSql, /v_collection.waiting_list_enabled is not true/);
 assert.match(insertSql, /v_capacity.waiting_list_enabled is not true/);
+
+const multiItemSql = readSrc(
+  "supabase/migrations/20260920160000_guest_waiting_list_multi_item.sql",
+);
+assert.match(multiItemSql, /create or replace function public\._waiting_list_insert_request/);
+assert.match(multiItemSql, /is_pickup_orders_closed\(p_pickup_date\)/);
+assert.match(multiItemSql, /_guest_preorder_item_fully_booked/);
+assert.match(multiItemSql, /group by cake_id, size_id/);
+assert.match(multiItemSql, /collection_cakes/);
+assert.match(multiItemSql, /One of the selected cakes is no longer available/);
+assert.doesNotMatch(multiItemSql, /capacity_quantity/);
+assert.doesNotMatch(multiItemSql, /staff_notification/);
+assert.doesNotMatch(multiItemSql, /waiting_list_new_request/);
+assert.deepEqual(
+  consolidateWaitingListRequestItems([
+    { cakeId: cakeA, sizeId: sizeM, quantity: 1 },
+    { cakeId: cakeB, sizeId: sizeL, quantity: 1 },
+    { cakeId: cakeA, sizeId: sizeM, quantity: 1 },
+    { cakeId: cakeB, sizeId: sizeL, quantity: 0 },
+  ]),
+  [
+    { cakeId: cakeA, sizeId: sizeM, quantity: 2 },
+    { cakeId: cakeB, sizeId: sizeL, quantity: 1 },
+  ],
+);
+assert.deepEqual(
+  consolidateWaitingListRequestItems([
+    { cakeId: cakeA, sizeId: sizeM, quantity: 5 },
+  ]),
+  [{ cakeId: cakeA, sizeId: sizeM, quantity: 5 }],
+);
 
 const closedDate = evaluateCollectionDate({
   selectedYmd: pickupDate,

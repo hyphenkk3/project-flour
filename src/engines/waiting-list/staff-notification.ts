@@ -65,11 +65,14 @@ export function waitingListHomePreviewLine(input: {
   sizeLabel: string;
   pickupDate: string;
   quantity: number;
+  extraItemCount?: number;
 }): string {
+  const extra = input.extraItemCount ?? 0;
   return [
     [input.cakeName.trim(), input.sizeLabel.trim()].filter(Boolean).join(" · "),
     formatShortBusinessDate(input.pickupDate),
     input.quantity > 0 ? `Qty ${input.quantity}` : "",
+    extra > 0 ? `+ ${extra} more` : "",
   ]
     .filter((part) => Boolean(part && part.trim()))
     .join(" · ");

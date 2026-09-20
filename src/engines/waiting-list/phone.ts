@@ -1,5 +1,7 @@
 /** Waiting-list WhatsApp: digits only. */
 
+import { formatShortBusinessDate } from "@/lib/dates";
+
 export function waitingListWhatsAppDigits(value: string): string {
   return value.replace(/\D/g, "");
 }
@@ -30,13 +32,20 @@ export const WAITING_LIST_CLOSED_REGULAR_ORDERS =
 export const WAITING_LIST_AVAILABLE_LABEL = "Waiting List available";
 
 export const WAITING_LIST_SEE_AVAILABLE_HELP =
-  "See which cakes are currently available on our waiting list for this date.";
+  "You can submit a request for cakes currently accepting Waiting List requests for this date.";
 
 export const WAITING_LIST_SEE_AVAILABLE_CTA =
   "See What's Available on the Waiting List";
+
+export const WAITING_LIST_CONTINUE_CTA = "Continue";
 
 export const WAITING_LIST_CLOSED_NONE =
   "We're not currently accepting Waiting List requests for this date.";
 
 export const WAITING_LIST_AVAILABILITY_INTRO =
-  "These cakes are currently available on our waiting list for this date.";
+  "These cakes are currently available for waiting-list requests for this date.";
+
+export function waitingListOtherFlavoursQuestion(pickupDate: string): string {
+  const label = formatShortBusinessDate(pickupDate.trim().slice(0, 10));
+  return `If other flavours become available for ${label}, would you like us to contact you?`;
+}

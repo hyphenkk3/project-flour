@@ -9,12 +9,14 @@ import {
   FormRadioGroup,
   FormSubmitButton,
 } from "@/components/ui/form";
+import { consolidateWaitingListRequestItems } from "@/engines/waiting-list/eligibility";
 import {
   WAITING_LIST_ACK_CONTACT,
   WAITING_LIST_JOIN_CTA,
   WAITING_LIST_NAME_HELP,
   WAITING_LIST_REQUEST_NOT_ORDER,
   WAITING_LIST_WHATSAPP_NOTE,
+  waitingListOtherFlavoursQuestion,
 } from "@/engines/waiting-list/phone";
 import { formatShortBusinessDate } from "@/lib/dates";
 import {
@@ -38,6 +40,12 @@ type JoinWaitingListFormProps = {
 
 const initialState: GuestWaitingListState = { error: null };
 
+function formatWaitingListDate(ymd: string): string {
+  const year = ymd.slice(0, 4);
+  const short = formatShortBusinessDate(ymd);
+  return /^\d{4}$/.test(year) ? `${short} ${year}` : short;
+}
+
 export function JoinWaitingListForm({
   pickupDate,
   collectionId,
@@ -48,19 +56,23 @@ export function JoinWaitingListForm({
     initialState,
   );
   const [openToAlternatives, setOpenToAlternatives] = useState("");
+  const selectedLines = useMemo(
+    () => consolidateWaitingListRequestItems(lines),
+    [lines],
+  );
   const itemsJson = useMemo(
     () =>
       JSON.stringify(
-        lines.map((line) => ({
+        selectedLines.map((line) => ({
           cake_id: line.cakeId,
           cake_size_id: line.sizeId,
           quantity: line.quantity,
         })),
       ),
-    [lines],
+    [selectedLines],
   );
 
-  if (lines.length === 0) return null;
+  if (selectedLines.length === 0) return null;
 
   return (
     <section className="border-fog space-y-4 border-t pt-5">
@@ -68,19 +80,17 @@ export function JoinWaitingListForm({
         <h2 className="text-ink text-sm font-semibold tracking-tight">
           {WAITING_LIST_JOIN_CTA}
         </h2>
-        <p className="text-skyline mt-1 text-sm leading-relaxed">
-          {WAITING_LIST_REQUEST_NOT_ORDER}
-        </p>
+        <p className="text-ink mt-1 text-sm">{formatWaitingListDate(pickupDate)}</p>
       </div>
       <ul className="text-ink space-y-1 text-sm">
-        {lines.map((line) => (
+        {selectedLines.map((line) => (
           <li key={`${line.cakeId}|${line.sizeId}`}>
             {line.cakeName} · {line.sizeLabel} × {line.quantity}
           </li>
         ))}
       </ul>
-      <p className="text-skyline text-sm">
-        Collection date · {formatShortBusinessDate(pickupDate)}
+      <p className="text-skyline text-sm leading-relaxed">
+        {WAITING_LIST_REQUEST_NOT_ORDER}
       </p>
       <form action={formAction} className="space-y-3">
         <input name="pickup_date" type="hidden" value={pickupDate} />
@@ -108,7 +118,7 @@ export function JoinWaitingListForm({
           />
         </FormField>
         <FormRadioGroup
-          legend="Would you like us to contact you if another flavour becomes available for the same date?"
+          legend={waitingListOtherFlavoursQuestion(pickupDate)}
           name="open_to_alternatives"
           onChange={setOpenToAlternatives}
           options={[

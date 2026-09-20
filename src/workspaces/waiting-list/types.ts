@@ -23,6 +23,12 @@ export type WaitingListBoardRow = {
   convertedOrderNumber: string | null;
   actionRequired: boolean;
   offeredQuantity: number | null;
+  requestItems: Array<{
+    itemId: string;
+    cakeName: string;
+    sizeLabel: string;
+    quantity: number;
+  }>;
 };
 
 export type WaitingListCrmCustomerOption = {
