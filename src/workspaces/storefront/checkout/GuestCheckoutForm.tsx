@@ -70,7 +70,14 @@ import {
   CUSTOMER_NAME_SPACE_HINT,
   customerNameValidationError,
 } from "@/engines/orders/customer-name";
-import { WAITING_LIST_WHATSAPP_NOTE } from "@/engines/waiting-list/phone";
+import {
+  WAITING_LIST_AVAILABLE_LABEL,
+  WAITING_LIST_CLOSED_NONE,
+  WAITING_LIST_CLOSED_REGULAR_ORDERS,
+  WAITING_LIST_SEE_AVAILABLE_CTA,
+  WAITING_LIST_SEE_AVAILABLE_HELP,
+  WAITING_LIST_WHATSAPP_NOTE,
+} from "@/engines/waiting-list/phone";
 import {
   buildCheckoutConfirmSnapshot,
   CheckoutConfirmPrompt,
@@ -118,7 +125,10 @@ import {
   type PreorderDraftFields,
   type PreorderDraftItem,
 } from "@/workspaces/storefront/checkout/preorder-draft";
+import { CustomerWaitingListAvailability } from "@/workspaces/storefront/waiting-list/CustomerWaitingListAvailability";
 import { JoinWaitingListForm } from "@/workspaces/storefront/waiting-list/JoinWaitingListForm";
+import { loadCustomerWaitingListAvailability } from "@/workspaces/storefront/waiting-list/actions";
+import type { CustomerWaitingListAvailability as CustomerWaitingListAvailabilityData } from "@/workspaces/storefront/waiting-list/availability-types";
 
 function formatCheckoutCakeDate(ymd: string): string {
   const year = ymd.slice(0, 4);
@@ -345,6 +355,10 @@ export function GuestCheckoutForm({
     blockingCakeNamesByDate: {},
     waitingListLineKeysByDate: {},
   });
+  const [closedWaitingList, setClosedWaitingList] =
+    useState<CustomerWaitingListAvailabilityData | null>(null);
+  const [waitingListAvailabilityOpen, setWaitingListAvailabilityOpen] =
+    useState(false);
 
   const effectivePickupBounds = useMemo(
     () => {
@@ -432,6 +446,39 @@ export function GuestCheckoutForm({
     effectivePickupBounds.min,
     hydrated,
     items,
+  ]);
+  useEffect(() => {
+    const selectedYmd = fields.pickupDate.trim().slice(0, 10);
+    if (!hydrated || !calendarReady || !/^\d{4}-\d{2}-\d{2}$/.test(selectedYmd)) {
+      return;
+    }
+    if (!isPickupOrdersClosed(selectedYmd, closedDates)) {
+      return;
+    }
+    let cancelled = false;
+    void loadCustomerWaitingListAvailability(selectedYmd).then(
+      (availability) => {
+        if (!cancelled) setClosedWaitingList(availability);
+      },
+      () => {
+        if (!cancelled) {
+          setClosedWaitingList({
+            pickupDate: selectedYmd,
+            collectionId,
+            options: [],
+          });
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    calendarReady,
+    closedDates,
+    collectionId,
+    fields.pickupDate,
+    hydrated,
   ]);
   const emptyCapacity = {
     fullyBookedDates: [] as string[],
@@ -1053,6 +1100,22 @@ export function GuestCheckoutForm({
     collectionDateEvaluation?.reason.code === "fully_booked" &&
     collectionDateEvaluation.reason.waitingListOffered &&
     waitingListLines.length > 0;
+  const ordersClosedSelected = Boolean(
+    calendarReady &&
+      fields.pickupDate &&
+      isPickupOrdersClosed(fields.pickupDate, closedDates),
+  );
+  const closedWaitingListForDate =
+    closedWaitingList?.pickupDate === fields.pickupDate
+      ? closedWaitingList
+      : null;
+  const closedWaitingListPending =
+    ordersClosedSelected && closedWaitingListForDate == null;
+  const closedWaitingListOptions = closedWaitingListForDate?.options ?? [];
+  const showClosedWaitingListCta =
+    ordersClosedSelected &&
+    !closedWaitingListPending &&
+    closedWaitingListOptions.length > 0;
   const pickupDateLabel = fields.pickupDate
     ? formatCheckoutCakeDate(fields.pickupDate)
     : null;
@@ -1185,7 +1248,41 @@ export function GuestCheckoutForm({
                   .join(", ")}.`}
           </p>
         ) : null}
-        {dateValidationMessage ? (
+        {ordersClosedSelected ? (
+          <div className="mt-4 space-y-2" role="status">
+            <p className="text-ink text-sm font-medium">
+              {`Orders closed for ${formatShortBusinessDate(fields.pickupDate)}`}
+            </p>
+            <p className="text-skyline text-sm leading-relaxed">
+              {WAITING_LIST_CLOSED_REGULAR_ORDERS}
+            </p>
+            {closedWaitingListPending ? (
+              <p className="text-skyline text-sm leading-relaxed">
+                Checking waiting list…
+              </p>
+            ) : showClosedWaitingListCta ? (
+              <>
+                <p className="text-ink text-sm font-medium">
+                  {WAITING_LIST_AVAILABLE_LABEL}
+                </p>
+                <p className="text-skyline text-sm leading-relaxed">
+                  {WAITING_LIST_SEE_AVAILABLE_HELP}
+                </p>
+                <button
+                  className="border-ink text-ink mt-1 inline-flex min-h-11 items-center justify-center border px-4 text-sm font-medium"
+                  onClick={() => setWaitingListAvailabilityOpen(true)}
+                  type="button"
+                >
+                  {WAITING_LIST_SEE_AVAILABLE_CTA}
+                </button>
+              </>
+            ) : (
+              <p className="text-skyline text-sm leading-relaxed">
+                {WAITING_LIST_CLOSED_NONE}
+              </p>
+            )}
+          </div>
+        ) : dateValidationMessage ? (
           <div className="mt-4">
             <FormError message={dateValidationMessage} />
           </div>
@@ -1742,6 +1839,13 @@ export function GuestCheckoutForm({
         pickupDate={fields.pickupDate}
       />
     ) : null}
+    <CustomerWaitingListAvailability
+      collectionId={closedWaitingListForDate?.collectionId ?? collectionId}
+      onClose={() => setWaitingListAvailabilityOpen(false)}
+      open={waitingListAvailabilityOpen && showClosedWaitingListCta}
+      options={closedWaitingListOptions}
+      pickupDate={fields.pickupDate}
+    />
     <CheckoutConfirmPrompt
       onConfirm={confirmOrder}
       onGoBack={goBackFromConfirm}

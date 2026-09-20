@@ -11,11 +11,21 @@ import {
   guestWaitingListCookieId,
   setGuestWaitingListCookie,
 } from "@/workspaces/storefront/waiting-list/cookie";
-import { getGuestWaitingListAck } from "@/workspaces/storefront/waiting-list/queries";
+import {
+  getGuestWaitingListAck,
+  listCustomerWaitingListAvailability,
+} from "@/workspaces/storefront/waiting-list/queries";
+import type { CustomerWaitingListAvailability } from "@/workspaces/storefront/waiting-list/availability-types";
 
 export type GuestWaitingListState = {
   error: string | null;
 };
+
+export async function loadCustomerWaitingListAvailability(
+  pickupDate: string,
+): Promise<CustomerWaitingListAvailability> {
+  return listCustomerWaitingListAvailability(pickupDate);
+}
 
 export async function submitGuestWaitingListAction(
   _prev: GuestWaitingListState,

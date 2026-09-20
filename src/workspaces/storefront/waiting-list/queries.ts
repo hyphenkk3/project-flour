@@ -1,4 +1,14 @@
 import { createServiceClient } from "@/lib/supabase/admin";
+import { parseBusinessDate } from "@/lib/dates";
+import { customerWaitingListOptionsForDate } from "@/engines/waiting-list/eligibility";
+import type { GuestCapacityRow } from "@/engines/preorder/capacity";
+import {
+  getStorefrontCollectionForPickupDate,
+  listAvailableCakes,
+} from "@/workspaces/storefront/catalog/queries";
+import { storefrontPhotoForSize } from "@/workspaces/storefront/catalog/cake-photo-map";
+import { isPickupOrdersClosed } from "@/workspaces/storefront/checkout/order-availability";
+import type { CustomerWaitingListAvailability } from "@/workspaces/storefront/waiting-list/availability-types";
 import { guestWaitingListCookieId } from "@/workspaces/storefront/waiting-list/cookie";
 
 export type GuestWaitingListAckItem = {
@@ -117,5 +127,156 @@ export async function getGuestWaitingListAck(
     };
   } catch {
     return null;
+  }
+}
+
+function emptyWaitingListAvailability(
+  pickupDate: string,
+  collectionId: string | null = null,
+): CustomerWaitingListAvailability {
+  return { pickupDate, collectionId, options: [] };
+}
+
+function isMissingWaitingListRelation(message: string): boolean {
+  return /production_capacity|waiting_list|schema cache|does not exist/i.test(
+    message,
+  );
+}
+
+/**
+ * Closed-date customer Waiting List options for one pickup date.
+ * Open dates return no options — discovery is closed-date only.
+ * Does not expose capacity quantities.
+ */
+export async function listCustomerWaitingListAvailability(
+  pickupDate: string,
+): Promise<CustomerWaitingListAvailability> {
+  const key = pickupDate.trim().slice(0, 10);
+  if (!parseBusinessDate(key)) return emptyWaitingListAvailability("");
+  try {
+    const closed = await isPickupOrdersClosed(key);
+    if (!closed) return emptyWaitingListAvailability(key);
+
+    const collection = await getStorefrontCollectionForPickupDate(key);
+    if (!collection) return emptyWaitingListAvailability(key);
+
+    const admin = createServiceClient();
+    const { data: collectionRow, error: collectionError } = await admin
+      .from("collections")
+      .select("waiting_list_enabled")
+      .eq("id", collection.id)
+      .maybeSingle();
+    if (collectionError) {
+      if (isMissingWaitingListRelation(collectionError.message)) {
+        return emptyWaitingListAvailability(key, collection.id);
+      }
+      throw new Error(collectionError.message);
+    }
+    const collectionWaitingListEnabled = Boolean(
+      (collectionRow as { waiting_list_enabled?: boolean } | null)
+        ?.waiting_list_enabled,
+    );
+    if (!collectionWaitingListEnabled) {
+      return emptyWaitingListAvailability(key, collection.id);
+    }
+
+    const cakes = await listAvailableCakes(collection.id);
+    const cakeIds = cakes.map((cake) => cake.id);
+    if (cakeIds.length === 0) {
+      return emptyWaitingListAvailability(key, collection.id);
+    }
+
+    let { data: capacityData, error: capacityError } = await admin
+      .from("production_capacity")
+      .select(
+        "pickup_date, library_cake_id, library_cake_size_id, collection_id, capacity_quantity, waiting_list_enabled",
+      )
+      .eq("pickup_date", key)
+      .in("library_cake_id", cakeIds);
+
+    if (capacityError && /waiting_list_enabled/i.test(capacityError.message)) {
+      const fallback = await admin
+        .from("production_capacity")
+        .select(
+          "pickup_date, library_cake_id, library_cake_size_id, collection_id, capacity_quantity",
+        )
+        .eq("pickup_date", key)
+        .in("library_cake_id", cakeIds);
+      capacityData = fallback.data as typeof capacityData;
+      capacityError = fallback.error;
+    }
+    if (capacityError) {
+      if (isMissingWaitingListRelation(capacityError.message)) {
+        return emptyWaitingListAvailability(key, collection.id);
+      }
+      throw new Error(capacityError.message);
+    }
+
+    const rows: GuestCapacityRow[] = (capacityData ?? []).map((row) => ({
+      pickupDate: String(
+        (row as { pickup_date?: string }).pickup_date ?? "",
+      ).slice(0, 10),
+      cakeId: String((row as { library_cake_id?: string }).library_cake_id ?? ""),
+      sizeId: String(
+        (row as { library_cake_size_id?: string | null }).library_cake_size_id ??
+          "",
+      ).trim()
+        ? String(
+            (row as { library_cake_size_id?: string | null })
+              .library_cake_size_id,
+          )
+        : null,
+      collectionId: String(
+        (row as { collection_id?: string | null }).collection_id ?? "",
+      ).trim()
+        ? String((row as { collection_id?: string | null }).collection_id)
+        : null,
+      capacityQuantity: Number(
+        (row as { capacity_quantity?: number }).capacity_quantity ?? 0,
+      ),
+      waitingListEnabled: Boolean(
+        (row as { waiting_list_enabled?: boolean }).waiting_list_enabled,
+      ),
+    }));
+
+    const sizes = cakes.flatMap((cake) =>
+      cake.sizes.map((size) => ({
+        cakeId: cake.id,
+        cakeName: cake.name,
+        sizeId: size.id,
+        sizeLabel: size.size,
+        price: size.price,
+      })),
+    );
+    const eligible = customerWaitingListOptionsForDate({
+      pickupDate: key,
+      collectionId: collection.id,
+      ordersClosed: true,
+      collectionWaitingListEnabled: true,
+      sizes,
+      rows,
+    });
+    const cakeById = new Map(cakes.map((cake) => [cake.id, cake]));
+    return {
+      pickupDate: key,
+      collectionId: collection.id,
+      options: eligible.map((option) => {
+        const cake = cakeById.get(option.cakeId);
+        const photo = cake
+          ? storefrontPhotoForSize(cake.photos, option.sizeId)
+          : null;
+        return {
+          ...option,
+          photoUrl: photo?.url ?? cake?.image ?? null,
+          photoAlt: photo?.altText || cake?.name || option.cakeName,
+        };
+      }),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (isMissingWaitingListRelation(message)) {
+      return emptyWaitingListAvailability(key);
+    }
+    throw error;
   }
 }

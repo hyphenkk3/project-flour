@@ -22,6 +22,7 @@ import {
   canViewWaitingList,
 } from "@/engines/waiting-list/capabilities";
 import {
+  isCustomerWaitingListJoinable,
   isWaitingListOffered,
   waitingListEligibleCartLines,
 } from "@/engines/waiting-list/eligibility";
@@ -98,6 +99,26 @@ assert.equal(
     fullyBooked: false,
     collectionWaitingListEnabled: true,
     capacityWaitingListEnabled: true,
+  }),
+  false,
+);
+assert.equal(
+  isCustomerWaitingListJoinable({
+    ordersClosed: true,
+    collectionWaitingListEnabled: true,
+    matchingCapacity: true,
+    capacityWaitingListEnabled: true,
+    fullyBooked: false,
+  }),
+  true,
+);
+assert.equal(
+  isCustomerWaitingListJoinable({
+    ordersClosed: false,
+    collectionWaitingListEnabled: true,
+    matchingCapacity: true,
+    capacityWaitingListEnabled: true,
+    fullyBooked: false,
   }),
   false,
 );
@@ -506,6 +527,8 @@ const formSrc = readSrc(
 assert.match(formSrc, /JoinWaitingListForm/);
 assert.match(formSrc, /fullyBookedWithoutWaitingList/);
 assert.match(formSrc, /waitingListOffered/);
+assert.match(formSrc, /CustomerWaitingListAvailability/);
+assert.match(formSrc, /WAITING_LIST_SEE_AVAILABLE_CTA/);
 
 const joinSrc = readSrc(
   "src/workspaces/storefront/waiting-list/JoinWaitingListForm.tsx",
@@ -684,6 +707,13 @@ const insertEnd = sql.indexOf("\ncreate or replace function public.", insertStar
 const insertSql = sql.slice(insertStart, insertEnd > insertStart ? insertEnd : undefined);
 assert.doesNotMatch(insertSql, /order_availability/);
 assert.doesNotMatch(insertSql, /is_pickup_orders_closed/);
+
+const closedDateSql = readSrc(
+  "supabase/migrations/20260920140000_guest_waiting_list_closed_date.sql",
+);
+assert.match(closedDateSql, /is_pickup_orders_closed\(p_pickup_date\)/);
+assert.match(closedDateSql, /_guest_preorder_item_fully_booked/);
+assert.match(closedDateSql, /p_actor_staff_id is null/);
 assert.match(insertSql, /_waiting_list_matching_capacity/);
 assert.match(insertSql, /v_collection.waiting_list_enabled is not true/);
 assert.match(insertSql, /v_capacity.waiting_list_enabled is not true/);

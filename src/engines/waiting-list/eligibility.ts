@@ -3,6 +3,13 @@
  * Fully Booked alone is never enough.
  */
 
+import {
+  guestPreorderItemFullyBooked,
+  selectMostSpecificGuestCapacityRow,
+  type GuestCapacityRow,
+  type GuestCapacityUsedLine,
+} from "@/engines/preorder/capacity";
+
 export function isWaitingListOffered(input: {
   fullyBooked: boolean;
   collectionWaitingListEnabled: boolean;
@@ -13,6 +20,81 @@ export function isWaitingListOffered(input: {
     input.collectionWaitingListEnabled &&
     input.capacityWaitingListEnabled
   );
+}
+
+/**
+ * Customer join eligibility for one cake/size on a date.
+ * Closed dates: collection + matching capacity Waiting List flags.
+ * Open dates: those flags plus the existing Fully Booked rule.
+ */
+export function isCustomerWaitingListJoinable(input: {
+  ordersClosed: boolean;
+  collectionWaitingListEnabled: boolean;
+  matchingCapacity: boolean;
+  capacityWaitingListEnabled: boolean;
+  fullyBooked: boolean;
+}): boolean {
+  if (!input.collectionWaitingListEnabled) return false;
+  if (!input.matchingCapacity) return false;
+  if (!input.capacityWaitingListEnabled) return false;
+  if (input.ordersClosed) return true;
+  return input.fullyBooked;
+}
+
+export type CustomerWaitingListDateOption = {
+  cakeId: string;
+  cakeName: string;
+  sizeId: string;
+  sizeLabel: string;
+  price: number;
+};
+
+/** Date-level customer-visible Waiting List options. Does not invent new flags. */
+export function customerWaitingListOptionsForDate(input: {
+  pickupDate: string;
+  collectionId: string | null;
+  ordersClosed: boolean;
+  collectionWaitingListEnabled: boolean;
+  sizes: readonly CustomerWaitingListDateOption[];
+  rows: readonly GuestCapacityRow[];
+  used?: readonly GuestCapacityUsedLine[];
+}): CustomerWaitingListDateOption[] {
+  if (!input.collectionWaitingListEnabled) return [];
+  const seen = new Set<string>();
+  const options: CustomerWaitingListDateOption[] = [];
+  for (const size of input.sizes) {
+    const key = `${size.cakeId}|${size.sizeId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const row = selectMostSpecificGuestCapacityRow(input.rows, {
+      pickupDate: input.pickupDate,
+      cakeId: size.cakeId,
+      sizeId: size.sizeId,
+      collectionId: input.collectionId,
+    });
+    const fullyBooked = guestPreorderItemFullyBooked({
+      pickupDate: input.pickupDate,
+      collectionId: input.collectionId,
+      cakeId: size.cakeId,
+      sizeId: size.sizeId,
+      quantity: 1,
+      rows: input.rows,
+      used: input.used ?? [],
+    });
+    if (
+      !isCustomerWaitingListJoinable({
+        ordersClosed: input.ordersClosed,
+        collectionWaitingListEnabled: true,
+        matchingCapacity: Boolean(row),
+        capacityWaitingListEnabled: Boolean(row?.waitingListEnabled),
+        fullyBooked,
+      })
+    ) {
+      continue;
+    }
+    options.push(size);
+  }
+  return options;
 }
 
 /** Lines the customer may queue when some cart items are eligible. */
