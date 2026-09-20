@@ -1,3 +1,4 @@
+import type { WaitingListConfirmationStaffLink } from "@/engines/waiting-list/confirmation-review";
 import type { WaitingListItemStatus } from "@/engines/waiting-list/types";
 
 export type WaitingListBoardRow = {
@@ -28,7 +29,10 @@ export type WaitingListBoardRow = {
     cakeName: string;
     sizeLabel: string;
     quantity: number;
+    status: WaitingListItemStatus;
+    offeredQuantity: number | null;
   }>;
+  confirmationLink: WaitingListConfirmationStaffLink | null;
 };
 
 export type WaitingListCrmCustomerOption = {

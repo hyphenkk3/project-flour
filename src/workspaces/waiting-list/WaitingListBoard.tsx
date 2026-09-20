@@ -26,6 +26,13 @@ import {
   setWaitingListItemQuantityAction,
 } from "@/workspaces/waiting-list/actions";
 import {
+  WAITING_LIST_CONFIRMATION_EXPIRED_LABEL,
+  WAITING_LIST_CONFIRMATION_INVALIDATED_LABEL,
+  WAITING_LIST_CONFIRMATION_ISSUED_LABEL,
+  WAITING_LIST_CONFIRMATION_SUBMITTED_LABEL,
+} from "@/engines/waiting-list/confirmation-review";
+import { WaitingListConfirmationStaffPanel } from "@/workspaces/waiting-list/WaitingListConfirmationStaffPanel";
+import {
   nextWaitingListFilterSizeId,
   WAITING_LIST_FILTER_ACTION,
   WAITING_LIST_SECTION_ID,
@@ -70,7 +77,8 @@ function WaitingListScopeForm({
   action: (formData: FormData) => void;
   pending: boolean;
 }) {
-  const listedCake = cakes.find((cake) => cake.id === row.cakeId) ?? cakes[0] ?? null;
+  const listedCake =
+    cakes.find((cake) => cake.id === row.cakeId) ?? cakes[0] ?? null;
   const [cakeId, setCakeId] = useState(listedCake?.id ?? row.cakeId);
   const cake =
     cakes.find((entry) => entry.id === cakeId) ??
@@ -348,13 +356,25 @@ export function WaitingListBoard({
   const grouped = useMemo(() => {
     const map = new Map<string, WaitingListBoardRow[]>();
     for (const row of rows) {
-      const key = scan === "date" ? row.pickupDate : `${row.cakeName} · ${row.sizeLabel}`;
+      const key =
+        scan === "date" ? row.pickupDate : `${row.cakeName} · ${row.sizeLabel}`;
       const list = map.get(key) ?? [];
       list.push(row);
       map.set(key, list);
     }
     return [...map.entries()];
   }, [rows, scan]);
+
+  const confirmationLeadItemIds = useMemo(() => {
+    const seen = new Set<string>();
+    const leads = new Set<string>();
+    for (const row of rows) {
+      if (seen.has(row.requestId)) continue;
+      seen.add(row.requestId);
+      leads.add(row.itemId);
+    }
+    return leads;
+  }, [rows]);
 
   return (
     <section aria-labelledby={WAITING_LIST_SECTION_ID} className="space-y-4">
@@ -366,11 +386,11 @@ export function WaitingListBoard({
           Waiting list
         </h2>
         <p className="text-skyline mt-1 max-w-2xl text-sm">
-          Queue for dates and cakes where Bakery has explicitly allowed waiting-list
-          participation. This is not a confirmed order and does not show production
-          capacity numbers. A production-capacity row with waiting list enabled is
-          required for that cake and date. Closing customer orders does not enable
-          the waiting list.
+          Queue for dates and cakes where Bakery has explicitly allowed
+          waiting-list participation. This is not a confirmed order and does not
+          show production capacity numbers. A production-capacity row with
+          waiting list enabled is required for that cake and date. Closing
+          customer orders does not enable the waiting list.
         </p>
       </div>
 
@@ -389,7 +409,11 @@ export function WaitingListBoard({
                     action={configAction}
                     className="flex flex-col gap-3 sm:flex-row sm:items-end"
                   >
-                    <input name="collection_id" type="hidden" value={collection.id} />
+                    <input
+                      name="collection_id"
+                      type="hidden"
+                      value={collection.id}
+                    />
                     <p className="text-ink min-w-40 text-sm font-medium">
                       {collection.name}
                     </p>
@@ -414,7 +438,11 @@ export function WaitingListBoard({
                         type="number"
                       />
                     </label>
-                    <button className={ghostButtonClass} disabled={pending} type="submit">
+                    <button
+                      className={ghostButtonClass}
+                      disabled={pending}
+                      type="submit"
+                    >
                       Save
                     </button>
                   </form>
@@ -455,7 +483,9 @@ export function WaitingListBoard({
       {queueError ? <FormError message={queueError} /> : null}
 
       {grouped.length === 0 ? (
-        <p className="text-skyline text-sm">No waiting-list entries for these filters.</p>
+        <p className="text-skyline text-sm">
+          No waiting-list entries for these filters.
+        </p>
       ) : (
         grouped.map(([heading, group]) => (
           <div className="space-y-2" key={heading}>
@@ -475,9 +505,10 @@ export function WaitingListBoard({
                       ) : null}
                     </p>
                     <p className="text-skyline mt-0.5 text-sm">
-                      WhatsApp {row.guestPhone} · {row.cakeName} · {row.sizeLabel} ·
-                      qty {row.quantity} · remaining {row.remainingQuantity} · #
-                      {row.queuePosition} · {statusLabel(row.status)}
+                      WhatsApp {row.guestPhone} · {row.cakeName} ·{" "}
+                      {row.sizeLabel} · qty {row.quantity} · remaining{" "}
+                      {row.remainingQuantity} · #{row.queuePosition} ·{" "}
+                      {statusLabel(row.status)}
                     </p>
                     {row.requestItems.length > 1 ? (
                       <p className="text-skyline mt-0.5 text-xs">
@@ -489,6 +520,23 @@ export function WaitingListBoard({
                               `${item.cakeName} · ${item.sizeLabel} × ${item.quantity}`,
                           )
                           .join(" · ")}
+                      </p>
+                    ) : null}
+                    {row.confirmationLink?.status === "submitted" ? (
+                      <p className="text-ink mt-1 text-xs font-medium">
+                        {WAITING_LIST_CONFIRMATION_SUBMITTED_LABEL}
+                      </p>
+                    ) : row.confirmationLink?.status === "issued" ? (
+                      <p className="text-ink mt-1 text-xs font-medium">
+                        {WAITING_LIST_CONFIRMATION_ISSUED_LABEL}
+                      </p>
+                    ) : row.confirmationLink?.status === "expired" ? (
+                      <p className="text-ink mt-1 text-xs font-medium">
+                        {WAITING_LIST_CONFIRMATION_EXPIRED_LABEL}
+                      </p>
+                    ) : row.confirmationLink?.status === "invalidated" ? (
+                      <p className="text-ink mt-1 text-xs font-medium">
+                        {WAITING_LIST_CONFIRMATION_INVALIDATED_LABEL}
                       </p>
                     ) : null}
                     <p className="text-skyline mt-0.5 text-xs">
@@ -509,9 +557,15 @@ export function WaitingListBoard({
                         : ""}
                     </p>
                     {row.notes ? (
-                      <p className="text-skyline mt-0.5 text-xs">Notes: {row.notes}</p>
+                      <p className="text-skyline mt-0.5 text-xs">
+                        Notes: {row.notes}
+                      </p>
                     ) : null}
                   </div>
+
+                  {canManage && confirmationLeadItemIds.has(row.itemId) ? (
+                    <WaitingListConfirmationStaffPanel row={row} />
+                  ) : null}
 
                   {canManage ? (
                     <div className="flex flex-col gap-2">
@@ -521,7 +575,11 @@ export function WaitingListBoard({
                           action={contactAction}
                           className="flex flex-wrap items-end gap-2"
                         >
-                          <input name="item_id" type="hidden" value={row.itemId} />
+                          <input
+                            name="item_id"
+                            type="hidden"
+                            value={row.itemId}
+                          />
                           <label className="text-ink text-sm">
                             Offer qty
                             <input
@@ -549,7 +607,11 @@ export function WaitingListBoard({
                           action={responseAction}
                           className="flex flex-wrap items-end gap-2"
                         >
-                          <input name="item_id" type="hidden" value={row.itemId} />
+                          <input
+                            name="item_id"
+                            type="hidden"
+                            value={row.itemId}
+                          />
                           <label className="text-ink text-sm">
                             Response
                             <select className={fieldClass} name="outcome">
@@ -599,7 +661,11 @@ export function WaitingListBoard({
                           action={convertAction}
                           className="flex flex-wrap items-end gap-2"
                         >
-                          <input name="item_id" type="hidden" value={row.itemId} />
+                          <input
+                            name="item_id"
+                            type="hidden"
+                            value={row.itemId}
+                          />
                           <label className="text-ink text-sm">
                             Convert qty
                             <input
@@ -647,7 +713,11 @@ export function WaitingListBoard({
                         row.status === "active" ||
                         row.status === "accepted") ? (
                         <form action={closeAction}>
-                          <input name="item_id" type="hidden" value={row.itemId} />
+                          <input
+                            name="item_id"
+                            type="hidden"
+                            value={row.itemId}
+                          />
                           <button
                             className={ghostButtonClass}
                             disabled={pending}
@@ -667,7 +737,11 @@ export function WaitingListBoard({
                             action={offerAction}
                             className="flex flex-wrap items-end gap-2"
                           >
-                            <input name="item_id" type="hidden" value={row.itemId} />
+                            <input
+                              name="item_id"
+                              type="hidden"
+                              value={row.itemId}
+                            />
                             <label className="text-ink text-sm">
                               Alternative cake
                               <select
@@ -718,11 +792,17 @@ export function WaitingListBoard({
                             action={altAction}
                             className="flex flex-wrap items-end gap-2"
                           >
-                            <input name="item_id" type="hidden" value={row.itemId} />
+                            <input
+                              name="item_id"
+                              type="hidden"
+                              value={row.itemId}
+                            />
                             <label className="text-ink text-sm">
                               Alternative reply
                               <select className={fieldClass} name="accept">
-                                <option value="yes">Switch to alternative</option>
+                                <option value="yes">
+                                  Switch to alternative
+                                </option>
                                 <option value="no">
                                   Continue waiting for original
                                 </option>
@@ -801,7 +881,11 @@ export function WaitingListBoard({
                             action={qtyAction}
                             className="flex flex-wrap items-end gap-2"
                           >
-                            <input name="item_id" type="hidden" value={row.itemId} />
+                            <input
+                              name="item_id"
+                              type="hidden"
+                              value={row.itemId}
+                            />
                             <label className="text-ink text-sm">
                               Quantity
                               <input
@@ -827,7 +911,11 @@ export function WaitingListBoard({
                       row.status !== "converted" &&
                       row.status !== "closed" ? (
                         <form action={cancelAction}>
-                          <input name="item_id" type="hidden" value={row.itemId} />
+                          <input
+                            name="item_id"
+                            type="hidden"
+                            value={row.itemId}
+                          />
                           <input
                             name="reason"
                             type="hidden"
@@ -852,8 +940,13 @@ export function WaitingListBoard({
       )}
 
       {canManage && cakes.length > 0 ? (
-        <form action={createAction} className="border-fog space-y-3 rounded-xl border bg-white px-4 py-4">
-          <p className="text-ink text-sm font-medium">Add customer to waiting list</p>
+        <form
+          action={createAction}
+          className="border-fog space-y-3 rounded-xl border bg-white px-4 py-4"
+        >
+          <p className="text-ink text-sm font-medium">
+            Add customer to waiting list
+          </p>
           {createState.error ? <FormError message={createState.error} /> : null}
           <p className="text-skyline text-xs">
             Choose a CRM customer to copy their name and WhatsApp, or enter a
@@ -863,7 +956,7 @@ export function WaitingListBoard({
           <input name="collection_id" type="hidden" value="" />
           <div className="grid gap-3 sm:grid-cols-2">
             {customers.length > 0 ? (
-              <label className="text-ink sm:col-span-2 text-sm">
+              <label className="text-ink text-sm sm:col-span-2">
                 CRM customer
                 <select
                   className={fieldClass}
@@ -871,7 +964,9 @@ export function WaitingListBoard({
                     const nextId = event.target.value;
                     setCrmCustomerId(nextId);
                     if (!nextId) return;
-                    const customer = customers.find((entry) => entry.id === nextId);
+                    const customer = customers.find(
+                      (entry) => entry.id === nextId,
+                    );
                     if (!customer) return;
                     const snapshot = guestSnapshotFromCrmCustomer(customer);
                     setGuestName(snapshot.guestName);
@@ -884,7 +979,10 @@ export function WaitingListBoard({
                   <option value="">Not in CRM — enter details</option>
                   {customers.map((customer) => (
                     <option key={customer.id} value={customer.id}>
-                      {customerIdentityLabel(customer.fullName, customer.phoneNumber)}
+                      {customerIdentityLabel(
+                        customer.fullName,
+                        customer.phoneNumber,
+                      )}
                     </option>
                   ))}
                 </select>
@@ -913,7 +1011,7 @@ export function WaitingListBoard({
                 value={guestPhone}
               />
             </label>
-            <p className="text-skyline sm:col-span-2 text-xs">
+            <p className="text-skyline text-xs sm:col-span-2">
               {WAITING_LIST_WHATSAPP_NOTE}
             </p>
             <label className="text-ink text-sm">
@@ -973,7 +1071,7 @@ export function WaitingListBoard({
                 <option value="yes">Yes</option>
               </select>
             </label>
-            <label className="text-ink sm:col-span-2 text-sm">
+            <label className="text-ink text-sm sm:col-span-2">
               Notes
               <textarea
                 className="border-fog text-ink mt-1 block min-h-20 w-full rounded-lg border bg-white px-3 py-2 text-sm"

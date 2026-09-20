@@ -99,10 +99,7 @@ assert.match(
   sql,
   /create unique index if not exists waiting_list_confirmation_links_token_hash_uidx/,
 );
-assert.match(
-  sql,
-  /on public\.waiting_list_confirmation_links \(token_hash\)/,
-);
+assert.match(sql, /on public\.waiting_list_confirmation_links \(token_hash\)/);
 assert.notEqual(
   hashWaitingListConfirmationToken("alpha-token"),
   hashWaitingListConfirmationToken("beta-token"),
@@ -137,10 +134,7 @@ assert.doesNotMatch(issueSql, /interval '30 minutes'/);
 assert.doesNotMatch(issueSql, /make_interval\(mins => 30\)/);
 assert.doesNotMatch(engineSrc, /30 minutes before/);
 assert.doesNotMatch(serverSrc, /30 minutes before/);
-assert.match(
-  sql,
-  /Link expiry is NOT\n-- fulfilment-time minus 30 minutes/,
-);
+assert.match(sql, /Link expiry is NOT\n-- fulfilment-time minus 30 minutes/);
 assert.match(sql, /is_valid_public_pickup_slot/);
 assert.match(sql, /is_valid_delivery_slot/);
 assert.match(sql, /is_valid_dine_in_slot/);
@@ -169,7 +163,10 @@ assert.match(
 assert.doesNotMatch(sql, /create policy/);
 assert.doesNotMatch(sql, /for select to anon/);
 assert.doesNotMatch(sql, /for select to authenticated/);
-assert.doesNotMatch(sql, /grant select on table public\.waiting_list_confirmation_links/);
+assert.doesNotMatch(
+  sql,
+  /grant select on table public\.waiting_list_confirmation_links/,
+);
 assert.match(
   sql,
   /revoke all on function public\.issue_waiting_list_confirmation_link\(uuid, uuid, text\)\n {2}from public, anon/,
@@ -201,7 +198,10 @@ assert.match(
   sql,
   /on public\.waiting_list_confirmation_links \(request_id\)\n {2}where status = 'issued'/,
 );
-assert.match(issueSql, /A confirmation link is already issued for this request/);
+assert.match(
+  issueSql,
+  /A confirmation link is already issued for this request/,
+);
 
 // 9. No order is created by issuing a link.
 assert.doesNotMatch(issueSql, /create_staff_guest_preorder/);
@@ -220,30 +220,46 @@ for (const rel of historicalMigrations) {
   assert.equal(sha256File(rel), historicalHashes[rel]);
 }
 assert.doesNotMatch(
-  readSrc("supabase/migrations/20260920120000_staff_notification_waiting_list_new_request.sql"),
+  readSrc(
+    "supabase/migrations/20260920120000_staff_notification_waiting_list_new_request.sql",
+  ),
   /confirmation_link/,
 );
 assert.match(
-  readSrc("supabase/migrations/20260920140000_guest_waiting_list_closed_date.sql"),
+  readSrc(
+    "supabase/migrations/20260920140000_guest_waiting_list_closed_date.sql",
+  ),
   /is_pickup_orders_closed\(p_pickup_date\)/,
 );
 assert.match(
-  readSrc("supabase/migrations/20260920160000_guest_waiting_list_multi_item.sql"),
+  readSrc(
+    "supabase/migrations/20260920160000_guest_waiting_list_multi_item.sql",
+  ),
   /group by cake_id, size_id/,
 );
 
 assert.match(typesSrc, /confirmation_link_issued/);
 assert.match(typesSrc, /confirmation_link_invalidated/);
 assert.match(issueSql, /_waiting_list_assert_manage_staff/);
-assert.match(issueSql, /v_request\.status in \('cancelled', 'closed', 'converted'\)/);
+assert.match(
+  issueSql,
+  /v_request\.status in \('cancelled', 'closed', 'converted'\)/,
+);
 assert.match(sql, /constraint waiting_list_confirmation_links_status_check/);
 assert.match(sql, /'issued', 'submitted', 'expired', 'invalidated'/);
 assert.match(sql, /issued_by_staff_id uuid not null/);
 assert.match(sql, /expires_at timestamptz not null/);
-assert.doesNotMatch(readSrc("src/workspaces/waiting-list/actions.ts"), /issueWaitingListConfirmationLink/);
 assert.doesNotMatch(
   readSrc("src/workspaces/waiting-list/WaitingListBoard.tsx"),
-  /issueWaitingListConfirmationLink/,
+  /hashWaitingListConfirmationToken/,
+);
+assert.doesNotMatch(
+  readSrc("src/workspaces/waiting-list/WaitingListBoard.tsx"),
+  /generateWaitingListConfirmationToken/,
+);
+assert.doesNotMatch(
+  readSrc("src/workspaces/waiting-list/WaitingListBoard.tsx"),
+  /token_hash/,
 );
 
 console.log("waiting-list confirmation-link foundation tests passed");

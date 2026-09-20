@@ -8,14 +8,22 @@ import {
   isWaitingListConfirmationTokenHash,
   type WaitingListConfirmationItemSnapshot,
 } from "@/engines/waiting-list/confirmation-link";
+import { waitingListConfirmationCustomerPath } from "@/engines/waiting-list/confirmation-whatsapp";
 import { createClient } from "@/lib/supabase/server";
 
 export type IssueWaitingListConfirmationLinkResult = {
   id: string;
   requestId: string;
   token: string;
+  confirmationPath: string;
   expiresAt: string;
   itemSnapshot: WaitingListConfirmationItemSnapshot[];
+  items: Array<{
+    cakeName: string;
+    sizeLabel: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
   error?: undefined;
 };
 
@@ -27,7 +35,9 @@ function asTrimmed(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function parseItemSnapshot(value: unknown): WaitingListConfirmationItemSnapshot[] {
+function parseItemSnapshot(
+  value: unknown,
+): WaitingListConfirmationItemSnapshot[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((row) => {
     const entry = row as Record<string, unknown>;
@@ -56,6 +66,53 @@ function parseItemSnapshot(value: unknown): WaitingListConfirmationItemSnapshot[
         offeredQuantity: Math.floor(offeredQuantity),
       },
     ];
+  });
+}
+
+async function displayItemsForSnapshot(
+  snapshot: WaitingListConfirmationItemSnapshot[],
+): Promise<
+  Array<{
+    cakeName: string;
+    sizeLabel: string;
+    quantity: number;
+    unitPrice: number;
+  }>
+> {
+  if (snapshot.length === 0) return [];
+  const supabase = await createClient();
+  const cakeIds = [...new Set(snapshot.map((item) => item.cakeId))];
+  const sizeIds = [...new Set(snapshot.map((item) => item.cakeSizeId))];
+  const [{ data: cakes }, { data: sizes }] = await Promise.all([
+    supabase.from("library_cakes").select("id, name").in("id", cakeIds),
+    supabase
+      .from("library_cake_sizes")
+      .select("id, label, price")
+      .in("id", sizeIds),
+  ]);
+  const cakeById = new Map(
+    (cakes ?? []).map((row) => [
+      String((row as { id?: string }).id),
+      String((row as { name?: string }).name ?? "Cake"),
+    ]),
+  );
+  const sizeById = new Map(
+    (sizes ?? []).map((row) => [
+      String((row as { id?: string }).id),
+      {
+        label: String((row as { label?: string }).label ?? "Size"),
+        unitPrice: Number((row as { price?: number }).price ?? 0),
+      },
+    ]),
+  );
+  return snapshot.map((item) => {
+    const size = sizeById.get(item.cakeSizeId);
+    return {
+      cakeName: cakeById.get(item.cakeId) ?? "Cake",
+      sizeLabel: size?.label ?? "Size",
+      quantity: item.offeredQuantity,
+      unitPrice: size?.unitPrice ?? 0,
+    };
   });
 }
 
@@ -101,14 +158,19 @@ export async function issueWaitingListConfirmationLink(
   const expiresAt = asTrimmed(payload?.expires_at);
   const itemSnapshot = parseItemSnapshot(payload?.item_snapshot);
   if (!linkId || !expiresAt || itemSnapshot.length === 0) {
-    return { error: "Confirmation link was created but could not be confirmed." };
+    return {
+      error: "Confirmation link was created but could not be confirmed.",
+    };
   }
+  const items = await displayItemsForSnapshot(itemSnapshot);
   return {
     id: linkId,
     requestId: asTrimmed(payload?.request_id) || id,
     token,
+    confirmationPath: waitingListConfirmationCustomerPath(token),
     expiresAt,
     itemSnapshot,
+    items,
   };
 }
 

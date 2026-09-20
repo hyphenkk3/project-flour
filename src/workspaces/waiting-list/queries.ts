@@ -1,5 +1,11 @@
-import { createClient } from "@/lib/supabase/server";
+import { getSessionStaff } from "@/foundation/auth/session";
 import { parseBusinessDate, toBusinessDateKey } from "@/lib/dates";
+import { createClient } from "@/lib/supabase/server";
+import {
+  parseStaffWaitingListConfirmationLinks,
+  type WaitingListConfirmationPaidAddonCatalog,
+  type WaitingListConfirmationStaffLink,
+} from "@/engines/waiting-list/confirmation-review";
 import type { WaitingListItemStatus } from "@/engines/waiting-list/types";
 import {
   parseWaitingListNotificationPayload,
@@ -16,6 +22,12 @@ import type {
 
 function isMissingWaitingList(message: string): boolean {
   return /waiting_list|schema cache|does not exist/i.test(message);
+}
+
+function isMissingConfirmationLinks(message: string): boolean {
+  return /staff_list_waiting_list_confirmation_links|waiting_list_confirmation_links|schema cache|does not exist/i.test(
+    message,
+  );
 }
 
 function asId(value: unknown): string {
@@ -63,7 +75,8 @@ export async function listWaitingListCakeOptions(): Promise<
     .order("name", { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => {
-    const sizesRel = (row as { library_cake_sizes?: unknown }).library_cake_sizes;
+    const sizesRel = (row as { library_cake_sizes?: unknown })
+      .library_cake_sizes;
     const sizes = Array.isArray(sizesRel) ? sizesRel : [];
     return {
       id: asId((row as { id?: string }).id),
@@ -107,13 +120,15 @@ export async function listWaitingListBoard(input: {
     if (rows.length === 0) return [];
 
     const requestIds = [
-      ...new Set(rows.map((row) => asId((row as { request_id?: string }).request_id))),
+      ...new Set(
+        rows.map((row) => asId((row as { request_id?: string }).request_id)),
+      ),
     ].filter(Boolean);
     const { data: requestItemRows } = requestIds.length
       ? await supabase
           .from("waiting_list_items")
           .select(
-            "id, request_id, library_cake_id, library_cake_size_id, quantity, created_at",
+            "id, request_id, library_cake_id, library_cake_size_id, quantity, status, created_at",
           )
           .in("request_id", requestIds)
           .order("created_at", { ascending: true })
@@ -129,46 +144,80 @@ export async function listWaitingListBoard(input: {
     const sizeIds = [
       ...new Set(
         [...rows, ...siblingRows].map((row) =>
-          asId((row as { library_cake_size_id?: string | null }).library_cake_size_id),
+          asId(
+            (row as { library_cake_size_id?: string | null })
+              .library_cake_size_id,
+          ),
         ),
       ),
     ].filter(Boolean);
     const itemIds = rows.map((row) => asId((row as { id?: string }).id));
+    const siblingItemIds = [
+      ...new Set(
+        siblingRows
+          .map((row) => asId((row as { id?: string }).id))
+          .filter(Boolean),
+      ),
+    ];
+    const holdItemIds = siblingItemIds.length > 0 ? siblingItemIds : itemIds;
     const orderIds = [
       ...new Set(
         rows.map((row) =>
-          asId((row as { converted_order_id?: string | null }).converted_order_id),
+          asId(
+            (row as { converted_order_id?: string | null }).converted_order_id,
+          ),
         ),
       ),
     ].filter(Boolean);
 
-    const [{ data: requests }, { data: cakes }, { data: sizes }, { data: holds }, { data: events }, { data: orders }] =
-      await Promise.all([
-        supabase
-          .from("waiting_list_requests")
-          .select("id, guest_name, guest_phone, open_to_alternatives, created_at, notes")
-          .in("id", requestIds),
-        supabase.from("library_cakes").select("id, name").in("id", cakeIds),
-        sizeIds.length > 0
-          ? supabase.from("library_cake_sizes").select("id, label").in("id", sizeIds)
-          : Promise.resolve({ data: [] as unknown[] }),
-        supabase
-          .from("production_capacity_holds")
-          .select("waiting_list_item_id, quantity, status")
-          .in("waiting_list_item_id", itemIds)
-          .eq("status", "active"),
-        supabase
-          .from("waiting_list_events")
-          .select("item_id, event_type")
-          .in("item_id", itemIds)
-          .eq("event_type", "capacity_action_required"),
-        orderIds.length > 0
-          ? supabase
-              .from("orders")
-              .select("id, order_number")
-              .in("id", orderIds)
-          : Promise.resolve({ data: [] as unknown[] }),
-      ]);
+    const staff = await getSessionStaff();
+    const [
+      { data: requests },
+      { data: cakes },
+      { data: sizes },
+      { data: holds },
+      { data: events },
+      { data: orders },
+      confirmationResult,
+      paidAddonResult,
+    ] = await Promise.all([
+      supabase
+        .from("waiting_list_requests")
+        .select(
+          "id, guest_name, guest_phone, open_to_alternatives, created_at, notes",
+        )
+        .in("id", requestIds),
+      supabase.from("library_cakes").select("id, name").in("id", cakeIds),
+      sizeIds.length > 0
+        ? supabase
+            .from("library_cake_sizes")
+            .select("id, label")
+            .in("id", sizeIds)
+        : Promise.resolve({ data: [] as unknown[] }),
+      supabase
+        .from("production_capacity_holds")
+        .select("waiting_list_item_id, quantity, status")
+        .in("waiting_list_item_id", holdItemIds)
+        .eq("status", "active"),
+      supabase
+        .from("waiting_list_events")
+        .select("item_id, event_type")
+        .in("item_id", itemIds)
+        .eq("event_type", "capacity_action_required"),
+      orderIds.length > 0
+        ? supabase.from("orders").select("id, order_number").in("id", orderIds)
+        : Promise.resolve({ data: [] as unknown[] }),
+      staff
+        ? supabase.rpc("staff_list_waiting_list_confirmation_links", {
+            p_actor_staff_id: staff.id,
+            p_request_ids: requestIds,
+          })
+        : Promise.resolve({ data: [] as unknown[], error: null }),
+      supabase
+        .from("paid_addon_types")
+        .select("code, name, unit_price")
+        .eq("is_active", true),
+    ]);
 
     const requestById = new Map(
       (requests ?? []).map((row) => [asId((row as { id?: string }).id), row]),
@@ -211,22 +260,57 @@ export async function listWaitingListBoard(input: {
         cakeName: string;
         sizeLabel: string;
         quantity: number;
+        status: WaitingListItemStatus;
+        offeredQuantity: number | null;
       }>
     >();
     for (const sibling of siblingRows) {
       const requestId = asId((sibling as { request_id?: string }).request_id);
-      const cakeId = asId((sibling as { library_cake_id?: string }).library_cake_id);
-      const sizeId = asId(
-        (sibling as { library_cake_size_id?: string | null }).library_cake_size_id,
+      const cakeId = asId(
+        (sibling as { library_cake_id?: string }).library_cake_id,
       );
+      const sizeId = asId(
+        (sibling as { library_cake_size_id?: string | null })
+          .library_cake_size_id,
+      );
+      const siblingId = asId((sibling as { id?: string }).id);
       const list = requestItemsByRequest.get(requestId) ?? [];
       list.push({
-        itemId: asId((sibling as { id?: string }).id),
+        itemId: siblingId,
         cakeName: cakeById.get(cakeId) ?? "Cake",
         sizeLabel: sizeById.get(sizeId) ?? "Size",
         quantity: Number((sibling as { quantity?: number }).quantity ?? 0),
+        status: String(
+          (sibling as { status?: string }).status ?? "active",
+        ) as WaitingListItemStatus,
+        offeredQuantity: holdByItem.get(siblingId) ?? null,
       });
       requestItemsByRequest.set(requestId, list);
+    }
+
+    const paidAddonCatalog: WaitingListConfirmationPaidAddonCatalog[] = (
+      paidAddonResult.error ? [] : (paidAddonResult.data ?? [])
+    ).map((row) => ({
+      code: asId((row as { code?: string }).code),
+      name: String((row as { name?: string }).name ?? ""),
+      unitPrice: Number((row as { unit_price?: number }).unit_price ?? 0),
+    }));
+    let confirmationByRequest = new Map<
+      string,
+      WaitingListConfirmationStaffLink
+    >();
+    const confirmationError = confirmationResult.error
+      ? confirmationResult.error.message
+      : "";
+    if (!confirmationError || isMissingConfirmationLinks(confirmationError)) {
+      confirmationByRequest = new Map(
+        parseStaffWaitingListConfirmationLinks(
+          confirmationResult.data,
+          paidAddonCatalog,
+        ).map((link) => [link.requestId, link]),
+      );
+    } else if (confirmationError) {
+      throw new Error(confirmationError);
     }
 
     return rows.map((row) => {
@@ -241,7 +325,9 @@ export async function listWaitingListBoard(input: {
             notes?: string | null;
           }
         | undefined;
-      const cakeId = asId((row as { library_cake_id?: string }).library_cake_id);
+      const cakeId = asId(
+        (row as { library_cake_id?: string }).library_cake_id,
+      );
       const sizeId = asId(
         (row as { library_cake_size_id?: string | null }).library_cake_size_id,
       );
@@ -261,28 +347,34 @@ export async function listWaitingListBoard(input: {
         remainingQuantity: Number(
           (row as { remaining_quantity?: number }).remaining_quantity ?? 0,
         ),
-        pickupDate: String((row as { pickup_date?: string }).pickup_date ?? "").slice(
-          0,
-          10,
+        pickupDate: String(
+          (row as { pickup_date?: string }).pickup_date ?? "",
+        ).slice(0, 10),
+        queuePosition: Number(
+          (row as { queue_position?: number }).queue_position ?? 0,
         ),
-        queuePosition: Number((row as { queue_position?: number }).queue_position ?? 0),
         joinedAt: String(
-          request?.created_at ?? (row as { created_at?: string }).created_at ?? "",
+          request?.created_at ??
+            (row as { created_at?: string }).created_at ??
+            "",
         ),
-        status: String((row as { status?: string }).status ?? "active") as WaitingListItemStatus,
+        status: String(
+          (row as { status?: string }).status ?? "active",
+        ) as WaitingListItemStatus,
         openToAlternatives: Boolean(request?.open_to_alternatives),
         notes: String(request?.notes ?? "").trim() || null,
         contactedAt:
-          String((row as { contacted_at?: string | null }).contacted_at ?? "") ||
-          null,
+          String(
+            (row as { contacted_at?: string | null }).contacted_at ?? "",
+          ) || null,
         responseDeadlineAt:
           String(
-            (row as { response_deadline_at?: string | null }).response_deadline_at ??
-              "",
+            (row as { response_deadline_at?: string | null })
+              .response_deadline_at ?? "",
           ) || null,
         convertedOrderId: convertedOrderId || null,
         convertedOrderNumber: convertedOrderId
-          ? orderNumberById.get(convertedOrderId) ?? null
+          ? (orderNumberById.get(convertedOrderId) ?? null)
           : null,
         actionRequired: actionRequired.has(itemId),
         offeredQuantity: holdByItem.get(itemId) ?? null,
@@ -292,8 +384,13 @@ export async function listWaitingListBoard(input: {
             cakeName: cakeById.get(cakeId) ?? "Cake",
             sizeLabel: sizeById.get(sizeId) ?? "Size",
             quantity: Number((row as { quantity?: number }).quantity ?? 0),
+            status: String(
+              (row as { status?: string }).status ?? "active",
+            ) as WaitingListItemStatus,
+            offeredQuantity: holdByItem.get(itemId) ?? null,
           },
         ],
+        confirmationLink: confirmationByRequest.get(requestId) ?? null,
       };
     });
   } catch (error) {
@@ -368,7 +465,9 @@ export async function listHomeWaitingListAttention(): Promise<HomeWaitingListAtt
         })
         .map((row) => asId((row as { id?: string }).id)),
     );
-    const visible = parsed.filter((row) => activeIds.has(row.payload.requestId));
+    const visible = parsed.filter((row) =>
+      activeIds.has(row.payload.requestId),
+    );
     const first = visible[0];
     if (!first) return empty;
 
