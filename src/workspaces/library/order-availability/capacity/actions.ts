@@ -7,6 +7,7 @@ import { parseBusinessDate } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import type { LibraryActionState } from "@/workspaces/library/action-state";
 import { emptyToNull } from "@/workspaces/library/labels";
+import { resolvePickupCollectionId } from "@/workspaces/library/order-availability/capacity/queries";
 
 function revalidateCapacity() {
   revalidatePath("/bakery/availability");
@@ -62,6 +63,26 @@ export async function saveProductionCapacityAction(
   }
 
   const supabase = await createClient();
+  if (String(formData.get("capacity_set") ?? "") === "1") {
+    const pickupCollectionId = await resolvePickupCollectionId(pickupDate);
+    if (!pickupCollectionId) {
+      return { error: "No collection available for this date." };
+    }
+    const { data: membership, error: membershipError } = await supabase
+      .from("collection_cakes")
+      .select("library_cake_id")
+      .eq("collection_id", pickupCollectionId)
+      .eq("library_cake_id", cakeId)
+      .eq("available", true)
+      .maybeSingle();
+    if (membershipError) {
+      return { error: membershipError.message };
+    }
+    if (!membership) {
+      return { error: "Choose a cake from the collection for this date." };
+    }
+  }
+
   const { error } = await supabase.rpc("set_production_capacity", {
     p_actor_staff_id: auth.staff.id,
     p_pickup_date: pickupDate,

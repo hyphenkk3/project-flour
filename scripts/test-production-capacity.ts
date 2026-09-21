@@ -237,8 +237,29 @@ assert.match(actionSrc, /canMutateOrderAvailability/);
 assert.match(actionSrc, /set_production_capacity/);
 assert.match(actionSrc, /p_collection_id: collectionId/);
 assert.match(actionSrc, /p_capacity_quantity: null/);
+assert.match(actionSrc, /capacity_set/);
+assert.match(actionSrc, /storefront_collection_for_pickup_date|resolvePickupCollectionId/);
+assert.match(actionSrc, /Choose a cake from the collection for this date/);
+assert.match(actionSrc, /No collection available for this date/);
 assert.doesNotMatch(actionSrc, /canManageLibrary/);
 assert.doesNotMatch(actionSrc, /production_capacity_holds/);
+
+const querySrc = readSrc(
+  "src/workspaces/library/order-availability/capacity/queries.ts",
+);
+assert.match(querySrc, /storefront_collection_for_pickup_date/);
+assert.match(querySrc, /from\("collection_cakes"\)/);
+assert.match(querySrc, /listProductionCapacityCakesForPickupDate/);
+assert.doesNotMatch(querySrc, /listWaitingListCakeOptions/);
+assert.doesNotMatch(querySrc, /purpose = 'monthly'/);
+
+const sectionSrc = readSrc(
+  "src/workspaces/library/order-availability/capacity/ProductionCapacitySection.tsx",
+);
+assert.match(sectionSrc, /listProductionCapacityCakesForPickupDate/);
+assert.match(sectionSrc, /hasApplicableCollection/);
+assert.match(sectionSrc, /key=\{pickupDate\}/);
+assert.doesNotMatch(sectionSrc, /listWaitingListCakeOptions/);
 
 const panelSrc = readSrc(
   "src/workspaces/library/order-availability/capacity/ProductionCapacityPanel.tsx",
@@ -247,8 +268,13 @@ assert.match(panelSrc, /canMutate/);
 assert.match(panelSrc, /Confirmed/);
 assert.match(panelSrc, /All sizes/);
 assert.match(panelSrc, /Allow waiting list/);
+assert.match(panelSrc, /name="capacity_set"/);
+assert.match(panelSrc, /No collection available for this date/);
+assert.match(panelSrc, /cakes\.some\(\(cake\) => cake\.id === cakeId\)/);
+assert.match(panelSrc, /resolvedCakeId/);
 assert.doesNotMatch(panelSrc, /Join Waiting List/);
 assert.doesNotMatch(panelSrc, /queue_position/);
+assert.doesNotMatch(panelSrc, /cakes\[0\] \?\? null/);
 
 const bakeryPageSrc = readSrc(
   "src/app/(app)/bakery/availability/page.tsx",

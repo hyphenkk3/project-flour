@@ -22,6 +22,7 @@ type ProductionCapacityPanelProps = {
   pickupDate: string;
   canMutate: boolean;
   canConfigureWaitingList: boolean;
+  hasApplicableCollection: boolean;
   cakes: ProductionCapacityCakeOption[];
   rows: ProductionCapacityRow[];
 };
@@ -30,6 +31,7 @@ export function ProductionCapacityPanel({
   pickupDate,
   canMutate,
   canConfigureWaitingList,
+  hasApplicableCollection,
   cakes,
   rows,
 }: ProductionCapacityPanelProps) {
@@ -46,9 +48,12 @@ export function ProductionCapacityPanel({
     libraryActionInitialState,
   );
   const [cakeId, setCakeId] = useState(cakes[0]?.id ?? "");
+  const resolvedCakeId = cakes.some((cake) => cake.id === cakeId)
+    ? cakeId
+    : (cakes[0]?.id ?? "");
   const selectedCake = useMemo(
-    () => cakes.find((cake) => cake.id === cakeId) ?? cakes[0] ?? null,
-    [cakeId, cakes],
+    () => cakes.find((cake) => cake.id === resolvedCakeId) ?? null,
+    [cakes, resolvedCakeId],
   );
   const pending = savePending || removePending || waitPending;
   const error = saveState.error ?? removeState.error ?? waitState.error;
@@ -196,6 +201,7 @@ export function ProductionCapacityPanel({
         <form action={saveAction} className="border-fog space-y-3 rounded-xl border bg-white px-4 py-4">
           <p className="text-ink text-sm font-medium">Set capacity</p>
           <input name="pickup_date" type="hidden" value={pickupDate} />
+          <input name="capacity_set" type="hidden" value="1" />
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-ink text-sm">
               Cake
@@ -203,7 +209,7 @@ export function ProductionCapacityPanel({
                 className="border-fog mt-1 block h-11 w-full rounded-lg border bg-white px-3 text-sm"
                 name="library_cake_id"
                 onChange={(event) => setCakeId(event.target.value)}
-                value={selectedCake?.id ?? ""}
+                value={resolvedCakeId}
               >
                 {cakes.map((cake) => (
                   <option key={cake.id} value={cake.id}>
@@ -250,6 +256,14 @@ export function ProductionCapacityPanel({
             Save capacity
           </button>
         </form>
+      ) : null}
+
+      {canMutate && cakes.length === 0 ? (
+        <p className="text-skyline text-sm">
+          {hasApplicableCollection
+            ? "No cakes in the collection for this date."
+            : "No collection available for this date."}
+        </p>
       ) : null}
     </section>
   );

@@ -1,8 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { parseBusinessDate } from "@/lib/dates";
+import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
 import { PRODUCTION_CAPACITY_REMOVED_EVENT_NOTE } from "@/engines/orders/production-capacity";
+import { isStorefrontLibraryStatus } from "@/workspaces/library/collections/membership";
+import type { LibraryCakeStatus } from "@/types/library-cake";
 import type {
+  ProductionCapacityCakeOption,
   ProductionCapacityEvent,
   ProductionCapacityRow,
 } from "@/workspaces/library/order-availability/capacity/capacity-event-format";
@@ -13,8 +17,103 @@ export type {
   ProductionCapacityRow,
 } from "@/workspaces/library/order-availability/capacity/capacity-event-format";
 
+export type ProductionCapacityCakeCatalog = {
+  collectionId: string | null;
+  cakes: ProductionCapacityCakeOption[];
+};
+
 function isMissingCapacityTable(message: string): boolean {
   return /production_capacity|schema cache|does not exist/i.test(message);
+}
+
+function rpcCollectionId(data: unknown): string | null {
+  const row = (Array.isArray(data) ? data[0] : data) as { id?: string } | null;
+  const id = String(row?.id ?? "").trim();
+  return id || null;
+}
+
+function unwrapEmbeddedCake(value: unknown): {
+  id: string;
+  name: string;
+  status: string;
+  library_cake_sizes?: unknown;
+} | null {
+  const row = (Array.isArray(value) ? value[0] : value) as {
+    id?: string;
+    name?: string;
+    status?: string;
+    library_cake_sizes?: unknown;
+  } | null;
+  const id = String(row?.id ?? "").trim();
+  if (!id) return null;
+  return {
+    id,
+    name: String(row?.name ?? "Cake"),
+    status: String(row?.status ?? ""),
+    library_cake_sizes: row?.library_cake_sizes,
+  };
+}
+
+export async function resolvePickupCollectionId(
+  pickupDate: string,
+): Promise<string | null> {
+  if (!parseBusinessDate(pickupDate)) return null;
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
+    "storefront_collection_for_pickup_date",
+    { p_pickup_date: pickupDate },
+  );
+  if (error) throw new Error(error.message);
+  return rpcCollectionId(data);
+}
+
+export async function listProductionCapacityCakesForPickupDate(
+  pickupDate: string,
+): Promise<ProductionCapacityCakeCatalog> {
+  const collectionId = await resolvePickupCollectionId(pickupDate);
+  if (!collectionId) return { collectionId: null, cakes: [] };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("collection_cakes")
+    .select(
+      `
+      sort_order,
+      library_cakes (
+        id,
+        name,
+        status,
+        library_cake_sizes ( id, label )
+      )
+    `,
+    )
+    .eq("collection_id", collectionId)
+    .eq("available", true)
+    .order("sort_order", { ascending: true });
+  if (error) throw new Error(error.message);
+
+  const cakes: ProductionCapacityCakeOption[] = [];
+  for (const row of data ?? []) {
+    const cake = unwrapEmbeddedCake(
+      (row as { library_cakes?: unknown }).library_cakes,
+    );
+    if (!cake) continue;
+    if (!isStorefrontLibraryStatus(cake.status as LibraryCakeStatus)) continue;
+    const sizesRel = cake.library_cake_sizes;
+    const sizes = Array.isArray(sizesRel) ? sizesRel : [];
+    cakes.push({
+      id: cake.id,
+      name: cake.name,
+      sizes: sortCakeSizesByNumericLabel(
+        sizes.map((size) => ({
+          id: String((size as { id?: string }).id ?? ""),
+          label: String((size as { label?: string }).label ?? "Size"),
+        })),
+        (size) => size.label,
+      ).filter((size) => size.id),
+    });
+  }
+  return { collectionId, cakes };
 }
 
 async function loadStaffDisplayNames(

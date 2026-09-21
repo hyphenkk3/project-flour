@@ -3,13 +3,13 @@ import { parseBusinessDate, toBusinessDateKey } from "@/lib/dates";
 import { isTransientDataLoadError } from "@/lib/supabase/fetch-timeout";
 import { ProductionCapacityPanel } from "@/workspaces/library/order-availability/capacity/ProductionCapacityPanel";
 import {
+  listProductionCapacityCakesForPickupDate,
   listProductionCapacityForDate,
   listRecentProductionCapacityEvents,
   type ProductionCapacityCakeOption,
   type ProductionCapacityEvent,
   type ProductionCapacityRow,
 } from "@/workspaces/library/order-availability/capacity/queries";
-import { listWaitingListCakeOptions } from "@/workspaces/waiting-list/queries";
 
 type ProductionCapacitySectionProps = {
   dateParam?: string;
@@ -43,12 +43,14 @@ export const loadProductionCapacityWorkspace = cache(
   ): Promise<{
     pickupDate: string;
     cakes: ProductionCapacityCakeOption[];
+    hasApplicableCollection: boolean;
     rows: ProductionCapacityRow[];
     events: ProductionCapacityEvent[];
     loadError: string | null;
   }> => {
     const pickupDate = resolveCapacityDate(dateParam, month);
     let cakes: ProductionCapacityCakeOption[] = [];
+    let hasApplicableCollection = false;
     let rows: ProductionCapacityRow[] = [];
     let events: ProductionCapacityEvent[] = [];
     let loadError: string | null = null;
@@ -68,12 +70,24 @@ export const loadProductionCapacityWorkspace = cache(
     }
 
     try {
-      cakes = await listWaitingListCakeOptions();
-    } catch {
+      const catalog = await listProductionCapacityCakesForPickupDate(pickupDate);
+      cakes = catalog.cakes;
+      hasApplicableCollection = Boolean(catalog.collectionId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (!isCapacityLoadFailure(message)) throw error;
       cakes = [];
+      hasApplicableCollection = false;
     }
 
-    return { pickupDate, cakes, rows, events, loadError };
+    return {
+      pickupDate,
+      cakes,
+      hasApplicableCollection,
+      rows,
+      events,
+      loadError,
+    };
   },
 );
 
@@ -83,10 +97,8 @@ export async function ProductionCapacitySection({
   canMutate,
   canConfigureWaitingList,
 }: ProductionCapacitySectionProps) {
-  const { cakes, rows, loadError } = await loadProductionCapacityWorkspace(
-    dateParam,
-    month,
-  );
+  const { cakes, hasApplicableCollection, rows, loadError } =
+    await loadProductionCapacityWorkspace(dateParam, month);
   const pickupDate = resolveCapacityDate(dateParam, month);
 
   return (
@@ -96,6 +108,8 @@ export async function ProductionCapacitySection({
         cakes={cakes}
         canMutate={canMutate}
         canConfigureWaitingList={canConfigureWaitingList}
+        hasApplicableCollection={hasApplicableCollection}
+        key={pickupDate}
         pickupDate={pickupDate}
         rows={rows}
       />
