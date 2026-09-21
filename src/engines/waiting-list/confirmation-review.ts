@@ -106,8 +106,11 @@ export type WaitingListConfirmationStaffLink = {
   review: WaitingListConfirmationReview | null;
 };
 
-export function waitingListConvertedOrderHref(orderId: string): string {
-  return `/bakery/orders/${orderId}`;
+export function waitingListConvertedOrderHref(
+  orderId: string,
+  pickupDate: string,
+): string {
+  return `/bakery/orders/${orderId}?date=${encodeURIComponent(pickupDate)}`;
 }
 
 export function canConvertWaitingListConfirmation(

@@ -76,9 +76,10 @@ assert.ok(WAITING_LIST_CONFIRMATION_LINK_STATUSES.includes("converted"));
 assert.equal(WAITING_LIST_CONFIRMATION_CONVERT_LABEL, "Convert to Order");
 assert.equal(WAITING_LIST_CONFIRMATION_CONVERTED_LABEL, "Converted to Order");
 assert.equal(
-  waitingListConvertedOrderHref("order-1"),
-  "/bakery/orders/order-1",
+  waitingListConvertedOrderHref("order-1", "2026-09-25"),
+  "/bakery/orders/order-1?date=2026-09-25",
 );
+assert.match(panelSrc, /effectiveLink\.review\?\.pickupDate \|\| row\.pickupDate/);
 
 const submittedLink: WaitingListConfirmationStaffLink = {
   id: "link-1",

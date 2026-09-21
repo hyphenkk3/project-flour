@@ -78,7 +78,10 @@ export function WaitingListConfirmationStaffPanel({
     eligible.length > 0;
   const canConvert = canConvertWaitingListConfirmation(effectiveLink);
   const convertedOrderHref = effectiveLink?.convertedOrderId
-    ? waitingListConvertedOrderHref(effectiveLink.convertedOrderId)
+    ? waitingListConvertedOrderHref(
+        effectiveLink.convertedOrderId,
+        effectiveLink.review?.pickupDate || row.pickupDate,
+      )
     : "";
 
   const confirmationUrl = rawToken
