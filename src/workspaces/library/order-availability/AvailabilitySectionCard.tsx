@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { PagePanel } from "@/components/ui";
-import { AVAILABILITY_SECTION_SCROLL_MARGIN_CLASS } from "@/workspaces/library/order-availability/availability-sections";
 
 type AvailabilitySectionCardProps = {
   id: string;
@@ -14,13 +13,14 @@ export function AvailabilitySectionCard({
   children,
 }: AvailabilitySectionCardProps) {
   return (
-    <section
-      aria-labelledby={id}
-      className={AVAILABILITY_SECTION_SCROLL_MARGIN_CLASS}
-      id={id}
-    >
+    <section aria-labelledby={id}>
       <PagePanel>
-        <h2 className="text-ink text-lg font-semibold tracking-tight">{title}</h2>
+        <h2
+          className="text-ink text-lg font-semibold tracking-tight"
+          id={id}
+        >
+          {title}
+        </h2>
         <div className="mt-4">{children}</div>
       </PagePanel>
     </section>

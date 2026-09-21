@@ -271,15 +271,27 @@ assert.doesNotMatch(panelSrc, /Recent capacity changes/);
 const sectionCardSrc = readSrc(
   "src/workspaces/library/order-availability/AvailabilitySectionCard.tsx",
 );
-assert.match(sectionCardSrc, /AVAILABILITY_SECTION_SCROLL_MARGIN_CLASS/);
 assert.match(sectionCardSrc, /id=\{id\}/);
-assert.doesNotMatch(sectionCardSrc, /scroll-mt-32/);
+assert.match(sectionCardSrc, /<h2/);
+assert.doesNotMatch(sectionCardSrc, /scroll-mt/);
 
 const sectionNavSrc = readSrc(
   "src/workspaces/library/order-availability/AvailabilitySectionNav.tsx",
 );
 assert.match(sectionNavSrc, /flex-nowrap/);
-assert.doesNotMatch(sectionNavSrc, /flex-wrap/);
+assert.match(sectionNavSrc, /preventDefault/);
+assert.match(sectionNavSrc, /scrollAvailabilitySectionIntoView/);
+assert.match(sectionNavSrc, /data-availability-section-nav/);
+assert.doesNotMatch(sectionNavSrc, /flex flex-wrap/);
+
+const scrollSrc = readSrc(
+  "src/workspaces/library/order-availability/scroll-availability-section.ts",
+);
+assert.match(scrollSrc, /header\.sticky/);
+assert.match(scrollSrc, /data-availability-section-nav/);
+assert.match(scrollSrc, /window\.scrollTo/);
+assert.match(scrollSrc, /getBoundingClientRect/);
+assert.doesNotMatch(scrollSrc, /set_production_capacity/);
 
 const queryParamsSrc = readSrc("src/lib/query-params.ts");
 assert.match(queryParamsSrc, /Array.isArray\(value\)/);
