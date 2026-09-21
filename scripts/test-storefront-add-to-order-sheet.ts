@@ -14,7 +14,9 @@ function readSrc(rel: string): string {
 }
 
 const sheetSrc = readSrc("src/workspaces/storefront/cart/AddToOrderSheet.tsx");
-const cardSrc = readSrc("src/workspaces/storefront/catalog/StorefrontCakeCard.tsx");
+const cardSrc = readSrc(
+  "src/workspaces/storefront/catalog/StorefrontCakeCard.tsx",
+);
 const detailPanelSrc = readSrc(
   "src/workspaces/storefront/catalog/CakeDetailPurchasePanel.tsx",
 );
@@ -24,7 +26,9 @@ const detailViewSrc = readSrc(
 const catalogueSrc = readSrc(
   "src/workspaces/storefront/catalog/BrowseCakeCatalogue.tsx",
 );
-const draftSrc = readSrc("src/workspaces/storefront/checkout/preorder-draft.ts");
+const draftSrc = readSrc(
+  "src/workspaces/storefront/checkout/preorder-draft.ts",
+);
 
 assert.match(catalogueSrc, /StorefrontCakeCard/);
 assert.match(cardSrc, /<AddToOrderButton/);
@@ -32,7 +36,10 @@ assert.match(cardSrc, /cake=\{cake\}/);
 assert.match(detailViewSrc, /CakeDetailPurchasePanel/);
 assert.match(detailPanelSrc, /<AddToOrderButton/);
 assert.match(detailPanelSrc, /initialSizeId=\{selectedSizeId\}/);
-assert.match(detailPanelSrc, /h-20 md:hidden/);
+assert.match(
+  detailPanelSrc,
+  /h-\[calc\(4\.25rem\+env\(safe-area-inset-bottom,0px\)\)\] md:hidden/,
+);
 
 assert.match(sheetSrc, /export function AddToOrderButton/);
 assert.match(sheetSrc, /export function AddToOrderSheet/);
@@ -57,10 +64,7 @@ assert.match(
   /flex max-h-\[100dvh\] min-h-0 w-full flex-col overflow-hidden/,
 );
 assert.match(sheetSrc, /md:max-h-\[calc\(100dvh-5rem\)\]/);
-assert.match(
-  sheetSrc,
-  /flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto/,
-);
+assert.match(sheetSrc, /flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto/);
 assert.doesNotMatch(sheetSrc, /from "react-dom"/);
 assert.doesNotMatch(sheetSrc, /fixed inset-x-0 bottom-0 z-\[60\]/);
 assert.doesNotMatch(sheetSrc, /pointer-events-none fixed inset-0 z-50/);
@@ -75,7 +79,9 @@ assert.doesNotMatch(sheetSrc, /showModal/);
 assert.doesNotMatch(sheetSrc, /<dialog/);
 
 const overlaySrc = readSrc("src/workspaces/storefront/StorefrontOverlay.tsx");
-const cartSrc = readSrc("src/workspaces/storefront/cart/StorefrontCartShell.tsx");
+const cartSrc = readSrc(
+  "src/workspaces/storefront/cart/StorefrontCartShell.tsx",
+);
 assert.match(overlaySrc, /The dialog element is the sheet itself/);
 assert.match(overlaySrc, /createPortal\(/);
 assert.match(overlaySrc, /document\.body/);
@@ -102,6 +108,9 @@ assert.match(
   /cursor-pointer items-center justify-center rounded-md px-5[\s\S]*type="submit"/,
 );
 assert.match(sheetSrc, /mergeDraftItem/);
+assert.match(sheetSrc, /addingRef\.current/);
+assert.match(sheetSrc, /disabled=\{\!selected \|\| adding\}/);
+assert.match(sheetSrc, /Added ✓/);
 assert.match(sheetSrc, /setSizeId/);
 assert.match(sheetSrc, /setQuantity/);
 assert.match(sheetSrc, /\{cake\.name\}/);

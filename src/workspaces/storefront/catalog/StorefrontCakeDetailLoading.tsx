@@ -50,11 +50,11 @@ export function StorefrontCakeDetailLoading() {
             </ul>
           </section>
 
+          <div aria-hidden className="bg-fog h-11 w-full rounded-md" />
           <div
             aria-hidden
-            className="bg-fog h-11 w-full rounded-md"
+            className="h-[calc(4.25rem+env(safe-area-inset-bottom,0px))] md:hidden"
           />
-          <div aria-hidden className="h-20 md:hidden" />
         </div>
       </div>
     </main>

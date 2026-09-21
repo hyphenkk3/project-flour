@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import { StorefrontOverlay } from "@/workspaces/storefront/StorefrontOverlay";
 import type { StorefrontCake } from "@/types/storefront";
@@ -45,16 +45,20 @@ export function AddToOrderSheet({
   initialSizeId,
 }: AddToOrderSheetProps) {
   const titleId = useId();
+  const addingRef = useRef(false);
   const [sizeId, setSizeId] = useState(
     initialSizeId || cake.sizes[0]?.id || "",
   );
   const [quantity, setQuantity] = useState(1);
+  const [adding, setAdding] = useState(false);
 
   const selected = cake.sizes.find((size) => size.id === sizeId);
   const photo = storefrontPhotoForSize(cake.photos, sizeId);
 
   function addToOrder() {
-    if (!selected) return;
+    if (!selected || addingRef.current) return;
+    addingRef.current = true;
+    setAdding(true);
     const draft = readPreorderDraft() ?? emptyPreorderDraft();
     const next = mergeDraftItem(draft, {
       cakeId: cake.id,
@@ -151,7 +155,7 @@ export function AddToOrderSheet({
                       className={
                         selectedSize
                           ? "border-ink bg-mist flex cursor-pointer items-center justify-between gap-3 border px-4 py-3"
-                          : "border-fog bg-transparent hover:border-ink flex cursor-pointer items-center justify-between gap-3 border px-4 py-3"
+                          : "border-fog hover:border-ink flex cursor-pointer items-center justify-between gap-3 border bg-transparent px-4 py-3"
                       }
                     >
                       <span className="min-w-0">
@@ -217,11 +221,12 @@ export function AddToOrderSheet({
         </div>
 
         <button
+          aria-busy={adding}
           className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200 disabled:opacity-50"
-          disabled={!selected}
+          disabled={!selected || adding}
           type="submit"
         >
-          Add
+          {adding ? "Added ✓" : "Add"}
         </button>
       </form>
     </StorefrontOverlay>
@@ -267,7 +272,7 @@ export function AddToOrderButton({
       </button>
       {added ? (
         <p
-          className="text-ink mt-2 text-center text-sm"
+          className="text-ink mt-2 text-center text-sm font-medium"
           role="status"
         >
           Added to your order

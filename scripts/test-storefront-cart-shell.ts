@@ -167,7 +167,9 @@ withDraftStorage(() => {
   assert.equal(readPreorderDraft()?.pickupDate, "2026-09-20");
 });
 
-const cartSrc = readSrc("src/workspaces/storefront/cart/StorefrontCartShell.tsx");
+const cartSrc = readSrc(
+  "src/workspaces/storefront/cart/StorefrontCartShell.tsx",
+);
 const summarySrc = readSrc(
   "src/workspaces/storefront/cart/cart-order-summary.ts",
 );
@@ -194,6 +196,15 @@ assert.match(cartSrc, /href=\{continueHref\}/);
 assert.match(cartSrc, /continueOrderingHref/);
 assert.match(cartSrc, /preorderCheckoutHref/);
 assert.match(cartSrc, /View Order →/);
+assert.match(
+  cartSrc,
+  /h-\[calc\(4\.25rem\+env\(safe-area-inset-bottom,0px\)\)\] md:hidden/,
+);
+assert.match(
+  cartSrc,
+  /bg-ink text-mist fixed right-0 bottom-0 left-0 z-40 flex min-h-12 flex-col/,
+);
+assert.match(cartSrc, /Your Order/);
 assert.match(cartSrc, /Collection date/);
 assert.match(cartSrc, /Earliest collection/);
 assert.match(cartSrc, /bg-\[#E2E1DC\]/);
@@ -219,7 +230,9 @@ assert.doesNotMatch(cartSrc, /submitGuestPreorderAction/);
 assert.doesNotMatch(cartSrc, /pickupDate:/);
 assert.doesNotMatch(cartSrc, /writePreorderDraft/);
 
-const draftSrc = readSrc("src/workspaces/storefront/checkout/preorder-draft.ts");
+const draftSrc = readSrc(
+  "src/workspaces/storefront/checkout/preorder-draft.ts",
+);
 assert.match(draftSrc, /whitebird-preorder-draft-v1/);
 const sizeFn = draftSrc.slice(
   draftSrc.indexOf("/** Size/price/preorder/image only."),

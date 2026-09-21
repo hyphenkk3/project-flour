@@ -59,11 +59,7 @@ export function CakeDetailPurchasePanel({
   const existingQuantity = useMemo(
     () =>
       selectedSizeId
-        ? existingQuantityForSize(
-            cake.id,
-            selectedSizeId,
-            draft?.items ?? [],
-          )
+        ? existingQuantityForSize(cake.id, selectedSizeId, draft?.items ?? [])
         : 0,
     [cake.id, draft?.items, selectedSizeId],
   );
@@ -107,7 +103,9 @@ export function CakeDetailPurchasePanel({
           <h2 className="text-ink text-[11px] font-medium tracking-[0.16em] uppercase">
             Allergens
           </h2>
-          <p className="text-skyline mt-1.5 text-sm">{cake.allergens.join(", ")}</p>
+          <p className="text-skyline mt-1.5 text-sm">
+            {cake.allergens.join(", ")}
+          </p>
         </section>
       ) : null}
 
@@ -138,7 +136,9 @@ export function CakeDetailPurchasePanel({
                   type="button"
                 >
                   <span>
-                    <span className="block text-sm font-medium">{size.size}</span>
+                    <span className="block text-sm font-medium">
+                      {size.size}
+                    </span>
                     <span className="text-skyline mt-0.5 block text-sm">
                       {formatPreorderRequirement(size.preorderDays)}
                     </span>
@@ -189,7 +189,10 @@ export function CakeDetailPurchasePanel({
             initialSizeId={selectedSizeId}
             pickupScope={pickupScope}
           />
-          <div aria-hidden className="h-20 md:hidden" />
+          <div
+            aria-hidden
+            className="h-[calc(4.25rem+env(safe-area-inset-bottom,0px))] md:hidden"
+          />
         </>
       )}
     </div>

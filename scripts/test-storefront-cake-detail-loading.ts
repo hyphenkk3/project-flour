@@ -33,7 +33,10 @@ assert.doesNotMatch(loadingShellSrc, /["']use client["']/);
 assert.doesNotMatch(combined, /createClient|supabase|from\("/);
 assert.doesNotMatch(combined, /cookies\(|sessionStorage|localStorage/);
 assert.doesNotMatch(combined, /fetch\(|getBrowsePublishedCakeById/);
-assert.doesNotMatch(combined, /listBrowsePublishedCakes|listStorefrontCakesByIds/);
+assert.doesNotMatch(
+  combined,
+  /listBrowsePublishedCakes|listStorefrontCakesByIds/,
+);
 assert.doesNotMatch(combined, /next\/image|CakePhotoImage/);
 assert.doesNotMatch(combined, /useEffect|useState|useRouter/);
 
@@ -46,7 +49,10 @@ assert.match(
 assert.match(loadingShellSrc, /Opening cake/);
 assert.match(loadingShellSrc, /aria-busy/);
 assert.match(loadingShellSrc, /min-h-12/);
-assert.match(loadingShellSrc, /h-20 md:hidden/);
+assert.match(
+  loadingShellSrc,
+  /h-\[calc\(4\.25rem\+env\(safe-area-inset-bottom,0px\)\)\] md:hidden/,
+);
 
 const detailSrc = readSrc(detailPage);
 assert.match(detailSrc, /getBrowsePublishedCakeById/);
