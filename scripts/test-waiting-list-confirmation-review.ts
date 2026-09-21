@@ -471,7 +471,7 @@ assert.equal(
 );
 
 // Request-level UI: one generate panel per request.
-assert.match(boardSrc, /confirmationLeadItemIds/);
+assert.match(boardSrc, /groupWaitingListHeadingByRequest/);
 assert.match(boardSrc, /WaitingListConfirmationStaffPanel/);
 assert.match(queriesSrc, /confirmationLink/);
 assert.match(serverSrc, /waitingListConfirmationCustomerPath\(token\)/);

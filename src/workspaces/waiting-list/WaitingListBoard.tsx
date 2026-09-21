@@ -164,6 +164,46 @@ function statusLabel(status: string): string {
   return status.replaceAll("_", " ");
 }
 
+function compactWaitingListRequestId(requestId: string): string {
+  return requestId.replaceAll("-", "").slice(0, 8).toUpperCase();
+}
+
+function groupWaitingListHeadingByRequest(
+  headingRows: WaitingListBoardRow[],
+  allRows: WaitingListBoardRow[],
+  alreadyRendered: Set<string>,
+): WaitingListBoardRow[][] {
+  const groups: WaitingListBoardRow[][] = [];
+  for (const row of headingRows) {
+    if (alreadyRendered.has(row.requestId)) continue;
+    alreadyRendered.add(row.requestId);
+    const members = allRows.filter(
+      (entry) => entry.requestId === row.requestId,
+    );
+    groups.push(members.length > 0 ? members : [row]);
+  }
+  return groups;
+}
+
+function confirmationStatusLabel(
+  link: WaitingListBoardRow["confirmationLink"],
+): string | null {
+  if (!link) return null;
+  if (link.status === "converted") {
+    return link.convertedOrderNumber
+      ? `${WAITING_LIST_CONFIRMATION_CONVERTED_LABEL} · ${link.convertedOrderNumber}`
+      : WAITING_LIST_CONFIRMATION_CONVERTED_LABEL;
+  }
+  if (link.status === "submitted")
+    return WAITING_LIST_CONFIRMATION_SUBMITTED_LABEL;
+  if (link.status === "issued") return WAITING_LIST_CONFIRMATION_ISSUED_LABEL;
+  if (link.status === "expired") return WAITING_LIST_CONFIRMATION_EXPIRED_LABEL;
+  if (link.status === "invalidated") {
+    return WAITING_LIST_CONFIRMATION_INVALIDATED_LABEL;
+  }
+  return null;
+}
+
 function WaitingListFilterForm({
   cakes,
   month,
@@ -264,6 +304,311 @@ function WaitingListFilterForm({
         Filter
       </button>
     </form>
+  );
+}
+
+type WaitingListItemControlsProps = {
+  row: WaitingListBoardRow;
+  cakes: WaitingListCakeOption[];
+  pending: boolean;
+  contactAction: (formData: FormData) => void;
+  responseAction: (formData: FormData) => void;
+  convertAction: (formData: FormData) => void;
+  closeAction: (formData: FormData) => void;
+  offerAction: (formData: FormData) => void;
+  altAction: (formData: FormData) => void;
+  qtyAction: (formData: FormData) => void;
+  scopeAction: (formData: FormData) => void;
+  cancelAction: (formData: FormData) => void;
+};
+
+function WaitingListItemControls({
+  row,
+  cakes,
+  pending,
+  contactAction,
+  responseAction,
+  convertAction,
+  closeAction,
+  offerAction,
+  altAction,
+  qtyAction,
+  scopeAction,
+  cancelAction,
+}: WaitingListItemControlsProps) {
+  return (
+    <div className="flex flex-col gap-2">
+      {row.status === "active" || row.status === "partially_accepted" ? (
+        <form action={contactAction} className="flex flex-wrap items-end gap-2">
+          <input name="item_id" type="hidden" value={row.itemId} />
+          <label className="text-ink text-sm">
+            Offer qty
+            <input
+              className="border-fog text-ink ml-2 h-11 w-20 rounded-lg border bg-white px-3 text-sm tabular-nums"
+              defaultValue={row.offeredQuantity ?? row.remainingQuantity}
+              min={1}
+              name="offered_quantity"
+              type="number"
+            />
+          </label>
+          <button className={inkButtonClass} disabled={pending} type="submit">
+            Contact
+          </button>
+        </form>
+      ) : null}
+
+      {canRecordWaitingListItemResponse({
+        itemStatus: row.status,
+        confirmationLink: row.confirmationLink,
+      }) ? (
+        <form
+          action={responseAction}
+          className="flex flex-wrap items-end gap-2"
+        >
+          <input name="item_id" type="hidden" value={row.itemId} />
+          <label className="text-ink text-sm">
+            Response
+            <select className={fieldClass} name="outcome">
+              <option value="accept">Accept</option>
+              <option value="decline">Decline</option>
+              <option value="late_accept">Late accept</option>
+              <option value="late_decline">Late decline</option>
+            </select>
+          </label>
+          <label className="text-ink text-sm">
+            Accepted qty
+            <input
+              className="border-fog text-ink ml-2 h-11 w-20 rounded-lg border bg-white px-3 text-sm tabular-nums"
+              defaultValue={row.offeredQuantity ?? row.remainingQuantity}
+              min={1}
+              name="accepted_quantity"
+              type="number"
+            />
+          </label>
+          <label className="text-ink text-sm">
+            Keep remaining
+            <select
+              className={fieldClass}
+              defaultValue="yes"
+              name="keep_remaining"
+            >
+              <option value="yes">Yes</option>
+              <option value="no">No — close remaining</option>
+            </select>
+          </label>
+          <button className={inkButtonClass} disabled={pending} type="submit">
+            Record response
+          </button>
+        </form>
+      ) : null}
+
+      {canShowWaitingListItemConvertAction({
+        itemStatus: row.status,
+        confirmationLink: row.confirmationLink,
+      }) ? (
+        <form action={convertAction} className="flex flex-wrap items-end gap-2">
+          <input name="item_id" type="hidden" value={row.itemId} />
+          <label className="text-ink text-sm">
+            Convert qty
+            <input
+              className="border-fog text-ink ml-2 h-11 w-20 rounded-lg border bg-white px-3 text-sm tabular-nums"
+              defaultValue={row.offeredQuantity ?? row.remainingQuantity}
+              min={1}
+              name="quantity"
+              type="number"
+            />
+          </label>
+          <label className="text-ink text-sm">
+            Pickup time
+            <input
+              className={fieldClass}
+              name="pickup_time"
+              required
+              type="time"
+            />
+          </label>
+          <label className="text-ink text-sm">
+            Keep remaining
+            <select
+              className={fieldClass}
+              defaultValue="yes"
+              name="keep_remaining"
+            >
+              <option value="yes">Yes</option>
+              <option value="no">No — close remaining</option>
+            </select>
+          </label>
+          <button className={inkButtonClass} disabled={pending} type="submit">
+            Convert to order
+          </button>
+        </form>
+      ) : null}
+
+      {row.remainingQuantity > 0 &&
+      (row.status === "partially_accepted" ||
+        row.status === "active" ||
+        row.status === "accepted") ? (
+        <form action={closeAction}>
+          <input name="item_id" type="hidden" value={row.itemId} />
+          <button className={ghostButtonClass} disabled={pending} type="submit">
+            Close remaining request
+          </button>
+        </form>
+      ) : null}
+
+      {row.openToAlternatives &&
+      (row.status === "active" ||
+        row.status === "partially_accepted" ||
+        row.status === "contacted") ? (
+        <>
+          <form action={offerAction} className="flex flex-wrap items-end gap-2">
+            <input name="item_id" type="hidden" value={row.itemId} />
+            <label className="text-ink text-sm">
+              Alternative cake
+              <select className={fieldClass} name="alternative_cake_id">
+                {cakes.map((cake) => (
+                  <option key={cake.id} value={cake.id}>
+                    {cake.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-ink text-sm">
+              Size
+              <select className={fieldClass} name="alternative_size_id">
+                {cakes.flatMap((cake) =>
+                  cake.sizes.map((size) => (
+                    <option key={size.id} value={size.id}>
+                      {cake.name} · {size.label}
+                    </option>
+                  )),
+                )}
+              </select>
+            </label>
+            <label className="text-ink text-sm">
+              Qty
+              <input
+                className="border-fog text-ink ml-2 h-11 w-20 rounded-lg border bg-white px-3 text-sm tabular-nums"
+                defaultValue={1}
+                min={1}
+                name="quantity"
+                type="number"
+              />
+            </label>
+            <button
+              className={ghostButtonClass}
+              disabled={pending}
+              type="submit"
+            >
+              Offer alternative
+            </button>
+          </form>
+          <form action={altAction} className="flex flex-wrap items-end gap-2">
+            <input name="item_id" type="hidden" value={row.itemId} />
+            <label className="text-ink text-sm">
+              Alternative reply
+              <select className={fieldClass} name="accept">
+                <option value="yes">Switch to alternative</option>
+                <option value="no">Continue waiting for original</option>
+              </select>
+            </label>
+            <label className="text-ink text-sm">
+              Alternative cake
+              <select className={fieldClass} name="alternative_cake_id">
+                {cakes.map((cake) => (
+                  <option key={cake.id} value={cake.id}>
+                    {cake.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-ink text-sm">
+              Size
+              <select className={fieldClass} name="alternative_size_id">
+                {cakes.flatMap((cake) =>
+                  cake.sizes.map((size) => (
+                    <option key={size.id} value={size.id}>
+                      {cake.name} · {size.label}
+                    </option>
+                  )),
+                )}
+              </select>
+            </label>
+            <label className="text-ink text-sm">
+              Alt qty
+              <input
+                className="border-fog text-ink ml-2 h-11 w-20 rounded-lg border bg-white px-3 text-sm tabular-nums"
+                defaultValue={1}
+                min={1}
+                name="quantity"
+                type="number"
+              />
+            </label>
+            <label className="text-ink text-sm">
+              Keep original remaining
+              <select
+                className={fieldClass}
+                defaultValue="yes"
+                name="keep_original"
+              >
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </label>
+            <button
+              className={ghostButtonClass}
+              disabled={pending}
+              type="submit"
+            >
+              Record alternative
+            </button>
+          </form>
+        </>
+      ) : null}
+
+      {row.status === "active" || row.status === "partially_accepted" ? (
+        <>
+          <WaitingListScopeForm
+            action={scopeAction}
+            cakes={cakes}
+            pending={pending}
+            row={row}
+          />
+          <form action={qtyAction} className="flex flex-wrap items-end gap-2">
+            <input name="item_id" type="hidden" value={row.itemId} />
+            <label className="text-ink text-sm">
+              Quantity
+              <input
+                className="border-fog text-ink ml-2 h-11 w-20 rounded-lg border bg-white px-3 text-sm tabular-nums"
+                defaultValue={row.quantity}
+                min={1}
+                name="quantity"
+                type="number"
+              />
+            </label>
+            <button
+              className={ghostButtonClass}
+              disabled={pending}
+              type="submit"
+            >
+              Update quantity
+            </button>
+          </form>
+        </>
+      ) : null}
+
+      {row.status !== "cancelled" &&
+      row.status !== "converted" &&
+      row.status !== "closed" ? (
+        <form action={cancelAction}>
+          <input name="item_id" type="hidden" value={row.itemId} />
+          <input name="reason" type="hidden" value="Staff cancelled" />
+          <button className={ghostButtonClass} disabled={pending} type="submit">
+            Cancel
+          </button>
+        </form>
+      ) : null}
+    </div>
   );
 }
 
@@ -368,16 +713,19 @@ export function WaitingListBoard({
     return [...map.entries()];
   }, [rows, scan]);
 
-  const confirmationLeadItemIds = useMemo(() => {
-    const seen = new Set<string>();
-    const leads = new Set<string>();
-    for (const row of rows) {
-      if (seen.has(row.requestId)) continue;
-      seen.add(row.requestId);
-      leads.add(row.itemId);
-    }
-    return leads;
-  }, [rows]);
+  const headedRequestGroups = useMemo(() => {
+    const alreadyRendered = new Set<string>();
+    return grouped
+      .map(([heading, group]) => ({
+        heading,
+        requestGroups: groupWaitingListHeadingByRequest(
+          group,
+          rows,
+          alreadyRendered,
+        ),
+      }))
+      .filter((entry) => entry.requestGroups.length > 0);
+  }, [grouped, rows]);
 
   return (
     <section aria-labelledby={WAITING_LIST_SECTION_ID} className="space-y-4">
@@ -485,470 +833,131 @@ export function WaitingListBoard({
 
       {queueError ? <FormError message={queueError} /> : null}
 
-      {grouped.length === 0 ? (
+      {headedRequestGroups.length === 0 ? (
         <p className="text-skyline text-sm">
           No waiting-list entries for these filters.
         </p>
       ) : (
-        grouped.map(([heading, group]) => (
-          <div className="space-y-2" key={heading}>
+        headedRequestGroups.map(({ heading, requestGroups }) => (
+          <div className="space-y-3" key={heading}>
             <h3 className="text-ink text-sm font-semibold tracking-tight">
               {scan === "date" ? formatShortBusinessDate(heading) : heading}
             </h3>
-            <ul className="divide-fog border-fog divide-y overflow-hidden rounded-xl border">
-              {group.map((row) => (
-                <li className="space-y-3 px-4 py-4" key={row.itemId}>
-                  <div>
-                    <p className="text-ink text-sm font-medium">
-                      {row.guestName}
-                      {row.actionRequired ? (
-                        <span className="text-signal ml-2 font-normal">
-                          Action required
-                        </span>
+            <div className="space-y-6">
+              {requestGroups.map((requestRows) => {
+                const lead = requestRows[0];
+                if (!lead) return null;
+                const confirmationLabel = confirmationStatusLabel(
+                  lead.confirmationLink,
+                );
+                const requestNeedsAction = requestRows.some(
+                  (row) => row.actionRequired,
+                );
+                return (
+                  <article
+                    className="border-ink overflow-hidden rounded-xl border-2 bg-white"
+                    key={lead.requestId}
+                  >
+                    <header className="border-ink space-y-1 border-b-2 px-4 py-3">
+                      <p className="text-ink text-lg font-semibold tracking-tight">
+                        {lead.guestName}
+                        {requestNeedsAction ? (
+                          <span className="text-signal ml-2 text-sm font-medium">
+                            Action required
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="text-ink text-sm">
+                        WhatsApp {lead.guestPhone}
+                      </p>
+                      <p className="text-ink text-sm">
+                        Requested {formatShortBusinessDate(lead.pickupDate)}
+                      </p>
+                      <p className="text-skyline text-xs">
+                        Request {compactWaitingListRequestId(lead.requestId)} ·
+                        joined{" "}
+                        {lead.joinedAt ? formatDateTime(lead.joinedAt) : "—"} ·{" "}
+                        {statusLabel(lead.requestStatus)}
+                        {lead.openToAlternatives
+                          ? " · alternatives yes"
+                          : " · alternatives no"}
+                      </p>
+                      {confirmationLabel ? (
+                        <p className="text-ink text-sm font-medium">
+                          {confirmationLabel}
+                        </p>
                       ) : null}
-                    </p>
-                    <p className="text-skyline mt-0.5 text-sm">
-                      WhatsApp {row.guestPhone} · {row.cakeName} ·{" "}
-                      {row.sizeLabel} · qty {row.quantity} · remaining{" "}
-                      {row.remainingQuantity} · #{row.queuePosition} ·{" "}
-                      {statusLabel(row.status)}
-                    </p>
-                    {row.requestItems.length > 1 ? (
-                      <p className="text-skyline mt-0.5 text-xs">
-                        Also on this request:{" "}
-                        {row.requestItems
-                          .filter((item) => item.itemId !== row.itemId)
-                          .map(
-                            (item) =>
-                              `${item.cakeName} · ${item.sizeLabel} × ${item.quantity}`,
-                          )
-                          .join(" · ")}
-                      </p>
-                    ) : null}
-                    {row.confirmationLink?.status === "converted" ? (
-                      <p className="text-ink mt-1 text-xs font-medium">
-                        {WAITING_LIST_CONFIRMATION_CONVERTED_LABEL}
-                        {row.confirmationLink.convertedOrderNumber
-                          ? ` · ${row.confirmationLink.convertedOrderNumber}`
-                          : ""}
-                      </p>
-                    ) : row.confirmationLink?.status === "submitted" ? (
-                      <p className="text-ink mt-1 text-xs font-medium">
-                        {WAITING_LIST_CONFIRMATION_SUBMITTED_LABEL}
-                      </p>
-                    ) : row.confirmationLink?.status === "issued" ? (
-                      <p className="text-ink mt-1 text-xs font-medium">
-                        {WAITING_LIST_CONFIRMATION_ISSUED_LABEL}
-                      </p>
-                    ) : row.confirmationLink?.status === "expired" ? (
-                      <p className="text-ink mt-1 text-xs font-medium">
-                        {WAITING_LIST_CONFIRMATION_EXPIRED_LABEL}
-                      </p>
-                    ) : row.confirmationLink?.status === "invalidated" ? (
-                      <p className="text-ink mt-1 text-xs font-medium">
-                        {WAITING_LIST_CONFIRMATION_INVALIDATED_LABEL}
-                      </p>
-                    ) : null}
-                    <p className="text-skyline mt-0.5 text-xs">
-                      {formatShortBusinessDate(row.pickupDate)} · joined{" "}
-                      {row.joinedAt ? formatDateTime(row.joinedAt) : "—"} ·
-                      alternatives {row.openToAlternatives ? "yes" : "no"}
-                      {row.contactedAt
-                        ? ` · contacted ${formatDateTime(row.contactedAt)}`
-                        : ""}
-                      {row.responseDeadlineAt
-                        ? ` · reply by ${formatDateTime(row.responseDeadlineAt)}`
-                        : ""}
-                      {row.offeredQuantity
-                        ? ` · offered ${row.offeredQuantity}`
-                        : ""}
-                      {row.convertedOrderNumber
-                        ? ` · order ${row.convertedOrderNumber}`
-                        : ""}
-                    </p>
-                    {row.notes ? (
-                      <p className="text-skyline mt-0.5 text-xs">
-                        Notes: {row.notes}
-                      </p>
-                    ) : null}
-                  </div>
+                      {lead.notes ? (
+                        <p className="text-skyline text-xs">
+                          Notes: {lead.notes}
+                        </p>
+                      ) : null}
+                    </header>
 
-                  {canManage && confirmationLeadItemIds.has(row.itemId) ? (
-                    <WaitingListConfirmationStaffPanel row={row} />
-                  ) : null}
-
-                  {canManage ? (
-                    <div className="flex flex-col gap-2">
-                      {row.status === "active" ||
-                      row.status === "partially_accepted" ? (
-                        <form
-                          action={contactAction}
-                          className="flex flex-wrap items-end gap-2"
-                        >
-                          <input
-                            name="item_id"
-                            type="hidden"
-                            value={row.itemId}
-                          />
-                          <label className="text-ink text-sm">
-                            Offer qty
-                            <input
-                              className="border-fog text-ink ml-2 h-11 w-20 rounded-lg border bg-white px-3 text-sm tabular-nums"
-                              defaultValue={
-                                row.offeredQuantity ?? row.remainingQuantity
-                              }
-                              min={1}
-                              name="offered_quantity"
-                              type="number"
-                            />
-                          </label>
-                          <button
-                            className={inkButtonClass}
-                            disabled={pending}
-                            type="submit"
-                          >
-                            Contact
-                          </button>
-                        </form>
+                    <div className="space-y-4 p-4">
+                      {canManage ? (
+                        <WaitingListConfirmationStaffPanel row={lead} />
                       ) : null}
 
-                      {canRecordWaitingListItemResponse({
-                        itemStatus: row.status,
-                        confirmationLink: row.confirmationLink,
-                      }) ? (
-                        <form
-                          action={responseAction}
-                          className="flex flex-wrap items-end gap-2"
-                        >
-                          <input
-                            name="item_id"
-                            type="hidden"
-                            value={row.itemId}
-                          />
-                          <label className="text-ink text-sm">
-                            Response
-                            <select className={fieldClass} name="outcome">
-                              <option value="accept">Accept</option>
-                              <option value="decline">Decline</option>
-                              <option value="late_accept">Late accept</option>
-                              <option value="late_decline">Late decline</option>
-                            </select>
-                          </label>
-                          <label className="text-ink text-sm">
-                            Accepted qty
-                            <input
-                              className="border-fog text-ink ml-2 h-11 w-20 rounded-lg border bg-white px-3 text-sm tabular-nums"
-                              defaultValue={
-                                row.offeredQuantity ?? row.remainingQuantity
-                              }
-                              min={1}
-                              name="accepted_quantity"
-                              type="number"
-                            />
-                          </label>
-                          <label className="text-ink text-sm">
-                            Keep remaining
-                            <select
-                              className={fieldClass}
-                              defaultValue="yes"
-                              name="keep_remaining"
+                      <div className="space-y-2">
+                        <p className="text-ink text-xs font-semibold tracking-wide uppercase">
+                          Items in this request
+                        </p>
+                        <ul className="space-y-3">
+                          {requestRows.map((row) => (
+                            <li
+                              className="border-fog space-y-3 rounded-lg border bg-white p-3"
+                              key={row.itemId}
                             >
-                              <option value="yes">Yes</option>
-                              <option value="no">No — close remaining</option>
-                            </select>
-                          </label>
-                          <button
-                            className={inkButtonClass}
-                            disabled={pending}
-                            type="submit"
-                          >
-                            Record response
-                          </button>
-                        </form>
-                      ) : null}
-
-                      {canShowWaitingListItemConvertAction({
-                        itemStatus: row.status,
-                        confirmationLink: row.confirmationLink,
-                      }) ? (
-                        <form
-                          action={convertAction}
-                          className="flex flex-wrap items-end gap-2"
-                        >
-                          <input
-                            name="item_id"
-                            type="hidden"
-                            value={row.itemId}
-                          />
-                          <label className="text-ink text-sm">
-                            Convert qty
-                            <input
-                              className="border-fog text-ink ml-2 h-11 w-20 rounded-lg border bg-white px-3 text-sm tabular-nums"
-                              defaultValue={
-                                row.offeredQuantity ?? row.remainingQuantity
-                              }
-                              min={1}
-                              name="quantity"
-                              type="number"
-                            />
-                          </label>
-                          <label className="text-ink text-sm">
-                            Pickup time
-                            <input
-                              className={fieldClass}
-                              name="pickup_time"
-                              required
-                              type="time"
-                            />
-                          </label>
-                          <label className="text-ink text-sm">
-                            Keep remaining
-                            <select
-                              className={fieldClass}
-                              defaultValue="yes"
-                              name="keep_remaining"
-                            >
-                              <option value="yes">Yes</option>
-                              <option value="no">No — close remaining</option>
-                            </select>
-                          </label>
-                          <button
-                            className={inkButtonClass}
-                            disabled={pending}
-                            type="submit"
-                          >
-                            Convert to order
-                          </button>
-                        </form>
-                      ) : null}
-
-                      {row.remainingQuantity > 0 &&
-                      (row.status === "partially_accepted" ||
-                        row.status === "active" ||
-                        row.status === "accepted") ? (
-                        <form action={closeAction}>
-                          <input
-                            name="item_id"
-                            type="hidden"
-                            value={row.itemId}
-                          />
-                          <button
-                            className={ghostButtonClass}
-                            disabled={pending}
-                            type="submit"
-                          >
-                            Close remaining request
-                          </button>
-                        </form>
-                      ) : null}
-
-                      {row.openToAlternatives &&
-                      (row.status === "active" ||
-                        row.status === "partially_accepted" ||
-                        row.status === "contacted") ? (
-                        <>
-                          <form
-                            action={offerAction}
-                            className="flex flex-wrap items-end gap-2"
-                          >
-                            <input
-                              name="item_id"
-                              type="hidden"
-                              value={row.itemId}
-                            />
-                            <label className="text-ink text-sm">
-                              Alternative cake
-                              <select
-                                className={fieldClass}
-                                name="alternative_cake_id"
-                              >
-                                {cakes.map((cake) => (
-                                  <option key={cake.id} value={cake.id}>
-                                    {cake.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <label className="text-ink text-sm">
-                              Size
-                              <select
-                                className={fieldClass}
-                                name="alternative_size_id"
-                              >
-                                {cakes.flatMap((cake) =>
-                                  cake.sizes.map((size) => (
-                                    <option key={size.id} value={size.id}>
-                                      {cake.name} · {size.label}
-                                    </option>
-                                  )),
-                                )}
-                              </select>
-                            </label>
-                            <label className="text-ink text-sm">
-                              Qty
-                              <input
-                                className="border-fog text-ink ml-2 h-11 w-20 rounded-lg border bg-white px-3 text-sm tabular-nums"
-                                defaultValue={1}
-                                min={1}
-                                name="quantity"
-                                type="number"
-                              />
-                            </label>
-                            <button
-                              className={ghostButtonClass}
-                              disabled={pending}
-                              type="submit"
-                            >
-                              Offer alternative
-                            </button>
-                          </form>
-                          <form
-                            action={altAction}
-                            className="flex flex-wrap items-end gap-2"
-                          >
-                            <input
-                              name="item_id"
-                              type="hidden"
-                              value={row.itemId}
-                            />
-                            <label className="text-ink text-sm">
-                              Alternative reply
-                              <select className={fieldClass} name="accept">
-                                <option value="yes">
-                                  Switch to alternative
-                                </option>
-                                <option value="no">
-                                  Continue waiting for original
-                                </option>
-                              </select>
-                            </label>
-                            <label className="text-ink text-sm">
-                              Alternative cake
-                              <select
-                                className={fieldClass}
-                                name="alternative_cake_id"
-                              >
-                                {cakes.map((cake) => (
-                                  <option key={cake.id} value={cake.id}>
-                                    {cake.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <label className="text-ink text-sm">
-                              Size
-                              <select
-                                className={fieldClass}
-                                name="alternative_size_id"
-                              >
-                                {cakes.flatMap((cake) =>
-                                  cake.sizes.map((size) => (
-                                    <option key={size.id} value={size.id}>
-                                      {cake.name} · {size.label}
-                                    </option>
-                                  )),
-                                )}
-                              </select>
-                            </label>
-                            <label className="text-ink text-sm">
-                              Alt qty
-                              <input
-                                className="border-fog text-ink ml-2 h-11 w-20 rounded-lg border bg-white px-3 text-sm tabular-nums"
-                                defaultValue={1}
-                                min={1}
-                                name="quantity"
-                                type="number"
-                              />
-                            </label>
-                            <label className="text-ink text-sm">
-                              Keep original remaining
-                              <select
-                                className={fieldClass}
-                                defaultValue="yes"
-                                name="keep_original"
-                              >
-                                <option value="yes">Yes</option>
-                                <option value="no">No</option>
-                              </select>
-                            </label>
-                            <button
-                              className={ghostButtonClass}
-                              disabled={pending}
-                              type="submit"
-                            >
-                              Record alternative
-                            </button>
-                          </form>
-                        </>
-                      ) : null}
-
-                      {row.status === "active" ||
-                      row.status === "partially_accepted" ? (
-                        <>
-                          <WaitingListScopeForm
-                            action={scopeAction}
-                            cakes={cakes}
-                            pending={pending}
-                            row={row}
-                          />
-                          <form
-                            action={qtyAction}
-                            className="flex flex-wrap items-end gap-2"
-                          >
-                            <input
-                              name="item_id"
-                              type="hidden"
-                              value={row.itemId}
-                            />
-                            <label className="text-ink text-sm">
-                              Quantity
-                              <input
-                                className="border-fog text-ink ml-2 h-11 w-20 rounded-lg border bg-white px-3 text-sm tabular-nums"
-                                defaultValue={row.quantity}
-                                min={1}
-                                name="quantity"
-                                type="number"
-                              />
-                            </label>
-                            <button
-                              className={ghostButtonClass}
-                              disabled={pending}
-                              type="submit"
-                            >
-                              Update quantity
-                            </button>
-                          </form>
-                        </>
-                      ) : null}
-
-                      {row.status !== "cancelled" &&
-                      row.status !== "converted" &&
-                      row.status !== "closed" ? (
-                        <form action={cancelAction}>
-                          <input
-                            name="item_id"
-                            type="hidden"
-                            value={row.itemId}
-                          />
-                          <input
-                            name="reason"
-                            type="hidden"
-                            value="Staff cancelled"
-                          />
-                          <button
-                            className={ghostButtonClass}
-                            disabled={pending}
-                            type="submit"
-                          >
-                            Cancel
-                          </button>
-                        </form>
-                      ) : null}
+                              <div>
+                                <p className="text-ink text-sm font-medium">
+                                  {row.cakeName} · {row.sizeLabel}
+                                </p>
+                                <p className="text-skyline mt-0.5 text-sm">
+                                  qty {row.quantity} · remaining{" "}
+                                  {row.remainingQuantity} · #{row.queuePosition}{" "}
+                                  · {statusLabel(row.status)}
+                                  {row.offeredQuantity
+                                    ? ` · offered ${row.offeredQuantity} on hold`
+                                    : " · no hold"}
+                                  {row.convertedOrderNumber
+                                    ? ` · order ${row.convertedOrderNumber}`
+                                    : ""}
+                                </p>
+                                {row.contactedAt ? (
+                                  <p className="text-skyline mt-0.5 text-xs">
+                                    contacted {formatDateTime(row.contactedAt)}
+                                    {row.responseDeadlineAt
+                                      ? ` · reply by ${formatDateTime(row.responseDeadlineAt)}`
+                                      : ""}
+                                  </p>
+                                ) : null}
+                              </div>
+                              {canManage ? (
+                                <WaitingListItemControls
+                                  cancelAction={cancelAction}
+                                  cakes={cakes}
+                                  closeAction={closeAction}
+                                  contactAction={contactAction}
+                                  convertAction={convertAction}
+                                  offerAction={offerAction}
+                                  pending={pending}
+                                  qtyAction={qtyAction}
+                                  responseAction={responseAction}
+                                  row={row}
+                                  altAction={altAction}
+                                  scopeAction={scopeAction}
+                                />
+                              ) : null}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+                  </article>
+                );
+              })}
+            </div>
           </div>
         ))
       )}

@@ -283,7 +283,10 @@ assert.equal(
 const rpcSql = readSrc(
   "supabase/migrations/20260920140000_guest_waiting_list_closed_date.sql",
 );
-assert.match(rpcSql, /create or replace function public\._waiting_list_insert_request/);
+assert.match(
+  rpcSql,
+  /create or replace function public\._waiting_list_insert_request/,
+);
 assert.match(rpcSql, /is_pickup_orders_closed\(p_pickup_date\)/);
 assert.match(rpcSql, /_guest_preorder_item_fully_booked/);
 assert.match(rpcSql, /This cake is still available to order for that date/);
@@ -299,7 +302,10 @@ const insertBlock = rpcSql.slice(
   rpcSql.indexOf("if p_actor_staff_id is null"),
   rpcSql.indexOf("v_position :="),
 );
-assert.match(insertBlock, /not public\.is_pickup_orders_closed\(p_pickup_date\)/);
+assert.match(
+  insertBlock,
+  /not public\.is_pickup_orders_closed\(p_pickup_date\)/,
+);
 assert.match(insertBlock, /_guest_preorder_item_fully_booked/);
 
 const checkoutSrc = readSrc(
@@ -313,10 +319,7 @@ assert.match(checkoutSrc, /JoinWaitingListForm/);
 assert.doesNotMatch(checkoutSrc, /production_capacity/);
 assert.doesNotMatch(checkoutSrc, /capacity_quantity/);
 assert.match(checkoutSrc, /reason\.code === "fully_booked"/);
-assert.match(
-  checkoutSrc,
-  /showClosedWaitingListCta \?/,
-);
+assert.match(checkoutSrc, /showClosedWaitingListCta \?/);
 
 const selectorSrc = readSrc(
   "src/workspaces/storefront/waiting-list/CustomerWaitingListAvailability.tsx",
@@ -344,18 +347,14 @@ assert.match(joinSrc, /consolidateWaitingListRequestItems/);
 assert.match(joinSrc, /customer_name/);
 assert.match(joinSrc, /items_json/);
 
-const actionSrc = readSrc(
-  "src/workspaces/storefront/waiting-list/actions.ts",
-);
+const actionSrc = readSrc("src/workspaces/storefront/waiting-list/actions.ts");
 assert.match(actionSrc, /submit_guest_waiting_list_request/);
 assert.match(actionSrc, /loadCustomerWaitingListAvailability/);
 assert.match(actionSrc, /consolidateWaitingListRequestItems/);
 assert.match(actionSrc, /p_open_to_alternatives: openToAlternatives/);
 assert.doesNotMatch(actionSrc, /emit_staff_notification_event/);
 
-const querySrc = readSrc(
-  "src/workspaces/storefront/waiting-list/queries.ts",
-);
+const querySrc = readSrc("src/workspaces/storefront/waiting-list/queries.ts");
 assert.match(querySrc, /listCustomerWaitingListAvailability/);
 assert.match(querySrc, /customerWaitingListOptionsForDate/);
 assert.match(querySrc, /ordersClosed: true/);
@@ -372,7 +371,10 @@ assert.doesNotMatch(typesSrc, /remaining/);
 const multiSql = readSrc(
   "supabase/migrations/20260920160000_guest_waiting_list_multi_item.sql",
 );
-assert.match(multiSql, /create or replace function public\._waiting_list_insert_request/);
+assert.match(
+  multiSql,
+  /create or replace function public\._waiting_list_insert_request/,
+);
 assert.match(multiSql, /is_pickup_orders_closed\(p_pickup_date\)/);
 assert.match(multiSql, /group by cake_id, size_id/);
 assert.match(multiSql, /insert into public.waiting_list_requests/);
@@ -382,7 +384,9 @@ assert.match(multiSql, /One of the selected cakes is no longer available/);
 assert.doesNotMatch(multiSql, /capacity_quantity/);
 assert.doesNotMatch(multiSql, /staff_notification/);
 assert.doesNotMatch(
-  readSrc("supabase/migrations/20260920140000_guest_waiting_list_closed_date.sql"),
+  readSrc(
+    "supabase/migrations/20260920140000_guest_waiting_list_closed_date.sql",
+  ),
   /group by cake_id, size_id/,
 );
 
@@ -394,18 +398,25 @@ assert.match(notifySrc, /'itemCount'/);
 assert.doesNotMatch(rpcSql, /created_by_staff_id is not null then/);
 assert.doesNotMatch(multiSql, /waiting_list_new_request/);
 
-assert.equal(WAITING_LIST_SEE_AVAILABLE_CTA, "See What's Available on the Waiting List");
+assert.equal(
+  WAITING_LIST_SEE_AVAILABLE_CTA,
+  "See What's Available on the Waiting List",
+);
 assert.equal(WAITING_LIST_CONTINUE_CTA, "Continue");
 assert.match(WAITING_LIST_CLOSED_REGULAR_ORDERS, /no longer available/);
 assert.match(WAITING_LIST_AVAILABLE_LABEL, /Waiting List available/);
-assert.match(WAITING_LIST_SEE_AVAILABLE_HELP, /accepting Waiting List requests/);
+assert.match(
+  WAITING_LIST_SEE_AVAILABLE_HELP,
+  /accepting Waiting List requests/,
+);
 assert.match(WAITING_LIST_CLOSED_NONE, /not currently accepting Waiting List/);
 
 const staffBoard = readSrc("src/workspaces/waiting-list/WaitingListBoard.tsx");
 assert.doesNotMatch(staffBoard, /CustomerWaitingListAvailability/);
 assert.doesNotMatch(staffBoard, /WAITING_LIST_SEE_AVAILABLE_CTA/);
-assert.match(staffBoard, /Also on this request/);
-assert.match(staffBoard, /requestItems/);
+assert.match(staffBoard, /Items in this request/);
+assert.match(staffBoard, /WaitingListConfirmationStaffPanel/);
+assert.match(staffBoard, /groupWaitingListHeadingByRequest/);
 assert.match(staffBoard, /offered_quantity/);
 assert.match(staffBoard, /accepted_quantity/);
 

@@ -184,7 +184,7 @@ export async function listWaitingListBoard(input: {
       supabase
         .from("waiting_list_requests")
         .select(
-          "id, guest_name, guest_phone, open_to_alternatives, created_at, notes",
+          "id, guest_name, guest_phone, open_to_alternatives, created_at, notes, status",
         )
         .in("id", requestIds),
       supabase.from("library_cakes").select("id, name").in("id", cakeIds),
@@ -323,6 +323,7 @@ export async function listWaitingListBoard(input: {
             open_to_alternatives?: boolean;
             created_at?: string;
             notes?: string | null;
+            status?: string;
           }
         | undefined;
       const cakeId = asId(
@@ -361,6 +362,7 @@ export async function listWaitingListBoard(input: {
         status: String(
           (row as { status?: string }).status ?? "active",
         ) as WaitingListItemStatus,
+        requestStatus: String(request?.status ?? "active"),
         openToAlternatives: Boolean(request?.open_to_alternatives),
         notes: String(request?.notes ?? "").trim() || null,
         contactedAt:

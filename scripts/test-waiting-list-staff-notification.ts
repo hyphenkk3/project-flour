@@ -44,7 +44,10 @@ assert.equal(
   waitingListNewRequestEventKey(requestId),
   staffNotificationEventKey("waiting_list_new_request", requestId),
 );
-assert.equal(isCustomerWaitingListNotificationSource({ createdByStaffId: null }), true);
+assert.equal(
+  isCustomerWaitingListNotificationSource({ createdByStaffId: null }),
+  true,
+);
 assert.equal(isCustomerWaitingListNotificationSource({}), true);
 assert.equal(
   isCustomerWaitingListNotificationSource({ createdByStaffId: "staff-1" }),
@@ -56,7 +59,10 @@ const customerEvents = classifyWaitingListRequestInsert({
   createdByStaffId: null,
 });
 assert.equal(customerEvents.length, 1);
-assert.equal(customerEvents[0]?.eventKey, waitingListNewRequestEventKey(requestId));
+assert.equal(
+  customerEvents[0]?.eventKey,
+  waitingListNewRequestEventKey(requestId),
+);
 
 const staffEvents = classifyWaitingListRequestInsert({
   id: requestId,
@@ -159,7 +165,9 @@ assert.match(sql, /'guestName'/);
 assert.doesNotMatch(sql, /create_staff_waiting_list_request/);
 assert.doesNotMatch(sql, /manually_added/);
 
-const guestAction = readSrc("src/workspaces/storefront/waiting-list/actions.ts");
+const guestAction = readSrc(
+  "src/workspaces/storefront/waiting-list/actions.ts",
+);
 assert.match(guestAction, /submit_guest_waiting_list_request/);
 assert.doesNotMatch(guestAction, /emit_staff_notification_event/);
 
@@ -167,7 +175,9 @@ const staffAction = readSrc("src/workspaces/waiting-list/actions.ts");
 assert.match(staffAction, /create_staff_waiting_list_request/);
 assert.doesNotMatch(staffAction, /waiting_list_new_request/);
 
-const listenerSrc = readSrc("src/components/shell/StaffNotificationListener.tsx");
+const listenerSrc = readSrc(
+  "src/components/shell/StaffNotificationListener.tsx",
+);
 assert.match(listenerSrc, /waiting_list_new_request/);
 assert.match(listenerSrc, /View/);
 
@@ -177,14 +187,11 @@ const engineSql = readSrc(
 assert.match(engineSql, /Waiting list is not available for that cake and date/);
 assert.match(engineSql, /Waiting list is not enabled for that cake and date/);
 assert.match(engineSql, /Waiting list is not enabled for this collection/);
-assert.doesNotMatch(
-  sql,
-  /_waiting_list_matching_capacity/,
-);
+assert.doesNotMatch(sql, /_waiting_list_matching_capacity/);
 
 const boardSrc = readSrc("src/workspaces/waiting-list/WaitingListBoard.tsx");
 assert.match(boardSrc, /WAITING_LIST_FILTER_ACTION/);
-assert.match(boardSrc, /Also on this request/);
+assert.match(boardSrc, /Items in this request/);
 assert.equal(
   WAITING_LIST_FILTER_ACTION,
   "/bakery/availability#waiting-list-heading",

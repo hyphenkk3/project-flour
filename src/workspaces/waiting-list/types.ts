@@ -1,5 +1,8 @@
 import type { WaitingListConfirmationStaffLink } from "@/engines/waiting-list/confirmation-review";
-import type { WaitingListItemStatus } from "@/engines/waiting-list/types";
+import type {
+  WaitingListItemStatus,
+  WaitingListRequestStatus,
+} from "@/engines/waiting-list/types";
 
 export type WaitingListBoardRow = {
   itemId: string;
@@ -16,6 +19,7 @@ export type WaitingListBoardRow = {
   queuePosition: number;
   joinedAt: string;
   status: WaitingListItemStatus;
+  requestStatus: WaitingListRequestStatus | string;
   openToAlternatives: boolean;
   notes: string | null;
   contactedAt: string | null;
