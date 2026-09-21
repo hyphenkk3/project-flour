@@ -750,17 +750,17 @@ export function WaitingListBoard({
                 <li className="px-4 py-3" key={collection.id}>
                   <form
                     action={configAction}
-                    className="flex flex-col gap-3 sm:flex-row sm:items-end"
+                    className="grid w-full min-w-0 grid-cols-1 items-center gap-3 md:grid-cols-2 md:gap-x-4 lg:grid-cols-[12.5rem_13.5rem_15.5rem_auto]"
                   >
                     <input
                       name="collection_id"
                       type="hidden"
                       value={collection.id}
                     />
-                    <p className="text-ink min-w-40 text-sm font-medium">
+                    <p className="text-ink flex min-h-11 items-center text-sm font-medium">
                       {collection.name}
                     </p>
-                    <label className="text-ink flex items-center gap-2 text-sm">
+                    <label className="text-ink flex min-h-11 items-center gap-2 text-sm">
                       <input
                         defaultChecked={collection.waitingListEnabled}
                         name="waiting_list_enabled"
@@ -768,10 +768,10 @@ export function WaitingListBoard({
                       />
                       Enable waiting list
                     </label>
-                    <label className="text-ink text-sm">
+                    <label className="text-ink flex min-h-11 items-center gap-2 text-sm">
                       Response minutes
                       <input
-                        className="border-fog text-ink ml-2 h-11 w-24 rounded-lg border bg-white px-3 text-sm tabular-nums"
+                        className="border-fog text-ink h-11 w-24 shrink-0 rounded-lg border bg-white px-3 text-sm tabular-nums"
                         defaultValue={
                           collection.waitingListResponseMinutes ?? ""
                         }

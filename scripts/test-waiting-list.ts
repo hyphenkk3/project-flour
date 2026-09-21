@@ -602,6 +602,13 @@ assert.match(boardSrc, /name="notes"/);
 assert.doesNotMatch(boardSrc, /name="customer_id"/);
 assert.doesNotMatch(boardSrc, /capacity_quantity/);
 assert.doesNotMatch(boardSrc, /committedQuantity/);
+assert.match(boardSrc, /Collection waiting list/);
+assert.match(boardSrc, /lg:grid-cols-\[12\.5rem_13\.5rem_15\.5rem_auto\]/);
+assert.match(boardSrc, /grid w-full min-w-0 grid-cols-1 items-center/);
+assert.match(boardSrc, /name="waiting_list_enabled"/);
+assert.match(boardSrc, /name="waiting_list_response_minutes"/);
+assert.doesNotMatch(boardSrc, /sm:items-end/);
+assert.doesNotMatch(boardSrc, /min-w-40/);
 
 const sectionSrc = readSrc("src/workspaces/waiting-list/WaitingListSection.tsx");
 assert.match(sectionSrc, /listCustomers/);
