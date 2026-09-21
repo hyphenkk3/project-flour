@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { FormError } from "@/components/ui/form";
 import {
   WAITING_LIST_CONFIRMATION_CONVERT_LABEL,
+  WAITING_LIST_CONFIRMATION_CONVERT_USES_SUBMITTED_DETAILS,
   WAITING_LIST_CONFIRMATION_CONVERTED_LABEL,
   WAITING_LIST_CONFIRMATION_EXPIRED_LABEL,
   WAITING_LIST_CONFIRMATION_GENERATE_LABEL,
@@ -346,6 +347,12 @@ export function WaitingListConfirmationStaffPanel({
           </a>
         ) : null}
       </div>
+
+      {canConvert ? (
+        <p className="text-skyline text-xs">
+          {WAITING_LIST_CONFIRMATION_CONVERT_USES_SUBMITTED_DETAILS}
+        </p>
+      ) : null}
 
       {error ? <FormError message={error} /> : null}
 

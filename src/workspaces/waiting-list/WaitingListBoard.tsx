@@ -31,6 +31,8 @@ import {
   WAITING_LIST_CONFIRMATION_INVALIDATED_LABEL,
   WAITING_LIST_CONFIRMATION_ISSUED_LABEL,
   WAITING_LIST_CONFIRMATION_SUBMITTED_LABEL,
+  canRecordWaitingListItemResponse,
+  canShowWaitingListItemConvertAction,
 } from "@/engines/waiting-list/confirmation-review";
 import { WaitingListConfirmationStaffPanel } from "@/workspaces/waiting-list/WaitingListConfirmationStaffPanel";
 import {
@@ -610,7 +612,10 @@ export function WaitingListBoard({
                         </form>
                       ) : null}
 
-                      {row.status === "contacted" ? (
+                      {canRecordWaitingListItemResponse({
+                        itemStatus: row.status,
+                        confirmationLink: row.confirmationLink,
+                      }) ? (
                         <form
                           action={responseAction}
                           className="flex flex-wrap items-end gap-2"
@@ -662,9 +667,10 @@ export function WaitingListBoard({
                         </form>
                       ) : null}
 
-                      {row.status === "contacted" ||
-                      row.status === "accepted" ||
-                      row.status === "partially_accepted" ? (
+                      {canShowWaitingListItemConvertAction({
+                        itemStatus: row.status,
+                        confirmationLink: row.confirmationLink,
+                      }) ? (
                         <form
                           action={convertAction}
                           className="flex flex-wrap items-end gap-2"

@@ -84,32 +84,87 @@ export function waitingListItemAfterPartialAccept(input: {
   };
 }
 
+export type WaitingListRequestStatusItemInput =
+  | WaitingListItemStatus
+  | {
+      status: WaitingListItemStatus;
+      convertedOrderId?: string | null;
+    };
+
+function normalizeWaitingListRequestStatusItem(
+  item: WaitingListRequestStatusItemInput,
+): { status: WaitingListItemStatus; convertedOrderId: string | null } {
+  if (typeof item === "string") {
+    return {
+      status: item,
+      convertedOrderId: item === "converted" ? "converted" : null,
+    };
+  }
+  return {
+    status: item.status,
+    convertedOrderId: item.convertedOrderId ?? null,
+  };
+}
+
+export function waitingListConsumeConfirmationOffer(input: {
+  quantity: number;
+  acceptedQuantity: number;
+  offeredQuantity: number;
+}): {
+  acceptedQuantity: number;
+  remainingQuantity: number;
+  consumeQuantity: number;
+  status: Extract<WaitingListItemStatus, "converted" | "partially_accepted">;
+} {
+  const remainingQuantity = waitingListRemainingQuantity(
+    input.quantity,
+    input.acceptedQuantity,
+  );
+  const consumeQuantity = Math.min(
+    Math.max(0, input.offeredQuantity),
+    remainingQuantity,
+  );
+  const acceptedQuantity = input.acceptedQuantity + consumeQuantity;
+  const nextRemaining = waitingListRemainingQuantity(
+    input.quantity,
+    acceptedQuantity,
+  );
+  return {
+    acceptedQuantity,
+    remainingQuantity: nextRemaining,
+    consumeQuantity,
+    status: nextRemaining <= 0 ? "converted" : "partially_accepted",
+  };
+}
+
 export function waitingListRequestStatusFromItems(
-  itemStatuses: readonly WaitingListItemStatus[],
+  items: readonly WaitingListRequestStatusItemInput[],
 ): "active" | "partially_converted" | "converted" | "cancelled" | "closed" {
-  if (itemStatuses.length === 0) return "closed";
-  const allCancelled = itemStatuses.every((status) => status === "cancelled");
+  if (items.length === 0) return "closed";
+  const normalized = items.map(normalizeWaitingListRequestStatusItem);
+  const allCancelled = normalized.every((item) => item.status === "cancelled");
   if (allCancelled) return "cancelled";
-  const allClosed = itemStatuses.every(
-    (status) =>
-      status === "closed" ||
-      status === "cancelled" ||
-      status === "converted" ||
-      status === "declined" ||
-      status === "expired",
+  const hasConvertedOrder = (item: {
+    status: WaitingListItemStatus;
+    convertedOrderId: string | null;
+  }) => Boolean(item.convertedOrderId);
+  const allClosed = normalized.every(
+    (item) =>
+      item.status === "closed" ||
+      item.status === "cancelled" ||
+      item.status === "declined" ||
+      item.status === "expired" ||
+      hasConvertedOrder(item),
   );
-  const anyConverted = itemStatuses.some(
-    (status) =>
-      status === "converted" ||
-      status === "partially_accepted" ||
-      status === "accepted",
-  );
-  const anyActive = itemStatuses.some((status) =>
-    isWaitingListQueueStatus(status),
+  const anyConverted = normalized.some(hasConvertedOrder);
+  const anyActive = normalized.some(
+    (item) =>
+      isWaitingListQueueStatus(item.status) ||
+      (item.status === "accepted" && !item.convertedOrderId),
   );
   if (anyActive && anyConverted) return "partially_converted";
   if (anyActive) return "active";
-  if (anyConverted && allClosed) return "converted";
+  if (anyConverted) return "converted";
   if (allClosed) return "closed";
   return "active";
 }

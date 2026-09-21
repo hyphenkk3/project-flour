@@ -372,6 +372,19 @@ assert.equal(
   "partially_converted",
 );
 assert.equal(waitingListRequestStatusFromItems(["cancelled"]), "cancelled");
+assert.equal(waitingListRequestStatusFromItems(["accepted"]), "active");
+assert.equal(
+  waitingListRequestStatusFromItems([
+    { status: "accepted", convertedOrderId: null },
+  ]),
+  "active",
+);
+assert.equal(
+  waitingListRequestStatusFromItems([
+    { status: "accepted", convertedOrderId: "order-1" },
+  ]),
+  "converted",
+);
 
 // 32. Multiple customers in queue order
 const offers = allocateWaitingListOffers(3, [

@@ -17,6 +17,8 @@ import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 export const WAITING_LIST_CONFIRMATION_GENERATE_LABEL =
   "Generate Confirmation Link";
 export const WAITING_LIST_CONFIRMATION_CONVERT_LABEL = "Convert to Order";
+export const WAITING_LIST_CONFIRMATION_CONVERT_USES_SUBMITTED_DETAILS =
+  "Uses the customer's submitted fulfilment details.";
 export const WAITING_LIST_CONFIRMATION_ISSUED_LABEL = "Confirmation link sent";
 export const WAITING_LIST_CONFIRMATION_SUBMITTED_LABEL =
   "Customer details received";
@@ -113,11 +115,50 @@ export function canConvertWaitingListConfirmation(
 ): boolean {
   return Boolean(
     link &&
-      link.status === "submitted" &&
-      link.review &&
-      !link.convertedOrderId,
+    link.status === "submitted" &&
+    link.review &&
+    !link.convertedOrderId,
   );
 }
+
+export function waitingListConfirmationIsAuthoritativeResponse(
+  link: WaitingListConfirmationStaffLink | null | undefined,
+): boolean {
+  return Boolean(
+    link && (link.status === "submitted" || link.status === "converted"),
+  );
+}
+
+export function canRecordWaitingListItemResponse(input: {
+  itemStatus: string;
+  confirmationLink: WaitingListConfirmationStaffLink | null | undefined;
+}): boolean {
+  if (input.itemStatus !== "contacted") return false;
+  return !waitingListConfirmationIsAuthoritativeResponse(
+    input.confirmationLink,
+  );
+}
+
+export function canShowWaitingListItemConvertAction(input: {
+  itemStatus: string;
+  confirmationLink: WaitingListConfirmationStaffLink | null | undefined;
+}): boolean {
+  if (
+    input.itemStatus !== "contacted" &&
+    input.itemStatus !== "accepted" &&
+    input.itemStatus !== "partially_accepted"
+  ) {
+    return false;
+  }
+  return !waitingListConfirmationIsAuthoritativeResponse(
+    input.confirmationLink,
+  );
+}
+
+export const WAITING_LIST_CONFIRMATION_ALREADY_SUBMITTED_RESPONSE =
+  "Customer confirmation has already been submitted";
+export const WAITING_LIST_ITEM_ALREADY_CONVERTED =
+  "This waiting-list item has already been converted";
 
 const WAITING_LIST_CONVERT_SAFE_ERRORS = [
   "Waiting-list request is required",
@@ -128,6 +169,8 @@ const WAITING_LIST_CONVERT_SAFE_ERRORS = [
   "This confirmation has not been submitted",
   "Customer details are missing",
   "This confirmation has already been converted",
+  WAITING_LIST_ITEM_ALREADY_CONVERTED,
+  WAITING_LIST_CONFIRMATION_ALREADY_SUBMITTED_RESPONSE,
   "This waiting-list request is no longer convertible",
   "This confirmation no longer matches the waiting-list items",
   "Offered quantity is no longer available",

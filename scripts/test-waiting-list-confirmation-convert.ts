@@ -25,9 +25,17 @@ function readSrc(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
 }
 
-const convertSql = readSrc(
+const originalConvertSql = readSrc(
   "supabase/migrations/20260920220000_waiting_list_confirmation_convert.sql",
 );
+const convertStateSql = readSrc(
+  "supabase/migrations/20260921100000_waiting_list_confirmation_conversion_state.sql",
+);
+const convertFnStart = convertStateSql.indexOf(
+  "create or replace function public.waiting_list_convert_confirmation",
+);
+assert.ok(convertFnStart >= 0);
+const convertSql = convertStateSql.slice(convertFnStart);
 const staffCreateSql = readSrc(
   "supabase/migrations/20260917120000_staff_guest_preorder_dine_in.sql",
 );
@@ -195,23 +203,24 @@ assert.match(
   /jsonb_build_object\(\s*'cake_id', v_cake_id,\s*'cake_size_id', v_size_id,\s*'quantity', v_qty/,
 );
 assert.doesNotMatch(convertSql, /waiting_list_convert_item\(/);
-assert.match(staffCreateSql, /for item in select \* from jsonb_array_elements\(p_items\)/);
+assert.match(
+  staffCreateSql,
+  /for item in select \* from jsonb_array_elements\(p_items\)/,
+);
 
 // C. Partial offer: accepted uses offered snapshot qty, remaining stays represented.
 assert.match(convertSql, /offered_quantity/);
 assert.match(
   convertSql,
-  /accepted_quantity = i\.accepted_quantity \+ v_qty/,
+  /accepted_quantity = i\.accepted_quantity \+ v_consume/,
 );
 assert.match(
   convertSql,
-  /when i\.remaining_quantity - v_qty <= 0 then 'converted'/,
+  /when i\.remaining_quantity - v_consume <= 0 then 'converted'/,
 );
 assert.match(convertSql, /else 'partially_accepted'/);
-assert.doesNotMatch(
-  convertSql,
-  /accepted_quantity\s*=\s*i\.quantity/,
-);
+assert.doesNotMatch(convertSql, /accepted_quantity\s*=\s*i\.quantity/);
+assert.doesNotMatch(convertSql, /v_remaining := v_item\.remaining_quantity/);
 
 // D. Fulfilment: pickup / delivery / dine-in persisted through staff create.
 assert.match(convertSql, /v_method not in \('pickup', 'delivery', 'dine_in'\)/);
@@ -264,7 +273,10 @@ assert.match(
   actionsSrc,
   /convertWaitingListConfirmationAction\(\s*requestId: string/,
 );
-assert.match(panelSrc, /convertWaitingListConfirmationAction\(\s*row\.requestId/);
+assert.match(
+  panelSrc,
+  /convertWaitingListConfirmationAction\(\s*row\.requestId/,
+);
 assert.doesNotMatch(
   panelSrc,
   /convertWaitingListConfirmationAction\([^)]*quantity/,
@@ -343,13 +355,15 @@ assert.match(serverSrc, /p_actor_staff_id: staff\.id/);
 assert.match(serverSrc, /p_request_id: id/);
 assert.match(reviewSrc, /WAITING_LIST_CONFIRMATION_CONVERT_LABEL/);
 assert.equal(
-  waitingListConvertConfirmationError("duplicate key value violates unique constraint"),
+  waitingListConvertConfirmationError(
+    "duplicate key value violates unique constraint",
+  ),
   WAITING_LIST_CONVERT_GENERIC_ERROR,
 );
 
 assert.match(historicalStaffListSql, /Does not create an order/);
-assert.match(convertSql, /when 'converted' then 2/);
-assert.match(convertSql, /converted_order_number/);
+assert.match(originalConvertSql, /when 'converted' then 2/);
+assert.match(originalConvertSql, /converted_order_number/);
 assert.match(panelSrc, /Open order/);
 assert.match(panelSrc, /waitingListConvertedOrderHref/);
 assert.doesNotMatch(panelSrc, /name="quantity"/);
