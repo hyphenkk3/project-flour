@@ -3,6 +3,14 @@ export const AVAILABILITY_WAITING_LIST_SECTION_ID = "waiting-list-heading";
 export const AVAILABILITY_OVERVIEW_SECTION_ID = "availability-overview-heading";
 export const AVAILABILITY_RECENT_SECTION_ID = "recent-capacity-changes-heading";
 
+/**
+ * Shared hash-scroll offset for Availability section tabs.
+ * TopHeader is sticky at top-16; the local nav is one row (py-2 + min-h-11)
+ * stuck just below it. Keep this in one place so all four sections land
+ * at the same position under the nav.
+ */
+export const AVAILABILITY_SECTION_SCROLL_MARGIN_CLASS = "scroll-mt-[8.5rem]";
+
 export const AVAILABILITY_WORKSPACE_SECTIONS = [
   {
     id: AVAILABILITY_CAPACITY_SECTION_ID,

@@ -16,7 +16,14 @@ import { firstQueryDateParam, firstQueryParam } from "@/lib/query-params";
 import { BakeryWorkspaceNav } from "@/workspaces/bakery/BakeryWorkspaceNav";
 import { countExtraStockProposed } from "@/workspaces/extra/queries";
 import { AvailabilityDateBar } from "@/workspaces/library/order-availability/AvailabilityDateBar";
+import { AvailabilitySectionCard } from "@/workspaces/library/order-availability/AvailabilitySectionCard";
 import { AvailabilitySectionNav } from "@/workspaces/library/order-availability/AvailabilitySectionNav";
+import {
+  AVAILABILITY_CAPACITY_SECTION_ID,
+  AVAILABILITY_OVERVIEW_SECTION_ID,
+  AVAILABILITY_RECENT_SECTION_ID,
+  AVAILABILITY_WAITING_LIST_SECTION_ID,
+} from "@/workspaces/library/order-availability/availability-sections";
 import { PickupDateClosureSection } from "@/workspaces/library/order-availability/PickupDateClosureSection";
 import { WaitingListAvailabilitySection } from "@/workspaces/library/order-availability/WaitingListAvailabilitySection";
 import {
@@ -91,21 +98,27 @@ export default async function BakeryAvailabilityPage({
           />
         </PagePanel>
         <AvailabilitySectionNav />
-        <PagePanel>
-          <PickupDateClosureSection
+        <AvailabilitySectionCard
+          id={AVAILABILITY_CAPACITY_SECTION_ID}
+          title="Production capacity"
+        >
+          <ProductionCapacitySection
+            canConfigureWaitingList={canConfigureQueue}
             canMutate={canMutate}
-            pickupDate={pickupDate}
+            dateParam={date || undefined}
+            month={month}
           />
           <div className="border-fog mt-6 border-t pt-6">
-            <ProductionCapacitySection
-              canConfigureWaitingList={canConfigureQueue}
+            <PickupDateClosureSection
               canMutate={canMutate}
-              dateParam={date || undefined}
-              month={month}
+              pickupDate={pickupDate}
             />
           </div>
-        </PagePanel>
-        <PagePanel>
+        </AvailabilitySectionCard>
+        <AvailabilitySectionCard
+          id={AVAILABILITY_WAITING_LIST_SECTION_ID}
+          title="Waiting list"
+        >
           <WaitingListAvailabilitySection
             dateParam={date || undefined}
             month={month}
@@ -123,20 +136,26 @@ export default async function BakeryAvailabilityPage({
               />
             </div>
           ) : null}
-        </PagePanel>
-        <PagePanel>
+        </AvailabilitySectionCard>
+        <AvailabilitySectionCard
+          id={AVAILABILITY_OVERVIEW_SECTION_ID}
+          title="Availability overview"
+        >
           <AvailabilityOverviewSection
             dateParam={date || undefined}
             fromParam={overviewFrom || undefined}
             month={month}
           />
-        </PagePanel>
-        <PagePanel>
+        </AvailabilitySectionCard>
+        <AvailabilitySectionCard
+          id={AVAILABILITY_RECENT_SECTION_ID}
+          title="Recent capacity changes"
+        >
           <ProductionCapacityHistorySection
             dateParam={date || undefined}
             month={month}
           />
-        </PagePanel>
+        </AvailabilitySectionCard>
       </div>
     </div>
   );

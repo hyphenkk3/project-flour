@@ -54,25 +54,14 @@ export function ProductionCapacityPanel({
   const error = saveState.error ?? removeState.error ?? waitState.error;
 
   return (
-    <section
-      aria-labelledby="production-capacity-heading"
-      className="space-y-4"
-    >
-      <div>
-        <h2
-          className="text-ink scroll-mt-32 text-lg font-semibold tracking-tight"
-          id="production-capacity-heading"
-        >
-          Production capacity
-        </h2>
-        <p className="text-skyline mt-1 max-w-2xl text-sm">
-          Staff only. No capacity row means unrestricted production, and waiting
-          list is not available for that cake and date. Capacity 0 is fully
-          booked. Enable waiting list on the capacity row. Closing customer
-          orders does not enable the waiting list. Customers never see these
-          numbers.
-        </p>
-      </div>
+    <section aria-labelledby="production-capacity-heading" className="space-y-4">
+      <p className="text-skyline max-w-2xl text-sm">
+        Staff only. No capacity row means unrestricted production, and waiting
+        list is not available for that cake and date. Capacity 0 is fully
+        booked. Enable waiting list on the capacity row. Closing customer
+        orders does not enable the waiting list. Customers never see these
+        numbers.
+      </p>
 
       {canMutate ? <FormError message={error} /> : null}
 

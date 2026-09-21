@@ -620,6 +620,7 @@ assert.match(staffActionsSrc, /canConfigureWaitingList/);
 const pageSrc = readSrc("src/app/(app)/bakery/availability/page.tsx");
 assert.match(pageSrc, /WaitingListSection/);
 assert.match(pageSrc, /WaitingListAvailabilitySection/);
+assert.match(pageSrc, /AVAILABILITY_WAITING_LIST_SECTION_ID/);
 assert.match(pageSrc, /canViewWaitingList/);
 
 const accessSrc = readSrc("src/foundation/navigation/access.ts");
@@ -662,7 +663,8 @@ assert.match(boardSrc, /name="date"/);
 assert.match(boardSrc, /name="wlCake"/);
 assert.match(boardSrc, /name="wlSize"/);
 assert.match(boardSrc, /name="wlStatus"/);
-assert.match(boardSrc, /id=\{WAITING_LIST_SECTION_ID\}/);
+assert.match(boardSrc, /aria-labelledby=\{WAITING_LIST_SECTION_ID\}/);
+assert.doesNotMatch(boardSrc, /id=\{WAITING_LIST_SECTION_ID\}/);
 assert.doesNotMatch(boardSrc, /action="\/bakery\/availability"/);
 
 const filterCakes = [

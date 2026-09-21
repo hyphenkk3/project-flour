@@ -198,6 +198,29 @@ assert.match(
   /Capacity cannot be reduced below the number of confirmed orders already committed to this date and cake/,
 );
 
+const noopSql = readSrc(
+  "supabase/migrations/20260921120000_skip_noop_production_capacity_events.sql",
+);
+assert.match(
+  noopSql,
+  /create or replace function public\.set_production_capacity/,
+);
+assert.match(
+  noopSql,
+  /v_has_row and v_previous is not distinct from p_capacity_quantity/,
+);
+assert.match(noopSql, /Initial set \(no previous row\) still records an event/);
+assert.match(
+  noopSql,
+  /Does not insert a production_capacity_event when the existing quantity is unchanged/,
+);
+assert.doesNotMatch(noopSql, /from public\.production_capacity_holds/);
+assert.doesNotMatch(noopSql, /waiting_list_requests/);
+assert.match(
+  noopSql,
+  /Capacity cannot be reduced below the number of confirmed orders already committed to this date and cake/,
+);
+
 const phase3Sql = readSrc(
   "supabase/migrations/20260902230000_phase3_preorder_date_engine.sql",
 );
@@ -220,7 +243,6 @@ assert.doesNotMatch(actionSrc, /production_capacity_holds/);
 const panelSrc = readSrc(
   "src/workspaces/library/order-availability/capacity/ProductionCapacityPanel.tsx",
 );
-assert.match(panelSrc, /Production capacity/);
 assert.match(panelSrc, /canMutate/);
 assert.match(panelSrc, /Confirmed/);
 assert.match(panelSrc, /All sizes/);
@@ -231,6 +253,8 @@ assert.doesNotMatch(panelSrc, /queue_position/);
 const bakeryPageSrc = readSrc(
   "src/app/(app)/bakery/availability/page.tsx",
 );
+assert.match(bakeryPageSrc, /title="Production capacity"/);
+assert.match(bakeryPageSrc, /AvailabilitySectionCard/);
 assert.match(bakeryPageSrc, /ProductionCapacitySection/);
 assert.match(bakeryPageSrc, /PickupDateClosureSection/);
 assert.match(bakeryPageSrc, /ProductionCapacityHistorySection/);
@@ -243,6 +267,19 @@ const historyPanelSrc = readSrc(
 assert.match(historyPanelSrc, /View all changes/);
 assert.match(historyPanelSrc, /PREVIEW_COUNT = 8/);
 assert.doesNotMatch(panelSrc, /Recent capacity changes/);
+
+const sectionCardSrc = readSrc(
+  "src/workspaces/library/order-availability/AvailabilitySectionCard.tsx",
+);
+assert.match(sectionCardSrc, /AVAILABILITY_SECTION_SCROLL_MARGIN_CLASS/);
+assert.match(sectionCardSrc, /id=\{id\}/);
+assert.doesNotMatch(sectionCardSrc, /scroll-mt-32/);
+
+const sectionNavSrc = readSrc(
+  "src/workspaces/library/order-availability/AvailabilitySectionNav.tsx",
+);
+assert.match(sectionNavSrc, /flex-nowrap/);
+assert.doesNotMatch(sectionNavSrc, /flex-wrap/);
 
 const queryParamsSrc = readSrc("src/lib/query-params.ts");
 assert.match(queryParamsSrc, /Array.isArray\(value\)/);

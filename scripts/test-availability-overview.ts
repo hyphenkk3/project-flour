@@ -304,6 +304,7 @@ const bakeryPageSrc = readSrc(
   "src/app/(app)/bakery/availability/page.tsx",
 );
 assert.match(bakeryPageSrc, /AvailabilityOverviewSection/);
+assert.match(bakeryPageSrc, /title="Availability overview"/);
 assert.match(bakeryPageSrc, /canViewOrderAvailability/);
 assert.match(bakeryPageSrc, /showWorkspaceLinks/);
 assert.match(bakeryPageSrc, /AvailabilitySectionNav/);
@@ -339,7 +340,6 @@ assert.doesNotMatch(libraryPageSrc, /ProductionCapacity/);
 const panelSrc = readSrc(
   "src/workspaces/library/order-availability/overview/AvailabilityOverviewPanel.tsx",
 );
-assert.match(panelSrc, /Availability overview/);
 assert.match(panelSrc, /Fully Booked/);
 assert.match(panelSrc, /Unrestricted/);
 assert.doesNotMatch(panelSrc, /saveProductionCapacityAction/);

@@ -729,21 +729,13 @@ export function WaitingListBoard({
 
   return (
     <section aria-labelledby={WAITING_LIST_SECTION_ID} className="space-y-4">
-      <div>
-        <h2
-          className="text-ink scroll-mt-32 text-lg font-semibold tracking-tight"
-          id={WAITING_LIST_SECTION_ID}
-        >
-          Waiting list
-        </h2>
-        <p className="text-skyline mt-1 max-w-2xl text-sm">
-          Queue for dates and cakes where Bakery has explicitly allowed
-          waiting-list participation. This is not a confirmed order and does not
-          show production capacity numbers. A production-capacity row with
-          waiting list enabled is required for that cake and date. Closing
-          customer orders does not enable the waiting list.
-        </p>
-      </div>
+      <p className="text-skyline max-w-2xl text-sm">
+        Queue for dates and cakes where Bakery has explicitly allowed
+        waiting-list participation. This is not a confirmed order and does not
+        show production capacity numbers. A production-capacity row with
+        waiting list enabled is required for that cake and date. Closing
+        customer orders does not enable the waiting list.
+      </p>
 
       {canConfigure ? (
         <div className="space-y-3">

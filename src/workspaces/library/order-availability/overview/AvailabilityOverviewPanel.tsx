@@ -56,19 +56,11 @@ export function AvailabilityOverviewPanel({
 
   return (
     <section aria-labelledby="availability-overview-heading" className="space-y-4">
-      <div>
-        <h2
-          className="text-ink scroll-mt-32 text-lg font-semibold tracking-tight"
-          id="availability-overview-heading"
-        >
-          Availability overview
-        </h2>
-        <p className="text-skyline mt-1 max-w-2xl text-sm">
-          Staff only. Upcoming pickup dates with closures and production limits.
-          Customers never see these numbers. Each limit is its own scope — size
-          limits are not added to a whole-cake limit.
-        </p>
-      </div>
+      <p className="text-skyline max-w-2xl text-sm">
+        Staff only. Upcoming pickup dates with closures and production limits.
+        Customers never see these numbers. Each limit is its own scope — size
+        limits are not added to a whole-cake limit.
+      </p>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-ink text-sm font-medium">
