@@ -267,6 +267,18 @@ export function mergeDraftItem(
   return { ...draft, items: next };
 }
 
+/** Quantity of one cake+size line. Identity is cakeId + sizeId, never cake alone. */
+export function draftLineQuantity(
+  draft: PreorderDraft | null | undefined,
+  cakeId: string,
+  sizeId: string,
+): number {
+  if (!draft?.items?.length || !cakeId || !sizeId) return 0;
+  return draft.items
+    .filter((item) => item.cakeId === cakeId && item.sizeId === sizeId)
+    .reduce((sum, item) => sum + item.quantity, 0);
+}
+
 function parseDraftSizeChoices(
   value: unknown,
 ): PreorderDraftSizeChoice[] | undefined {

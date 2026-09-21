@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { StorefrontCake } from "@/types/storefront";
 import { AddToOrderButton } from "@/workspaces/storefront/cart/AddToOrderSheet";
 import { usePreorderDraft } from "@/workspaces/storefront/cart/usePreorderDraft";
+import { draftLineQuantity } from "@/workspaces/storefront/checkout/preorder-draft";
 import { BROWSE_CURRENTLY_UNAVAILABLE_NOTE } from "@/engines/menu/homepage-collection-preview";
 import {
   formatPreorderRequirement,
@@ -23,16 +24,6 @@ type CakeDetailPurchasePanelProps = {
   selectedSizeId: string;
   onSelectedSizeIdChange: (sizeId: string) => void;
 };
-
-function existingQuantityForSize(
-  cakeId: string,
-  sizeId: string,
-  items: Array<{ cakeId: string; sizeId: string; quantity: number }>,
-): number {
-  return items
-    .filter((item) => item.cakeId === cakeId && item.sizeId === sizeId)
-    .reduce((sum, item) => sum + item.quantity, 0);
-}
 
 export function CakeDetailPurchasePanel({
   cake,
@@ -58,10 +49,8 @@ export function CakeDetailPurchasePanel({
 
   const existingQuantity = useMemo(
     () =>
-      selectedSizeId
-        ? existingQuantityForSize(cake.id, selectedSizeId, draft?.items ?? [])
-        : 0,
-    [cake.id, draft?.items, selectedSizeId],
+      selectedSizeId ? draftLineQuantity(draft, cake.id, selectedSizeId) : 0,
+    [cake.id, draft, selectedSizeId],
   );
 
   return (
@@ -178,14 +167,10 @@ export function CakeDetailPurchasePanel({
             </p>
           </section>
 
-          {existingQuantity > 0 ? (
-            <p className="text-skyline text-sm">
-              {existingQuantity} already in your order for this size.
-            </p>
-          ) : null}
-
           <AddToOrderButton
             cake={cake}
+            existingQuantity={existingQuantity}
+            existingSizeLabel={selectedSize?.size}
             initialSizeId={selectedSizeId}
             pickupScope={pickupScope}
           />

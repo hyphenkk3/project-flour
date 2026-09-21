@@ -10,10 +10,13 @@ import {
   formatPreorderRequirement,
   formatRm,
 } from "@/workspaces/storefront/catalog/pricing";
+import { openStorefrontOrder } from "@/workspaces/storefront/cart/open-order";
 import {
+  draftLineQuantity,
   emptyPreorderDraft,
   mergeDraftItem,
   readPreorderDraft,
+  setDraftLineQuantity,
   writePreorderDraft,
 } from "@/workspaces/storefront/checkout/preorder-draft";
 
@@ -27,7 +30,7 @@ type AddToOrderSheetProps = {
   cake: StorefrontCake;
   open: boolean;
   onClose: () => void;
-  onAdded: () => void;
+  onAdded: (result: "added" | "updated") => void;
   pickupScope?: AddToOrderPickupScope | null;
   initialSizeId?: string;
 };
@@ -46,20 +49,46 @@ export function AddToOrderSheet({
 }: AddToOrderSheetProps) {
   const titleId = useId();
   const addingRef = useRef(false);
-  const [sizeId, setSizeId] = useState(
-    initialSizeId || cake.sizes[0]?.id || "",
-  );
-  const [quantity, setQuantity] = useState(1);
+  const initialSelectedId = initialSizeId || cake.sizes[0]?.id || "";
+  const [sizeId, setSizeId] = useState(initialSelectedId);
+  const [quantity, setQuantity] = useState(() => {
+    const existing = draftLineQuantity(
+      readPreorderDraft(),
+      cake.id,
+      initialSelectedId,
+    );
+    return existing > 0 ? existing : 1;
+  });
   const [adding, setAdding] = useState(false);
 
   const selected = cake.sizes.find((size) => size.id === sizeId);
   const photo = storefrontPhotoForSize(cake.photos, sizeId);
+  const existingQuantity = selected
+    ? draftLineQuantity(readPreorderDraft(), cake.id, selected.id)
+    : 0;
+  const editingExisting = existingQuantity > 0;
+
+  function selectSize(nextSizeId: string) {
+    setSizeId(nextSizeId);
+    const existing = draftLineQuantity(
+      readPreorderDraft(),
+      cake.id,
+      nextSizeId,
+    );
+    setQuantity(existing > 0 ? existing : 1);
+  }
 
   function addToOrder() {
     if (!selected || addingRef.current) return;
     addingRef.current = true;
     setAdding(true);
     const draft = readPreorderDraft() ?? emptyPreorderDraft();
+    const existing = draftLineQuantity(draft, cake.id, selected.id);
+    if (existing > 0) {
+      setDraftLineQuantity(cake.id, selected.id, quantity);
+      onAdded("updated");
+      return;
+    }
     const next = mergeDraftItem(draft, {
       cakeId: cake.id,
       sizeId: selected.id,
@@ -88,7 +117,7 @@ export function AddToOrderSheet({
       next.pickupScopeConstrainsBounds = !isFullMonthPickupScope(from, to);
     }
     writePreorderDraft(next);
-    onAdded();
+    onAdded("added");
   }
 
   if (!open) return null;
@@ -108,7 +137,7 @@ export function AddToOrderSheet({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-signal text-[11px] font-medium tracking-[0.22em] uppercase">
-              Add to Order
+              {editingExisting ? "Already in your order" : "Add to Order"}
             </p>
             <h2
               className="font-display text-ink mt-1 text-2xl tracking-tight"
@@ -163,7 +192,7 @@ export function AddToOrderSheet({
                           checked={selectedSize}
                           className="sr-only"
                           name="add-to-order-size"
-                          onChange={() => setSizeId(size.id)}
+                          onChange={() => selectSize(size.id)}
                           type="radio"
                           value={size.id}
                         />
@@ -184,6 +213,12 @@ export function AddToOrderSheet({
             </ul>
           </fieldset>
         )}
+
+        {editingExisting ? (
+          <p className="text-ink text-sm" role="status">
+            {existingQuantity} × {selected?.size} already in your order
+          </p>
+        ) : null}
 
         <div className="flex items-center justify-between gap-3">
           <p className="text-ink text-sm font-medium" id={`${titleId}-qty`}>
@@ -226,8 +261,26 @@ export function AddToOrderSheet({
           disabled={!selected || adding}
           type="submit"
         >
-          {adding ? "Added ✓" : "Add"}
+          {adding
+            ? editingExisting
+              ? "Updated ✓"
+              : "Added ✓"
+            : editingExisting
+              ? "Update Order"
+              : "Add"}
         </button>
+        {editingExisting ? (
+          <button
+            className="text-ink hover:text-skyline inline-flex min-h-11 w-full cursor-pointer items-center justify-center text-sm font-medium"
+            onClick={() => {
+              onClose();
+              openStorefrontOrder();
+            }}
+            type="button"
+          >
+            View Order
+          </button>
+        ) : null}
       </form>
     </StorefrontOverlay>
   );
@@ -242,6 +295,8 @@ type AddToOrderButtonProps = {
   initialSizeId?: string;
   className?: string;
   buttonClassName?: string;
+  existingQuantity?: number;
+  existingSizeLabel?: string;
 };
 
 export function AddToOrderButton({
@@ -250,9 +305,12 @@ export function AddToOrderButton({
   initialSizeId,
   className = "",
   buttonClassName = defaultAddToOrderButtonClassName,
+  existingQuantity = 0,
+  existingSizeLabel,
 }: AddToOrderButtonProps) {
   const [open, setOpen] = useState(false);
   const [added, setAdded] = useState(false);
+  const [addedResult, setAddedResult] = useState<"added" | "updated">("added");
 
   useEffect(() => {
     if (!added) return;
@@ -260,30 +318,56 @@ export function AddToOrderButton({
     return () => window.clearTimeout(timer);
   }, [added]);
 
+  const showExisting = existingQuantity > 0;
+
   return (
     <div className={className}>
-      <button
-        className={buttonClassName}
-        disabled={cake.sizes.length === 0}
-        onClick={() => setOpen(true)}
-        type="button"
-      >
-        Add to Order
-      </button>
+      {showExisting ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-ink text-center text-sm font-medium" role="status">
+            {existingQuantity} × {existingSizeLabel ?? "this size"} already in
+            your order
+          </p>
+          <button
+            className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200"
+            onClick={() => openStorefrontOrder()}
+            type="button"
+          >
+            View / Edit Order
+          </button>
+          <button
+            className="text-ink hover:text-skyline inline-flex min-h-11 w-full cursor-pointer items-center justify-center text-sm font-medium"
+            onClick={() => setOpen(true)}
+            type="button"
+          >
+            + Add Another
+          </button>
+        </div>
+      ) : (
+        <button
+          className={buttonClassName}
+          disabled={cake.sizes.length === 0}
+          onClick={() => setOpen(true)}
+          type="button"
+        >
+          Add to Order
+        </button>
+      )}
       {added ? (
         <p
           className="text-ink mt-2 text-center text-sm font-medium"
           role="status"
         >
-          Added to your order
+          {addedResult === "updated" ? "Order updated" : "Added to your order"}
         </p>
       ) : null}
       <AddToOrderSheet
         cake={cake}
         initialSizeId={initialSizeId}
         key={open ? `open:${cake.id}:${initialSizeId ?? ""}` : "closed"}
-        onAdded={() => {
+        onAdded={(result) => {
           setOpen(false);
+          setAddedResult(result);
           setAdded(true);
         }}
         onClose={() => setOpen(false)}

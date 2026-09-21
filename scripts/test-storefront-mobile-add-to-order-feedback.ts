@@ -26,7 +26,7 @@ assert.match(sheetSrc, /if \(!selected \|\| addingRef\.current\) return;/);
 assert.match(sheetSrc, /addingRef\.current = true;/);
 assert.match(sheetSrc, /setAdding\(true\)/);
 assert.match(sheetSrc, /disabled=\{\!selected \|\| adding\}/);
-assert.match(sheetSrc, /\{adding \? "Added ✓" : "Add"\}/);
+assert.match(sheetSrc, /Added ✓/);
 assert.match(sheetSrc, /Added to your order/);
 assert.match(sheetSrc, /mergeDraftItem/);
 assert.match(sheetSrc, /quantity,/);
@@ -54,7 +54,8 @@ assert.match(cartSrc, /setOpen\(true\)/);
 assert.doesNotMatch(cartSrc, /bg-paper\/95/);
 
 assert.match(draftSrc, /quantity: existing\.quantity \+ item\.quantity/);
-assert.match(panelSrc, /already in your order for this size/);
+assert.match(panelSrc, /draftLineQuantity/);
+assert.match(sheetSrc, /already in your order/);
 assert.match(
   panelSrc,
   /h-\[calc\(4\.25rem\+env\(safe-area-inset-bottom,0px\)\)\] md:hidden/,

@@ -108,9 +108,12 @@ assert.match(
   /cursor-pointer items-center justify-center rounded-md px-5[\s\S]*type="submit"/,
 );
 assert.match(sheetSrc, /mergeDraftItem/);
+assert.match(sheetSrc, /setDraftLineQuantity/);
+assert.match(sheetSrc, /draftLineQuantity/);
 assert.match(sheetSrc, /addingRef\.current/);
 assert.match(sheetSrc, /disabled=\{\!selected \|\| adding\}/);
 assert.match(sheetSrc, /Added ✓/);
+assert.match(sheetSrc, /Update Order/);
 assert.match(sheetSrc, /setSizeId/);
 assert.match(sheetSrc, /setQuantity/);
 assert.match(sheetSrc, /\{cake\.name\}/);
