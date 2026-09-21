@@ -40,6 +40,9 @@ export type CollectionDineInReservation = {
   reservationTime: string;
   venue: "hyphen" | "whitebird";
   guestCount: number;
+  adultCount: number;
+  kidCount: number;
+  toddlerCount: number;
   reservationNote: string | null;
 };
 

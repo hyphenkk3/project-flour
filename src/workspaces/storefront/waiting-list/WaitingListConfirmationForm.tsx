@@ -12,10 +12,10 @@ import {
   FormTextarea,
 } from "@/components/ui/form";
 import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
+import { DineInVenuePartyFields } from "@/components/ui/DineInVenuePartyFields";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
   cakeServingSlotsForReservation,
-  dineInVenueLabel,
   resolveDineInVenueForPair,
   venuesForReservationAndServing,
 } from "@/engines/business-calendar/dine-in-hours";
@@ -115,7 +115,13 @@ export function WaitingListConfirmationForm({
   const [pickupTime, setPickupTime] = useState("");
   const [reservationTime, setReservationTime] = useState("");
   const [dineInVenue, setDineInVenue] = useState("");
-  const [guestCount, setGuestCount] = useState("");
+  const [adultCount, setAdultCount] = useState("");
+  const [kidCount, setKidCount] = useState("");
+  const [toddlerCount, setToddlerCount] = useState("");
+  const [
+    whitebirdSplitSeatingAcknowledged,
+    setWhitebirdSplitSeatingAcknowledged,
+  ] = useState(false);
   const [reservationNote, setReservationNote] = useState("");
   const [sameAsCustomer, setSameAsCustomer] = useState(true);
   const [recipientName, setRecipientName] = useState("");
@@ -274,7 +280,11 @@ export function WaitingListConfirmationForm({
               timeLabel="Dine-in reservation time"
               timeName="reservation_time"
             />
-            <input name="reservation_time" type="hidden" value={reservationTime} />
+            <input
+              name="reservation_time"
+              type="hidden"
+              value={reservationTime}
+            />
             {reservationTime ? (
               <PickupSlotFields
                 closedDates={WAITING_LIST_CONFIRMATION_CLOSED_DATES}
@@ -308,36 +318,31 @@ export function WaitingListConfirmationForm({
               />
             ) : null}
             {pickupDate && reservationTime && pickupTime ? (
-              <FormRadioGroup
-                legend="Where would you like to sit?"
-                name="dine_in_venue"
-                onChange={setDineInVenue}
-                options={venuesForReservationAndServing(
+              <DineInVenuePartyFields
+                onChange={(next) => {
+                  setDineInVenue(next.venue);
+                  setAdultCount(next.adultCount);
+                  setKidCount(next.kidCount);
+                  setToddlerCount(next.toddlerCount);
+                  setWhitebirdSplitSeatingAcknowledged(
+                    next.whitebirdSplitSeatingAcknowledged,
+                  );
+                }}
+                value={{
+                  venue: dineInVenue,
+                  adultCount,
+                  kidCount,
+                  toddlerCount,
+                  whitebirdSplitSeatingAcknowledged,
+                }}
+                venues={venuesForReservationAndServing(
                   pickupDate,
                   reservationTime,
                   pickupTime,
                   hoursSnapshot,
-                ).map((venue) => ({
-                  value: venue,
-                  label: dineInVenueLabel(venue),
-                }))}
-                required
-                value={dineInVenue}
+                )}
               />
             ) : null}
-            <FormField htmlFor="guest_count" label="Number of guests">
-              <FormInput
-                id="guest_count"
-                max={50}
-                min={1}
-                name="guest_count"
-                onChange={(event) => setGuestCount(event.target.value)}
-                required
-                step={1}
-                type="number"
-                value={guestCount}
-              />
-            </FormField>
             <FormField
               help="Optional."
               htmlFor="reservation_note"
@@ -503,7 +508,9 @@ export function WaitingListConfirmationForm({
             <div className="space-y-3">
               <p className="text-ink text-sm font-medium">Paid</p>
               {paidAddonOptions.map((option) => {
-                const selected = selections.paidAddonCodes.includes(option.code);
+                const selected = selections.paidAddonCodes.includes(
+                  option.code,
+                );
                 const messageVisible =
                   option.code === "birthday_card" ||
                   option.code === "wishing_card"
@@ -630,7 +637,10 @@ export function WaitingListConfirmationForm({
         />
       </CheckoutSection>
 
-      <CheckoutSection className="border-fog border-t pt-10" title="Order Notes">
+      <CheckoutSection
+        className="border-fog border-t pt-10"
+        title="Order Notes"
+      >
         <p className="text-ink text-sm font-medium">Optional notes</p>
         <p
           className="text-status-danger text-sm leading-snug font-bold"

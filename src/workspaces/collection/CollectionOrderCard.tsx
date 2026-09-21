@@ -8,6 +8,10 @@ import {
 } from "@/workspaces/owner/orders/labels";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
+import {
+  dineInSplitSeatingStaffLabel,
+  formatDineInPartyComposition,
+} from "@/engines/orders/dine-in-party";
 import { formatLongBusinessDate } from "@/lib/dates";
 import { collectionOrderHref } from "@/workspaces/collection/date";
 import {
@@ -63,7 +67,6 @@ export function CollectionOrderCard({
       : "Pickup";
   const showCompletedMeta = tab === "completed" || tab === "history";
   const reservationTime = order.dineIn?.reservationTime ?? "";
-  const guestCount = order.dineIn?.guestCount;
   const complimentaryItems = order.complimentaryItems ?? [];
   const paidAddons = order.paidAddons ?? [];
   const hasOptions = complimentaryItems.length > 0 || paidAddons.length > 0;
@@ -72,7 +75,7 @@ export function CollectionOrderCard({
     <article
       className={
         dineIn
-          ? "border-skyline/30 rounded-xl border bg-skyline/5 px-3.5 py-2.5"
+          ? "border-skyline/30 bg-skyline/5 rounded-xl border px-3.5 py-2.5"
           : "border-fog rounded-xl border bg-white px-3.5 py-2.5"
       }
     >
@@ -106,9 +109,7 @@ export function CollectionOrderCard({
             <div className="text-skyline mt-1 space-y-0.5 text-xs leading-snug">
               <p>
                 <span className="text-ink font-medium">Reservation:</span>{" "}
-                {reservationTime
-                  ? formatPickupTime(reservationTime)
-                  : "—"}
+                {reservationTime ? formatPickupTime(reservationTime) : "—"}
               </p>
               <p>
                 <span className="text-ink font-medium">Cake serving:</span>{" "}
@@ -117,8 +118,17 @@ export function CollectionOrderCard({
               {order.dineIn ? (
                 <p>
                   {dineInVenueLabel(order.dineIn.venue)}
-                  {guestCount
-                    ? ` · ${guestCount} guest${guestCount === 1 ? "" : "s"}`
+                  {` · ${formatDineInPartyComposition({
+                    adultCount: order.dineIn.adultCount,
+                    kidCount: order.dineIn.kidCount,
+                    toddlerCount: order.dineIn.toddlerCount,
+                    totalGuestCount: order.dineIn.guestCount,
+                  })}`}
+                  {dineInSplitSeatingStaffLabel(
+                    order.dineIn.venue,
+                    order.dineIn.guestCount,
+                  )
+                    ? " · separate tables"
                     : null}
                 </p>
               ) : null}
@@ -151,15 +161,10 @@ export function CollectionOrderCard({
           ) : null}
 
           {hasOptions ? (
-            <div className="mt-2 space-y-1 border-t border-fog pt-2">
+            <div className="border-fog mt-2 space-y-1 border-t pt-2">
               {complimentaryItems.map((item) => (
-                <p
-                  key={item.id}
-                  className="text-skyline text-xs leading-snug"
-                >
-                  <span className="text-ink font-medium">
-                    {item.name}
-                  </span>
+                <p key={item.id} className="text-skyline text-xs leading-snug">
+                  <span className="text-ink font-medium">{item.name}</span>
                   {item.quantity > 1 ? ` × ${item.quantity}` : ""}
                 </p>
               ))}
@@ -198,9 +203,7 @@ export function CollectionOrderCard({
             label={guestOrderStatusLabel(order.status)}
             tone={guestOrderStatusBadgeTone(order.status)}
           />
-          {!secured ? (
-            <StatusBadge label="Not secured" tone="warning" />
-          ) : null}
+          {!secured ? <StatusBadge label="Not secured" tone="warning" /> : null}
           {paymentAttention && tab === "ready" ? (
             <StatusBadge label="Payment Attention" tone="danger" />
           ) : null}

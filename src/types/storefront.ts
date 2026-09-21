@@ -55,6 +55,10 @@ export type StorefrontOrderDineInReservation = {
   reservationTime: string;
   venue: StorefrontDineInVenue;
   guestCount: number;
+  adultCount: number;
+  kidCount: number;
+  toddlerCount: number;
+  whitebirdSplitSeatingAcknowledged: boolean;
   reservationNote: string | null;
   status: string;
 };

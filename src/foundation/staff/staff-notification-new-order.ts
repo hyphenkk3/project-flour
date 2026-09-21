@@ -1,5 +1,9 @@
 import { formatShortBusinessDate } from "@/lib/dates";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
+import {
+  dineInSplitSeatingStaffLabel,
+  formatDineInPartyComposition,
+} from "@/engines/orders/dine-in-party";
 
 export type NewOrderNotificationItem = {
   cakeName: string;
@@ -29,6 +33,9 @@ export type NewOrderNotificationDelivery = {
 export type NewOrderNotificationDineIn = {
   venue: string | null;
   guestCount: number | null;
+  adultCount?: number | null;
+  kidCount?: number | null;
+  toddlerCount?: number | null;
   reservationTime: string | null;
 };
 
@@ -48,7 +55,9 @@ export type NewOrderNotificationSummary = {
   dineIn: NewOrderNotificationDineIn | null;
 };
 
-export function fulfilmentLabelForMethod(method: string | null | undefined): string {
+export function fulfilmentLabelForMethod(
+  method: string | null | undefined,
+): string {
   switch (method) {
     case "dine_in":
       return "Dine-in";
@@ -191,6 +200,9 @@ function parseDineIn(value: unknown): NewOrderNotificationDineIn | null {
   return {
     venue: asTrimmedString(record.venue),
     guestCount: asFiniteNumber(record.guestCount),
+    adultCount: asFiniteNumber(record.adultCount),
+    kidCount: asFiniteNumber(record.kidCount),
+    toddlerCount: asFiniteNumber(record.toddlerCount),
     reservationTime: asTrimmedString(record.reservationTime),
   };
 }
@@ -271,6 +283,32 @@ export function newOrderEmailSections(
         label: "Guests",
         value: String(summary.dineIn.guestCount),
       });
+    }
+    if (
+      summary.dineIn.adultCount != null &&
+      summary.dineIn.kidCount != null &&
+      summary.dineIn.toddlerCount != null &&
+      summary.dineIn.guestCount != null
+    ) {
+      sections.push({
+        label: "Party",
+        value: formatDineInPartyComposition({
+          adultCount: summary.dineIn.adultCount,
+          kidCount: summary.dineIn.kidCount,
+          toddlerCount: summary.dineIn.toddlerCount,
+          totalGuestCount: summary.dineIn.guestCount,
+        }),
+      });
+    }
+    const split =
+      summary.dineIn.venue && summary.dineIn.guestCount != null
+        ? dineInSplitSeatingStaffLabel(
+            summary.dineIn.venue,
+            summary.dineIn.guestCount,
+          )
+        : null;
+    if (split) {
+      sections.push({ label: "Seating", value: split });
     }
   }
   if (summary.fulfilmentMethod === "delivery" && summary.delivery) {

@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/form";
 import { OPTIONAL_NOTES_CUSTOMER_WARNING } from "@/engines/orders/order-guide";
 import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
+import { DineInVenuePartyFields } from "@/components/ui/DineInVenuePartyFields";
+import { derivedGuestCountDraft } from "@/engines/orders/dine-in-party";
 import {
   ORDERS_CLOSED_CUSTOMER_LABEL,
   ORDERS_CLOSED_RPC_MESSAGE,
@@ -23,7 +25,6 @@ import {
 import { getDeliverySlotsForDate } from "@/engines/business-calendar/delivery-hours";
 import {
   cakeServingSlotsForReservation,
-  dineInVenueLabel,
   getDineInSlotsForDate,
   resolveDineInVenueForPair,
   venuesForReservationAndServing,
@@ -112,9 +113,7 @@ import {
   submitGuestPreorderAction,
   type CheckoutState,
 } from "@/workspaces/storefront/checkout/actions";
-import {
-  clampCustomerPickupWindow,
-} from "@/engines/menu/customer-browse";
+import { clampCustomerPickupWindow } from "@/engines/menu/customer-browse";
 import {
   emptyPreorderFields,
   fieldsAfterFulfilmentChange,
@@ -219,9 +218,7 @@ function toPreorderLines(
       cakeName: item.cakeName,
       sizeLabel: item.sizeLabel,
       quantity: item.quantity,
-      preorderDays: readPreorderDays(
-        size?.preorderDays ?? item.preorderDays,
-      ),
+      preorderDays: readPreorderDays(size?.preorderDays ?? item.preorderDays),
     };
   });
 }
@@ -329,9 +326,8 @@ export function GuestCheckoutForm({
   const [closedDates, setClosedDates] = useState<readonly string[]>([]);
   const [entrySpecialUnavailableDates, setEntrySpecialUnavailableDates] =
     useState<readonly string[]>([]);
-  const [hoursSnapshot, setHoursSnapshot] = useState<OperatingHoursSnapshot>(
-    OPERATING_HOURS_SEED,
-  );
+  const [hoursSnapshot, setHoursSnapshot] =
+    useState<OperatingHoursSnapshot>(OPERATING_HOURS_SEED);
   const [liveMinPickupDate, setLiveMinPickupDate] = useState<string | null>(
     null,
   );
@@ -360,43 +356,36 @@ export function GuestCheckoutForm({
   const [waitingListAvailabilityOpen, setWaitingListAvailabilityOpen] =
     useState(false);
 
-  const effectivePickupBounds = useMemo(
-    () => {
-      const pickerMin = pickerMinForCart(
-        items,
-        cakes,
-        fields.pickupDate,
-      );
-      const combined = combinePickupBounds(
-        (liveMinPickupDate ?? minPickupDate)?.trim().slice(0, 10) ||
-          emptyCartEarliestCollectionDate(),
-        (liveMaxPickupDate ?? maxPickupDate)?.trim().slice(0, 10) ?? null,
-        cartPickupBounds,
-        liveScopeConstrainsBounds ?? pickupScopeConstrainsBounds,
-        pickupScopeFrom?.trim().slice(0, 10) ?? null,
-        pickupScopeTo?.trim().slice(0, 10) ?? null,
+  const effectivePickupBounds = useMemo(() => {
+    const pickerMin = pickerMinForCart(items, cakes, fields.pickupDate);
+    const combined = combinePickupBounds(
+      (liveMinPickupDate ?? minPickupDate)?.trim().slice(0, 10) ||
         emptyCartEarliestCollectionDate(),
-      );
-      return {
-        min: pickerMin,
-        max: combined.max,
-      };
-    },
-    [
+      (liveMaxPickupDate ?? maxPickupDate)?.trim().slice(0, 10) ?? null,
       cartPickupBounds,
-      cakes,
-      fields.pickupDate,
-      items,
-      liveMaxPickupDate,
-      liveMinPickupDate,
-      liveScopeConstrainsBounds,
-      maxPickupDate,
-      minPickupDate,
-      pickupScopeConstrainsBounds,
-      pickupScopeFrom,
-      pickupScopeTo,
-    ],
-  );
+      liveScopeConstrainsBounds ?? pickupScopeConstrainsBounds,
+      pickupScopeFrom?.trim().slice(0, 10) ?? null,
+      pickupScopeTo?.trim().slice(0, 10) ?? null,
+      emptyCartEarliestCollectionDate(),
+    );
+    return {
+      min: pickerMin,
+      max: combined.max,
+    };
+  }, [
+    cartPickupBounds,
+    cakes,
+    fields.pickupDate,
+    items,
+    liveMaxPickupDate,
+    liveMinPickupDate,
+    liveScopeConstrainsBounds,
+    maxPickupDate,
+    minPickupDate,
+    pickupScopeConstrainsBounds,
+    pickupScopeFrom,
+    pickupScopeTo,
+  ]);
 
   const effectiveExcludedDates = useMemo(() => {
     const scopeConstrains =
@@ -449,7 +438,11 @@ export function GuestCheckoutForm({
   ]);
   useEffect(() => {
     const selectedYmd = fields.pickupDate.trim().slice(0, 10);
-    if (!hydrated || !calendarReady || !/^\d{4}-\d{2}-\d{2}$/.test(selectedYmd)) {
+    if (
+      !hydrated ||
+      !calendarReady ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(selectedYmd)
+    ) {
       return;
     }
     if (!isPickupOrdersClosed(selectedYmd, closedDates)) {
@@ -473,13 +466,7 @@ export function GuestCheckoutForm({
     return () => {
       cancelled = true;
     };
-  }, [
-    calendarReady,
-    closedDates,
-    collectionId,
-    fields.pickupDate,
-    hydrated,
-  ]);
+  }, [calendarReady, closedDates, collectionId, fields.pickupDate, hydrated]);
   const emptyCapacity = {
     fullyBookedDates: [] as string[],
     waitingListDates: [] as string[],
@@ -555,7 +542,10 @@ export function GuestCheckoutForm({
       : hasEntryScope
         ? ""
         : (draft?.pickupDate ?? "");
-    if (draftItems.length > 0 && /^\d{4}-\d{2}-\d{2}$/.test(draft?.pickupDate ?? "")) {
+    if (
+      draftItems.length > 0 &&
+      /^\d{4}-\d{2}-\d{2}$/.test(draft?.pickupDate ?? "")
+    ) {
       pickupDate = String(draft?.pickupDate);
     }
     if (max && pickupDate > max && draftItems.length === 0) {
@@ -597,7 +587,12 @@ export function GuestCheckoutForm({
         draft?.fulfilmentMethod,
       ),
       dineInVenue: draft?.dineInVenue ?? "",
+      adultCount: draft?.adultCount ?? "",
+      kidCount: draft?.kidCount ?? "",
+      toddlerCount: draft?.toddlerCount ?? "",
       guestCount: draft?.guestCount ?? "",
+      whitebirdSplitSeatingAcknowledged:
+        draft?.whitebirdSplitSeatingAcknowledged ?? false,
       reservationNote: draft?.reservationNote ?? "",
       recipientName: draft?.recipientName ?? "",
       recipientPhone: draft?.recipientPhone ?? "",
@@ -806,7 +801,9 @@ export function GuestCheckoutForm({
       pickupMembershipsPending ||
       (cakesAllowedForDate &&
         checkoutDraftItemsInCatalogue(items, cakes, liveOfferPending));
-    const selectedCapacity = activeCartCapacity.fullyBookedDates.includes(selectedYmd)
+    const selectedCapacity = activeCartCapacity.fullyBookedDates.includes(
+      selectedYmd,
+    )
       ? {
           fullyBooked: true as const,
           waitingListEnabled: waitingListPickerDates.includes(selectedYmd),
@@ -861,10 +858,10 @@ export function GuestCheckoutForm({
   ]);
   const selectedDateInvalidated = Boolean(
     collectionDateEvaluation &&
-      !collectionDateEvaluation.valid &&
-      items.length > 0 &&
-      (collectionDateEvaluation.reason.code === "fully_booked" ||
-        collectionDateEvaluation.reason.code === "before_preorder"),
+    !collectionDateEvaluation.valid &&
+    items.length > 0 &&
+    (collectionDateEvaluation.reason.code === "fully_booked" ||
+      collectionDateEvaluation.reason.code === "before_preorder"),
   );
   const collectionDateMessageRaw = collectionDateEvaluation
     ? customerCollectionDateMessage(collectionDateEvaluation, preorderLines)
@@ -1102,8 +1099,8 @@ export function GuestCheckoutForm({
     waitingListLines.length > 0;
   const ordersClosedSelected = Boolean(
     calendarReady &&
-      fields.pickupDate &&
-      isPickupOrdersClosed(fields.pickupDate, closedDates),
+    fields.pickupDate &&
+    isPickupOrdersClosed(fields.pickupDate, closedDates),
   );
   const closedWaitingListForDate =
     closedWaitingList?.pickupDate === fields.pickupDate
@@ -1120,15 +1117,14 @@ export function GuestCheckoutForm({
     ? formatCheckoutCakeDate(fields.pickupDate)
     : null;
   const earliestYmd =
-    collectionDateEvaluation?.earliestYmd ??
-    draftEarliestCollectionYmd(items);
+    collectionDateEvaluation?.earliestYmd ?? draftEarliestCollectionYmd(items);
   const earliestLabel = earliestYmd
     ? formatCheckoutCakeDate(earliestYmd)
     : null;
   const preorderLabel = draftStrongestPreorder(items).label;
   const collectionDateInvalid = Boolean(
     (collectionDateEvaluation && !collectionDateEvaluation.valid) ||
-      pickupCompatibility?.dateLevelMessage,
+    pickupCompatibility?.dateLevelMessage,
   );
   const submitBlocked =
     calendarPending ||
@@ -1148,711 +1144,746 @@ export function GuestCheckoutForm({
 
   return (
     <div className="flex flex-col gap-10">
-    <form
-      action={handleSubmit}
-      className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_20.5rem] lg:items-start lg:gap-x-16 lg:gap-y-0"
-    >
-      <input name="items_json" type="hidden" value={itemsJson} />
-      <input name="preorder_options_json" type="hidden" value={optionsJson} />
-      <input
-        name="preorder_options_ready"
-        type="hidden"
-        value={optionsReady ? "1" : "0"}
-      />
-
-      <div className="order-2 flex min-w-0 flex-col gap-12 lg:order-1">
-      <CheckoutSection title="Collection Date">
-        <p className="font-display text-ink text-4xl tracking-tight sm:text-[2.75rem]">
-          {pickupDateLabel ?? "Select a date"}
-        </p>
-        {earliestLabel ? (
-          <p className="text-skyline mt-3 text-sm leading-relaxed">
-            Earliest collection {earliestLabel}
-            {preorderLabel ? ` · ${preorderLabel}` : ""}
-          </p>
-        ) : preorderLabel ? (
-          <p className="text-skyline mt-3 text-sm leading-relaxed">
-            {preorderLabel}
-          </p>
-        ) : null}
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
-            Selected date
-          </p>
-          <button
-            className="text-signal text-sm font-medium disabled:opacity-40"
-            disabled={calendarPending}
-            onClick={() => setChangingDate((open) => !open)}
-            type="button"
-          >
-            {changingDate ? "Done" : "Change date"}
-          </button>
-        </div>
-        {calendarPending ? (
-          <p className="text-skyline mt-3 text-sm leading-relaxed">
-            Confirming collection dates…
-          </p>
-        ) : changingDate ? (
-          <div className="mt-3 max-w-sm">
-            <PickupSlotFields
-              closedDates={closedDates}
-              dateLabel="Date"
-              defaultDate={fields.pickupDate}
-              defaultTime={fields.pickupTime}
-              excludedDateMessage="This date is reserved for the Special Menu."
-              excludedDates={effectiveExcludedDates}
-              includeFieldNames={false}
-              key="checkout-cake-date"
-              maxDate={effectivePickupBounds.max ?? undefined}
-              minDate={effectivePickupBounds.min}
-              onDateChange={changeDate}
-              rejectExcludedDates={rejectExcludedDates}
-              unavailableDateMessageFor={(ymd) =>
-                customerFullyBookedDateMessage({
-                  selectedYmd: ymd,
-                  blockingCakeNames:
-                    activeCartCapacity.blockingCakeNamesByDate[ymd] ?? [],
-                })
-              }
-              unavailableDates={fullyBookedWithoutWaitingList}
-              showTime={false}
-            />
-          </div>
-        ) : null}
-        {pickupMembershipsPending && !calendarPending ? (
-          <p className="text-skyline mt-3 text-sm leading-relaxed">
-            Confirming cake availability for this order…
-          </p>
-        ) : null}
-        {calendarError ? (
-          <p className="text-status-danger mt-4 text-sm leading-relaxed" role="status">
-            {calendarError}
-          </p>
-        ) : null}
-        {unavailableMessage ? (
-          <div className="mt-4" role="status">
-            <p className="text-ink text-sm leading-relaxed">
-              {unavailableMessage}
-            </p>
-            <p className="text-skyline mt-2 text-sm leading-relaxed">
-              Please choose a date in a published catalogue.
-            </p>
-          </div>
-        ) : null}
-        {upcomingClosed.length > 0 ? (
-          <p className="text-skyline mt-4 text-sm leading-relaxed">
-            {upcomingClosed.length === 1
-              ? `${formatShortBusinessDate(upcomingClosed[0] ?? "")} — ${ORDERS_CLOSED_CUSTOMER_LABEL}.`
-              : `Pickup dates with ${ORDERS_CLOSED_CUSTOMER_LABEL.toLowerCase()}: ${upcomingClosed
-                  .map((date) => formatShortBusinessDate(date))
-                  .join(", ")}.`}
-          </p>
-        ) : null}
-        {ordersClosedSelected ? (
-          <div className="mt-4 space-y-2" role="status">
-            <p className="text-ink text-sm font-medium">
-              {`Orders closed for ${formatShortBusinessDate(fields.pickupDate)}`}
-            </p>
-            <p className="text-skyline text-sm leading-relaxed">
-              {WAITING_LIST_CLOSED_REGULAR_ORDERS}
-            </p>
-            {closedWaitingListPending ? (
-              <p className="text-skyline text-sm leading-relaxed">
-                Checking waiting list…
-              </p>
-            ) : showClosedWaitingListCta ? (
-              <>
-                <p className="text-ink text-sm font-medium">
-                  {WAITING_LIST_AVAILABLE_LABEL}
-                </p>
-                <p className="text-skyline text-sm leading-relaxed">
-                  {WAITING_LIST_SEE_AVAILABLE_HELP}
-                </p>
-                <button
-                  className="border-ink text-ink mt-1 inline-flex min-h-11 items-center justify-center border px-4 text-sm font-medium"
-                  onClick={() => setWaitingListAvailabilityOpen(true)}
-                  type="button"
-                >
-                  {WAITING_LIST_SEE_AVAILABLE_CTA}
-                </button>
-              </>
-            ) : (
-              <p className="text-skyline text-sm leading-relaxed">
-                {WAITING_LIST_CLOSED_NONE}
-              </p>
-            )}
-          </div>
-        ) : dateValidationMessage ? (
-          <div className="mt-4">
-            <FormError message={dateValidationMessage} />
-          </div>
-        ) : null}
-        {showJoinWaitingList ? (
-          <p className="text-ink mt-4 text-sm leading-relaxed">
-            Join Waiting List is below. This is a waiting-list request, not a
-            confirmed order.
-          </p>
-        ) : null}
-      </CheckoutSection>
-
-      <CheckoutSection
-        className="border-fog border-t pt-10"
-        description={customerFulfilmentHoursNotice(hoursSnapshot)}
-        title="Fulfilment"
+      <form
+        action={handleSubmit}
+        className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_20.5rem] lg:items-start lg:gap-x-16 lg:gap-y-0"
       >
-        {calendarPending ? (
-          <p className="text-skyline text-sm leading-relaxed">
-            Confirming opening hours…
-          </p>
-        ) : (
-        <>
-        <FulfilmentMethodChooser
-          closedDates={closedDates}
-          dateYmd={fields.pickupDate}
-          hoursSnapshot={hoursSnapshot}
-          onChange={changeFulfilment}
-          value={fields.fulfilmentMethod}
+        <input name="items_json" type="hidden" value={itemsJson} />
+        <input name="preorder_options_json" type="hidden" value={optionsJson} />
+        <input
+          name="preorder_options_ready"
+          type="hidden"
+          value={optionsReady ? "1" : "0"}
         />
-        {fields.fulfilmentMethod === "dine_in" ? (
-          <>
-            <p className="text-ink text-sm leading-relaxed">
-              {DINE_IN_RESERVATION_INCLUDED_NOTICE}
+
+        <div className="order-2 flex min-w-0 flex-col gap-12 lg:order-1">
+          <CheckoutSection title="Collection Date">
+            <p className="font-display text-ink text-4xl tracking-tight sm:text-[2.75rem]">
+              {pickupDateLabel ?? "Select a date"}
             </p>
-            <PickupSlotFields
-              closedDates={closedDates}
-              dateLabel="Dine-in date"
-              defaultDate={fields.pickupDate}
-              defaultTime={fields.reservationTime}
-              excludedDates={effectiveExcludedDates}
-              key="checkout-dine-in-reservation"
-              maxDate={effectivePickupBounds.max ?? undefined}
-              minDate={effectivePickupBounds.min}
-              onDateChange={changeDate}
-              rejectExcludedDates={rejectExcludedDates}
-              unavailableDateMessageFor={(ymd) =>
-                customerFullyBookedDateMessage({
-                  selectedYmd: ymd,
-                  blockingCakeNames:
-                    activeCartCapacity.blockingCakeNamesByDate[ymd] ?? [],
-                })
-              }
-              unavailableDates={fullyBookedWithoutWaitingList}
-              onTimeChange={(reservationTime) => {
-                const servingOptions = cakeServingSlotsForReservation(
-                  fields.pickupDate,
-                  reservationTime,
-                  hoursSnapshot,
-                );
-                const nextServing = servingOptions.some(
-                  (slot) => slot.value === fields.pickupTime,
-                )
-                  ? fields.pickupTime
-                  : "";
-                patchFields({
-                  reservationTime,
-                  pickupTime: nextServing,
-                  dineInVenue: nextServing
-                    ? resolveDineInVenueForPair(
-                        fields.pickupDate,
-                        reservationTime,
-                        nextServing,
-                        fields.dineInVenue,
-                        hoursSnapshot,
-                      )
-                    : "",
-                });
-              }}
-              slotsForDate={(date, closed) =>
-                dineInCheckoutSlots(date, closed, hoursSnapshot)
-              }
-              timeHelp="Choose when you would like your table reservation to start."
-              timeId="reservation_time"
-              timeLabel="Dine-in reservation time"
-              timeName="reservation_time"
-            />
-            {fields.reservationTime ? (
-              <PickupSlotFields
-                closedDates={closedDates}
-                defaultDate={fields.pickupDate}
-                defaultTime={fields.pickupTime}
-                includeFieldNames
-                key={`checkout-dine-in-serving-${fields.reservationTime}`}
-                onTimeChange={(pickupTime) =>
-                  patchFields({
-                    pickupTime,
-                    dineInVenue: resolveDineInVenueForPair(
-                      fields.pickupDate,
-                      fields.reservationTime,
-                      pickupTime,
-                      fields.dineInVenue,
-                      hoursSnapshot,
-                    ),
-                  })
-                }
-                showDate={false}
-                slotsForDate={(date, closed) =>
-                  isPickupOrdersClosed(date, closed)
-                    ? []
-                    : cakeServingSlotsForReservation(
-                        date,
-                        fields.reservationTime,
-                        hoursSnapshot,
-                      )
-                }
-                timeHelp="Choose when you would like your cake served. Cake serving time must be within 1 hour of your reservation time."
-                timeLabel="Cake serving time"
-              />
+            {earliestLabel ? (
+              <p className="text-skyline mt-3 text-sm leading-relaxed">
+                Earliest collection {earliestLabel}
+                {preorderLabel ? ` · ${preorderLabel}` : ""}
+              </p>
+            ) : preorderLabel ? (
+              <p className="text-skyline mt-3 text-sm leading-relaxed">
+                {preorderLabel}
+              </p>
             ) : null}
-            <div className="space-y-3">
-              {fields.pickupDate &&
-              fields.reservationTime &&
-              fields.pickupTime ? (
-                <FormRadioGroup
-                  legend="Where would you like to sit?"
-                  name="dine_in_venue"
-                  onChange={(value) => patchFields({ dineInVenue: value })}
-                  options={venuesForReservationAndServing(
-                    fields.pickupDate,
-                    fields.reservationTime,
-                    fields.pickupTime,
-                    hoursSnapshot,
-                  ).map((venue) => ({
-                    value: venue,
-                    label: dineInVenueLabel(venue),
-                  }))}
-                  required
-                  value={fields.dineInVenue}
-                />
-              ) : null}
-              <FormField htmlFor="guest_count" label="Number of guests">
-                <FormInput
-                  id="guest_count"
-                  max={50}
-                  min={1}
-                  name="guest_count"
-                  onChange={(event) =>
-                    patchFields({ guestCount: event.target.value })
-                  }
-                  required
-                  step={1}
-                  type="number"
-                  value={fields.guestCount}
-                />
-              </FormField>
-              <FormField
-                help="Optional."
-                htmlFor="reservation_note"
-                label="Reservation note"
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
+                Selected date
+              </p>
+              <button
+                className="text-signal text-sm font-medium disabled:opacity-40"
+                disabled={calendarPending}
+                onClick={() => setChangingDate((open) => !open)}
+                type="button"
               >
-                <FormTextarea
-                  id="reservation_note"
-                  name="reservation_note"
-                  onChange={(event) =>
-                    patchFields({ reservationNote: event.target.value })
-                  }
-                  rows={3}
-                  value={fields.reservationNote}
-                />
-              </FormField>
+                {changingDate ? "Done" : "Change date"}
+              </button>
             </div>
-          </>
-        ) : (
-          <PickupSlotFields
-            closedDates={closedDates}
-            dateLabel={workspaceScheduleDateLabel(fields.fulfilmentMethod)}
-            defaultDate={fields.pickupDate}
-            defaultTime={fields.pickupTime}
-            excludedDates={effectiveExcludedDates}
-            key={`checkout-${fields.fulfilmentMethod}-schedule`}
-            maxDate={effectivePickupBounds.max ?? undefined}
-            minDate={effectivePickupBounds.min}
-            onDateChange={changeDate}
-            onTimeChange={(pickupTime) => patchFields({ pickupTime })}
-            rejectExcludedDates={rejectExcludedDates}
-            unavailableDateMessageFor={(ymd) =>
-              customerFullyBookedDateMessage({
-                selectedYmd: ymd,
-                blockingCakeNames:
-                  activeCartCapacity.blockingCakeNamesByDate[ymd] ?? [],
-              })
-            }
-            unavailableDates={fullyBookedWithoutWaitingList}
-            slotsForDate={
-              fields.fulfilmentMethod === "delivery"
-                ? (date, closed) =>
-                    deliveryCheckoutSlots(date, closed, hoursSnapshot)
-                : (date, closed) =>
-                    customerPickupSlotsForDate(date, closed, hoursSnapshot)
-            }
-            timeLabel={workspaceScheduleTimeLabel(fields.fulfilmentMethod)}
-          />
-        )}
-        {fields.fulfilmentMethod === "delivery" ? (
-          <div className="space-y-3">
-            <FormCheckbox
-              checked={fields.sameAsCustomer}
-              label="Recipient is the same as the ordering customer"
-              name="same_as_customer"
-              onChange={(event) => {
-                const sameAsCustomer = event.target.checked;
-                patchFields({
-                  sameAsCustomer,
-                  recipientName: sameAsCustomer ? fields.customerName : "",
-                  recipientPhone: sameAsCustomer ? fields.phone : "",
-                  recipientNotifyPreference: sameAsCustomer
-                    ? ""
-                    : fields.recipientNotifyPreference,
-                });
-              }}
-            />
-            {!fields.sameAsCustomer ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <FormField htmlFor="recipient_name" label="Recipient name">
-                  <FormInput
-                    id="recipient_name"
-                    name="recipient_name"
-                    onChange={(event) =>
-                      patchFields({ recipientName: event.target.value })
-                    }
-                    required
-                    value={fields.recipientName}
-                  />
-                </FormField>
-                <FormField htmlFor="recipient_phone" label="Recipient phone">
-                  <FormInput
-                    id="recipient_phone"
-                    name="recipient_phone"
-                    onChange={(event) =>
-                      patchFields({ recipientPhone: event.target.value })
-                    }
-                    required
-                    type="tel"
-                    value={fields.recipientPhone}
-                  />
-                </FormField>
+            {calendarPending ? (
+              <p className="text-skyline mt-3 text-sm leading-relaxed">
+                Confirming collection dates…
+              </p>
+            ) : changingDate ? (
+              <div className="mt-3 max-w-sm">
+                <PickupSlotFields
+                  closedDates={closedDates}
+                  dateLabel="Date"
+                  defaultDate={fields.pickupDate}
+                  defaultTime={fields.pickupTime}
+                  excludedDateMessage="This date is reserved for the Special Menu."
+                  excludedDates={effectiveExcludedDates}
+                  includeFieldNames={false}
+                  key="checkout-cake-date"
+                  maxDate={effectivePickupBounds.max ?? undefined}
+                  minDate={effectivePickupBounds.min}
+                  onDateChange={changeDate}
+                  rejectExcludedDates={rejectExcludedDates}
+                  unavailableDateMessageFor={(ymd) =>
+                    customerFullyBookedDateMessage({
+                      selectedYmd: ymd,
+                      blockingCakeNames:
+                        activeCartCapacity.blockingCakeNamesByDate[ymd] ?? [],
+                    })
+                  }
+                  unavailableDates={fullyBookedWithoutWaitingList}
+                  showTime={false}
+                />
               </div>
             ) : null}
-            <FormField htmlFor="address_line_1" label="Address line 1">
-              <FormInput
-                id="address_line_1"
-                name="address_line_1"
-                onChange={(event) =>
-                  patchFields({ addressLine1: event.target.value })
-                }
-                required
-                value={fields.addressLine1}
-              />
-            </FormField>
-            <FormField htmlFor="address_line_2" label="Address line 2">
-              <FormInput
-                id="address_line_2"
-                name="address_line_2"
-                onChange={(event) =>
-                  patchFields({ addressLine2: event.target.value })
-                }
-                value={fields.addressLine2}
-              />
-            </FormField>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <FormField htmlFor="postcode" label="Postcode">
-                <FormInput
-                  id="postcode"
-                  name="postcode"
-                  onChange={(event) =>
-                    patchFields({ postcode: event.target.value })
-                  }
-                  required
-                  value={fields.postcode}
-                />
-              </FormField>
-              <FormField htmlFor="city" label="City">
-                <FormInput
-                  id="city"
-                  name="city"
-                  onChange={(event) =>
-                    patchFields({ city: event.target.value })
-                  }
-                  required
-                  value={fields.city}
-                />
-              </FormField>
-              <FormField htmlFor="state" label="State">
-                <FormInput
-                  id="state"
-                  name="state"
-                  onChange={(event) =>
-                    patchFields({ state: event.target.value })
-                  }
-                  required
-                  value={fields.state}
-                />
-              </FormField>
-            </div>
-            {!fields.sameAsCustomer ? (
-              <FormRadioGroup
-                legend="Should we inform the recipient?"
-                name="recipient_notify_preference"
-                onChange={(value) =>
-                  patchFields({ recipientNotifyPreference: value })
-                }
-                options={[...RECIPIENT_NOTIFY_OPTIONS]}
-                required
-                value={fields.recipientNotifyPreference}
-              />
+            {pickupMembershipsPending && !calendarPending ? (
+              <p className="text-skyline mt-3 text-sm leading-relaxed">
+                Confirming cake availability for this order…
+              </p>
             ) : null}
-          </div>
-        ) : null}
-        </>
-        )}
-      </CheckoutSection>
+            {calendarError ? (
+              <p
+                className="text-status-danger mt-4 text-sm leading-relaxed"
+                role="status"
+              >
+                {calendarError}
+              </p>
+            ) : null}
+            {unavailableMessage ? (
+              <div className="mt-4" role="status">
+                <p className="text-ink text-sm leading-relaxed">
+                  {unavailableMessage}
+                </p>
+                <p className="text-skyline mt-2 text-sm leading-relaxed">
+                  Please choose a date in a published catalogue.
+                </p>
+              </div>
+            ) : null}
+            {upcomingClosed.length > 0 ? (
+              <p className="text-skyline mt-4 text-sm leading-relaxed">
+                {upcomingClosed.length === 1
+                  ? `${formatShortBusinessDate(upcomingClosed[0] ?? "")} — ${ORDERS_CLOSED_CUSTOMER_LABEL}.`
+                  : `Pickup dates with ${ORDERS_CLOSED_CUSTOMER_LABEL.toLowerCase()}: ${upcomingClosed
+                      .map((date) => formatShortBusinessDate(date))
+                      .join(", ")}.`}
+              </p>
+            ) : null}
+            {ordersClosedSelected ? (
+              <div className="mt-4 space-y-2" role="status">
+                <p className="text-ink text-sm font-medium">
+                  {`Orders closed for ${formatShortBusinessDate(fields.pickupDate)}`}
+                </p>
+                <p className="text-skyline text-sm leading-relaxed">
+                  {WAITING_LIST_CLOSED_REGULAR_ORDERS}
+                </p>
+                {closedWaitingListPending ? (
+                  <p className="text-skyline text-sm leading-relaxed">
+                    Checking waiting list…
+                  </p>
+                ) : showClosedWaitingListCta ? (
+                  <>
+                    <p className="text-ink text-sm font-medium">
+                      {WAITING_LIST_AVAILABLE_LABEL}
+                    </p>
+                    <p className="text-skyline text-sm leading-relaxed">
+                      {WAITING_LIST_SEE_AVAILABLE_HELP}
+                    </p>
+                    <button
+                      className="border-ink text-ink mt-1 inline-flex min-h-11 items-center justify-center border px-4 text-sm font-medium"
+                      onClick={() => setWaitingListAvailabilityOpen(true)}
+                      type="button"
+                    >
+                      {WAITING_LIST_SEE_AVAILABLE_CTA}
+                    </button>
+                  </>
+                ) : (
+                  <p className="text-skyline text-sm leading-relaxed">
+                    {WAITING_LIST_CLOSED_NONE}
+                  </p>
+                )}
+              </div>
+            ) : dateValidationMessage ? (
+              <div className="mt-4">
+                <FormError message={dateValidationMessage} />
+              </div>
+            ) : null}
+            {showJoinWaitingList ? (
+              <p className="text-ink mt-4 text-sm leading-relaxed">
+                Join Waiting List is below. This is a waiting-list request, not
+                a confirmed order.
+              </p>
+            ) : null}
+          </CheckoutSection>
 
-      {optionsReady &&
-      (complimentaryOptions.length > 0 || paidAddonOptions.length > 0) ? (
-        <CheckoutSection className="border-fog border-t pt-10" title="Options">
-          {complimentaryOptions.length > 0 ? (
-            <div className="space-y-2">
-              <p className="text-ink text-sm font-medium">Complimentary</p>
-              {complimentaryOptions.map((option) => (
-                <FormCheckbox
-                  checked={fields.complimentaryCodes.includes(option.code)}
-                  key={option.code}
-                  label={formatCustomerPreorderOptionLabel(option.name, 0)}
-                  onChange={(event) =>
-                    toggleComplimentary(option.code, event.target.checked)
-                  }
+          <CheckoutSection
+            className="border-fog border-t pt-10"
+            description={customerFulfilmentHoursNotice(hoursSnapshot)}
+            title="Fulfilment"
+          >
+            {calendarPending ? (
+              <p className="text-skyline text-sm leading-relaxed">
+                Confirming opening hours…
+              </p>
+            ) : (
+              <>
+                <FulfilmentMethodChooser
+                  closedDates={closedDates}
+                  dateYmd={fields.pickupDate}
+                  hoursSnapshot={hoursSnapshot}
+                  onChange={changeFulfilment}
+                  value={fields.fulfilmentMethod}
                 />
-              ))}
-            </div>
-          ) : null}
-          {paidAddonOptions.length > 0 ? (
-            <div className="space-y-3">
-              <p className="text-ink text-sm font-medium">Paid</p>
-              {paidAddonOptions.map((option) => {
-                const selected = fields.paidAddonCodes.includes(option.code);
-                const messageVisible =
-                  option.code === "birthday_card" ||
-                  option.code === "wishing_card"
-                    ? customerPaidAddonMessageVisible(
-                        option.code,
-                        fields.paidAddonCodes,
-                      )
-                    : false;
-                const messageRequired =
-                  option.code === "birthday_card" ||
-                  option.code === "wishing_card"
-                    ? customerPaidAddonMessageRequired(
-                        option.code,
-                        fields.paidAddonCodes,
-                      )
-                    : false;
-                const messageValue =
-                  option.code === "birthday_card"
-                    ? fields.birthdayCardMessage
-                    : option.code === "wishing_card"
-                      ? fields.wishingCardMessage
-                      : "";
-                return (
-                  <div className="space-y-2" key={option.code}>
-                    <FormCheckbox
-                      checked={selected}
-                      label={formatCustomerPreorderOptionLabel(
-                        option.name,
-                        option.unitPrice,
-                      )}
-                      onChange={(event) =>
-                        togglePaidAddon(option.code, event.target.checked)
+                {fields.fulfilmentMethod === "dine_in" ? (
+                  <>
+                    <p className="text-ink text-sm leading-relaxed">
+                      {DINE_IN_RESERVATION_INCLUDED_NOTICE}
+                    </p>
+                    <PickupSlotFields
+                      closedDates={closedDates}
+                      dateLabel="Dine-in date"
+                      defaultDate={fields.pickupDate}
+                      defaultTime={fields.reservationTime}
+                      excludedDates={effectiveExcludedDates}
+                      key="checkout-dine-in-reservation"
+                      maxDate={effectivePickupBounds.max ?? undefined}
+                      minDate={effectivePickupBounds.min}
+                      onDateChange={changeDate}
+                      rejectExcludedDates={rejectExcludedDates}
+                      unavailableDateMessageFor={(ymd) =>
+                        customerFullyBookedDateMessage({
+                          selectedYmd: ymd,
+                          blockingCakeNames:
+                            activeCartCapacity.blockingCakeNamesByDate[ymd] ??
+                            [],
+                        })
                       }
+                      unavailableDates={fullyBookedWithoutWaitingList}
+                      onTimeChange={(reservationTime) => {
+                        const servingOptions = cakeServingSlotsForReservation(
+                          fields.pickupDate,
+                          reservationTime,
+                          hoursSnapshot,
+                        );
+                        const nextServing = servingOptions.some(
+                          (slot) => slot.value === fields.pickupTime,
+                        )
+                          ? fields.pickupTime
+                          : "";
+                        patchFields({
+                          reservationTime,
+                          pickupTime: nextServing,
+                          dineInVenue: nextServing
+                            ? resolveDineInVenueForPair(
+                                fields.pickupDate,
+                                reservationTime,
+                                nextServing,
+                                fields.dineInVenue,
+                                hoursSnapshot,
+                              )
+                            : "",
+                        });
+                      }}
+                      slotsForDate={(date, closed) =>
+                        dineInCheckoutSlots(date, closed, hoursSnapshot)
+                      }
+                      timeHelp="Choose when you would like your table reservation to start."
+                      timeId="reservation_time"
+                      timeLabel="Dine-in reservation time"
+                      timeName="reservation_time"
                     />
-                    {messageVisible ? (
+                    {fields.reservationTime ? (
+                      <PickupSlotFields
+                        closedDates={closedDates}
+                        defaultDate={fields.pickupDate}
+                        defaultTime={fields.pickupTime}
+                        includeFieldNames
+                        key={`checkout-dine-in-serving-${fields.reservationTime}`}
+                        onTimeChange={(pickupTime) =>
+                          patchFields({
+                            pickupTime,
+                            dineInVenue: resolveDineInVenueForPair(
+                              fields.pickupDate,
+                              fields.reservationTime,
+                              pickupTime,
+                              fields.dineInVenue,
+                              hoursSnapshot,
+                            ),
+                          })
+                        }
+                        showDate={false}
+                        slotsForDate={(date, closed) =>
+                          isPickupOrdersClosed(date, closed)
+                            ? []
+                            : cakeServingSlotsForReservation(
+                                date,
+                                fields.reservationTime,
+                                hoursSnapshot,
+                              )
+                        }
+                        timeHelp="Choose when you would like your cake served. Cake serving time must be within 1 hour of your reservation time."
+                        timeLabel="Cake serving time"
+                      />
+                    ) : null}
+                    <div className="space-y-3">
+                      {fields.pickupDate &&
+                      fields.reservationTime &&
+                      fields.pickupTime ? (
+                        <DineInVenuePartyFields
+                          onChange={(next) =>
+                            patchFields({
+                              dineInVenue: next.venue,
+                              adultCount: next.adultCount,
+                              kidCount: next.kidCount,
+                              toddlerCount: next.toddlerCount,
+                              guestCount: derivedGuestCountDraft(next),
+                              whitebirdSplitSeatingAcknowledged:
+                                next.whitebirdSplitSeatingAcknowledged,
+                            })
+                          }
+                          value={{
+                            venue: fields.dineInVenue,
+                            adultCount: fields.adultCount,
+                            kidCount: fields.kidCount,
+                            toddlerCount: fields.toddlerCount,
+                            whitebirdSplitSeatingAcknowledged:
+                              fields.whitebirdSplitSeatingAcknowledged,
+                          }}
+                          venues={venuesForReservationAndServing(
+                            fields.pickupDate,
+                            fields.reservationTime,
+                            fields.pickupTime,
+                            hoursSnapshot,
+                          )}
+                        />
+                      ) : null}
                       <FormField
                         help="Optional."
-                        htmlFor={`${option.code}_message`}
-                        label={`Written message on ${option.name}`}
+                        htmlFor="reservation_note"
+                        label="Reservation note"
                       >
                         <FormTextarea
-                          id={`${option.code}_message`}
+                          id="reservation_note"
+                          name="reservation_note"
                           onChange={(event) =>
-                            patchFields(
-                              option.code === "birthday_card"
-                                ? {
-                                    birthdayCardMessage: event.target.value,
-                                  }
-                                : {
-                                    wishingCardMessage: event.target.value,
-                                  },
-                            )
+                            patchFields({ reservationNote: event.target.value })
                           }
-                          required={messageRequired}
                           rows={3}
-                          value={messageValue}
+                          value={fields.reservationNote}
                         />
                       </FormField>
+                    </div>
+                  </>
+                ) : (
+                  <PickupSlotFields
+                    closedDates={closedDates}
+                    dateLabel={workspaceScheduleDateLabel(
+                      fields.fulfilmentMethod,
+                    )}
+                    defaultDate={fields.pickupDate}
+                    defaultTime={fields.pickupTime}
+                    excludedDates={effectiveExcludedDates}
+                    key={`checkout-${fields.fulfilmentMethod}-schedule`}
+                    maxDate={effectivePickupBounds.max ?? undefined}
+                    minDate={effectivePickupBounds.min}
+                    onDateChange={changeDate}
+                    onTimeChange={(pickupTime) => patchFields({ pickupTime })}
+                    rejectExcludedDates={rejectExcludedDates}
+                    unavailableDateMessageFor={(ymd) =>
+                      customerFullyBookedDateMessage({
+                        selectedYmd: ymd,
+                        blockingCakeNames:
+                          activeCartCapacity.blockingCakeNamesByDate[ymd] ?? [],
+                      })
+                    }
+                    unavailableDates={fullyBookedWithoutWaitingList}
+                    slotsForDate={
+                      fields.fulfilmentMethod === "delivery"
+                        ? (date, closed) =>
+                            deliveryCheckoutSlots(date, closed, hoursSnapshot)
+                        : (date, closed) =>
+                            customerPickupSlotsForDate(
+                              date,
+                              closed,
+                              hoursSnapshot,
+                            )
+                    }
+                    timeLabel={workspaceScheduleTimeLabel(
+                      fields.fulfilmentMethod,
+                    )}
+                  />
+                )}
+                {fields.fulfilmentMethod === "delivery" ? (
+                  <div className="space-y-3">
+                    <FormCheckbox
+                      checked={fields.sameAsCustomer}
+                      label="Recipient is the same as the ordering customer"
+                      name="same_as_customer"
+                      onChange={(event) => {
+                        const sameAsCustomer = event.target.checked;
+                        patchFields({
+                          sameAsCustomer,
+                          recipientName: sameAsCustomer
+                            ? fields.customerName
+                            : "",
+                          recipientPhone: sameAsCustomer ? fields.phone : "",
+                          recipientNotifyPreference: sameAsCustomer
+                            ? ""
+                            : fields.recipientNotifyPreference,
+                        });
+                      }}
+                    />
+                    {!fields.sameAsCustomer ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <FormField
+                          htmlFor="recipient_name"
+                          label="Recipient name"
+                        >
+                          <FormInput
+                            id="recipient_name"
+                            name="recipient_name"
+                            onChange={(event) =>
+                              patchFields({ recipientName: event.target.value })
+                            }
+                            required
+                            value={fields.recipientName}
+                          />
+                        </FormField>
+                        <FormField
+                          htmlFor="recipient_phone"
+                          label="Recipient phone"
+                        >
+                          <FormInput
+                            id="recipient_phone"
+                            name="recipient_phone"
+                            onChange={(event) =>
+                              patchFields({
+                                recipientPhone: event.target.value,
+                              })
+                            }
+                            required
+                            type="tel"
+                            value={fields.recipientPhone}
+                          />
+                        </FormField>
+                      </div>
+                    ) : null}
+                    <FormField htmlFor="address_line_1" label="Address line 1">
+                      <FormInput
+                        id="address_line_1"
+                        name="address_line_1"
+                        onChange={(event) =>
+                          patchFields({ addressLine1: event.target.value })
+                        }
+                        required
+                        value={fields.addressLine1}
+                      />
+                    </FormField>
+                    <FormField htmlFor="address_line_2" label="Address line 2">
+                      <FormInput
+                        id="address_line_2"
+                        name="address_line_2"
+                        onChange={(event) =>
+                          patchFields({ addressLine2: event.target.value })
+                        }
+                        value={fields.addressLine2}
+                      />
+                    </FormField>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <FormField htmlFor="postcode" label="Postcode">
+                        <FormInput
+                          id="postcode"
+                          name="postcode"
+                          onChange={(event) =>
+                            patchFields({ postcode: event.target.value })
+                          }
+                          required
+                          value={fields.postcode}
+                        />
+                      </FormField>
+                      <FormField htmlFor="city" label="City">
+                        <FormInput
+                          id="city"
+                          name="city"
+                          onChange={(event) =>
+                            patchFields({ city: event.target.value })
+                          }
+                          required
+                          value={fields.city}
+                        />
+                      </FormField>
+                      <FormField htmlFor="state" label="State">
+                        <FormInput
+                          id="state"
+                          name="state"
+                          onChange={(event) =>
+                            patchFields({ state: event.target.value })
+                          }
+                          required
+                          value={fields.state}
+                        />
+                      </FormField>
+                    </div>
+                    {!fields.sameAsCustomer ? (
+                      <FormRadioGroup
+                        legend="Should we inform the recipient?"
+                        name="recipient_notify_preference"
+                        onChange={(value) =>
+                          patchFields({ recipientNotifyPreference: value })
+                        }
+                        options={[...RECIPIENT_NOTIFY_OPTIONS]}
+                        required
+                        value={fields.recipientNotifyPreference}
+                      />
                     ) : null}
                   </div>
-                );
-              })}
-            </div>
+                ) : null}
+              </>
+            )}
+          </CheckoutSection>
+
+          {optionsReady &&
+          (complimentaryOptions.length > 0 || paidAddonOptions.length > 0) ? (
+            <CheckoutSection
+              className="border-fog border-t pt-10"
+              title="Options"
+            >
+              {complimentaryOptions.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-ink text-sm font-medium">Complimentary</p>
+                  {complimentaryOptions.map((option) => (
+                    <FormCheckbox
+                      checked={fields.complimentaryCodes.includes(option.code)}
+                      key={option.code}
+                      label={formatCustomerPreorderOptionLabel(option.name, 0)}
+                      onChange={(event) =>
+                        toggleComplimentary(option.code, event.target.checked)
+                      }
+                    />
+                  ))}
+                </div>
+              ) : null}
+              {paidAddonOptions.length > 0 ? (
+                <div className="space-y-3">
+                  <p className="text-ink text-sm font-medium">Paid</p>
+                  {paidAddonOptions.map((option) => {
+                    const selected = fields.paidAddonCodes.includes(
+                      option.code,
+                    );
+                    const messageVisible =
+                      option.code === "birthday_card" ||
+                      option.code === "wishing_card"
+                        ? customerPaidAddonMessageVisible(
+                            option.code,
+                            fields.paidAddonCodes,
+                          )
+                        : false;
+                    const messageRequired =
+                      option.code === "birthday_card" ||
+                      option.code === "wishing_card"
+                        ? customerPaidAddonMessageRequired(
+                            option.code,
+                            fields.paidAddonCodes,
+                          )
+                        : false;
+                    const messageValue =
+                      option.code === "birthday_card"
+                        ? fields.birthdayCardMessage
+                        : option.code === "wishing_card"
+                          ? fields.wishingCardMessage
+                          : "";
+                    return (
+                      <div className="space-y-2" key={option.code}>
+                        <FormCheckbox
+                          checked={selected}
+                          label={formatCustomerPreorderOptionLabel(
+                            option.name,
+                            option.unitPrice,
+                          )}
+                          onChange={(event) =>
+                            togglePaidAddon(option.code, event.target.checked)
+                          }
+                        />
+                        {messageVisible ? (
+                          <FormField
+                            help="Optional."
+                            htmlFor={`${option.code}_message`}
+                            label={`Written message on ${option.name}`}
+                          >
+                            <FormTextarea
+                              id={`${option.code}_message`}
+                              onChange={(event) =>
+                                patchFields(
+                                  option.code === "birthday_card"
+                                    ? {
+                                        birthdayCardMessage: event.target.value,
+                                      }
+                                    : {
+                                        wishingCardMessage: event.target.value,
+                                      },
+                                )
+                              }
+                              required={messageRequired}
+                              rows={3}
+                              value={messageValue}
+                            />
+                          </FormField>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </CheckoutSection>
           ) : null}
-        </CheckoutSection>
-      ) : null}
 
-      <CheckoutSection
-        className="border-fog border-t pt-10"
-        title="Customer Details"
-      >
-        <FormField
-          help={
-            <>
-              {CUSTOMER_NAME_HELP}
-              <span className="mt-0.5 block">{CUSTOMER_NAME_SPACE_HINT}</span>
-            </>
-          }
-          htmlFor="customer_name"
-          label="Name"
-        >
-          <FormInput
-            id="customer_name"
-            name="customer_name"
-            onChange={(event) => {
-              setNameError(null);
-              patchFields({ customerName: event.target.value });
-            }}
-            required
-            value={fields.customerName}
+          <CheckoutSection
+            className="border-fog border-t pt-10"
+            title="Customer Details"
+          >
+            <FormField
+              help={
+                <>
+                  {CUSTOMER_NAME_HELP}
+                  <span className="mt-0.5 block">
+                    {CUSTOMER_NAME_SPACE_HINT}
+                  </span>
+                </>
+              }
+              htmlFor="customer_name"
+              label="Name"
+            >
+              <FormInput
+                id="customer_name"
+                name="customer_name"
+                onChange={(event) => {
+                  setNameError(null);
+                  patchFields({ customerName: event.target.value });
+                }}
+                required
+                value={fields.customerName}
+              />
+            </FormField>
+            {nameError ? (
+              <p
+                className="text-status-danger text-sm leading-relaxed"
+                role="alert"
+              >
+                {nameError}
+              </p>
+            ) : null}
+            <FormField
+              help={WAITING_LIST_WHATSAPP_NOTE}
+              htmlFor="phone"
+              label="WhatsApp phone"
+            >
+              <FormInput
+                id="phone"
+                name="phone"
+                onChange={(event) => patchFields({ phone: event.target.value })}
+                required
+                type="tel"
+                value={fields.phone}
+              />
+            </FormField>
+            <FormRadioGroup
+              legend="Would you like a copy of the receipt? (will be attached during pickup)"
+              name="include_receipt"
+              onChange={(value) =>
+                patchFields({
+                  includeReceiptChoice:
+                    value === "yes" || value === "no" ? value : "",
+                })
+              }
+              options={[
+                { value: "yes", label: "Yes" },
+                { value: "no", label: "No" },
+              ]}
+              required
+              value={fields.includeReceiptChoice}
+            />
+          </CheckoutSection>
+
+          <CheckoutSection
+            className="border-fog border-t pt-10"
+            title="Order Notes"
+          >
+            <p className="text-ink text-sm font-medium">Optional notes</p>
+            <p
+              className="text-status-danger text-sm leading-snug font-bold"
+              id="optional-notes-warning"
+            >
+              {OPTIONAL_NOTES_CUSTOMER_WARNING}
+            </p>
+            <FormTextarea
+              aria-describedby="optional-notes-warning"
+              aria-label="Optional notes"
+              id="notes"
+              name="notes"
+              onChange={(event) => patchFields({ notes: event.target.value })}
+              rows={3}
+              value={fields.notes}
+            />
+          </CheckoutSection>
+
+          {itemError && itemError !== collectionDateMessage ? (
+            <p
+              className="text-status-danger text-sm leading-relaxed"
+              role="alert"
+            >
+              {itemError}
+            </p>
+          ) : null}
+          <FormError message={state.error} />
+
+          <FormActions className="border-fog border-t pt-8 sm:items-center">
+            <FormSubmitButton
+              className="w-full rounded-md sm:w-auto"
+              disabled={submitBlocked || confirmOpen}
+              pending={pending}
+              pendingLabel="Submitting…"
+            >
+              Submit Order
+            </FormSubmitButton>
+            <Link
+              className="text-ink hover:text-skyline inline-flex min-h-11 items-center justify-center px-2 text-sm font-medium"
+              href="/browse"
+            >
+              Continue Ordering
+            </Link>
+          </FormActions>
+        </div>
+
+        <div className="order-1 min-w-0 lg:order-2">
+          <CheckoutOrderSummary
+            addSizeByCake={addSizeByCake}
+            addingCake={addingCake}
+            cakePickupAvailabilityNotes={cakePickupAvailabilityNotes}
+            cakes={cakes}
+            catalogueReady={catalogueReady}
+            earliestLabel={earliestLabel}
+            items={items}
+            loadingOffer={liveOfferPending}
+            offerLabel={offerLabel}
+            onAddCake={addOfferedCakeAndClosePicker}
+            onAddSize={(cakeId, sizeId) =>
+              setAddSizeByCake((current) => ({
+                ...current,
+                [cakeId]: sizeId,
+              }))
+            }
+            onChangeQuantity={(index, quantity) =>
+              updateItem(index, { quantity })
+            }
+            onChangeSize={changeSize}
+            onRemove={removeItem}
+            onToggleAdding={setAddingCake}
+            pickupDateLabel={pickupDateLabel}
+            preorderLabel={preorderLabel}
+            total={total}
+            unavailableMessage={unavailableMessage}
           />
-        </FormField>
-        {nameError ? (
-          <p className="text-status-danger text-sm leading-relaxed" role="alert">
-            {nameError}
-          </p>
-        ) : null}
-        <FormField
-          help={WAITING_LIST_WHATSAPP_NOTE}
-          htmlFor="phone"
-          label="WhatsApp phone"
-        >
-          <FormInput
-            id="phone"
-            name="phone"
-            onChange={(event) => patchFields({ phone: event.target.value })}
-            required
-            type="tel"
-            value={fields.phone}
-          />
-        </FormField>
-        <FormRadioGroup
-          legend="Would you like a copy of the receipt? (will be attached during pickup)"
-          name="include_receipt"
-          onChange={(value) =>
-            patchFields({
-              includeReceiptChoice: value === "yes" || value === "no" ? value : "",
-            })
-          }
-          options={[
-            { value: "yes", label: "Yes" },
-            { value: "no", label: "No" },
-          ]}
-          required
-          value={fields.includeReceiptChoice}
+        </div>
+      </form>
+      {showJoinWaitingList ? (
+        <JoinWaitingListForm
+          collectionId={collectionId}
+          lines={waitingListLines}
+          pickupDate={fields.pickupDate}
         />
-      </CheckoutSection>
-
-      <CheckoutSection className="border-fog border-t pt-10" title="Order Notes">
-        <p className="text-ink text-sm font-medium">Optional notes</p>
-        <p
-          className="text-status-danger text-sm leading-snug font-bold"
-          id="optional-notes-warning"
-        >
-          {OPTIONAL_NOTES_CUSTOMER_WARNING}
-        </p>
-        <FormTextarea
-          aria-describedby="optional-notes-warning"
-          aria-label="Optional notes"
-          id="notes"
-          name="notes"
-          onChange={(event) => patchFields({ notes: event.target.value })}
-          rows={3}
-          value={fields.notes}
-        />
-      </CheckoutSection>
-
-      {itemError && itemError !== collectionDateMessage ? (
-        <p className="text-status-danger text-sm leading-relaxed" role="alert">
-          {itemError}
-        </p>
       ) : null}
-      <FormError message={state.error} />
-
-      <FormActions className="border-fog border-t pt-8 sm:items-center">
-        <FormSubmitButton
-          className="w-full rounded-md sm:w-auto"
-          disabled={submitBlocked || confirmOpen}
-          pending={pending}
-          pendingLabel="Submitting…"
-        >
-          Submit Order
-        </FormSubmitButton>
-        <Link
-          className="text-ink hover:text-skyline inline-flex min-h-11 items-center justify-center px-2 text-sm font-medium"
-          href="/browse"
-        >
-          Continue Ordering
-        </Link>
-      </FormActions>
-      </div>
-
-      <div className="order-1 min-w-0 lg:order-2">
-        <CheckoutOrderSummary
-          addSizeByCake={addSizeByCake}
-          addingCake={addingCake}
-          cakePickupAvailabilityNotes={cakePickupAvailabilityNotes}
-          cakes={cakes}
-          catalogueReady={catalogueReady}
-          earliestLabel={earliestLabel}
-          items={items}
-          loadingOffer={liveOfferPending}
-          offerLabel={offerLabel}
-          onAddCake={addOfferedCakeAndClosePicker}
-          onAddSize={(cakeId, sizeId) =>
-            setAddSizeByCake((current) => ({
-              ...current,
-              [cakeId]: sizeId,
-            }))
-          }
-          onChangeQuantity={(index, quantity) =>
-            updateItem(index, { quantity })
-          }
-          onChangeSize={changeSize}
-          onRemove={removeItem}
-          onToggleAdding={setAddingCake}
-          pickupDateLabel={pickupDateLabel}
-          preorderLabel={preorderLabel}
-          total={total}
-          unavailableMessage={unavailableMessage}
-        />
-      </div>
-    </form>
-    {showJoinWaitingList ? (
-      <JoinWaitingListForm
-        collectionId={collectionId}
-        lines={waitingListLines}
+      <CustomerWaitingListAvailability
+        collectionId={closedWaitingListForDate?.collectionId ?? collectionId}
+        onClose={() => setWaitingListAvailabilityOpen(false)}
+        open={waitingListAvailabilityOpen && showClosedWaitingListCta}
+        options={closedWaitingListOptions}
         pickupDate={fields.pickupDate}
       />
-    ) : null}
-    <CustomerWaitingListAvailability
-      collectionId={closedWaitingListForDate?.collectionId ?? collectionId}
-      onClose={() => setWaitingListAvailabilityOpen(false)}
-      open={waitingListAvailabilityOpen && showClosedWaitingListCta}
-      options={closedWaitingListOptions}
-      pickupDate={fields.pickupDate}
-    />
-    <CheckoutConfirmPrompt
-      onConfirm={confirmOrder}
-      onGoBack={goBackFromConfirm}
-      open={confirmOpen}
-      pending={pending || Boolean(state.orderId)}
-      snapshot={confirmSnapshot}
-    />
+      <CheckoutConfirmPrompt
+        onConfirm={confirmOrder}
+        onGoBack={goBackFromConfirm}
+        open={confirmOpen}
+        pending={pending || Boolean(state.orderId)}
+        snapshot={confirmSnapshot}
+      />
     </div>
   );
 }

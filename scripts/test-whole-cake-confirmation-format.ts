@@ -16,7 +16,10 @@ import {
   generateConfirmationMessage,
 } from "@/engines/orders/confirmation-message";
 import { generateCrewOrderMessage } from "@/engines/orders/messages";
-import type { StorefrontOrder, StorefrontOrderDelivery } from "@/types/storefront";
+import type {
+  StorefrontOrder,
+  StorefrontOrderDelivery,
+} from "@/types/storefront";
 
 function payload(
   overrides: Partial<Parameters<typeof buildConfirmationPayload>[0]> = {},
@@ -112,6 +115,10 @@ function assertNoCustomerInternalShorthand(body: string) {
         reservationTime: "14:30",
         venue: "whitebird",
         guestCount: 4,
+        adultCount: 4,
+        kidCount: 0,
+        toddlerCount: 0,
+        whitebirdSplitSeatingAcknowledged: false,
         reservationNote: null,
         status: "pending",
       },
@@ -159,6 +166,10 @@ assert.equal(
       reservationTime: "14:30",
       venue: "hyphen",
       guestCount: 4,
+      adultCount: 4,
+      kidCount: 0,
+      toddlerCount: 0,
+      whitebirdSplitSeatingAcknowledged: false,
       reservationNote: null,
       status: "pending",
     },

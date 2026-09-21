@@ -2,20 +2,20 @@
 
 import { useState } from "react";
 import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
+import { DineInVenuePartyFields } from "@/components/ui/DineInVenuePartyFields";
 import {
   FormCheckbox,
   FormField,
   FormInput,
-  FormRadioGroup,
   FormTextarea,
 } from "@/components/ui/form";
 import {
   DINE_IN_VENUES,
   cakeServingSlotsForReservation,
-  dineInVenueLabel,
   resolveDineInVenueForPair,
   venuesForReservationAndServing,
 } from "@/engines/business-calendar/dine-in-hours";
+import { derivedGuestCountDraft } from "@/engines/orders/dine-in-party";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import { isPickupOrdersClosed } from "@/engines/business-calendar/order-availability";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
@@ -311,46 +311,43 @@ export function AssistedOrderFulfilmentFields({
               ) : null}
             </>
           )}
-          {((useSpecialSchedule && Boolean(selectedDate)) ||
-            (!useSpecialSchedule &&
-              Boolean(selectedDate) &&
-              Boolean(dineIn.reservationTime) &&
-              Boolean(servingTime))) ? (
-            <FormRadioGroup
-              legend="Where would you like to sit?"
-              name="dine_in_venue"
-              onChange={(value) => onDineInChange({ ...dineIn, venue: value })}
-              options={(useSpecialSchedule
-                ? [...DINE_IN_VENUES]
-                : venuesForReservationAndServing(
-                    selectedDate,
-                    dineIn.reservationTime,
-                    servingTime,
-                    hoursSnapshot,
-                  )
-              ).map((venue) => ({
-                value: venue,
-                label: dineInVenueLabel(venue),
-              }))}
-              required
-              value={dineIn.venue}
+          {(useSpecialSchedule && Boolean(selectedDate)) ||
+          (!useSpecialSchedule &&
+            Boolean(selectedDate) &&
+            Boolean(dineIn.reservationTime) &&
+            Boolean(servingTime)) ? (
+            <DineInVenuePartyFields
+              idPrefix="assisted_"
+              onChange={(next) =>
+                onDineInChange({
+                  ...dineIn,
+                  venue: next.venue,
+                  adultCount: next.adultCount,
+                  kidCount: next.kidCount,
+                  toddlerCount: next.toddlerCount,
+                  guestCount: derivedGuestCountDraft(next),
+                })
+              }
+              requireAcknowledgement={false}
+              value={{
+                venue: dineIn.venue,
+                adultCount: dineIn.adultCount || dineIn.guestCount,
+                kidCount: dineIn.kidCount,
+                toddlerCount: dineIn.toddlerCount,
+                whitebirdSplitSeatingAcknowledged: false,
+              }}
+              venues={
+                useSpecialSchedule
+                  ? [...DINE_IN_VENUES]
+                  : venuesForReservationAndServing(
+                      selectedDate,
+                      dineIn.reservationTime,
+                      servingTime,
+                      hoursSnapshot,
+                    )
+              }
             />
           ) : null}
-          <FormField htmlFor="guest_count" label="Number of guests">
-            <FormInput
-              id="guest_count"
-              max={50}
-              min={1}
-              name="guest_count"
-              onChange={(event) =>
-                onDineInChange({ ...dineIn, guestCount: event.target.value })
-              }
-              required
-              step={1}
-              type="number"
-              value={dineIn.guestCount}
-            />
-          </FormField>
           <FormField
             help="Optional."
             htmlFor="reservation_note"

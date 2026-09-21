@@ -20,9 +20,14 @@ import {
   FormSubmitButton,
   FormTextarea,
 } from "@/components/ui/form";
+import { DineInVenuePartyFields } from "@/components/ui/DineInVenuePartyFields";
 import { OrderGuideCallout } from "@/components/ui/OrderGuideCallout";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { formatLongBusinessDate, formatBusinessMonthYear, isDifferentBusinessMonth } from "@/lib/dates";
+import {
+  formatLongBusinessDate,
+  formatBusinessMonthYear,
+  isDifferentBusinessMonth,
+} from "@/lib/dates";
 import { buildApprovalChangeSummary } from "@/engines/operations/approval-change-summary";
 import {
   canCancelOperationsApproval,
@@ -45,6 +50,11 @@ import {
 } from "@/engines/operations/approval-ux";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
+import { DINE_IN_VENUES } from "@/engines/business-calendar/dine-in-hours";
+import {
+  dineInSplitSeatingStaffLabel,
+  formatDineInPartyComposition,
+} from "@/engines/orders/dine-in-party";
 import { normalizePickupTimeValue } from "@/engines/business-calendar/pickup-slots";
 import { scrollWorkspaceSectionIntoView } from "@/workspaces/owner/orders/scroll-workspace-section";
 import {
@@ -227,15 +237,15 @@ export function OrderWorkspaceForm({
     useState<OwnerCreateFulfilmentMethod>(() =>
       normalizeOwnerCreateFulfilmentMethod(order.fulfilmentMethod),
     );
-  const [editDeliveryDraft, setEditDeliveryDraft] = useState<DeliveryCreateDraft>(
-    () =>
+  const [editDeliveryDraft, setEditDeliveryDraft] =
+    useState<DeliveryCreateDraft>(() =>
       deliveryDraftFromPersistedOrder({
         customerName: order.customerName,
         customerPhone: order.phone,
         fulfilmentMethod: order.fulfilmentMethod,
         delivery: order.delivery,
       }),
-  );
+    );
 
   const canEdit =
     capabilities.canEditOrderWorkspace && isGuestOrderEditable(order.status);
@@ -249,6 +259,14 @@ export function OrderWorkspaceForm({
   const [editPickupTime, setEditPickupTime] = useState(() =>
     normalizePickupTimeValue(order.pickupTime),
   );
+  const [editDineInParty, setEditDineInParty] = useState({
+    venue: order.dineInReservation?.venue ?? "",
+    adultCount: String(order.dineInReservation?.adultCount ?? ""),
+    kidCount: String(order.dineInReservation?.kidCount ?? "0"),
+    toddlerCount: String(order.dineInReservation?.toddlerCount ?? "0"),
+    whitebirdSplitSeatingAcknowledged:
+      order.dineInReservation?.whitebirdSplitSeatingAcknowledged === true,
+  });
   const [pickupMonthOverride, setPickupMonthOverride] = useState(false);
   const [postPaymentChangeOverride, setPostPaymentChangeOverride] =
     useState(false);
@@ -277,7 +295,8 @@ export function OrderWorkspaceForm({
   const blockDirectSave =
     capabilities.canRequestOperationsApproval && lateChangeRequired;
 
-  const selectedPickupDate = mode === "edit" ? editPickupDate : order.pickupDate;
+  const selectedPickupDate =
+    mode === "edit" ? editPickupDate : order.pickupDate;
   const preorderLines = preorderLinesFromWorkspaceItems({
     items:
       mode === "edit"
@@ -403,10 +422,7 @@ export function OrderWorkspaceForm({
   function renderApprovalPanels() {
     const visible = [
       ...pendingApprovals,
-      ...visibleDecidedApprovalsForOrder(
-        decidedApprovals,
-        highlightApprovalId,
-      ),
+      ...visibleDecidedApprovalsForOrder(decidedApprovals, highlightApprovalId),
     ];
     if (visible.length === 0) return null;
     return (
@@ -504,7 +520,9 @@ export function OrderWorkspaceForm({
     }
     const includePickup = !pickupMonthChanging;
     if (includePickup && (!editPickupDate || !pickupTime)) {
-      setLateEditError("Choose a pickup date and time before requesting approval.");
+      setLateEditError(
+        "Choose a pickup date and time before requesting approval.",
+      );
       return;
     }
     setLateEditError(null);
@@ -802,10 +820,7 @@ export function OrderWorkspaceForm({
           </p>
         ) : null}
 
-        <OrderLifecycleActions
-          capabilities={capabilities}
-          order={order}
-        />
+        <OrderLifecycleActions capabilities={capabilities} order={order} />
 
         {showSaved ? (
           <p className="border-status-success/30 bg-status-success-soft text-status-success rounded-lg border px-4 py-3 text-sm">
@@ -823,7 +838,9 @@ export function OrderWorkspaceForm({
 
         <ViewBlock title="Customer">
           <div className="space-y-1">
-            <p className="text-ink text-base font-semibold">{order.customerName}</p>
+            <p className="text-ink text-base font-semibold">
+              {order.customerName}
+            </p>
             <p className="text-ink text-sm">
               {order.phone.trim() ? order.phone : "No WhatsApp phone"}
             </p>
@@ -876,11 +893,30 @@ export function OrderWorkspaceForm({
                     : fulfilmentView.dineInReservation.venue}
               </p>
               <p className="text-ink text-sm">
-                <span className="text-skyline">Guests · </span>
-                {fulfilmentView.dineInReservation.guestCount}
+                <span className="text-skyline">Party · </span>
+                {formatDineInPartyComposition({
+                  adultCount: fulfilmentView.dineInReservation.adultCount,
+                  kidCount: fulfilmentView.dineInReservation.kidCount,
+                  toddlerCount: fulfilmentView.dineInReservation.toddlerCount,
+                  totalGuestCount: fulfilmentView.dineInReservation.guestCount,
+                })}
               </p>
+              {dineInSplitSeatingStaffLabel(
+                fulfilmentView.dineInReservation.venue,
+                fulfilmentView.dineInReservation.guestCount,
+              ) ? (
+                <p className="text-ink text-sm">
+                  <span className="text-skyline">Seating · </span>
+                  {dineInSplitSeatingStaffLabel(
+                    fulfilmentView.dineInReservation.venue,
+                    fulfilmentView.dineInReservation.guestCount,
+                  )}
+                </p>
+              ) : null}
               <p className="text-ink text-sm">
-                <span className="text-skyline">Dine-in reservation time · </span>
+                <span className="text-skyline">
+                  Dine-in reservation time ·{" "}
+                </span>
                 {formatPickupTime(
                   fulfilmentView.dineInReservation.reservationTime,
                 )}
@@ -939,10 +975,7 @@ export function OrderWorkspaceForm({
 
         {renderPreorderExceptionNotice()}
 
-        <DeliveryChargesSection
-          capabilities={capabilities}
-          order={order}
-        />
+        <DeliveryChargesSection capabilities={capabilities} order={order} />
 
         <ViewBlock title="Order">
           <ul className="space-y-2">
@@ -1192,14 +1225,12 @@ export function OrderWorkspaceForm({
                   <p className="text-ink text-sm font-medium">
                     Version {snapshot.version}
                     {" · "}
-                    {snapshot.lifecycleStatus === "sent"
-                      ? "Sent"
-                      : "Outdated"}
+                    {snapshot.lifecycleStatus === "sent" ? "Sent" : "Outdated"}
                     {snapshot.sentAt
                       ? ` · ${formatTimelineDateTime(snapshot.sentAt)}`
                       : null}
                   </p>
-                  <pre className="border-fog text-skyline mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg border bg-mist/40 p-3 text-xs leading-relaxed">
+                  <pre className="border-fog text-skyline bg-mist/40 mt-2 max-h-48 overflow-auto rounded-lg border p-3 text-xs leading-relaxed whitespace-pre-wrap">
                     {snapshot.messageBody}
                   </pre>
                 </li>
@@ -1214,7 +1245,11 @@ export function OrderWorkspaceForm({
   return (
     <form action={formAction} className="space-y-6" key={formKey}>
       <input name="items_json" type="hidden" value={itemsJson} />
-      <input name="complimentary_json" type="hidden" value={complimentaryJson} />
+      <input
+        name="complimentary_json"
+        type="hidden"
+        value={complimentaryJson}
+      />
       <input name="paid_addons_json" type="hidden" value={paidAddonsJson} />
       <input
         name="fulfilment_method"
@@ -1345,11 +1380,6 @@ export function OrderWorkspaceForm({
             <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
               Dine-in
             </h2>
-            <input
-              name="dine_in_venue"
-              type="hidden"
-              value={order.dineInReservation.venue}
-            />
             <FormField htmlFor="pickup_date" label="Dine-in date">
               <FormInput
                 defaultValue={order.pickupDate}
@@ -1387,16 +1417,12 @@ export function OrderWorkspaceForm({
                 type="time"
               />
             </FormField>
-            <FormField htmlFor="guest_count" label="Guests">
-              <FormInput
-                defaultValue={order.dineInReservation.guestCount}
-                id="guest_count"
-                min={1}
-                name="guest_count"
-                required
-                type="number"
-              />
-            </FormField>
+            <DineInVenuePartyFields
+              onChange={setEditDineInParty}
+              requireAcknowledgement={false}
+              value={editDineInParty}
+              venues={[...DINE_IN_VENUES]}
+            />
             <FormField htmlFor="reservation_note" label="Reservation note">
               <FormTextarea
                 defaultValue={order.dineInReservation.reservationNote ?? ""}
@@ -1453,8 +1479,8 @@ export function OrderWorkspaceForm({
             ) : capabilities.canRequestCrossMonthPickupApproval ? (
               <>
                 <p className="text-ink text-sm">
-                  Request Approval to change the pickup month. Owner can override
-                  this change directly.
+                  Request Approval to change the pickup month. Owner can
+                  override this change directly.
                 </p>
                 {pendingCrossMonth ? (
                   <p className="text-skyline text-sm">
@@ -1716,11 +1742,7 @@ export function OrderWorkspaceForm({
         </h2>
         {lateEditScopeHint("excluded")}
         {/* Preserve existing customer_notes on save — field hidden from UI. */}
-        <input
-          name="customer_notes"
-          type="hidden"
-          value={order.notes ?? ""}
-        />
+        <input name="customer_notes" type="hidden" value={order.notes ?? ""} />
         <FormField htmlFor="internal_notes" label="Internal notes">
           <FormTextarea
             defaultValue={order.internalNotes ?? ""}
@@ -1744,10 +1766,7 @@ export function OrderWorkspaceForm({
           value="1"
         />
         {needsAttention ? (
-          <FormField
-            htmlFor="bakery_attention_note"
-            label="Attention note"
-          >
+          <FormField htmlFor="bakery_attention_note" label="Attention note">
             <FormInput
               defaultValue={order.bakeryAttentionNote ?? ""}
               id="bakery_attention_note"
@@ -1788,9 +1807,12 @@ export function OrderWorkspaceForm({
             Late-change approval required
           </p>
           <p className="text-ink text-sm">
-            {lateChangeReason ?? "This order is within the 2-day change cutoff."}
+            {lateChangeReason ??
+              "This order is within the 2-day change cutoff."}
           </p>
-          <p className="text-ink text-sm">{LATE_ORDER_EDIT_APPROVAL_SCOPE_SUMMARY}</p>
+          <p className="text-ink text-sm">
+            {LATE_ORDER_EDIT_APPROVAL_SCOPE_SUMMARY}
+          </p>
           <p className="text-skyline text-sm">
             {LATE_ORDER_EDIT_APPROVAL_SCOPE_EXCLUSIONS}
           </p>

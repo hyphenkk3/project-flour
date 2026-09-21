@@ -4,9 +4,12 @@ import { isValidDeliverySlot } from "@/engines/business-calendar/delivery-hours"
 import {
   isValidDineInReservationPair,
   isValidDineInSlot,
-  parseDineInVenue,
-  parseGuestCount,
 } from "@/engines/business-calendar/dine-in-hours";
+import {
+  buildDineInReservationRpcPayload,
+  validateDineInPartyFromForm,
+  type DineInReservationRpcPayload,
+} from "@/engines/orders/dine-in-party";
 import { isValidPickupSlot } from "@/engines/business-calendar/pickup-slots";
 import {
   OWNER_DELIVERY_CITY,
@@ -85,7 +88,9 @@ function parseJsonObject<T>(raw: string): T | null {
   }
 }
 
-function parseDisplayItems(value: unknown): WaitingListConfirmationDisplayItem[] {
+function parseDisplayItems(
+  value: unknown,
+): WaitingListConfirmationDisplayItem[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((row) => {
     const entry = row as Record<string, unknown>;
@@ -107,7 +112,9 @@ function parseDisplayItems(value: unknown): WaitingListConfirmationDisplayItem[]
   });
 }
 
-function parseCustomerSelections(formData: FormData): CustomerPreorderSelections {
+function parseCustomerSelections(
+  formData: FormData,
+): CustomerPreorderSelections {
   const parsed = parseJsonObject<Partial<CustomerPreorderSelections>>(
     String(formData.get("preorder_options_json") ?? ""),
   );
@@ -218,7 +225,9 @@ export async function submitWaitingListConfirmationAction(
   const includeReceipt = parseRequiredPhysicalReceipt(
     String(formData.get("include_receipt") ?? "").trim(),
   );
-  const pickupDate = String(formData.get("pickup_date") ?? "").trim().slice(0, 10);
+  const pickupDate = String(formData.get("pickup_date") ?? "")
+    .trim()
+    .slice(0, 10);
   const pickupTime = String(formData.get("pickup_time") ?? "").trim();
   const requestedDate = String(formData.get("requested_date") ?? "")
     .trim()
@@ -250,8 +259,7 @@ export async function submitWaitingListConfirmationAction(
     return { error: "Please keep the requested collection date." };
   }
 
-  let guestCount: number | null = null;
-  let dineInVenue: ReturnType<typeof parseDineInVenue> = null;
+  let dineInPayload: DineInReservationRpcPayload | null = null;
   let reservationTime = "";
   let deliveryDraft: DeliveryCreateDraft | null = null;
   const calendar = await loadCheckoutCalendarContext({
@@ -284,20 +292,16 @@ export async function submitWaitingListConfirmationAction(
         error: "Please choose a valid cake serving time for that date.",
       };
     }
-    guestCount = parseGuestCount(formData.get("guest_count"));
-    if (guestCount == null) {
-      return { error: "Please enter how many guests are dining in." };
-    }
-    dineInVenue = parseDineInVenue(formData.get("dine_in_venue"));
-    if (dineInVenue == null) {
-      return { error: "Please choose where you would like to sit." };
+    const partyResult = validateDineInPartyFromForm(formData, true);
+    if (!partyResult.ok) {
+      return { error: partyResult.error };
     }
     if (
       !isValidDineInReservationPair({
         dateYmd: pickupDate,
         reservationTime,
         servingTime: pickupTime,
-        venue: dineInVenue,
+        venue: partyResult.party.venue,
         snapshot: hoursSnapshot,
       })
     ) {
@@ -306,6 +310,12 @@ export async function submitWaitingListConfirmationAction(
           "Cake serving time must be within 1 hour of the reservation time, and the venue must be available for both times.",
       };
     }
+    dineInPayload = buildDineInReservationRpcPayload({
+      party: partyResult.party,
+      reservationTime,
+      reservationNote:
+        String(formData.get("reservation_note") ?? "").trim() || null,
+    });
   } else {
     if (
       !pickupTime ||
@@ -357,7 +367,10 @@ export async function submitWaitingListConfirmationAction(
       }).p_delivery;
     } catch (error) {
       return {
-        error: error instanceof Error ? error.message : "Please enter the delivery details.",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Please enter the delivery details.",
       };
     }
   }
@@ -393,16 +406,7 @@ export async function submitWaitingListConfirmationAction(
     include_receipt: includeReceipt,
     notes: notes || null,
     delivery: method === "delivery" ? deliveryPayload : null,
-    dine_in:
-      method === "dine_in" && dineInVenue && guestCount != null
-        ? {
-            venue: dineInVenue,
-            guest_count: guestCount,
-            reservation_time: reservationTime,
-            reservation_note:
-              String(formData.get("reservation_note") ?? "").trim() || null,
-          }
-        : null,
+    dine_in: method === "dine_in" ? dineInPayload : null,
     complimentary,
     paid_addons: paidAddons,
   };

@@ -6,6 +6,7 @@ import {
 } from "@/engines/extra/customer-fresh-picks";
 import { isValidExtraCustomerFulfilment } from "@/engines/extra/fresh-picks-fulfilment";
 import type { FreshPicksPreparationConfig } from "@/engines/extra/fresh-picks-preparation";
+import { readDineInPartyDraftFields } from "@/engines/orders/dine-in-party";
 import {
   OWNER_DELIVERY_CITY,
   OWNER_DELIVERY_STATE,
@@ -15,7 +16,8 @@ import {
 import type { PhysicalReceiptChoice } from "@/workspaces/storefront/checkout/preorder-draft";
 
 export const FRESH_PICK_CART_KEY = "whitebird-fresh-pick-cart-v1";
-export const FRESH_PICK_CART_CHANGED_EVENT = "whitebird-fresh-pick-cart-changed";
+export const FRESH_PICK_CART_CHANGED_EVENT =
+  "whitebird-fresh-pick-cart-changed";
 export const FRESH_PICK_CART_OPEN_EVENT = "whitebird-open-fresh-pick-cart";
 
 export type FreshPickCartItem = {
@@ -35,7 +37,11 @@ export type FreshPickCart = {
   pickupAvailableFromAt: string;
   orderCutoffAt: string;
   dineInVenue: string;
+  adultCount: string;
+  kidCount: string;
+  toddlerCount: string;
   guestCount: string;
+  whitebirdSplitSeatingAcknowledged: boolean;
   reservationNote: string;
   recipientName: string;
   recipientPhone: string;
@@ -88,7 +94,11 @@ export function emptyFreshPickCart(): FreshPickCart {
     pickupAvailableFromAt: "",
     orderCutoffAt: "",
     dineInVenue: "",
+    adultCount: "",
+    kidCount: "",
+    toddlerCount: "",
     guestCount: "",
+    whitebirdSplitSeatingAcknowledged: false,
     reservationNote: "",
     recipientName: "",
     recipientPhone: "",
@@ -135,8 +145,12 @@ function parseItem(value: unknown): FreshPickCartItem | null {
   const extraStockId = String(row.extraStockId ?? "").trim();
   const cakeName = String(row.cakeName ?? "").trim();
   const sizeLabel = String(row.sizeLabel ?? "").trim();
-  const pickupDate = String(row.pickupDate ?? "").trim().slice(0, 10);
-  const pickupTime = String(row.pickupTime ?? "").trim().slice(0, 5);
+  const pickupDate = String(row.pickupDate ?? "")
+    .trim()
+    .slice(0, 10);
+  const pickupTime = String(row.pickupTime ?? "")
+    .trim()
+    .slice(0, 5);
   if (!extraStockId || !cakeName || !isYmd(pickupDate) || !isHm(pickupTime)) {
     return null;
   }
@@ -150,7 +164,8 @@ function parseItem(value: unknown): FreshPickCartItem | null {
     extraStockId,
     cakeName,
     sizeLabel,
-    unitPrice: unitPrice != null && Number.isFinite(unitPrice) ? unitPrice : null,
+    unitPrice:
+      unitPrice != null && Number.isFinite(unitPrice) ? unitPrice : null,
     imageUrl:
       typeof row.imageUrl === "string" && row.imageUrl.trim()
         ? row.imageUrl
@@ -167,20 +182,31 @@ export function parseFreshPickCart(value: unknown): FreshPickCart | null {
   const items = row.items
     .map(parseItem)
     .filter((item): item is FreshPickCartItem => item != null);
-  const pickupDate = String(row.pickupDate ?? "").trim().slice(0, 10);
-  const pickupTime = String(row.pickupTime ?? "").trim().slice(0, 5);
+  const pickupDate = String(row.pickupDate ?? "")
+    .trim()
+    .slice(0, 10);
+  const pickupTime = String(row.pickupTime ?? "")
+    .trim()
+    .slice(0, 5);
   const receipt = String(row.includeReceiptChoice ?? "");
   const empty = emptyFreshPickCart();
   return {
     ...empty,
-    pickupDate: isYmd(pickupDate) ? pickupDate : items[0]?.pickupDate ?? "",
-    pickupTime: isHm(pickupTime) ? pickupTime : items[0]?.pickupTime ?? "",
+    pickupDate: isYmd(pickupDate) ? pickupDate : (items[0]?.pickupDate ?? ""),
+    pickupTime: isHm(pickupTime) ? pickupTime : (items[0]?.pickupTime ?? ""),
     fulfilmentMethod: parseCustomerWebsiteFulfilmentMethod(
       String(row.fulfilmentMethod ?? "pickup"),
     ),
     pickupAvailableFromAt: String(row.pickupAvailableFromAt ?? ""),
     orderCutoffAt: String(row.orderCutoffAt ?? ""),
     dineInVenue: String(row.dineInVenue ?? ""),
+    ...readDineInPartyDraftFields({
+      adultCount: row.adultCount,
+      kidCount: row.kidCount,
+      toddlerCount: row.toddlerCount,
+      guestCount: row.guestCount,
+      whitebirdSplitSeatingAcknowledged: row.whitebirdSplitSeatingAcknowledged,
+    }),
     guestCount: String(row.guestCount ?? ""),
     reservationNote: String(row.reservationNote ?? ""),
     recipientName: String(row.recipientName ?? ""),
@@ -331,7 +357,10 @@ export function addFreshPickToCart(
       context,
     )
   ) {
-    return { ok: false, error: "Please choose a valid fulfilment time for that date." };
+    return {
+      ok: false,
+      error: "Please choose a valid fulfilment time for that date.",
+    };
   }
 
   const current = cart ?? emptyFreshPickCart();
@@ -375,8 +404,10 @@ export function addFreshPickToCart(
   };
   const next: FreshPickCart = {
     ...current,
-    pickupDate: current.items.length > 0 ? current.pickupDate : input.pickupDate,
-    pickupTime: current.items.length > 0 ? current.pickupTime : input.pickupTime,
+    pickupDate:
+      current.items.length > 0 ? current.pickupDate : input.pickupDate,
+    pickupTime:
+      current.items.length > 0 ? current.pickupTime : input.pickupTime,
     fulfilmentMethod:
       current.items.length > 0 ? current.fulfilmentMethod : fulfilmentMethod,
     pickupAvailableFromAt:

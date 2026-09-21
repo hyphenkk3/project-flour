@@ -2,6 +2,11 @@ import {
   dineInVenueLabel,
   parseDineInVenue,
 } from "@/engines/business-calendar/dine-in-hours";
+import {
+  dineInSplitSeatingStaffLabel,
+  formatDineInPartyComposition,
+  parseDineInPartyCounts,
+} from "@/engines/orders/dine-in-party";
 import { formatPickupClockLabel } from "@/engines/business-calendar/pickup-schedule";
 import {
   recipientNotifyPreferenceLabel,
@@ -66,6 +71,8 @@ export type WaitingListConfirmationReviewDineIn = {
   reservationTime: string;
   servingTime: string;
   guestCount: number | null;
+  partyLabel: string | null;
+  splitSeatingLabel: string | null;
   note: string | null;
 };
 
@@ -380,7 +387,13 @@ export function parseWaitingListConfirmationReview(input: {
 
   const venue = parseDineInVenue(dineInRaw?.venue);
   const reservationTime = asTrimmed(dineInRaw?.reservation_time);
-  const guestCountRaw = Number(dineInRaw?.guest_count ?? 0);
+  const party = parseDineInPartyCounts({
+    adultCount: dineInRaw?.adult_count,
+    kidCount: dineInRaw?.kid_count,
+    toddlerCount: dineInRaw?.toddler_count,
+    guestCount: dineInRaw?.guest_count,
+  });
+  const guestCount = party.ok ? party.counts.totalGuestCount : null;
 
   return {
     customerName: asTrimmed(payload.customer_name),
@@ -419,9 +432,13 @@ export function parseWaitingListConfirmationReview(input: {
             servingTime: selectedTime
               ? formatPickupClockLabel(selectedTime)
               : "",
-            guestCount:
-              Number.isFinite(guestCountRaw) && guestCountRaw > 0
-                ? Math.floor(guestCountRaw)
+            guestCount,
+            partyLabel: party.ok
+              ? formatDineInPartyComposition(party.counts)
+              : null,
+            splitSeatingLabel:
+              venue && guestCount != null
+                ? dineInSplitSeatingStaffLabel(venue, guestCount)
                 : null,
             note: asTrimmed(dineInRaw?.reservation_note) || null,
           }

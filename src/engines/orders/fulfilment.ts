@@ -138,9 +138,7 @@ export function buildWorkspaceFulfilmentViewModel(order: {
   const isDelivery = order.fulfilmentMethod === "delivery";
   const isDineIn = order.fulfilmentMethod === "dine_in";
   const delivery = isDelivery ? order.delivery : null;
-  const dineInReservation = isDineIn
-    ? (order.dineInReservation ?? null)
-    : null;
+  const dineInReservation = isDineIn ? (order.dineInReservation ?? null) : null;
   const recipientSameAsCustomer = isDeliveryRecipientSameAsOrderingCustomer({
     customerName: order.customerName,
     customerPhone: order.phone,
@@ -528,7 +526,9 @@ export function mapOrderDeliveryDetails(
       resolvedBy: trimOptionalNull(row.delivery_fee_request_resolved_by),
       resolvedByName: null,
       resolvedAt: trimOptionalNull(row.delivery_fee_request_resolved_at),
-      resolutionNote: trimOptionalNull(row.delivery_fee_request_resolution_note),
+      resolutionNote: trimOptionalNull(
+        row.delivery_fee_request_resolution_note,
+      ),
     };
   } else if (
     String(row.fee_request_kind ?? "").trim() === "delivery_waiver" &&
@@ -553,7 +553,9 @@ export function mapOrderDeliveryDetails(
   const processingStatus = normalizeFeeRequestStatus(
     row.processing_fee_request_status,
   );
-  const processingKindRaw = String(row.processing_fee_request_kind ?? "").trim();
+  const processingKindRaw = String(
+    row.processing_fee_request_kind ?? "",
+  ).trim();
   const processingKind =
     processingKindRaw === "processing_override" ||
     processingKindRaw === "processing_waiver"
@@ -694,8 +696,7 @@ export function fulfilmentMateriallyDiffer(
   before: FulfilmentTruth,
   after: FulfilmentTruth,
 ): boolean {
-  const beforeMethod =
-    before.method === "delivery" ? "delivery" : "pickup";
+  const beforeMethod = before.method === "delivery" ? "delivery" : "pickup";
   const afterMethod = after.method === "delivery" ? "delivery" : "pickup";
   // Owner Workspace only Pickup|Delivery; drive_through treated as non-delivery.
   if (beforeMethod !== afterMethod) return true;
@@ -851,9 +852,7 @@ export function buildQuickViewFulfilmentSummary(order: {
 export function isPickupCrewMessageAvailable(
   fulfilmentMethod: StorefrontOrderFulfilmentMethod | null | undefined,
 ): boolean {
-  return (
-    fulfilmentMethod !== "delivery" && fulfilmentMethod !== "dine_in"
-  );
+  return fulfilmentMethod !== "delivery" && fulfilmentMethod !== "dine_in";
 }
 
 export type CustomerWebsiteFulfilmentMethod = "pickup" | "dine_in" | "delivery";
@@ -872,6 +871,10 @@ export function mapOrderDineInReservation(
         reservation_time?: string | null;
         venue?: string | null;
         guest_count?: number | string | null;
+        adult_count?: number | string | null;
+        kid_count?: number | string | null;
+        toddler_count?: number | string | null;
+        whitebird_split_seating_acknowledged?: boolean | null;
         reservation_note?: string | null;
         status?: string | null;
       }
@@ -883,15 +886,32 @@ export function mapOrderDineInReservation(
   if (!Number.isInteger(guestCount) || guestCount < 1) return null;
   const reservationDate = String(row.reservation_date ?? "").slice(0, 10);
   const reservationTime = String(row.reservation_time ?? "").slice(0, 5);
-  const venueRaw = String(row.venue ?? "").trim().toLowerCase();
-  const venue = venueRaw === "hyphen" || venueRaw === "whitebird" ? venueRaw : null;
+  const venueRaw = String(row.venue ?? "")
+    .trim()
+    .toLowerCase();
+  const venue =
+    venueRaw === "hyphen" || venueRaw === "whitebird" ? venueRaw : null;
   if (!reservationDate || !reservationTime || !venue) return null;
   const note = String(row.reservation_note ?? "").trim();
+  const adultRaw = Number(row.adult_count);
+  const kidRaw = Number(row.kid_count);
+  const toddlerRaw = Number(row.toddler_count);
+  const adultCount =
+    Number.isInteger(adultRaw) && adultRaw >= 0 ? adultRaw : guestCount;
+  const kidCount = Number.isInteger(kidRaw) && kidRaw >= 0 ? kidRaw : 0;
+  const toddlerCount =
+    Number.isInteger(toddlerRaw) && toddlerRaw >= 0 ? toddlerRaw : 0;
+  const totalMatches = adultCount + kidCount + toddlerCount === guestCount;
   return {
     reservationDate,
     reservationTime,
     venue,
     guestCount,
+    adultCount: totalMatches ? adultCount : guestCount,
+    kidCount: totalMatches ? kidCount : 0,
+    toddlerCount: totalMatches ? toddlerCount : 0,
+    whitebirdSplitSeatingAcknowledged:
+      row.whitebird_split_seating_acknowledged === true,
     reservationNote: note.length > 0 ? note : null,
     status: String(row.status ?? "pending") || "pending",
   };

@@ -5,12 +5,16 @@ import {
   dineInVenueLabel,
   type DineInVenue,
 } from "@/engines/business-calendar/dine-in-hours";
+import { parseDineInPartyCounts } from "@/engines/orders/dine-in-party";
 import {
   CUSTOMER_PAID_ADDON_QUANTITY,
   type CustomerComplimentaryOption,
   type CustomerPaidAddonOption,
 } from "@/engines/orders/customer-preorder-options";
-import { workspaceFulfilmentSectionTitle, type CustomerWebsiteFulfilmentMethod } from "@/engines/orders/fulfilment";
+import {
+  workspaceFulfilmentSectionTitle,
+  type CustomerWebsiteFulfilmentMethod,
+} from "@/engines/orders/fulfilment";
 import { formatShortBusinessDate } from "@/lib/dates";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
@@ -86,10 +90,12 @@ function confirmFulfilmentDetails(fields: PreorderDraftFields): string[] {
     if (fields.dineInVenue === "hyphen" || fields.dineInVenue === "whitebird") {
       details.push(dineInVenueLabel(fields.dineInVenue as DineInVenue));
     }
-    const guests = Number(fields.guestCount);
-    if (fields.guestCount.trim()) {
+    const parsed = parseDineInPartyCounts(fields);
+    if (parsed.ok) {
       details.push(
-        `${fields.guestCount} ${guests === 1 ? "guest" : "guests"}`,
+        `${parsed.counts.totalGuestCount} ${
+          parsed.counts.totalGuestCount === 1 ? "guest" : "guests"
+        }`,
       );
     }
     if (fields.reservationTime) {
@@ -255,105 +261,105 @@ export function CheckoutConfirmPrompt({
       labelledBy={titleId}
       panelClassName="border-fog bg-mist text-ink flex w-full max-w-md max-h-[min(85dvh,40rem)] flex-col overflow-hidden rounded-t-lg border md:rounded-lg"
     >
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-5">
-          <p className="text-signal text-[11px] font-medium tracking-[0.22em] uppercase">
-            Whitebird
-          </p>
-          <h2
-            className="font-display text-ink mt-1 text-2xl tracking-tight"
-            id={titleId}
-          >
-            Confirm Your Order
-          </h2>
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-5">
+        <p className="text-signal text-[11px] font-medium tracking-[0.22em] uppercase">
+          Whitebird
+        </p>
+        <h2
+          className="font-display text-ink mt-1 text-2xl tracking-tight"
+          id={titleId}
+        >
+          Confirm Your Order
+        </h2>
 
-          <div className="mt-5 space-y-5">
-            <ConfirmBlock label="Collection">
-              <p className="font-medium">{snapshot.collectionDate}</p>
-              {snapshot.collectionTime ? (
-                <p className="text-skyline">{snapshot.collectionTime}</p>
-              ) : null}
-            </ConfirmBlock>
-
-            <ConfirmBlock label="Your Order">
-              <ul className="divide-fog divide-y">
-                {snapshot.lines.map((line) => (
-                  <li
-                    className="flex items-start justify-between gap-4 py-2 first:pt-0 last:pb-0"
-                    key={line.key}
-                  >
-                    <div className="min-w-0">
-                      <p className="font-medium">{line.name}</p>
-                      <p className="text-skyline mt-0.5">
-                        {line.sizeLabel
-                          ? `${line.sizeLabel} · Qty ${line.quantity}`
-                          : `Qty ${line.quantity}`}
-                      </p>
-                    </div>
-                    {line.complimentary ? (
-                      <p className="text-skyline shrink-0">Complimentary</p>
-                    ) : (
-                      <p className="shrink-0 font-medium tabular-nums">
-                        {formatRm(line.linePrice)}
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </ConfirmBlock>
-
-            <div className="border-fog flex items-baseline justify-between gap-3 border-t pt-3">
-              <p className="text-ink text-sm font-medium">Total</p>
-              <p className="font-display text-ink text-xl tracking-tight tabular-nums">
-                {formatRm(snapshot.total)}
-              </p>
-            </div>
-
-            <ConfirmBlock label="Customer">
-              <p className="font-medium">{snapshot.customerName}</p>
-              <p className="text-skyline">{snapshot.customerPhone}</p>
-            </ConfirmBlock>
-
-            <ConfirmBlock label="Fulfilment">
-              <p className="font-medium">{snapshot.fulfilmentLabel}</p>
-              {snapshot.fulfilmentDetails.map((detail) => (
-                <p className="text-skyline" key={detail}>
-                  {detail}
-                </p>
-              ))}
-            </ConfirmBlock>
-
-            {snapshot.notes ? (
-              <ConfirmBlock label="Notes">
-                <p className="whitespace-pre-wrap">{snapshot.notes}</p>
-              </ConfirmBlock>
+        <div className="mt-5 space-y-5">
+          <ConfirmBlock label="Collection">
+            <p className="font-medium">{snapshot.collectionDate}</p>
+            {snapshot.collectionTime ? (
+              <p className="text-skyline">{snapshot.collectionTime}</p>
             ) : null}
-          </div>
-        </div>
+          </ConfirmBlock>
 
-        <div className="border-fog shrink-0 border-t px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:pb-5">
-          <p className="text-ink text-sm font-medium">
-            Would you like to confirm this order?
-          </p>
-          <div className="mt-4 flex flex-col gap-3">
-            <button
-              className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 cursor-pointer items-center justify-center rounded-md px-6 text-sm font-medium transition duration-200 disabled:opacity-60"
-              disabled={pending}
-              onClick={onConfirm}
-              ref={confirmRef}
-              type="button"
-            >
-              {pending ? "Submitting…" : "Confirm Order"}
-            </button>
-            <button
-              className="text-ink hover:text-skyline inline-flex min-h-12 cursor-pointer items-center justify-center rounded-md px-6 text-sm font-medium transition-colors duration-200 disabled:opacity-60"
-              disabled={pending}
-              onClick={onGoBack}
-              type="button"
-            >
-              Go Back
-            </button>
+          <ConfirmBlock label="Your Order">
+            <ul className="divide-fog divide-y">
+              {snapshot.lines.map((line) => (
+                <li
+                  className="flex items-start justify-between gap-4 py-2 first:pt-0 last:pb-0"
+                  key={line.key}
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium">{line.name}</p>
+                    <p className="text-skyline mt-0.5">
+                      {line.sizeLabel
+                        ? `${line.sizeLabel} · Qty ${line.quantity}`
+                        : `Qty ${line.quantity}`}
+                    </p>
+                  </div>
+                  {line.complimentary ? (
+                    <p className="text-skyline shrink-0">Complimentary</p>
+                  ) : (
+                    <p className="shrink-0 font-medium tabular-nums">
+                      {formatRm(line.linePrice)}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </ConfirmBlock>
+
+          <div className="border-fog flex items-baseline justify-between gap-3 border-t pt-3">
+            <p className="text-ink text-sm font-medium">Total</p>
+            <p className="font-display text-ink text-xl tracking-tight tabular-nums">
+              {formatRm(snapshot.total)}
+            </p>
           </div>
+
+          <ConfirmBlock label="Customer">
+            <p className="font-medium">{snapshot.customerName}</p>
+            <p className="text-skyline">{snapshot.customerPhone}</p>
+          </ConfirmBlock>
+
+          <ConfirmBlock label="Fulfilment">
+            <p className="font-medium">{snapshot.fulfilmentLabel}</p>
+            {snapshot.fulfilmentDetails.map((detail) => (
+              <p className="text-skyline" key={detail}>
+                {detail}
+              </p>
+            ))}
+          </ConfirmBlock>
+
+          {snapshot.notes ? (
+            <ConfirmBlock label="Notes">
+              <p className="whitespace-pre-wrap">{snapshot.notes}</p>
+            </ConfirmBlock>
+          ) : null}
         </div>
+      </div>
+
+      <div className="border-fog shrink-0 border-t px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:pb-5">
+        <p className="text-ink text-sm font-medium">
+          Would you like to confirm this order?
+        </p>
+        <div className="mt-4 flex flex-col gap-3">
+          <button
+            className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 cursor-pointer items-center justify-center rounded-md px-6 text-sm font-medium transition duration-200 disabled:opacity-60"
+            disabled={pending}
+            onClick={onConfirm}
+            ref={confirmRef}
+            type="button"
+          >
+            {pending ? "Submitting…" : "Confirm Order"}
+          </button>
+          <button
+            className="text-ink hover:text-skyline inline-flex min-h-12 cursor-pointer items-center justify-center rounded-md px-6 text-sm font-medium transition-colors duration-200 disabled:opacity-60"
+            disabled={pending}
+            onClick={onGoBack}
+            type="button"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
     </StorefrontOverlay>
   );
 }

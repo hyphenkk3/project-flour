@@ -6,9 +6,12 @@ import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours
 import {
   isValidDineInReservationPair,
   isValidDineInSlot,
-  parseDineInVenue,
-  parseGuestCount,
 } from "@/engines/business-calendar/dine-in-hours";
+import {
+  buildDineInReservationRpcPayload,
+  validateDineInPartyFromForm,
+  type DineInReservationRpcPayload,
+} from "@/engines/orders/dine-in-party";
 import {
   earliestPickupDateYmd,
   isValidPickupSlot,
@@ -236,8 +239,7 @@ export async function submitGuestPreorderAction(
     return { error: ORDERS_CLOSED_RPC_MESSAGE };
   }
 
-  let guestCount: number | null = null;
-  let dineInVenue: ReturnType<typeof parseDineInVenue> = null;
+  let dineInPayload: DineInReservationRpcPayload | null = null;
   let reservationTime = "";
   let deliveryDraft: DeliveryCreateDraft | null = null;
   const hoursSnapshot = await loadOperatingHoursSnapshot();
@@ -269,20 +271,16 @@ export async function submitGuestPreorderAction(
         error: "Please choose a valid cake serving time for that date.",
       };
     }
-    guestCount = parseGuestCount(formData.get("guest_count"));
-    if (guestCount == null) {
-      return { error: "Please enter how many guests are dining in." };
-    }
-    dineInVenue = parseDineInVenue(formData.get("dine_in_venue"));
-    if (dineInVenue == null) {
-      return { error: "Please choose where you would like to sit." };
+    const partyResult = validateDineInPartyFromForm(formData, true);
+    if (!partyResult.ok) {
+      return { error: partyResult.error };
     }
     if (
       !isValidDineInReservationPair({
         dateYmd: pickupDate,
         reservationTime,
         servingTime: pickupTime,
-        venue: dineInVenue,
+        venue: partyResult.party.venue,
         snapshot: hoursSnapshot,
       })
     ) {
@@ -291,6 +289,12 @@ export async function submitGuestPreorderAction(
           "Cake serving time must be within 1 hour of the reservation time, and the venue must be available for both times.",
       };
     }
+    dineInPayload = buildDineInReservationRpcPayload({
+      party: partyResult.party,
+      reservationTime,
+      reservationNote:
+        String(formData.get("reservation_note") ?? "").trim() || null,
+    });
   } else {
     if (
       !pickupTime ||
@@ -468,16 +472,7 @@ export async function submitGuestPreorderAction(
             delivery: deliveryDraft,
           }).p_delivery
         : null,
-    p_dine_in:
-      fulfilmentMethod === "dine_in" && guestCount != null && dineInVenue
-        ? {
-            venue: dineInVenue,
-            guest_count: guestCount,
-            reservation_time: reservationTime,
-            reservation_note:
-              String(formData.get("reservation_note") ?? "").trim() || null,
-          }
-        : null,
+    p_dine_in: fulfilmentMethod === "dine_in" ? dineInPayload : null,
   };
   if (optionCatalog.ready) {
     rpcArgs.p_complimentary = complimentary;
@@ -720,7 +715,9 @@ export async function loadCheckoutCalendarContext(input: {
   pickupQuery?: string | null;
   toQuery?: string | null;
 }): Promise<CheckoutCalendarContext> {
-  const cakeIds = [...new Set((input.cakeIds ?? []).map((id) => id.trim()).filter(Boolean))];
+  const cakeIds = [
+    ...new Set((input.cakeIds ?? []).map((id) => id.trim()).filter(Boolean)),
+  ];
   const earliest = earliestPickupDateYmd();
   const [catalogues, specials, hoursSnapshot, memberships] = await Promise.all([
     listOrderableMonthlyCatalogues(),
@@ -762,9 +759,7 @@ export async function loadCheckoutCalendarContext(input: {
   }
   const closedDates = await listClosedPickupOrderDates(rangeMin, rangeMax);
   const entrySpecialUnavailableDates =
-    scopeFrom &&
-    scopeTo &&
-    isFullMonthPickupScope(scopeFrom, scopeTo)
+    scopeFrom && scopeTo && isFullMonthPickupScope(scopeFrom, scopeTo)
       ? [
           ...new Set(
             specials

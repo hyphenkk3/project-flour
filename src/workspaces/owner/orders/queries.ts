@@ -101,6 +101,10 @@ type OrderRow = {
         reservation_time: string;
         venue: string;
         guest_count: number;
+        adult_count?: number;
+        kid_count?: number;
+        toddler_count?: number;
+        whitebird_split_seating_acknowledged?: boolean;
         reservation_note: string | null;
         status: string;
       }
@@ -109,6 +113,10 @@ type OrderRow = {
         reservation_time: string;
         venue: string;
         guest_count: number;
+        adult_count?: number;
+        kid_count?: number;
+        toddler_count?: number;
+        whitebird_split_seating_acknowledged?: boolean;
         reservation_note: string | null;
         status: string;
       }[]
@@ -232,8 +240,7 @@ function mapOrder(
   const paidAddons = normalizePaidAddonLines(row.order_paid_addons)
     .map(mapPaidAddon)
     .sort(
-      (a, b) =>
-        a.sortOrder - b.sortOrder || a.code.localeCompare(b.code, "en"),
+      (a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code, "en"),
     );
   const complimentaryItems = [...(row.order_complimentary_items ?? [])]
     .map(mapComplimentary)
@@ -403,6 +410,10 @@ const orderSelect = `
     reservation_time,
     venue,
     guest_count,
+    adult_count,
+    kid_count,
+    toddler_count,
+    whitebird_split_seating_acknowledged,
     reservation_note,
     status
   ),
@@ -519,7 +530,7 @@ function mapListItem(row: OrderRow): StorefrontOrderListItem {
     paymentDeadlineAt: order.paymentDeadlineAt,
     hasPendingFeeRequest: Boolean(
       order.delivery?.deliveryFeeRequest.status === "pending" ||
-        order.delivery?.processingFeeRequest.status === "pending",
+      order.delivery?.processingFeeRequest.status === "pending",
     ),
   };
 }
@@ -621,16 +632,15 @@ async function loadOrderFinancials(orderId: string): Promise<{
       reason: (row.reason as string | null) ?? null,
       metadata: (row.metadata as Record<string, unknown> | null) ?? {},
       status: ((row.status as string | null) ?? "active") as
-        | "active"
-        | "reversed",
+        "active" | "reversed",
       reversesAdjustmentId:
         (row.reverses_adjustment_id as string | null) ?? null,
       createdAt: row.created_at as string,
     }),
   );
 
-  const paymentAllocations: OrderPaymentAllocationView[] = allocationRows.flatMap(
-    (raw) => {
+  const paymentAllocations: OrderPaymentAllocationView[] =
+    allocationRows.flatMap((raw) => {
       const row = raw as {
         id: string;
         payment_id: string;
@@ -648,9 +658,7 @@ async function loadOrderFinancials(orderId: string): Promise<{
               verified_at: string;
               created_at: string;
               staff_profiles?:
-                | { display_name: string }
-                | { display_name: string }[]
-                | null;
+                { display_name: string } | { display_name: string }[] | null;
             }
           | {
               status: string;
@@ -662,9 +670,7 @@ async function loadOrderFinancials(orderId: string): Promise<{
               verified_at: string;
               created_at: string;
               staff_profiles?:
-                | { display_name: string }
-                | { display_name: string }[]
-                | null;
+                { display_name: string } | { display_name: string }[] | null;
             }[]
           | null;
       };
@@ -688,8 +694,7 @@ async function loadOrderFinancials(orderId: string): Promise<{
           createdAt: row.created_at ?? payment.created_at,
         },
       ];
-    },
-  );
+    });
 
   const refunds: OrderRefundView[] = (refundsRes.data ?? []).map((row) => ({
     id: row.id as string,
@@ -807,8 +812,12 @@ export async function listOrderTimeline(
 
   return (data ?? []).map((row) => {
     const staff = relationOne(
-      (row as { staff_profiles?: { display_name: string } | { display_name: string }[] | null })
-        .staff_profiles,
+      (
+        row as {
+          staff_profiles?:
+            { display_name: string } | { display_name: string }[] | null;
+        }
+      ).staff_profiles,
     );
     return {
       id: row.id as string,
@@ -842,7 +851,8 @@ export async function listConfirmationSnapshots(
     version: row.version as number,
     lifecycleStatus: row.lifecycle_status as "sent" | "outdated",
     messageBody: row.message_body as string,
-    snapshotPayload: row.snapshot_payload as ConfirmationSnapshot["snapshotPayload"],
+    snapshotPayload:
+      row.snapshot_payload as ConfirmationSnapshot["snapshotPayload"],
     preparedBy: (row.prepared_by as string | null) ?? null,
     preparedAt: (row.prepared_at as string | null) ?? null,
     sentBy: (row.sent_by as string | null) ?? null,
@@ -886,9 +896,7 @@ export async function listCollectionComplimentaryOptions(
   return (data ?? []).map((row) => {
     const type = relationOne(
       row.complimentary_item_types as
-        | { id: string; name: string }
-        | { id: string; name: string }[]
-        | null,
+        { id: string; name: string } | { id: string; name: string }[] | null,
     );
     return {
       typeId: type?.id ?? "",
@@ -925,8 +933,6 @@ export async function listActivePaidAddonTypes(): Promise<PaidAddonType[]> {
     financialShorthand: row.financial_shorthand as string,
     isActive: Boolean(row.is_active),
     sortOrder: Number(row.sort_order ?? 0),
-    maxQuantity: Number(
-      (row as { max_quantity?: number }).max_quantity ?? 3,
-    ),
+    maxQuantity: Number((row as { max_quantity?: number }).max_quantity ?? 3),
   }));
 }

@@ -218,7 +218,9 @@ assert.deepEqual(managerNavIds, [
   "library",
 ]);
 
-const vivianNavIds = getNavigationForRole("customer_operations").map((i) => i.id);
+const vivianNavIds = getNavigationForRole("customer_operations").map(
+  (i) => i.id,
+);
 assert.deepEqual(vivianNavIds, [
   "home",
   "owner",
@@ -302,6 +304,9 @@ const pendingDineInOrder: CollectionBoardOrder = {
     reservationTime: "14:00:00",
     venue: "hyphen",
     guestCount: 2,
+    adultCount: 2,
+    kidCount: 0,
+    toddlerCount: 0,
     reservationNote: null,
   },
 };
@@ -318,6 +323,9 @@ const completedDineInOrder: CollectionBoardOrder = {
     reservationTime: "15:00:00",
     venue: "whitebird",
     guestCount: 4,
+    adultCount: 4,
+    kidCount: 0,
+    toddlerCount: 0,
     reservationNote: null,
   },
 };
@@ -368,10 +376,22 @@ const dineInModel = buildHomeCockpitModel({
 assert.equal(dineInModel.summary.dineInsToday, 2);
 assert.equal(dineInModel.summary.pickupsToday, 3);
 assert.equal(dineInModel.summary.deliveriesToday, 1);
-assert.equal(dineInModel.summary.ready, 1, "dine-in ready must not increment Ready");
+assert.equal(
+  dineInModel.summary.ready,
+  1,
+  "dine-in ready must not increment Ready",
+);
 assert.equal(dineInModel.handoffs.ready, 1, "pickup Ready queue unchanged");
-assert.equal(dineInModel.handoffs.pickedUp, 1, "completed dine-in is not Picked Up");
-assert.equal(dineInModel.handoffs.delivered, 1, "completed dine-in is not Delivered");
+assert.equal(
+  dineInModel.handoffs.pickedUp,
+  1,
+  "completed dine-in is not Picked Up",
+);
+assert.equal(
+  dineInModel.handoffs.delivered,
+  1,
+  "completed dine-in is not Delivered",
+);
 assert.equal(dineInModel.handoffs.outForDelivery, 0);
 
 const deliveryOutModel = buildHomeCockpitModel({
@@ -501,11 +521,17 @@ assert.equal(dineInModel.handoffs.dineInPending, 1);
 assert.equal(dineInModel.handoffs.dineInCompleted, 1);
 assert.equal(dineInModel.handoffs.dineInPreview[0]?.guestName, "Gia");
 assert.equal(dineInModel.handoffs.dineInPreview[0]?.venue, "hyphen");
-assert.equal(dineInModel.handoffs.dineInPreview[0]?.reservationTime, "14:00:00");
+assert.equal(
+  dineInModel.handoffs.dineInPreview[0]?.reservationTime,
+  "14:00:00",
+);
 assert.equal(dineInModel.handoffs.dineInPreview[0]?.servingTime, "15:00:00");
 assert.equal(dineInModel.handoffs.dineInPreview[0]?.guestCount, 2);
 assert.equal(dineInModel.handoffs.dineInCompletedPreview[0]?.guestName, "Han");
-assert.equal(dineInModel.handoffs.dineInCompletedPreview[0]?.venue, "whitebird");
+assert.equal(
+  dineInModel.handoffs.dineInCompletedPreview[0]?.venue,
+  "whitebird",
+);
 
 const dineInOnly = buildHomeCockpitModel({
   orders: [
@@ -608,10 +634,7 @@ assert.match(
   /flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-x-3 sm:gap-y-1/,
 );
 assert.match(uiSrc, /mb-3 flex items-end justify-between gap-3/);
-assert.match(
-  uiSrc,
-  /flex flex-wrap items-center justify-end gap-x-3 gap-y-1/,
-);
+assert.match(uiSrc, /flex flex-wrap items-center justify-end gap-x-3 gap-y-1/);
 assert.match(uiSrc, /Pickup Ready/);
 assert.match(uiSrc, /Delivery Ready/);
 assert.match(uiSrc, /collectionDateNavHref\(model\.todayYmd, "dine_in"\)/);
@@ -632,11 +655,11 @@ assert.doesNotMatch(uiSrc, /canOverrideDiscountEligibility/);
 assert.doesNotMatch(uiSrc, /Propose EXTRA/);
 assert.doesNotMatch(uiSrc, /Mark Ready/);
 
-const pageSrcAfter = readFileSync(resolve("src/app/(app)/home/page.tsx"), "utf8");
-assert.match(
-  pageSrcAfter,
-  /preferCalendarScheduleCta=\{role === "owner"\}/,
+const pageSrcAfter = readFileSync(
+  resolve("src/app/(app)/home/page.tsx"),
+  "utf8",
 );
+assert.match(pageSrcAfter, /preferCalendarScheduleCta=\{role === "owner"\}/);
 
 const modelSrc = readFileSync(
   resolve("src/workspaces/home/cockpit-model.ts"),
@@ -706,8 +729,9 @@ assert.ok(
   assert.equal(futureOnly.summary.ordersToday, 0);
   assert.equal(futureOnly.summary.needAttention, 3);
   assert.equal(
-    futureOnly.attentionGroups.find((group) => group.key === "prepare_confirmation")
-      ?.count,
+    futureOnly.attentionGroups.find(
+      (group) => group.key === "prepare_confirmation",
+    )?.count,
     3,
   );
   assert.equal(
@@ -720,10 +744,11 @@ assert.ok(
     ),
     false,
   );
-  assert.deepEqual(
-    futureOnly.attentionPreview.map((item) => item.id).sort(),
-    ["future-sub-delivery", "future-sub-dine", "future-sub-pickup"],
-  );
+  assert.deepEqual(futureOnly.attentionPreview.map((item) => item.id).sort(), [
+    "future-sub-delivery",
+    "future-sub-dine",
+    "future-sub-pickup",
+  ]);
 }
 
 {
@@ -810,11 +835,7 @@ assert.ok(
     };
   }
 
-  const operatorRoles: RoleCode[] = [
-    "owner",
-    "manager",
-    "customer_operations",
-  ];
+  const operatorRoles: RoleCode[] = ["owner", "manager", "customer_operations"];
   for (const role of operatorRoles) {
     const { capabilities, model: roleModel } = homeAttentionForRole(role);
     assert.equal(
@@ -823,8 +844,9 @@ assert.ok(
       `${role} can prepare confirmation`,
     );
     assert.equal(
-      roleModel.attentionGroups.find((group) => group.key === "prepare_confirmation")
-        ?.count,
+      roleModel.attentionGroups.find(
+        (group) => group.key === "prepare_confirmation",
+      )?.count,
       1,
       `${role} Home shows Confirmation not prepared`,
     );
@@ -842,7 +864,9 @@ assert.ok(
       `${role} Home keeps Waiting for customer confirmation`,
     );
     assert.equal(roleModel.summary.needAttention, 3);
-    assert.ok(roleModel.attentionPreview.some((item) => item.id === "sub-home"));
+    assert.ok(
+      roleModel.attentionPreview.some((item) => item.id === "sub-home"),
+    );
   }
 
   for (const role of ["bakery", "collection"] as const) {
@@ -877,8 +901,12 @@ assert.ok(
       roleModel.attentionPreview.some((item) => item.id === "sub-home"),
       false,
     );
-    assert.ok(roleModel.attentionPreview.some((item) => item.id === "pay-home"));
-    assert.ok(roleModel.attentionPreview.some((item) => item.id === "conf-home"));
+    assert.ok(
+      roleModel.attentionPreview.some((item) => item.id === "pay-home"),
+    );
+    assert.ok(
+      roleModel.attentionPreview.some((item) => item.id === "conf-home"),
+    );
   }
 }
 

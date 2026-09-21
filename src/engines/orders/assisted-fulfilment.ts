@@ -8,10 +8,12 @@ import { isValidDeliverySlot } from "@/engines/business-calendar/delivery-hours"
 import {
   isValidDineInReservationPair,
   isValidDineInSlot,
-  parseDineInVenue,
-  parseGuestCount,
   type DineInVenue,
 } from "@/engines/business-calendar/dine-in-hours";
+import {
+  buildDineInReservationRpcPayload,
+  validateDineInParty,
+} from "@/engines/orders/dine-in-party";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
@@ -43,21 +45,31 @@ export const ASSISTED_ORDER_FULFILMENT_OPTIONS = [
 export type AssistedDineInDraft = {
   reservationTime: string;
   venue: string;
+  adultCount: string;
+  kidCount: string;
+  toddlerCount: string;
   guestCount: string;
   reservationNote: string;
 };
 
 export type AssistedDineInRpcPayload = {
   venue: DineInVenue;
+  adult_count: number;
+  kid_count: number;
+  toddler_count: number;
   guest_count: number;
   reservation_time: string;
   reservation_note: string | null;
+  whitebird_split_seating_acknowledged: boolean;
 };
 
 export function defaultAssistedDineInDraft(): AssistedDineInDraft {
   return {
     reservationTime: "",
     venue: "",
+    adultCount: "",
+    kidCount: "",
+    toddlerCount: "",
     guestCount: "",
     reservationNote: "",
   };
@@ -66,17 +78,21 @@ export function defaultAssistedDineInDraft(): AssistedDineInDraft {
 export function buildAssistedDineInRpcPayload(
   draft: AssistedDineInDraft,
 ): AssistedDineInRpcPayload | null {
-  const venue = parseDineInVenue(draft.venue);
-  const guestCount = parseGuestCount(draft.guestCount);
   const reservationTime = draft.reservationTime.trim().slice(0, 5);
-  if (!venue || guestCount == null || !reservationTime) return null;
-  const note = draft.reservationNote.trim();
-  return {
-    venue,
-    guest_count: guestCount,
-    reservation_time: reservationTime,
-    reservation_note: note.length > 0 ? note : null,
-  };
+  const party = validateDineInParty({
+    venue: draft.venue,
+    adultCount: draft.adultCount,
+    kidCount: draft.kidCount,
+    toddlerCount: draft.toddlerCount,
+    guestCount: draft.guestCount,
+    requireAcknowledgement: false,
+  });
+  if (!party.ok || !reservationTime) return null;
+  return buildDineInReservationRpcPayload({
+    party: party.party,
+    reservationTime,
+    reservationNote: draft.reservationNote.trim() || null,
+  });
 }
 
 export function buildAssistedFulfilmentRpcParams(input: {
@@ -114,7 +130,9 @@ export function buildAssistedFulfilmentRpcParams(input: {
 }
 
 export function parseOwnerSpecialArrangementFlag(value: unknown): boolean {
-  const raw = String(value ?? "").trim().toLowerCase();
+  const raw = String(value ?? "")
+    .trim()
+    .toLowerCase();
   return raw === "1" || raw === "true" || raw === "on" || raw === "yes";
 }
 
@@ -189,20 +207,21 @@ export function validateAssistedOwnerOverrideFulfilment(input: {
   if (!isValidClockPickupTime(timeValue)) {
     return "Please choose a cake serving time.";
   }
-  const guestCount = parseGuestCount(input.dineIn.guestCount);
-  if (guestCount == null) {
-    return "Please enter how many guests are dining in.";
-  }
-  const venue = parseDineInVenue(input.dineIn.venue);
-  if (venue == null) {
-    return "Please choose where you would like to sit.";
-  }
+  const party = validateDineInParty({
+    venue: input.dineIn.venue,
+    adultCount: input.dineIn.adultCount,
+    kidCount: input.dineIn.kidCount,
+    toddlerCount: input.dineIn.toddlerCount,
+    guestCount: input.dineIn.guestCount,
+    requireAcknowledgement: false,
+  });
+  if (!party.ok) return party.error;
   if (
     !isValidDineInReservationPair({
       dateYmd,
       reservationTime,
       servingTime: timeValue,
-      venue,
+      venue: party.party.venue,
       snapshot,
     })
   ) {
@@ -266,26 +285,30 @@ export function validateAssistedOrderFulfilment(input: {
   }
 
   const reservationTime = input.dineIn.reservationTime.trim().slice(0, 5);
-  if (!reservationTime || !isValidDineInSlot(dateYmd, reservationTime, snapshot)) {
+  if (
+    !reservationTime ||
+    !isValidDineInSlot(dateYmd, reservationTime, snapshot)
+  ) {
     return "Please choose a valid dine-in reservation time for that date.";
   }
   if (!isValidDineInSlot(dateYmd, timeValue, snapshot)) {
     return "Please choose a valid cake serving time for that date.";
   }
-  const guestCount = parseGuestCount(input.dineIn.guestCount);
-  if (guestCount == null) {
-    return "Please enter how many guests are dining in.";
-  }
-  const venue = parseDineInVenue(input.dineIn.venue);
-  if (venue == null) {
-    return "Please choose where you would like to sit.";
-  }
+  const party = validateDineInParty({
+    venue: input.dineIn.venue,
+    adultCount: input.dineIn.adultCount,
+    kidCount: input.dineIn.kidCount,
+    toddlerCount: input.dineIn.toddlerCount,
+    guestCount: input.dineIn.guestCount,
+    requireAcknowledgement: false,
+  });
+  if (!party.ok) return party.error;
   if (
     !isValidDineInReservationPair({
       dateYmd,
       reservationTime,
       servingTime: timeValue,
-      venue,
+      venue: party.party.venue,
       snapshot,
     })
   ) {

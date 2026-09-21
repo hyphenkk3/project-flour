@@ -38,6 +38,9 @@ export type CollectionOrderRow = {
         reservation_time: string | null;
         venue: string | null;
         guest_count: number | string | null;
+        adult_count?: number | string | null;
+        kid_count?: number | string | null;
+        toddler_count?: number | string | null;
         reservation_note: string | null;
         status: string | null;
       }
@@ -46,6 +49,9 @@ export type CollectionOrderRow = {
         reservation_time: string | null;
         venue: string | null;
         guest_count: number | string | null;
+        adult_count?: number | string | null;
+        kid_count?: number | string | null;
+        toddler_count?: number | string | null;
         reservation_note: string | null;
         status: string | null;
       }[]
@@ -87,7 +93,9 @@ function mapCakeLines(row: CollectionOrderRow): CollectionCakeLine[] {
     }));
 }
 
-function mapComplimentary(row: CollectionOrderRow): CollectionComplimentaryLine[] {
+function mapComplimentary(
+  row: CollectionOrderRow,
+): CollectionComplimentaryLine[] {
   return [...(row.order_complimentary_items ?? [])]
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((item) => ({
@@ -131,7 +139,9 @@ function firstDineInReservation(row: CollectionOrderRow) {
   return value ?? null;
 }
 
-function mapDineIn(row: CollectionOrderRow): CollectionDineInReservation | null {
+function mapDineIn(
+  row: CollectionOrderRow,
+): CollectionDineInReservation | null {
   const mapped = mapOrderDineInReservation(firstDineInReservation(row));
   if (!mapped) return null;
   return {
@@ -139,11 +149,16 @@ function mapDineIn(row: CollectionOrderRow): CollectionDineInReservation | null 
     reservationTime: mapped.reservationTime,
     venue: mapped.venue,
     guestCount: mapped.guestCount,
+    adultCount: mapped.adultCount,
+    kidCount: mapped.kidCount,
+    toddlerCount: mapped.toddlerCount,
     reservationNote: mapped.reservationNote,
   };
 }
 
-export function mapCollectionBoardOrder(row: CollectionOrderRow): CollectionBoardOrder {
+export function mapCollectionBoardOrder(
+  row: CollectionOrderRow,
+): CollectionBoardOrder {
   const phone = row.guest_phone?.trim() ?? "";
   return {
     id: row.id,

@@ -1,11 +1,14 @@
 "use server";
 
+import { isDineInVenueAvailable } from "@/engines/business-calendar/dine-in-hours";
 import {
-  isDineInVenueAvailable,
-  parseDineInVenue,
-  parseGuestCount,
-} from "@/engines/business-calendar/dine-in-hours";
-import { extraCartItemUnavailableMessage, extraSubmitCustomerError } from "@/engines/extra/customer-fresh-picks";
+  buildDineInReservationRpcPayload,
+  validateDineInPartyFromForm,
+} from "@/engines/orders/dine-in-party";
+import {
+  extraCartItemUnavailableMessage,
+  extraSubmitCustomerError,
+} from "@/engines/extra/customer-fresh-picks";
 import { isValidExtraCustomerFulfilment } from "@/engines/extra/fresh-picks-fulfilment";
 import {
   buildCreateStaffFulfilmentRpcParams,
@@ -186,19 +189,15 @@ export async function submitGuestExtraOrderAction(
   let deliveryPayload: Record<string, unknown> | null = null;
   if (fulfilmentMethod === "dine_in") {
     const reservationTime = pickupTime;
-    const guestCount = parseGuestCount(formData.get("guest_count"));
-    if (guestCount == null) {
-      return { error: "Please enter how many guests are dining in." };
-    }
-    const dineInVenue = parseDineInVenue(formData.get("dine_in_venue"));
-    if (dineInVenue == null) {
-      return { error: "Please choose where you would like to sit." };
+    const partyResult = validateDineInPartyFromForm(formData, true);
+    if (!partyResult.ok) {
+      return { error: partyResult.error };
     }
     if (
       !isDineInVenueAvailable(
         pickupDate,
         reservationTime,
-        dineInVenue,
+        partyResult.party.venue,
         hoursSnapshot,
       )
     ) {
@@ -206,13 +205,12 @@ export async function submitGuestExtraOrderAction(
         error: "Please choose a valid dine-in venue for that date and time.",
       };
     }
-    dineInPayload = {
-      venue: dineInVenue,
-      guest_count: guestCount,
-      reservation_time: reservationTime,
-      reservation_note:
+    dineInPayload = buildDineInReservationRpcPayload({
+      party: partyResult.party,
+      reservationTime,
+      reservationNote:
         String(formData.get("reservation_note") ?? "").trim() || null,
-    };
+    });
   } else if (fulfilmentMethod === "delivery") {
     const sameAsCustomer =
       String(formData.get("same_as_customer") ?? "") === "on" ||
@@ -256,7 +254,9 @@ export async function submitGuestExtraOrderAction(
   const allowedComplimentary = new Set(
     complimentaryOptions.map((option) => option.code),
   );
-  if (submittedComplimentaryCodes.some((code) => !allowedComplimentary.has(code))) {
+  if (
+    submittedComplimentaryCodes.some((code) => !allowedComplimentary.has(code))
+  ) {
     return { error: "Complimentary item is not available" };
   }
   const allowedPaid = new Set(paidAddonOptions.map((option) => option.code));

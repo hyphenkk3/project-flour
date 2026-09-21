@@ -22,6 +22,10 @@ export const COLLECTION_ORDER_SELECT = `
     reservation_time,
     venue,
     guest_count,
+    adult_count,
+    kid_count,
+    toddler_count,
+    whitebird_split_seating_acknowledged,
     reservation_note,
     status
   ),

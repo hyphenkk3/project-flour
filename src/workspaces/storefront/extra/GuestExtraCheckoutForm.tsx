@@ -13,12 +13,18 @@ import {
   FormSubmitButton,
   FormTextarea,
 } from "@/components/ui/form";
+import { DineInVenuePartyFields } from "@/components/ui/DineInVenuePartyFields";
 import {
   availableDineInVenues,
   dineInVenueLabel,
   parseDineInVenue,
   resolveDineInVenueSelection,
 } from "@/engines/business-calendar/dine-in-hours";
+import {
+  derivedGuestCountDraft,
+  parseDineInPartyCounts,
+  readDineInPartyDraftFields,
+} from "@/engines/orders/dine-in-party";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
@@ -120,7 +126,14 @@ export function GuestExtraCheckoutForm({
       cart?.fulfilmentMethod ?? "pickup",
     );
   const [dineInVenue, setDineInVenue] = useState(cart?.dineInVenue ?? "");
-  const [guestCount, setGuestCount] = useState(cart?.guestCount ?? "");
+  const cartParty = readDineInPartyDraftFields(cart ?? {});
+  const [adultCount, setAdultCount] = useState(cartParty.adultCount);
+  const [kidCount, setKidCount] = useState(cartParty.kidCount);
+  const [toddlerCount, setToddlerCount] = useState(cartParty.toddlerCount);
+  const [
+    whitebirdSplitSeatingAcknowledged,
+    setWhitebirdSplitSeatingAcknowledged,
+  ] = useState(cartParty.whitebirdSplitSeatingAcknowledged);
   const [reservationNote, setReservationNote] = useState(
     cart?.reservationNote ?? "",
   );
@@ -135,7 +148,9 @@ export function GuestExtraCheckoutForm({
   const [addressLine2, setAddressLine2] = useState(cart?.addressLine2 ?? "");
   const [postcode, setPostcode] = useState(cart?.postcode ?? "");
   const [city, setCity] = useState(cart?.city || OWNER_DELIVERY_CITY);
-  const [stateName, setStateName] = useState(cart?.state || OWNER_DELIVERY_STATE);
+  const [stateName, setStateName] = useState(
+    cart?.state || OWNER_DELIVERY_STATE,
+  );
   const [recipientNotifyPreference, setRecipientNotifyPreference] = useState(
     cart?.recipientNotifyPreference ?? "",
   );
@@ -151,7 +166,13 @@ export function GuestExtraCheckoutForm({
     setWishingCardMessage(cart.wishingCardMessage);
     setFulfilmentMethod(cart.fulfilmentMethod);
     setDineInVenue(cart.dineInVenue);
-    setGuestCount(cart.guestCount);
+    const nextParty = readDineInPartyDraftFields(cart);
+    setAdultCount(nextParty.adultCount);
+    setKidCount(nextParty.kidCount);
+    setToddlerCount(nextParty.toddlerCount);
+    setWhitebirdSplitSeatingAcknowledged(
+      nextParty.whitebirdSplitSeatingAcknowledged,
+    );
     setReservationNote(cart.reservationNote);
     setSameAsCustomer(cart.sameAsCustomer !== false);
     setRecipientName(cart.recipientName);
@@ -233,7 +254,9 @@ export function GuestExtraCheckoutForm({
       )
     : null;
   const usableSlots = methodAvailability?.slots ?? [];
-  const timeStillValid = usableSlots.some((slot) => slot.value === selectedTime);
+  const timeStillValid = usableSlots.some(
+    (slot) => slot.value === selectedTime,
+  );
   const dineInVenues = selectedDate
     ? availableDineInVenues(
         selectedDate,
@@ -256,21 +279,29 @@ export function GuestExtraCheckoutForm({
       const details: string[] = [];
       const venue = parseDineInVenue(resolvedVenue || dineInVenue);
       if (venue) details.push(dineInVenueLabel(venue));
-      if (guestCount.trim()) {
-        const n = Number(guestCount);
-        details.push(`${guestCount} ${n === 1 ? "guest" : "guests"}`);
+      const parsed = parseDineInPartyCounts({
+        adultCount,
+        kidCount,
+        toddlerCount,
+        guestCount: derivedGuestCountDraft({
+          adultCount,
+          kidCount,
+          toddlerCount,
+          whitebirdSplitSeatingAcknowledged,
+        }),
+      });
+      if (parsed.ok) {
+        details.push(
+          `${parsed.counts.totalGuestCount} ${
+            parsed.counts.totalGuestCount === 1 ? "guest" : "guests"
+          }`,
+        );
       }
       return details;
     }
     if (resolvedMethod === "delivery") {
       const details: string[] = [];
-      const address = [
-        addressLine1,
-        addressLine2,
-        postcode,
-        city,
-        stateName,
-      ]
+      const address = [addressLine1, addressLine2, postcode, city, stateName]
         .map((part) => part.trim())
         .filter(Boolean)
         .join(", ");
@@ -301,7 +332,16 @@ export function GuestExtraCheckoutForm({
         pickupTime: timeStillValid ? selectedTime : "",
         fulfilmentMethod: resolvedMethod,
         dineInVenue: resolvedVenue || dineInVenue,
-        guestCount,
+        adultCount,
+        kidCount,
+        toddlerCount,
+        guestCount: derivedGuestCountDraft({
+          adultCount,
+          kidCount,
+          toddlerCount,
+          whitebirdSplitSeatingAcknowledged,
+        }),
+        whitebirdSplitSeatingAcknowledged,
         reservationNote,
         sameAsCustomer,
         recipientName,
@@ -395,12 +435,20 @@ export function GuestExtraCheckoutForm({
       >
         {cart.items.map((item) => (
           <span key={item.extraStockId}>
-            <input name="extra_stock_id" type="hidden" value={item.extraStockId} />
+            <input
+              name="extra_stock_id"
+              type="hidden"
+              value={item.extraStockId}
+            />
             <input name="extra_cake_name" type="hidden" value={item.cakeName} />
           </span>
         ))}
         <input name="pickup_date" type="hidden" value={selectedDate} />
-        <input name="pickup_time" type="hidden" value={timeStillValid ? selectedTime : ""} />
+        <input
+          name="pickup_time"
+          type="hidden"
+          value={timeStillValid ? selectedTime : ""}
+        />
         <input name="fulfilment_method" type="hidden" value={resolvedMethod} />
 
         <section className="space-y-3">
@@ -409,9 +457,14 @@ export function GuestExtraCheckoutForm({
           </h2>
           <ul className="divide-fog divide-y">
             {cart.items.map((item) => (
-              <li className="flex items-start justify-between gap-3 py-3" key={item.extraStockId}>
+              <li
+                className="flex items-start justify-between gap-3 py-3"
+                key={item.extraStockId}
+              >
                 <div>
-                  <p className="text-ink text-sm font-medium">{item.cakeName}</p>
+                  <p className="text-ink text-sm font-medium">
+                    {item.cakeName}
+                  </p>
                   <p className="text-skyline text-sm">{item.sizeLabel}</p>
                 </div>
                 <p className="text-ink text-sm tabular-nums">
@@ -436,7 +489,7 @@ export function GuestExtraCheckoutForm({
           </h2>
           <div className="flex flex-col gap-1.5">
             <label
-              className="text-sm font-medium text-ink"
+              className="text-ink text-sm font-medium"
               htmlFor="checkout_pickup_date"
             >
               {workspaceScheduleDateLabel(resolvedMethod)}
@@ -496,7 +549,7 @@ export function GuestExtraCheckoutForm({
           ) : null}
           <div className="flex flex-col gap-1.5">
             <label
-              className="text-sm font-medium text-ink"
+              className="text-ink text-sm font-medium"
               htmlFor="checkout_pickup_time"
             >
               {resolvedMethod === "dine_in"
@@ -520,31 +573,26 @@ export function GuestExtraCheckoutForm({
           {resolvedMethod === "dine_in" ? (
             <div className="space-y-3">
               {dineInVenues.length > 0 ? (
-                <FormRadioGroup
-                  legend="Where would you like to sit?"
-                  name="dine_in_venue"
-                  onChange={(value) => setDineInVenue(value)}
-                  options={dineInVenues.map((venue) => ({
-                    value: venue,
-                    label: dineInVenueLabel(venue),
-                  }))}
-                  required
-                  value={resolvedVenue}
+                <DineInVenuePartyFields
+                  onChange={(next) => {
+                    setDineInVenue(next.venue);
+                    setAdultCount(next.adultCount);
+                    setKidCount(next.kidCount);
+                    setToddlerCount(next.toddlerCount);
+                    setWhitebirdSplitSeatingAcknowledged(
+                      next.whitebirdSplitSeatingAcknowledged,
+                    );
+                  }}
+                  value={{
+                    venue: resolvedVenue || dineInVenue,
+                    adultCount,
+                    kidCount,
+                    toddlerCount,
+                    whitebirdSplitSeatingAcknowledged,
+                  }}
+                  venues={dineInVenues}
                 />
               ) : null}
-              <FormField htmlFor="guest_count" label="Number of guests">
-                <FormInput
-                  id="guest_count"
-                  max={50}
-                  min={1}
-                  name="guest_count"
-                  onChange={(event) => setGuestCount(event.target.value)}
-                  required
-                  step={1}
-                  type="number"
-                  value={guestCount}
-                />
-              </FormField>
               <FormField
                 help="Optional."
                 htmlFor="reservation_note"
@@ -685,10 +733,16 @@ export function GuestExtraCheckoutForm({
                 {paidAddonOptions.map((option) => {
                   const messageVisible =
                     isCustomerPaidAddonCode(option.code) &&
-                    customerPaidAddonMessageVisible(option.code, paidAddonCodes);
+                    customerPaidAddonMessageVisible(
+                      option.code,
+                      paidAddonCodes,
+                    );
                   const messageRequired =
                     isCustomerPaidAddonCode(option.code) &&
-                    customerPaidAddonMessageRequired(option.code, paidAddonCodes);
+                    customerPaidAddonMessageRequired(
+                      option.code,
+                      paidAddonCodes,
+                    );
                   const messageValue =
                     option.code === "birthday_card"
                       ? birthdayCardMessage

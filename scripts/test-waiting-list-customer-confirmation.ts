@@ -34,7 +34,7 @@ const submitSql = readSrc(
   "supabase/migrations/20260920190000_waiting_list_confirmation_submit.sql",
 );
 const closedDateSql = readSrc(
-  "supabase/migrations/20260920210000_waiting_list_confirmation_closed_date.sql",
+  "supabase/migrations/20260921150000_dine_in_party_composition.sql",
 );
 const actionSrc = readSrc(
   "src/workspaces/storefront/waiting-list/confirmation-actions.ts",
@@ -45,9 +45,7 @@ const formSrc = readSrc(
 const pageSrc = readSrc(
   "src/workspaces/storefront/waiting-list/WaitingListConfirmationPage.tsx",
 );
-const routeSrc = readSrc(
-  "src/app/order/waiting-list/confirm/[token]/page.tsx",
-);
+const routeSrc = readSrc("src/app/order/waiting-list/confirm/[token]/page.tsx");
 const engineSrc = readSrc("src/engines/waiting-list/confirmation-page.ts");
 const typesSrc = readSrc("src/engines/waiting-list/types.ts");
 
@@ -78,7 +76,15 @@ const snapshot = [
 ];
 
 // 1. Valid token loads the correct request.
-assert.equal(existsSync(resolve(process.cwd(), "src/app/order/waiting-list/confirm/[token]/page.tsx")), true);
+assert.equal(
+  existsSync(
+    resolve(
+      process.cwd(),
+      "src/app/order/waiting-list/confirm/[token]/page.tsx",
+    ),
+  ),
+  true,
+);
 assert.match(routeSrc, /WaitingListConfirmationPage token=/);
 assert.match(actionSrc, /hashWaitingListConfirmationToken/);
 assert.match(actionSrc, /lookup_waiting_list_confirmation_link/);
@@ -113,20 +119,29 @@ assert.equal(
 );
 
 // 5–6. Cancelled/closed/converted request fails.
-assert.match(lookupSql, /v_request\.status in \('cancelled', 'closed', 'converted'\)/);
-assert.match(submitFnSql, /v_request\.status in \('cancelled', 'closed', 'converted'\)/);
+assert.match(
+  lookupSql,
+  /v_request\.status in \('cancelled', 'closed', 'converted'\)/,
+);
+assert.match(
+  submitFnSql,
+  /v_request\.status in \('cancelled', 'closed', 'converted'\)/,
+);
 
 // 7–9. Item outside snapshot / quantity / cake-size cannot be injected.
 assert.match(submitFnSql, /Never persist a client-supplied item list/);
-assert.match(submitFnSql, /v_stored := v_stored - 'token' - 'token_hash' - 'request_id'/);
-assert.match(submitFnSql, /'quantity', \(v_entry ->> 'offered_quantity'\)::integer/);
-assert.deepEqual(
-  waitingListConfirmationQuantitiesFromSnapshot(snapshot),
-  [
-    { cakeId: "cake-a", sizeId: "size-6", quantity: 1 },
-    { cakeId: "cake-b", sizeId: "size-6", quantity: 1 },
-  ],
+assert.match(
+  submitFnSql,
+  /v_stored := v_stored - 'token' - 'token_hash' - 'request_id'/,
 );
+assert.match(
+  submitFnSql,
+  /'quantity', \(v_entry ->> 'offered_quantity'\)::integer/,
+);
+assert.deepEqual(waitingListConfirmationQuantitiesFromSnapshot(snapshot), [
+  { cakeId: "cake-a", sizeId: "size-6", quantity: 1 },
+  { cakeId: "cake-b", sizeId: "size-6", quantity: 1 },
+]);
 assert.equal(
   waitingListConfirmationRejectsItemInjection({
     snapshot,
@@ -243,7 +258,10 @@ assert.doesNotMatch(submitFnSql, /waiting_list_convert_item/);
 assert.doesNotMatch(actionSrc, /submit_guest_preorder/);
 assert.doesNotMatch(actionSrc, /create_staff_guest_preorder/);
 assert.match(submitSql, /Does not create an order/);
-assert.match(WAITING_LIST_CONFIRMATION_SUCCESS_BODY, /not yet a confirmed order/);
+assert.match(
+  WAITING_LIST_CONFIRMATION_SUCCESS_BODY,
+  /not yet a confirmed order/,
+);
 assert.doesNotMatch(WAITING_LIST_CONFIRMATION_SUCCESS_TITLE, /order number/i);
 
 // 18–19. Payload stored exactly once; second submission rejected.
@@ -265,7 +283,10 @@ assert.notEqual(
   hashWaitingListConfirmationToken("other-token"),
 );
 assert.match(actionSrc, /p_token_hash: tokenHash/);
-assert.doesNotMatch(lookupSql, /grant select on table public.waiting_list_confirmation_links/);
+assert.doesNotMatch(
+  lookupSql,
+  /grant select on table public.waiting_list_confirmation_links/,
+);
 assert.match(
   submitSql,
   /grant execute on function public.lookup_waiting_list_confirmation_link\(text\)\n {2}to anon, authenticated/,
@@ -295,11 +316,15 @@ for (const rel of historical) {
   assert.doesNotMatch(readSrc(rel), /submit_waiting_list_confirmation/);
 }
 assert.match(
-  readSrc("supabase/migrations/20260920140000_guest_waiting_list_closed_date.sql"),
+  readSrc(
+    "supabase/migrations/20260920140000_guest_waiting_list_closed_date.sql",
+  ),
   /is_pickup_orders_closed\(p_pickup_date\)/,
 );
 assert.match(
-  readSrc("supabase/migrations/20260920160000_guest_waiting_list_multi_item.sql"),
+  readSrc(
+    "supabase/migrations/20260920160000_guest_waiting_list_multi_item.sql",
+  ),
   /is_pickup_orders_closed\(p_pickup_date\)/,
 );
 

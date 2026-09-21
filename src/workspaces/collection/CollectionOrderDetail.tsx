@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
+import {
+  dineInSplitSeatingStaffLabel,
+  formatDineInPartyComposition,
+} from "@/engines/orders/dine-in-party";
 import { formatLongBusinessDate } from "@/lib/dates";
 import type { CollectionWorkspaceCapabilities } from "@/engines/collection/capabilities";
 import {
@@ -104,18 +108,13 @@ export function CollectionOrderDetail({
 
       <header className="mt-3 space-y-2">
         <div className="flex flex-wrap gap-2">
-          <StatusBadge
-            label={desk.label}
-            tone={desk.tone}
-          />
+          <StatusBadge label={desk.label} tone={desk.tone} />
           <StatusBadge
             className={guestOrderStatusBadgeClassName(order.status)}
             label={guestOrderStatusLabel(order.status)}
             tone={guestOrderStatusBadgeTone(order.status)}
           />
-          {!secured ? (
-            <StatusBadge label="Not secured" tone="warning" />
-          ) : null}
+          {!secured ? <StatusBadge label="Not secured" tone="warning" /> : null}
           {paymentAttention ? (
             <StatusBadge label="Payment Attention" tone="danger" />
           ) : null}
@@ -184,17 +183,37 @@ export function CollectionOrderDetail({
                 <div>
                   <dt className="text-skyline">Venue</dt>
                   <dd className="text-ink mt-0.5 font-medium">
-                    {order.dineIn
-                      ? dineInVenueLabel(order.dineIn.venue)
-                      : "—"}
+                    {order.dineIn ? dineInVenueLabel(order.dineIn.venue) : "—"}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-skyline">Guests</dt>
+                  <dt className="text-skyline">Party</dt>
                   <dd className="text-ink mt-0.5 font-medium">
-                    {order.dineIn?.guestCount ?? "—"}
+                    {order.dineIn
+                      ? formatDineInPartyComposition({
+                          adultCount: order.dineIn.adultCount,
+                          kidCount: order.dineIn.kidCount,
+                          toddlerCount: order.dineIn.toddlerCount,
+                          totalGuestCount: order.dineIn.guestCount,
+                        })
+                      : "—"}
                   </dd>
                 </div>
+                {order.dineIn &&
+                dineInSplitSeatingStaffLabel(
+                  order.dineIn.venue,
+                  order.dineIn.guestCount,
+                ) ? (
+                  <div>
+                    <dt className="text-skyline">Seating</dt>
+                    <dd className="text-ink mt-0.5 font-medium">
+                      {dineInSplitSeatingStaffLabel(
+                        order.dineIn.venue,
+                        order.dineIn.guestCount,
+                      )}
+                    </dd>
+                  </div>
+                ) : null}
                 {order.guestPhone ? (
                   <div>
                     <dt className="text-skyline">Phone</dt>

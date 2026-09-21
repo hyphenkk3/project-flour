@@ -1,14 +1,16 @@
 import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
 import {
+  dineInSplitSeatingStaffLabel,
+  formatDineInPartyComposition,
+} from "@/engines/orders/dine-in-party";
+import {
   formatPickupDateShort,
   formatPickupWeekdayShort,
   formatComplimentaryLine,
 } from "@/engines/orders/confirmation-message";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import { formatDeliveryFinanceWaiverLines } from "@/engines/orders/delivery-finance";
-import {
-  isDeliveryRecipientSameAsOrderingCustomer,
-} from "@/engines/orders/fulfilment";
+import { isDeliveryRecipientSameAsOrderingCustomer } from "@/engines/orders/fulfilment";
 import {
   formatItemPriceComponent,
   formatOrderFinancialEquation,
@@ -319,12 +321,11 @@ export function formatCrewDeliveryAddress(
 ): string {
   const line1 = delivery.addressLine1.trim();
   const line2 = delivery.addressLine2?.trim() ?? "";
-  const locality =
-    `${delivery.postcode.trim()} ${delivery.city.trim()}`.trim();
+  const locality = `${delivery.postcode.trim()} ${delivery.city.trim()}`.trim();
   const state = delivery.state.trim();
-  return [line1, line2, locality, state].filter((part) => part.length > 0).join(
-    ", ",
-  );
+  return [line1, line2, locality, state]
+    .filter((part) => part.length > 0)
+    .join(", ");
 }
 
 export function formatCrewRecipientNotifyFooter(
@@ -361,7 +362,11 @@ function formatCrewDeliveryIdentityLines(order: StorefrontOrder): string[] {
   const delivery = order.delivery ?? null;
 
   if (!delivery) {
-    return [`Ordered by: ${displayName}`, `Phone No: ${phone}`, `Time: ${time}`];
+    return [
+      `Ordered by: ${displayName}`,
+      `Phone No: ${phone}`,
+      `Time: ${time}`,
+    ];
   }
 
   const samePerson = isDeliveryRecipientSameAsOrderingCustomer({
@@ -474,10 +479,23 @@ function generateDineInCrewOrderMessage(order: StorefrontOrder): string {
     const venue = dineInVenueLabel(reservation.venue);
     const reservationTime = formatPickupTime(reservation.reservationTime);
     lines.push("");
-    lines.push(
-      `* Dine-in reservation: ${reservationTime} @ ${venue}`,
-    );
+    lines.push(`* Dine-in reservation: ${reservationTime} @ ${venue}`);
     lines.push(`* Guests: ${reservation.guestCount}`);
+    lines.push(
+      `* Party: ${formatDineInPartyComposition({
+        adultCount: reservation.adultCount,
+        kidCount: reservation.kidCount,
+        toddlerCount: reservation.toddlerCount,
+        totalGuestCount: reservation.guestCount,
+      })}`,
+    );
+    const split = dineInSplitSeatingStaffLabel(
+      reservation.venue,
+      reservation.guestCount,
+    );
+    if (split) {
+      lines.push(`* ${split}`);
+    }
     if (reservation.reservationNote?.trim()) {
       lines.push(`* ${reservation.reservationNote.trim()}`);
     }
@@ -557,7 +575,10 @@ export function generateCustomerReadyMessage(senderName: string): string {
 }
 
 export function deliveryCustomerReadyVariant(
-  order: Pick<StorefrontOrder, "customerName" | "phone" | "fulfilmentMethod" | "delivery">,
+  order: Pick<
+    StorefrontOrder,
+    "customerName" | "phone" | "fulfilmentMethod" | "delivery"
+  >,
 ): DeliveryCustomerReadyVariant {
   const delivery = order.delivery;
   if (!delivery || order.fulfilmentMethod !== "delivery") {
@@ -597,7 +618,10 @@ export function generateCustomerDeliveryReadyMessage(input: {
 }
 
 export function outForDeliveryMessageAudiences(
-  order: Pick<StorefrontOrder, "customerName" | "phone" | "fulfilmentMethod" | "delivery">,
+  order: Pick<
+    StorefrontOrder,
+    "customerName" | "phone" | "fulfilmentMethod" | "delivery"
+  >,
 ): OutForDeliveryAudience[] {
   const delivery = order.delivery;
   if (!delivery || order.fulfilmentMethod !== "delivery") {

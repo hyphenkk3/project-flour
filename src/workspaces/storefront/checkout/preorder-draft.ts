@@ -1,4 +1,5 @@
 import { customerPreorderCommercialTotal } from "@/engines/orders/customer-preorder-options";
+import { readDineInPartyDraftFields } from "@/engines/orders/dine-in-party";
 import {
   OWNER_DELIVERY_CITY,
   OWNER_DELIVERY_STATE,
@@ -48,7 +49,11 @@ export type PreorderDraftFields = {
   reservationTime: string;
   fulfilmentMethod: CustomerWebsiteFulfilmentMethod;
   dineInVenue: string;
+  adultCount: string;
+  kidCount: string;
+  toddlerCount: string;
   guestCount: string;
+  whitebirdSplitSeatingAcknowledged: boolean;
   reservationNote: string;
   recipientName: string;
   recipientPhone: string;
@@ -108,7 +113,11 @@ export const emptyPreorderFields = (): PreorderDraftFields => ({
   reservationTime: "",
   fulfilmentMethod: "pickup",
   dineInVenue: "",
+  adultCount: "",
+  kidCount: "",
+  toddlerCount: "",
   guestCount: "",
+  whitebirdSplitSeatingAcknowledged: false,
   reservationNote: "",
   recipientName: "",
   recipientPhone: "",
@@ -163,6 +172,14 @@ export function readPreorderDraft(): PreorderDraft | null {
         parsed.fulfilmentMethod,
       ),
       dineInVenue: String(parsed.dineInVenue ?? ""),
+      ...readDineInPartyDraftFields({
+        adultCount: parsed.adultCount,
+        kidCount: parsed.kidCount,
+        toddlerCount: parsed.toddlerCount,
+        guestCount: parsed.guestCount,
+        whitebirdSplitSeatingAcknowledged:
+          parsed.whitebirdSplitSeatingAcknowledged,
+      }),
       guestCount: String(parsed.guestCount ?? ""),
       reservationNote: String(parsed.reservationNote ?? ""),
       recipientName: String(parsed.recipientName ?? ""),
@@ -172,9 +189,7 @@ export function readPreorderDraft(): PreorderDraft | null {
       postcode: String(parsed.postcode ?? ""),
       city: String(parsed.city ?? OWNER_DELIVERY_CITY),
       state: String(parsed.state ?? OWNER_DELIVERY_STATE),
-      recipientNotifyPreference: String(
-        parsed.recipientNotifyPreference ?? "",
-      ),
+      recipientNotifyPreference: String(parsed.recipientNotifyPreference ?? ""),
       sameAsCustomer: parsed.sameAsCustomer !== false,
       notes: String(parsed.notes ?? ""),
       complimentaryCodes: Array.isArray(parsed.complimentaryCodes)
@@ -349,10 +364,7 @@ export function setDraftLineQuantity(
 }
 
 /** Remove one cake+size line. Does not change collection date. */
-export function removeDraftLine(
-  cakeId: string,
-  sizeId: string,
-): PreorderDraft {
+export function removeDraftLine(cakeId: string, sizeId: string): PreorderDraft {
   const current = readPreorderDraft() ?? emptyPreorderDraft();
   const next = {
     ...current,
@@ -447,7 +459,9 @@ export function filterDraftItemsToOfferedCakes(
   return { items: consolidateDraftLines(next), dropped };
 }
 
-function consolidateDraftLines(items: PreorderDraftItem[]): PreorderDraftItem[] {
+function consolidateDraftLines(
+  items: PreorderDraftItem[],
+): PreorderDraftItem[] {
   const map = new Map<string, PreorderDraftItem>();
   for (const item of items) {
     const key = `${item.cakeId}::${item.sizeId}`;
@@ -482,7 +496,12 @@ export function fieldsAfterFulfilmentChange(
     pickupTime: "",
     reservationTime: "",
     dineInVenue: "",
+    adultCount: method === "dine_in" ? fields.adultCount : "",
+    kidCount: method === "dine_in" ? fields.kidCount : "",
+    toddlerCount: method === "dine_in" ? fields.toddlerCount : "",
     guestCount: method === "dine_in" ? fields.guestCount : "",
+    whitebirdSplitSeatingAcknowledged:
+      method === "dine_in" ? fields.whitebirdSplitSeatingAcknowledged : false,
     reservationNote: method === "dine_in" ? fields.reservationNote : "",
     recipientName: method === "delivery" ? fields.recipientName : "",
     recipientPhone: method === "delivery" ? fields.recipientPhone : "",

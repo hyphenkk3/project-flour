@@ -133,7 +133,8 @@ const actionsSrc = readFileSync(
   resolve("src/workspaces/storefront/checkout/actions.ts"),
   "utf8",
 );
-assert.match(actionsSrc, /reservation_time: reservationTime/);
+assert.match(actionsSrc, /buildDineInReservationRpcPayload/);
+assert.match(actionsSrc, /reservationTime,/);
 assert.match(actionsSrc, /isValidDineInReservationPair/);
 
 const sqlSrc = readFileSync(

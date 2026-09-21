@@ -5,7 +5,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { getDeliverySchedule, isValidDeliverySlot } from "@/engines/business-calendar/delivery-hours";
+import {
+  getDeliverySchedule,
+  isValidDeliverySlot,
+} from "@/engines/business-calendar/delivery-hours";
 import {
   isValidDineInSlot,
   parseGuestCount,
@@ -31,10 +34,12 @@ import {
   fieldsAfterFulfilmentChange,
 } from "@/workspaces/storefront/checkout/preorder-draft";
 
-const checkoutSrc = readFileSync(
-  resolve("src/workspaces/storefront/checkout/GuestCheckoutForm.tsx"),
-  "utf8",
-);
+const checkoutSrc =
+  readFileSync(
+    resolve("src/workspaces/storefront/checkout/GuestCheckoutForm.tsx"),
+    "utf8",
+  ) +
+  readFileSync(resolve("src/components/ui/DineInVenuePartyFields.tsx"), "utf8");
 const availabilitySrc = readFileSync(
   resolve("src/engines/orders/customer-fulfilment-availability.ts"),
   "utf8",
@@ -81,7 +86,7 @@ assert.match(chooserSrc, /fulfilment_method/);
 assert.match(checkoutSrc, /guest_count/);
 assert.match(checkoutSrc, /dine_in_venue/);
 assert.match(checkoutSrc, /reservation_time/);
-assert.match(checkoutSrc, /Where would you like to sit\?/);
+assert.match(checkoutSrc, />Venue</);
 assert.match(checkoutSrc, /address_line_1/);
 assert.match(checkoutSrc, /include_receipt/);
 assert.doesNotMatch(checkoutSrc, /email_submission_receipt_requested/);
@@ -139,7 +144,10 @@ assert.equal(parseGuestCount(""), null);
 assert.equal(parseGuestCount("0"), null);
 assert.equal(parseGuestCount("4"), 4);
 
-const fromPickup = fieldsAfterFulfilmentChange(emptyPreorderFields(), "dine_in");
+const fromPickup = fieldsAfterFulfilmentChange(
+  emptyPreorderFields(),
+  "dine_in",
+);
 assert.equal(fromPickup.fulfilmentMethod, "dine_in");
 assert.equal(fromPickup.recipientName, "");
 assert.equal(fromPickup.addressLine1, "");
@@ -206,9 +214,15 @@ assert.equal(isValidDeliverySlot(fri, "15:30"), false);
 
 assert.equal(customerPickupAvailability(mon, []).available, true);
 assert.equal(customerDineInAvailability(wed, []).available, false);
-assert.equal(customerDineInAvailability(wed, []).reason, "Unavailable Wednesday");
+assert.equal(
+  customerDineInAvailability(wed, []).reason,
+  "Unavailable Wednesday",
+);
 assert.equal(customerDeliveryAvailability(wed, []).available, false);
-assert.equal(customerDeliveryAvailability(wed, []).reason, "No delivery Wednesday");
+assert.equal(
+  customerDeliveryAvailability(wed, []).reason,
+  "No delivery Wednesday",
+);
 assert.equal(customerDineInAvailability(mon, []).available, true);
 assert.equal(customerDeliveryAvailability(mon, []).available, true);
 

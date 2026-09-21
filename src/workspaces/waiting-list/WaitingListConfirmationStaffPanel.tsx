@@ -442,6 +442,8 @@ function WaitingListConfirmationReviewPanel({
             value={review.dineIn.servingTime}
           />
           <ReviewRow label="Guest count" value={review.dineIn.guestCount} />
+          <ReviewRow label="Party" value={review.dineIn.partyLabel} />
+          <ReviewRow label="Seating" value={review.dineIn.splitSeatingLabel} />
           <ReviewRow label="Note" value={review.dineIn.note} />
         </section>
       ) : null}

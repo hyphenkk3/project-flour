@@ -49,12 +49,18 @@ export function parseDineInDraftFromForm(
   const named: AssistedDineInDraft = {
     reservationTime: String(formData.get("reservation_time") ?? "").trim(),
     venue: String(formData.get("dine_in_venue") ?? "").trim(),
+    adultCount: String(formData.get("adult_count") ?? "").trim(),
+    kidCount: String(formData.get("kid_count") ?? "").trim(),
+    toddlerCount: String(formData.get("toddler_count") ?? "").trim(),
     guestCount: String(formData.get("guest_count") ?? "").trim(),
     reservationNote: String(formData.get("reservation_note") ?? "").trim(),
   };
   const raw = String(formData.get("dine_in_json") ?? "").trim();
   if (!raw) {
-    return named.reservationTime || named.venue || named.guestCount
+    return named.reservationTime ||
+      named.venue ||
+      named.adultCount ||
+      named.guestCount
       ? named
       : defaultAssistedDineInDraft();
   }
@@ -64,6 +70,10 @@ export function parseDineInDraftFromForm(
       reservationTime:
         named.reservationTime || String(parsed.reservationTime ?? "").trim(),
       venue: named.venue || String(parsed.venue ?? "").trim(),
+      adultCount: named.adultCount || String(parsed.adultCount ?? "").trim(),
+      kidCount: named.kidCount || String(parsed.kidCount ?? "").trim(),
+      toddlerCount:
+        named.toddlerCount || String(parsed.toddlerCount ?? "").trim(),
       guestCount: named.guestCount || String(parsed.guestCount ?? "").trim(),
       reservationNote:
         named.reservationNote || String(parsed.reservationNote ?? "").trim(),

@@ -241,6 +241,10 @@ function storefrontOrder(
         reservationTime: "13:00",
         venue: "whitebird",
         guestCount: 4,
+        adultCount: 4,
+        kidCount: 0,
+        toddlerCount: 0,
+        whitebirdSplitSeatingAcknowledged: false,
         reservationNote: "Window seat if possible",
         status: "pending",
       },
@@ -248,9 +252,7 @@ function storefrontOrder(
   );
   assert.ok(dineInBody.includes("🟠🍽️ Dine-In order: 15/8 (Sat)"));
   assert.ok(dineInBody.includes("Cake serving time: 1:00 PM"));
-  assert.ok(
-    dineInBody.includes("* Dine-in reservation: 1:00 PM @ Whitebird"),
-  );
+  assert.ok(dineInBody.includes("* Dine-in reservation: 1:00 PM @ Whitebird"));
   assert.ok(dineInBody.includes("* Guests: 4"));
   assert.ok(dineInBody.includes("Window seat if possible"));
   assert.ok(
@@ -449,7 +451,9 @@ function storefrontOrder(
     }),
   );
   assert.ok(!/Pick-up order/i.test(body));
-  assert.ok(!/GrabExpress|delivery fee|RM5|Dispatched|Rider Assigned/i.test(body));
+  assert.ok(
+    !/GrabExpress|delivery fee|RM5|Dispatched|Rider Assigned/i.test(body),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -508,8 +512,7 @@ function storefrontOrder(
 // T–X equation / August / RM10 / complimentary / footer
 // ---------------------------------------------------------------------------
 {
-  const footer =
-    "Kindly review ALL the details in this confirmation carefully";
+  const footer = "Kindly review ALL the details in this confirmation carefully";
   const deliveryBody = generateConfirmationMessage(
     basePayload({
       fulfilmentMethod: "delivery",
@@ -556,7 +559,11 @@ function storefrontOrder(
       amountDue: 105,
     }),
   );
-  assert.ok(august.includes("August Promo") || august.includes("RM105") || august.includes("105"));
+  assert.ok(
+    august.includes("August Promo") ||
+      august.includes("RM105") ||
+      august.includes("105"),
+  );
 
   const rm10 = generateConfirmationMessage(
     basePayload({
@@ -743,14 +750,20 @@ function storefrontOrder(
     pickedUpAt: null,
     fulfilmentMethod: "delivery",
   });
-  assert.equal(actions.some((a) => a.type === "crew"), true);
+  assert.equal(
+    actions.some((a) => a.type === "crew"),
+    true,
+  );
 
   const pickupActions = messageActionsForOperationalState({
     readyAt: null,
     pickedUpAt: null,
     fulfilmentMethod: "pickup",
   });
-  assert.equal(pickupActions.some((a) => a.type === "crew"), true);
+  assert.equal(
+    pickupActions.some((a) => a.type === "crew"),
+    true,
+  );
 
   // NYP / partial / paid suffixes still work on Pickup
   const nyp = generateCrewOrderMessage(
@@ -764,7 +777,11 @@ function storefrontOrder(
       },
     }),
   );
-  assert.ok(nyp.includes("🔺🟢Pick-up order:") || nyp.includes("NYP") || nyp.includes("RM"));
+  assert.ok(
+    nyp.includes("🔺🟢Pick-up order:") ||
+      nyp.includes("NYP") ||
+      nyp.includes("RM"),
+  );
 
   const paid = generateCrewOrderMessage(
     storefrontOrder({
@@ -777,7 +794,9 @@ function storefrontOrder(
       },
     }),
   );
-  assert.ok(paid.startsWith("🟢Pick-up order:") || paid.includes("🟢Pick-up order:"));
+  assert.ok(
+    paid.startsWith("🟢Pick-up order:") || paid.includes("🟢Pick-up order:"),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -870,9 +889,7 @@ function storefrontOrder(
   assert.ok(!confirmationSrc.includes("delivery fee"));
 }
 
-console.log(
-  "M4-P2 Slice 4 confirmation/crew/quick-view helper tests: PASSED",
-);
+console.log("M4-P2 Slice 4 confirmation/crew/quick-view helper tests: PASSED");
 
 // Soft env presence check only — no live fixtures created in this suite.
 if (

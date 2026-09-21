@@ -48,19 +48,19 @@ import {
   decidePostPaymentCancel,
   decidePostPaymentSave,
 } from "@/engines/orders/post-payment-customer-change";
+import { isValidDineInReservationPair } from "@/engines/business-calendar/dine-in-hours";
 import {
-  isValidDineInReservationPair,
-  parseDineInVenue,
-  parseGuestCount,
-} from "@/engines/business-calendar/dine-in-hours";
-import { isValidClockPickupTime, isValidPickupSlot } from "@/engines/business-calendar/pickup-slots";
+  validateDineInPartyFromForm,
+  type ValidatedDineInParty,
+} from "@/engines/orders/dine-in-party";
+import {
+  isValidClockPickupTime,
+  isValidPickupSlot,
+} from "@/engines/business-calendar/pickup-slots";
 import { requireStaff } from "@/foundation/auth/session";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
-import {
-  formatBusinessMonthYear,
-  isDifferentBusinessMonth,
-} from "@/lib/dates";
+import { formatBusinessMonthYear, isDifferentBusinessMonth } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 import type {
   StorefrontOrder,
@@ -316,9 +316,7 @@ function parsePaidAddonsMutationFromForm(
         if (Array.isArray(item.messages)) {
           messages = item.messages
             .slice(0, quantity)
-            .map((m) =>
-              m == null ? null : String(m).trim() || null,
-            );
+            .map((m) => (m == null ? null : String(m).trim() || null));
           while (messages.length < quantity) messages.push(null);
         } else if (item.written_message != null) {
           messages = Array.from({ length: quantity }, (_, i) =>
@@ -551,23 +549,19 @@ export async function saveOrderWorkspaceAction(
     formData.get("reservation_time") ?? "",
   ).trim();
   const hoursSnapshot = await loadOperatingHoursSnapshot();
+  let dineInParty: ValidatedDineInParty | null = null;
   if (preserveDineIn) {
-    const venue =
-      parseDineInVenue(formData.get("dine_in_venue")) ??
-      before.dineInReservation?.venue ??
-      null;
-    const guests =
-      parseGuestCount(formData.get("guest_count")) ??
-      before.dineInReservation?.guestCount ??
-      null;
+    const partyResult = validateDineInPartyFromForm(formData, false);
+    if (!partyResult.ok) {
+      return { error: partyResult.error, success: false };
+    }
+    dineInParty = partyResult.party;
     if (
-      !venue ||
-      guests == null ||
       !isValidDineInReservationPair({
         dateYmd: pickupDate,
         reservationTime: dineInReservationTime,
         servingTime: pickupTime,
-        venue,
+        venue: dineInParty.venue,
         snapshot: hoursSnapshot,
       })
     ) {
@@ -597,11 +591,15 @@ export async function saveOrderWorkspaceAction(
     };
   }
   if (draftItems.length === 0) {
-    return { error: "Please keep at least one cake on the order.", success: false };
+    return {
+      error: "Please keep at least one cake on the order.",
+      success: false,
+    };
   }
 
-  let fulfilmentRpc: ReturnType<typeof buildCreateStaffFulfilmentRpcParams> | null =
-    null;
+  let fulfilmentRpc: ReturnType<
+    typeof buildCreateStaffFulfilmentRpcParams
+  > | null = null;
   if (!preserveDineIn) {
     try {
       fulfilmentRpc = buildCreateStaffFulfilmentRpcParams({
@@ -788,17 +786,20 @@ export async function saveOrderWorkspaceAction(
   }
 
   // Transactional replace of the full item set (delete + insert in one RPC).
-  const { error: syncItemsError } = await supabase.rpc("sync_guest_order_items", {
-    p_order_id: orderId,
-    p_items: finalItems.map((item) => ({
-      cake_id: item.cakeId,
-      cake_size_id: item.cakeSizeId,
-      quantity: item.quantity,
-      unit_price: item.unitPrice,
-      cake_name: item.cakeName,
-      size_label: item.sizeLabel,
-    })),
-  });
+  const { error: syncItemsError } = await supabase.rpc(
+    "sync_guest_order_items",
+    {
+      p_order_id: orderId,
+      p_items: finalItems.map((item) => ({
+        cake_id: item.cakeId,
+        cake_size_id: item.cakeSizeId,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        cake_name: item.cakeName,
+        size_label: item.sizeLabel,
+      })),
+    },
+  );
 
   if (syncItemsError) {
     return { error: syncItemsError.message, success: false };
@@ -846,20 +847,19 @@ export async function saveOrderWorkspaceAction(
     return { error: syncPaidAddonsError.message, success: false };
   }
 
-  if (preserveDineIn && before.dineInReservation) {
-    const venue =
-      parseDineInVenue(formData.get("dine_in_venue")) ??
-      before.dineInReservation.venue;
-    const guests =
-      parseGuestCount(formData.get("guest_count")) ??
-      before.dineInReservation.guestCount;
+  if (preserveDineIn && before.dineInReservation && dineInParty) {
     const { error: reservationError } = await supabase
       .from("order_dine_in_reservations")
       .update({
         reservation_date: pickupDate,
         reservation_time: dineInReservationTime,
-        venue,
-        guest_count: guests,
+        venue: dineInParty.venue,
+        guest_count: dineInParty.totalGuestCount,
+        adult_count: dineInParty.adultCount,
+        kid_count: dineInParty.kidCount,
+        toddler_count: dineInParty.toddlerCount,
+        whitebird_split_seating_acknowledged:
+          dineInParty.whitebirdSplitSeatingAcknowledged,
         reservation_note:
           String(formData.get("reservation_note") ?? "").trim() || null,
       })
@@ -1061,7 +1061,9 @@ export async function markConfirmationSentAction(
       confirmationNeedsResend: order.confirmationNeedsResend,
     })
   ) {
-    return { error: "This order cannot receive a confirmation send right now." };
+    return {
+      error: "This order cannot receive a confirmation send right now.",
+    };
   }
 
   const payload = buildConfirmationPayloadFromOrder({
@@ -1069,10 +1071,11 @@ export async function markConfirmationSentAction(
     staffCustomerFacingName: staff.displayName,
   });
   const messageBody = generateConfirmationMessage(payload);
-  const isUpdated = shouldOfferUpdatedConfirmationAction({
-    status: order.status,
-    confirmationNeedsResend: order.confirmationNeedsResend,
-  }) || order.status === "pending_confirmation";
+  const isUpdated =
+    shouldOfferUpdatedConfirmationAction({
+      status: order.status,
+      confirmationNeedsResend: order.confirmationNeedsResend,
+    }) || order.status === "pending_confirmation";
   const nextStatus = nextStatusAfterConfirmationMarkedSent(order.status);
 
   const supabase = await createClient();
@@ -1169,11 +1172,15 @@ export async function customerConfirmedAction(
     return { error: "Order not found." };
   }
   if (order.status !== "pending_confirmation") {
-    return { error: "Only orders waiting for customer confirmation can be marked confirmed." };
+    return {
+      error:
+        "Only orders waiting for customer confirmation can be marked confirmed.",
+    };
   }
   if (order.confirmationNeedsResend) {
     return {
-      error: "Confirmation needs to be resent before marking customer confirmed.",
+      error:
+        "Confirmation needs to be resent before marking customer confirmed.",
     };
   }
 
@@ -1203,7 +1210,9 @@ export async function customerConfirmedAction(
   return { error: null };
 }
 
-export async function listGuestOrdersAction(): Promise<StorefrontOrderListItem[]> {
+export async function listGuestOrdersAction(): Promise<
+  StorefrontOrderListItem[]
+> {
   await requireOwnerOrCustomerOperations();
   return listGuestOrders();
 }
@@ -1262,7 +1271,9 @@ export async function markPaymentRequestSentAction(
     return { error: "Order not found." };
   }
   if (order.status !== "awaiting_payment") {
-    return { error: "Payment request can only be sent while awaiting payment." };
+    return {
+      error: "Payment request can only be sent while awaiting payment.",
+    };
   }
   if (order.settlement.remainingBalance <= 0) {
     return {
@@ -1988,7 +1999,8 @@ export async function waiveGuestOrderDeliveryFeeAction(
   reason?: string | null,
 ): Promise<{ error: string | null }> {
   const auth = await requireOwnerOrManager();
-  if (auth.error || !auth.staff) return { error: auth.error ?? "Not authorized." };
+  if (auth.error || !auth.staff)
+    return { error: auth.error ?? "Not authorized." };
   const staff = auth.staff;
   const before = await getGuestOrderById(orderId);
   if (!before) return { error: "Order not found." };
@@ -2021,7 +2033,8 @@ export async function overrideGuestOrderProcessingFeeAction(
   reason?: string | null,
 ): Promise<{ error: string | null }> {
   const auth = await requireOwnerOrManager();
-  if (auth.error || !auth.staff) return { error: auth.error ?? "Not authorized." };
+  if (auth.error || !auth.staff)
+    return { error: auth.error ?? "Not authorized." };
   const staff = auth.staff;
   const before = await getGuestOrderById(orderId);
   if (!before) return { error: "Order not found." };
@@ -2054,7 +2067,8 @@ export async function waiveGuestOrderProcessingFeeAction(
   reason?: string | null,
 ): Promise<{ error: string | null }> {
   const auth = await requireOwnerOrManager();
-  if (auth.error || !auth.staff) return { error: auth.error ?? "Not authorized." };
+  if (auth.error || !auth.staff)
+    return { error: auth.error ?? "Not authorized." };
   const staff = auth.staff;
   const before = await getGuestOrderById(orderId);
   if (!before) return { error: "Order not found." };
@@ -2086,7 +2100,8 @@ export async function restoreGuestOrderProcessingFeeAction(
   reason?: string | null,
 ): Promise<{ error: string | null }> {
   const auth = await requireOwnerOrManager();
-  if (auth.error || !auth.staff) return { error: auth.error ?? "Not authorized." };
+  if (auth.error || !auth.staff)
+    return { error: auth.error ?? "Not authorized." };
   const staff = auth.staff;
   const before = await getGuestOrderById(orderId);
   if (!before) return { error: "Order not found." };
@@ -2118,7 +2133,8 @@ export async function restoreGuestOrderDeliveryFeeAction(
   reason?: string | null,
 ): Promise<{ error: string | null }> {
   const auth = await requireOwnerOrManager();
-  if (auth.error || !auth.staff) return { error: auth.error ?? "Not authorized." };
+  if (auth.error || !auth.staff)
+    return { error: auth.error ?? "Not authorized." };
   const staff = auth.staff;
   const before = await getGuestOrderById(orderId);
   if (!before) return { error: "Order not found." };
@@ -2316,7 +2332,8 @@ export async function resolveGuestOrderDeliveryFeeRequestAction(
   note?: string | null,
 ): Promise<{ error: string | null }> {
   const auth = await requireOwnerOrManager();
-  if (auth.error || !auth.staff) return { error: auth.error ?? "Not authorized." };
+  if (auth.error || !auth.staff)
+    return { error: auth.error ?? "Not authorized." };
   const staff = auth.staff;
   const before = await getGuestOrderById(orderId);
   if (!before) return { error: "Order not found." };
@@ -2353,7 +2370,8 @@ export async function resolveGuestOrderProcessingFeeRequestAction(
   note?: string | null,
 ): Promise<{ error: string | null }> {
   const auth = await requireOwnerOrManager();
-  if (auth.error || !auth.staff) return { error: auth.error ?? "Not authorized." };
+  if (auth.error || !auth.staff)
+    return { error: auth.error ?? "Not authorized." };
   const staff = auth.staff;
   const before = await getGuestOrderById(orderId);
   if (!before) return { error: "Order not found." };
@@ -2577,4 +2595,3 @@ export async function duplicateGuestOrderAction(
   revalidatePath(`/owner/orders/${newOrderId}`);
   redirect(`/owner/orders/${newOrderId}`);
 }
-

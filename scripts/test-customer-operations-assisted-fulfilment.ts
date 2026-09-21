@@ -70,8 +70,7 @@ function previousWeekdayOnOrBefore(ymd: string, weekday: number): string {
 const earliest = earliestPickupDateYmd();
 const THU = nextWeekdayOnOrAfter(earliest, 4);
 const WED = nextWeekdayOnOrAfter(earliest, 3);
-const beforeEarliest =
-  addBusinessCalendarDays(earliest, -1) ?? "2020-01-01";
+const beforeEarliest = addBusinessCalendarDays(earliest, -1) ?? "2020-01-01";
 const THU_BEFORE = previousWeekdayOnOrBefore(beforeEarliest, 4);
 assert.equal(weekdayOf(THU), 4);
 assert.equal(weekdayOf(WED), 3);
@@ -114,7 +113,8 @@ assert.equal(slotStep(dineInSlots), DINE_IN_SLOT_MINUTES);
 assert.equal(DINE_IN_SLOT_MINUTES, 15);
 
 const pickupTime = pickupSlots[2]?.value ?? pickupSlots[0]?.value ?? "12:00";
-const deliveryTime = deliverySlots[2]?.value ?? deliverySlots[0]?.value ?? "12:00";
+const deliveryTime =
+  deliverySlots[2]?.value ?? deliverySlots[0]?.value ?? "12:00";
 const dineReservation = dineInSlots[4]?.value ?? "14:00";
 const dineServing = dineInSlots[4]?.value ?? "14:00";
 assert.equal(isValidPickupSlot(THU, pickupTime, OPERATING_HOURS_SEED), true);
@@ -290,11 +290,7 @@ assert.match(
 const laterServing = dineInSlots.find((slot) => {
   const reservation = hmToMinutes(dineReservation);
   const serving = hmToMinutes(slot.value);
-  return (
-    reservation != null &&
-    serving != null &&
-    serving > reservation + 60
-  );
+  return reservation != null && serving != null && serving > reservation + 60;
 });
 if (laterServing) {
   assert.match(
@@ -316,9 +312,12 @@ assert.equal(workspaceScheduleTimeLabel("delivery"), "Delivery time");
 assert.equal(workspaceScheduleDateLabel("dine_in"), "Dine-in date");
 assert.equal(workspaceScheduleTimeLabel("dine_in"), "Cake serving time");
 
-const form = read(
-  "src/workspaces/customer-operations/orders/AssistedOrderFulfilmentFields.tsx",
-);
+const form = [
+  read(
+    "src/workspaces/customer-operations/orders/AssistedOrderFulfilmentFields.tsx",
+  ),
+  read("src/components/ui/DineInVenuePartyFields.tsx"),
+].join("\n");
 const assistedForm = read(
   "src/workspaces/customer-operations/orders/AssistedOrderForm.tsx",
 );
@@ -368,7 +367,9 @@ assert.match(ownerCreateFields, /scheduleMode = "owner"/);
 assert.doesNotMatch(ownerCreateFields, /dine_in/);
 const ownerCreateAction = read("src/workspaces/owner/orders/actions.ts");
 const ownerCreateFn = ownerCreateAction.slice(
-  ownerCreateAction.indexOf("export async function createStaffGuestOrderAction"),
+  ownerCreateAction.indexOf(
+    "export async function createStaffGuestOrderAction",
+  ),
   ownerCreateAction.indexOf("export async function saveOrderWorkspaceAction"),
 );
 assert.doesNotMatch(ownerCreateFn, /slotPolicy: "customer-slots"/);
@@ -398,7 +399,10 @@ assert.equal(
 
 assert.equal(canOverrideCustomerFulfilmentSchedule("owner"), true);
 assert.equal(canOverrideCustomerFulfilmentSchedule("manager"), false);
-assert.equal(canOverrideCustomerFulfilmentSchedule("customer_operations"), false);
+assert.equal(
+  canOverrideCustomerFulfilmentSchedule("customer_operations"),
+  false,
+);
 assert.equal(
   buildGuestOrderWorkspaceCapabilities({ role: "owner", staffId: "o" })
     .canOverrideCustomerFulfilmentSchedule,
@@ -535,9 +539,7 @@ assert.match(
   /guests/,
 );
 
-const newPage = read(
-  "src/app/(app)/customer-operations/orders/new/page.tsx",
-);
+const newPage = read("src/app/(app)/customer-operations/orders/new/page.tsx");
 assert.match(newPage, /canOverrideCustomerFulfilmentSchedule/);
 assert.match(newPage, /requireStaff/);
 
