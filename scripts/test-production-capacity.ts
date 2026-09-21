@@ -20,6 +20,7 @@ import {
   canMutateOrderAvailability,
   canViewOrderAvailability,
 } from "@/foundation/navigation/access";
+import { firstQueryDateParam, firstQueryParam } from "@/lib/query-params";
 
 function readSrc(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -231,7 +232,23 @@ const bakeryPageSrc = readSrc(
   "src/app/(app)/bakery/availability/page.tsx",
 );
 assert.match(bakeryPageSrc, /ProductionCapacitySection/);
-assert.match(bakeryPageSrc, /OrderAvailabilityScreen/);
+assert.match(bakeryPageSrc, /PickupDateClosureSection/);
+assert.match(bakeryPageSrc, /ProductionCapacityHistorySection/);
+assert.match(bakeryPageSrc, /firstQueryDateParam/);
+assert.doesNotMatch(bakeryPageSrc, /OrderAvailabilityScreen/);
+
+const historyPanelSrc = readSrc(
+  "src/workspaces/library/order-availability/capacity/ProductionCapacityHistory.tsx",
+);
+assert.match(historyPanelSrc, /View all changes/);
+assert.match(historyPanelSrc, /PREVIEW_COUNT = 8/);
+assert.doesNotMatch(panelSrc, /Recent capacity changes/);
+
+const queryParamsSrc = readSrc("src/lib/query-params.ts");
+assert.match(queryParamsSrc, /Array.isArray\(value\)/);
+assert.equal(firstQueryParam([" 2026-09-25 ", "other"]), "2026-09-25");
+assert.equal(firstQueryDateParam(["2026-09-25", "2026-09-01"]), "2026-09-25");
+assert.equal(firstQueryDateParam(undefined), "");
 
 const libraryPageSrc = readSrc(
   "src/app/(app)/library/order-availability/page.tsx",

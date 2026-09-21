@@ -731,7 +731,7 @@ export function WaitingListBoard({
     <section aria-labelledby={WAITING_LIST_SECTION_ID} className="space-y-4">
       <div>
         <h2
-          className="text-ink text-lg font-semibold tracking-tight"
+          className="text-ink scroll-mt-32 text-lg font-semibold tracking-tight"
           id={WAITING_LIST_SECTION_ID}
         >
           Waiting list

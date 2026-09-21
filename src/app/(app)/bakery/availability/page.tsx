@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { PageHeader } from "@/components/shell/PageHeader";
+import { PagePanel } from "@/components/ui";
 import { requireStaff } from "@/foundation/auth/session";
 import { canAccessBakeryWorkspace } from "@/engines/bakery/capabilities";
 import { parseOrderAvailabilityMonth } from "@/engines/business-calendar/order-availability";
@@ -10,23 +12,31 @@ import {
   canViewWaitingList,
 } from "@/foundation/navigation/access";
 import { parseBusinessDate, toBusinessDateKey } from "@/lib/dates";
+import { firstQueryDateParam, firstQueryParam } from "@/lib/query-params";
 import { BakeryWorkspaceNav } from "@/workspaces/bakery/BakeryWorkspaceNav";
 import { countExtraStockProposed } from "@/workspaces/extra/queries";
-import { ProductionCapacitySection } from "@/workspaces/library/order-availability/capacity/ProductionCapacitySection";
+import { AvailabilityDateBar } from "@/workspaces/library/order-availability/AvailabilityDateBar";
+import { AvailabilitySectionNav } from "@/workspaces/library/order-availability/AvailabilitySectionNav";
+import { PickupDateClosureSection } from "@/workspaces/library/order-availability/PickupDateClosureSection";
+import { WaitingListAvailabilitySection } from "@/workspaces/library/order-availability/WaitingListAvailabilitySection";
+import {
+  ProductionCapacitySection,
+  resolveCapacityDate,
+} from "@/workspaces/library/order-availability/capacity/ProductionCapacitySection";
+import { ProductionCapacityHistorySection } from "@/workspaces/library/order-availability/capacity/ProductionCapacityHistorySection";
 import { AvailabilityOverviewSection } from "@/workspaces/library/order-availability/overview/AvailabilityOverviewSection";
-import { OrderAvailabilityScreen } from "@/workspaces/library/order-availability/OrderAvailabilityScreen";
 import { WaitingListSection } from "@/workspaces/waiting-list/WaitingListSection";
 
 export const dynamic = "force-dynamic";
 
 type BakeryAvailabilityPageProps = {
   searchParams: Promise<{
-    month?: string;
-    date?: string;
-    overviewFrom?: string;
-    wlCake?: string;
-    wlStatus?: string;
-    wlSize?: string;
+    month?: string | string[];
+    date?: string | string[];
+    overviewFrom?: string | string[];
+    wlCake?: string | string[];
+    wlStatus?: string | string[];
+    wlSize?: string | string[];
   }>;
 };
 
@@ -40,11 +50,16 @@ export default async function BakeryAvailabilityPage({
 
   const params = await searchParams;
   const today = toBusinessDateKey();
-  const date = params.date?.trim().slice(0, 10) ?? "";
+  const date = firstQueryDateParam(params.date);
   const month = parseOrderAvailabilityMonth(
-    parseBusinessDate(date) ? date.slice(0, 7) : params.month,
+    parseBusinessDate(date) ? date.slice(0, 7) : firstQueryParam(params.month),
     today,
   );
+  const overviewFrom = firstQueryDateParam(params.overviewFrom);
+  const wlCake = firstQueryParam(params.wlCake);
+  const wlSize = firstQueryParam(params.wlSize);
+  const wlStatus = firstQueryParam(params.wlStatus);
+  const pickupDate = resolveCapacityDate(date || undefined, month);
   const canMutate = canMutateOrderAvailability(staff.role.code);
   const canViewQueue = canViewWaitingList(staff.role.code);
   const canManageQueue = canManageWaitingList(staff.role.code);
@@ -61,36 +76,67 @@ export default async function BakeryAvailabilityPage({
         proposedCount={proposedCount}
         showWorkspaceLinks={showWorkspaceLinks}
       />
-      <div className="mt-6 space-y-10">
-        <OrderAvailabilityScreen
-          canMutate={canMutate}
-          description="Close or reopen pickup dates for new customer preorders. Closing a date prevents new website preorders for that pickup date. Existing confirmed orders are unchanged."
-          hrefBase="/bakery/availability"
-          monthParam={month}
+      <div className="mt-6 space-y-6">
+        <PageHeader
+          description="Production limits, waiting-list availability, and commercial remaining for a pickup date."
           title="Availability"
         />
-        <ProductionCapacitySection
-          canConfigureWaitingList={canConfigureQueue}
-          canMutate={canMutate}
-          dateParam={params.date}
-          month={month}
-        />
-        {canViewQueue ? (
-          <WaitingListSection
-            cakeParam={params.wlCake}
-            canConfigure={canConfigureQueue}
-            canManage={canManageQueue}
-            dateParam={params.date}
+        <PagePanel>
+          <AvailabilityDateBar
             month={month}
-            sizeParam={params.wlSize}
-            statusParam={params.wlStatus}
+            pickupDate={pickupDate}
+            wlCake={wlCake}
+            wlSize={wlSize}
+            wlStatus={wlStatus}
           />
-        ) : null}
-        <AvailabilityOverviewSection
-          dateParam={params.date}
-          fromParam={params.overviewFrom}
-          month={month}
-        />
+        </PagePanel>
+        <AvailabilitySectionNav />
+        <PagePanel>
+          <PickupDateClosureSection
+            canMutate={canMutate}
+            pickupDate={pickupDate}
+          />
+          <div className="border-fog mt-6 border-t pt-6">
+            <ProductionCapacitySection
+              canConfigureWaitingList={canConfigureQueue}
+              canMutate={canMutate}
+              dateParam={date || undefined}
+              month={month}
+            />
+          </div>
+        </PagePanel>
+        <PagePanel>
+          <WaitingListAvailabilitySection
+            dateParam={date || undefined}
+            month={month}
+          />
+          {canViewQueue ? (
+            <div className="border-fog mt-6 border-t pt-6">
+              <WaitingListSection
+                cakeParam={wlCake || undefined}
+                canConfigure={canConfigureQueue}
+                canManage={canManageQueue}
+                dateParam={date || undefined}
+                month={month}
+                sizeParam={wlSize || undefined}
+                statusParam={wlStatus || undefined}
+              />
+            </div>
+          ) : null}
+        </PagePanel>
+        <PagePanel>
+          <AvailabilityOverviewSection
+            dateParam={date || undefined}
+            fromParam={overviewFrom || undefined}
+            month={month}
+          />
+        </PagePanel>
+        <PagePanel>
+          <ProductionCapacityHistorySection
+            dateParam={date || undefined}
+            month={month}
+          />
+        </PagePanel>
       </div>
     </div>
   );

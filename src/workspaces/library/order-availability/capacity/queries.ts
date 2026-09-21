@@ -131,27 +131,38 @@ export async function listProductionCapacityForDate(
     ]),
   );
 
-  const result: ProductionCapacityRow[] = [];
-  for (const row of rows) {
+  const committedResults = await Promise.all(
+    rows.map(async (row) => {
+      const cakeId = String((row as { library_cake_id?: string }).library_cake_id ?? "");
+      const sizeIdRaw = (row as { library_cake_size_id?: string | null })
+        .library_cake_size_id;
+      const collectionIdRaw = (row as { collection_id?: string | null }).collection_id;
+      const sizeId = sizeIdRaw ? String(sizeIdRaw) : null;
+      const collectionId = collectionIdRaw ? String(collectionIdRaw) : null;
+      const { data: committed, error: committedError } = await supabase.rpc(
+        "production_capacity_committed_quantity",
+        {
+          p_pickup_date: pickupDate,
+          p_library_cake_id: cakeId,
+          p_library_cake_size_id: sizeId,
+          p_collection_id: collectionId,
+        },
+      );
+      if (committedError && !isMissingCapacityTable(committedError.message)) {
+        throw new Error(committedError.message);
+      }
+      return Number(committed ?? 0);
+    }),
+  );
+
+  return rows.map((row, index) => {
     const cakeId = String((row as { library_cake_id?: string }).library_cake_id ?? "");
     const sizeIdRaw = (row as { library_cake_size_id?: string | null })
       .library_cake_size_id;
     const collectionIdRaw = (row as { collection_id?: string | null }).collection_id;
     const sizeId = sizeIdRaw ? String(sizeIdRaw) : null;
     const collectionId = collectionIdRaw ? String(collectionIdRaw) : null;
-    const { data: committed, error: committedError } = await supabase.rpc(
-      "production_capacity_committed_quantity",
-      {
-        p_pickup_date: pickupDate,
-        p_library_cake_id: cakeId,
-        p_library_cake_size_id: sizeId,
-        p_collection_id: collectionId,
-      },
-    );
-    if (committedError && !isMissingCapacityTable(committedError.message)) {
-      throw new Error(committedError.message);
-    }
-    result.push({
+    return {
       id: String((row as { id?: string }).id ?? ""),
       pickupDate,
       cakeId,
@@ -163,14 +174,13 @@ export async function listProductionCapacityForDate(
         ? (collectionNames.get(collectionId) ?? "Catalogue")
         : null,
       quantity: Number((row as { capacity_quantity?: number }).capacity_quantity ?? 0),
-      committedQuantity: Number(committed ?? 0),
+      committedQuantity: committedResults[index] ?? 0,
       waitingListEnabled: Boolean(
         (row as { waiting_list_enabled?: boolean }).waiting_list_enabled,
       ),
       note: String((row as { note?: string | null }).note ?? "").trim() || null,
-    });
-  }
-  return result;
+    };
+  });
 }
 
 export async function listRecentProductionCapacityEvents(

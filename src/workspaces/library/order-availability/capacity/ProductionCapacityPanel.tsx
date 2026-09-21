@@ -8,14 +8,10 @@ import {
   saveProductionCapacityAction,
 } from "@/workspaces/library/order-availability/capacity/actions";
 import { setCapacityWaitingListAction } from "@/workspaces/waiting-list/actions";
-import {
-  formatCapacityEventSummary,
-  formatCapacityEventWhen,
-  type ProductionCapacityCakeOption,
-  type ProductionCapacityEvent,
-  type ProductionCapacityRow,
+import type {
+  ProductionCapacityCakeOption,
+  ProductionCapacityRow,
 } from "@/workspaces/library/order-availability/capacity/capacity-event-format";
-import { formatLongBusinessDate } from "@/lib/dates";
 
 const ghostButtonClass =
   "border-fog text-ink hover:border-skyline inline-flex min-h-11 items-center justify-center rounded-lg border bg-white px-3 text-sm font-medium transition disabled:opacity-60";
@@ -24,24 +20,18 @@ const inkButtonClass =
 
 type ProductionCapacityPanelProps = {
   pickupDate: string;
-  month: string;
-  hrefBase: "/bakery/availability";
   canMutate: boolean;
   canConfigureWaitingList: boolean;
   cakes: ProductionCapacityCakeOption[];
   rows: ProductionCapacityRow[];
-  events: ProductionCapacityEvent[];
 };
 
 export function ProductionCapacityPanel({
   pickupDate,
-  month,
-  hrefBase,
   canMutate,
   canConfigureWaitingList,
   cakes,
   rows,
-  events,
 }: ProductionCapacityPanelProps) {
   const [saveState, saveAction, savePending] = useActionState(
     saveProductionCapacityAction,
@@ -70,7 +60,7 @@ export function ProductionCapacityPanel({
     >
       <div>
         <h2
-          className="text-ink text-lg font-semibold tracking-tight"
+          className="text-ink scroll-mt-32 text-lg font-semibold tracking-tight"
           id="production-capacity-heading"
         >
           Production capacity
@@ -83,29 +73,6 @@ export function ProductionCapacityPanel({
           numbers.
         </p>
       </div>
-
-      <form
-        action={hrefBase}
-        className="flex flex-wrap items-end gap-3"
-        method="get"
-      >
-        <input name="month" type="hidden" value={month} />
-        <label className="text-ink text-sm font-medium">
-          Pickup date
-          <input
-            className="border-fog text-ink mt-1 block h-11 rounded-lg border bg-white px-3 text-sm"
-            defaultValue={pickupDate}
-            name="date"
-            type="date"
-          />
-        </label>
-        <button className={ghostButtonClass} type="submit">
-          View date
-        </button>
-        <p className="text-skyline text-sm">
-          {formatLongBusinessDate(pickupDate)}
-        </p>
-      </form>
 
       {canMutate ? <FormError message={error} /> : null}
 
@@ -295,32 +262,6 @@ export function ProductionCapacityPanel({
           </button>
         </form>
       ) : null}
-
-      <div className="space-y-2">
-        <h3 className="text-ink text-sm font-semibold tracking-tight">
-          Recent capacity changes
-        </h3>
-        {events.length === 0 ? (
-          <p className="text-skyline text-sm">No capacity changes for this date.</p>
-        ) : (
-          <ul className="divide-fog border-fog divide-y overflow-hidden rounded-xl border">
-            {events.map((event) => (
-              <li
-                className="px-4 py-3"
-                key={`${event.createdAt}:${event.cakeName}:${event.newQuantity}`}
-              >
-                <p className="text-ink text-sm font-medium">
-                  {formatCapacityEventSummary(event)}
-                </p>
-                <p className="text-skyline mt-0.5 text-xs">
-                  {formatCapacityEventWhen(event)}
-                  {event.actorName ? ` · ${event.actorName}` : ""}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
     </section>
   );
 }

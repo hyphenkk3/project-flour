@@ -4,6 +4,7 @@ import {
   closedPickupDateSet,
   orderAvailabilityMonthDays,
 } from "@/engines/business-calendar/order-availability";
+import { parseBusinessDate } from "@/lib/dates";
 
 export type OrderAvailabilityDay = {
   pickupDate: string;
@@ -104,6 +105,34 @@ export async function listOrderAvailabilityDays(
     closed: closed.has(pickupDate),
     note: closed.has(pickupDate) ? (notes.get(pickupDate) ?? null) : null,
   }));
+}
+
+export async function getOrderAvailabilityDay(
+  pickupDate: string,
+): Promise<OrderAvailabilityDay | null> {
+  if (!parseBusinessDate(pickupDate)) return null;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("order_availability_overrides")
+    .select("pickup_date, closed, note")
+    .eq("pickup_date", pickupDate)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    return { pickupDate, closed: false, note: null };
+  }
+
+  const closed = (data as OverrideRow).closed !== false;
+  return {
+    pickupDate,
+    closed,
+    note: closed ? optionalNote((data as OverrideRow).note) : null,
+  };
 }
 
 /**

@@ -124,9 +124,12 @@ const bakeryPageSrc = readSrc(
 assert.match(bakeryPageSrc, /canAccessBakeryWorkspace/);
 assert.match(bakeryPageSrc, /canViewOrderAvailability/);
 assert.match(bakeryPageSrc, /canMutateOrderAvailability/);
-assert.match(bakeryPageSrc, /hrefBase="\/bakery\/availability"/);
+assert.match(bakeryPageSrc, /PickupDateClosureSection/);
+assert.match(bakeryPageSrc, /firstQueryDateParam/);
+assert.match(bakeryPageSrc, /AvailabilitySectionNav/);
+assert.doesNotMatch(bakeryPageSrc, /OrderAvailabilityScreen/);
+assert.doesNotMatch(bakeryPageSrc, /hrefBase="\/bakery\/availability"/);
 assert.match(bakeryPageSrc, /active="availability"/);
-assert.match(bakeryPageSrc, /OrderAvailabilityScreen/);
 assert.doesNotMatch(bakeryPageSrc, /production_capacity/);
 
 const bakeryLayoutSrc = readSrc("src/app/(app)/bakery/layout.tsx");
@@ -153,6 +156,7 @@ const queriesSrc = readSrc(
 );
 assert.match(queriesSrc, /order_availability_override_events/);
 assert.match(queriesSrc, /listRecentOrderAvailabilityEvents/);
+assert.match(queriesSrc, /getOrderAvailabilityDay/);
 assert.match(
   queriesSrc,
   /select\("pickup_date, action, actor_staff_id, created_at"\)/,

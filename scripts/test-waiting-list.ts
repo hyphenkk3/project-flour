@@ -619,6 +619,7 @@ assert.match(staffActionsSrc, /canConfigureWaitingList/);
 
 const pageSrc = readSrc("src/app/(app)/bakery/availability/page.tsx");
 assert.match(pageSrc, /WaitingListSection/);
+assert.match(pageSrc, /WaitingListAvailabilitySection/);
 assert.match(pageSrc, /canViewWaitingList/);
 
 const accessSrc = readSrc("src/foundation/navigation/access.ts");

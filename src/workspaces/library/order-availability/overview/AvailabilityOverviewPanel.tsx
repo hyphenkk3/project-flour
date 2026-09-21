@@ -58,7 +58,7 @@ export function AvailabilityOverviewPanel({
     <section aria-labelledby="availability-overview-heading" className="space-y-4">
       <div>
         <h2
-          className="text-ink text-lg font-semibold tracking-tight"
+          className="text-ink scroll-mt-32 text-lg font-semibold tracking-tight"
           id="availability-overview-heading"
         >
           Availability overview

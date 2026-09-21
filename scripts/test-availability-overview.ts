@@ -306,7 +306,13 @@ const bakeryPageSrc = readSrc(
 assert.match(bakeryPageSrc, /AvailabilityOverviewSection/);
 assert.match(bakeryPageSrc, /canViewOrderAvailability/);
 assert.match(bakeryPageSrc, /showWorkspaceLinks/);
+assert.match(bakeryPageSrc, /AvailabilitySectionNav/);
 assert.doesNotMatch(bakeryPageSrc, /set_production_capacity/);
+
+const overviewSectionSrc = readSrc(
+  "src/workspaces/library/order-availability/overview/AvailabilityOverviewSection.tsx",
+);
+assert.match(overviewSectionSrc, /parseBusinessDate\(selectedDate\)/);
 
 const bakeryLayoutSrc = readSrc("src/app/(app)/bakery/layout.tsx");
 assert.match(bakeryLayoutSrc, /canViewOrderAvailability/);

@@ -19,3 +19,8 @@ export function fetchWithTimeout(timeoutMs: number): typeof fetch {
 
 export const AUTH_FETCH_TIMEOUT_MS = 3_000;
 export const DATA_FETCH_TIMEOUT_MS = 8_000;
+
+/** Network/timeout failures from bounded Supabase fetches. */
+export function isTransientDataLoadError(message: string): boolean {
+  return /aborted|abort|timeout|fetch failed|network/i.test(message);
+}

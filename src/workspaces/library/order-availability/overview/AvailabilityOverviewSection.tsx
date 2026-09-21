@@ -1,4 +1,5 @@
-import { toBusinessDateKey } from "@/lib/dates";
+import { parseBusinessDate, toBusinessDateKey } from "@/lib/dates";
+import { isTransientDataLoadError } from "@/lib/supabase/fetch-timeout";
 import {
   availabilityOverviewDates,
   buildAvailabilityOverviewDays,
@@ -33,7 +34,11 @@ export async function AvailabilityOverviewSection({
   dateParam,
 }: AvailabilityOverviewSectionProps) {
   const today = toBusinessDateKey();
-  const from = parseAvailabilityOverviewFrom(fromParam, today);
+  const selectedDate = dateParam?.trim().slice(0, 10) ?? "";
+  const from = parseAvailabilityOverviewFrom(
+    fromParam,
+    parseBusinessDate(selectedDate) ? selectedDate : today,
+  );
   const dates = availabilityOverviewDates(from);
   const to = dates[dates.length - 1] ?? from;
 
@@ -44,14 +49,15 @@ export async function AvailabilityOverviewSection({
   });
 
   try {
-    const window = await listAvailabilityOverview(fromParam, today);
+    const window = await listAvailabilityOverview(from, from);
     days = window.days;
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (
       !/production_capacity|order_availability_override|schema cache|does not exist/i.test(
         message,
-      )
+      ) &&
+      !isTransientDataLoadError(message)
     ) {
       throw error;
     }
