@@ -2,6 +2,7 @@ import type { StorefrontCake } from "@/types/storefront";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import { FormSelect } from "@/components/ui/form";
 import { startingPrice, formatRm } from "@/workspaces/storefront/catalog/pricing";
+import { chargedDraftItemUnitPrice } from "@/engines/orders/cake-size-price-ack";
 import {
   draftItemSizeChoices,
   draftLinePreorderLabel,
@@ -168,7 +169,9 @@ export function CheckoutOrderSummary({
                           value={item.quantity}
                         />
                         <p className="text-ink ml-auto text-sm font-medium tabular-nums">
-                          {formatRm(item.unitPrice * item.quantity)}
+                          {formatRm(
+                            chargedDraftItemUnitPrice(item) * item.quantity,
+                          )}
                         </p>
                       </div>
                       {preorder ? (

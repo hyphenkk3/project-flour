@@ -87,7 +87,7 @@ import { CheckoutOrderSummary } from "@/workspaces/storefront/checkout/CheckoutO
 import { CheckoutSection } from "@/workspaces/storefront/checkout/CheckoutSection";
 import { FulfilmentMethodChooser } from "@/workspaces/storefront/checkout/FulfilmentMethodChooser";
 import type { StorefrontCake } from "@/types/storefront";
-import { formatCollectionAvailabilityLabel } from "@/workspaces/storefront/catalog/pricing";
+import { formatCollectionAvailabilityLabel, formatRm } from "@/workspaces/storefront/catalog/pricing";
 import {
   draftEarliestCollectionYmd,
   draftItemSizeChoices,
@@ -107,9 +107,21 @@ import {
   type CustomerPaidAddonOption,
 } from "@/engines/orders/customer-preorder-options";
 import {
+  applyApplicableUnitPrices,
+  buildCakePriceAckPayload,
+  CAKE_PRICE_ACK_REQUIRED_MESSAGE,
+  cakePriceAckRequired,
+  cakePriceAckSatisfied,
+  cakePriceAckSnapshot,
+  cakePriceChangeLines,
+  chargedDraftItemUnitPrice,
+  isCakePriceAckStaleError,
+} from "@/engines/orders/cake-size-price-ack";
+import {
   loadCartDateCapacityAvailability,
   loadCheckoutCalendarContext,
   loadCheckoutPickupOffer,
+  resolveCheckoutCakeSizePrices,
   submitGuestPreorderAction,
   type CheckoutState,
 } from "@/workspaces/storefront/checkout/actions";
@@ -249,7 +261,17 @@ function persistDraft(
     ...fields,
     email: "",
     emailSubmissionReceiptRequested: false,
-    items,
+    items: items.map((item) => ({
+      cakeId: item.cakeId,
+      sizeId: item.sizeId,
+      quantity: item.quantity,
+      cakeName: item.cakeName,
+      sizeLabel: item.sizeLabel,
+      unitPrice: item.unitPrice,
+      preorderDays: item.preorderDays,
+      imageUrl: item.imageUrl,
+      sizeChoices: item.sizeChoices,
+    })),
   };
   writePreorderDraft(draft);
 }
@@ -268,10 +290,17 @@ export function GuestCheckoutForm({
   );
   const [confirmOpen, setConfirmOpen] = useState(false);
   const pendingSubmitRef = useRef<FormData | null>(null);
+  const [resolvedPriceKey, setResolvedPriceKey] = useState<string | null>(null);
+  const [priceRefreshKey, setPriceRefreshKey] = useState(0);
+  const [acknowledgedSnapshot, setAcknowledgedSnapshot] = useState("");
 
   useEffect(() => {
     if (state.error) {
       setConfirmOpen(false);
+      if (isCakePriceAckStaleError(state.error)) {
+        setAcknowledgedSnapshot("");
+        setPriceRefreshKey((key) => key + 1);
+      }
     }
   }, [state.error]);
 
@@ -668,7 +697,6 @@ export function GuestCheckoutForm({
             ...item,
             cakeName: cake.name,
             sizeLabel: size.size,
-            unitPrice: size.price,
             preorderDays: size.preorderDays,
             imageUrl: item.imageUrl,
           };
@@ -697,14 +725,81 @@ export function GuestCheckoutForm({
     };
   }, [fields.pickupDate, hydrated]);
 
+  const sizeIdsKey = [...new Set(items.map((item) => item.sizeId).filter(Boolean))]
+    .sort()
+    .join(",");
+  const priceResolutionKey = fields.pickupDate
+    ? `${fields.pickupDate}|${sizeIdsKey}`
+    : "";
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const pickupDate = fields.pickupDate.trim().slice(0, 10);
+    const sizeIds = sizeIdsKey.split(",").filter(Boolean);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(pickupDate) || sizeIds.length === 0) {
+      return;
+    }
+    let cancelled = false;
+    void resolveCheckoutCakeSizePrices(pickupDate, sizeIds).then((prices) => {
+      if (cancelled) return;
+      const missing = sizeIds.some((id) => prices[id] == null);
+      setItems((current) => applyApplicableUnitPrices(current, prices));
+      if (!missing) {
+        setResolvedPriceKey(`${pickupDate}|${sizeIds.slice().sort().join(",")}`);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [fields.pickupDate, hydrated, priceRefreshKey, sizeIdsKey]);
+
+  const pricesReady =
+    items.length === 0 ||
+    !fields.pickupDate ||
+    resolvedPriceKey === priceResolutionKey;
+  const pricedItems = pricesReady
+    ? items
+    : items.map((item) => ({ ...item, applicableUnitPrice: undefined }));
+
   const total = useMemo(
     () =>
       customerPreorderCommercialTotal({
-        items,
+        items: pricedItems.map((item) => ({
+          unitPrice: chargedDraftItemUnitPrice(item),
+          quantity: item.quantity,
+        })),
         options: paidAddonOptions,
         selectedCodes: fields.paidAddonCodes,
       }),
-    [items, paidAddonOptions, fields.paidAddonCodes],
+    [pricedItems, paidAddonOptions, fields.paidAddonCodes],
+  );
+  const priceChangeLines = useMemo(
+    () => cakePriceChangeLines(pricedItems),
+    [pricedItems],
+  );
+  const ackSnapshot = useMemo(
+    () =>
+      cakePriceAckSnapshot({
+        pickupDate: fields.pickupDate,
+        items: pricedItems,
+      }),
+    [fields.pickupDate, pricedItems],
+  );
+  const ackRequired = cakePriceAckRequired(pricedItems);
+  const pricesAcknowledged = cakePriceAckSatisfied({
+    pickupDate: fields.pickupDate,
+    items: pricedItems,
+    acknowledgedSnapshot,
+  });
+  const priceAckJson = useMemo(
+    () =>
+      JSON.stringify(
+        buildCakePriceAckPayload({
+          pickupDate: fields.pickupDate,
+          items: pricedItems,
+        }),
+      ),
+    [fields.pickupDate, pricedItems],
   );
   const itemsJson = useMemo(
     () =>
@@ -737,6 +832,10 @@ export function GuestCheckoutForm({
     fields.pickupDate,
     resolvedOfferDate,
   );
+  const sizePricesPending =
+    items.length > 0 &&
+    Boolean(fields.pickupDate) &&
+    resolvedPriceKey !== priceResolutionKey;
   const calendarPending = isCheckoutCalendarPending(calendarReady);
   const preorderLines = useMemo(
     () => toPreorderLines(items, cakes),
@@ -959,6 +1058,7 @@ export function GuestCheckoutForm({
         sizeLabel: liveSize.size,
         unitPrice: liveSize.price,
         preorderDays: liveSize.preorderDays,
+        applicableUnitPrice: undefined,
       });
       return;
     }
@@ -971,6 +1071,7 @@ export function GuestCheckoutForm({
       sizeLabel: draftSize.size,
       unitPrice: draftSize.price,
       preorderDays: draftSize.preorderDays,
+      applicableUnitPrice: undefined,
     });
   }
 
@@ -1010,7 +1111,7 @@ export function GuestCheckoutForm({
   }
 
   function handleSubmit(formData: FormData) {
-    if (calendarPending || liveOfferPending) {
+    if (calendarPending || liveOfferPending || sizePricesPending) {
       return;
     }
     if (unavailableMessage) {
@@ -1040,6 +1141,10 @@ export function GuestCheckoutForm({
     if (nameErrorMessage) {
       setNameError(nameErrorMessage);
       setItemError(nameErrorMessage);
+      return;
+    }
+    if (ackRequired && !pricesAcknowledged) {
+      setItemError(CAKE_PRICE_ACK_REQUIRED_MESSAGE);
       return;
     }
     setNameError(null);
@@ -1131,12 +1236,14 @@ export function GuestCheckoutForm({
     pickupMembershipsPending ||
     Boolean(calendarError) ||
     liveOfferPending ||
+    sizePricesPending ||
     !catalogueReady ||
     Boolean(unavailableMessage) ||
-    (items.length > 0 && collectionDateInvalid);
+    (items.length > 0 && collectionDateInvalid) ||
+    (ackRequired && !pricesAcknowledged);
   const confirmSnapshot = buildCheckoutConfirmSnapshot({
     fields,
-    items,
+    items: pricedItems,
     paidAddonOptions,
     pickupDateLabel,
     total,
@@ -1149,6 +1256,7 @@ export function GuestCheckoutForm({
         className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_20.5rem] lg:items-start lg:gap-x-16 lg:gap-y-0"
       >
         <input name="items_json" type="hidden" value={itemsJson} />
+        <input name="price_ack_json" type="hidden" value={priceAckJson} />
         <input name="preorder_options_json" type="hidden" value={optionsJson} />
         <input
           name="preorder_options_ready"
@@ -1804,6 +1912,51 @@ export function GuestCheckoutForm({
             />
           </CheckoutSection>
 
+          {ackRequired ? (
+            <CheckoutSection
+              className="border-fog border-t pt-10"
+              title="Price updated for your selected pickup date"
+            >
+              <div className="space-y-4" role="status">
+                <p className="text-ink text-sm leading-relaxed">
+                  The following prices differ from the price shown when you
+                  added the item:
+                </p>
+                <ul className="space-y-2">
+                  {priceChangeLines.map((line) => (
+                    <li
+                      className="text-ink text-sm leading-relaxed"
+                      key={line.sizeId}
+                    >
+                      <span className="font-medium">
+                        {line.cakeName}
+                        {line.sizeLabel ? ` ${line.sizeLabel}` : ""}
+                      </span>
+                      <span className="mt-1 block tabular-nums">
+                        {formatRm(line.quotedUnitPrice)} →{" "}
+                        {formatRm(line.applicableUnitPrice)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-ink text-sm leading-relaxed">
+                  Your order total has been updated based on the price for your
+                  selected pickup date.
+                </p>
+                <FormCheckbox
+                  checked={pricesAcknowledged}
+                  label="I understand and accept the updated prices for my selected pickup date."
+                  name="price_ack_accepted"
+                  onChange={(event) =>
+                    setAcknowledgedSnapshot(
+                      event.target.checked ? ackSnapshot : "",
+                    )
+                  }
+                />
+              </div>
+            </CheckoutSection>
+          ) : null}
+
           {itemError && itemError !== collectionDateMessage ? (
             <p
               className="text-status-danger text-sm leading-relaxed"
@@ -1840,7 +1993,7 @@ export function GuestCheckoutForm({
             cakes={cakes}
             catalogueReady={catalogueReady}
             earliestLabel={earliestLabel}
-            items={items}
+            items={pricedItems}
             loadingOffer={liveOfferPending}
             offerLabel={offerLabel}
             onAddCake={addOfferedCakeAndClosePicker}

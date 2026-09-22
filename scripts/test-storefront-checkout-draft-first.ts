@@ -156,7 +156,7 @@ assert.match(summarySrc, /draftItemSizeChoices/);
 assert.match(summarySrc, /cakePickupAvailabilityNotes/);
 assert.match(summarySrc, /item\.cakeName/);
 assert.match(summarySrc, /item\.imageUrl/);
-assert.match(summarySrc, /item\.unitPrice \* item\.quantity/);
+assert.match(summarySrc, /chargedDraftItemUnitPrice\(item\) \* item\.quantity|item\.unitPrice \* item\.quantity/);
 assert.match(summarySrc, /Checking availability for that date/);
 assert.doesNotMatch(summarySrc, /Loading cakes for that date/);
 assert.match(summarySrc, /items\.length === 0/);
@@ -174,7 +174,7 @@ assert.match(formSrc, /isCheckoutLiveOfferPending/);
 assert.match(formSrc, /resolvedOfferDate/);
 assert.match(formSrc, /liveOfferPending/);
 assert.match(formSrc, /draftItemSizeChoices\(item, cake\)/);
-assert.match(formSrc, /if \(calendarPending \|\| liveOfferPending\) \{\s*return;/);
+assert.match(formSrc, /if \(calendarPending \|\| liveOfferPending \|\| sizePricesPending\) \{\s*return;/);
 assert.doesNotMatch(formSrc, /setLoadingOffer/);
 assert.match(formSrc, /imageUrl: item\.imageUrl/);
 

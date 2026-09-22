@@ -78,6 +78,10 @@ import {
   listClosedPickupOrderDates,
 } from "@/workspaces/storefront/checkout/order-availability";
 import { parseRequiredPhysicalReceipt } from "@/workspaces/storefront/checkout/preorder-draft";
+import {
+  CAKE_PRICE_ACK_STALE_MESSAGE,
+  isCakePriceAckStaleError,
+} from "@/engines/orders/cake-size-price-ack";
 import { setGuestPreorderReceiptCookie } from "@/workspaces/storefront/checkout/receipt";
 import { customerNameValidationError } from "@/engines/orders/customer-name";
 
@@ -117,6 +121,20 @@ function parseItems(formData: FormData): SubmitItem[] {
       );
   } catch {
     return [];
+  }
+}
+
+function parsePriceAck(formData: FormData): Record<string, unknown> | null {
+  const raw = String(formData.get("price_ack_json") ?? "").trim();
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
   }
 }
 
@@ -479,6 +497,12 @@ export async function submitGuestPreorderAction(
     rpcArgs.p_paid_addons = paidAddons;
   }
 
+  const priceAck = parsePriceAck(formData);
+  if (priceAck == null) {
+    return { error: CAKE_PRICE_ACK_STALE_MESSAGE };
+  }
+  rpcArgs.p_price_ack = priceAck;
+
   const { data, error } = await supabase.rpc("submit_guest_preorder", rpcArgs);
 
   if (error) {
@@ -488,6 +512,9 @@ export async function submitGuestPreorderAction(
           "Fully Booked for your current order.",
         ),
       };
+    }
+    if (isCakePriceAckStaleError(error.message)) {
+      return { error: CAKE_PRICE_ACK_STALE_MESSAGE };
     }
     return { error: error.message };
   }
@@ -613,6 +640,38 @@ export async function loadCheckoutPickupOffer(
     paidAddonOptions: options.paidAddons,
     optionsReady: options.ready,
   };
+}
+
+export async function resolveCheckoutCakeSizePrices(
+  pickupDate: string,
+  sizeIds: readonly string[],
+): Promise<Record<string, number>> {
+  const key = pickupDate.trim().slice(0, 10);
+  const ids = [
+    ...new Set(sizeIds.map((id) => id.trim()).filter((id) => id.length > 0)),
+  ];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || ids.length === 0) {
+    return {};
+  }
+  const supabase = await createClient();
+  const resolved = await Promise.all(
+    ids.map(async (id) => {
+      const { data, error } = await supabase.rpc("library_cake_size_price_on", {
+        p_cake_size_id: id,
+        p_pickup_date: key,
+      });
+      if (error || data == null) return null;
+      const price = Number(data);
+      if (!Number.isFinite(price)) return null;
+      return [id, price] as const;
+    }),
+  );
+  const prices: Record<string, number> = {};
+  for (const row of resolved) {
+    if (!row) continue;
+    prices[row[0]] = row[1];
+  }
+  return prices;
 }
 
 export async function loadCartDateCapacityAvailability(input: {

@@ -41,7 +41,7 @@ assert.match(formSrc, /Confirming collection dates/);
 assert.match(formSrc, /Confirming opening hours/);
 assert.match(formSrc, /calendarPending/);
 assert.match(formSrc, /isCheckoutCalendarPending/);
-assert.match(formSrc, /if \(calendarPending \|\| liveOfferPending\)/);
+assert.match(formSrc, /if \(calendarPending \|\| liveOfferPending(?: \|\| sizePricesPending)?\)/);
 assert.match(formSrc, /loadCheckoutPickupOffer/);
 assert.match(formSrc, /liveOfferPending/);
 assert.doesNotMatch(formSrc, /Loading cakes for that date/);

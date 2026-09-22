@@ -22,7 +22,12 @@ export type PreorderDraftItem = {
   quantity: number;
   cakeName: string;
   sizeLabel: string;
+  /** Quoted/add-time unit price. Do not overwrite with pickup-date price. */
   unitPrice: number;
+  /** Optional alias; when present, treated as the original quote. */
+  quotedUnitPrice?: number;
+  /** Pickup-date price from library_cake_size_price_on. Display/charge only. */
+  applicableUnitPrice?: number;
   /** Display/UX only. Final validation reloads live size preorder_days. */
   preorderDays?: number;
   /** Display-only thumbnail captured at add-to-order. */
@@ -215,7 +220,12 @@ export function readPreorderDraft(): PreorderDraft | null {
         quantity: Number(item.quantity) || 1,
         cakeName: String(item.cakeName ?? ""),
         sizeLabel: String(item.sizeLabel ?? ""),
-        unitPrice: Number(item.unitPrice) || 0,
+        unitPrice: Number(
+          typeof item.quotedUnitPrice === "number" &&
+            Number.isFinite(item.quotedUnitPrice)
+            ? item.quotedUnitPrice
+            : item.unitPrice,
+        ) || 0,
         preorderDays:
           typeof item.preorderDays === "number" && item.preorderDays >= 1
             ? item.preorderDays
@@ -434,7 +444,8 @@ export function draftTotal(draft: PreorderDraft | null): number {
 
 /**
  * Drop draft lines that are not offered on the current storefront catalogue.
- * Refreshes display name/size/price from live catalog (display-only; RPC snapshots price).
+ * Refreshes display name/size/lead time from live catalog. Keeps the quoted
+ * unitPrice captured at add-to-order.
  */
 export function filterDraftItemsToOfferedCakes(
   items: PreorderDraftItem[],
@@ -459,11 +470,15 @@ export function filterDraftItemsToOfferedCakes(
       dropped = true;
       continue;
     }
+    const quoted =
+      Number.isFinite(item.unitPrice) && item.unitPrice >= 0
+        ? item.unitPrice
+        : size.price;
     next.push({
       ...item,
       cakeName: cake.name,
       sizeLabel: size.size,
-      unitPrice: size.price,
+      unitPrice: quoted,
       quantity: Math.max(1, Number(item.quantity) || 1),
       preorderDays: size.preorderDays ?? item.preorderDays,
     });

@@ -17,6 +17,7 @@ import {
 } from "@/engines/orders/fulfilment";
 import { formatShortBusinessDate } from "@/lib/dates";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
+import { chargedDraftItemUnitPrice } from "@/engines/orders/cake-size-price-ack";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import { StorefrontOverlay } from "@/workspaces/storefront/StorefrontOverlay";
 import type {
@@ -57,7 +58,7 @@ export function buildCheckoutConfirmSnapshot(input: {
     name: item.cakeName,
     sizeLabel: item.sizeLabel,
     quantity: item.quantity,
-    linePrice: item.unitPrice * item.quantity,
+    linePrice: chargedDraftItemUnitPrice(item) * item.quantity,
   }));
   const selectedAddons = new Set(input.fields.paidAddonCodes);
   const addonLines: CheckoutConfirmLine[] = input.paidAddonOptions

@@ -107,7 +107,7 @@ const filtered = filterDraftItemsToOfferedCakes(draftItems, catalogCakes);
 assert.equal(filtered.dropped, true);
 assert.equal(filtered.items.length, 1);
 assert.equal(filtered.items[0]?.cakeName, "Alpha");
-assert.equal(filtered.items[0]?.unitPrice, 125);
+assert.equal(filtered.items[0]?.unitPrice, 1);
 
 function nextValidPublicPickup(from = new Date()): { date: string; time: string } {
   let ymd = earliestPickupDateYmd(from);

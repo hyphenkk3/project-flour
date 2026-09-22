@@ -88,7 +88,7 @@ assert.match(promptSrc, /Customer/);
 assert.match(promptSrc, /Fulfilment/);
 assert.match(promptSrc, /formatRm\(line\.linePrice\)/);
 assert.match(promptSrc, /formatRm\(snapshot\.total\)/);
-assert.match(promptSrc, /customerPreorderCommercialTotal|unitPrice \* item\.quantity/);
+assert.match(promptSrc, /chargedDraftItemUnitPrice|customerPreorderCommercialTotal|unitPrice \* item\.quantity/);
 assert.match(promptSrc, /snapshot\.notes \?/);
 assert.match(formSrc, /open=\{confirmOpen\}/);
 assert.match(formSrc, /onConfirm=\{confirmOrder\}/);
