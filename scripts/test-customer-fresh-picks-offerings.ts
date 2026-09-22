@@ -529,6 +529,7 @@ assert.match(extraPageSrc, /pick\.walkInHeld/);
 assert.match(extraPageSrc, /FreshPickCatalogueAddCta/);
 assert.match(extraPageSrc, /extraStockIds=\{pick\.extraStockIds\}/);
 assert.doesNotMatch(extraPageSrc, /Pickup today/);
+assert.doesNotMatch(extraPageSrc, /Orders available through/);
 assert.doesNotMatch(extraPageSrc, /1 left/);
 assert.doesNotMatch(extraPageSrc, /2 available/);
 assert.match(extraPageSrc, /freshPickAvailabilityDateLabel/);
@@ -562,6 +563,7 @@ assert.match(homeFreshSrc, /text-skyline mt-0\.5 text-xs leading-tight whitespac
 assert.doesNotMatch(homeFreshSrc, / · \$\{dateLabel\}/);
 assert.match(homeFreshSrc, /Order →/);
 assert.doesNotMatch(homeFreshSrc, /Pickup today/);
+assert.doesNotMatch(homeFreshSrc, /Orders available through/);
 assert.doesNotMatch(homeFreshSrc, /Held by/);
 assert.doesNotMatch(homeFreshSrc, /text-status-danger/);
 assert.doesNotMatch(homeFreshSrc, /text-skyline text-\[11px\] leading-tight/);

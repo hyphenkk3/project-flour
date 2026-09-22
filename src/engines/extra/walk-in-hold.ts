@@ -5,8 +5,7 @@
  */
 
 import { formatExtraPickupThroughClock } from "@/engines/extra/fresh-picks-time";
-import { freshPickDay } from "@/engines/extra/customer-fresh-picks";
-import { formatLongBusinessDate } from "@/lib/dates";
+import { formatBusinessCalendarDate, toBusinessDateKey } from "@/lib/dates";
 
 export const EXTRA_WALK_IN_HOLD_MINUTES = 15;
 export const EXTRA_WALK_IN_HOLD_EXTENSION_MINUTES = 15;
@@ -86,24 +85,20 @@ export const WALK_IN_HOLD_RELEASE_CONFIRM_DESCRIPTION =
   "Release this Walk-in Hold? The Fresh Pick will be available for online sale and other staff actions immediately.";
 
 /**
- * Compact Home / counter line: "Pickup today · 5:30 PM cutoff".
+ * Compact Home / counter line from the order-availability deadline
+ * (`pickup_through_at` / orders available through). Display only.
  */
 export function freshPickHomeSummaryLine(input: {
   preparedOn: string | null;
   pickupThroughAt: string | null;
   todayYmd: string;
 }): string {
-  const day = freshPickDay(input.preparedOn, input.todayYmd);
-  const when =
-    day === "today"
-      ? "today"
-      : day === "tomorrow"
-        ? "tomorrow"
-        : input.preparedOn
-          ? formatLongBusinessDate(input.preparedOn)
-          : "—";
-  const cutoff = input.pickupThroughAt
-    ? formatExtraPickupThroughClock(input.pickupThroughAt)
-    : "—";
-  return `Pickup ${when} · ${cutoff} cutoff`;
+  const through = input.pickupThroughAt?.trim() ?? "";
+  const throughMs = through ? Date.parse(through) : Number.NaN;
+  if (!Number.isFinite(throughMs)) {
+    return "Orders available through — · — cutoff";
+  }
+  const dateLabel = formatBusinessCalendarDate(toBusinessDateKey(through));
+  const cutoff = formatExtraPickupThroughClock(through);
+  return `Orders available through ${dateLabel} · ${cutoff} cutoff`;
 }

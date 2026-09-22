@@ -23,6 +23,9 @@ import {
   isPublishedFreshPick,
 } from "@/engines/extra/customer-fresh-picks";
 import {
+  extraPickupThroughIso,
+} from "@/engines/extra/fresh-picks-time";
+import {
   EXTRA_WALK_IN_HOLD_EXTENSION_MINUTES,
   EXTRA_WALK_IN_HOLD_MINUTES,
   EXTRA_WALK_IN_HOLD_REMINDER_LEAD_MINUTES,
@@ -233,8 +236,99 @@ assert.equal(
     pickupThroughAt: "2026-09-17T09:30:00.000Z",
     todayYmd: "2026-09-17",
   }),
-  "Pickup today · 5:30 PM cutoff",
+  "Orders available through 17 Sep 2026 · 5:30 PM cutoff",
 );
+
+const throughTomorrow = extraPickupThroughIso("2026-09-23", "15:00");
+assert.equal(
+  freshPickHomeSummaryLine({
+    preparedOn: "2026-09-22",
+    pickupThroughAt: throughTomorrow,
+    todayYmd: "2026-09-22",
+  }),
+  "Orders available through 23 Sep 2026 · 3:00 PM cutoff",
+);
+assert.notEqual(
+  freshPickHomeSummaryLine({
+    preparedOn: "2026-09-22",
+    pickupThroughAt: throughTomorrow,
+    todayYmd: "2026-09-22",
+  }),
+  "Pickup today · 3:00 PM cutoff",
+);
+
+const throughToday = extraPickupThroughIso("2026-09-22", "15:00");
+assert.equal(
+  freshPickHomeSummaryLine({
+    preparedOn: "2026-09-22",
+    pickupThroughAt: throughToday,
+    todayYmd: "2026-09-22",
+  }),
+  "Orders available through 22 Sep 2026 · 3:00 PM cutoff",
+);
+
+const throughFuture = extraPickupThroughIso("2026-09-24", "15:00");
+assert.equal(
+  freshPickHomeSummaryLine({
+    preparedOn: "2026-09-23",
+    pickupThroughAt: throughFuture,
+    todayYmd: "2026-09-22",
+  }),
+  "Orders available through 24 Sep 2026 · 3:00 PM cutoff",
+);
+
+assert.equal(
+  freshPickHomeSummaryLine({
+    preparedOn: "2026-09-22",
+    pickupThroughAt: throughTomorrow,
+    todayYmd: "2026-09-22",
+  }),
+  freshPickHomeSummaryLine({
+    preparedOn: "2026-09-23",
+    pickupThroughAt: throughTomorrow,
+    todayYmd: "2026-09-24",
+  }),
+  "displayed date comes from pickupThroughAt, not pickup/today",
+);
+
+assert.doesNotMatch(
+  freshPickHomeSummaryLine({
+    preparedOn: "2026-09-22",
+    pickupThroughAt: throughTomorrow,
+    todayYmd: "2026-09-22",
+  }),
+  /Malaysia time/i,
+);
+assert.equal(
+  freshPickHomeSummaryLine({
+    preparedOn: "2026-09-22",
+    pickupThroughAt: null,
+    todayYmd: "2026-09-22",
+  }),
+  "Orders available through — · — cutoff",
+);
+
+const homeOpsSrc = readFileSync(
+  resolve("src/workspaces/home/HomeFreshPicksOperations.tsx"),
+  "utf8",
+);
+assert.match(homeOpsSrc, /freshPickHomeSummaryLine/);
+assert.doesNotMatch(homeOpsSrc, /Malaysia time/);
+
+const extraPageSrc = readFileSync(
+  resolve("src/workspaces/storefront/home/StorefrontExtraPage.tsx"),
+  "utf8",
+);
+const homeFreshSrc = readFileSync(
+  resolve("src/workspaces/storefront/home/HomeFreshPicksSection.tsx"),
+  "utf8",
+);
+assert.doesNotMatch(extraPageSrc, /freshPickHomeSummaryLine/);
+assert.doesNotMatch(homeFreshSrc, /freshPickHomeSummaryLine/);
+assert.doesNotMatch(extraPageSrc, /Orders available through/);
+assert.doesNotMatch(homeFreshSrc, /Orders available through/);
+assert.doesNotMatch(extraPageSrc, /Pickup today/);
+assert.doesNotMatch(homeFreshSrc, /Pickup today/);
 
 const boardSrc = readFileSync(
   resolve("src/workspaces/extra/ExtraBoard.tsx"),
