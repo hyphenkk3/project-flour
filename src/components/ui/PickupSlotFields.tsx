@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
@@ -98,6 +98,13 @@ export function PickupSlotFields({
     null,
   );
 
+  const onTimeChangeRef = useRef(onTimeChange);
+  const slotsForDateRef = useRef(slotsForDate);
+  useLayoutEffect(() => {
+    onTimeChangeRef.current = onTimeChange;
+    slotsForDateRef.current = slotsForDate;
+  });
+
   const ordersClosed = date
     ? isPickupOrdersClosed(date, closedDates)
     : false;
@@ -122,14 +129,16 @@ export function PickupSlotFields({
 
   useEffect(() => {
     if (!date || !time) return;
-    const stillValid = resolveSlots(date, closedDates).some(
-      (slot) => slot.value === time,
-    );
+    const override = slotsForDateRef.current;
+    const slotsForValue = override
+      ? override(date, closedDates)
+      : customerPickupSlotsForDate(date, closedDates, hoursSnapshot);
+    const stillValid = slotsForValue.some((slot) => slot.value === time);
     if (!stillValid) {
       setTime("");
-      onTimeChange?.("");
+      onTimeChangeRef.current?.("");
     }
-  }, [closedDates, date, hoursSnapshot, onTimeChange, slotsForDate, time]);
+  }, [closedDates, date, hoursSnapshot, time]);
 
   return (
     <div

@@ -246,7 +246,9 @@ export function readPreorderDraft(): PreorderDraft | null {
 
 export function writePreorderDraft(draft: PreorderDraft): void {
   if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(PREORDER_DRAFT_KEY, JSON.stringify(draft));
+  const payload = JSON.stringify(draft);
+  if (window.sessionStorage.getItem(PREORDER_DRAFT_KEY) === payload) return;
+  window.sessionStorage.setItem(PREORDER_DRAFT_KEY, payload);
   emitPreorderDraftChanged();
 }
 

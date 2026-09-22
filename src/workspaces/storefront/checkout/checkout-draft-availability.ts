@@ -8,6 +8,19 @@ export function isCheckoutCalendarPending(calendarReady: boolean): boolean {
   return !calendarReady;
 }
 
+/** Cake identity + quantity only. Price/name updates must not refetch capacity. */
+export function checkoutCartCapacityKey(
+  items: readonly {
+    cakeId: string;
+    sizeId: string;
+    quantity: number;
+  }[],
+): string {
+  return items
+    .map((item) => `${item.cakeId}|${item.sizeId}|${item.quantity}`)
+    .join(",");
+}
+
 export function isCheckoutLiveOfferPending(
   pickupDate: string,
   resolvedOfferDate: string | null,

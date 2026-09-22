@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { StorefrontCake } from "@/types/storefront";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import { FormSelect } from "@/components/ui/form";
@@ -31,7 +32,7 @@ type CheckoutOrderSummaryProps = {
   onRemove: (index: number) => void;
 };
 
-export function CheckoutOrderSummary({
+function CheckoutOrderSummaryView({
   items,
   cakes,
   total,
@@ -298,3 +299,5 @@ export function CheckoutOrderSummary({
     </aside>
   );
 }
+
+export const CheckoutOrderSummary = memo(CheckoutOrderSummaryView);

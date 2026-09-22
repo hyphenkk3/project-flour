@@ -145,15 +145,21 @@ export function applyApplicableUnitPrices<T extends CakePriceQuotedItem>(
   items: readonly T[],
   priceBySizeId: Readonly<Record<string, number>>,
 ): T[] {
-  return items.map((item) => {
+  let changed = false;
+  const next = items.map((item) => {
     const applicable = priceBySizeId[item.sizeId];
     if (typeof applicable !== "number" || !Number.isFinite(applicable)) {
-      const next = { ...item };
-      delete next.applicableUnitPrice;
-      return next;
+      if (item.applicableUnitPrice === undefined) return item;
+      changed = true;
+      const copy = { ...item };
+      delete copy.applicableUnitPrice;
+      return copy;
     }
+    if (item.applicableUnitPrice === applicable) return item;
+    changed = true;
     return { ...item, applicableUnitPrice: applicable };
   });
+  return changed ? next : (items as T[]);
 }
 
 export function isCakePriceAckStaleError(message: string | null | undefined): boolean {

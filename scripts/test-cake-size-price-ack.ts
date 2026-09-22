@@ -334,6 +334,11 @@ const priced = applyApplicableUnitPrices([legacyDraft], {
 });
 assert.equal(priced[0]?.unitPrice, 120);
 assert.equal(priced[0]?.applicableUnitPrice, 130);
+assert.equal(
+  applyApplicableUnitPrices(priced, { "size-6": 130 }),
+  priced,
+  "same applicable prices keep item identity",
+);
 
 const payload = buildCakePriceAckPayload({
   pickupDate: "2026-10-01",

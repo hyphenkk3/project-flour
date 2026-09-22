@@ -1,6 +1,14 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useActionState,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import {
   FormActions,
@@ -94,6 +102,7 @@ import {
   draftStrongestPreorder,
 } from "@/workspaces/storefront/cart/cart-order-summary";
 import {
+  checkoutCartCapacityKey,
   checkoutDraftItemsInCatalogue,
   isCheckoutCalendarPending,
   isCheckoutLiveOfferPending,
@@ -123,6 +132,7 @@ import {
   loadCheckoutPickupOffer,
   resolveCheckoutCakeSizePrices,
   submitGuestPreorderAction,
+  type CheckoutPickupOffer,
   type CheckoutState,
 } from "@/workspaces/storefront/checkout/actions";
 import { clampCustomerPickupWindow } from "@/engines/menu/customer-browse";
@@ -276,6 +286,9 @@ function persistDraft(
   writePreorderDraft(draft);
 }
 
+const checkoutPickupOfferCache = new Map<string, CheckoutPickupOffer>();
+const checkoutCakeSizePriceCache = new Map<string, Record<string, number>>();
+
 export function GuestCheckoutForm({
   suggestedPickupDate = null,
   minPickupDate = null,
@@ -298,6 +311,7 @@ export function GuestCheckoutForm({
     if (state.error) {
       setConfirmOpen(false);
       if (isCakePriceAckStaleError(state.error)) {
+        checkoutCakeSizePriceCache.clear();
         setAcknowledgedSnapshot("");
         setPriceRefreshKey((key) => key + 1);
       }
@@ -434,6 +448,8 @@ export function GuestCheckoutForm({
 
   const rejectExcludedDates = items.length === 0;
 
+  const cartCapacityKey = checkoutCartCapacityKey(items);
+
   useEffect(() => {
     if (!hydrated || !calendarReady || items.length === 0) {
       return;
@@ -457,13 +473,15 @@ export function GuestCheckoutForm({
     return () => {
       cancelled = true;
     };
+  // Price/name-only item updates must not refetch capacity.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- cartCapacityKey encodes cake+size+qty
   }, [
     calendarReady,
+    cartCapacityKey,
     collectionId,
     effectivePickupBounds.max,
     effectivePickupBounds.min,
     hydrated,
-    items,
   ]);
   useEffect(() => {
     const selectedYmd = fields.pickupDate.trim().slice(0, 10);
@@ -555,7 +573,7 @@ export function GuestCheckoutForm({
     suggestedPickupDate,
   ]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const draft = readPreorderDraft();
     const draftItems = draft?.items ?? [];
     const suggested = suggestedPickupDate?.trim().slice(0, 10) ?? "";
@@ -670,7 +688,7 @@ export function GuestCheckoutForm({
     }
 
     let cancelled = false;
-    void loadCheckoutPickupOffer(pickupDate).then((offer) => {
+    const applyOffer = (offer: CheckoutPickupOffer) => {
       if (cancelled) return;
       setCakes(offer.cakes);
       setUnavailableMessage(offer.unavailableMessage);
@@ -688,11 +706,20 @@ export function GuestCheckoutForm({
           offer.cakes.map((cake) => [cake.id, cake.sizes[0]?.id ?? ""]),
         ),
       );
-      setItems((current) =>
-        current.map((item) => {
+      setItems((current) => {
+        let changed = false;
+        const next = current.map((item) => {
           const cake = offer.cakes.find((entry) => entry.id === item.cakeId);
           const size = cake?.sizes.find((entry) => entry.id === item.sizeId);
           if (!cake || !size) return item;
+          if (
+            item.cakeName === cake.name &&
+            item.sizeLabel === size.size &&
+            item.preorderDays === size.preorderDays
+          ) {
+            return item;
+          }
+          changed = true;
           return {
             ...item,
             cakeName: cake.name,
@@ -700,25 +727,41 @@ export function GuestCheckoutForm({
             preorderDays: size.preorderDays,
             imageUrl: item.imageUrl,
           };
-        }),
-      );
+        });
+        return changed ? next : current;
+      });
       setResolvedOfferDate(pickupDate);
-      setFields((current) => ({
-        ...current,
-        complimentaryCodes: current.complimentaryCodes.filter((code) =>
+      setFields((current) => {
+        const complimentaryCodes = current.complimentaryCodes.filter((code) =>
           offer.complimentaryOptions.some((option) => option.code === code),
-        ),
-        paidAddonCodes: current.paidAddonCodes.filter((code) =>
+        );
+        const paidAddonCodes = current.paidAddonCodes.filter((code) =>
           offer.paidAddonOptions.some((option) => option.code === code),
-        ),
-        paidAddonUnitPriceByCode: Object.fromEntries(
+        );
+        const paidAddonUnitPriceByCode = Object.fromEntries(
           offer.paidAddonOptions.map((option) => [
             option.code,
             option.unitPrice,
           ]),
-        ),
-      }));
-    });
+        );
+        return {
+          ...current,
+          complimentaryCodes,
+          paidAddonCodes,
+          paidAddonUnitPriceByCode,
+        };
+      });
+    };
+
+    const cached = checkoutPickupOfferCache.get(pickupDate);
+    if (cached) {
+      applyOffer(cached);
+    } else {
+      void loadCheckoutPickupOffer(pickupDate).then((offer) => {
+        checkoutPickupOfferCache.set(pickupDate, offer);
+        applyOffer(offer);
+      });
+    }
 
     return () => {
       cancelled = true;
@@ -740,14 +783,25 @@ export function GuestCheckoutForm({
       return;
     }
     let cancelled = false;
-    void resolveCheckoutCakeSizePrices(pickupDate, sizeIds).then((prices) => {
+    const applyPrices = (prices: Record<string, number>) => {
       if (cancelled) return;
       const missing = sizeIds.some((id) => prices[id] == null);
       setItems((current) => applyApplicableUnitPrices(current, prices));
       if (!missing) {
         setResolvedPriceKey(`${pickupDate}|${sizeIds.slice().sort().join(",")}`);
       }
-    });
+    };
+    const cached = checkoutCakeSizePriceCache.get(
+      `${pickupDate}|${sizeIdsKey}`,
+    );
+    if (cached) {
+      applyPrices(cached);
+    } else {
+      void resolveCheckoutCakeSizePrices(pickupDate, sizeIds).then((prices) => {
+        checkoutCakeSizePriceCache.set(`${pickupDate}|${sizeIdsKey}`, prices);
+        applyPrices(prices);
+      });
+    }
     return () => {
       cancelled = true;
     };
@@ -1005,10 +1059,143 @@ export function GuestCheckoutForm({
     });
   }
 
-  function addOfferedCakeAndClosePicker(cake: StorefrontCake) {
-    addOfferedCake(cake);
-    setAddingCake(false);
-  }
+  const updateItem = useCallback(
+    (index: number, patch: Partial<PreorderDraftItem>) => {
+      setItemError(null);
+      setItems((current) => {
+        const next = current.map((item, i) =>
+          i === index ? { ...item, ...patch } : item,
+        );
+        const map = new Map<string, PreorderDraftItem>();
+        for (const item of next) {
+          const key = `${item.cakeId}::${item.sizeId}`;
+          const existing = map.get(key);
+          if (existing) {
+            map.set(key, {
+              ...existing,
+              quantity: existing.quantity + item.quantity,
+            });
+          } else {
+            map.set(key, item);
+          }
+        }
+        return Array.from(map.values());
+      });
+    },
+    [],
+  );
+
+  const handleChangeQuantity = useCallback(
+    (index: number, quantity: number) => {
+      updateItem(index, { quantity });
+    },
+    [updateItem],
+  );
+
+  const changeSize = useCallback(
+    (index: number, sizeId: string) => {
+      setItems((current) => {
+        const item = current[index];
+        if (!item) return current;
+        const cake = cakes.find((entry) => entry.id === item.cakeId);
+        const liveSize = cake?.sizes.find((entry) => entry.id === sizeId);
+        const nextSize = liveSize
+          ? {
+              sizeId: liveSize.id,
+              sizeLabel: liveSize.size,
+              unitPrice: liveSize.price,
+              preorderDays: liveSize.preorderDays,
+              applicableUnitPrice: undefined,
+            }
+          : draftItemSizeChoices(item, cake).find(
+              (choice) => choice.id === sizeId,
+            );
+        if (!nextSize) return current;
+        const patch =
+          "id" in nextSize
+            ? {
+                sizeId: nextSize.id,
+                sizeLabel: nextSize.size,
+                unitPrice: nextSize.price,
+                preorderDays: nextSize.preorderDays,
+                applicableUnitPrice: undefined,
+              }
+            : nextSize;
+        const mapped = current.map((entry, i) =>
+          i === index ? { ...entry, ...patch } : entry,
+        );
+        const map = new Map<string, PreorderDraftItem>();
+        for (const entry of mapped) {
+          const key = `${entry.cakeId}::${entry.sizeId}`;
+          const existing = map.get(key);
+          if (existing) {
+            map.set(key, {
+              ...existing,
+              quantity: existing.quantity + entry.quantity,
+            });
+          } else {
+            map.set(key, entry);
+          }
+        }
+        return Array.from(map.values());
+      });
+      setItemError(null);
+    },
+    [cakes],
+  );
+
+  const removeItem = useCallback((index: number) => {
+    setItemError(null);
+    setItems((current) => current.filter((_, i) => index !== i));
+  }, []);
+
+  const addOfferedCake = useCallback(
+    (cake: StorefrontCake) => {
+      const sizeId = addSizeByCake[cake.id] || cake.sizes[0]?.id;
+      const size = cake.sizes.find((entry) => entry.id === sizeId);
+      if (!size) return;
+      setItemError(null);
+      setItems((current) => {
+        const filtered = filterDraftItemsToOfferedCakes(
+          [
+            ...current,
+            {
+              cakeId: cake.id,
+              sizeId: size.id,
+              quantity: 1,
+              cakeName: cake.name,
+              sizeLabel: size.size,
+              unitPrice: size.price,
+              preorderDays: size.preorderDays,
+            },
+          ],
+          cakes,
+        );
+        if (filtered.dropped) {
+          setItemError(
+            "Some cakes are not available for this pickup date and were removed.",
+          );
+        }
+        return filtered.items;
+      });
+    },
+    [addSizeByCake, cakes],
+  );
+
+  const addOfferedCakeAndClosePicker = useCallback(
+    (cake: StorefrontCake) => {
+      addOfferedCake(cake);
+      setAddingCake(false);
+    },
+    [addOfferedCake],
+  );
+
+  const handleAddSize = useCallback((cakeId: string, sizeId: string) => {
+    setAddSizeByCake((current) => ({
+      ...current,
+      [cakeId]: sizeId,
+    }));
+  }, []);
 
   function toggleComplimentary(code: string, selected: boolean) {
     const next = selected
@@ -1022,92 +1209,6 @@ export function GuestCheckoutForm({
       ? Array.from(new Set([...fields.paidAddonCodes, code]))
       : fields.paidAddonCodes.filter((entry) => entry !== code);
     patchFields({ paidAddonCodes: next });
-  }
-
-  function updateItem(index: number, patch: Partial<PreorderDraftItem>) {
-    setItemError(null);
-    setItems((current) => {
-      const next = current.map((item, i) =>
-        i === index ? { ...item, ...patch } : item,
-      );
-      const map = new Map<string, PreorderDraftItem>();
-      for (const item of next) {
-        const key = `${item.cakeId}::${item.sizeId}`;
-        const existing = map.get(key);
-        if (existing) {
-          map.set(key, {
-            ...existing,
-            quantity: existing.quantity + item.quantity,
-          });
-        } else {
-          map.set(key, item);
-        }
-      }
-      return Array.from(map.values());
-    });
-  }
-
-  function changeSize(index: number, sizeId: string) {
-    const item = items[index];
-    if (!item) return;
-    const cake = cakes.find((entry) => entry.id === item.cakeId);
-    const liveSize = cake?.sizes.find((entry) => entry.id === sizeId);
-    if (liveSize) {
-      updateItem(index, {
-        sizeId: liveSize.id,
-        sizeLabel: liveSize.size,
-        unitPrice: liveSize.price,
-        preorderDays: liveSize.preorderDays,
-        applicableUnitPrice: undefined,
-      });
-      return;
-    }
-    const draftSize = draftItemSizeChoices(item, cake).find(
-      (choice) => choice.id === sizeId,
-    );
-    if (!draftSize) return;
-    updateItem(index, {
-      sizeId: draftSize.id,
-      sizeLabel: draftSize.size,
-      unitPrice: draftSize.price,
-      preorderDays: draftSize.preorderDays,
-      applicableUnitPrice: undefined,
-    });
-  }
-
-  function removeItem(index: number) {
-    setItemError(null);
-    setItems((current) => current.filter((_, i) => index !== i));
-  }
-
-  function addOfferedCake(cake: StorefrontCake) {
-    const sizeId = addSizeByCake[cake.id] || cake.sizes[0]?.id;
-    const size = cake.sizes.find((entry) => entry.id === sizeId);
-    if (!size) return;
-    setItemError(null);
-    setItems((current) => {
-      const filtered = filterDraftItemsToOfferedCakes(
-        [
-          ...current,
-          {
-            cakeId: cake.id,
-            sizeId: size.id,
-            quantity: 1,
-            cakeName: cake.name,
-            sizeLabel: size.size,
-            unitPrice: size.price,
-            preorderDays: size.preorderDays,
-          },
-        ],
-        cakes,
-      );
-      if (filtered.dropped) {
-        setItemError(
-          "Some cakes are not available for this pickup date and were removed.",
-        );
-      }
-      return filtered.items;
-    });
   }
 
   function handleSubmit(formData: FormData) {
@@ -1997,15 +2098,8 @@ export function GuestCheckoutForm({
             loadingOffer={liveOfferPending}
             offerLabel={offerLabel}
             onAddCake={addOfferedCakeAndClosePicker}
-            onAddSize={(cakeId, sizeId) =>
-              setAddSizeByCake((current) => ({
-                ...current,
-                [cakeId]: sizeId,
-              }))
-            }
-            onChangeQuantity={(index, quantity) =>
-              updateItem(index, { quantity })
-            }
+            onAddSize={handleAddSize}
+            onChangeQuantity={handleChangeQuantity}
             onChangeSize={changeSize}
             onRemove={removeItem}
             onToggleAdding={setAddingCake}
