@@ -38,6 +38,10 @@ import {
   resolveOwnerReturnTo,
   shouldPropagateOwnerReturnTo,
 } from "@/workspaces/owner/navigation/return-to";
+import {
+  copyPaymentMessageWithQr,
+  copyPaymentMessageWithQrError,
+} from "@/workspaces/owner/orders/copy-payment-message-with-qr";
 
 type PaymentRequestPreviewProps = {
   order: StorefrontOrder;
@@ -54,6 +58,8 @@ export function PaymentRequestPreview({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedMessageAndQr, setCopiedMessageAndQr] = useState(false);
+  const [copyingMessageAndQr, setCopyingMessageAndQr] = useState(false);
   const [preparedLogged, setPreparedLogged] = useState(false);
   const [method, setMethod] = useState<PaymentRequestMethod>("wb_qr");
   const back = resolveOwnerReturnTo(returnTo);
@@ -142,6 +148,30 @@ export function PaymentRequestPreview({
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     });
+  }
+
+  const canCopyMessageAndQr = method === "wb_qr" && wholecakePreorderQr;
+
+  async function handleCopyMessageAndQr() {
+    if (!canCopyMessageAndQr || copyingMessageAndQr) return;
+    setError(null);
+    setCopyingMessageAndQr(true);
+    try {
+      const result = await copyPaymentMessageWithQr({
+        message,
+        qrSrc: WHOLECAKE_PREORDER_PAYMENT_QR_SRC,
+      });
+      if (!result.ok) {
+        setError(copyPaymentMessageWithQrError(result.reason));
+        return;
+      }
+      setCopiedMessageAndQr(true);
+      window.setTimeout(() => setCopiedMessageAndQr(false), 2000);
+    } catch {
+      setError(copyPaymentMessageWithQrError("failed"));
+    } finally {
+      setCopyingMessageAndQr(false);
+    }
   }
 
   function handleOpenWhatsApp() {
@@ -353,6 +383,16 @@ export function PaymentRequestPreview({
       ) : null}
 
       <div className="flex flex-col gap-3">
+        {canCopyMessageAndQr ? (
+          <button
+            className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium disabled:opacity-60"
+            disabled={copyingMessageAndQr}
+            onClick={() => void handleCopyMessageAndQr()}
+            type="button"
+          >
+            {copiedMessageAndQr ? "Message + QR copied" : "Copy Message + QR"}
+          </button>
+        ) : null}
         <button
           className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium"
           onClick={handleOpenWhatsApp}
