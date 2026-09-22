@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -42,6 +42,11 @@ import {
   copyPaymentMessageWithQr,
   copyPaymentMessageWithQrError,
 } from "@/workspaces/owner/orders/copy-payment-message-with-qr";
+import {
+  fetchPaymentQrFile,
+  sharePaymentMessageWithQr,
+  sharePaymentMessageWithQrError,
+} from "@/workspaces/owner/orders/share-payment-message-with-qr";
 
 type PaymentRequestPreviewProps = {
   order: StorefrontOrder;
@@ -60,6 +65,9 @@ export function PaymentRequestPreview({
   const [copied, setCopied] = useState(false);
   const [copiedMessageAndQr, setCopiedMessageAndQr] = useState(false);
   const [copyingMessageAndQr, setCopyingMessageAndQr] = useState(false);
+  const [paymentShared, setPaymentShared] = useState(false);
+  const [sharingPayment, setSharingPayment] = useState(false);
+  const qrFileRef = useRef<File | null>(null);
   const [preparedLogged, setPreparedLogged] = useState(false);
   const [method, setMethod] = useState<PaymentRequestMethod>("wb_qr");
   const back = resolveOwnerReturnTo(returnTo);
@@ -151,6 +159,22 @@ export function PaymentRequestPreview({
   }
 
   const canCopyMessageAndQr = method === "wb_qr" && wholecakePreorderQr;
+  const canSharePayment = canCopyMessageAndQr;
+
+  useEffect(() => {
+    if (!canSharePayment) return;
+    let cancelled = false;
+    // Prefetch so Share Payment can call navigator.share in the click turn.
+    // Awaiting fetch inside the click can lose Safari's user gesture.
+    void fetchPaymentQrFile({ qrSrc: WHOLECAKE_PREORDER_PAYMENT_QR_SRC }).then(
+      (file) => {
+        if (!cancelled && file) qrFileRef.current = file;
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [canSharePayment]);
 
   async function handleCopyMessageAndQr() {
     if (!canCopyMessageAndQr || copyingMessageAndQr) return;
@@ -171,6 +195,40 @@ export function PaymentRequestPreview({
       setError(copyPaymentMessageWithQrError("failed"));
     } finally {
       setCopyingMessageAndQr(false);
+    }
+  }
+
+  async function handleSharePayment() {
+    if (!canSharePayment || sharingPayment) return;
+    setError(null);
+    setSharingPayment(true);
+    try {
+      let qrFile = qrFileRef.current;
+      if (!qrFile) {
+        qrFile = await fetchPaymentQrFile({
+          qrSrc: WHOLECAKE_PREORDER_PAYMENT_QR_SRC,
+        });
+        if (!qrFile) {
+          setError(sharePaymentMessageWithQrError("failed"));
+          return;
+        }
+        qrFileRef.current = qrFile;
+      }
+      const result = await sharePaymentMessageWithQr({
+        message,
+        qrFile,
+      });
+      if (result.ok) {
+        setPaymentShared(true);
+        window.setTimeout(() => setPaymentShared(false), 2000);
+        return;
+      }
+      if (result.reason === "cancelled") return;
+      setError(sharePaymentMessageWithQrError(result.reason));
+    } catch {
+      setError(sharePaymentMessageWithQrError("failed"));
+    } finally {
+      setSharingPayment(false);
     }
   }
 
@@ -383,6 +441,24 @@ export function PaymentRequestPreview({
       ) : null}
 
       <div className="flex flex-col gap-3">
+        {canSharePayment ? (
+          <button
+            className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium disabled:opacity-60"
+            disabled={sharingPayment}
+            onClick={() => void handleSharePayment()}
+            onPointerDown={() => {
+              if (qrFileRef.current) return;
+              void fetchPaymentQrFile({
+                qrSrc: WHOLECAKE_PREORDER_PAYMENT_QR_SRC,
+              }).then((file) => {
+                if (file) qrFileRef.current = file;
+              });
+            }}
+            type="button"
+          >
+            {paymentShared ? "Payment shared" : "Share Payment"}
+          </button>
+        ) : null}
         {canCopyMessageAndQr ? (
           <button
             className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 items-center justify-center rounded-lg px-5 text-sm font-medium disabled:opacity-60"
