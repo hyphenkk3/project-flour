@@ -82,6 +82,12 @@ import {
   CAKE_PRICE_ACK_STALE_MESSAGE,
   isCakePriceAckStaleError,
 } from "@/engines/orders/cake-size-price-ack";
+import {
+  DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE,
+  deliveryProcessingFeeAckMatchesAuthority,
+  isDeliveryProcessingFeeAckError,
+  parseDeliveryProcessingFeeAckPayload,
+} from "@/engines/orders/delivery-processing-fee-ack";
 import { setGuestPreorderReceiptCookie } from "@/workspaces/storefront/checkout/receipt";
 import { customerNameValidationError } from "@/engines/orders/customer-name";
 
@@ -133,6 +139,18 @@ function parsePriceAck(formData: FormData): Record<string, unknown> | null {
       return null;
     }
     return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function parseDeliveryProcessingFeeAck(formData: FormData) {
+  const raw = String(
+    formData.get("delivery_processing_fee_ack_json") ?? "",
+  ).trim();
+  if (!raw) return null;
+  try {
+    return parseDeliveryProcessingFeeAckPayload(JSON.parse(raw) as unknown);
   } catch {
     return null;
   }
@@ -503,6 +521,18 @@ export async function submitGuestPreorderAction(
   }
   rpcArgs.p_price_ack = priceAck;
 
+  const deliveryProcessingAck = parseDeliveryProcessingFeeAck(formData);
+  const deliveryAckCheck = deliveryProcessingFeeAckMatchesAuthority({
+    payload: deliveryProcessingAck,
+    fulfilmentMethod,
+  });
+  if (!deliveryAckCheck.ok) {
+    return { error: DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE };
+  }
+  if (fulfilmentMethod === "delivery") {
+    rpcArgs.p_delivery_processing_fee_ack = deliveryProcessingAck;
+  }
+
   const { data, error } = await supabase.rpc("submit_guest_preorder", rpcArgs);
 
   if (error) {
@@ -515,6 +545,9 @@ export async function submitGuestPreorderAction(
     }
     if (isCakePriceAckStaleError(error.message)) {
       return { error: CAKE_PRICE_ACK_STALE_MESSAGE };
+    }
+    if (isDeliveryProcessingFeeAckError(error.message)) {
+      return { error: DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE };
     }
     return { error: error.message };
   }

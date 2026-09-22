@@ -127,6 +127,18 @@ import {
   isCakePriceAckStaleError,
 } from "@/engines/orders/cake-size-price-ack";
 import {
+  buildDeliveryProcessingFeeAckPayload,
+  checkoutDeliveryChargesBreakdown,
+  DELIVERY_FEE_PENDING_EXPLANATION,
+  DELIVERY_PROCESSING_FEE_ACK_LABEL,
+  DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE,
+  DELIVERY_PROCESSING_FEE_EXPLANATION,
+  DELIVERY_PROCESSING_FEE_SECTION_TITLE,
+  deliveryProcessingFeeAckRequired,
+  deliveryProcessingFeeAckSatisfied,
+  deliveryProcessingFeeAckSnapshot,
+} from "@/engines/orders/delivery-processing-fee-ack";
+import {
   loadCartDateCapacityAvailability,
   loadCheckoutCalendarContext,
   loadCheckoutPickupOffer,
@@ -306,6 +318,8 @@ export function GuestCheckoutForm({
   const [resolvedPriceKey, setResolvedPriceKey] = useState<string | null>(null);
   const [priceRefreshKey, setPriceRefreshKey] = useState(0);
   const [acknowledgedSnapshot, setAcknowledgedSnapshot] = useState("");
+  const [deliveryProcessingAckSnapshot, setDeliveryProcessingAckSnapshot] =
+    useState("");
 
   useEffect(() => {
     if (state.error) {
@@ -855,6 +869,24 @@ export function GuestCheckoutForm({
       ),
     [fields.pickupDate, pricedItems],
   );
+  const deliveryAckRequired = deliveryProcessingFeeAckRequired(
+    fields.fulfilmentMethod,
+  );
+  const deliveryProcessingFeeAcknowledged = deliveryProcessingFeeAckSatisfied({
+    fulfilmentMethod: fields.fulfilmentMethod,
+    acknowledgedSnapshot: deliveryProcessingAckSnapshot,
+  });
+  const deliveryProcessingFeeAckJson = useMemo(
+    () =>
+      deliveryAckRequired && deliveryProcessingFeeAcknowledged
+        ? JSON.stringify(buildDeliveryProcessingFeeAckPayload())
+        : "",
+    [deliveryAckRequired, deliveryProcessingFeeAcknowledged],
+  );
+  const deliveryCharges = checkoutDeliveryChargesBreakdown({
+    fulfilmentMethod: fields.fulfilmentMethod,
+    itemsSubtotal: total,
+  });
   const itemsJson = useMemo(
     () =>
       JSON.stringify(
@@ -1036,10 +1068,21 @@ export function GuestCheckoutForm({
 
   function changeFulfilment(value: string) {
     const method = parseCustomerWebsiteFulfilmentMethod(value);
+    setDeliveryProcessingAckSnapshot("");
     setFields((current) => fieldsAfterFulfilmentChange(current, method));
   }
 
   function changeDate(nextDate: string) {
+    const currentMethod = fields.fulfilmentMethod;
+    const nextMethod = firstAvailableCustomerFulfilment(
+      nextDate,
+      closedDates,
+      currentMethod,
+      hoursSnapshot,
+    );
+    if (nextMethod !== currentMethod) {
+      setDeliveryProcessingAckSnapshot("");
+    }
     setFields((current) => {
       const withDate = {
         ...current,
@@ -1048,12 +1091,6 @@ export function GuestCheckoutForm({
         reservationTime: "",
         dineInVenue: "",
       };
-      const nextMethod = firstAvailableCustomerFulfilment(
-        nextDate,
-        closedDates,
-        withDate.fulfilmentMethod,
-        hoursSnapshot,
-      );
       if (nextMethod === withDate.fulfilmentMethod) return withDate;
       return fieldsAfterFulfilmentChange(withDate, nextMethod);
     });
@@ -1248,6 +1285,10 @@ export function GuestCheckoutForm({
       setItemError(CAKE_PRICE_ACK_REQUIRED_MESSAGE);
       return;
     }
+    if (deliveryAckRequired && !deliveryProcessingFeeAcknowledged) {
+      setItemError(DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE);
+      return;
+    }
     setNameError(null);
     setItemError(null);
     persistDraft(items, fields);
@@ -1257,6 +1298,16 @@ export function GuestCheckoutForm({
 
   function confirmOrder() {
     if (pending || state.orderId) return;
+    if (ackRequired && !pricesAcknowledged) {
+      setConfirmOpen(false);
+      setItemError(CAKE_PRICE_ACK_REQUIRED_MESSAGE);
+      return;
+    }
+    if (deliveryAckRequired && !deliveryProcessingFeeAcknowledged) {
+      setConfirmOpen(false);
+      setItemError(DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE);
+      return;
+    }
     const formData = pendingSubmitRef.current;
     if (!formData) return;
     formAction(formData);
@@ -1341,7 +1392,8 @@ export function GuestCheckoutForm({
     !catalogueReady ||
     Boolean(unavailableMessage) ||
     (items.length > 0 && collectionDateInvalid) ||
-    (ackRequired && !pricesAcknowledged);
+    (ackRequired && !pricesAcknowledged) ||
+    (deliveryAckRequired && !deliveryProcessingFeeAcknowledged);
   const confirmSnapshot = buildCheckoutConfirmSnapshot({
     fields,
     items: pricedItems,
@@ -1358,6 +1410,11 @@ export function GuestCheckoutForm({
       >
         <input name="items_json" type="hidden" value={itemsJson} />
         <input name="price_ack_json" type="hidden" value={priceAckJson} />
+        <input
+          name="delivery_processing_fee_ack_json"
+          type="hidden"
+          value={deliveryProcessingFeeAckJson}
+        />
         <input name="preorder_options_json" type="hidden" value={optionsJson} />
         <input
           name="preorder_options_ready"
@@ -1823,6 +1880,29 @@ export function GuestCheckoutForm({
                         value={fields.recipientNotifyPreference}
                       />
                     ) : null}
+                    <div className="space-y-3">
+                      <p className="text-ink text-sm font-medium">
+                        {DELIVERY_PROCESSING_FEE_SECTION_TITLE}
+                      </p>
+                      <p className="text-ink text-sm leading-relaxed">
+                        {DELIVERY_PROCESSING_FEE_EXPLANATION}
+                      </p>
+                      <p className="text-ink text-sm leading-relaxed">
+                        {DELIVERY_FEE_PENDING_EXPLANATION}
+                      </p>
+                      <FormCheckbox
+                        checked={deliveryProcessingFeeAcknowledged}
+                        label={DELIVERY_PROCESSING_FEE_ACK_LABEL}
+                        name="delivery_processing_fee_ack_accepted"
+                        onChange={(event) =>
+                          setDeliveryProcessingAckSnapshot(
+                            event.target.checked
+                              ? deliveryProcessingFeeAckSnapshot()
+                              : "",
+                          )
+                        }
+                      />
+                    </div>
                   </div>
                 ) : null}
               </>
@@ -2106,6 +2186,7 @@ export function GuestCheckoutForm({
             pickupDateLabel={pickupDateLabel}
             preorderLabel={preorderLabel}
             total={total}
+            deliveryCharges={deliveryCharges}
             unavailableMessage={unavailableMessage}
           />
         </div>

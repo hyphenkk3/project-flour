@@ -5,6 +5,14 @@ import { FormSelect } from "@/components/ui/form";
 import { startingPrice, formatRm } from "@/workspaces/storefront/catalog/pricing";
 import { chargedDraftItemUnitPrice } from "@/engines/orders/cake-size-price-ack";
 import {
+  DELIVERY_FEE_LINE_LABEL,
+  DELIVERY_FEE_PENDING_LABEL,
+  DELIVERY_PROCESSING_FEE_LINE_LABEL,
+  ITEMS_SUBTOTAL_LABEL,
+  TOTAL_BEFORE_DELIVERY_FEE_LABEL,
+  type CheckoutDeliveryChargesBreakdown,
+} from "@/engines/orders/delivery-processing-fee-ack";
+import {
   draftItemSizeChoices,
   draftLinePreorderLabel,
 } from "@/workspaces/storefront/cart/cart-order-summary";
@@ -14,6 +22,7 @@ type CheckoutOrderSummaryProps = {
   items: PreorderDraftItem[];
   cakes: StorefrontCake[];
   total: number;
+  deliveryCharges?: CheckoutDeliveryChargesBreakdown | null;
   pickupDateLabel: string | null;
   earliestLabel: string | null;
   preorderLabel: string | null;
@@ -36,6 +45,7 @@ function CheckoutOrderSummaryView({
   items,
   cakes,
   total,
+  deliveryCharges = null,
   pickupDateLabel,
   earliestLabel,
   preorderLabel,
@@ -288,12 +298,43 @@ function CheckoutOrderSummaryView({
           </div>
         ) : null}
         {items.length > 0 ? (
-          <div className="flex items-baseline justify-between gap-3 pt-1">
-            <dt className="text-ink text-sm">Total</dt>
-            <dd className="text-ink font-display text-xl tracking-tight tabular-nums">
-              {formatRm(total)}
-            </dd>
-          </div>
+          deliveryCharges ? (
+            <div className="space-y-2 pt-1">
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-ink text-sm">{ITEMS_SUBTOTAL_LABEL}</dt>
+                <dd className="text-ink text-sm font-medium tabular-nums">
+                  {formatRm(deliveryCharges.itemsSubtotal)}
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-ink text-sm">
+                  {DELIVERY_PROCESSING_FEE_LINE_LABEL}
+                </dt>
+                <dd className="text-ink text-sm font-medium tabular-nums">
+                  {formatRm(deliveryCharges.processingFee)}
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-ink text-sm">{DELIVERY_FEE_LINE_LABEL}</dt>
+                <dd className="text-skyline text-sm">{DELIVERY_FEE_PENDING_LABEL}</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3 pt-1">
+                <dt className="text-ink text-sm">
+                  {TOTAL_BEFORE_DELIVERY_FEE_LABEL}
+                </dt>
+                <dd className="text-ink font-display text-xl tracking-tight tabular-nums">
+                  {formatRm(deliveryCharges.totalBeforeDeliveryFee)}
+                </dd>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-baseline justify-between gap-3 pt-1">
+              <dt className="text-ink text-sm">Total</dt>
+              <dd className="text-ink font-display text-xl tracking-tight tabular-nums">
+                {formatRm(total)}
+              </dd>
+            </div>
+          )
         ) : null}
       </dl>
     </aside>

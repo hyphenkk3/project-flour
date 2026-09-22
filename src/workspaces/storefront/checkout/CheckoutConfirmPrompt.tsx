@@ -18,6 +18,15 @@ import {
 import { formatShortBusinessDate } from "@/lib/dates";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import { chargedDraftItemUnitPrice } from "@/engines/orders/cake-size-price-ack";
+import {
+  checkoutDeliveryChargesBreakdown,
+  DELIVERY_FEE_LINE_LABEL,
+  DELIVERY_FEE_PENDING_CONFIRM_LABEL,
+  DELIVERY_PROCESSING_FEE_LINE_LABEL,
+  ITEMS_SUBTOTAL_LABEL,
+  TOTAL_BEFORE_DELIVERY_FEE_LABEL,
+  type CheckoutDeliveryChargesBreakdown,
+} from "@/engines/orders/delivery-processing-fee-ack";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import { StorefrontOverlay } from "@/workspaces/storefront/StorefrontOverlay";
 import type {
@@ -44,6 +53,7 @@ export type CheckoutConfirmSnapshot = {
   notes: string;
   lines: CheckoutConfirmLine[];
   total: number;
+  deliveryCharges?: CheckoutDeliveryChargesBreakdown | null;
 };
 
 export function buildCheckoutConfirmSnapshot(input: {
@@ -82,6 +92,10 @@ export function buildCheckoutConfirmSnapshot(input: {
     notes: input.fields.notes.trim(),
     lines: [...cakeLines, ...addonLines],
     total: input.total,
+    deliveryCharges: checkoutDeliveryChargesBreakdown({
+      fulfilmentMethod: input.fields.fulfilmentMethod,
+      itemsSubtotal: input.total,
+    }),
   };
 }
 
@@ -308,11 +322,46 @@ export function CheckoutConfirmPrompt({
             </ul>
           </ConfirmBlock>
 
-          <div className="border-fog flex items-baseline justify-between gap-3 border-t pt-3">
-            <p className="text-ink text-sm font-medium">Total</p>
-            <p className="font-display text-ink text-xl tracking-tight tabular-nums">
-              {formatRm(snapshot.total)}
-            </p>
+          <div className="border-fog space-y-2 border-t pt-3">
+            {snapshot.deliveryCharges ? (
+              <>
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-ink text-sm">{ITEMS_SUBTOTAL_LABEL}</p>
+                  <p className="text-sm font-medium tabular-nums">
+                    {formatRm(snapshot.total)}
+                  </p>
+                </div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-ink text-sm">
+                    {DELIVERY_PROCESSING_FEE_LINE_LABEL}
+                  </p>
+                  <p className="text-sm font-medium tabular-nums">
+                    {formatRm(snapshot.deliveryCharges.processingFee)}
+                  </p>
+                </div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-ink text-sm">{DELIVERY_FEE_LINE_LABEL}</p>
+                  <p className="text-skyline text-sm">
+                    {DELIVERY_FEE_PENDING_CONFIRM_LABEL}
+                  </p>
+                </div>
+                <div className="flex items-baseline justify-between gap-3 pt-1">
+                  <p className="text-ink text-sm font-medium">
+                    {TOTAL_BEFORE_DELIVERY_FEE_LABEL}
+                  </p>
+                  <p className="font-display text-ink text-xl tracking-tight tabular-nums">
+                    {formatRm(snapshot.deliveryCharges.totalBeforeDeliveryFee)}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="text-ink text-sm font-medium">Total</p>
+                <p className="font-display text-ink text-xl tracking-tight tabular-nums">
+                  {formatRm(snapshot.total)}
+                </p>
+              </div>
+            )}
           </div>
 
           <ConfirmBlock label="Customer">
@@ -327,6 +376,17 @@ export function CheckoutConfirmPrompt({
                 {detail}
               </p>
             ))}
+            {snapshot.deliveryCharges ? (
+              <div className="mt-2 space-y-1">
+                <p>
+                  {DELIVERY_PROCESSING_FEE_LINE_LABEL}:{" "}
+                  {formatRm(snapshot.deliveryCharges.processingFee)}
+                </p>
+                <p>
+                  {DELIVERY_FEE_LINE_LABEL}: {DELIVERY_FEE_PENDING_CONFIRM_LABEL}
+                </p>
+              </div>
+            ) : null}
           </ConfirmBlock>
 
           {snapshot.notes ? (
