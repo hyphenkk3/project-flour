@@ -42,6 +42,16 @@ export type LibraryCakeSize = {
   preorderDays: number;
 };
 
+export type LibraryCakeSizePrice = {
+  id: string;
+  cakeSizeId: string;
+  price: number;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type LibraryCakePhoto = {
   id: string;
   cakeId: string;

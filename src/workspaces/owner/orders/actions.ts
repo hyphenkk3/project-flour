@@ -83,6 +83,22 @@ import {
   listOfferableLibraryCakes,
 } from "@/workspaces/storefront/catalog/queries";
 
+async function resolveNewOrderItemUnitPrice(input: {
+  cakeSizeId: string;
+  pickupDate: string;
+  fallbackPrice: number;
+}): Promise<number> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("library_cake_size_price_on", {
+    p_cake_size_id: input.cakeSizeId,
+    p_pickup_date: input.pickupDate,
+  });
+  if (error || data == null || !Number.isFinite(Number(data))) {
+    return input.fallbackPrice;
+  }
+  return Number(data);
+}
+
 export type OrderWorkspaceSaveState = {
   error: string | null;
   success: boolean;
@@ -654,7 +670,13 @@ export async function saveOrderWorkspaceAction(
       cakeId: cake.id,
       cakeSizeId: size.id,
       quantity: draft.quantity,
-      unitPrice: prior ? prior.unitPrice : size.price,
+      unitPrice: prior
+        ? prior.unitPrice
+        : await resolveNewOrderItemUnitPrice({
+            cakeSizeId: size.id,
+            pickupDate,
+            fallbackPrice: size.price,
+          }),
       cakeName: prior?.cakeName ?? cake.name,
       sizeLabel: prior?.sizeLabel ?? size.size,
     });

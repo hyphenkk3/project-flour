@@ -5,7 +5,12 @@ import { requireStaff } from "@/foundation/auth/session";
 import { canManageLibrary } from "@/foundation/navigation/access";
 import { CakeForm } from "@/workspaces/library/cakes/CakeForm";
 import { CakePhotoManager } from "@/workspaces/library/cakes/CakePhotoManager";
-import { getCakeById, listCakeCategories, listCakeTags } from "@/workspaces/library/cakes/queries";
+import {
+  getCakeById,
+  listCakeCategories,
+  listCakeSizePricesForCake,
+  listCakeTags,
+} from "@/workspaces/library/cakes/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +27,11 @@ export default async function EditLibraryCakePage({
   }
 
   const { id } = await params;
-  const [cake, categories, tags] = await Promise.all([
+  const [cake, categories, tags, schedules] = await Promise.all([
     getCakeById(id),
     listCakeCategories(),
     listCakeTags(),
+    listCakeSizePricesForCake(id),
   ]);
 
   if (!cake) {
@@ -52,6 +58,7 @@ export default async function EditLibraryCakePage({
         cancelHref={`/library/cakes/${cake.id}`}
         categories={categories}
         mode="edit"
+        schedules={schedules}
         tags={tags}
       />
     </div>

@@ -25,6 +25,7 @@ import {
 import type {
   LibraryCakeCategoryRecord,
   LibraryCakeDetail,
+  LibraryCakeSizePrice,
   LibraryCakeTagRecord,
 } from "@/types/library-cake";
 import { libraryActionInitialState } from "@/workspaces/library/action-state";
@@ -44,6 +45,7 @@ type CakeFormProps = {
   categories: LibraryCakeCategoryRecord[];
   tags: LibraryCakeTagRecord[];
   cancelHref: string;
+  schedules?: LibraryCakeSizePrice[];
 };
 
 export function CakeForm({
@@ -52,6 +54,7 @@ export function CakeForm({
   categories,
   tags,
   cancelHref,
+  schedules = [],
 }: CakeFormProps) {
   const action =
     mode === "create"
@@ -67,11 +70,11 @@ export function CakeForm({
   const currentTagIds = cake?.tags?.map((row) => row.id) ?? [];
   const options = cakeEditorCategoryOptions(categories, currentCategoryIds);
   const tagOptions = cakeEditorTagOptions(tags, currentTagIds);
-  const currentInactive = cake?.categories.some((row) => !row.isActive) ?? false;
+  const currentInactive =
+    cake?.categories.some((row) => !row.isActive) ?? false;
   const currentInactiveTags = cake?.tags?.some((row) => !row.isActive) ?? false;
-  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(
-    currentCategoryIds,
-  );
+  const [selectedCategoryIds, setSelectedCategoryIds] =
+    useState<string[]>(currentCategoryIds);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>(currentTagIds);
   const [showInPopularCakes, setShowInPopularCakes] = useState(
     cake?.showInPopularCakes ?? false,
@@ -207,12 +210,14 @@ export function CakeForm({
       </FormField>
 
       <CakeSizeFields
+        cakeId={cake?.id}
         initialSizes={cake?.sizes.map((size) => ({
           id: size.id,
           label: size.label,
           price: size.price,
           preorderDays: size.preorderDays,
         }))}
+        schedules={schedules}
       />
 
       {mode === "create" ? (

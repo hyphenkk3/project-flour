@@ -20,6 +20,7 @@ import type {
   LibraryCakeDetail,
   LibraryCakePhoto,
   LibraryCakeSize,
+  LibraryCakeSizePrice,
   LibraryCakeStatus,
   LibraryCakeTagRecord,
 } from "@/types/library-cake";
@@ -150,7 +151,9 @@ export function mapCake(row: CakeRow): LibraryCake {
         sortOrder: category.sort_order,
       };
     })
-    .filter((category): category is NonNullable<typeof category> => category != null);
+    .filter(
+      (category): category is NonNullable<typeof category> => category != null,
+    );
   const fallback = unwrapOne(row.library_cake_categories);
   const categories = hasAssignmentEmbed
     ? sortCakeCategories(assigned)
@@ -180,9 +183,11 @@ export function mapCake(row: CakeRow): LibraryCake {
   return {
     id: row.id,
     name: row.name,
-    categoryId: primary?.id ?? (hasAssignmentEmbed ? "" : (row.category_id ?? "")),
+    categoryId:
+      primary?.id ?? (hasAssignmentEmbed ? "" : (row.category_id ?? "")),
     categoryName: primary?.name ?? "",
-    categoryActive: categories.length === 0 || categories.every((row) => row.isActive),
+    categoryActive:
+      categories.length === 0 || categories.every((row) => row.isActive),
     categorySortOrder: primary?.sortOrder ?? 0,
     categories,
     tags,
@@ -193,7 +198,10 @@ export function mapCake(row: CakeRow): LibraryCake {
     status: row.status,
     showInPopularCakes: row.show_in_popular_cakes === true,
     popularCakesSortOrder: (() => {
-      if (row.popular_cakes_sort_order == null || row.popular_cakes_sort_order === "") {
+      if (
+        row.popular_cakes_sort_order == null ||
+        row.popular_cakes_sort_order === ""
+      ) {
         return null;
       }
       const order = Number(row.popular_cakes_sort_order);
@@ -372,7 +380,9 @@ export async function getCakeById(
   };
 }
 
-export async function listCakeCategories(): Promise<LibraryCakeCategoryRecord[]> {
+export async function listCakeCategories(): Promise<
+  LibraryCakeCategoryRecord[]
+> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("library_cake_categories")
@@ -394,14 +404,14 @@ export async function countCakesByCategoryId(): Promise<Map<string, number>> {
     .select("category_id");
 
   if (error && isMissingCakeCategoryAssignmentSchema(error.message)) {
-    const fallback = await supabase
-      .from("library_cakes")
-      .select("category_id");
+    const fallback = await supabase.from("library_cakes").select("category_id");
     if (fallback.error) {
       throw new Error(fallback.error.message);
     }
     const counts = new Map<string, number>();
-    for (const row of (fallback.data ?? []) as Array<{ category_id: string | null }>) {
+    for (const row of (fallback.data ?? []) as Array<{
+      category_id: string | null;
+    }>) {
       const id = row.category_id?.trim() ?? "";
       if (!id) continue;
       counts.set(id, (counts.get(id) ?? 0) + 1);
@@ -439,6 +449,57 @@ export async function listCakeTags(): Promise<LibraryCakeTagRecord[]> {
   }
 
   return sortCakeTags((data as CategoryRow[]).map(mapCakeCategory));
+}
+
+type SizePriceRow = {
+  id: string;
+  cake_size_id: string;
+  price: number | string;
+  effective_from: string;
+  effective_to: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export function mapCakeSizePrice(row: SizePriceRow): LibraryCakeSizePrice {
+  return {
+    id: row.id,
+    cakeSizeId: row.cake_size_id,
+    price: Number(row.price),
+    effectiveFrom: String(row.effective_from).slice(0, 10),
+    effectiveTo: row.effective_to
+      ? String(row.effective_to).slice(0, 10)
+      : null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function listCakeSizePricesForCake(
+  cakeId: string,
+): Promise<LibraryCakeSizePrice[]> {
+  const supabase = await createClient();
+  const { data: sizes, error: sizeError } = await supabase
+    .from("library_cake_sizes")
+    .select("id")
+    .eq("cake_id", cakeId);
+  if (sizeError) {
+    throw new Error(sizeError.message);
+  }
+  const sizeIds = (sizes ?? []).map((row) => String(row.id));
+  if (sizeIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("library_cake_size_prices")
+    .select(
+      "id, cake_size_id, price, effective_from, effective_to, created_at, updated_at",
+    )
+    .in("cake_size_id", sizeIds)
+    .order("effective_from", { ascending: true });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return ((data ?? []) as SizePriceRow[]).map(mapCakeSizePrice);
 }
 
 export async function countCakesByTagId(): Promise<Map<string, number>> {
