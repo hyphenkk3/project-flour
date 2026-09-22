@@ -10,7 +10,7 @@ import { freshPickCatalogueCtaState } from "@/workspaces/storefront/extra/fresh-
 import { useFreshPickCart } from "@/workspaces/storefront/extra/useFreshPickCart";
 
 const CATALOGUE_CTA_CLASS =
-  "bg-ink text-mist hover:bg-skyline inline-flex min-h-11 w-fit items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200";
+  "bg-ink text-mist hover:bg-skyline active:opacity-80 inline-flex min-h-11 w-fit items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200";
 
 const ADD_ANOTHER_CLASS =
   "text-ink hover:text-skyline inline-flex min-h-11 items-center text-sm font-medium";

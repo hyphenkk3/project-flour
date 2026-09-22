@@ -9,9 +9,8 @@ type CollectionOrderPageProps = {
   params: Promise<{ id: string }>;
 };
 
-export default async function CollectionOrderPage({
+export default function CollectionOrderPage({
   params,
 }: CollectionOrderPageProps) {
-  const { id } = await params;
-  return <StorefrontCollectionCakesPage collectionId={id} />;
+  return <StorefrontCollectionCakesPage params={params} />;
 }

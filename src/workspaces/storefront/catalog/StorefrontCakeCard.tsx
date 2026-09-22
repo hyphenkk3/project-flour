@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
-import { canonicalCakeDetailPath } from "@/workspaces/storefront/catalog/cake-detail-prefetch";
 import { StorefrontCakeDetailLink } from "@/workspaces/storefront/catalog/StorefrontCakeDetailLink";
 import { BROWSE_CURRENTLY_UNAVAILABLE_NOTE } from "@/engines/menu/homepage-collection-preview";
 import type { StorefrontCake } from "@/types/storefront";
@@ -56,13 +54,6 @@ export function StorefrontCakeCard({
   const imageUrl = hero?.url ?? null;
   const imageAlt = hero?.altText || cake.name;
   const href = detailHref ?? `/cakes/${cake.id}`;
-  const canonical = canonicalCakeDetailPath(href);
-  const [detailIntent, setDetailIntent] = useState(false);
-
-  function markDetailIntent() {
-    if (!canonical || detailIntent) return;
-    setDetailIntent(true);
-  }
 
   return (
     <article className="flex h-full flex-col overflow-hidden">
@@ -85,8 +76,6 @@ export function StorefrontCakeCard({
             aria-label={`View ${cake.name}`}
             className="absolute inset-0"
             href={href}
-            intent={detailIntent}
-            onIntent={markDetailIntent}
           >
             {imageUrl ? (
               <CakePhotoImage
@@ -125,8 +114,6 @@ export function StorefrontCakeCard({
               <StorefrontCakeDetailLink
                 className="hover:text-skyline transition-colors duration-200"
                 href={href}
-                intent={detailIntent}
-                onIntent={markDetailIntent}
               >
                 {cake.name}
               </StorefrontCakeDetailLink>
@@ -168,7 +155,7 @@ export function StorefrontCakeCard({
           <div className="mt-auto grid gap-1 pt-1 sm:gap-1.5 sm:pt-0">
             {hideAddToOrder ? null : (
               <AddToOrderButton
-                buttonClassName="border-ink bg-mist text-ink hover:border-skyline inline-flex h-11 min-h-11 w-full items-center justify-center rounded-md border px-3 text-[15px] leading-none font-medium transition duration-200 disabled:opacity-50 sm:h-auto sm:min-h-11 sm:rounded-md sm:border-fog sm:bg-transparent sm:px-4 sm:text-sm sm:leading-normal sm:hover:border-ink sm:hover:bg-transparent sm:active:bg-transparent"
+                buttonClassName="border-ink bg-mist text-ink hover:border-skyline active:opacity-70 inline-flex h-11 min-h-11 w-full items-center justify-center rounded-md border px-3 text-[15px] leading-none font-medium transition duration-200 disabled:opacity-50 sm:h-auto sm:min-h-11 sm:rounded-md sm:border-fog sm:bg-transparent sm:px-4 sm:text-sm sm:leading-normal sm:hover:border-ink sm:hover:bg-transparent"
                 cake={cake}
                 pickupScope={pickupScope}
               />
@@ -176,8 +163,6 @@ export function StorefrontCakeCard({
             <StorefrontCakeDetailLink
               className="text-skyline hover:text-ink hidden min-h-11 w-full items-center justify-center text-sm font-medium transition-colors duration-200 sm:inline-flex"
               href={href}
-              intent={detailIntent}
-              onIntent={markDetailIntent}
             >
               View cake
             </StorefrontCakeDetailLink>

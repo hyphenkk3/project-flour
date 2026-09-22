@@ -10,7 +10,6 @@ type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function CakePage({ params, searchParams }: PageProps) {
-  const { id } = await params;
-  return <StorefrontCakeDetail cakeId={id} searchParams={searchParams} />;
+export default function CakePage({ params, searchParams }: PageProps) {
+  return <StorefrontCakeDetail params={params} searchParams={searchParams} />;
 }

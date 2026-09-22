@@ -31,6 +31,10 @@ import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/Preorder
 import { Suspense } from "react";
 
 type StorefrontCollectionCakesPageProps = {
+  params: Promise<{ id: string }>;
+};
+
+type CollectionCakesBodyProps = {
   collectionId: string;
 };
 
@@ -52,17 +56,24 @@ function scopedCheckoutHref(
 }
 
 export function StorefrontCollectionCakesPage({
-  collectionId,
+  params,
 }: StorefrontCollectionCakesPageProps) {
   return (
     <main className="bg-paper mx-auto min-h-screen max-w-5xl px-5 py-4 sm:px-6 sm:py-10">
       <StorefrontHomeLink />
       <Suspense fallback={<CollectionCakesFallback />}>
-        <CollectionCakesBody collectionId={collectionId} />
+        <CollectionCakesFromParams params={params} />
       </Suspense>
       <PreorderInProgressBar />
     </main>
   );
+}
+
+async function CollectionCakesFromParams({
+  params,
+}: StorefrontCollectionCakesPageProps) {
+  const { id } = await params;
+  return <CollectionCakesBody collectionId={id} />;
 }
 
 function CollectionCakesFallback() {
@@ -83,7 +94,7 @@ function CollectionCakesFallback() {
 
 async function CollectionCakesBody({
   collectionId,
-}: StorefrontCollectionCakesPageProps) {
+}: CollectionCakesBodyProps) {
   const [monthly, specialCandidate, cakes, specials] = await Promise.all([
     getOrderableMonthlyCatalogueById(collectionId),
     getCustomerSpecialCatalogueById(collectionId),

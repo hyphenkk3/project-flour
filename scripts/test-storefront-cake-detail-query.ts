@@ -396,6 +396,8 @@ assert.match(detailPageSrc, /getBrowseCakeDisplayById/);
 assert.match(detailPageSrc, /mergeBrowseCakeDisplay/);
 assert.match(detailPageSrc, /browseCakePreviewFromDisplay/);
 assert.match(detailPageSrc, /CakeDetailWithDisplay/);
+assert.match(detailPageSrc, /displayPromise/);
+assert.match(detailPageSrc, /Promise\.all/);
 assert.match(detailPageSrc, /notFound\(\)/);
 assert.match(detailPageSrc, /hideAddToOrder=\{cake\.currentlyOffered === false\}/);
 assert.doesNotMatch(detailPageSrc, /force-dynamic/);
@@ -406,17 +408,18 @@ const cardSrc = readSrc(
 );
 assert.match(cardSrc, /StorefrontCakeDetailLink/);
 assert.doesNotMatch(cardSrc, /prefetch=\{false\}/);
-assert.match(cardSrc, /detailIntent/);
-assert.equal((cardSrc.match(/onIntent=\{markDetailIntent\}/g) ?? []).length, 3);
+assert.doesNotMatch(cardSrc, /detailIntent/);
+assert.doesNotMatch(cardSrc, /onIntent/);
 
 const detailLinkSrc = readSrc(
   "src/workspaces/storefront/catalog/StorefrontCakeDetailLink.tsx",
 );
-assert.match(detailLinkSrc, /prefetch=\{intent && canonical \? true : false\}/);
+assert.match(detailLinkSrc, /prefetch=\{Boolean\(canonical\)\}/);
 assert.match(detailLinkSrc, /canonicalCakeDetailPath/);
 assert.match(detailLinkSrc, /onPointerDown/);
 assert.match(detailLinkSrc, /prefetchCanonicalCakeDetail/);
 assert.match(detailLinkSrc, /router\.prefetch/);
+assert.doesNotMatch(detailLinkSrc, /setDetailIntent|onIntent/);
 
 const popularSrc = readSrc(
   "src/workspaces/storefront/home/HomePopularCakes.tsx",

@@ -18,7 +18,7 @@ type CakeDetailSearchParams = Promise<
 >;
 
 type CakeDetailProps = {
-  cakeId: string;
+  params: Promise<{ id: string }>;
   searchParams: CakeDetailSearchParams;
 };
 
@@ -67,15 +67,19 @@ function CakeDetailBodyFallback() {
 }
 
 async function CakeDetailLive({
-  display,
+  displayPromise,
   livePromise,
   searchParams,
 }: {
-  display: Awaited<ReturnType<typeof getBrowseCakeDisplayById>>;
+  displayPromise: ReturnType<typeof getBrowseCakeDisplayById>;
   livePromise: ReturnType<typeof getBrowsePublishedCakeById>;
   searchParams: CakeDetailSearchParams;
 }) {
-  const [cake, query] = await Promise.all([livePromise, searchParams]);
+  const [display, cake, query] = await Promise.all([
+    displayPromise,
+    livePromise,
+    searchParams,
+  ]);
   if (!cake) {
     notFound();
   }
@@ -117,7 +121,7 @@ async function CakeDetailWithDisplay({
       }
     >
       <CakeDetailLive
-        display={display}
+        displayPromise={displayPromise}
         livePromise={livePromise}
         searchParams={searchParams}
       />
@@ -125,18 +129,30 @@ async function CakeDetailWithDisplay({
   );
 }
 
+async function CakeDetailResolved({
+  params,
+  searchParams,
+}: CakeDetailProps) {
+  const { id } = await params;
+  return (
+    <>
+      <CakeDetailBackNav cakeId={id} />
+      <PreorderInProgressBar />
+      <Suspense fallback={<CakeDetailBodyFallback />}>
+        <CakeDetailWithDisplay cakeId={id} searchParams={searchParams} />
+      </Suspense>
+    </>
+  );
+}
+
 export function StorefrontCakeDetail({
-  cakeId,
+  params,
   searchParams,
 }: CakeDetailProps) {
   return (
     <main className="bg-paper mx-auto min-h-screen max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
-      <CakeDetailBackNav cakeId={cakeId} />
-
-      <PreorderInProgressBar />
-
       <Suspense fallback={<CakeDetailBodyFallback />}>
-        <CakeDetailWithDisplay cakeId={cakeId} searchParams={searchParams} />
+        <CakeDetailResolved params={params} searchParams={searchParams} />
       </Suspense>
     </main>
   );

@@ -10,9 +10,8 @@ type ExtraOrderRouteProps = {
   params: Promise<{ id: string }>;
 };
 
-export default async function ExtraOrderRoute({
+export default function ExtraOrderRoute({
   params,
 }: ExtraOrderRouteProps) {
-  const { id } = await params;
-  return <StorefrontExtraOrderPage extraId={id} />;
+  return <StorefrontExtraOrderPage params={params} />;
 }

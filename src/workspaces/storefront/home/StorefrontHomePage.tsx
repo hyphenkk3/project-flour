@@ -164,25 +164,25 @@ function HomeHeroHeader() {
         </div>
         <nav className="text-skyline hidden flex-wrap items-center justify-center gap-x-5 gap-y-1 text-sm md:flex">
           <Link
-            className="hover:text-ink transition-colors duration-200"
+            className="hover:text-ink active:opacity-70 transition-colors duration-200"
             href="/order"
           >
             Order
           </Link>
           <Link
-            className="hover:text-ink transition-colors duration-200"
+            className="hover:text-ink active:opacity-70 transition-colors duration-200"
             href="/browse"
           >
             Browse Cakes
           </Link>
           <Link
-            className="hover:text-ink transition-colors duration-200"
+            className="hover:text-ink active:opacity-70 transition-colors duration-200"
             href="/extra"
           >
             Fresh Picks
           </Link>
           <Link
-            className="hover:text-ink transition-colors duration-200"
+            className="hover:text-ink active:opacity-70 transition-colors duration-200"
             href="/faq"
           >
             FAQ

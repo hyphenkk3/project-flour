@@ -118,8 +118,8 @@ export function CakeDetailPurchasePanel({
                   aria-pressed={selected}
                   className={
                     selected
-                      ? "border-ink bg-mist text-ink flex min-h-12 w-full items-center justify-between border px-4 py-2 text-left"
-                      : "border-fog text-ink hover:border-ink flex min-h-12 w-full items-center justify-between border bg-transparent px-4 py-2 text-left"
+                      ? "border-ink bg-mist text-ink flex min-h-12 w-full items-center justify-between border px-4 py-2 text-left active:opacity-80"
+                      : "border-fog text-ink hover:border-ink flex min-h-12 w-full items-center justify-between border bg-transparent px-4 py-2 text-left active:opacity-80"
                   }
                   onClick={() => onSelectedSizeIdChange(size.id)}
                   type="button"

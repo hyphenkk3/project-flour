@@ -287,7 +287,7 @@ export function AddToOrderSheet({
 }
 
 const defaultAddToOrderButtonClassName =
-  "bg-ink text-mist hover:bg-skyline inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-md px-4 text-sm font-medium transition duration-200 disabled:opacity-50";
+  "bg-ink text-mist hover:bg-skyline active:opacity-80 inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-md px-4 text-sm font-medium transition duration-200 disabled:opacity-50";
 
 type AddToOrderButtonProps = {
   cake: StorefrontCake;

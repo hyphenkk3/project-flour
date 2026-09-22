@@ -1557,12 +1557,16 @@ async function loadBrowsePublishedCakeById(
   });
 }
 
+const readCachedBrowsePublishedCakeById = cache(
+  (id: string, todayYmd: string) => loadBrowsePublishedCakeById(id, todayYmd),
+);
+
 export async function getBrowsePublishedCakeById(
   id: string,
   todayYmd: string = toBusinessDateKey(),
 ): Promise<BrowseStorefrontCake | null> {
   if (!id) return null;
-  return loadBrowsePublishedCakeById(id, todayYmd);
+  return readCachedBrowsePublishedCakeById(id, todayYmd);
 }
 
 /**

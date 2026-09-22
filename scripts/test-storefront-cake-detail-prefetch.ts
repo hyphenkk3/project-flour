@@ -108,23 +108,23 @@ const cardSrc = readSrc(
 );
 assert.match(cardSrc, /StorefrontCakeDetailLink/);
 assert.match(cardSrc, /detailHref \?\? `\/cakes\/\$\{cake\.id\}`/);
-assert.match(cardSrc, /detailIntent/);
-assert.equal(
-  (cardSrc.match(/onIntent=\{markDetailIntent\}/g) ?? []).length,
-  3,
-  "image, name, and view-cake links share one intent so the clicked Link has Full prefetch",
-);
+assert.doesNotMatch(cardSrc, /detailIntent/);
+assert.doesNotMatch(cardSrc, /onIntent/);
+assert.doesNotMatch(cardSrc, /useState/);
 
 const linkSrc = readSrc(
   "src/workspaces/storefront/catalog/StorefrontCakeDetailLink.tsx",
 );
-assert.match(linkSrc, /prefetch=\{intent && canonical \? true : false\}/);
+assert.match(linkSrc, /prefetch=\{Boolean\(canonical\)\}/);
 assert.match(linkSrc, /onPointerDown/);
 assert.match(linkSrc, /onPointerEnter/);
 assert.match(linkSrc, /canonicalCakeDetailPath/);
 assert.match(linkSrc, /prefetchCanonicalCakeDetail/);
 assert.match(linkSrc, /router\.prefetch/);
 assert.match(linkSrc, /urgent:\s*true/);
+assert.match(linkSrc, /active:opacity-70/);
+assert.doesNotMatch(linkSrc, /onIntent/);
+assert.doesNotMatch(linkSrc, /intent && canonical/);
 
 const homeSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontHomePage.tsx",

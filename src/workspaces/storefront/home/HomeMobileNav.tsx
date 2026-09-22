@@ -72,7 +72,7 @@ export function HomeMobileNav() {
         >
           {MENU_ITEMS.map((item) => (
             <Link
-              className="text-ink hover:bg-ink/[0.035] flex min-h-11 items-center px-4 text-sm transition-colors duration-200"
+              className="text-ink hover:bg-ink/[0.035] active:bg-ink/[0.06] flex min-h-11 items-center px-4 text-sm transition-colors duration-200"
               href={item.href}
               key={item.href}
               onClick={() => setOpen(false)}

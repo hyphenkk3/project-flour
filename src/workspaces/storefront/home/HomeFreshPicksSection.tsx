@@ -80,7 +80,7 @@ export function HomeFreshPicksSection({ picks }: HomeFreshPicksSectionProps) {
                     ) : (
                       <Link
                         aria-label={pick.cakeName}
-                        className="bg-fog relative aspect-square h-[5.5rem] w-[5.5rem] shrink-0 overflow-hidden rounded-[10px] lg:h-[10.5rem] lg:w-[10.5rem]"
+                        className="bg-fog relative aspect-square h-[5.5rem] w-[5.5rem] shrink-0 overflow-hidden rounded-[10px] active:opacity-70 lg:h-[10.5rem] lg:w-[10.5rem]"
                         href={`/extra/${pick.id}`}
                       >
                         {photo}
@@ -110,7 +110,7 @@ export function HomeFreshPicksSection({ picks }: HomeFreshPicksSectionProps) {
                       ) : null}
                       {held ? null : (
                         <Link
-                          className="text-ink mt-2 inline-flex items-center text-[13px] font-medium"
+                          className="text-ink mt-2 inline-flex items-center text-[13px] font-medium active:opacity-70"
                           href={`/extra/${pick.id}`}
                         >
                           Order →
