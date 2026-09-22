@@ -127,6 +127,8 @@ assert.match(formSrc, /useActionState\(\s*submitGuestPreorderAction/);
 assert.doesNotMatch(formSrc, /router\.refresh/);
 assert.doesNotMatch(formSrc, /router\.replace/);
 assert.doesNotMatch(formSrc, /router\.push/);
+assert.doesNotMatch(formSrc, /StorefrontCheckoutLoading/);
+assert.doesNotMatch(pageSrc, /StorefrontCheckoutLoading/);
 assert.match(
   formSrc,
   /window\.location\.assign\(`\/order\/success\?order=\$\{orderId\}`\)/,

@@ -1,3 +1,7 @@
+"use client";
+
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { earliestPickupDateYmd } from "@/engines/business-calendar/pickup-slots";
 import {
   CUSTOMER_PICKUP_DATE_CAKE_NOTICE,
@@ -5,8 +9,6 @@ import {
 } from "@/engines/menu/customer-browse";
 import { GuestCheckoutForm } from "@/workspaces/storefront/checkout/GuestCheckoutForm";
 import { StorefrontHomeLink } from "@/workspaces/storefront/StorefrontBrand";
-
-export const dynamic = "force-dynamic";
 
 function ymdQuery(value: string | null | undefined): string | null {
   const key = value?.trim().slice(0, 10) ?? "";
@@ -19,21 +21,36 @@ type StorefrontCheckoutPageProps = {
   toQuery?: string | null;
 };
 
-export function StorefrontCheckoutPage({
+function StorefrontCheckoutPreparing() {
+  return (
+    <main className="bg-paper mx-auto min-h-screen max-w-5xl px-5 py-10 sm:px-6">
+      <StorefrontHomeLink />
+      <h1 className="sr-only">Your Order</h1>
+      <p className="text-skyline mt-8 text-sm" aria-live="polite">
+        Preparing your preorder…
+      </p>
+    </main>
+  );
+}
+
+function StorefrontCheckoutPageInner({
   pickupQuery = null,
   fromQuery = null,
   toQuery = null,
 }: StorefrontCheckoutPageProps) {
+  const searchParams = useSearchParams();
   const fromDate = earliestPickupDateYmd();
-  const scopeFrom = ymdQuery(fromQuery);
-  const scopeTo = ymdQuery(toQuery);
+  const scopeFrom = ymdQuery(fromQuery ?? searchParams.get("from"));
+  const scopeTo = ymdQuery(toQuery ?? searchParams.get("to"));
   const scope = resolveCheckoutPickupScope({
     earliest: fromDate,
     globalMax: null,
     scopeFrom,
     scopeTo,
   });
-  const pickupFromQuery = ymdQuery(pickupQuery);
+  const pickupFromQuery = ymdQuery(
+    pickupQuery ?? searchParams.get("pickup"),
+  );
   const suggestedPickupDate =
     pickupFromQuery &&
     pickupFromQuery >= scope.minPickupDate &&
@@ -60,5 +77,13 @@ export function StorefrontCheckoutPage({
         />
       </div>
     </main>
+  );
+}
+
+export function StorefrontCheckoutPage(props: StorefrontCheckoutPageProps) {
+  return (
+    <Suspense fallback={<StorefrontCheckoutPreparing />}>
+      <StorefrontCheckoutPageInner {...props} />
+    </Suspense>
   );
 }

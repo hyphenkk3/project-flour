@@ -63,6 +63,8 @@ assert.match(readSrc(checkoutPage), /GuestCheckoutForm/);
 assert.doesNotMatch(readSrc(checkoutPage), /StorefrontCheckoutLoading/);
 assert.match(readSrc(checkoutRoute), /StorefrontCheckoutPage/);
 assert.doesNotMatch(readSrc(checkoutRoute), /StorefrontCheckoutLoading/);
+assert.doesNotMatch(readSrc(checkoutRoute), /await searchParams/);
+assert.doesNotMatch(readSrc(checkoutRoute), /async function OrderCheckoutPage/);
 assert.doesNotMatch(readSrc(extraCheckout), /StorefrontCheckoutLoading/);
 
 assert.match(cartSrc, /preorderCheckoutHref/);
