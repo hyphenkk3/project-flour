@@ -1,6 +1,6 @@
 /**
- * Whitebird payment instruction details — Milestone 3 Preview 1 temporary config.
- * Later replaceable by Business Settings. Do not hardcode elsewhere.
+ * Whitebird wholecake preorder payment instruction details.
+ * Do not hardcode these values elsewhere.
  */
 
 export type PaymentRequestMethod = "wb_qr" | "online_transfer";
@@ -24,6 +24,15 @@ export function paymentMethodLabel(
   return PAYMENT_METHOD_LABELS[method];
 }
 
+export const WHOLECAKE_PREORDER_PAYMENT_QR_SRC =
+  "/payment/whitebird_wholecake_payment_qr.png";
+
+export const WHOLECAKE_PREORDER_PAYMENT_QR_LABEL =
+  "Whitebird Wholecake Preorder Payment QR";
+
+export const WHOLECAKE_PREORDER_PAYMENT_QR_SCOPE =
+  "For wholecake preorder payments only. Not for dine-in, beverages, or other items.";
+
 export type WbQrPaymentDetails = {
   method: "wb_qr";
   label: string;
@@ -40,25 +49,22 @@ export type OnlineTransferPaymentDetails = {
   instructionLines: string[];
 };
 
-/**
- * Placeholder operational details for Preview 1.
- * Replace via Business Settings before production rollout.
- */
 export const PAYMENT_DETAILS = {
   wb_qr: {
     method: "wb_qr",
     label: "WB QR",
     instructionLines: [
-      "Please make payment using the Whitebird QR code we share on WhatsApp.",
+      "Please make payment using the Whitebird Wholecake Preorder Payment QR below.",
+      "This QR is for wholecake preorder payments only. It is not for dine-in, beverages, or other items.",
       "After paying, send us your successful payment slip on WhatsApp for verification.",
     ],
   } satisfies WbQrPaymentDetails,
   online_transfer: {
     method: "online_transfer",
     label: "Online Transfer",
-    bankName: "Maybank",
-    accountName: "Whitebird Cake House",
-    accountNumber: "123456789012",
+    bankName: "CIMB Bank Berhad",
+    accountName: "THE HYPHEN SDN BHD",
+    accountNumber: "8604100053",
     instructionLines: [
       "Please transfer the amount due to the account below.",
       "After transferring, send us your successful payment slip on WhatsApp for verification.",
@@ -70,6 +76,19 @@ export function getPaymentRequestDetails(
   method: PaymentRequestMethod,
 ): WbQrPaymentDetails | OnlineTransferPaymentDetails {
   return PAYMENT_DETAILS[method];
+}
+
+/**
+ * The supplied QR is wholecake preorder payment only.
+ * Do not show it for Fresh Pick / EXTRA sales or dine-in reservations.
+ */
+export function isWholecakePreorderPaymentContext(input: {
+  extraStockId?: string | null;
+  fulfilmentMethod?: string | null;
+}): boolean {
+  if (input.extraStockId) return false;
+  if (input.fulfilmentMethod === "dine_in") return false;
+  return true;
 }
 
 /** Default payment hold: 24 hours after request marked sent. */

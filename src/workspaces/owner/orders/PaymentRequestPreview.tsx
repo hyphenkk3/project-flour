@@ -2,10 +2,15 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   defaultPaymentDeadlineAt,
+  isWholecakePreorderPaymentContext,
   PAYMENT_METHOD_LABELS,
+  WHOLECAKE_PREORDER_PAYMENT_QR_LABEL,
+  WHOLECAKE_PREORDER_PAYMENT_QR_SCOPE,
+  WHOLECAKE_PREORDER_PAYMENT_QR_SRC,
   type PaymentRequestMethod,
 } from "@/engines/orders/payment-details";
 import {
@@ -89,6 +94,11 @@ export function PaymentRequestPreview({
     [order.adjustments],
   );
 
+  const wholecakePreorderQr = isWholecakePreorderPaymentContext({
+    extraStockId: order.extraStockId,
+    fulfilmentMethod: order.fulfilmentMethod,
+  });
+
   const payload = buildPaymentRequestPayload({
     commercialSubtotal: settlement.subtotal,
     amountDue: settlement.amountDue,
@@ -105,6 +115,7 @@ export function PaymentRequestPreview({
           : null,
     })),
     method,
+    wholecakePreorderQr,
   });
   const collectAmount = paymentRequestCollectAmount(payload);
   const message = generatePaymentRequestMessage(payload);
@@ -307,7 +318,31 @@ export function PaymentRequestPreview({
         </div>
       </section>
 
-      <pre className="border-fog text-ink overflow-x-auto whitespace-pre-wrap rounded-xl border bg-white p-4 text-sm leading-relaxed">
+      {method === "wb_qr" && wholecakePreorderQr ? (
+        <figure className="border-fog space-y-3 rounded-xl border bg-white p-5">
+          <figcaption className="text-ink text-sm font-medium">
+            {WHOLECAKE_PREORDER_PAYMENT_QR_LABEL}
+          </figcaption>
+          <div className="bg-white p-3">
+            {/* contrast-[1000%] maps a grey QR to near-black without changing the file. */}
+            <Image
+              alt={WHOLECAKE_PREORDER_PAYMENT_QR_LABEL}
+              className="mx-auto h-auto w-56 max-w-full bg-white contrast-[1000%]"
+              height={660}
+              src={WHOLECAKE_PREORDER_PAYMENT_QR_SRC}
+              unoptimized
+              width={645}
+            />
+          </div>
+          <p className="text-skyline text-xs leading-relaxed">
+            {WHOLECAKE_PREORDER_PAYMENT_QR_SCOPE} Send this QR with the WhatsApp
+            message. Opening WhatsApp does not attach the image or verify
+            payment.
+          </p>
+        </figure>
+      ) : null}
+
+      <pre className="border-fog text-ink overflow-x-auto rounded-xl border bg-white p-4 text-sm leading-relaxed whitespace-pre-wrap">
         {message}
       </pre>
 

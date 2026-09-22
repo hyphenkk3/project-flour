@@ -30,6 +30,11 @@ export type PaymentRequestPayload = {
   remainingBalance: number;
   adjustments: PaymentRequestAdjustmentLine[];
   method: PaymentRequestMethod;
+  /**
+   * When true, WB QR copy refers to the wholecake-preorder-only QR.
+   * Fresh Pick / dine-in requests must leave this false.
+   */
+  wholecakePreorderQr?: boolean;
 };
 
 /** Customer-facing signed money, e.g. -RM20 */
@@ -115,9 +120,7 @@ export function formatPaymentRequestAmountBlock(payload: {
   const orderTotalLabel = formatOrderTotal(payload.commercialSubtotal);
   const amountDueLabel = formatOrderTotal(payload.amountDue);
   const receivedLabel = formatOrderTotal(payload.netReceived);
-  const balanceLabel = formatOrderTotal(
-    Math.max(0, payload.remainingBalance),
-  );
+  const balanceLabel = formatOrderTotal(Math.max(0, payload.remainingBalance));
 
   if (hasPriorVerifiedPayment(payload.netReceived)) {
     const adjustmentLines = payload.adjustments
@@ -179,14 +182,21 @@ export function generatePaymentRequestMessage(
     "Do send us the payment slip WITH Status (Successful etc) once payment is completed ya. 😊";
 
   if (details.method === "wb_qr") {
+    const qrName = payload.wholecakePreorderQr
+      ? "Whitebird Wholecake Preorder Payment QR"
+      : "Whitebird QR code";
     const payLine = hasPrior
-      ? `Please make payment of ${collectLabel} using the Whitebird QR code below.`
-      : "Please make payment using the Whitebird QR code below.";
+      ? `Please make payment of ${collectLabel} using the ${qrName} below.`
+      : `Please make payment using the ${qrName} below.`;
+    const scopeLine = payload.wholecakePreorderQr
+      ? "This QR is for wholecake preorder payments only. It is not for dine-in, beverages, or other items.\n\n"
+      : "";
     return (
       `Thank you for confirming. ;)\n\n` +
       `Here are the payment details.\n\n` +
       `${amountBlock}\n\n` +
       `${payLine}\n\n` +
+      scopeLine +
       slipLine
     );
   }
@@ -214,6 +224,7 @@ export function buildPaymentRequestPayload(input: {
   remainingBalance: number;
   adjustments: PaymentRequestAdjustmentLine[];
   method: PaymentRequestMethod;
+  wholecakePreorderQr?: boolean;
 }): PaymentRequestPayload {
   return {
     commercialSubtotal: input.commercialSubtotal,
@@ -222,5 +233,6 @@ export function buildPaymentRequestPayload(input: {
     remainingBalance: input.remainingBalance,
     adjustments: input.adjustments,
     method: input.method,
+    wholecakePreorderQr: input.wholecakePreorderQr,
   };
 }

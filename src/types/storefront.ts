@@ -301,6 +301,11 @@ export type StorefrontOrder = {
   createdAt: string;
   confirmationNeedsResend: boolean;
   collectionId: string | null;
+  /**
+   * Fresh Pick / EXTRA stock id when this guest order sold extra stock.
+   * Absent/null for ordinary wholecake preorders.
+   */
+  extraStockId?: string | null;
   orderSource: OrderSource;
   /** Crew Order flag — not an order source. Display precedence later: (crew) over source suffix. */
   crewOrder: boolean;

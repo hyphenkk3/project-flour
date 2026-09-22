@@ -286,6 +286,7 @@ function mapOrder(
     createdAt: row.created_at,
     confirmationNeedsResend: Boolean(row.confirmation_needs_resend),
     collectionId: row.collection_id,
+    extraStockId: row.extra_stock_id ?? null,
     orderSource: row.order_source ?? "customer_website",
     crewOrder: Boolean(row.crew_order),
     includeReceipt: Boolean(row.include_receipt),
