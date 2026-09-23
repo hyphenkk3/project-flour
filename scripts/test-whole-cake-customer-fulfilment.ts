@@ -94,6 +94,7 @@ assert.match(checkoutSrc, /addingCake/);
 assert.match(checkoutSrc, /Change date/);
 assert.match(checkoutSrc, /customerFulfilmentHoursNotice/);
 assert.match(checkoutSrc, /DINE_IN_RESERVATION_INCLUDED_NOTICE/);
+assert.match(checkoutSrc, /DineInReservationNotesNotice/);
 assert.match(customerFulfilmentHoursNotice(), /Planning your visit\?/);
 assert.match(availabilitySrc, /Dine-in reservation included/);
 assert.match(availabilitySrc, /Unavailable Wednesday/);

@@ -61,6 +61,7 @@ import {
 import { WAITING_LIST_WHATSAPP_NOTE } from "@/engines/waiting-list/phone";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import { CheckoutSection } from "@/workspaces/storefront/checkout/CheckoutSection";
+import { DineInReservationNotesNotice } from "@/workspaces/storefront/checkout/DineInReservationNotesNotice";
 import { FulfilmentMethodChooser } from "@/workspaces/storefront/checkout/FulfilmentMethodChooser";
 import {
   submitWaitingListConfirmationAction,
@@ -343,6 +344,7 @@ export function WaitingListConfirmationForm({
                 )}
               />
             ) : null}
+            <DineInReservationNotesNotice />
             <FormField
               help="Optional."
               htmlFor="reservation_note"

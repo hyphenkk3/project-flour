@@ -93,6 +93,7 @@ import {
 } from "@/workspaces/storefront/checkout/CheckoutConfirmPrompt";
 import { CheckoutOrderSummary } from "@/workspaces/storefront/checkout/CheckoutOrderSummary";
 import { CheckoutSection } from "@/workspaces/storefront/checkout/CheckoutSection";
+import { DineInReservationNotesNotice } from "@/workspaces/storefront/checkout/DineInReservationNotesNotice";
 import { FulfilmentMethodChooser } from "@/workspaces/storefront/checkout/FulfilmentMethodChooser";
 import type { StorefrontCake } from "@/types/storefront";
 import { formatCollectionAvailabilityLabel, formatRm } from "@/workspaces/storefront/catalog/pricing";
@@ -1701,6 +1702,7 @@ export function GuestCheckoutForm({
                           )}
                         />
                       ) : null}
+                      <DineInReservationNotesNotice />
                       <FormField
                         help="Optional."
                         htmlFor="reservation_note"

@@ -71,6 +71,7 @@ import {
   TOTAL_BEFORE_DELIVERY_FEE_LABEL,
 } from "@/engines/orders/delivery-processing-fee-ack";
 import { OPTIONAL_NOTES_CUSTOMER_WARNING } from "@/engines/orders/order-guide";
+import { DineInReservationNotesNotice } from "@/workspaces/storefront/checkout/DineInReservationNotesNotice";
 import { FulfilmentMethodChooser } from "@/workspaces/storefront/checkout/FulfilmentMethodChooser";
 import {
   customerPaidAddonMessageRequired,
@@ -668,6 +669,7 @@ export function GuestExtraCheckoutForm({
                   venues={dineInVenues}
                 />
               ) : null}
+              <DineInReservationNotesNotice />
               <FormField
                 help="Optional."
                 htmlFor="reservation_note"

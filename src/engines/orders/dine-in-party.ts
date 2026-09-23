@@ -50,6 +50,15 @@ export const DINE_IN_WHITEBIRD_SPLIT_SEATING_ACK_LABEL =
 export const DINE_IN_BABY_CHAIR_NOTICE =
   "Baby chair is available on a first-come, first-served basis. Selecting a toddler does not guarantee a baby chair.";
 
+/** Customer-facing Dine-in reservation notes. Display only. */
+export const DINE_IN_RESERVATION_NOTES_HEADING = "Please note:";
+
+export const DINE_IN_RESERVATION_RULES = [
+  "Only light food is available after 5:00 PM on weekends.",
+  "Specific table requests may not be fulfilled.",
+  "Your table will be automatically cancelled if you do not arrive within 10 minutes of your reservation time.",
+] as const;
+
 export const DINE_IN_PARTY_ERRORS = {
   venue: "Please choose where you would like to sit.",
   guests: "Please enter how many guests are dining in.",
