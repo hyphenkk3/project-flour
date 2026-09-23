@@ -86,7 +86,7 @@ assert.match(chooserSrc, /fulfilment_method/);
 assert.match(checkoutSrc, /guest_count/);
 assert.match(checkoutSrc, /dine_in_venue/);
 assert.match(checkoutSrc, /reservation_time/);
-assert.match(checkoutSrc, />Venue</);
+assert.match(checkoutSrc, />\s*Venue\s*/);
 assert.match(checkoutSrc, /address_line_1/);
 assert.match(checkoutSrc, /include_receipt/);
 assert.doesNotMatch(checkoutSrc, /email_submission_receipt_requested/);

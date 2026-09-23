@@ -1,8 +1,12 @@
-import type {
-  InputHTMLAttributes,
-  ReactNode,
-  SelectHTMLAttributes,
-  TextareaHTMLAttributes,
+import {
+  cloneElement,
+  isValidElement,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactElement,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
 } from "react";
 
 /**
@@ -24,31 +28,97 @@ export const formStyles = {
   helpClass: "text-skyline text-xs font-normal",
   errorClass:
     "rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800",
+  fieldErrorClass: "text-status-danger text-sm font-normal leading-relaxed",
+  invalidControlClass: "border-red-300",
 } as const;
+
+export function RequiredAsterisk() {
+  return (
+    <span aria-hidden="true" className="text-status-danger">
+      {" *"}
+    </span>
+  );
+}
+
+export function FormRequiredLegend({ className = "" }: { className?: string }) {
+  return (
+    <p className={`text-skyline text-sm ${className}`.trim()}>
+      <span aria-hidden="true">*</span> Required fields
+    </p>
+  );
+}
 
 type FormFieldProps = {
   label: string;
   htmlFor?: string;
   help?: ReactNode;
+  required?: boolean;
+  error?: string | null;
   children: ReactNode;
   className?: string;
 };
+
+function withFieldAccessibility(
+  children: ReactNode,
+  input: {
+    required: boolean;
+    error: string | null;
+    errorId?: string;
+  },
+): ReactNode {
+  if (!isValidElement(children)) {
+    return children;
+  }
+  const child = children as ReactElement<{
+    required?: boolean;
+    className?: string;
+    "aria-invalid"?: boolean;
+    "aria-required"?: boolean;
+    "aria-describedby"?: string;
+  }>;
+  const describedBy = [child.props["aria-describedby"], input.error ? input.errorId : null]
+    .filter(Boolean)
+    .join(" ");
+  return cloneElement(child, {
+    "aria-required": input.required || child.props["aria-required"] || undefined,
+    "aria-invalid": input.error ? true : child.props["aria-invalid"],
+    "aria-describedby": describedBy || undefined,
+    className: input.error
+      ? `${child.props.className ?? ""} ${formStyles.invalidControlClass}`.trim()
+      : child.props.className,
+  });
+}
 
 export function FormField({
   label,
   htmlFor,
   help,
+  required = false,
+  error = null,
   children,
   className = "",
 }: FormFieldProps) {
+  const errorId = htmlFor ? `${htmlFor}-error` : undefined;
   return (
     <label
       className={`${formStyles.labelClass} ${className}`.trim()}
       htmlFor={htmlFor}
     >
-      <span>{label}</span>
+      <span>
+        {label}
+        {required ? <RequiredAsterisk /> : null}
+      </span>
       {help ? <span className={formStyles.helpClass}>{help}</span> : null}
-      {children}
+      {withFieldAccessibility(children, {
+        required,
+        error,
+        errorId,
+      })}
+      {error ? (
+        <span className={formStyles.fieldErrorClass} id={errorId} role="alert">
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }
@@ -126,27 +196,50 @@ export function FormActions({ children, className = "" }: FormActionsProps) {
 type FormCheckboxProps = InputHTMLAttributes<HTMLInputElement> & {
   label: string;
   help?: string;
+  error?: string | null;
+  markRequired?: boolean;
 };
 
 export function FormCheckbox({
   label,
   help,
+  error = null,
+  markRequired = false,
   className = "",
+  required,
   ...props
 }: FormCheckboxProps) {
+  const errorId = props.id
+    ? `${props.id}-error`
+    : props.name
+      ? `${props.name}-error`
+      : undefined;
   return (
     <label
       className={`border-fog text-ink flex min-h-12 items-center gap-3 rounded-lg border bg-white px-3 text-sm ${className}`.trim()}
     >
       <input
+        aria-describedby={error && errorId ? errorId : undefined}
+        aria-invalid={error ? true : undefined}
         className="size-4 accent-[var(--color-signal)]"
+        required={required}
         type="checkbox"
         {...props}
       />
       <span>
         {label}
+        {markRequired ? <RequiredAsterisk /> : null}
         {help ? (
           <span className={`${formStyles.helpClass} mt-0.5 block`}>{help}</span>
+        ) : null}
+        {error ? (
+          <span
+            className={`${formStyles.fieldErrorClass} mt-0.5 block`}
+            id={errorId}
+            role="alert"
+          >
+            {error}
+          </span>
         ) : null}
       </span>
     </label>
@@ -164,6 +257,7 @@ type FormRadioGroupProps = {
   help?: string;
   value: string;
   required?: boolean;
+  error?: string | null;
   options: readonly FormRadioOption[];
   onChange: (value: string) => void;
 };
@@ -174,13 +268,27 @@ export function FormRadioGroup({
   help,
   value,
   required = false,
+  error = null,
   options,
   onChange,
 }: FormRadioGroupProps) {
+  const errorId = `${name}-error`;
   return (
-    <fieldset className="space-y-2">
-      <legend className="text-ink text-sm font-medium">{legend}</legend>
+    <fieldset
+      aria-describedby={error ? errorId : undefined}
+      aria-invalid={error ? true : undefined}
+      className="space-y-2"
+    >
+      <legend className="text-ink text-sm font-medium">
+        {legend}
+        {required ? <RequiredAsterisk /> : null}
+      </legend>
       {help ? <p className={formStyles.helpClass}>{help}</p> : null}
+      {error ? (
+        <p className={formStyles.fieldErrorClass} id={errorId} role="alert">
+          {error}
+        </p>
+      ) : null}
       <div className="grid gap-2 sm:grid-cols-2">
         {options.map((option, index) => (
           <label
@@ -210,6 +318,8 @@ type FormSubmitButtonProps = {
   pendingLabel?: string;
   className?: string;
   disabled?: boolean;
+  type?: "submit" | "button";
+  onClick?: ButtonHTMLAttributes<HTMLButtonElement>["onClick"];
 };
 
 export function FormSubmitButton({
@@ -218,12 +328,15 @@ export function FormSubmitButton({
   pendingLabel = "Saving…",
   className = "",
   disabled,
+  type = "submit",
+  onClick,
 }: FormSubmitButtonProps) {
   return (
     <button
-      className={`bg-ink text-mist hover:bg-skyline min-h-12 rounded-lg px-5 text-sm font-medium transition disabled:opacity-60 ${className}`.trim()}
+      className={`bg-ink text-mist hover:bg-skyline min-h-12 cursor-pointer rounded-lg px-5 text-sm font-medium transition disabled:opacity-60 ${className}`.trim()}
       disabled={disabled || pending}
-      type="submit"
+      onClick={onClick}
+      type={type}
     >
       {pending ? pendingLabel : children}
     </button>

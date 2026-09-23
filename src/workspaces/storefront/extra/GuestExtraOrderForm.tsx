@@ -3,10 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  CUSTOMER_FORM_HIGHLIGHT_SUMMARY,
   FormActions,
   FormError,
+  FormRequiredLegend,
   FormSelect,
   FormSubmitButton,
+  RequiredAsterisk,
+  collectInvalidFieldMessages,
+  focusFirstInvalidField,
+  formStyles,
 } from "@/components/ui/form";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
@@ -73,6 +79,7 @@ export function GuestExtraOrderForm({
     useState<CustomerWebsiteFulfilmentMethod>("pickup");
   const [pickupTime, setPickupTime] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [added, setAdded] = useState(false);
   const addedTimer = useRef<number | null>(null);
   const cart = useFreshPickCart();
@@ -186,12 +193,21 @@ export function GuestExtraOrderForm({
   return (
     <form
       className="flex flex-col gap-5"
+      noValidate
       onSubmit={(event) => {
         event.preventDefault();
+        const errors = collectInvalidFieldMessages(event.currentTarget);
+        if (Object.keys(errors).length > 0) {
+          setFieldErrors(errors);
+          focusFirstInvalidField(event.currentTarget);
+          return;
+        }
+        setFieldErrors({});
         addToCart();
       }}
     >
       <input name="extra_stock_id" type="hidden" value={extra.id} />
+      <FormRequiredLegend />
 
       <section className="space-y-3">
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
@@ -206,8 +222,11 @@ export function GuestExtraOrderForm({
             htmlFor="pickup_date"
           >
             {workspaceScheduleDateLabel(resolvedMethod)}
+            <RequiredAsterisk />
           </label>
           <FormSelect
+            aria-invalid={fieldErrors.pickup_date ? true : undefined}
+            className={fieldErrors.pickup_date ? formStyles.invalidControlClass : ""}
             id="pickup_date"
             name="pickup_date"
             onChange={(event) => {
@@ -235,6 +254,11 @@ export function GuestExtraOrderForm({
               </option>
             ))}
           </FormSelect>
+          {fieldErrors.pickup_date ? (
+            <p className={formStyles.fieldErrorClass} role="alert">
+              {fieldErrors.pickup_date}
+            </p>
+          ) : null}
         </div>
         {pickupDate ? (
           <FulfilmentMethodChooser
@@ -273,8 +297,11 @@ export function GuestExtraOrderForm({
             {resolvedMethod === "dine_in"
               ? "Dine-in reservation time"
               : workspaceScheduleTimeLabel(resolvedMethod)}
+            <RequiredAsterisk />
           </label>
           <FormSelect
+            aria-invalid={fieldErrors.pickup_time ? true : undefined}
+            className={fieldErrors.pickup_time ? formStyles.invalidControlClass : ""}
             id="pickup_time"
             name="pickup_time"
             onChange={(event) => setPickupTime(event.target.value)}
@@ -288,6 +315,11 @@ export function GuestExtraOrderForm({
               </option>
             ))}
           </FormSelect>
+          {fieldErrors.pickup_time ? (
+            <p className={formStyles.fieldErrorClass} role="alert">
+              {fieldErrors.pickup_time}
+            </p>
+          ) : null}
         </div>
       </section>
 
@@ -297,6 +329,9 @@ export function GuestExtraOrderForm({
         </p>
       ) : null}
 
+      {Object.keys(fieldErrors).length > 0 ? (
+        <FormError message={CUSTOMER_FORM_HIGHLIGHT_SUMMARY} />
+      ) : null}
       <FormError message={error} />
       {added ? (
         <p className="text-signal text-sm" role="status">

@@ -2,12 +2,16 @@
 
 import { useActionState, useMemo, useState } from "react";
 import {
+  CUSTOMER_FORM_HIGHLIGHT_SUMMARY,
   FormActions,
   FormError,
   FormField,
   FormInput,
   FormRadioGroup,
+  FormRequiredLegend,
   FormSubmitButton,
+  collectInvalidFieldMessages,
+  focusFirstInvalidField,
 } from "@/components/ui/form";
 import { consolidateWaitingListRequestItems } from "@/engines/waiting-list/eligibility";
 import {
@@ -56,6 +60,7 @@ export function JoinWaitingListForm({
     initialState,
   );
   const [openToAlternatives, setOpenToAlternatives] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const selectedLines = useMemo(
     () => consolidateWaitingListRequestItems(lines),
     [lines],
@@ -92,21 +97,40 @@ export function JoinWaitingListForm({
       <p className="text-skyline text-sm leading-relaxed">
         {WAITING_LIST_REQUEST_NOT_ORDER}
       </p>
-      <form action={formAction} className="space-y-3">
+      <form
+        action={formAction}
+        className="space-y-3"
+        noValidate
+        onSubmit={(event) => {
+          const errors = collectInvalidFieldMessages(event.currentTarget);
+          if (Object.keys(errors).length === 0) {
+            setFieldErrors({});
+            return;
+          }
+          event.preventDefault();
+          setFieldErrors(errors);
+          focusFirstInvalidField(event.currentTarget);
+        }}
+      >
         <input name="pickup_date" type="hidden" value={pickupDate} />
         <input name="collection_id" type="hidden" value={collectionId ?? ""} />
         <input name="items_json" type="hidden" value={itemsJson} />
+        <FormRequiredLegend />
         <FormField
+          error={fieldErrors.customer_name}
           help={WAITING_LIST_NAME_HELP}
           htmlFor="wl_customer_name"
           label="Name"
+          required
         >
           <FormInput id="wl_customer_name" name="customer_name" required />
         </FormField>
         <FormField
+          error={fieldErrors.phone}
           help={WAITING_LIST_WHATSAPP_NOTE}
           htmlFor="wl_phone"
           label="WhatsApp phone"
+          required
         >
           <FormInput
             id="wl_phone"
@@ -118,6 +142,7 @@ export function JoinWaitingListForm({
           />
         </FormField>
         <FormRadioGroup
+          error={fieldErrors.open_to_alternatives}
           legend={waitingListOtherFlavoursQuestion(pickupDate)}
           name="open_to_alternatives"
           onChange={setOpenToAlternatives}
@@ -131,6 +156,9 @@ export function JoinWaitingListForm({
         <p className="text-skyline text-xs leading-relaxed">
           {WAITING_LIST_ACK_CONTACT}
         </p>
+        {Object.keys(fieldErrors).length > 0 ? (
+          <FormError message={CUSTOMER_FORM_HIGHLIGHT_SUMMARY} />
+        ) : null}
         <FormError message={state.error} />
         <FormActions>
           <FormSubmitButton pending={pending}>

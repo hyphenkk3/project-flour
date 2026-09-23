@@ -2,14 +2,18 @@
 
 import { useActionState, useMemo, useState } from "react";
 import {
+  CUSTOMER_FORM_HIGHLIGHT_SUMMARY,
   FormActions,
   FormCheckbox,
   FormError,
   FormField,
   FormInput,
   FormRadioGroup,
+  FormRequiredLegend,
   FormSubmitButton,
   FormTextarea,
+  collectInvalidFieldMessages,
+  focusFirstInvalidField,
 } from "@/components/ui/form";
 import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
 import { DineInVenuePartyFields } from "@/components/ui/DineInVenuePartyFields";
@@ -140,6 +144,7 @@ export function WaitingListConfirmationForm({
   const [stateCode, setStateCode] = useState(OWNER_DELIVERY_STATE);
   const [recipientNotify, setRecipientNotify] = useState("");
   const [selections, setSelections] = useState(emptyCustomerPreorderSelections);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const total = useMemo(
     () =>
@@ -165,7 +170,21 @@ export function WaitingListConfirmationForm({
   }
 
   return (
-    <form action={action} className="space-y-10">
+    <form
+      action={action}
+      className="space-y-10"
+      noValidate
+      onSubmit={(event) => {
+        const errors = collectInvalidFieldMessages(event.currentTarget);
+        if (Object.keys(errors).length === 0) {
+          setFieldErrors({});
+          return;
+        }
+        event.preventDefault();
+        setFieldErrors(errors);
+        focusFirstInvalidField(event.currentTarget);
+      }}
+    >
       <input name="token" type="hidden" value={token} />
       <input name="requested_date" type="hidden" value={pickupDate} />
       <input name="pickup_date" type="hidden" value={pickupDate} />
@@ -192,6 +211,8 @@ export function WaitingListConfirmationForm({
           {WAITING_LIST_CONFIRMATION_DEADLINE_HELP}
         </p>
       </header>
+
+      <FormRequiredLegend />
 
       <CheckoutSection title="Your Waiting List request">
         <ul className="space-y-2">
@@ -241,6 +262,7 @@ export function WaitingListConfirmationForm({
             </p>
             <PickupSlotFields
               closedDates={WAITING_LIST_CONFIRMATION_CLOSED_DATES}
+              dateError={fieldErrors.pickup_date}
               dateLabel="Dine-in date"
               defaultDate={pickupDate}
               defaultTime={reservationTime}
@@ -282,6 +304,8 @@ export function WaitingListConfirmationForm({
                   hoursSnapshot,
                 )
               }
+              markRequired
+              timeError={fieldErrors.reservation_time}
               timeHelp="Choose when you would like your table reservation to start."
               timeId="reservation_time"
               timeLabel="Dine-in reservation time"
@@ -298,8 +322,10 @@ export function WaitingListConfirmationForm({
                 defaultDate={pickupDate}
                 defaultTime={pickupTime}
                 hoursSnapshot={hoursSnapshot}
+                markRequired
                 maxDate={pickupDate}
                 minDate={pickupDate}
+                timeError={fieldErrors.pickup_time}
                 onTimeChange={(next) => {
                   setPickupTime(next);
                   setDineInVenue(
@@ -326,6 +352,8 @@ export function WaitingListConfirmationForm({
             ) : null}
             {pickupDate && reservationTime && pickupTime ? (
               <DineInVenuePartyFields
+                fieldErrors={fieldErrors}
+                markRequired
                 onChange={(next) => {
                   setDineInVenue(next.venue);
                   setAdultCount(next.adultCount);
@@ -369,6 +397,7 @@ export function WaitingListConfirmationForm({
         ) : (
           <PickupSlotFields
             closedDates={WAITING_LIST_CONFIRMATION_CLOSED_DATES}
+            dateError={fieldErrors.pickup_date}
             dateLabel={workspaceScheduleDateLabel(fulfilmentMethod)}
             defaultDate={pickupDate}
             defaultTime={pickupTime}
@@ -385,6 +414,8 @@ export function WaitingListConfirmationForm({
                 hoursSnapshot,
               )
             }
+            markRequired
+            timeError={fieldErrors.pickup_time}
             timeLabel={workspaceScheduleTimeLabel(fulfilmentMethod)}
           />
         )}
@@ -406,7 +437,12 @@ export function WaitingListConfirmationForm({
             />
             {!sameAsCustomer ? (
               <div className="grid gap-3 sm:grid-cols-2">
-                <FormField htmlFor="recipient_name" label="Recipient name">
+                <FormField
+                  error={fieldErrors.recipient_name}
+                  htmlFor="recipient_name"
+                  label="Recipient name"
+                  required
+                >
                   <FormInput
                     id="recipient_name"
                     name="recipient_name"
@@ -415,7 +451,12 @@ export function WaitingListConfirmationForm({
                     value={recipientName}
                   />
                 </FormField>
-                <FormField htmlFor="recipient_phone" label="Recipient phone">
+                <FormField
+                  error={fieldErrors.recipient_phone}
+                  htmlFor="recipient_phone"
+                  label="Recipient phone"
+                  required
+                >
                   <FormInput
                     id="recipient_phone"
                     name="recipient_phone"
@@ -427,7 +468,12 @@ export function WaitingListConfirmationForm({
                 </FormField>
               </div>
             ) : null}
-            <FormField htmlFor="address_line_1" label="Address line 1">
+            <FormField
+              error={fieldErrors.address_line_1}
+              htmlFor="address_line_1"
+              label="Address line 1"
+              required
+            >
               <FormInput
                 id="address_line_1"
                 name="address_line_1"
@@ -445,7 +491,12 @@ export function WaitingListConfirmationForm({
               />
             </FormField>
             <div className="grid gap-3 sm:grid-cols-3">
-              <FormField htmlFor="postcode" label="Postcode">
+              <FormField
+                error={fieldErrors.postcode}
+                htmlFor="postcode"
+                label="Postcode"
+                required
+              >
                 <FormInput
                   id="postcode"
                   name="postcode"
@@ -454,7 +505,12 @@ export function WaitingListConfirmationForm({
                   value={postcode}
                 />
               </FormField>
-              <FormField htmlFor="city" label="City">
+              <FormField
+                error={fieldErrors.city}
+                htmlFor="city"
+                label="City"
+                required
+              >
                 <FormInput
                   id="city"
                   name="city"
@@ -463,7 +519,12 @@ export function WaitingListConfirmationForm({
                   value={city}
                 />
               </FormField>
-              <FormField htmlFor="state" label="State">
+              <FormField
+                error={fieldErrors.state}
+                htmlFor="state"
+                label="State"
+                required
+              >
                 <FormInput
                   id="state"
                   name="state"
@@ -475,6 +536,7 @@ export function WaitingListConfirmationForm({
             </div>
             {!sameAsCustomer ? (
               <FormRadioGroup
+                error={fieldErrors.recipient_notify_preference}
                 legend="Should we inform the recipient?"
                 name="recipient_notify_preference"
                 onChange={setRecipientNotify}
@@ -564,9 +626,10 @@ export function WaitingListConfirmationForm({
                     />
                     {messageVisible ? (
                       <FormField
-                        help="Optional."
+                        help={messageRequired ? undefined : "Optional."}
                         htmlFor={`${option.code}_message`}
                         label={`Written message on ${option.name}`}
+                        required={messageRequired}
                       >
                         <FormTextarea
                           id={`${option.code}_message`}
@@ -602,6 +665,7 @@ export function WaitingListConfirmationForm({
         title="Customer Details"
       >
         <FormField
+          error={fieldErrors.customer_name}
           help={
             <>
               {CUSTOMER_NAME_HELP}
@@ -610,6 +674,7 @@ export function WaitingListConfirmationForm({
           }
           htmlFor="customer_name"
           label="Name"
+          required
         >
           <FormInput
             id="customer_name"
@@ -620,9 +685,11 @@ export function WaitingListConfirmationForm({
           />
         </FormField>
         <FormField
+          error={fieldErrors.phone}
           help={WAITING_LIST_WHATSAPP_NOTE}
           htmlFor="phone"
           label="WhatsApp phone"
+          required
         >
           <FormInput
             id="phone"
@@ -634,6 +701,7 @@ export function WaitingListConfirmationForm({
           />
         </FormField>
         <FormRadioGroup
+          error={fieldErrors.include_receipt}
           legend="Would you like a copy of the receipt? (will be attached during pickup)"
           name="include_receipt"
           onChange={setIncludeReceipt}
@@ -668,6 +736,9 @@ export function WaitingListConfirmationForm({
         />
       </CheckoutSection>
 
+      {Object.keys(fieldErrors).length > 0 ? (
+        <FormError message={CUSTOMER_FORM_HIGHLIGHT_SUMMARY} />
+      ) : null}
       <FormError message={state.error} />
       <FormActions className="border-fog border-t pt-8">
         <FormSubmitButton

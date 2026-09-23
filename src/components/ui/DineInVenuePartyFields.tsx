@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { FormCheckbox, FormField, FormInput } from "@/components/ui/form";
+import {
+  FormCheckbox,
+  FormField,
+  FormInput,
+  RequiredAsterisk,
+  formStyles,
+} from "@/components/ui/form";
 import type { DineInVenue } from "@/engines/business-calendar/dine-in-hours";
 import {
   DINE_IN_BABY_CHAIR_NOTICE,
@@ -39,6 +45,12 @@ type DineInVenuePartyFieldsProps = {
   requireAcknowledgement?: boolean;
   idPrefix?: string;
   photos?: DineInVenuePhotoMap | null;
+  /**
+   * Customer-facing only. Staff callers omit this so venue/party fields
+   * stay enforced without a visual asterisk.
+   */
+  markRequired?: boolean;
+  fieldErrors?: Record<string, string>;
 };
 
 function VenueCardPhoto({ photo }: { photo: DineInVenuePhoto }) {
@@ -81,6 +93,8 @@ export function DineInVenuePartyFields({
   requireAcknowledgement = true,
   idPrefix = "",
   photos = null,
+  markRequired = false,
+  fieldErrors = {},
 }: DineInVenuePartyFieldsProps) {
   const parsed = parseDineInPartyCounts(value);
   const total = parsed.ok ? parsed.counts.totalGuestCount : 0;
@@ -104,8 +118,28 @@ export function DineInVenuePartyFields({
   return (
     <div className="space-y-3">
       {venues.length > 0 ? (
-        <fieldset className="space-y-2">
-          <legend className="text-ink text-sm font-medium">Venue</legend>
+        <fieldset
+          aria-describedby={
+            fieldErrors.dine_in_venue
+              ? `${idPrefix}dine_in_venue-error`
+              : undefined
+          }
+          aria-invalid={fieldErrors.dine_in_venue ? true : undefined}
+          className="space-y-2"
+        >
+          <legend className="text-ink text-sm font-medium">
+            Venue
+            {markRequired ? <RequiredAsterisk /> : null}
+          </legend>
+          {fieldErrors.dine_in_venue ? (
+            <p
+              className={formStyles.fieldErrorClass}
+              id={`${idPrefix}dine_in_venue-error`}
+              role="alert"
+            >
+              {fieldErrors.dine_in_venue}
+            </p>
+          ) : null}
           <div className="grid gap-2">
             {venues.map((venue, index) => {
               const copy = DINE_IN_VENUE_CUSTOMER_COPY[venue];
@@ -157,7 +191,12 @@ export function DineInVenuePartyFields({
       <fieldset className="space-y-2">
         <legend className="text-ink text-sm font-medium">Party size</legend>
         <div className="grid grid-cols-3 gap-2">
-          <FormField htmlFor={adultId} label="Adults">
+          <FormField
+            error={fieldErrors.adult_count}
+            htmlFor={adultId}
+            label="Adults"
+            required={markRequired}
+          >
             <FormInput
               id={adultId}
               inputMode="numeric"
@@ -240,7 +279,9 @@ export function DineInVenuePartyFields({
       {showAck ? (
         <FormCheckbox
           checked={value.whitebirdSplitSeatingAcknowledged}
+          error={fieldErrors.whitebird_split_seating_acknowledged}
           label={DINE_IN_WHITEBIRD_SPLIT_SEATING_ACK_LABEL}
+          markRequired={markRequired}
           name="whitebird_split_seating_acknowledged"
           onChange={(event) =>
             onChange(

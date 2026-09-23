@@ -7,6 +7,7 @@ import {
   type CustomerFulfilmentAvailability,
 } from "@/engines/orders/customer-fulfilment-availability";
 import type { CustomerWebsiteFulfilmentMethod } from "@/engines/orders/fulfilment";
+import { RequiredAsterisk } from "@/components/ui/form";
 
 const METHODS: Array<{
   value: CustomerWebsiteFulfilmentMethod;
@@ -65,6 +66,7 @@ export function FulfilmentMethodChooser({
     <fieldset className="space-y-2">
       <legend className="text-ink text-sm font-medium">
         How would you like to receive your order?
+        <RequiredAsterisk />
       </legend>
       <div className="grid gap-2 sm:grid-cols-3">
         {METHODS.map((method) => {

@@ -58,6 +58,13 @@ type PickupSlotFieldsProps = {
    */
   unavailableDates?: readonly string[];
   unavailableDateMessageFor?: (ymd: string) => string;
+  /**
+   * Customer-facing only. Staff callers omit this so required date/time
+   * stay enforced without a visual asterisk.
+   */
+  markRequired?: boolean;
+  dateError?: string | null;
+  timeError?: string | null;
 };
 
 export function PickupSlotFields({
@@ -86,6 +93,9 @@ export function PickupSlotFields({
   includeFieldNames = true,
   unavailableDates = [],
   unavailableDateMessageFor,
+  markRequired = false,
+  dateError = null,
+  timeError = null,
 }: PickupSlotFieldsProps) {
   const earliest = earliestPickupDateYmd();
   const minDate = minDateProp?.trim() || earliest;
@@ -147,7 +157,12 @@ export function PickupSlotFields({
       }
     >
       {showDate ? (
-        <FormField htmlFor={dateId} label={dateLabel}>
+        <FormField
+          error={dateError}
+          htmlFor={dateId}
+          label={dateLabel}
+          required={markRequired && required}
+        >
           <FormInput
             id={dateId}
             max={maxDate || undefined}
@@ -186,7 +201,13 @@ export function PickupSlotFields({
         </FormField>
       ) : null}
       {showTime ? (
-        <FormField help={timeHelp} htmlFor={timeId} label={timeLabel}>
+        <FormField
+          error={timeError}
+          help={timeHelp}
+          htmlFor={timeId}
+          label={timeLabel}
+          required={markRequired && required && !ordersClosed}
+        >
           <FormSelect
             disabled={!date || slots.length === 0 || ordersClosed}
             id={timeId}

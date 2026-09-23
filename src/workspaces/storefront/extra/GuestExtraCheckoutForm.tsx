@@ -3,15 +3,21 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  CUSTOMER_FORM_HIGHLIGHT_SUMMARY,
   FormActions,
   FormCheckbox,
   FormError,
   FormField,
   FormInput,
   FormRadioGroup,
+  FormRequiredLegend,
   FormSelect,
   FormSubmitButton,
   FormTextarea,
+  RequiredAsterisk,
+  collectInvalidFieldMessages,
+  focusFirstInvalidField,
+  formStyles,
 } from "@/components/ui/form";
 import { DineInVenuePartyFields } from "@/components/ui/DineInVenuePartyFields";
 import {
@@ -183,6 +189,7 @@ export function GuestExtraCheckoutForm({
   const [deliveryProcessingAckSnapshot, setDeliveryProcessingAckSnapshot] =
     useState("");
   const [clientError, setClientError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!cart) return;
@@ -407,13 +414,25 @@ export function GuestExtraCheckoutForm({
   function openConfirm() {
     const form = formRef.current;
     if (!form || !cart || cart.items.length === 0) return;
-    if (!form.reportValidity()) return;
+    const errors = collectInvalidFieldMessages(form);
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setClientError(CUSTOMER_FORM_HIGHLIGHT_SUMMARY);
+      focusFirstInvalidField(form);
+      return;
+    }
     persistCheckoutFields(form);
     const data = new FormData(form);
     if (deliveryAckRequired && !deliveryProcessingFeeAcknowledged) {
-      setClientError(DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE);
+      setFieldErrors((current) => ({
+        ...current,
+        delivery_processing_fee_ack_accepted:
+          DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE,
+      }));
+      setClientError(CUSTOMER_FORM_HIGHLIGHT_SUMMARY);
       return;
     }
+    setFieldErrors({});
     setClientError(null);
     pendingSubmitRef.current = data;
     setConfirmSnapshot(
@@ -485,12 +504,14 @@ export function GuestExtraCheckoutForm({
     <>
       <form
         className="flex flex-col gap-5"
+        noValidate
         onSubmit={(event) => {
           event.preventDefault();
           openConfirm();
         }}
         ref={formRef}
       >
+        <FormRequiredLegend />
         {cart.items.map((item) => (
           <span key={item.extraStockId}>
             <input
@@ -575,8 +596,15 @@ export function GuestExtraCheckoutForm({
               htmlFor="checkout_pickup_date"
             >
               {workspaceScheduleDateLabel(resolvedMethod)}
+              <RequiredAsterisk />
             </label>
             <FormSelect
+              aria-invalid={fieldErrors.checkout_pickup_date ? true : undefined}
+              className={
+                fieldErrors.checkout_pickup_date
+                  ? formStyles.invalidControlClass
+                  : ""
+              }
               id="checkout_pickup_date"
               onChange={(event) => {
                 const next = event.target.value;
@@ -603,6 +631,11 @@ export function GuestExtraCheckoutForm({
                 </option>
               ))}
             </FormSelect>
+            {fieldErrors.checkout_pickup_date ? (
+              <p className={formStyles.fieldErrorClass} role="alert">
+                {fieldErrors.checkout_pickup_date}
+              </p>
+            ) : null}
           </div>
           {sameDayNotice ? (
             <p className="text-skyline text-sm leading-relaxed" role="status">
@@ -637,8 +670,15 @@ export function GuestExtraCheckoutForm({
               {resolvedMethod === "dine_in"
                 ? "Dine-in reservation time"
                 : workspaceScheduleTimeLabel(resolvedMethod)}
+              <RequiredAsterisk />
             </label>
             <FormSelect
+              aria-invalid={fieldErrors.checkout_pickup_time ? true : undefined}
+              className={
+                fieldErrors.checkout_pickup_time
+                  ? formStyles.invalidControlClass
+                  : ""
+              }
               id="checkout_pickup_time"
               onChange={(event) => setSelectedTime(event.target.value)}
               required
@@ -651,11 +691,18 @@ export function GuestExtraCheckoutForm({
                 </option>
               ))}
             </FormSelect>
+            {fieldErrors.checkout_pickup_time ? (
+              <p className={formStyles.fieldErrorClass} role="alert">
+                {fieldErrors.checkout_pickup_time}
+              </p>
+            ) : null}
           </div>
           {resolvedMethod === "dine_in" ? (
             <div className="space-y-3">
               {dineInVenues.length > 0 ? (
                 <DineInVenuePartyFields
+                  fieldErrors={fieldErrors}
+                  markRequired
                   onChange={(next) => {
                     setDineInVenue(next.venue);
                     setAdultCount(next.adultCount);
@@ -706,7 +753,12 @@ export function GuestExtraCheckoutForm({
               />
               {!sameAsCustomer ? (
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <FormField htmlFor="recipient_name" label="Recipient name">
+                  <FormField
+                    error={fieldErrors.recipient_name}
+                    htmlFor="recipient_name"
+                    label="Recipient name"
+                    required
+                  >
                     <FormInput
                       id="recipient_name"
                       name="recipient_name"
@@ -715,7 +767,12 @@ export function GuestExtraCheckoutForm({
                       value={recipientName}
                     />
                   </FormField>
-                  <FormField htmlFor="recipient_phone" label="Recipient phone">
+                  <FormField
+                    error={fieldErrors.recipient_phone}
+                    htmlFor="recipient_phone"
+                    label="Recipient phone"
+                    required
+                  >
                     <FormInput
                       id="recipient_phone"
                       name="recipient_phone"
@@ -729,7 +786,12 @@ export function GuestExtraCheckoutForm({
                   </FormField>
                 </div>
               ) : null}
-              <FormField htmlFor="address_line_1" label="Address line 1">
+              <FormField
+                error={fieldErrors.address_line_1}
+                htmlFor="address_line_1"
+                label="Address line 1"
+                required
+              >
                 <FormInput
                   id="address_line_1"
                   name="address_line_1"
@@ -747,7 +809,12 @@ export function GuestExtraCheckoutForm({
                 />
               </FormField>
               <div className="grid gap-3 sm:grid-cols-3">
-                <FormField htmlFor="postcode" label="Postcode">
+                <FormField
+                  error={fieldErrors.postcode}
+                  htmlFor="postcode"
+                  label="Postcode"
+                  required
+                >
                   <FormInput
                     id="postcode"
                     name="postcode"
@@ -756,7 +823,12 @@ export function GuestExtraCheckoutForm({
                     value={postcode}
                   />
                 </FormField>
-                <FormField htmlFor="city" label="City">
+                <FormField
+                  error={fieldErrors.city}
+                  htmlFor="city"
+                  label="City"
+                  required
+                >
                   <FormInput
                     id="city"
                     name="city"
@@ -765,7 +837,12 @@ export function GuestExtraCheckoutForm({
                     value={city}
                   />
                 </FormField>
-                <FormField htmlFor="state" label="State">
+                <FormField
+                  error={fieldErrors.state}
+                  htmlFor="state"
+                  label="State"
+                  required
+                >
                   <FormInput
                     id="state"
                     name="state"
@@ -777,6 +854,7 @@ export function GuestExtraCheckoutForm({
               </div>
               {!sameAsCustomer ? (
                 <FormRadioGroup
+                  error={fieldErrors.recipient_notify_preference}
                   legend="Should we inform the recipient?"
                   name="recipient_notify_preference"
                   onChange={(value) => setRecipientNotifyPreference(value)}
@@ -797,8 +875,12 @@ export function GuestExtraCheckoutForm({
                 </p>
                 <FormCheckbox
                   checked={deliveryProcessingFeeAcknowledged}
+                  error={fieldErrors.delivery_processing_fee_ack_accepted}
+                  id="delivery_processing_fee_ack_accepted"
                   label={DELIVERY_PROCESSING_FEE_ACK_LABEL}
+                  markRequired
                   name="delivery_processing_fee_ack_accepted"
+                  required
                   onChange={(event) => {
                     setDeliveryProcessingAckSnapshot(
                       event.target.checked
@@ -873,9 +955,10 @@ export function GuestExtraCheckoutForm({
                       />
                       {messageVisible ? (
                         <FormField
-                          help="Optional."
+                          help={messageRequired ? undefined : "Optional."}
                           htmlFor={`${option.code}_message`}
                           label={`Written message on ${option.name}`}
+                          required={messageRequired}
                         >
                           <FormTextarea
                             id={`${option.code}_message`}
@@ -906,9 +989,11 @@ export function GuestExtraCheckoutForm({
             Customer
           </h2>
           <FormField
+            error={fieldErrors.customer_name}
             help={FRESH_PICKS_NAME_HELP}
             htmlFor="customer_name"
             label="Name"
+            required
           >
             <FormInput
               defaultValue={cart.customerName}
@@ -918,9 +1003,11 @@ export function GuestExtraCheckoutForm({
             />
           </FormField>
           <FormField
+            error={fieldErrors.phone}
             help={FRESH_PICKS_WHATSAPP_NOTE}
             htmlFor="phone"
             label="WhatsApp phone"
+            required
           >
             <FormInput
               defaultValue={cart.phone}
@@ -931,6 +1018,7 @@ export function GuestExtraCheckoutForm({
             />
           </FormField>
           <FormRadioGroup
+            error={fieldErrors.include_receipt}
             legend="Would you like a copy of the receipt? (will be attached during pickup)"
             name="include_receipt"
             onChange={(value) =>
