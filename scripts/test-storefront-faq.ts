@@ -100,12 +100,40 @@ const faqPage = readFileSync(
   resolve(process.cwd(), "src/workspaces/storefront/home/StorefrontFaqPage.tsx"),
   "utf8",
 );
-assert.match(faqPage, /STOREFRONT_FAQ_ITEMS/);
+assert.match(faqPage, /loadActiveStorefrontFaqItems/);
+assert.doesNotMatch(faqPage, /STOREFRONT_FAQ_ITEMS/);
 assert.match(faqPage, /whitespace-pre-line/);
 assert.match(faqPage, /text-skyline mt-2 max-w-xl text-sm leading-relaxed whitespace-pre-line/);
 assert.doesNotMatch(faqPage, /text-status-danger/);
 assert.doesNotMatch(faqPage, /accordion/i);
 assert.doesNotMatch(faqPage, /Please note:/);
+
+const faqQueries = readFileSync(
+  resolve(process.cwd(), "src/workspaces/storefront/home/faq-queries.ts"),
+  "utf8",
+);
+assert.match(faqQueries, /createPublicClient/);
+assert.match(faqQueries, /is_active/);
+assert.match(faqQueries, /storefront_faq_items/);
+
+const faqRoute = readFileSync(resolve(process.cwd(), "src/app/faq/page.tsx"), "utf8");
+assert.match(faqRoute, /StorefrontFaqPage/);
+assert.match(faqRoute, /force-dynamic/);
+
+const migration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20260923120000_storefront_faq_items.sql",
+  ),
+  "utf8",
+);
+for (const item of STOREFRONT_FAQ_ITEMS) {
+  assert.ok(migration.includes(item.question), item.question);
+  assert.ok(migration.includes(item.answer), item.question);
+}
+assert.match(migration, /\n {6}1,\n/);
+assert.match(migration, /\n {6}13,\n/);
+assert.doesNotMatch(migration, /Please note:/);
 
 assert.equal(
   STOREFRONT_INSTAGRAM_URL,

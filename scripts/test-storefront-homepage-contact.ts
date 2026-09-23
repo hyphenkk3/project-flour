@@ -192,7 +192,7 @@ assert.doesNotMatch(faqAnswers, /capacity/i);
 assert.doesNotMatch(faqAnswers, /waiting list/i);
 
 const faqPageSrc = readSrc("src/workspaces/storefront/home/StorefrontFaqPage.tsx");
-assert.match(faqPageSrc, /STOREFRONT_FAQ_ITEMS/);
+assert.match(faqPageSrc, /loadActiveStorefrontFaqItems/);
 assert.match(faqPageSrc, /StorefrontHomeLink/);
 assert.doesNotMatch(faqPageSrc, /accordion/i);
 

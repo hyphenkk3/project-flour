@@ -4,9 +4,11 @@ import {
   storefrontKickerClass,
 } from "@/workspaces/storefront/StorefrontBrand";
 import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
-import { STOREFRONT_FAQ_ITEMS } from "@/workspaces/storefront/home/storefront-contact";
+import { loadActiveStorefrontFaqItems } from "@/workspaces/storefront/home/faq-queries";
 
-export function StorefrontFaqPage() {
+export async function StorefrontFaqPage() {
+  const loaded = await loadActiveStorefrontFaqItems();
+
   return (
     <main className="bg-paper min-h-dvh">
       <StorefrontTheme />
@@ -20,18 +22,28 @@ export function StorefrontFaqPage() {
           A few notes on ordering with Whitebird.
         </p>
 
-        <dl className="mt-10 space-y-8">
-          {STOREFRONT_FAQ_ITEMS.map((item) => (
-            <div className="border-fog/70 border-t pt-5" key={item.question}>
-              <dt className="font-display text-ink text-xl tracking-tight">
-                {item.question}
-              </dt>
-              <dd className="text-skyline mt-2 max-w-xl text-sm leading-relaxed whitespace-pre-line">
-                {item.answer}
-              </dd>
-            </div>
-          ))}
-        </dl>
+        {loaded.error ? (
+          <p className="text-skyline mt-10 max-w-xl text-sm leading-relaxed">
+            {loaded.error}
+          </p>
+        ) : loaded.items.length === 0 ? (
+          <p className="text-skyline mt-10 max-w-xl text-sm leading-relaxed">
+            No questions to show right now.
+          </p>
+        ) : (
+          <dl className="mt-10 space-y-8">
+            {loaded.items.map((item) => (
+              <div className="border-fog/70 border-t pt-5" key={item.id}>
+                <dt className="font-display text-ink text-xl tracking-tight">
+                  {item.question}
+                </dt>
+                <dd className="text-skyline mt-2 max-w-xl text-sm leading-relaxed whitespace-pre-line">
+                  {item.answer}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
 
         <StorefrontStaffSignIn />
       </div>

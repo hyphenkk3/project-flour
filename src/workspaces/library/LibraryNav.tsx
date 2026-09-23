@@ -11,6 +11,7 @@ const ITEMS = [
   { href: "/library/promotions", label: "Promotions" },
   { href: "/library/vouchers", label: "Vouchers" },
   { href: "/library/assets", label: "Assets" },
+  { href: "/library/customer-qa", label: "Customer Q&A" },
 ] as const;
 
 export function LibraryNav() {

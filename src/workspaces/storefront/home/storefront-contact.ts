@@ -52,7 +52,10 @@ export type StorefrontFaqItem = {
   answer: string;
 };
 
-/** Customer FAQ copy drawn only from established storefront behaviour. */
+/**
+ * Seed snapshot of the approved customer FAQ.
+ * The public FAQ page reads live rows from storefront_faq_items.
+ */
 export const STOREFRONT_FAQ_ITEMS: readonly StorefrontFaqItem[] = [
   {
     question: "How many days in advance should I order?",

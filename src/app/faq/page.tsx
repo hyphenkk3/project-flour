@@ -6,6 +6,8 @@ export const metadata: Metadata = {
   description: "Ordering with Whitebird — preorder, collection, payment, and Fresh Picks.",
 };
 
+export const dynamic = "force-dynamic";
+
 export default function FaqPage() {
   return <StorefrontFaqPage />;
 }
