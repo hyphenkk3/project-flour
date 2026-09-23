@@ -12,6 +12,7 @@ export type LibraryAsset = {
   title: string;
   kind: LibraryAssetKind;
   imageUrl: string;
+  storagePath: string | null;
   altText: string | null;
   status: LibraryAssetStatus;
   createdAt: string;
@@ -21,7 +22,6 @@ export type LibraryAsset = {
 export type LibraryAssetInput = {
   title: string;
   kind: LibraryAssetKind;
-  imageUrl: string;
   altText: string | null;
   status: LibraryAssetStatus;
 };

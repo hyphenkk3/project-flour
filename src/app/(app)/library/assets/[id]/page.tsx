@@ -70,6 +70,20 @@ export default async function LibraryAssetDetailPage({
 
       <dl className="border-fog grid gap-4 rounded-xl border bg-white p-5 text-sm">
         <div>
+          <dt className="text-skyline">Image</dt>
+          <dd className="mt-2">
+            <div className="bg-fog overflow-hidden rounded-xl">
+              {/* Storage public URL; local object URLs are not used here. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                alt={asset.altText ?? asset.title}
+                className="mx-auto max-h-80 w-full max-w-full object-contain"
+                src={asset.imageUrl}
+              />
+            </div>
+          </dd>
+        </div>
+        <div>
           <dt className="text-skyline">Image URL</dt>
           <dd className="text-ink mt-1 break-all">
             <a

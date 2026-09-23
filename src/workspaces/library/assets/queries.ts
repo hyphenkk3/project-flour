@@ -10,6 +10,7 @@ type AssetRow = {
   title: string;
   kind: LibraryAssetKind;
   image_url: string;
+  storage_path: string | null;
   alt_text: string | null;
   status: LibraryAssetStatus;
   created_at: string;
@@ -22,6 +23,7 @@ export function mapAsset(row: AssetRow): LibraryAsset {
     title: row.title,
     kind: row.kind,
     imageUrl: row.image_url,
+    storagePath: row.storage_path ?? null,
     altText: row.alt_text,
     status: row.status,
     createdAt: row.created_at,
