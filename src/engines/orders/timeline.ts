@@ -13,6 +13,7 @@ export const TIMELINE_EVENT_LABELS: Record<string, string> = {
   payment_request_marked_sent: "Payment request marked as sent",
   payment_deadline_extended: "Payment follow-up deadline extended",
   payment_recorded: "Payment recorded",
+  payment_correction_recorded: "Overpayment refund recorded",
   payment_secured: "Paid · Preorder secured",
   august_promo_applied: "August Promo applied",
   rm10_voucher_redeemed: "RM10 Discount Card redeemed",

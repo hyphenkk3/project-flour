@@ -26,6 +26,11 @@ import {
 import { OrderDiscountsPanel } from "@/workspaces/owner/orders/OrderDiscountsPanel";
 import { DeliveryFinanceBreakdown } from "@/workspaces/owner/orders/DeliveryFinanceBreakdown";
 import { RecordPaymentForm } from "@/workspaces/owner/orders/RecordPaymentForm";
+import { RecordRefundForm } from "@/workspaces/owner/orders/RecordRefundForm";
+import {
+  PAYMENT_CORRECTION_STATUS_LABEL,
+  paymentCorrectionStatus,
+} from "@/engines/orders/payment-correction";
 import { withOwnerReturnTo } from "@/workspaces/owner/navigation/return-to";
 import type { OperationsApprovalRecord } from "@/engines/operations/approvals";
 
@@ -34,6 +39,7 @@ type PaymentSectionProps = {
   returnTo?: string | null;
   canPreparePaymentRequest?: boolean;
   canRecordPayment?: boolean;
+  canRecordPaymentCorrection?: boolean;
   canManageDiscounts?: boolean;
   canOverrideDiscountEligibility?: boolean;
   canRequestOperationsApproval?: boolean;
@@ -46,6 +52,7 @@ export function PaymentSection({
   returnTo = null,
   canPreparePaymentRequest = false,
   canRecordPayment = false,
+  canRecordPaymentCorrection = false,
   canManageDiscounts = false,
   canOverrideDiscountEligibility = false,
   canRequestOperationsApproval = false,
@@ -54,8 +61,14 @@ export function PaymentSection({
 }: PaymentSectionProps) {
   const router = useRouter();
   const [showRecord, setShowRecord] = useState(false);
+  const [showRefund, setShowRefund] = useState(false);
   const [showExtend, setShowExtend] = useState(false);
   const settlement = order.settlement;
+  const correctionStatus = paymentCorrectionStatus(settlement);
+  const canCorrect =
+    canRecordPaymentCorrection &&
+    order.status !== "cancelled" &&
+    settlement.overpayment > 0;
   const isPaid = order.status === "paid";
   const overdue = isPaymentOverdue(
     order.status,
@@ -177,7 +190,11 @@ export function PaymentSection({
       ) : null}
 
       <dl
-        className={`grid gap-2 text-sm ${settlement.overpayment > 0 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}
+        className={`grid gap-2 text-sm ${
+          settlement.overpayment > 0 || settlement.refundsTotal > 0
+            ? "sm:grid-cols-2 lg:grid-cols-4"
+            : "sm:grid-cols-3"
+        }`}
       >
         <div>
           <dt className="text-skyline">Amount due</dt>
@@ -188,7 +205,7 @@ export function PaymentSection({
         <div>
           <dt className="text-skyline">Received</dt>
           <dd className="text-ink font-semibold">
-            {formatRm(settlement.netReceived)}
+            {formatRm(settlement.verifiedPaymentsAllocated)}
           </dd>
         </div>
         <div>
@@ -197,6 +214,14 @@ export function PaymentSection({
             {formatRm(settlement.remainingBalance)}
           </dd>
         </div>
+        {settlement.refundsTotal > 0 ? (
+          <div>
+            <dt className="text-skyline">Refunded</dt>
+            <dd className="text-ink font-semibold">
+              {formatRm(settlement.refundsTotal)}
+            </dd>
+          </div>
+        ) : null}
         {settlement.overpayment > 0 ? (
           <div>
             <dt className="text-skyline">Overpaid</dt>
@@ -206,10 +231,12 @@ export function PaymentSection({
           </div>
         ) : null}
       </dl>
-      {settlement.overpayment > 0 ? (
+      {correctionStatus !== "none" || settlement.overpayment > 0 ? (
         <p className="text-skyline text-sm">
-          Customer has paid more than the current amount due. Do not change
-          Payment History here — refund/correction is a separate workflow.
+          Correction: {PAYMENT_CORRECTION_STATUS_LABEL[correctionStatus]}.
+          {settlement.overpayment > 0
+            ? " Payment History stays as originally recorded."
+            : null}
         </p>
       ) : null}
 
@@ -233,6 +260,33 @@ export function PaymentSection({
 
       {!isPaid && !order.paymentDeadlineAt && order.paymentRequestSentAt ? (
         <p className="text-skyline text-sm">Payment request sent</p>
+      ) : null}
+
+      {order.refunds.length > 0 ? (
+        <div className="space-y-3">
+          <h3 className="text-ink text-xs font-semibold tracking-[0.12em] uppercase">
+            Refunds
+          </h3>
+          <ul className="space-y-3">
+            {order.refunds.map((row) => (
+              <li key={row.id}>
+                <p className="text-ink text-sm font-medium">
+                  {formatRm(row.amount)}
+                </p>
+                <p className="text-skyline text-sm">
+                  Recorded {formatPaymentHistoryDate(row.refundedAt)}
+                  {" · "}
+                  {row.createdByName ?? "Staff"}
+                </p>
+                {row.reason ? (
+                  <p className="text-skyline whitespace-pre-line text-sm">
+                    {row.reason}
+                  </p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
 
       {order.paymentAllocations.length > 0 ? (
@@ -260,7 +314,7 @@ export function PaymentSection({
         </div>
       ) : null}
 
-      {canRequest || canRecord ? (
+      {canRequest || canRecord || canCorrect ? (
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           {canRequest ? (
             <Link
@@ -278,11 +332,25 @@ export function PaymentSection({
               className="border-fog text-ink hover:bg-mist inline-flex min-h-12 items-center justify-center rounded-lg border px-5 text-sm font-medium"
               onClick={() => {
                 setShowRecord(true);
+                setShowRefund(false);
                 setShowExtend(false);
               }}
               type="button"
             >
               + Record Payment
+            </button>
+          ) : null}
+          {canCorrect ? (
+            <button
+              className="border-fog text-ink hover:bg-mist inline-flex min-h-12 items-center justify-center rounded-lg border px-5 text-sm font-medium"
+              onClick={() => {
+                setShowRefund(true);
+                setShowRecord(false);
+                setShowExtend(false);
+              }}
+              type="button"
+            >
+              Record refund
             </button>
           ) : null}
           {canExtendFollowUp ? (
@@ -291,6 +359,7 @@ export function PaymentSection({
               onClick={() => {
                 setShowExtend((value) => !value);
                 setShowRecord(false);
+                setShowRefund(false);
               }}
               type="button"
             >
@@ -305,6 +374,13 @@ export function PaymentSection({
           onCancel={() => setShowRecord(false)}
           orderId={order.id}
           remainingBalance={settlement.remainingBalance}
+        />
+      ) : null}
+
+      {showRefund && canCorrect ? (
+        <RecordRefundForm
+          onCancel={() => setShowRefund(false)}
+          order={order}
         />
       ) : null}
 

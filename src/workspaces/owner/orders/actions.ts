@@ -44,6 +44,13 @@ import {
 } from "@/engines/orders/lifecycle";
 import { reconcilePaymentLifecycleStatus } from "@/engines/orders/payment-status";
 import {
+  PAYMENT_CORRECTION_INVALID_AMOUNT,
+  PAYMENT_CORRECTION_TYPE,
+  PAYMENT_CORRECTION_UNAUTHORIZED,
+  parseRefundAmount,
+  validatePaymentCorrection,
+} from "@/engines/orders/payment-correction";
+import {
   classifyPaidOrderSave,
   decidePostPaymentCancel,
   decidePostPaymentSave,
@@ -1454,6 +1461,89 @@ export async function recordAndVerifyPaymentAction(
   }
 
   scheduleStaffNotificationDispatch();
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${orderId}`);
+  return { error: null, success: true };
+}
+
+export type RecordPaymentCorrectionState = {
+  error: string | null;
+  success: boolean;
+};
+
+export async function recordOverpaymentRefundAction(
+  orderId: string,
+  _prev: RecordPaymentCorrectionState,
+  formData: FormData,
+): Promise<RecordPaymentCorrectionState> {
+  const auth = await requireOwnerOrManager();
+  if (auth.error || !auth.staff) {
+    return { error: PAYMENT_CORRECTION_UNAUTHORIZED, success: false };
+  }
+  const staff = auth.staff;
+
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found.", success: false };
+  }
+  if (order.status === "cancelled") {
+    return { error: "Cannot correct payment on a cancelled order.", success: false };
+  }
+
+  const amount = parseRefundAmount(String(formData.get("amount") ?? ""));
+  if (amount == null) {
+    return { error: PAYMENT_CORRECTION_INVALID_AMOUNT, success: false };
+  }
+
+  const reasonRaw = String(formData.get("reason") ?? "").replace(/^\s+|\s+$/g, "");
+  const reason = reasonRaw ? reasonRaw : null;
+
+  const checked = validatePaymentCorrection({
+    settlement: order.settlement,
+    amount,
+  });
+  if (checked.error || !checked.preview) {
+    return { error: checked.error ?? PAYMENT_CORRECTION_INVALID_AMOUNT, success: false };
+  }
+  const preview = checked.preview;
+
+  const paymentSnapshot = order.paymentAllocations.map((row) => ({
+    id: row.id,
+    amount: row.amount,
+    paidAt: row.paidAt,
+    method: row.method,
+    referenceNote: row.referenceNote,
+  }));
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("refunds").insert({
+    order_id: orderId,
+    payment_id: null,
+    amount: preview.refundAmount,
+    reason,
+    created_by: staff.id,
+    status: "recorded",
+  });
+
+  if (error) {
+    return { error: error.message, success: false };
+  }
+
+  await insertTimelineEvent({
+    orderId,
+    eventType: "payment_correction_recorded",
+    actorStaffId: staff.id,
+    metadata: {
+      correction_type: PAYMENT_CORRECTION_TYPE,
+      amount: preview.refundAmount,
+      reason,
+      payment_received: preview.paymentReceived,
+      order_amount: preview.orderAmount,
+      remaining_excess: preview.remainingExcessAfter,
+      payment_snapshot: paymentSnapshot,
+    },
+  });
+
   revalidatePath("/owner");
   revalidatePath(`/owner/orders/${orderId}`);
   return { error: null, success: true };

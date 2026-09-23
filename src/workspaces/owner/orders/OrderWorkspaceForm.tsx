@@ -1082,6 +1082,7 @@ export function OrderWorkspaceForm({
             }
             canPreparePaymentRequest={capabilities.canPreparePaymentRequest}
             canRecordPayment={capabilities.canRecordPayment}
+            canRecordPaymentCorrection={capabilities.canRecordPaymentCorrection}
             canRequestOperationsApproval={
               capabilities.canRequestOperationsApproval
             }

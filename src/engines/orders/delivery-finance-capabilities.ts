@@ -62,6 +62,11 @@ export type GuestOrderWorkspaceCapabilities = {
   /** Record ordinary received payment (Owner + Manager + Customer Operations). */
   canRecordPayment: boolean;
   /**
+   * Record overpayment refund / payment correction (Owner or Manager).
+   * Not granted with ordinary canRecordPayment.
+   */
+  canRecordPaymentCorrection: boolean;
+  /**
    * @deprecated Prefer canPreparePaymentRequest / canRecordPayment.
    * True when either payment communication or record authority is granted.
    */
@@ -205,6 +210,7 @@ export function buildGuestOrderWorkspaceCapabilities(input: {
     canPrepareConfirmation: isRoutineOrderOperator,
     canPreparePaymentRequest,
     canRecordPayment,
+    canRecordPaymentCorrection: isOwner || isManager,
     canManagePayments: canPreparePaymentRequest || canRecordPayment,
     canExtendPaymentDeadline: isOwner,
     canManageDiscounts: isRoutineOrderOperator,

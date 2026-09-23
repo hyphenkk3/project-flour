@@ -578,7 +578,18 @@ async function loadOrderFinancials(orderId: string): Promise<{
     supabase
       .from("refunds")
       .select(
-        "id, order_id, payment_id, amount, reason, refunded_at, status, created_at",
+        `
+        id,
+        order_id,
+        payment_id,
+        amount,
+        reason,
+        refunded_at,
+        status,
+        created_at,
+        created_by,
+        staff_profiles!created_by ( display_name )
+      `,
       )
       .eq("order_id", orderId)
       .order("created_at", { ascending: true }),
@@ -587,8 +598,20 @@ async function loadOrderFinancials(orderId: string): Promise<{
   if (adjustmentsRes.error) {
     throw new Error(adjustmentsRes.error.message);
   }
+
+  let refundRows: unknown[] = refundsRes.data ?? [];
   if (refundsRes.error) {
-    throw new Error(refundsRes.error.message);
+    const fallback = await supabase
+      .from("refunds")
+      .select(
+        "id, order_id, payment_id, amount, reason, refunded_at, status, created_at, created_by",
+      )
+      .eq("order_id", orderId)
+      .order("created_at", { ascending: true });
+    if (fallback.error) {
+      throw new Error(fallback.error.message);
+    }
+    refundRows = fallback.data ?? [];
   }
 
   let allocationRows: unknown[] = allocationsRes.data ?? [];
@@ -697,16 +720,35 @@ async function loadOrderFinancials(orderId: string): Promise<{
       ];
     });
 
-  const refunds: OrderRefundView[] = (refundsRes.data ?? []).map((row) => ({
-    id: row.id as string,
-    orderId: row.order_id as string,
-    paymentId: (row.payment_id as string | null) ?? null,
-    amount: Number(row.amount),
-    reason: (row.reason as string | null) ?? null,
-    refundedAt: row.refunded_at as string,
-    status: "recorded" as const,
-    createdAt: row.created_at as string,
-  }));
+  const refunds: OrderRefundView[] = refundRows.map((raw) => {
+    const row = raw as {
+      id: string;
+      order_id: string;
+      payment_id: string | null;
+      amount: number | string;
+      reason: string | null;
+      refunded_at: string;
+      created_at: string;
+      created_by: string | null;
+      staff_profiles?:
+        | { display_name: string }
+        | { display_name: string }[]
+        | null;
+    };
+    const staff = relationOne(row.staff_profiles);
+    return {
+      id: row.id,
+      orderId: row.order_id,
+      paymentId: row.payment_id ?? null,
+      amount: Number(row.amount),
+      reason: row.reason ?? null,
+      refundedAt: row.refunded_at,
+      status: "recorded" as const,
+      createdBy: row.created_by ?? null,
+      createdByName: staff?.display_name ?? null,
+      createdAt: row.created_at,
+    };
+  });
 
   return { adjustments, paymentAllocations, refunds };
 }

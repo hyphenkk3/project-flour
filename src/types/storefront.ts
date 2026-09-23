@@ -140,6 +140,8 @@ export type OrderRefundView = {
   reason: string | null;
   refundedAt: string;
   status: "recorded";
+  createdBy: string | null;
+  createdByName: string | null;
   createdAt: string;
 };
 
@@ -387,6 +389,7 @@ export type OrderTimelineEventType =
   | "payment_request_marked_sent"
   | "payment_deadline_extended"
   | "payment_recorded"
+  | "payment_correction_recorded"
   | "payment_secured"
   | "august_promo_applied"
   | "rm10_voucher_redeemed"
