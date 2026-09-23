@@ -325,6 +325,8 @@ assert.match(ui, /Total guests/);
 assert.match(ui, /DINE_IN_WHITEBIRD_GROUP_SIZE_BODY/);
 assert.match(ui, /DINE_IN_BABY_CHAIR_NOTICE/);
 assert.match(ui, /requireAcknowledgement/);
+assert.match(ui, /photos\?/);
+assert.match(ui, /dineInVenuePhoto/);
 
 const checkoutForm = read(
   "src/workspaces/storefront/checkout/GuestCheckoutForm.tsx",

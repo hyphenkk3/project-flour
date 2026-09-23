@@ -25,6 +25,10 @@ import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
 import { DineInVenuePartyFields } from "@/components/ui/DineInVenuePartyFields";
 import { derivedGuestCountDraft } from "@/engines/orders/dine-in-party";
 import {
+  EMPTY_DINE_IN_VENUE_PHOTOS,
+  type DineInVenuePhotoMap,
+} from "@/engines/orders/dine-in-venue-photos";
+import {
   ORDERS_CLOSED_CUSTOMER_LABEL,
   ORDERS_CLOSED_RPC_MESSAGE,
   customerPickupSlotsForDate,
@@ -386,6 +390,9 @@ export function GuestCheckoutForm({
     useState<readonly string[]>([]);
   const [hoursSnapshot, setHoursSnapshot] =
     useState<OperatingHoursSnapshot>(OPERATING_HOURS_SEED);
+  const [venuePhotos, setVenuePhotos] = useState<DineInVenuePhotoMap>(
+    EMPTY_DINE_IN_VENUE_PHOTOS,
+  );
   const [liveMinPickupDate, setLiveMinPickupDate] = useState<string | null>(
     null,
   );
@@ -559,6 +566,7 @@ export function GuestCheckoutForm({
         setClosedDates(context.closedDates);
         setEntrySpecialUnavailableDates(context.entrySpecialUnavailableDates);
         setHoursSnapshot(context.hoursSnapshot);
+        setVenuePhotos(context.venuePhotos);
         setLiveMinPickupDate(context.minPickupDate);
         setLiveMaxPickupDate(context.maxPickupDate);
         setLiveScopeConstrainsBounds(context.pickupScopeConstrainsBounds);
@@ -1686,6 +1694,7 @@ export function GuestCheckoutForm({
                                 next.whitebirdSplitSeatingAcknowledged,
                             })
                           }
+                          photos={venuePhotos}
                           value={{
                             venue: fields.dineInVenue,
                             adultCount: fields.adultCount,

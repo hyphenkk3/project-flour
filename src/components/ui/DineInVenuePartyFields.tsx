@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { FormCheckbox, FormField, FormInput } from "@/components/ui/form";
 import type { DineInVenue } from "@/engines/business-calendar/dine-in-hours";
 import {
@@ -17,6 +18,11 @@ import {
   shouldShowHyphenCombineNote,
   shouldShowWhitebirdSplitSeatingWarning,
 } from "@/engines/orders/dine-in-party";
+import {
+  dineInVenuePhoto,
+  type DineInVenuePhoto,
+  type DineInVenuePhotoMap,
+} from "@/engines/orders/dine-in-venue-photos";
 
 export type DineInVenuePartyFieldsValue = {
   venue: string;
@@ -32,7 +38,25 @@ type DineInVenuePartyFieldsProps = {
   onChange: (next: DineInVenuePartyFieldsValue) => void;
   requireAcknowledgement?: boolean;
   idPrefix?: string;
+  photos?: DineInVenuePhotoMap | null;
 };
+
+function VenueCardPhoto({ photo }: { photo: DineInVenuePhoto }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    <span className="bg-fog mb-2 block h-16 w-full overflow-hidden rounded-md">
+      {/* Library public URL; hide if the file cannot be loaded. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        alt={photo.alt}
+        className="h-16 w-full object-cover"
+        onError={() => setFailed(true)}
+        src={photo.src}
+      />
+    </span>
+  );
+}
 
 function patchValue(
   current: DineInVenuePartyFieldsValue,
@@ -56,6 +80,7 @@ export function DineInVenuePartyFields({
   onChange,
   requireAcknowledgement = true,
   idPrefix = "",
+  photos = null,
 }: DineInVenuePartyFieldsProps) {
   const parsed = parseDineInPartyCounts(value);
   const total = parsed.ok ? parsed.counts.totalGuestCount : 0;
@@ -84,7 +109,13 @@ export function DineInVenuePartyFields({
           <div className="grid gap-2">
             {venues.map((venue, index) => {
               const copy = DINE_IN_VENUE_CUSTOMER_COPY[venue];
-              const photoSrc = DINE_IN_VENUE_PHOTO_SRC[venue];
+              const linkedPhoto = dineInVenuePhoto(photos, venue);
+              const fallbackSrc = DINE_IN_VENUE_PHOTO_SRC[venue];
+              const photo =
+                linkedPhoto ??
+                (fallbackSrc
+                  ? { src: fallbackSrc, alt: copy.name }
+                  : null);
               const selected = value.venue === venue;
               return (
                 <label
@@ -103,13 +134,7 @@ export function DineInVenuePartyFields({
                     value={venue}
                   />
                   <span className="min-w-0 flex-1">
-                    {photoSrc ? (
-                      <span
-                        aria-hidden="true"
-                        className="bg-fog mb-2 block h-16 w-full overflow-hidden rounded-md bg-cover bg-center"
-                        style={{ backgroundImage: `url(${photoSrc})` }}
-                      />
-                    ) : null}
+                    {photo ? <VenueCardPhoto photo={photo} /> : null}
                     <span className="text-ink block text-sm font-medium tracking-[0.08em] uppercase">
                       {copy.name}
                     </span>

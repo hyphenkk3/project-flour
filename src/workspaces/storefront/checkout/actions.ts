@@ -3,6 +3,8 @@
 import { ORDERS_CLOSED_RPC_MESSAGE } from "@/engines/business-calendar/order-availability";
 import { isValidDeliverySlot } from "@/engines/business-calendar/delivery-hours";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
+import { loadDineInVenuePhotos } from "@/workspaces/storefront/dine-in/queries";
+import type { DineInVenuePhotoMap } from "@/engines/orders/dine-in-venue-photos";
 import {
   isValidDineInReservationPair,
   isValidDineInSlot,
@@ -790,6 +792,7 @@ export type CheckoutCalendarContext = {
   closedDates: string[];
   entrySpecialUnavailableDates: string[];
   hoursSnapshot: OperatingHoursSnapshot;
+  venuePhotos: DineInVenuePhotoMap;
   maxPickupDate: string | null;
   minPickupDate: string;
   pickupScopeConstrainsBounds: boolean;
@@ -811,14 +814,16 @@ export async function loadCheckoutCalendarContext(input: {
     ...new Set((input.cakeIds ?? []).map((id) => id.trim()).filter(Boolean)),
   ];
   const earliest = earliestPickupDateYmd();
-  const [catalogues, specials, hoursSnapshot, memberships] = await Promise.all([
-    listOrderableMonthlyCatalogues(),
-    listCustomerSpecialCatalogues(),
-    loadOperatingHoursSnapshot(),
-    cakeIds.length > 0
-      ? getCustomerCakePickupMemberships(cakeIds)
-      : Promise.resolve([]),
-  ]);
+  const [catalogues, specials, hoursSnapshot, memberships, venuePhotos] =
+    await Promise.all([
+      listOrderableMonthlyCatalogues(),
+      listCustomerSpecialCatalogues(),
+      loadOperatingHoursSnapshot(),
+      cakeIds.length > 0
+        ? getCustomerCakePickupMemberships(cakeIds)
+        : Promise.resolve([]),
+      loadDineInVenuePhotos(),
+    ]);
   const globalMax = latestOrderableCataloguePickupEnd(
     catalogues.map((catalogue) => catalogue.month ?? ""),
   );
@@ -880,6 +885,7 @@ export async function loadCheckoutCalendarContext(input: {
     closedDates,
     entrySpecialUnavailableDates,
     hoursSnapshot,
+    venuePhotos,
     maxPickupDate: scope.maxPickupDate,
     minPickupDate: scope.minPickupDate,
     pickupScopeConstrainsBounds: scope.scopeConstrainsBounds,

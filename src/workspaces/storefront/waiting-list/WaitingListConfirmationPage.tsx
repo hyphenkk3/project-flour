@@ -50,6 +50,7 @@ export async function WaitingListConfirmationPage({
             guestPhone={model.guestPhone}
             hoursSnapshot={model.hoursSnapshot}
             items={model.items}
+            venuePhotos={model.venuePhotos}
             optionsReady={model.optionsReady}
             paidAddonOptions={model.paidAddonOptions}
             pickupDate={model.pickupDate}

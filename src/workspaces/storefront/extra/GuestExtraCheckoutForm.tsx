@@ -15,6 +15,10 @@ import {
 } from "@/components/ui/form";
 import { DineInVenuePartyFields } from "@/components/ui/DineInVenuePartyFields";
 import {
+  EMPTY_DINE_IN_VENUE_PHOTOS,
+  type DineInVenuePhotoMap,
+} from "@/engines/orders/dine-in-venue-photos";
+import {
   availableDineInVenues,
   dineInVenueLabel,
   parseDineInVenue,
@@ -108,11 +112,13 @@ const initialState: ExtraOrderState = { error: null };
 type GuestExtraCheckoutFormProps = {
   hoursSnapshot?: OperatingHoursSnapshot;
   preparationConfig?: FreshPicksPreparationConfig;
+  venuePhotos?: DineInVenuePhotoMap;
 };
 
 export function GuestExtraCheckoutForm({
   hoursSnapshot = OPERATING_HOURS_SEED,
   preparationConfig = DEFAULT_FRESH_PICKS_PREPARATION_CONFIG,
+  venuePhotos = EMPTY_DINE_IN_VENUE_PHOTOS,
 }: GuestExtraCheckoutFormProps) {
   const cart = useFreshPickCart();
   const [state, formAction, pending] = useActionState(
@@ -659,6 +665,7 @@ export function GuestExtraCheckoutForm({
                       next.whitebirdSplitSeatingAcknowledged,
                     );
                   }}
+                  photos={venuePhotos}
                   value={{
                     venue: resolvedVenue || dineInVenue,
                     adultCount,

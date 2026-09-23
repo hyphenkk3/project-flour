@@ -1,14 +1,16 @@
 import { StorefrontHomeLink } from "@/workspaces/storefront/StorefrontBrand";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
+import { loadDineInVenuePhotos } from "@/workspaces/storefront/dine-in/queries";
 import { GuestExtraCheckoutForm } from "@/workspaces/storefront/extra/GuestExtraCheckoutForm";
 import { loadFreshPicksPreparationConfig } from "@/workspaces/storefront/extra/config";
 
 export const dynamic = "force-dynamic";
 
 export async function StorefrontExtraCheckoutPage() {
-  const [hoursSnapshot, preparationConfig] = await Promise.all([
+  const [hoursSnapshot, preparationConfig, venuePhotos] = await Promise.all([
     loadOperatingHoursSnapshot(),
     loadFreshPicksPreparationConfig(),
+    loadDineInVenuePhotos(),
   ]);
 
   return (
@@ -25,6 +27,7 @@ export async function StorefrontExtraCheckoutPage() {
         <GuestExtraCheckoutForm
           hoursSnapshot={hoursSnapshot}
           preparationConfig={preparationConfig}
+          venuePhotos={venuePhotos}
         />
       </div>
     </main>

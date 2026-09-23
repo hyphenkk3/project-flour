@@ -49,6 +49,7 @@ import {
 } from "@/workspaces/storefront/checkout/actions";
 import { createClient } from "@/lib/supabase/server";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
+import type { DineInVenuePhotoMap } from "@/engines/orders/dine-in-venue-photos";
 import type { CustomerWebsiteFulfilmentMethod } from "@/engines/orders/fulfilment";
 
 export type WaitingListConfirmationState = {
@@ -66,6 +67,7 @@ export type WaitingListConfirmationPageModel =
       pickupDate: string;
       items: WaitingListConfirmationDisplayItem[];
       hoursSnapshot: OperatingHoursSnapshot;
+      venuePhotos: DineInVenuePhotoMap;
       complimentaryOptions: CustomerComplimentaryOption[];
       paidAddonOptions: CustomerPaidAddonOption[];
       optionsReady: boolean;
@@ -205,6 +207,7 @@ export async function loadWaitingListConfirmationPage(
     pickupDate,
     items,
     hoursSnapshot: calendar.hoursSnapshot,
+    venuePhotos: calendar.venuePhotos,
     complimentaryOptions: offer.complimentaryOptions,
     paidAddonOptions: offer.paidAddonOptions,
     optionsReady: offer.optionsReady,

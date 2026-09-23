@@ -25,7 +25,7 @@ export const DINE_IN_VENUE_CUSTOMER_COPY = {
   },
 } as const;
 
-/** Existing project assets have no dedicated Hyphen/Whitebird venue photos. */
+/** Hardcoded photo fallback only. Live cards use dine_in_venue_assets. */
 export const DINE_IN_VENUE_PHOTO_SRC: Record<DineInVenue, string | null> = {
   hyphen: null,
   whitebird: null,

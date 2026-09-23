@@ -68,6 +68,10 @@ import {
   type WaitingListConfirmationState,
 } from "@/workspaces/storefront/waiting-list/confirmation-actions";
 import { formatShortBusinessDate } from "@/lib/dates";
+import {
+  EMPTY_DINE_IN_VENUE_PHOTOS,
+  type DineInVenuePhotoMap,
+} from "@/engines/orders/dine-in-venue-photos";
 
 type WaitingListConfirmationFormProps = {
   token: string;
@@ -77,6 +81,7 @@ type WaitingListConfirmationFormProps = {
   pickupDate: string;
   items: WaitingListConfirmationDisplayItem[];
   hoursSnapshot: OperatingHoursSnapshot;
+  venuePhotos?: DineInVenuePhotoMap;
   complimentaryOptions: CustomerComplimentaryOption[];
   paidAddonOptions: CustomerPaidAddonOption[];
   optionsReady: boolean;
@@ -92,6 +97,7 @@ export function WaitingListConfirmationForm({
   pickupDate,
   items,
   hoursSnapshot,
+  venuePhotos = EMPTY_DINE_IN_VENUE_PHOTOS,
   complimentaryOptions,
   paidAddonOptions,
   optionsReady,
@@ -329,6 +335,7 @@ export function WaitingListConfirmationForm({
                     next.whitebirdSplitSeatingAcknowledged,
                   );
                 }}
+                photos={venuePhotos}
                 value={{
                   venue: dineInVenue,
                   adultCount,
