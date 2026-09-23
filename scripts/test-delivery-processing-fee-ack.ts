@@ -1,5 +1,6 @@
 /**
  * Customer Delivery processing-fee acknowledgement (fixed RM5).
+ * Global across customer-facing Delivery checkouts.
  * Run: npx tsx scripts/test-delivery-processing-fee-ack.ts
  *
  * Static checks only. Does not mutate catalogues, production, Fresh Picks, or EXTRA.
@@ -27,7 +28,7 @@ import {
   TOTAL_BEFORE_DELIVERY_FEE_LABEL,
 } from "@/engines/orders/delivery-processing-fee-ack";
 import { customerPreorderCommercialTotal } from "@/engines/orders/customer-preorder-options";
-import { buildCheckoutConfirmSnapshot } from "@/workspaces/storefront/checkout/CheckoutConfirmPrompt";
+import { buildCheckoutConfirmSnapshot, buildExtraCheckoutConfirmSnapshot } from "@/workspaces/storefront/checkout/CheckoutConfirmPrompt";
 import { emptyPreorderFields } from "@/workspaces/storefront/checkout/preorder-draft";
 
 function readSrc(rel: string): string {
@@ -56,6 +57,9 @@ const extraCheckoutSrc = readSrc(
 );
 const extraSql = readSrc(
   "supabase/migrations/20260917140000_extra_walk_in_hold.sql",
+);
+const extraAckMigrationSrc = readSrc(
+  "supabase/migrations/20260923080000_guest_extra_delivery_processing_ack.sql",
 );
 const freshPicksSql = readSrc(
   "supabase/migrations/20260916120000_fresh_picks_fulfilment_preparation.sql",
@@ -99,11 +103,67 @@ assert.match(summarySrc, /TOTAL_BEFORE_DELIVERY_FEE_LABEL/);
 assert.match(promptSrc, /DELIVERY_PROCESSING_FEE_LINE_LABEL/);
 assert.match(promptSrc, /DELIVERY_FEE_PENDING_CONFIRM_LABEL/);
 assert.match(promptSrc, /formatRm\(snapshot\.total\)/);
-assert.doesNotMatch(extraActionsSrc, /p_delivery_processing_fee_ack/);
-assert.doesNotMatch(extraFormSrc, /delivery-processing-fee-ack/);
-assert.doesNotMatch(extraCheckoutSrc, /delivery-processing-fee-ack/);
+assert.match(extraActionsSrc, /p_delivery_processing_fee_ack/);
+assert.match(extraActionsSrc, /DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE/);
+assert.match(extraCheckoutSrc, /delivery_processing_fee_ack_json/);
+assert.match(extraCheckoutSrc, /delivery_processing_fee_ack_accepted/);
+assert.match(
+  extraCheckoutSrc,
+  /deliveryAckRequired && !deliveryProcessingFeeAcknowledged/,
+);
+assert.match(extraCheckoutSrc, /setDeliveryProcessingAckSnapshot/);
+assert.match(extraCheckoutSrc, /function applyFulfilment/);
+assert.match(
+  extraCheckoutSrc.slice(
+    extraCheckoutSrc.indexOf("function applyFulfilment"),
+    extraCheckoutSrc.indexOf("function extraConfirmDetails"),
+  ),
+  /setDeliveryProcessingAckSnapshot\(""\)/,
+);
+assert.doesNotMatch(extraCheckoutSrc, /router\.refresh/);
+assert.doesNotMatch(
+  extraCheckoutSrc.slice(
+    extraCheckoutSrc.indexOf('name="delivery_processing_fee_ack_accepted"'),
+    extraCheckoutSrc.indexOf('name="delivery_processing_fee_ack_accepted"') +
+      500,
+  ),
+  /formAction\(|router\.refresh/,
+);
+assert.match(extraCheckoutSrc, /DELIVERY_PROCESSING_FEE_SECTION_TITLE/);
+assert.match(extraCheckoutSrc, /DELIVERY_PROCESSING_FEE_EXPLANATION/);
+assert.match(extraCheckoutSrc, /DELIVERY_FEE_PENDING_EXPLANATION/);
+assert.match(extraCheckoutSrc, /DELIVERY_PROCESSING_FEE_ACK_LABEL/);
+assert.match(extraCheckoutSrc, /DELIVERY_PROCESSING_FEE_LINE_LABEL/);
+assert.match(extraCheckoutSrc, /DELIVERY_FEE_PENDING_LABEL/);
+assert.match(extraCheckoutSrc, /TOTAL_BEFORE_DELIVERY_FEE_LABEL/);
+assert.doesNotMatch(extraFormSrc, /delivery_processing_fee_ack/);
 assert.doesNotMatch(extraSql, /p_delivery_processing_fee_ack/);
 assert.doesNotMatch(freshPicksSql, /p_delivery_processing_fee_ack/);
+assert.match(
+  extraAckMigrationSrc,
+  /p_delivery_processing_fee_ack jsonb default null/,
+);
+assert.match(extraAckMigrationSrc, /current_delivery_processing_fee_default\(\)/);
+assert.match(
+  extraAckMigrationSrc,
+  /Please acknowledge the RM5 delivery processing fee before submitting your order/,
+);
+assert.match(
+  extraAckMigrationSrc.slice(
+    0,
+    extraAckMigrationSrc.indexOf("insert into public.orders"),
+  ),
+  /v_method = 'delivery'/,
+);
+assert.match(
+  extraAckMigrationSrc.slice(
+    extraAckMigrationSrc.indexOf("if v_method = 'delivery' then"),
+    extraAckMigrationSrc.indexOf("insert into public.orders"),
+  ),
+  /_assert_fresh_picks_customer_fulfilment/,
+);
+assert.match(extraAckMigrationSrc, /extra_walk_in_hold_is_active/);
+assert.match(extraAckMigrationSrc, /pickup_available_from_at/);
 assert.doesNotMatch(
   priceAckSrc,
   /deliveryProcessingFeeAck|DELIVERY_PROCESSING_FEE_ACK/,
@@ -433,6 +493,77 @@ assert.match(validationSrc, /v_delivery_proc_ack_required/);
 assert.doesNotMatch(
   DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE,
   /operator does not exist|column .* does not exist/i,
+);
+
+const extraAckValidationSrc = extraAckMigrationSrc.slice(
+  extraAckMigrationSrc.indexOf("if v_method = 'delivery' then"),
+  extraAckMigrationSrc.indexOf("insert into public.orders"),
+);
+assert.match(extraAckValidationSrc, /p_delivery_processing_fee_ack is null/);
+assert.match(extraAckValidationSrc, /current_delivery_processing_fee_default\(\)/);
+assert.match(extraAckValidationSrc, /v_delivery_proc_ack_required/);
+assert.match(
+  extraAckValidationSrc,
+  /insert into public.extra_stock|update public.extra_stock/,
+);
+
+const extraPickupSnapshot = buildExtraCheckoutConfirmSnapshot({
+  cakeName: "Avocado Fresh Pick",
+  sizeLabel: '6"',
+  unitPrice: 88,
+  pickupDate: "2026-09-23",
+  pickupTime: "15:00",
+  fulfilmentMethod: "pickup",
+  customerName: "Fresh Pick Pickup",
+  customerPhone: "0123456789",
+  notes: "",
+  paidAddonOptions: [],
+  paidAddonCodes: [],
+  complimentaryOptions: [],
+  complimentaryCodes: [],
+  total: 88,
+});
+assert.equal(extraPickupSnapshot.fulfilmentLabel, "Pickup");
+assert.equal(extraPickupSnapshot.deliveryCharges, null);
+
+const extraDeliverySnapshot = buildExtraCheckoutConfirmSnapshot({
+  cakeName: "Avocado Fresh Pick",
+  sizeLabel: '6"',
+  unitPrice: 88,
+  pickupDate: "2026-09-23",
+  pickupTime: "15:00",
+  fulfilmentMethod: "delivery",
+  fulfilmentDetails: ["1 Test Road, 88000, Kota Kinabalu, Sabah"],
+  customerName: "Fresh Pick Delivery",
+  customerPhone: "0123456789",
+  notes: "",
+  paidAddonOptions: [],
+  paidAddonCodes: [],
+  complimentaryOptions: [],
+  complimentaryCodes: [],
+  total: 88,
+});
+assert.equal(extraDeliverySnapshot.fulfilmentLabel, "Delivery");
+assert.equal(extraDeliverySnapshot.deliveryCharges?.processingFee, 5);
+assert.equal(extraDeliverySnapshot.deliveryCharges?.itemsSubtotal, 88);
+assert.equal(
+  extraDeliverySnapshot.deliveryCharges?.totalBeforeDeliveryFee,
+  93,
+);
+assert.match(promptSrc, /DELIVERY_PROCESSING_FEE_LINE_LABEL/);
+assert.match(promptSrc, /DELIVERY_FEE_PENDING_CONFIRM_LABEL/);
+
+const waitingListFormSrc = readSrc(
+  "src/workspaces/storefront/waiting-list/WaitingListConfirmationForm.tsx",
+);
+const waitingListActionSrc = readSrc(
+  "src/workspaces/storefront/waiting-list/confirmation-actions.ts",
+);
+assert.doesNotMatch(waitingListFormSrc, /delivery_processing_fee_ack/);
+assert.doesNotMatch(waitingListActionSrc, /p_delivery_processing_fee_ack/);
+assert.match(
+  waitingListActionSrc,
+  /submit_waiting_list_confirmation/,
 );
 
 console.log("PASS delivery processing fee acknowledgement");

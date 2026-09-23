@@ -11,6 +11,12 @@ import {
 } from "@/engines/extra/customer-fresh-picks";
 import { isValidExtraCustomerFulfilment } from "@/engines/extra/fresh-picks-fulfilment";
 import {
+  DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE,
+  deliveryProcessingFeeAckMatchesAuthority,
+  isDeliveryProcessingFeeAckError,
+  parseDeliveryProcessingFeeAckPayload,
+} from "@/engines/orders/delivery-processing-fee-ack";
+import {
   buildCreateStaffFulfilmentRpcParams,
   OWNER_DELIVERY_CITY,
   OWNER_DELIVERY_STATE,
@@ -41,6 +47,18 @@ export type ExtraOrderState = {
   error: string | null;
   orderId?: string;
 };
+
+function parseDeliveryProcessingFeeAck(formData: FormData) {
+  const raw = String(
+    formData.get("delivery_processing_fee_ack_json") ?? "",
+  ).trim();
+  if (!raw) return null;
+  try {
+    return parseDeliveryProcessingFeeAckPayload(JSON.parse(raw) as unknown);
+  } catch {
+    return null;
+  }
+}
 
 function parseComplimentaryOptions(
   rows: unknown,
@@ -249,6 +267,15 @@ export async function submitGuestExtraOrderAction(
     }).p_delivery;
   }
 
+  const deliveryProcessingAck = parseDeliveryProcessingFeeAck(formData);
+  const deliveryAckCheck = deliveryProcessingFeeAckMatchesAuthority({
+    payload: deliveryProcessingAck,
+    fulfilmentMethod,
+  });
+  if (!deliveryAckCheck.ok) {
+    return { error: DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE };
+  }
+
   const { complimentaryOptions, paidAddonOptions } =
     await loadExtraCustomerOptions(pickupDate);
   const allowedComplimentary = new Set(
@@ -295,6 +322,9 @@ export async function submitGuestExtraOrderAction(
     p_fulfilment_method: fulfilmentMethod,
     p_delivery: deliveryPayload,
     p_dine_in: dineInPayload,
+    ...(fulfilmentMethod === "delivery"
+      ? { p_delivery_processing_fee_ack: deliveryProcessingAck }
+      : {}),
   });
 
   if (error) {
@@ -303,6 +333,9 @@ export async function submitGuestExtraOrderAction(
       if (!stillAvailable || stillAvailable.walkInHeld) {
         return { error: extraCartItemUnavailableMessage(extra.cakeName) };
       }
+    }
+    if (isDeliveryProcessingFeeAckError(error.message)) {
+      return { error: DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE };
     }
     return { error: extraSubmitCustomerError(error.message) };
   }

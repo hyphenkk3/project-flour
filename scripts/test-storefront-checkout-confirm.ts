@@ -349,6 +349,27 @@ assert.equal(extraSnapshot.lines[1]?.linePrice, 3);
 assert.equal(extraSnapshot.lines[2]?.name, "Cake Knife");
 assert.equal(extraSnapshot.lines[2]?.complimentary, true);
 assert.equal(extraSnapshot.total, 91);
+assert.equal(extraSnapshot.deliveryCharges, null);
 assert.match(promptSrc, /Complimentary/);
+
+const extraDeliverySnapshot = buildExtraCheckoutConfirmSnapshot({
+  cakeName: "Avocado Fresh Pick",
+  sizeLabel: '6"',
+  unitPrice: 88,
+  pickupDate: "2026-09-08",
+  pickupTime: "15:00",
+  fulfilmentMethod: "delivery",
+  customerName: "QA Extra Confirm",
+  customerPhone: "0123456789",
+  notes: "",
+  paidAddonOptions: [],
+  paidAddonCodes: [],
+  complimentaryOptions: [],
+  complimentaryCodes: [],
+  total: 88,
+});
+assert.equal(extraDeliverySnapshot.fulfilmentLabel, "Delivery");
+assert.equal(extraDeliverySnapshot.deliveryCharges?.processingFee, 5);
+assert.equal(extraDeliverySnapshot.deliveryCharges?.totalBeforeDeliveryFee, 93);
 
 console.log("PASS storefront checkout confirmation");

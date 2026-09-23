@@ -215,6 +215,10 @@ export function buildExtraCheckoutConfirmSnapshot(input: {
     notes: input.notes.trim(),
     lines: [...cakeLines, ...addonLines, ...complimentaryLines],
     total: input.total,
+    deliveryCharges: checkoutDeliveryChargesBreakdown({
+      fulfilmentMethod: input.fulfilmentMethod ?? "pickup",
+      itemsSubtotal: input.total,
+    }),
   };
 }
 

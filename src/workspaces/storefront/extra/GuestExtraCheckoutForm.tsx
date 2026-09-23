@@ -53,8 +53,25 @@ import {
   workspaceScheduleTimeLabel,
   type CustomerWebsiteFulfilmentMethod,
 } from "@/engines/orders/fulfilment";
-import { FulfilmentMethodChooser } from "@/workspaces/storefront/checkout/FulfilmentMethodChooser";
+import {
+  buildDeliveryProcessingFeeAckPayload,
+  checkoutDeliveryChargesBreakdown,
+  DELIVERY_FEE_LINE_LABEL,
+  DELIVERY_FEE_PENDING_EXPLANATION,
+  DELIVERY_FEE_PENDING_LABEL,
+  DELIVERY_PROCESSING_FEE_ACK_LABEL,
+  DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE,
+  DELIVERY_PROCESSING_FEE_EXPLANATION,
+  DELIVERY_PROCESSING_FEE_LINE_LABEL,
+  DELIVERY_PROCESSING_FEE_SECTION_TITLE,
+  deliveryProcessingFeeAckRequired,
+  deliveryProcessingFeeAckSatisfied,
+  deliveryProcessingFeeAckSnapshot,
+  ITEMS_SUBTOTAL_LABEL,
+  TOTAL_BEFORE_DELIVERY_FEE_LABEL,
+} from "@/engines/orders/delivery-processing-fee-ack";
 import { OPTIONAL_NOTES_CUSTOMER_WARNING } from "@/engines/orders/order-guide";
+import { FulfilmentMethodChooser } from "@/workspaces/storefront/checkout/FulfilmentMethodChooser";
 import {
   customerPaidAddonMessageRequired,
   customerPaidAddonMessageVisible,
@@ -156,6 +173,9 @@ export function GuestExtraCheckoutForm({
   );
   const [selectedDate, setSelectedDate] = useState(pickupDate);
   const [selectedTime, setSelectedTime] = useState(pickupTime);
+  const [deliveryProcessingAckSnapshot, setDeliveryProcessingAckSnapshot] =
+    useState("");
+  const [clientError, setClientError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!cart) return;
@@ -273,6 +293,27 @@ export function GuestExtraCheckoutForm({
           hoursSnapshot,
         )
       : "";
+  const deliveryAckRequired = deliveryProcessingFeeAckRequired(resolvedMethod);
+  const deliveryProcessingFeeAcknowledged = deliveryProcessingFeeAckSatisfied({
+    fulfilmentMethod: resolvedMethod,
+    acknowledgedSnapshot: deliveryProcessingAckSnapshot,
+  });
+  const deliveryProcessingFeeAckJson =
+    deliveryAckRequired && deliveryProcessingFeeAcknowledged
+      ? JSON.stringify(buildDeliveryProcessingFeeAckPayload())
+      : "";
+  const deliveryCharges = checkoutDeliveryChargesBreakdown({
+    fulfilmentMethod: resolvedMethod,
+    itemsSubtotal: displayedTotal,
+  });
+
+  function applyFulfilment(next: CustomerWebsiteFulfilmentMethod) {
+    if (next !== "delivery") {
+      setDeliveryProcessingAckSnapshot("");
+      setClientError(null);
+    }
+    setFulfilmentMethod(next);
+  }
 
   function extraConfirmDetails(): string[] {
     if (resolvedMethod === "dine_in") {
@@ -362,6 +403,11 @@ export function GuestExtraCheckoutForm({
     if (!form.reportValidity()) return;
     persistCheckoutFields(form);
     const data = new FormData(form);
+    if (deliveryAckRequired && !deliveryProcessingFeeAcknowledged) {
+      setClientError(DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE);
+      return;
+    }
+    setClientError(null);
     pendingSubmitRef.current = data;
     setConfirmSnapshot(
       buildExtraCheckoutConfirmSnapshot({
@@ -388,6 +434,11 @@ export function GuestExtraCheckoutForm({
 
   function confirmOrder() {
     if (pending || state.orderId) return;
+    if (deliveryAckRequired && !deliveryProcessingFeeAcknowledged) {
+      setConfirmOpen(false);
+      setClientError(DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE);
+      return;
+    }
     const formData = pendingSubmitRef.current;
     if (!formData) return;
     formAction(formData);
@@ -450,6 +501,11 @@ export function GuestExtraCheckoutForm({
           value={timeStillValid ? selectedTime : ""}
         />
         <input name="fulfilment_method" type="hidden" value={resolvedMethod} />
+        <input
+          name="delivery_processing_fee_ack_json"
+          type="hidden"
+          value={deliveryProcessingFeeAckJson}
+        />
 
         <section className="space-y-3">
           <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
@@ -478,9 +534,28 @@ export function GuestExtraCheckoutForm({
             {formatShortBusinessDate(selectedDate) || selectedDate} ·{" "}
             {formatPickupTime(timeStillValid ? selectedTime : "")}
           </p>
-          <p className="text-ink text-sm font-semibold">
-            Total · {formatRm(displayedTotal)}
-          </p>
+          {deliveryCharges ? (
+            <div className="space-y-1.5">
+              <p className="text-ink text-sm">
+                {ITEMS_SUBTOTAL_LABEL} · {formatRm(deliveryCharges.itemsSubtotal)}
+              </p>
+              <p className="text-ink text-sm">
+                {DELIVERY_PROCESSING_FEE_LINE_LABEL} ·{" "}
+                {formatRm(deliveryCharges.processingFee)}
+              </p>
+              <p className="text-skyline text-sm">
+                {DELIVERY_FEE_LINE_LABEL} · {DELIVERY_FEE_PENDING_LABEL}
+              </p>
+              <p className="text-ink text-sm font-semibold">
+                {TOTAL_BEFORE_DELIVERY_FEE_LABEL} ·{" "}
+                {formatRm(deliveryCharges.totalBeforeDeliveryFee)}
+              </p>
+            </div>
+          ) : (
+            <p className="text-ink text-sm font-semibold">
+              Total · {formatRm(displayedTotal)}
+            </p>
+          )}
         </section>
 
         <section className="space-y-3">
@@ -504,7 +579,7 @@ export function GuestExtraCheckoutForm({
                   fulfilmentMethod,
                   fulfilmentContext,
                 );
-                setFulfilmentMethod(nextMethod);
+                applyFulfilment(nextMethod);
                 const nextSlots = freshPicksMethodAvailability(
                   nextMethod,
                   next,
@@ -536,7 +611,7 @@ export function GuestExtraCheckoutForm({
               methodStates={methodStates}
               onChange={(value) => {
                 const next = parseCustomerWebsiteFulfilmentMethod(value);
-                setFulfilmentMethod(next);
+                applyFulfilment(next);
                 const nextSlots = freshPicksMethodAvailability(
                   next,
                   selectedDate,
@@ -701,6 +776,30 @@ export function GuestExtraCheckoutForm({
                   value={recipientNotifyPreference}
                 />
               ) : null}
+              <div className="space-y-3">
+                <p className="text-ink text-sm font-medium">
+                  {DELIVERY_PROCESSING_FEE_SECTION_TITLE}
+                </p>
+                <p className="text-ink text-sm leading-relaxed">
+                  {DELIVERY_PROCESSING_FEE_EXPLANATION}
+                </p>
+                <p className="text-ink text-sm leading-relaxed">
+                  {DELIVERY_FEE_PENDING_EXPLANATION}
+                </p>
+                <FormCheckbox
+                  checked={deliveryProcessingFeeAcknowledged}
+                  label={DELIVERY_PROCESSING_FEE_ACK_LABEL}
+                  name="delivery_processing_fee_ack_accepted"
+                  onChange={(event) => {
+                    setDeliveryProcessingAckSnapshot(
+                      event.target.checked
+                        ? deliveryProcessingFeeAckSnapshot()
+                        : "",
+                    );
+                    if (event.target.checked) setClientError(null);
+                  }}
+                />
+              </div>
             </div>
           ) : null}
         </section>
@@ -860,11 +959,14 @@ export function GuestExtraCheckoutForm({
           />
         </section>
 
-        <FormError message={state.error} />
+        <FormError message={clientError ?? state.error} />
 
         <FormActions>
           <FormSubmitButton
-            disabled={confirmOpen}
+            disabled={
+              confirmOpen ||
+              (deliveryAckRequired && !deliveryProcessingFeeAcknowledged)
+            }
             pending={pending || Boolean(state.orderId)}
           >
             Place order
