@@ -45,7 +45,7 @@ function VenueCardPhoto({ photo }: { photo: DineInVenuePhoto }) {
   const [failed, setFailed] = useState(false);
   if (failed) return null;
   return (
-    <span className="bg-fog mb-2 block aspect-[16/7] w-full min-w-0 overflow-hidden rounded-md">
+    <span className="bg-fog mb-1.5 block aspect-[2/1] w-full min-w-0 overflow-hidden rounded-md">
       {/* Library public URL; hide if the file cannot be loaded. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -119,7 +119,7 @@ export function DineInVenuePartyFields({
               const selected = value.venue === venue;
               return (
                 <label
-                  className={`flex min-h-12 cursor-pointer gap-3 rounded-lg border bg-white p-3 ${
+                  className={`flex min-h-12 cursor-pointer gap-2.5 rounded-lg border bg-white p-2.5 ${
                     selected ? "border-[var(--color-signal)]" : "border-fog"
                   }`}
                   key={venue}
