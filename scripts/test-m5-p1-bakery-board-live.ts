@@ -116,12 +116,19 @@ async function main() {
   }
 
   try {
+    const { data: ownerRole } = await admin
+      .from("roles")
+      .select("id")
+      .eq("code", "owner")
+      .maybeSingle();
     const { data: staff } = await admin
       .from("staff_profiles")
       .select("id")
+      .eq("role_id", ownerRole?.id ?? "")
+      .eq("is_active", true)
       .limit(1)
       .maybeSingle();
-    if (!staff?.id) throw new Error("No staff_profiles row");
+    if (!staff?.id) throw new Error("No active Owner staff_profiles row");
 
     const { data: sizes } = await admin
       .from("library_cake_sizes")

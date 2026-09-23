@@ -221,6 +221,9 @@ function StaffAdminMemberCard({
     formData.set("staffId", member.id);
     formData.set("isActive", nextActive ? "true" : "false");
     const result = await run(() => setManagedStaffActiveAction(formData));
+    if (result.warning) {
+      setWarning(result.warning);
+    }
     if (!result.error) {
       setMessage(
         nextActive

@@ -208,6 +208,10 @@ assert.match(adminActions, /transferMasterOwnerAction/);
 assert.match(adminActions, /transfer_master_owner/);
 assert.match(adminActions, /p_actor_staff_id:\s*actor\.id/);
 assert.match(adminActions, /staffAdminDeactivateError/);
+assert.equal(
+  STAFF_ADMIN_COPY.deactivateSessionWarning,
+  "The staff member is deactivated, but existing sessions could not be signed out.",
+);
 assert.match(adminActions, /staffAdminArchiveError/);
 assert.match(adminActions, /staffAdminRestoreError/);
 assert.match(adminActions, /staffAdminRoleChangeError/);
@@ -247,6 +251,15 @@ assert.match(
 assert.match(
   adminActions,
   /export async function setManagedStaffActiveAction[\s\S]*requireStaffAdmin\(\)/,
+);
+assert.match(adminActions, /deactivateSessionWarning/);
+assert.match(
+  adminActions,
+  /export async function setManagedStaffActiveAction[\s\S]*if \(!nextActive\) \{\s*const signOutResult = await signOutStaffGlobally/,
+);
+assert.match(
+  adminActions,
+  /export async function setManagedStaffActiveAction[\s\S]*if \(nextActive\) \{[\s\S]*staffAdminActivateError/,
 );
 assert.match(
   adminActions,
@@ -325,6 +338,10 @@ const directory = readFileSync(
 assert.match(directory, /updateManagedStaffUsernameAction/);
 assert.match(directory, /updateManagedStaffRoleAction/);
 assert.match(directory, /setManagedStaffActiveAction/);
+assert.match(
+  directory,
+  /setManagedStaffActiveAction[\s\S]*if \(result\.warning\) \{[\s\S]*setWarning\(result\.warning\)/,
+);
 assert.match(directory, /transferMasterOwnerAction/);
 assert.match(directory, /Confirm deactivate/);
 assert.match(directory, /Transfer Master Owner/);

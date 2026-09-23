@@ -114,14 +114,17 @@ async function main() {
   }
 
   try {
+    const { data: roles } = await admin.from("roles").select("id, code");
+    const ownerRoleId = (roles ?? []).find((row) => row.code === "owner")?.id;
     const { data: staff } = await admin
       .from("staff_profiles")
       .select("id, role_id")
+      .eq("role_id", ownerRoleId ?? "")
+      .eq("is_active", true)
       .limit(1)
       .maybeSingle();
-    if (!staff?.id) throw new Error("No staff_profiles row");
+    if (!staff?.id) throw new Error("No active Owner staff_profiles row");
 
-    const { data: roles } = await admin.from("roles").select("id, code");
     const roleById = new Map((roles ?? []).map((r) => [r.id, r.code]));
     const actorRole = roleById.get(staff.role_id) ?? "unknown";
     check(

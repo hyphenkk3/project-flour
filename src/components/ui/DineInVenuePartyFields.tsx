@@ -201,7 +201,7 @@ export function DineInVenuePartyFields({
               id={adultId}
               inputMode="numeric"
               max={50}
-              min={0}
+              min={1}
               name="adult_count"
               onChange={(event) =>
                 onChange(patchValue(value, { adultCount: event.target.value }))

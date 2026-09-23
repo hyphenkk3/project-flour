@@ -753,6 +753,7 @@ async function loadOrderFinancials(orderId: string): Promise<{
   return { adjustments, paymentAllocations, refunds };
 }
 
+/** Order Workspace detail. Guest and CRM-linked orders share verified payment. */
 export async function getGuestOrderById(
   id: string,
 ): Promise<StorefrontOrder | null> {
@@ -761,7 +762,6 @@ export async function getGuestOrderById(
     .from("orders")
     .select(orderSelect)
     .eq("id", id)
-    .is("customer_id", null)
     .maybeSingle();
 
   if (error) {

@@ -6,6 +6,7 @@ import {
   isValidWaitingListWhatsApp,
   waitingListWhatsAppDigits,
 } from "@/engines/waiting-list/phone";
+import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import { createClient } from "@/lib/supabase/server";
 import { parseBusinessDate } from "@/lib/dates";
 import {
@@ -107,6 +108,7 @@ export async function submitGuestWaitingListAction(
     return { error: "Waiting-list request was created but could not be confirmed." };
   }
   await setGuestWaitingListCookie(requestId);
+  scheduleStaffNotificationDispatch();
   redirect(`/order/waiting-list?request=${requestId}`);
 }
 

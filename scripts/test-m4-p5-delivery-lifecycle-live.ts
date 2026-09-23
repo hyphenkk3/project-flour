@@ -159,12 +159,23 @@ async function main() {
     }
     pass("columns out_for_delivery_at/by + delivered_at/by exist");
 
+    const { data: deliveryRoles, error: deliveryRoleErr } = await admin
+      .from("roles")
+      .select("id")
+      .in("code", ["owner", "manager", "collection", "customer_operations"]);
+    if (deliveryRoleErr) throw deliveryRoleErr;
+    const deliveryRoleIds = (deliveryRoles ?? []).map((row) => row.id);
     const { data: staff, error: staffErr } = await admin
       .from("staff_profiles")
       .select("id")
+      .in("role_id", deliveryRoleIds)
+      .eq("is_active", true)
+      .is("archived_at", null)
       .limit(1)
       .maybeSingle();
-    if (staffErr || !staff?.id) throw new Error("No staff_profiles");
+    if (staffErr || !staff?.id) {
+      throw new Error("No active Collection/Operations staff_profiles");
+    }
 
     const missingOrderProbe = await admin.rpc("mark_guest_order_out_for_delivery", {
       p_order_id: "00000000-0000-0000-0000-000000000001",

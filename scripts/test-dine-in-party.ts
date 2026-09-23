@@ -321,6 +321,9 @@ assert.doesNotMatch(migration, /raise exception 'Whitebird groups above 6/);
 
 const ui = read("src/components/ui/DineInVenuePartyFields.tsx");
 assert.match(ui, /DineInVenuePartyFields/);
+assert.match(ui, /name="adult_count"[\s\S]*?min=\{1\}|min=\{1\}[\s\S]*?name="adult_count"/);
+assert.match(ui, /name="kid_count"[\s\S]*?min=\{0\}|min=\{0\}[\s\S]*?name="kid_count"/);
+assert.match(ui, /name="toddler_count"[\s\S]*?min=\{0\}|min=\{0\}[\s\S]*?name="toddler_count"/);
 assert.match(ui, /Total guests/);
 assert.match(ui, /DINE_IN_WHITEBIRD_GROUP_SIZE_BODY/);
 assert.match(ui, /DINE_IN_BABY_CHAIR_NOTICE/);

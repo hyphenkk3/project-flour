@@ -397,6 +397,18 @@ export async function setManagedStaffActiveAction(
     return { error: STAFF_ADMIN_COPY.updateFailed, success: false };
   }
 
+  if (!nextActive) {
+    const signOutResult = await signOutStaffGlobally(admin, target.authUserId);
+    revalidateStaffAdmin();
+    return {
+      error: null,
+      success: true,
+      warning: signOutResult.error
+        ? STAFF_ADMIN_COPY.deactivateSessionWarning
+        : null,
+    };
+  }
+
   revalidateStaffAdmin();
   return { error: null, success: true };
 }

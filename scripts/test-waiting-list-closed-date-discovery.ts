@@ -352,6 +352,7 @@ assert.match(actionSrc, /submit_guest_waiting_list_request/);
 assert.match(actionSrc, /loadCustomerWaitingListAvailability/);
 assert.match(actionSrc, /consolidateWaitingListRequestItems/);
 assert.match(actionSrc, /p_open_to_alternatives: openToAlternatives/);
+assert.match(actionSrc, /scheduleStaffNotificationDispatch\(\)/);
 assert.doesNotMatch(actionSrc, /emit_staff_notification_event/);
 
 const querySrc = readSrc("src/workspaces/storefront/waiting-list/queries.ts");

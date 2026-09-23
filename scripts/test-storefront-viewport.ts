@@ -1,5 +1,5 @@
 /**
- * Public storefront disables pinch-to-zoom; staff layouts do not.
+ * Public storefront keeps a standard accessible viewport.
  * Run: npx tsx scripts/test-storefront-viewport.ts
  *
  * Static only. Pinch gestures cannot be unit-tested here.
@@ -14,10 +14,10 @@ function readSrc(rel: string): string {
 
 const viewportSrc = readSrc("src/workspaces/storefront/storefront-viewport.ts");
 assert.match(viewportSrc, /export const storefrontViewport/);
-assert.match(viewportSrc, /maximumScale: 1/);
-assert.match(viewportSrc, /userScalable: false/);
 assert.match(viewportSrc, /width: "device-width"/);
 assert.match(viewportSrc, /initialScale: 1/);
+assert.doesNotMatch(viewportSrc, /maximumScale/);
+assert.doesNotMatch(viewportSrc, /userScalable/);
 
 const publicLayouts = [
   "src/app/page.tsx",

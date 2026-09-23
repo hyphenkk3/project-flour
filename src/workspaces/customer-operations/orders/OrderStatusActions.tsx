@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import type { OrderDetail } from "@/types/order";
+import { ownerOrderWorkspaceHref } from "@/workspaces/owner/navigation/return-to";
 import {
   cancelOrderAction,
   confirmOrderAction,
   markOrderAwaitingPaymentAction,
   markOrderPendingConfirmationAction,
-  recordOrderPaidAction,
 } from "@/workspaces/customer-operations/orders/actions";
 
 type OrderStatusActionsProps = {
@@ -111,19 +111,15 @@ export function OrderStatusActions({ order }: OrderStatusActionsProps) {
         ) : null}
 
         {canRecordPaid ? (
-          <button
-            className="bg-status-success inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-medium text-white disabled:opacity-60"
-            disabled={pending}
-            onClick={() =>
-              runAction(
-                () => recordOrderPaidAction(order.id),
-                "Payment recorded as paid",
-              )
-            }
-            type="button"
+          <a
+            className="bg-status-success inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-medium text-white"
+            href={ownerOrderWorkspaceHref(
+              order.id,
+              "/customer-operations/orders",
+            )}
           >
-            Record payment paid
-          </button>
+            Record verified payment
+          </a>
         ) : null}
 
         {canCancel ? (

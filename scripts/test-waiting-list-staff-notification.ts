@@ -169,7 +169,12 @@ const guestAction = readSrc(
   "src/workspaces/storefront/waiting-list/actions.ts",
 );
 assert.match(guestAction, /submit_guest_waiting_list_request/);
+assert.match(guestAction, /scheduleStaffNotificationDispatch\(\)/);
 assert.doesNotMatch(guestAction, /emit_staff_notification_event/);
+assert.equal(
+  guestAction.split("scheduleStaffNotificationDispatch()").length - 1,
+  1,
+);
 
 const staffAction = readSrc("src/workspaces/waiting-list/actions.ts");
 assert.match(staffAction, /create_staff_waiting_list_request/);

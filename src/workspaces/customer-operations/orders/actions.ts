@@ -349,6 +349,9 @@ export async function markOrderAwaitingPaymentAction(
   return applyOrderUpdate(orderId, { status: "awaiting_payment" });
 }
 
+export const RECORD_VERIFIED_PAYMENT_REQUIRED =
+  "Record verified payment in the Order Workspace. Direct paid status is no longer used.";
+
 export async function recordOrderPaidAction(
   orderId: string,
 ): Promise<OrderActionState> {
@@ -366,19 +369,7 @@ export async function recordOrderPaidAction(
     return { error: "Payment is already recorded as paid." };
   }
 
-  if (
-    existing.status !== "confirmed" &&
-    existing.status !== "awaiting_payment"
-  ) {
-    return {
-      error: "Confirm the order before recording payment.",
-    };
-  }
-
-  return applyOrderUpdate(orderId, {
-    payment_status: "paid",
-    status: "paid",
-  });
+  return { error: RECORD_VERIFIED_PAYMENT_REQUIRED };
 }
 
 export async function cancelOrderAction(

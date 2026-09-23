@@ -50,6 +50,8 @@ export const STAFF_ADMIN_COPY = {
   archivedStatus: "This staff member is archived and cannot sign in.",
   archiveSessionWarning:
     "The staff member is archived, but existing sessions could not be signed out.",
+  deactivateSessionWarning:
+    "The staff member is deactivated, but existing sessions could not be signed out.",
   cannotResetOwnPassword: "Change your own password in Settings.",
   resetConfirm:
     "Their current password will stop working. They will receive a temporary password and must choose a new password after signing in.",

@@ -1018,6 +1018,10 @@ async function testEmailDelivery() {
     /scheduleStaffNotificationDispatch/,
   );
   assert.match(
+    read("src/workspaces/storefront/waiting-list/actions.ts"),
+    /scheduleStaffNotificationDispatch/,
+  );
+  assert.match(
     read("src/foundation/staff/schedule-staff-notification-dispatch.ts"),
     /after/,
   );

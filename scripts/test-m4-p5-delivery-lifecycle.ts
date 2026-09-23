@@ -581,6 +581,16 @@ assert.ok(
     actionsSrc,
   ),
 );
+
+const bindingSql = readFileSync(
+  resolve(
+    "supabase/migrations/20260923200000_rpc_actor_binding_and_payment_write_lock.sql",
+  ),
+  "utf8",
+);
+assert.match(bindingSql, /_bind_rpc_actor/);
+assert.match(bindingSql, /Not authorized to mark out for delivery/);
+assert.match(bindingSql, /Not authorized to mark delivered/);
 assert.ok(
   /markOrderReadyAction[\s\S]*requireOwner\(\)/.test(actionsSrc),
 );
