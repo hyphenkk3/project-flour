@@ -27,7 +27,10 @@ const notice = read(
 );
 assert.match(notice, /DINE_IN_RESERVATION_NOTES_HEADING/);
 assert.match(notice, /DINE_IN_RESERVATION_RULES/);
-assert.match(notice, /text-status-danger text-sm leading-snug font-bold/);
+assert.match(notice, /text-status-danger space-y-2/);
+assert.match(notice, /text-sm leading-snug font-bold/);
+assert.match(notice, /list-disc space-y-1.5 pl-5 text-sm leading-relaxed/);
+assert.doesNotMatch(notice, /text-ink/);
 assert.doesNotMatch(notice, /FormCheckbox|type="checkbox"/);
 assert.doesNotMatch(
   notice,
