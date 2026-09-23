@@ -4,6 +4,8 @@ import { StaffAdminCreateForm } from "@/components/settings/StaffAdminCreateForm
 import { StaffAdminDirectory } from "@/components/settings/StaffAdminDirectory";
 import { requireStaff } from "@/foundation/auth/session";
 import { canManageStaff } from "@/foundation/navigation/access";
+import { StaffCredentialActivity } from "@/components/settings/StaffCredentialActivity";
+import { listStaffCredentialEventsForAdmin } from "@/foundation/staff/credential-audit";
 import {
   listArchivedStaffProfilesForAdmin,
   listStaffProfilesForAdmin,
@@ -18,10 +20,11 @@ export default async function StaffAdminPage() {
     redirect("/settings");
   }
 
-  const [staff, archivedStaff, roles] = await Promise.all([
+  const [staff, archivedStaff, roles, credentialEvents] = await Promise.all([
     listStaffProfilesForAdmin(),
     listArchivedStaffProfilesForAdmin(),
     listStaffRoles(),
+    listStaffCredentialEventsForAdmin(),
   ]);
 
   return (
@@ -41,6 +44,8 @@ export default async function StaffAdminPage() {
           Create and manage Whitebird staff accounts.
         </p>
       </div>
+
+      <StaffCredentialActivity events={credentialEvents} />
 
       <StaffAdminCreateForm
         actorIsMasterOwner={actor.isMasterOwner}

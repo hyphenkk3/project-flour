@@ -56,7 +56,7 @@ export function StaffUsernameForm({
       const nextUsername = normalizeStaffUsername(username);
       setUsername(nextUsername);
       setSavedUsername(nextUsername);
-      setMessage(STAFF_USERNAME_COPY.success);
+      setMessage(result.warning ?? STAFF_USERNAME_COPY.success);
       router.refresh();
     }
 

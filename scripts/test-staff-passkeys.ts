@@ -165,6 +165,16 @@ assert.match(settingsSource, /registerPasskey/);
 assert.match(settingsSource, /passkey\.list/);
 assert.match(settingsSource, /passkey\.delete/);
 assert.match(settingsSource, /getUser/);
+assert.match(settingsSource, /recordOwnPasskeyCredentialEventAction/);
+assert.match(
+  settingsSource,
+  /registerError[\s\S]*return;[\s\S]*recordOwnPasskeyCredentialEventAction/,
+);
+assert.match(
+  settingsSource,
+  /deleteError[\s\S]*return;[\s\S]*recordOwnPasskeyCredentialEventAction/,
+);
+assert.doesNotMatch(settingsSource, /credential_id|rawId|privateKey/);
 
 const browse = readFileSync(
   resolve("src/workspaces/storefront/catalog/BrowseCakeCatalogue.tsx"),

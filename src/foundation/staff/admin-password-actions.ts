@@ -12,6 +12,10 @@ import {
   type AdminPasswordResetAuthStatus,
   resolveAdminPasswordResetOutcome,
 } from "@/foundation/staff/password-reset-outcome";
+import {
+  recordStaffCredentialEvent,
+  staffCredentialAuditWarning,
+} from "@/foundation/staff/credential-audit";
 import { getStaffProfileByIdForAdmin } from "@/foundation/staff/queries";
 import { generateTemporaryStaffPassword } from "@/foundation/staff/temporary-password";
 import { createServiceClient } from "@/lib/supabase/admin";
@@ -188,12 +192,24 @@ export async function resetManagedStaffPasswordAction(
     return emptyResetResult(error);
   }
 
+  const recorded = await recordStaffCredentialEvent({
+    eventType: "admin_password_reset",
+    actorStaffId: actor.id,
+    subjectStaffId: target.id,
+    metadata: {
+      sign_out_failed: signOutFailed,
+    },
+  });
+
+  const auditWarning = staffCredentialAuditWarning(recorded);
+  const warning = [outcome.warningCopy, auditWarning].filter(Boolean).join(" ");
+
   return {
     error: null,
     success: true,
     temporaryPassword: outcome.returnTemporaryPassword
       ? temporaryPassword
       : null,
-    warning: outcome.warningCopy,
+    warning: warning || null,
   };
 }

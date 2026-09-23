@@ -51,7 +51,7 @@ export function StaffPasswordSettings() {
       setError(result.error);
     } else {
       clearPasswordFields();
-      setMessage(STAFF_PASSWORD_COPY.success);
+      setMessage(result.warning ?? STAFF_PASSWORD_COPY.success);
     }
 
     setSaving(false);

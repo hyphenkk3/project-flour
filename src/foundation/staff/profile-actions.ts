@@ -15,6 +15,10 @@ import {
   staffUsernamesMatch,
   validateStaffUsername,
 } from "@/foundation/staff/username";
+import {
+  recordStaffCredentialEvent,
+  staffCredentialAuditWarning,
+} from "@/foundation/staff/credential-audit";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -26,9 +30,15 @@ function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+export type StaffProfileActionResult = {
+  error: string | null;
+  success: boolean;
+  warning?: string | null;
+};
+
 export async function updateStaffEmailAction(
   formData: FormData,
-): Promise<{ error: string | null; success: boolean }> {
+): Promise<StaffProfileActionResult> {
   const staff = await requireStaff();
 
   const email = normalizeEmail(formData.get("email"));
@@ -92,15 +102,26 @@ export async function updateStaffEmailAction(
     };
   }
 
+  const recorded = await recordStaffCredentialEvent({
+    eventType: "email_changed",
+    actorStaffId: staff.id,
+    subjectStaffId: staff.id,
+    metadata: {
+      old_email: currentEmail,
+      new_email: email,
+    },
+  });
+
   return {
     error: null,
     success: true,
+    warning: staffCredentialAuditWarning(recorded),
   };
 }
 
 export async function updateStaffUsernameAction(
   formData: FormData,
-): Promise<{ error: string | null; success: boolean }> {
+): Promise<StaffProfileActionResult> {
   const staff = await requireStaff();
   const username = normalizeStaffUsername(String(formData.get("username") ?? ""));
 
@@ -137,8 +158,22 @@ export async function updateStaffUsernameAction(
     return { error: STAFF_USERNAME_COPY.failed, success: false };
   }
 
+  const recorded = await recordStaffCredentialEvent({
+    eventType: "username_changed",
+    actorStaffId: staff.id,
+    subjectStaffId: staff.id,
+    metadata: {
+      old_username: staff.username,
+      new_username: username,
+    },
+  });
+
   revalidatePath("/settings");
-  return { error: null, success: true };
+  return {
+    error: null,
+    success: true,
+    warning: staffCredentialAuditWarning(recorded),
+  };
 }
 
 export async function updateStaffDisplayNameAction(
@@ -177,8 +212,8 @@ export async function updateStaffDisplayNameAction(
 
 export async function updateStaffPasswordAction(
   formData: FormData,
-): Promise<{ error: string | null; success: boolean }> {
-  await requireStaff();
+): Promise<StaffProfileActionResult> {
+  const staff = await requireStaff();
 
   const currentPassword = String(formData.get("currentPassword") ?? "");
   const newPassword = String(formData.get("newPassword") ?? "");
@@ -204,5 +239,18 @@ export async function updateStaffPasswordAction(
     return { error: mapPasswordUpdateError(error), success: false };
   }
 
-  return { error: null, success: true };
+  const recorded = await recordStaffCredentialEvent({
+    eventType: "password_changed",
+    actorStaffId: staff.id,
+    subjectStaffId: staff.id,
+    metadata: {
+      source: "self_service",
+    },
+  });
+
+  return {
+    error: null,
+    success: true,
+    warning: staffCredentialAuditWarning(recorded),
+  };
 }

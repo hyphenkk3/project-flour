@@ -49,7 +49,7 @@ export function StaffProfileForm({
     if (result.error) {
       setError(result.error);
     } else {
-      setMessage("Email address updated successfully.");
+      setMessage(result.warning ?? "Email address updated successfully.");
     }
 
     setSaving(false);

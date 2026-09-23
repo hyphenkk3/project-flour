@@ -138,6 +138,18 @@ assert.doesNotMatch(
   /updateStaffPasswordAction[\s\S]*createServiceClient/,
 );
 assert.doesNotMatch(profileActions, /must_change_password/);
+assert.match(
+  profileActions,
+  /updateStaffUsernameAction[\s\S]*eventType:\s*"username_changed"/,
+);
+assert.match(
+  profileActions,
+  /updateStaffEmailAction[\s\S]*eventType:\s*"email_changed"/,
+);
+assert.match(
+  profileActions,
+  /updateStaffPasswordAction[\s\S]*eventType:\s*"password_changed"/,
+);
 
 assert.equal(
   validateForcedPasswordChangeInput({

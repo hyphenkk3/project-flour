@@ -198,6 +198,11 @@ assert.ok(
 );
 assert.match(resetActions, /if \(authStatus === "success"\)/);
 assert.match(resetActions, /emptyResetResult\(error\)/);
+assert.match(resetActions, /eventType:\s*"admin_password_reset"/);
+assert.match(
+  resetActions,
+  /if \(!outcome\.success\) \{[\s\S]*return emptyResetResult[\s\S]*recordStaffCredentialEvent/,
+);
 assert.doesNotMatch(resetActions, /formData\.get\("authUserId"\)/);
 assert.doesNotMatch(resetActions, /formData\.get\("password"\)/);
 assert.doesNotMatch(resetActions, /Math\.random/);

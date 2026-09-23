@@ -16,6 +16,10 @@ import {
   staffAdminTransferError,
   staffAdminUsernameChangeError,
 } from "@/foundation/staff/admin-guards";
+import {
+  recordStaffCredentialEvent,
+  staffCredentialAuditWarning,
+} from "@/foundation/staff/credential-audit";
 import { mapPasswordUpdateError } from "@/foundation/staff/password-update";
 import {
   countActiveOwners,
@@ -254,8 +258,22 @@ export async function updateManagedStaffUsernameAction(
     return { error: STAFF_ADMIN_COPY.updateFailed, success: false };
   }
 
+  const recorded = await recordStaffCredentialEvent({
+    eventType: "username_changed",
+    actorStaffId: actor.id,
+    subjectStaffId: target.id,
+    metadata: {
+      old_username: target.username,
+      new_username: username,
+    },
+  });
+
   revalidateStaffAdmin();
-  return { error: null, success: true };
+  return {
+    error: null,
+    success: true,
+    warning: staffCredentialAuditWarning(recorded),
+  };
 }
 
 export async function updateManagedStaffRoleAction(

@@ -9,6 +9,7 @@ import {
   logPasskeyError,
   passkeySetupMessage,
 } from "@/foundation/auth/passkeys";
+import { recordOwnPasskeyCredentialEventAction } from "@/foundation/staff/credential-audit-actions";
 import { createClient } from "@/lib/supabase/client";
 
 type PasskeyRow = {
@@ -122,6 +123,14 @@ export function StaffPasskeySettings() {
       }
 
       await loadPasskeys();
+      try {
+        await recordOwnPasskeyCredentialEventAction({
+          kind: "added",
+          label: "Passkey",
+        });
+      } catch (auditError) {
+        logPasskeyError("recordOwnPasskeyCredentialEventAction", auditError);
+      }
       setMessage(PASSKEY_COPY.successSetup);
     } catch (registerError) {
       logPasskeyError("registerPasskey", registerError);
@@ -151,8 +160,17 @@ export function StaffPasskeySettings() {
         setError(PASSKEY_COPY.failedDelete);
         return;
       }
+      const removed = passkeys.find((entry) => entry.id === id);
       setConfirmingId(null);
       await loadPasskeys();
+      try {
+        await recordOwnPasskeyCredentialEventAction({
+          kind: "removed",
+          label: removed?.friendlyName || "Passkey",
+        });
+      } catch (auditError) {
+        logPasskeyError("recordOwnPasskeyCredentialEventAction", auditError);
+      }
       setMessage(PASSKEY_COPY.successDelete);
     } catch (deleteError) {
       logPasskeyError("passkey.delete", deleteError);

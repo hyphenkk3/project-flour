@@ -303,6 +303,8 @@ assert.match(staffPage, /listArchivedStaffProfilesForAdmin/);
 assert.match(staffPage, /archivedStaff=\{archivedStaff\}/);
 assert.match(staffPage, /actorIsMasterOwner=\{actor\.isMasterOwner\}/);
 assert.match(staffPage, /actorRole=\{actor\.role\.code\}/);
+assert.match(staffPage, /StaffCredentialActivity/);
+assert.match(staffPage, /listStaffCredentialEventsForAdmin/);
 assert.doesNotMatch(staffPage, /password reset|Passkey/);
 
 const createForm = readFileSync(

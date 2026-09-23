@@ -8,6 +8,7 @@ import {
   mapPasswordUpdateError,
   validateForcedPasswordChangeInput,
 } from "@/foundation/staff/password-update";
+import { recordStaffCredentialEvent } from "@/foundation/staff/credential-audit";
 import { createServiceClient } from "@/lib/supabase/admin";
 
 export type ForcedPasswordChangeResult = {
@@ -74,6 +75,15 @@ export async function completeForcedPasswordChangeAction(
       };
     }
   }
+
+  await recordStaffCredentialEvent({
+    eventType: "password_changed",
+    actorStaffId: staff.id,
+    subjectStaffId: staff.id,
+    metadata: {
+      source: "forced_reset_completion",
+    },
+  });
 
   redirect(resolvePostLoginDestination(staff.role.code));
 }
