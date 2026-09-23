@@ -26,7 +26,9 @@ export function StorefrontFaqPage() {
               <dt className="font-display text-ink text-xl tracking-tight">
                 {item.question}
               </dt>
-              <dd className="text-skyline mt-2 max-w-xl text-sm leading-relaxed whitespace-pre-line">
+              <dd
+                className={`${item.question === "What should I know about dine-in reservations?" ? "text-status-danger" : "text-skyline"} mt-2 max-w-xl text-sm leading-relaxed whitespace-pre-line`}
+              >
                 {item.answer}
               </dd>
             </div>

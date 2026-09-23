@@ -1,10 +1,14 @@
 import type { ReactNode } from "react";
 import { storefrontKickerClass } from "@/workspaces/storefront/StorefrontBrand";
-import { WhatsAppMark } from "@/workspaces/storefront/home/HomeMarks";
+import {
+  InstagramMark,
+  WhatsAppMark,
+} from "@/workspaces/storefront/home/HomeMarks";
 import {
   STOREFRONT_ADDRESS_LINES,
   STOREFRONT_LOCATION_LANDMARK,
   STOREFRONT_LOCATION_NAME,
+  storefrontInstagramHref,
   storefrontMapsHref,
   storefrontWhatsAppHref,
 } from "@/workspaces/storefront/home/storefront-contact";
@@ -17,6 +21,7 @@ type HomeVisitFooterProps = {
 };
 
 export function HomeVisitFooter({ lead }: HomeVisitFooterProps) {
+  const instagramHref = storefrontInstagramHref();
   const whatsappHref = storefrontWhatsAppHref();
   const mapsHref = storefrontMapsHref();
   const addressLines = STOREFRONT_ADDRESS_LINES.filter((line) => line.trim());
@@ -62,19 +67,39 @@ export function HomeVisitFooter({ lead }: HomeVisitFooterProps) {
             </div>
           ) : null}
 
-          {whatsappHref ? (
-            <div className="min-w-0">
-              <p className={storefrontKickerClass}>WhatsApp Us</p>
-              <a
-                className={`${linkClass} mt-2 flex-wrap`}
-                href={whatsappHref}
-                rel="noopener noreferrer"
-                target="_blank"
-              >
-                <WhatsAppMark className="h-3.5 w-3.5 shrink-0" />
-                Chat with us on WhatsApp
-                <span aria-hidden="true">→</span>
-              </a>
+          {instagramHref || whatsappHref ? (
+            <div className="flex min-w-0 flex-col gap-8">
+              {instagramHref ? (
+                <div className="min-w-0">
+                  <p className={storefrontKickerClass}>Instagram</p>
+                  <a
+                    aria-label="Follow us on Instagram"
+                    className={`${linkClass} mt-2 flex-wrap`}
+                    href={instagramHref}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    <InstagramMark className="h-3.5 w-3.5 shrink-0" />
+                    Follow us on Instagram
+                    <span aria-hidden="true">→</span>
+                  </a>
+                </div>
+              ) : null}
+              {whatsappHref ? (
+                <div className="min-w-0">
+                  <p className={storefrontKickerClass}>WhatsApp Us</p>
+                  <a
+                    className={`${linkClass} mt-2 flex-wrap`}
+                    href={whatsappHref}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    <WhatsAppMark className="h-3.5 w-3.5 shrink-0" />
+                    Chat with us on WhatsApp
+                    <span aria-hidden="true">→</span>
+                  </a>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>

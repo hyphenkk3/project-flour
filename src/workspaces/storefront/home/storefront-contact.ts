@@ -38,6 +38,15 @@ export function storefrontMapsHref(): string | null {
   return url ? url : null;
 }
 
+/** Official customer Instagram for the storefront. */
+export const STOREFRONT_INSTAGRAM_URL =
+  "https://www.instagram.com/whitebird.in.kk/";
+
+export function storefrontInstagramHref(): string | null {
+  const url = STOREFRONT_INSTAGRAM_URL.trim();
+  return url ? url : null;
+}
+
 export type StorefrontFaqItem = {
   question: string;
   answer: string;
@@ -88,7 +97,7 @@ export const STOREFRONT_FAQ_ITEMS: readonly StorefrontFaqItem[] = [
   {
     question: "What should I know about dine-in reservations?",
     answer:
-      "Please note:\n- Only light food is available after 5:00 PM on weekends.\n- Specific table requests may not be fulfilled.\n- Your table will be automatically cancelled if you do not arrive within 10 minutes of your reservation time.",
+      "- Only light food is available after 5:00 PM on weekends.\n- Specific table requests may not be fulfilled.\n- Your table will be automatically cancelled if you do not arrive within 10 minutes of your reservation time.",
   },
   {
     question: "What is the relationship between Hyphen and Whitebird?",

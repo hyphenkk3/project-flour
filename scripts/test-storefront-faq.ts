@@ -5,7 +5,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { STOREFRONT_FAQ_ITEMS } from "@/workspaces/storefront/home/storefront-contact";
+import {
+  STOREFRONT_FAQ_ITEMS,
+  STOREFRONT_INSTAGRAM_URL,
+  storefrontInstagramHref,
+} from "@/workspaces/storefront/home/storefront-contact";
 
 const questions = STOREFRONT_FAQ_ITEMS.map((item) => item.question);
 assert.deepEqual(questions, [
@@ -63,7 +67,11 @@ assert.equal(
 );
 assert.equal(
   byQuestion["What should I know about dine-in reservations?"],
-  "Please note:\n- Only light food is available after 5:00 PM on weekends.\n- Specific table requests may not be fulfilled.\n- Your table will be automatically cancelled if you do not arrive within 10 minutes of your reservation time.",
+  "- Only light food is available after 5:00 PM on weekends.\n- Specific table requests may not be fulfilled.\n- Your table will be automatically cancelled if you do not arrive within 10 minutes of your reservation time.",
+);
+assert.doesNotMatch(
+  byQuestion["What should I know about dine-in reservations?"] ?? "",
+  /Please note:/,
 );
 assert.equal(
   byQuestion["What is the relationship between Hyphen and Whitebird?"],
@@ -94,6 +102,31 @@ const faqPage = readFileSync(
 );
 assert.match(faqPage, /STOREFRONT_FAQ_ITEMS/);
 assert.match(faqPage, /whitespace-pre-line/);
+assert.match(faqPage, /text-status-danger/);
 assert.doesNotMatch(faqPage, /accordion/i);
+assert.doesNotMatch(faqPage, /Please note:/);
+
+assert.equal(
+  STOREFRONT_INSTAGRAM_URL,
+  "https://www.instagram.com/whitebird.in.kk/",
+);
+assert.equal(storefrontInstagramHref(), STOREFRONT_INSTAGRAM_URL);
+
+const footer = readFileSync(
+  resolve(process.cwd(), "src/workspaces/storefront/home/HomeVisitFooter.tsx"),
+  "utf8",
+);
+const instagramBlock = footer.indexOf("Instagram");
+const whatsappBlock = footer.indexOf("WhatsApp Us");
+assert.ok(instagramBlock >= 0);
+assert.ok(whatsappBlock > instagramBlock);
+assert.match(footer, /storefrontInstagramHref/);
+assert.match(footer, /Follow us on Instagram/);
+assert.match(footer, /Chat with us on WhatsApp/);
+assert.match(footer, /aria-label="Follow us on Instagram"/);
+assert.match(footer, /rel="noopener noreferrer"/);
+assert.match(footer, /target="_blank"/);
+assert.match(footer, /InstagramMark/);
+assert.match(footer, /WhatsAppMark/);
 
 console.log("test-storefront-faq: ok");

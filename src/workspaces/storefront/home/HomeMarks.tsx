@@ -90,6 +90,30 @@ export function BrowseMark({ className }: HomeMarkProps) {
   );
 }
 
+export function InstagramMark({ className }: HomeMarkProps) {
+  return (
+    <Mark className={className}>
+      <rect
+        height="14"
+        rx="4"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        width="14"
+        x="5"
+        y="5"
+      />
+      <circle
+        cx="12"
+        cy="12"
+        r="3.2"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <circle cx="16.2" cy="7.8" fill="currentColor" r="0.8" />
+    </Mark>
+  );
+}
+
 export function WhatsAppMark({ className }: HomeMarkProps) {
   return (
     <Mark className={className}>
