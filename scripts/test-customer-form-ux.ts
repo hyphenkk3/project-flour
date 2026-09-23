@@ -6,7 +6,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  CUSTOMER_NAME_HELP,
+  CUSTOMER_NAME_SPACE_HINT,
+} from "@/engines/orders/customer-name";
+import { WAITING_LIST_WHATSAPP_NOTE } from "@/engines/waiting-list/phone";
+import {
   CUSTOMER_FORM_HIGHLIGHT_SUMMARY,
+  customerFieldValidityMessage,
   humanValidityMessage,
 } from "@/components/ui/form/customer-form-ux";
 
@@ -54,27 +60,77 @@ assert.match(controls, /role="alert"/);
 assert.match(helper, /focusFirstInvalidField/);
 assert.match(helper, /collectInvalidFieldMessages/);
 assert.match(helper, /scrollIntoView/);
+assert.match(helper, /data-field-label/);
+assert.match(controls, /data-field-label/);
+assert.match(controls, /data-field-help/);
 
 assert.equal(
   CUSTOMER_FORM_HIGHLIGHT_SUMMARY,
   "Please complete the highlighted fields before continuing.",
 );
 assert.equal(
+  CUSTOMER_NAME_HELP,
+  "English / preferred name and surname.",
+);
+assert.equal(
+  CUSTOMER_NAME_SPACE_HINT,
+  "Please leave a space between names.",
+);
+assert.doesNotMatch(CUSTOMER_NAME_HELP, /\.\./);
+assert.doesNotMatch(`${CUSTOMER_NAME_HELP} ${CUSTOMER_NAME_SPACE_HINT}`, /names\.Please/);
+assert.equal(
   humanValidityMessage({ valueMissing: true, typeMismatch: false, patternMismatch: false }, "Name", "enter"),
   "Please enter your name.",
 );
 assert.equal(
   humanValidityMessage({ valueMissing: true, typeMismatch: false, patternMismatch: false }, "WhatsApp phone", "enter"),
-  "Please enter your whatsapp phone.",
+  "Please enter your WhatsApp number.",
 );
 assert.equal(
   humanValidityMessage({ valueMissing: true, typeMismatch: false, patternMismatch: false }, "Venue", "select"),
   "Please select a venue.",
 );
 assert.equal(
+  humanValidityMessage({ valueMissing: true, typeMismatch: false, patternMismatch: false }, "Adults", "enter"),
+  "Please enter the number of adults.",
+);
+assert.equal(
   humanValidityMessage({ valueMissing: false, typeMismatch: true, patternMismatch: false }, "Email", "enter"),
   "Please enter a valid email address.",
 );
+
+const nameError = customerFieldValidityMessage({
+  name: "customer_name",
+  label: `Name ${CUSTOMER_NAME_HELP} ${CUSTOMER_NAME_SPACE_HINT}`,
+  kind: "enter",
+  validity: { valueMissing: true, typeMismatch: false, patternMismatch: false },
+});
+assert.equal(nameError, "Please enter your name.");
+assert.doesNotMatch(nameError, /preferred name/i);
+assert.doesNotMatch(nameError, /leave a space/i);
+assert.doesNotMatch(nameError, /names\./i);
+
+const whatsappError = customerFieldValidityMessage({
+  name: "phone",
+  label: `WhatsApp phone ${WAITING_LIST_WHATSAPP_NOTE}`,
+  kind: "enter",
+  validity: { valueMissing: true, typeMismatch: false, patternMismatch: false },
+});
+assert.equal(whatsappError, "Please enter your WhatsApp number.");
+assert.doesNotMatch(whatsappError, /ensure the WhatsApp number/i);
+assert.doesNotMatch(whatsappError, /regarding your order/i);
+assert.match(whatsappError, /WhatsApp/);
+assert.doesNotMatch(whatsappError, /whatsapp/);
+
+const deliveryError = customerFieldValidityMessage({
+  name: "address_line_1",
+  label: "Address line 1 Optional delivery notes.",
+  kind: "enter",
+  validity: { valueMissing: true, typeMismatch: false, patternMismatch: false },
+});
+assert.equal(deliveryError, "Please enter address line 1.");
+assert.doesNotMatch(deliveryError, /Optional/);
+
 assert.doesNotMatch(helper, /Something went wrong/);
 assert.doesNotMatch(helper, /Validation failed/);
 assert.doesNotMatch(helper, /Invalid input/);

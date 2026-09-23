@@ -64,7 +64,7 @@ export function FulfilmentMethodChooser({
 
   return (
     <fieldset className="space-y-2">
-      <legend className="text-ink text-sm font-medium">
+      <legend className="text-ink text-sm font-medium" data-field-label="">
         How would you like to receive your order?
         <RequiredAsterisk />
       </legend>

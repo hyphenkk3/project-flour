@@ -15,6 +15,7 @@ export {
 export {
   CUSTOMER_FORM_HIGHLIGHT_SUMMARY,
   collectInvalidFieldMessages,
+  customerFieldValidityMessage,
   focusElementById,
   focusFirstInvalidField,
   humanValidityMessage,

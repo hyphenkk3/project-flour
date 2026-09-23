@@ -595,8 +595,10 @@ export function GuestExtraCheckoutForm({
               className="text-ink text-sm font-medium"
               htmlFor="checkout_pickup_date"
             >
-              {workspaceScheduleDateLabel(resolvedMethod)}
-              <RequiredAsterisk />
+              <span data-field-label="">
+                {workspaceScheduleDateLabel(resolvedMethod)}
+                <RequiredAsterisk />
+              </span>
             </label>
             <FormSelect
               aria-invalid={fieldErrors.checkout_pickup_date ? true : undefined}
@@ -667,10 +669,12 @@ export function GuestExtraCheckoutForm({
               className="text-ink text-sm font-medium"
               htmlFor="checkout_pickup_time"
             >
-              {resolvedMethod === "dine_in"
-                ? "Dine-in reservation time"
-                : workspaceScheduleTimeLabel(resolvedMethod)}
-              <RequiredAsterisk />
+              <span data-field-label="">
+                {resolvedMethod === "dine_in"
+                  ? "Dine-in reservation time"
+                  : workspaceScheduleTimeLabel(resolvedMethod)}
+                <RequiredAsterisk />
+              </span>
             </label>
             <FormSelect
               aria-invalid={fieldErrors.checkout_pickup_time ? true : undefined}

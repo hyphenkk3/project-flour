@@ -48,7 +48,7 @@ assert.equal(customerNameValidationError("John Tan"), null);
 assert.equal(customerNameValidationError("Tan Wei Ming"), null);
 assert.equal(customerNameValidationError("Siti Nur"), null);
 assert.equal(customerNameValidationError(""), null);
-assert.equal(CUSTOMER_NAME_HELP, "English / preferred name and surname");
+assert.equal(CUSTOMER_NAME_HELP, "English / preferred name and surname.");
 assert.equal(CUSTOMER_NAME_SPACE_HINT, "Please leave a space between names.");
 assert.equal(
   CUSTOMER_NAME_SURNAME_ERROR,

@@ -127,7 +127,7 @@ export function DineInVenuePartyFields({
           aria-invalid={fieldErrors.dine_in_venue ? true : undefined}
           className="space-y-2"
         >
-          <legend className="text-ink text-sm font-medium">
+          <legend className="text-ink text-sm font-medium" data-field-label="">
             Venue
             {markRequired ? <RequiredAsterisk /> : null}
           </legend>

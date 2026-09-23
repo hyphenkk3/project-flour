@@ -63,6 +63,7 @@ function withFieldAccessibility(
   input: {
     required: boolean;
     error: string | null;
+    helpId?: string;
     errorId?: string;
   },
 ): ReactNode {
@@ -76,7 +77,11 @@ function withFieldAccessibility(
     "aria-required"?: boolean;
     "aria-describedby"?: string;
   }>;
-  const describedBy = [child.props["aria-describedby"], input.error ? input.errorId : null]
+  const describedBy = [
+    child.props["aria-describedby"],
+    input.helpId,
+    input.error ? input.errorId : null,
+  ]
     .filter(Boolean)
     .join(" ");
   return cloneElement(child, {
@@ -98,20 +103,26 @@ export function FormField({
   children,
   className = "",
 }: FormFieldProps) {
+  const helpId = htmlFor && help ? `${htmlFor}-help` : undefined;
   const errorId = htmlFor ? `${htmlFor}-error` : undefined;
   return (
     <label
       className={`${formStyles.labelClass} ${className}`.trim()}
       htmlFor={htmlFor}
     >
-      <span>
+      <span data-field-label="">
         {label}
         {required ? <RequiredAsterisk /> : null}
       </span>
-      {help ? <span className={formStyles.helpClass}>{help}</span> : null}
+      {help ? (
+        <span className={formStyles.helpClass} data-field-help="" id={helpId}>
+          {help}
+        </span>
+      ) : null}
       {withFieldAccessibility(children, {
         required,
         error,
+        helpId,
         errorId,
       })}
       {error ? (
@@ -209,17 +220,18 @@ export function FormCheckbox({
   required,
   ...props
 }: FormCheckboxProps) {
-  const errorId = props.id
-    ? `${props.id}-error`
-    : props.name
-      ? `${props.name}-error`
-      : undefined;
+  const describedName = props.id ?? props.name;
+  const helpId = describedName && help ? `${describedName}-help` : undefined;
+  const errorId = describedName ? `${describedName}-error` : undefined;
+  const describedBy = [helpId, error && errorId ? errorId : null]
+    .filter(Boolean)
+    .join(" ");
   return (
     <label
       className={`border-fog text-ink flex min-h-12 items-center gap-3 rounded-lg border bg-white px-3 text-sm ${className}`.trim()}
     >
       <input
-        aria-describedby={error && errorId ? errorId : undefined}
+        aria-describedby={describedBy || undefined}
         aria-invalid={error ? true : undefined}
         className="size-4 accent-[var(--color-signal)]"
         required={required}
@@ -227,10 +239,18 @@ export function FormCheckbox({
         {...props}
       />
       <span>
-        {label}
-        {markRequired ? <RequiredAsterisk /> : null}
+        <span data-field-label="">
+          {label}
+          {markRequired ? <RequiredAsterisk /> : null}
+        </span>
         {help ? (
-          <span className={`${formStyles.helpClass} mt-0.5 block`}>{help}</span>
+          <span
+            className={`${formStyles.helpClass} mt-0.5 block`}
+            data-field-help=""
+            id={helpId}
+          >
+            {help}
+          </span>
         ) : null}
         {error ? (
           <span
@@ -272,18 +292,24 @@ export function FormRadioGroup({
   options,
   onChange,
 }: FormRadioGroupProps) {
+  const helpId = help ? `${name}-help` : undefined;
   const errorId = `${name}-error`;
+  const describedBy = [helpId, error ? errorId : null].filter(Boolean).join(" ");
   return (
     <fieldset
-      aria-describedby={error ? errorId : undefined}
+      aria-describedby={describedBy || undefined}
       aria-invalid={error ? true : undefined}
       className="space-y-2"
     >
-      <legend className="text-ink text-sm font-medium">
+      <legend className="text-ink text-sm font-medium" data-field-label="">
         {legend}
         {required ? <RequiredAsterisk /> : null}
       </legend>
-      {help ? <p className={formStyles.helpClass}>{help}</p> : null}
+      {help ? (
+        <p className={formStyles.helpClass} data-field-help="" id={helpId}>
+          {help}
+        </p>
+      ) : null}
       {error ? (
         <p className={formStyles.fieldErrorClass} id={errorId} role="alert">
           {error}
