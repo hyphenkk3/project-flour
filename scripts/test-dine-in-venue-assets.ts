@@ -124,6 +124,10 @@ assert.match(cardSrc, /photos\?: DineInVenuePhotoMap/);
 assert.match(cardSrc, /dineInVenuePhoto\(photos, venue\)/);
 assert.match(cardSrc, /alt=\{photo.alt\}/);
 assert.match(cardSrc, /onError/);
+assert.match(cardSrc, /aspect-\[16\/7\]/);
+assert.match(cardSrc, /object-cover/);
+assert.match(cardSrc, /object-center/);
+assert.doesNotMatch(cardSrc, /h-16/);
 assert.doesNotMatch(cardSrc, /supabase\.co/);
 assert.doesNotMatch(cardSrc, /library-assets\//);
 

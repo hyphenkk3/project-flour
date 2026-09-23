@@ -45,12 +45,12 @@ function VenueCardPhoto({ photo }: { photo: DineInVenuePhoto }) {
   const [failed, setFailed] = useState(false);
   if (failed) return null;
   return (
-    <span className="bg-fog mb-2 block h-16 w-full overflow-hidden rounded-md">
+    <span className="bg-fog mb-2 block aspect-[16/7] w-full min-w-0 overflow-hidden rounded-md">
       {/* Library public URL; hide if the file cannot be loaded. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         alt={photo.alt}
-        className="h-16 w-full object-cover"
+        className="h-full w-full object-cover object-center"
         onError={() => setFailed(true)}
         src={photo.src}
       />
