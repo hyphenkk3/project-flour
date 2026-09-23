@@ -102,7 +102,8 @@ const faqPage = readFileSync(
 );
 assert.match(faqPage, /STOREFRONT_FAQ_ITEMS/);
 assert.match(faqPage, /whitespace-pre-line/);
-assert.match(faqPage, /text-status-danger/);
+assert.match(faqPage, /text-skyline mt-2 max-w-xl text-sm leading-relaxed whitespace-pre-line/);
+assert.doesNotMatch(faqPage, /text-status-danger/);
 assert.doesNotMatch(faqPage, /accordion/i);
 assert.doesNotMatch(faqPage, /Please note:/);
 
