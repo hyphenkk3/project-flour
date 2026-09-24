@@ -102,6 +102,13 @@ function payloadString(
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+/** Development fallback only. Production must set RESEND_FROM to a verified sender. */
+const DEVELOPMENT_RESEND_FROM = "Whitebird <onboarding@resend.dev>";
+
+function staffNotificationResendFrom(): string {
+  return process.env.RESEND_FROM?.trim() || DEVELOPMENT_RESEND_FROM;
+}
+
 export function createResendStaffNotificationMailer(): StaffNotificationMailer {
   return {
     async send(input) {
@@ -113,7 +120,7 @@ export function createResendStaffNotificationMailer(): StaffNotificationMailer {
       const resend = new Resend(apiKey);
       const { data, error } = await resend.emails.send(
         {
-          from: "Whitebird <onboarding@resend.dev>",
+          from: staffNotificationResendFrom(),
           to: [input.to],
           subject: input.subject,
           html: input.html,

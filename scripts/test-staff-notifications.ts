@@ -870,6 +870,8 @@ async function testEmailDelivery() {
   );
   assert.match(dispatchSrc, /createServiceClient/);
   assert.match(dispatchSrc, /RESEND_API_KEY/);
+  assert.match(dispatchSrc, /RESEND_FROM/);
+  assert.match(dispatchSrc, /Whitebird <onboarding@resend.dev>/);
   assert.doesNotMatch(dispatchSrc, /StaffNotificationListener/);
   assert.match(dispatchSrc, /idempotencyKey/);
   assert.match(dispatchSrc, /claim_staff_notification_email_deliveries/);
@@ -969,6 +971,7 @@ async function testEmailDelivery() {
   }
 
   assert.match(read(".env.example"), /RESEND_API_KEY/);
+  assert.match(read(".env.example"), /RESEND_FROM/);
   assert.doesNotMatch(read(".env.example"), /NEXT_PUBLIC_RESEND/);
   const vercelJson = read("vercel.json");
   assert.doesNotMatch(vercelJson, /"crons"/);

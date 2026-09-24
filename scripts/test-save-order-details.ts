@@ -627,7 +627,8 @@ const staffDispatchSrc = readSrc(
 assert.doesNotMatch(staffDispatchSrc, /scheduleGuestPreorderCopyEmail/);
 assert.doesNotMatch(staffDispatchSrc, /guest-preorder-copy/);
 assert.doesNotMatch(staffDispatchSrc, /Save Order Details/);
-assert.match(staffDispatchSrc, /from: "Whitebird <onboarding@resend.dev>"/);
+assert.match(staffDispatchSrc, /RESEND_FROM/);
+assert.match(staffDispatchSrc, /Whitebird <onboarding@resend.dev>/);
 
 const extraFormSrc = readSrc(
   "src/workspaces/storefront/extra/GuestExtraOrderForm.tsx",
