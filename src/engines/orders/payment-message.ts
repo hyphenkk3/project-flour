@@ -182,21 +182,25 @@ export function generatePaymentRequestMessage(
     "Do send us the payment slip WITH Status (Successful etc) once payment is completed ya. 😊";
 
   if (details.method === "wb_qr") {
-    const qrName = payload.wholecakePreorderQr
-      ? "Whitebird Wholecake Preorder Payment QR"
-      : "Whitebird QR code";
+    if (payload.wholecakePreorderQr) {
+      return (
+        `Thank you for confirming. ;)\n\n` +
+        `Here are the payment details:\n\n` +
+        `${amountBlock}\n\n` +
+        `Please make payment using the attached Whitebird Wholecake Preorder Payment QR.\n\n` +
+        `Just a note — this QR is for wholecake preorder payments only. It is not for dine-in, beverages, or other items.\n\n` +
+        `Once payment is completed, please send us the payment slip within 24 hours, with the payment status clearly shown (e.g. “Successful”) ya. 😊`
+      );
+    }
+
     const payLine = hasPrior
-      ? `Please make payment of ${collectLabel} using the ${qrName} below.`
-      : `Please make payment using the ${qrName} below.`;
-    const scopeLine = payload.wholecakePreorderQr
-      ? "This QR is for wholecake preorder payments only. It is not for dine-in, beverages, or other items.\n\n"
-      : "";
+      ? `Please make payment of ${collectLabel} using the Whitebird QR code below.`
+      : `Please make payment using the Whitebird QR code below.`;
     return (
       `Thank you for confirming. ;)\n\n` +
       `Here are the payment details.\n\n` +
       `${amountBlock}\n\n` +
       `${payLine}\n\n` +
-      scopeLine +
       slipLine
     );
   }

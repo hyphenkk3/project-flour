@@ -93,12 +93,38 @@ function payload(
 const wholecakeQr = generatePaymentRequestMessage(
   payload({ wholecakePreorderQr: true }),
 );
-assert.match(wholecakeQr, /Whitebird Wholecake Preorder Payment QR/);
-assert.match(wholecakeQr, /wholecake preorder payments only/);
-assert.match(wholecakeQr, /not for dine-in, beverages, or other items/i);
-assert.match(wholecakeQr, /payment slip WITH Status/);
+assert.match(wholecakeQr, /Thank you for confirming\. ;\)/);
+assert.match(wholecakeQr, /Here are the payment details:/);
+assert.match(wholecakeQr, /Amount: RM135/);
+assert.match(
+  wholecakeQr,
+  /Please make payment using the attached Whitebird Wholecake Preorder Payment QR\./,
+);
+assert.match(
+  wholecakeQr,
+  /Just a note — this QR is for wholecake preorder payments only\. It is not for dine-in, beverages, or other items\./,
+);
+assert.match(
+  wholecakeQr,
+  /Once payment is completed, please send us the payment slip within 24 hours, with the payment status clearly shown \(e\.g\. “Successful”\) ya\. 😊/,
+);
+assert.doesNotMatch(wholecakeQr, /payment slip WITH Status/);
+assert.doesNotMatch(wholecakeQr, /using the .* below/);
 assert.doesNotMatch(wholecakeQr, /automatically verified/);
 assert.doesNotMatch(wholecakeQr, /CIMB Bank Berhad/);
+
+const wholecakePartial = generatePaymentRequestMessage(
+  payload({
+    wholecakePreorderQr: true,
+    netReceived: 50,
+    remainingBalance: 85,
+  }),
+);
+assert.match(wholecakePartial, /Balance to Pay: RM85/);
+assert.match(
+  wholecakePartial,
+  /Please make payment using the attached Whitebird Wholecake Preorder Payment QR\./,
+);
 
 const extraQr = generatePaymentRequestMessage(
   payload({ wholecakePreorderQr: false }),
