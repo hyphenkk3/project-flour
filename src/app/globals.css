@@ -54,6 +54,11 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
+html.storefront-no-pinch-zoom,
+html.storefront-no-pinch-zoom body {
+  touch-action: pan-x pan-y;
+}
+
 html.storefront-canvas {
   --color-ink: #1c1916;
   --color-mist: #f5f0e9;

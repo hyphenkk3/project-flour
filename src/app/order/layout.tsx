@@ -1,3 +1,4 @@
+import { StorefrontPinchZoomLock } from "@/workspaces/storefront/StorefrontPinchZoomLock";
 import { storefrontViewport } from "@/workspaces/storefront/storefront-viewport";
 
 export const viewport = storefrontViewport;
@@ -7,5 +8,10 @@ export default function StorefrontOrderLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return children;
+  return (
+    <>
+      <StorefrontPinchZoomLock />
+      {children}
+    </>
+  );
 }

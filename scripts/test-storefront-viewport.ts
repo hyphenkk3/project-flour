@@ -1,5 +1,5 @@
 /**
- * Public storefront keeps a standard accessible viewport.
+ * Public storefront disables pinch-to-zoom. Staff layouts stay untouched.
  * Run: npx tsx scripts/test-storefront-viewport.ts
  *
  * Static only. Pinch gestures cannot be unit-tested here.
@@ -16,8 +16,21 @@ const viewportSrc = readSrc("src/workspaces/storefront/storefront-viewport.ts");
 assert.match(viewportSrc, /export const storefrontViewport/);
 assert.match(viewportSrc, /width: "device-width"/);
 assert.match(viewportSrc, /initialScale: 1/);
-assert.doesNotMatch(viewportSrc, /maximumScale/);
-assert.doesNotMatch(viewportSrc, /userScalable/);
+assert.match(viewportSrc, /maximumScale: 1/);
+assert.match(viewportSrc, /userScalable: false/);
+assert.doesNotMatch(viewportSrc, /<meta[^>]*name=["']viewport["']/);
+
+const lockSrc = readSrc("src/workspaces/storefront/StorefrontPinchZoomLock.tsx");
+assert.match(lockSrc, /export function StorefrontPinchZoomLock/);
+assert.match(lockSrc, /storefront-no-pinch-zoom/);
+assert.match(lockSrc, /gesturestart/);
+assert.match(lockSrc, /gesturechange/);
+assert.doesNotMatch(lockSrc, /touchmove/);
+assert.doesNotMatch(lockSrc, /<meta[^>]*name=["']viewport["']/);
+
+const globalsSrc = readSrc("src/app/globals.css");
+assert.match(globalsSrc, /html\.storefront-no-pinch-zoom/);
+assert.match(globalsSrc, /touch-action:\s*pan-x\s+pan-y/);
 
 const publicLayouts = [
   "src/app/page.tsx",
@@ -32,6 +45,8 @@ for (const rel of publicLayouts) {
   const src = readSrc(rel);
   assert.match(src, /storefrontViewport/, rel);
   assert.match(src, /export const viewport/, rel);
+  assert.match(src, /StorefrontPinchZoomLock/, rel);
+  assert.doesNotMatch(src, /<meta[^>]*name=["']viewport["']/, rel);
 }
 
 const staffLayouts = [
@@ -47,6 +62,7 @@ const staffLayouts = [
 for (const rel of staffLayouts) {
   const src = readSrc(rel);
   assert.doesNotMatch(src, /storefrontViewport/, rel);
+  assert.doesNotMatch(src, /StorefrontPinchZoomLock/, rel);
   assert.doesNotMatch(src, /userScalable: false/, rel);
   assert.doesNotMatch(src, /maximumScale: 1/, rel);
 }
