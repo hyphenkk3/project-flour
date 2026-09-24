@@ -75,6 +75,14 @@ export function StorefrontBrowsePage() {
           Prefer a monthly collection or Special Menu? Choose a collection →
         </Link>
       </p>
+      <p className="mt-1.5 sm:mt-2">
+        <Link
+          className="text-ink hover:text-skyline text-sm font-medium transition-colors duration-200"
+          href="/offers"
+        >
+          Current offers →
+        </Link>
+      </p>
 
       <Suspense fallback={<BrowseCatalogueFallback />}>
         <BrowseCatalogueIsland />

@@ -168,6 +168,7 @@ import {
   type PreorderDraftFields,
   type PreorderDraftItem,
 } from "@/workspaces/storefront/checkout/preorder-draft";
+import { CatalogueVoucherCheckoutField } from "@/workspaces/storefront/offers/CatalogueVoucherCheckoutField";
 import { CustomerWaitingListAvailability } from "@/workspaces/storefront/waiting-list/CustomerWaitingListAvailability";
 import { JoinWaitingListForm } from "@/workspaces/storefront/waiting-list/JoinWaitingListForm";
 import { loadCustomerWaitingListAvailability } from "@/workspaces/storefront/waiting-list/actions";
@@ -1467,6 +1468,7 @@ export function GuestCheckoutForm({
           type="hidden"
           value={optionsReady ? "1" : "0"}
         />
+        <CatalogueVoucherCheckoutField />
 
         <div className="order-2 flex min-w-0 flex-col gap-12 lg:order-1">
           <FormRequiredLegend />

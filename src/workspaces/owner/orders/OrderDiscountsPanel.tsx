@@ -46,6 +46,7 @@ import { createOperationsApprovalAction } from "@/workspaces/owner/approvals/act
 import { evaluateRegisteredPhysicalRm10Expiry } from "@/engines/vouchers/physical-rm10";
 import { lookupManagedRm10CardAction } from "@/workspaces/library/vouchers/rm10/lookup-action";
 import { RegisteredRm10ExpiredNotice } from "@/workspaces/owner/orders/RegisteredRm10ExpiredNotice";
+import { CatalogueVoucherPaymentPanel } from "@/workspaces/owner/orders/CatalogueVoucherPaymentPanel";
 
 type OrderDiscountsPanelProps = {
   order: StorefrontOrder;
@@ -417,6 +418,8 @@ export function OrderDiscountsPanel({
           {lifecycleError}
         </p>
       ) : null}
+
+      <CatalogueVoucherPaymentPanel order={order} />
 
       {pendingDiscountApproval ? (
         <p className="border-status-warning/30 bg-status-warning-soft text-status-warning rounded-lg border px-4 py-3 text-sm">

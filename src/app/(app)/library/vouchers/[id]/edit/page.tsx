@@ -5,6 +5,7 @@ import { requireStaff } from "@/foundation/auth/session";
 import { canManageLibrary } from "@/foundation/navigation/access";
 import type { LibraryAsset } from "@/types/library-asset";
 import { listAssets } from "@/workspaces/library/assets/queries";
+import { loadVoucherEligibilityOptions } from "@/workspaces/library/vouchers/eligibility-options";
 import { VoucherForm } from "@/workspaces/library/vouchers/VoucherForm";
 import { getVoucherById } from "@/workspaces/library/vouchers/queries";
 import { VoucherLibraryTabs } from "@/workspaces/library/vouchers/VoucherLibraryTabs";
@@ -36,6 +37,7 @@ export default async function EditLibraryVoucherPage({
   } catch {
     assets = [];
   }
+  const eligibility = await loadVoucherEligibilityOptions();
 
   return (
     <div className="space-y-6">
@@ -54,8 +56,10 @@ export default async function EditLibraryVoucherPage({
       </div>
       <VoucherForm
         assets={assets}
+        cakes={eligibility.cakes}
         cancelHref={`/library/vouchers/${voucher.id}`}
         mode="edit"
+        sizeLabels={eligibility.sizeLabels}
         voucher={voucher}
       />
     </div>

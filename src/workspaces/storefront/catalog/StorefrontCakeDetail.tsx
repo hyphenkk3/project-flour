@@ -5,6 +5,7 @@ import { CakeDetailBackNav } from "@/workspaces/storefront/catalog/CakeDetailBac
 import { CakeDetailPickupScope } from "@/workspaces/storefront/catalog/CakeDetailPickupScope";
 import { StorefrontCakeDetailView } from "@/workspaces/storefront/catalog/StorefrontCakeDetailView";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
+import { CakeOfferHint } from "@/workspaces/storefront/offers/CakeOfferHint";
 import {
   browseCakePreviewFromDisplay,
   getBrowseCakeDisplayById,
@@ -138,6 +139,9 @@ async function CakeDetailResolved({
     <>
       <CakeDetailBackNav cakeId={id} />
       <PreorderInProgressBar />
+      <Suspense fallback={null}>
+        <CakeOfferHint cakeId={id} />
+      </Suspense>
       <Suspense fallback={<CakeDetailBodyFallback />}>
         <CakeDetailWithDisplay cakeId={id} searchParams={searchParams} />
       </Suspense>

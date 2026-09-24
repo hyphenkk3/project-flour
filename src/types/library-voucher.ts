@@ -1,3 +1,5 @@
+import type { CatalogueVoucherRules } from "@/types/catalogue-voucher";
+
 export type LibraryVoucherStatus =
   "draft" | "active" | "scheduled" | "expired" | "retired";
 
@@ -16,6 +18,7 @@ export type LibraryVoucher = {
   status: LibraryVoucherStatus;
   createdAt: string;
   updatedAt: string;
+  rules: CatalogueVoucherRules;
 };
 
 export type LibraryVoucherInput = {

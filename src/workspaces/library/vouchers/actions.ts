@@ -11,6 +11,7 @@ import type {
   LibraryVoucherType,
 } from "@/types/library-voucher";
 import type { LibraryActionState } from "@/workspaces/library/action-state";
+import { listCakes } from "@/workspaces/library/cakes/queries";
 import {
   emptyToNull,
   LIBRARY_VOUCHER_STATUSES,
@@ -18,6 +19,12 @@ import {
   parseNonNegativeNumber,
   parseOptionalDate,
 } from "@/workspaces/library/labels";
+import { replaceLibraryVoucherRules } from "@/workspaces/library/vouchers/rule-queries";
+import { parseCatalogueRulesFromForm } from "@/workspaces/library/vouchers/rules";
+import {
+  COMMON_CATALOGUE_SIZE_LABELS,
+  normalizeCatalogueSizeLabel,
+} from "@/engines/vouchers/catalogue-voucher";
 
 async function requireLibraryStaff() {
   const staff = await requireStaff();
@@ -69,6 +76,23 @@ function parseVoucherInput(formData: FormData): LibraryVoucherInput | string {
   };
 }
 
+async function knownEligibilityOptions() {
+  const cakes = await listCakes();
+  const sizeLabels = new Set<string>(COMMON_CATALOGUE_SIZE_LABELS);
+  for (const cake of cakes) {
+    for (const size of cake.sizes ?? []) {
+      const label = size.label?.trim();
+      if (label) sizeLabels.add(label);
+    }
+  }
+  return {
+    cakeIds: new Set(cakes.map((cake) => cake.id)),
+    sizeLabels: Array.from(sizeLabels).filter(
+      (label) => normalizeCatalogueSizeLabel(label) != null,
+    ),
+  };
+}
+
 export async function createVoucherAction(
   _prev: LibraryActionState,
   formData: FormData,
@@ -77,6 +101,16 @@ export async function createVoucherAction(
   const parsed = parseVoucherInput(formData);
   if (typeof parsed === "string") {
     return { error: parsed };
+  }
+
+  const options = await knownEligibilityOptions();
+  const rules = parseCatalogueRulesFromForm(
+    formData,
+    options.cakeIds,
+    options.sizeLabels,
+  );
+  if (typeof rules === "string") {
+    return { error: rules };
   }
 
   const supabase = await createClient();
@@ -104,6 +138,17 @@ export async function createVoucherAction(
     return { error: error.message };
   }
 
+  try {
+    await replaceLibraryVoucherRules(supabase, data.id, rules);
+  } catch (ruleError) {
+    return {
+      error:
+        ruleError instanceof Error
+          ? ruleError.message
+          : "Voucher saved but eligibility rules could not be stored.",
+    };
+  }
+
   revalidatePath("/library/vouchers");
   redirect(`/library/vouchers/${data.id}`);
 }
@@ -117,6 +162,16 @@ export async function updateVoucherAction(
   const parsed = parseVoucherInput(formData);
   if (typeof parsed === "string") {
     return { error: parsed };
+  }
+
+  const options = await knownEligibilityOptions();
+  const rules = parseCatalogueRulesFromForm(
+    formData,
+    options.cakeIds,
+    options.sizeLabels,
+  );
+  if (typeof rules === "string") {
+    return { error: rules };
   }
 
   const supabase = await createClient();
@@ -140,6 +195,17 @@ export async function updateVoucherAction(
       return { error: "That voucher code already exists." };
     }
     return { error: error.message };
+  }
+
+  try {
+    await replaceLibraryVoucherRules(supabase, id, rules);
+  } catch (ruleError) {
+    return {
+      error:
+        ruleError instanceof Error
+          ? ruleError.message
+          : "Voucher saved but eligibility rules could not be stored.",
+    };
   }
 
   revalidatePath("/library/vouchers");

@@ -1580,6 +1580,45 @@ export async function applyAugustPromoAction(
   return { error: null };
 }
 
+export async function applyCatalogueVoucherAction(
+  orderId: string,
+  voucherId: string,
+  clientAmount?: number | null,
+): Promise<{ error: string | null }> {
+  const staff = await requireOwnerOrCustomerOperations();
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found." };
+  }
+
+  const { applyCatalogueVoucherAuthoritative } = await import(
+    "@/workspaces/vouchers/catalogue-actions"
+  );
+  const result = await applyCatalogueVoucherAuthoritative({
+    orderId,
+    voucherId,
+    actorStaffId: staff.id,
+    clientAmount,
+  });
+  if (result.error) {
+    return result;
+  }
+
+  const reconcile = await afterDiscountMutation({
+    orderId,
+    before: order,
+    staffId: staff.id,
+  });
+  if (reconcile.error) {
+    return { error: reconcile.error };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/payment`);
+  return { error: null };
+}
+
 export type RedeemRm10State = {
   error: string | null;
   success: boolean;

@@ -1,9 +1,11 @@
+import { emptyCatalogueRules } from "@/engines/vouchers/catalogue-voucher";
 import { createClient } from "@/lib/supabase/server";
 import type {
   LibraryVoucher,
   LibraryVoucherStatus,
   LibraryVoucherType,
 } from "@/types/library-voucher";
+import { loadCatalogueRulesForVouchers } from "@/workspaces/library/vouchers/rule-queries";
 
 type VoucherRow = {
   id: string;
@@ -32,6 +34,7 @@ export function mapVoucher(row: VoucherRow): LibraryVoucher {
     status: row.status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    rules: emptyCatalogueRules(),
   };
 }
 
@@ -59,7 +62,19 @@ export async function listVouchers(query?: string): Promise<LibraryVoucher[]> {
     throw new Error(error.message);
   }
 
-  return (data as VoucherRow[]).map(mapVoucher);
+  const vouchers = (data as VoucherRow[]).map(mapVoucher);
+  try {
+    const rulesById = await loadCatalogueRulesForVouchers(
+      supabase,
+      vouchers.map((row) => row.id),
+    );
+    return vouchers.map((voucher) => ({
+      ...voucher,
+      rules: rulesById.get(voucher.id) ?? emptyCatalogueRules(),
+    }));
+  } catch {
+    return vouchers;
+  }
 }
 
 export async function getVoucherById(
@@ -76,5 +91,15 @@ export async function getVoucherById(
     throw new Error(error.message);
   }
 
-  return data ? mapVoucher(data as VoucherRow) : null;
+  if (!data) return null;
+  const voucher = mapVoucher(data as VoucherRow);
+  try {
+    const rulesById = await loadCatalogueRulesForVouchers(supabase, [voucher.id]);
+    return {
+      ...voucher,
+      rules: rulesById.get(voucher.id) ?? emptyCatalogueRules(),
+    };
+  } catch {
+    return voucher;
+  }
 }

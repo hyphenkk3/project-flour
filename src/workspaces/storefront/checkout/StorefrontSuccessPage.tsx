@@ -28,6 +28,7 @@ import { SaveOrderDetailsButton } from "@/workspaces/storefront/checkout/SaveOrd
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import { storefrontKickerClass } from "@/workspaces/storefront/StorefrontBrand";
 import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
+import { ApplySelectedCatalogueVoucher } from "@/workspaces/storefront/offers/ApplySelectedCatalogueVoucher";
 
 type StorefrontSuccessPageProps = {
   orderId?: string;
@@ -65,6 +66,9 @@ export async function StorefrontSuccessPage({
           <br />
           {contactLine}
         </p>
+        {!isFreshPick ? (
+          <ApplySelectedCatalogueVoucher orderId={orderId} />
+        ) : null}
       </div>
 
       <aside

@@ -13,6 +13,8 @@ import {
   voucherStatusLabel,
   voucherTypeLabel,
 } from "@/workspaces/library/labels";
+import { summarizeCatalogueVoucherRules } from "@/engines/vouchers/catalogue-voucher";
+import { toCatalogueVoucherRecord } from "@/engines/vouchers/catalogue-voucher-context";
 import { deleteVoucherAction } from "@/workspaces/library/vouchers/actions";
 import { getVoucherById } from "@/workspaces/library/vouchers/queries";
 import { VoucherLibraryTabs } from "@/workspaces/library/vouchers/VoucherLibraryTabs";
@@ -108,6 +110,23 @@ export default async function LibraryVoucherDetailPage({
               </a>
             ) : (
               "—"
+            )}
+          </dd>
+        </div>
+        <div className="sm:col-span-2">
+          <dt className="text-skyline">Eligibility</dt>
+          <dd className="text-ink mt-1">
+            {summarizeCatalogueVoucherRules(toCatalogueVoucherRecord(voucher))
+              .length > 0 ? (
+              <ul className="list-disc space-y-1 pl-5">
+                {summarizeCatalogueVoucherRules(
+                  toCatalogueVoucherRecord(voucher),
+                ).map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            ) : (
+              "No additional restrictions"
             )}
           </dd>
         </div>
