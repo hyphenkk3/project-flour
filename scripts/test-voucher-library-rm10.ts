@@ -344,6 +344,93 @@ assert.match(
   /redeem_rm10_physical_voucher_for_guest_order/,
 );
 
+const preserveExpiryMigration = readSrc(
+  "supabase/migrations/20260924170000_preserve_library_rm10_expiry.sql",
+);
+assert.match(
+  preserveExpiryMigration,
+  /when v\.library_managed then v\.expiry_date/,
+);
+assert.match(
+  preserveExpiryMigration,
+  /when v\.library_managed then v\.voucher_number/,
+);
+assert.match(preserveExpiryMigration, /Owner Override is unchanged/);
+assert.match(preserveExpiryMigration, /p_expiry_date,/);
+assert.match(preserveExpiryMigration, /'unredeemed'/);
+assert.doesNotMatch(
+  preserveExpiryMigration,
+  /update public\.physical_discount_vouchers v\n\s+set\n\s+expiry_date = p_expiry_date/,
+);
+
+// CASE A — registered voucher, normal redemption keeps library expiry
+const caseA = buildRm10LibraryRows({
+  today: "2026-09-24",
+  managedCards: [
+    {
+      id: "card-213",
+      voucherNumber: "213",
+      voucherNumberNormalized: "213",
+      expiryDate: "2026-07-31",
+    },
+  ],
+  redemptions: [
+    redemption({
+      adjustmentId: "adj-213-a",
+      voucherNumber: "213",
+      expiryDate: "2026-10-09",
+      orderNumber: "WB213A",
+    }),
+  ],
+});
+assert.equal(caseA.length, 1);
+assert.equal(caseA[0]?.status, "used");
+assert.equal(caseA[0]?.source, "library");
+assert.equal(caseA[0]?.expiryDate, "2026-07-31");
+assert.equal(caseA[0]?.redemption?.expiryDate, "2026-10-09");
+
+// CASE B — registered expired voucher + override metadata; library expiry stays July
+const caseB = buildRm10LibraryRows({
+  today: "2026-09-24",
+  managedCards: [
+    {
+      id: "card-213-b",
+      voucherNumber: "213",
+      voucherNumberNormalized: "213",
+      expiryDate: "2026-07-15",
+    },
+  ],
+  redemptions: [
+    redemption({
+      adjustmentId: "adj-213-b",
+      voucherNumber: "213",
+      expiryDate: "2026-10-09",
+      orderNumber: "WB213B",
+    }),
+  ],
+});
+assert.equal(caseB[0]?.status, "used");
+assert.equal(caseB[0]?.expiryDate, "2026-07-15");
+assert.notEqual(caseB[0]?.expiryDate, caseB[0]?.redemption?.expiryDate);
+
+// CASE C — unregistered/historical redemption still appears without a managed row
+const caseC = buildRm10LibraryRows({
+  today: "2026-09-24",
+  managedCards: [],
+  redemptions: [
+    redemption({
+      adjustmentId: "adj-hist-213",
+      voucherNumber: "213",
+      expiryDate: "2026-10-09",
+      orderNumber: "WB213C",
+    }),
+  ],
+});
+assert.equal(caseC.length, 1);
+assert.equal(caseC[0]?.source, "historical");
+assert.equal(caseC[0]?.status, "used");
+assert.equal(caseC[0]?.expiryDate, "2026-10-09");
+
 // 19. Existing voucher validation still works
 assert.equal(
   evaluateRm10CardEligibility({
