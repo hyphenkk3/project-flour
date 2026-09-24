@@ -7,6 +7,7 @@ import type { LibraryAsset } from "@/types/library-asset";
 import { listAssets } from "@/workspaces/library/assets/queries";
 import { VoucherForm } from "@/workspaces/library/vouchers/VoucherForm";
 import { getVoucherById } from "@/workspaces/library/vouchers/queries";
+import { VoucherLibraryTabs } from "@/workspaces/library/vouchers/VoucherLibraryTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export default async function EditLibraryVoucherPage({
 
   return (
     <div className="space-y-6">
+      <VoucherLibraryTabs active="catalogue" showRm10 />
       <div>
         <Link
           className="text-skyline hover:text-ink text-sm font-medium"

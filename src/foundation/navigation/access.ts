@@ -22,6 +22,16 @@ export function canManageLibrary(role: RoleCode): boolean {
 }
 
 /**
+ * RM10 Physical Card library (numbers, expiry, usage visibility).
+ *
+ * Financial/operational records. Owner and Manager only — not bakery,
+ * collection, customers, or anonymous users.
+ */
+export function canManageRm10PhysicalCards(role: RoleCode): boolean {
+  return canManageLibrary(role);
+}
+
+/**
  * Cake photo media (upload, default, size assignment, replace, delete, reorder).
  *
  * Separate from Library cake-record configuration (`canManageLibrary`).

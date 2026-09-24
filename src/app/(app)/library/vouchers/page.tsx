@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { requireStaff } from "@/foundation/auth/session";
-import { canManageLibrary } from "@/foundation/navigation/access";
+import {
+  canManageLibrary,
+  canManageRm10PhysicalCards,
+} from "@/foundation/navigation/access";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { LibraryVoucher } from "@/types/library-voucher";
 import { VoucherDirectory } from "@/workspaces/library/vouchers/VoucherDirectory";
+import { VoucherLibraryTabs } from "@/workspaces/library/vouchers/VoucherLibraryTabs";
 import { listVouchers } from "@/workspaces/library/vouchers/queries";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function LibraryVouchersPage() {
   const staff = await requireStaff();
   const canManage = canManageLibrary(staff.role.code);
+  const showRm10 = canManageRm10PhysicalCards(staff.role.code);
   let vouchers: LibraryVoucher[] = [];
   let loadError: string | null = null;
 
@@ -26,9 +31,10 @@ export default async function LibraryVouchersPage() {
 
   return (
     <div className="space-y-6">
+      <VoucherLibraryTabs active="catalogue" showRm10={showRm10} />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <PageHeader
-          description="Reusable voucher codes for future catalogues."
+          description="Reusable catalogue voucher codes. Owner and Manager can also manage RM10 Physical Cards."
           title="Voucher Library"
         />
         {canManage ? (

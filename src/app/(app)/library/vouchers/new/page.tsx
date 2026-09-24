@@ -5,6 +5,7 @@ import { canManageLibrary } from "@/foundation/navigation/access";
 import type { LibraryAsset } from "@/types/library-asset";
 import { listAssets } from "@/workspaces/library/assets/queries";
 import { VoucherForm } from "@/workspaces/library/vouchers/VoucherForm";
+import { VoucherLibraryTabs } from "@/workspaces/library/vouchers/VoucherLibraryTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export default async function NewLibraryVoucherPage() {
 
   return (
     <div className="space-y-6">
+      <VoucherLibraryTabs active="catalogue" showRm10 />
       <PageHeader
         description="Create a reusable voucher record."
         title="Add voucher"

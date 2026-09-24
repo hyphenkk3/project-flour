@@ -2,7 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { requireStaff } from "@/foundation/auth/session";
-import { canManageLibrary } from "@/foundation/navigation/access";
+import {
+  canManageLibrary,
+  canManageRm10PhysicalCards,
+} from "@/foundation/navigation/access";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { DeleteLibraryItemButton } from "@/workspaces/library/DeleteLibraryItemButton";
 import {
@@ -12,6 +15,7 @@ import {
 } from "@/workspaces/library/labels";
 import { deleteVoucherAction } from "@/workspaces/library/vouchers/actions";
 import { getVoucherById } from "@/workspaces/library/vouchers/queries";
+import { VoucherLibraryTabs } from "@/workspaces/library/vouchers/VoucherLibraryTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +37,10 @@ export default async function LibraryVoucherDetailPage({
 
   return (
     <div className="space-y-6">
+      <VoucherLibraryTabs
+        active="catalogue"
+        showRm10={canManageRm10PhysicalCards(staff.role.code)}
+      />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <Link
