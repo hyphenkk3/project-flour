@@ -30,7 +30,21 @@ assert.doesNotMatch(lockSrc, /<meta[^>]*name=["']viewport["']/);
 
 const globalsSrc = readSrc("src/app/globals.css");
 assert.match(globalsSrc, /html\.storefront-no-pinch-zoom/);
+assert.match(globalsSrc, /html\.storefront-no-pinch-zoom img/);
+assert.match(globalsSrc, /\[class\*="overflow-x-auto"\]/);
 assert.match(globalsSrc, /touch-action:\s*pan-x\s+pan-y/);
+
+const featuredSrc = readSrc(
+  "src/workspaces/storefront/home/HomeFeaturedCollection.tsx",
+);
+const popularSrc = readSrc("src/workspaces/storefront/home/HomePopularCakes.tsx");
+const freshSrc = readSrc(
+  "src/workspaces/storefront/home/HomeFreshPicksSection.tsx",
+);
+assert.match(featuredSrc, /overflow-x-auto/);
+assert.match(popularSrc, /overflow-x-auto/);
+assert.match(freshSrc, /max-lg:contents/);
+assert.match(freshSrc, /lg:overflow-x-auto/);
 
 const publicLayouts = [
   "src/app/page.tsx",

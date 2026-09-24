@@ -59,6 +59,18 @@ html.storefront-no-pinch-zoom body {
   touch-action: pan-x pan-y;
 }
 
+/*
+ * touch-action is not inherited. iOS WebKit also applies implicit `auto`
+ * (pinch allowed) to replaced images and overflow scrollers, so ancestor
+ * pan-x/pan-y plus gesturestart do not cover those targets. Fresh Picks
+ * is a vertical list on mobile and never hits this path.
+ */
+html.storefront-no-pinch-zoom img,
+html.storefront-no-pinch-zoom picture,
+html.storefront-no-pinch-zoom [class*="overflow-x-auto"] {
+  touch-action: pan-x pan-y;
+}
+
 html.storefront-canvas {
   --color-ink: #1c1916;
   --color-mist: #f5f0e9;
