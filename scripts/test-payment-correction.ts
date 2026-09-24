@@ -3,7 +3,7 @@
  * Run: npx tsx scripts/test-payment-correction.ts
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { buildGuestOrderWorkspaceCapabilities } from "@/engines/orders/delivery-finance-capabilities";
 import {
@@ -201,7 +201,8 @@ const paymentAction = readFileSync(
 assert.match(paymentAction, /record_and_verify_guest_order_payment/);
 assert.match(paymentAction, /recordOverpaymentRefundAction/);
 assert.match(paymentAction, /requireOwnerOrManager/);
-assert.match(paymentAction, /from\("refunds"\)\.insert/);
+assert.match(paymentAction, /record_overpayment_refund/);
+assert.doesNotMatch(paymentAction, /from\("refunds"\)\.insert/);
 assert.doesNotMatch(
   paymentAction.split("recordOverpaymentRefundAction")[1] ?? "",
   /\.update\([\s\S]*payments/,
@@ -243,5 +244,41 @@ assert.match(migration, /_current_staff_role_code\(\) in \('owner', 'manager'\)/
 assert.match(migration, /assert_refund_within_overpayment/);
 assert.doesNotMatch(migration, /for delete/);
 assert.doesNotMatch(migration, /for update/);
+
+const atomicMigration = readFileSync(
+  resolve(
+    process.cwd(),
+    "supabase/migrations/20260924120000_record_overpayment_refund_atomic.sql",
+  ),
+  "utf8",
+);
+assert.match(atomicMigration, /record_overpayment_refund/);
+assert.match(atomicMigration, /_bind_rpc_actor/);
+assert.match(atomicMigration, /_require_rpc_roles/);
+assert.match(atomicMigration, /array\['owner', 'manager'\]/);
+assert.match(atomicMigration, /security definer/i);
+assert.match(atomicMigration, /set search_path = public/);
+assert.match(atomicMigration, /insert into public.refunds/);
+assert.match(atomicMigration, /insert into public.order_timeline_events/);
+assert.match(atomicMigration, /payment_correction_recorded/);
+assert.match(atomicMigration, /drop policy if exists refunds_authenticated_insert/);
+assert.doesNotMatch(atomicMigration, /\bexception\s+when\b/i);
+assert.doesNotMatch(atomicMigration, /autonomous transaction/i);
+const refundActionSrc =
+  paymentAction.split("export async function recordOverpaymentRefundAction")[1]?.split(
+    "export async function applyAugustPromoAction",
+  )[0] ?? "";
+assert.match(refundActionSrc, /record_overpayment_refund/);
+assert.doesNotMatch(refundActionSrc, /from\("refunds"\)\.insert/);
+assert.doesNotMatch(refundActionSrc, /from\("order_timeline_events"\)\.insert/);
+assert.doesNotMatch(refundActionSrc, /insertTimelineEvent/);
+assert.match(paymentAction, /validatePaymentCorrection/);
+assert.match(paymentAction, /requireOwnerOrManager/);
+assert.equal(
+  existsSync(
+    resolve(process.cwd(), "scripts/test-payment-correction-atomic-live.ts"),
+  ),
+  true,
+);
 
 console.log("test-payment-correction: ok");

@@ -45,7 +45,6 @@ import {
 import { reconcilePaymentLifecycleStatus } from "@/engines/orders/payment-status";
 import {
   PAYMENT_CORRECTION_INVALID_AMOUNT,
-  PAYMENT_CORRECTION_TYPE,
   PAYMENT_CORRECTION_UNAUTHORIZED,
   parseRefundAmount,
   validatePaymentCorrection,
@@ -1516,34 +1515,19 @@ export async function recordOverpaymentRefundAction(
   }));
 
   const supabase = await createClient();
-  const { error } = await supabase.from("refunds").insert({
-    order_id: orderId,
-    payment_id: null,
-    amount: preview.refundAmount,
-    reason,
-    created_by: staff.id,
-    status: "recorded",
+  const { error } = await supabase.rpc("record_overpayment_refund", {
+    p_order_id: orderId,
+    p_amount: preview.refundAmount,
+    p_reason: reason,
+    p_actor_staff_id: staff.id,
+    p_payment_snapshot: paymentSnapshot,
   });
 
   if (error) {
     return { error: error.message, success: false };
   }
 
-  await insertTimelineEvent({
-    orderId,
-    eventType: "payment_correction_recorded",
-    actorStaffId: staff.id,
-    metadata: {
-      correction_type: PAYMENT_CORRECTION_TYPE,
-      amount: preview.refundAmount,
-      reason,
-      payment_received: preview.paymentReceived,
-      order_amount: preview.orderAmount,
-      remaining_excess: preview.remainingExcessAfter,
-      payment_snapshot: paymentSnapshot,
-    },
-  });
-
+  scheduleStaffNotificationDispatch();
   revalidatePath("/owner");
   revalidatePath(`/owner/orders/${orderId}`);
   return { error: null, success: true };

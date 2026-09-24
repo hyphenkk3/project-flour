@@ -42,7 +42,8 @@ assert.doesNotMatch(
 
 const ownerActions = read("src/workspaces/owner/orders/actions.ts");
 assert.match(ownerActions, /record_and_verify_guest_order_payment/);
-assert.match(ownerActions, /from\("refunds"\)\.insert/);
+assert.match(ownerActions, /record_overpayment_refund/);
+assert.doesNotMatch(ownerActions, /from\("refunds"\)\.insert/);
 assert.doesNotMatch(ownerActions, /from\("payments"\)\.insert/);
 assert.doesNotMatch(ownerActions, /from\("payment_allocations"\)\.insert/);
 
@@ -55,5 +56,15 @@ const refunds = read(
   "supabase/migrations/20260923140000_payment_correction_refunds.sql",
 );
 assert.match(refunds, /_current_staff_role_code\(\) in \('owner', 'manager'\)/);
+
+const atomicRefunds = read(
+  "supabase/migrations/20260924120000_record_overpayment_refund_atomic.sql",
+);
+assert.match(
+  atomicRefunds,
+  /drop policy if exists refunds_authenticated_insert/,
+);
+assert.match(atomicRefunds, /_bind_rpc_actor/);
+assert.match(atomicRefunds, /_require_rpc_roles/);
 
 console.log("PASS payment write lock (source)");
