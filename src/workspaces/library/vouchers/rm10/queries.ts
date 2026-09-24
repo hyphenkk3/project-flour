@@ -6,6 +6,7 @@ import {
 } from "@/engines/orders/promotions";
 import {
   buildRm10LibraryRows,
+  normalizePhysicalVoucherNumber,
   redemptionFromAdjustmentMetadata,
 } from "@/engines/vouchers/physical-rm10";
 import { createClient } from "@/lib/supabase/server";
@@ -60,7 +61,10 @@ function mapManagedCard(row: ManagedCardRow): Rm10LibraryCard {
   return {
     id: row.id,
     voucherNumber: row.voucher_number,
-    voucherNumberNormalized: row.voucher_number_normalized,
+    voucherNumberNormalized:
+      normalizePhysicalVoucherNumber(row.voucher_number_normalized) ??
+      normalizePhysicalVoucherNumber(row.voucher_number) ??
+      row.voucher_number_normalized,
     expiryDate: row.expiry_date,
   };
 }
@@ -136,22 +140,20 @@ export async function listRm10LibraryRows(): Promise<Rm10LibraryRow[]> {
   });
 }
 
-export async function listExistingRm10NormalizedNumbers(
-  normalized: string[],
-): Promise<string[]> {
-  if (normalized.length === 0) {
-    return [];
-  }
-
+export async function listExistingRm10NormalizedNumbers(): Promise<string[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("physical_discount_vouchers")
-    .select("voucher_number_normalized")
-    .in("voucher_number_normalized", normalized);
+    .select("voucher_number, voucher_number_normalized");
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return (data ?? []).map((row) => String(row.voucher_number_normalized));
+  return (data ?? [])
+    .map((row) =>
+      normalizePhysicalVoucherNumber(String(row.voucher_number_normalized ?? "")) ??
+      normalizePhysicalVoucherNumber(String(row.voucher_number ?? "")),
+    )
+    .filter((value): value is string => Boolean(value));
 }

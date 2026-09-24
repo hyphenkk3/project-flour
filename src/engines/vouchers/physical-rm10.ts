@@ -20,6 +20,10 @@ import type {
 export const RM10_LIBRARY_MAX_BATCH = 500;
 
 export const RM10_VOUCHER_NUMBER_REQUIRED = "Voucher number is required.";
+export const RM10_VOUCHER_DIGITS_REQUIRED =
+  "Voucher number must be digits only. Do not add a prefix.";
+export const RM10_VOUCHER_POSITIVE_REQUIRED =
+  "Voucher number must be a positive number.";
 export const RM10_EXPIRY_REQUIRED = "Expiry date is required.";
 export const RM10_RANGE_DIGITS_REQUIRED =
   "Starting and ending voucher numbers must be digits only.";
@@ -31,15 +35,49 @@ export const RM10_LIST_REQUIRED = "Paste at least one voucher number.";
 export const RM10_UNAUTHORIZED =
   "Only Owner and Manager can manage RM10 Physical Cards.";
 
-/** Matches public.normalize_physical_voucher_number: trim, strip spaces, upper. */
+/**
+ * Numeric identity for physical RM10 cards.
+ * Matches public.normalize_physical_voucher_number: trim, strip spaces,
+ * then strip insignificant leading zeroes for digit-only values.
+ * `0123`, `123`, and `000123` are the same identity (`123`).
+ * Does not add or require a WB prefix.
+ */
 export function normalizePhysicalVoucherNumber(
   value: string | null | undefined,
 ): string | null {
-  const normalized = String(value ?? "")
+  const compact = String(value ?? "")
     .trim()
     .replace(/\s+/g, "")
     .toUpperCase();
-  return normalized.length > 0 ? normalized : null;
+  if (!compact) {
+    return null;
+  }
+  if (/^\d+$/.test(compact)) {
+    const stripped = compact.replace(/^0+/, "");
+    return stripped.length > 0 ? stripped : null;
+  }
+  return compact;
+}
+
+function compactVoucherInput(value: FormDataEntryValue | null): string {
+  return String(value ?? "").trim().replace(/\s+/g, "");
+}
+
+function parseNumericVoucherInput(
+  value: FormDataEntryValue | null,
+): { voucherNumber: string; normalized: string } | string {
+  const compact = compactVoucherInput(value);
+  if (!compact) {
+    return RM10_VOUCHER_NUMBER_REQUIRED;
+  }
+  if (!/^\d+$/.test(compact)) {
+    return RM10_VOUCHER_DIGITS_REQUIRED;
+  }
+  const normalized = normalizePhysicalVoucherNumber(compact);
+  if (!normalized) {
+    return RM10_VOUCHER_POSITIVE_REQUIRED;
+  }
+  return { voucherNumber: compact, normalized };
 }
 
 export function parseRequiredExpiryDate(
@@ -55,12 +93,7 @@ export function parseRequiredExpiryDate(
 export function parseSingleVoucherNumber(
   value: FormDataEntryValue | null,
 ): { voucherNumber: string; normalized: string } | string {
-  const raw = String(value ?? "").trim();
-  const normalized = normalizePhysicalVoucherNumber(raw);
-  if (!normalized) {
-    return RM10_VOUCHER_NUMBER_REQUIRED;
-  }
-  return { voucherNumber: raw.replace(/\s+/g, ""), normalized };
+  return parseNumericVoucherInput(value);
 }
 
 export function parseVoucherNumberRange(
@@ -87,6 +120,10 @@ export function parseVoucherNumberRange(
     return RM10_BATCH_LIMIT_EXCEEDED;
   }
 
+  if (startNum === BigInt(0)) {
+    return RM10_VOUCHER_POSITIVE_REQUIRED;
+  }
+
   const width = start.length;
   const numbers: { voucherNumber: string; normalized: string }[] = [];
   const step = BigInt(1);
@@ -94,7 +131,7 @@ export function parseVoucherNumberRange(
     const voucherNumber = n.toString().padStart(width, "0");
     const normalized = normalizePhysicalVoucherNumber(voucherNumber);
     if (!normalized) {
-      return RM10_VOUCHER_NUMBER_REQUIRED;
+      return RM10_VOUCHER_POSITIVE_REQUIRED;
     }
     numbers.push({ voucherNumber, normalized });
   }
@@ -120,15 +157,15 @@ export function parseVoucherNumberList(
   const seen = new Set<string>();
 
   for (const line of lines) {
-    const normalized = normalizePhysicalVoucherNumber(line);
-    if (!normalized) {
-      return RM10_VOUCHER_NUMBER_REQUIRED;
+    const parsed = parseNumericVoucherInput(line);
+    if (typeof parsed === "string") {
+      return parsed;
     }
-    if (seen.has(normalized)) {
+    if (seen.has(parsed.normalized)) {
       continue;
     }
-    seen.add(normalized);
-    numbers.push({ voucherNumber: line.replace(/\s+/g, ""), normalized });
+    seen.add(parsed.normalized);
+    numbers.push(parsed);
   }
 
   if (numbers.length === 0) {
@@ -209,7 +246,13 @@ export function buildRm10LibraryRows(input: {
 }): Rm10LibraryRow[] {
   const managedByNorm = new Map<string, Rm10LibraryCard>();
   for (const card of input.managedCards) {
-    managedByNorm.set(card.voucherNumberNormalized, card);
+    const normalized =
+      normalizePhysicalVoucherNumber(card.voucherNumberNormalized) ??
+      normalizePhysicalVoucherNumber(card.voucherNumber);
+    if (!normalized) {
+      continue;
+    }
+    managedByNorm.set(normalized, { ...card, voucherNumberNormalized: normalized });
   }
 
   const redemptionsByNorm = new Map<string, Rm10LibraryRedemption[]>();
@@ -242,7 +285,7 @@ export function buildRm10LibraryRows(input: {
     }
   }
 
-  for (const card of input.managedCards) {
+  for (const card of managedByNorm.values()) {
     if (redemptionsByNorm.has(card.voucherNumberNormalized)) {
       continue;
     }
@@ -315,6 +358,7 @@ export function filterRm10LibraryRows(
   input: { query?: string; status?: Rm10LibraryFilterStatus },
 ): Rm10LibraryRow[] {
   const query = input.query?.trim().toLowerCase() ?? "";
+  const queryNormalized = normalizePhysicalVoucherNumber(input.query)?.toLowerCase();
   const status = input.status ?? "all";
 
   return rows.filter((row) => {
@@ -322,6 +366,12 @@ export function filterRm10LibraryRows(
       return false;
     }
     if (!query) {
+      return true;
+    }
+    if (
+      queryNormalized &&
+      row.voucherNumberNormalized.toLowerCase() === queryNormalized
+    ) {
       return true;
     }
     const haystack = [

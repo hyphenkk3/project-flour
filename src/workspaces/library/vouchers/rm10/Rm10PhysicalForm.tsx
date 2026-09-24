@@ -15,10 +15,8 @@ import {
   formatAlreadyExistMessage,
   RM10_LIBRARY_MAX_BATCH,
 } from "@/engines/vouchers/physical-rm10";
-import {
-  addRm10PhysicalVouchersAction,
-  rm10LibraryActionInitialState,
-} from "@/workspaces/library/vouchers/rm10/actions";
+import { rm10LibraryActionInitialState } from "@/workspaces/library/vouchers/rm10/action-state";
+import { addRm10PhysicalVouchersAction } from "@/workspaces/library/vouchers/rm10/actions";
 
 type AddMethod = "single" | "range" | "list";
 

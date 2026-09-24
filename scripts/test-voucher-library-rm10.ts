@@ -28,6 +28,7 @@ import {
   parseVoucherNumberRange,
   planRm10PhysicalVoucherInserts,
   RM10_RANGE_DIGITS_REQUIRED,
+  RM10_VOUCHER_DIGITS_REQUIRED,
   summarizeRm10Library,
 } from "@/engines/vouchers/physical-rm10";
 import type { Rm10LibraryRedemption } from "@/types/rm10-physical-voucher";
@@ -71,6 +72,13 @@ assert.match(addAction, /library_managed: true/);
 assert.match(addAction, /created_by: staff\.id/);
 assert.doesNotMatch(addAction, /status: "redeemed"/);
 assert.doesNotMatch(addAction, /Mark as Used/);
+assert.doesNotMatch(addAction, /^export const /m);
+
+const addForm = readSrc(
+  "src/workspaces/library/vouchers/rm10/Rm10PhysicalForm.tsx",
+);
+assert.match(addForm, /from "@\/workspaces\/library\/vouchers\/rm10\/action-state"/);
+assert.doesNotMatch(addForm, /rm10LibraryActionInitialState.*actions/);
 
 const rm10Page = readSrc("src/app/(app)/library/vouchers/rm10/page.tsx");
 assert.match(rm10Page, /canManageRm10PhysicalCards/);
@@ -374,6 +382,87 @@ assert.deepEqual(
 
 assert.equal(normalizePhysicalVoucherNumber(" 10 0001 "), "100001");
 assert.equal(normalizePhysicalVoucherNumber("   "), null);
+assert.equal(normalizePhysicalVoucherNumber("0123"), "123");
+assert.equal(normalizePhysicalVoucherNumber("123"), "123");
+assert.equal(normalizePhysicalVoucherNumber("000123"), "123");
+assert.equal(normalizePhysicalVoucherNumber("000"), null);
+assert.equal(parseSingleVoucherNumber("WB0123"), RM10_VOUCHER_DIGITS_REQUIRED);
+assert.equal(parseSingleVoucherNumber("0123")?.normalized, "123");
+assert.equal(
+  typeof parseSingleVoucherNumber("0123") === "object"
+    ? parseSingleVoucherNumber("0123").voucherNumber
+    : "",
+  "0123",
+);
+
+const leadingZeroDuplicate = planRm10PhysicalVoucherInserts(
+  [parseSingleVoucherNumber("0123") as { voucherNumber: string; normalized: string }],
+  ["123"],
+);
+assert.deepEqual(leadingZeroDuplicate.toCreate, []);
+assert.deepEqual(leadingZeroDuplicate.alreadyExist, ["0123"]);
+
+const reverseLeadingZeroDuplicate = planRm10PhysicalVoucherInserts(
+  [parseSingleVoucherNumber("123") as { voucherNumber: string; normalized: string }],
+  ["0123"],
+);
+assert.deepEqual(reverseLeadingZeroDuplicate.toCreate, []);
+
+const paddedRange = parseVoucherNumberRange("0123", "0127");
+assert.ok(Array.isArray(paddedRange));
+assert.deepEqual(
+  paddedRange.map((item) => item.voucherNumber),
+  ["0123", "0124", "0125", "0126", "0127"],
+);
+assert.deepEqual(
+  paddedRange.map((item) => item.normalized),
+  ["123", "124", "125", "126", "127"],
+);
+
+const pastedZeros = parseVoucherNumberList("0123\n123\n000123");
+assert.ok(Array.isArray(pastedZeros));
+assert.equal(pastedZeros.length, 1);
+assert.equal(pastedZeros[0]?.normalized, "123");
+
+assert.equal(
+  findRm10LibraryRowsByNumber(
+    buildRm10LibraryRows({
+      today: "2026-09-24",
+      managedCards: [
+        {
+          id: "card-123",
+          voucherNumber: "0123",
+          voucherNumberNormalized: "0123",
+          expiryDate: "2026-12-31",
+        },
+      ],
+      redemptions: [
+        redemption({
+          adjustmentId: "adj-123",
+          voucherNumber: "123",
+          orderNumber: "WB0123-MATCH",
+        }),
+      ],
+    }),
+    "0123",
+  )[0]?.status,
+  "used",
+);
+
+const engineSrc = readSrc("src/engines/vouchers/physical-rm10.ts");
+assert.doesNotMatch(engineSrc, /`WB\$\{/);
+assert.doesNotMatch(engineSrc, /voucherNumber = `WB/);
+assert.match(engineSrc, /Do not add a prefix/);
+
+const identityMigration = readSrc(
+  "supabase/migrations/20260924160000_rm10_voucher_number_numeric_identity.sql",
+);
+assert.match(identityMigration, /normalize_physical_voucher_number/);
+assert.match(identityMigration, /regexp_replace\(compact, '\^0\+', ''\)/);
+assert.doesNotMatch(
+  identityMigration,
+  /create or replace function public.redeem_rm10_physical_voucher_for_guest_order/,
+);
 
 const tabs = readSrc("src/workspaces/library/vouchers/VoucherLibraryTabs.tsx");
 assert.match(tabs, /All Vouchers/);

@@ -15,19 +15,8 @@ import {
   RM10_UNAUTHORIZED,
 } from "@/engines/vouchers/physical-rm10";
 import { createClient } from "@/lib/supabase/server";
+import type { Rm10LibraryActionState } from "@/workspaces/library/vouchers/rm10/action-state";
 import { listExistingRm10NormalizedNumbers } from "@/workspaces/library/vouchers/rm10/queries";
-
-export type Rm10LibraryActionState = {
-  error: string | null;
-  createdCount: number;
-  existingNumbers: string[];
-};
-
-export const rm10LibraryActionInitialState: Rm10LibraryActionState = {
-  error: null,
-  createdCount: 0,
-  existingNumbers: [],
-};
 
 async function requireRm10LibraryStaff() {
   const staff = await requireStaff();
@@ -79,9 +68,7 @@ export async function addRm10PhysicalVouchersAction(
 
   let existingNormalized: string[];
   try {
-    existingNormalized = await listExistingRm10NormalizedNumbers(
-      requested.map((item) => item.normalized),
-    );
+    existingNormalized = await listExistingRm10NormalizedNumbers();
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : RM10_UNAUTHORIZED,
