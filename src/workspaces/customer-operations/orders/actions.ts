@@ -349,7 +349,7 @@ export async function markOrderAwaitingPaymentAction(
   return applyOrderUpdate(orderId, { status: "awaiting_payment" });
 }
 
-export const RECORD_VERIFIED_PAYMENT_REQUIRED =
+const RECORD_VERIFIED_PAYMENT_REQUIRED =
   "Record verified payment in the Order Workspace. Direct paid status is no longer used.";
 
 export async function recordOrderPaidAction(

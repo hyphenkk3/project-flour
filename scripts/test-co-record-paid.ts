@@ -20,8 +20,9 @@ assert.doesNotMatch(recordPaidFn, /payment_status:\s*"paid"/);
 assert.match(recordPaidFn, /RECORD_VERIFIED_PAYMENT_REQUIRED/);
 assert.match(
   actions,
-  /RECORD_VERIFIED_PAYMENT_REQUIRED =\s*"Record verified payment in the Order Workspace\. Direct paid status is no longer used\."/,
+  /const RECORD_VERIFIED_PAYMENT_REQUIRED =\s*"Record verified payment in the Order Workspace\. Direct paid status is no longer used\."/,
 );
+assert.doesNotMatch(actions, /export const RECORD_VERIFIED_PAYMENT_REQUIRED/);
 
 const ui = read(
   "src/workspaces/customer-operations/orders/OrderStatusActions.tsx",
