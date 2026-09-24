@@ -80,6 +80,9 @@ export default async function LibraryRm10VoucherDetailPage({
               tone="neutral"
             />
           ) : null}
+          {used.usedAfterExpiry ? (
+            <StatusBadge label="Used after expiry" tone="warning" />
+          ) : null}
         </div>
         <PageHeader title="RM10 Physical Card" />
       </div>
@@ -108,7 +111,7 @@ export default async function LibraryRm10VoucherDetailPage({
             </dd>
           </div>
           <div>
-            <dt className="text-skyline">Expiry</dt>
+            <dt className="text-skyline">Original Expiry</dt>
             <dd className="text-ink mt-1">{formatExpiry(row.expiryDate)}</dd>
           </div>
           <div>
@@ -158,6 +161,28 @@ export default async function LibraryRm10VoucherDetailPage({
                 : "—"}
             </dd>
           </div>
+          {row.usedAfterExpiry ? (
+            <>
+              <div>
+                <dt className="text-skyline">Owner Override</dt>
+                <dd className="text-ink mt-1">Used after expiry</dd>
+              </div>
+              <div>
+                <dt className="text-skyline">Override Date</dt>
+                <dd className="text-ink mt-1">
+                  {row.redemption
+                    ? formatCalendar(row.redemption.redeemedDate)
+                    : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-skyline">Override By</dt>
+                <dd className="text-ink mt-1">
+                  {row.redemption?.overrideByName ?? "—"}
+                </dd>
+              </div>
+            </>
+          ) : null}
           {row.redemption ? (
             <div className="sm:col-span-2">
               <Link

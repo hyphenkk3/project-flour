@@ -1,9 +1,9 @@
 /**
  * RM10 Physical Card library — management/visibility helpers.
  *
- * Does not change redemption eligibility, expiry checks, or duplicate-use
- * rejection. Used status is derived from effective rm10_physical_card
- * adjustments, never from a manual flag.
+ * Library-managed registered expiry is the authoritative original expiry.
+ * Used status is derived from effective rm10_physical_card adjustments,
+ * never from a manual flag.
  */
 
 import { physicalVoucherNumberFromMetadata } from "@/engines/orders/promotions";
@@ -226,7 +226,11 @@ export function deriveRm10LibraryStatus(input: {
 
 export function redemptionFromAdjustmentMetadata(
   metadata: Record<string, unknown> | null | undefined,
-): { voucherNumber: string; expiryDate: string | null } | null {
+): {
+  voucherNumber: string;
+  expiryDate: string | null;
+  ownerOverride: boolean;
+} | null {
   const voucherNumber = physicalVoucherNumberFromMetadata(metadata);
   if (!voucherNumber) {
     return null;
@@ -236,7 +240,52 @@ export function redemptionFromAdjustmentMetadata(
     typeof rawExpiry === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawExpiry)
       ? rawExpiry
       : null;
-  return { voucherNumber, expiryDate };
+  return {
+    voucherNumber,
+    expiryDate,
+    ownerOverride: metadata?.owner_override === true,
+  };
+}
+
+/**
+ * Library-managed original expiry is authoritative.
+ * Form expiry must not make an expired registered card valid.
+ */
+export function evaluateRegisteredPhysicalRm10Expiry(input: {
+  registeredExpiry: string | null;
+  today: string;
+  orderDate: string;
+  pickupDate: string;
+}): { expired: boolean; reason: string | null } {
+  const expiry = input.registeredExpiry;
+  if (!expiry || !/^\d{4}-\d{2}-\d{2}$/.test(expiry)) {
+    return { expired: false, reason: null };
+  }
+  if (input.orderDate > expiry) {
+    return { expired: true, reason: "Order date is after voucher expiry" };
+  }
+  if (input.pickupDate > expiry) {
+    return { expired: true, reason: "Pickup date is after voucher expiry" };
+  }
+  if (input.today > expiry) {
+    return { expired: true, reason: "This physical voucher has expired" };
+  }
+  return { expired: false, reason: null };
+}
+
+export function isRm10UsedAfterExpiry(input: {
+  ownerOverride: boolean;
+  originalExpiry: string | null;
+  redeemedDate: string;
+  orderDate: string;
+}): boolean {
+  if (!input.ownerOverride || !input.originalExpiry) {
+    return false;
+  }
+  return (
+    input.redeemedDate > input.originalExpiry ||
+    input.orderDate > input.originalExpiry
+  );
 }
 
 export function buildRm10LibraryRows(input: {
@@ -280,6 +329,12 @@ export function buildRm10LibraryRows(input: {
         status: "used",
         source: managed ? "library" : "historical",
         duplicateRedemption,
+        usedAfterExpiry: isRm10UsedAfterExpiry({
+          ownerOverride: redemption.ownerOverride,
+          originalExpiry: managed?.expiryDate ?? redemption.expiryDate,
+          redeemedDate: redemption.redeemedDate,
+          orderDate: redemption.orderDate,
+        }),
         redemption,
       });
     }
@@ -301,6 +356,7 @@ export function buildRm10LibraryRows(input: {
       }),
       source: "library",
       duplicateRedemption: false,
+      usedAfterExpiry: false,
       redemption: null,
     });
   }

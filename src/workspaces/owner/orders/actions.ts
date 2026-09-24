@@ -66,7 +66,16 @@ import {
 import { requireStaff } from "@/foundation/auth/session";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
-import { formatBusinessMonthYear, isDifferentBusinessMonth } from "@/lib/dates";
+import {
+  formatBusinessMonthYear,
+  formatLongBusinessDayMonthYear,
+  isDifferentBusinessMonth,
+} from "@/lib/dates";
+import { singaporeDateFromIso } from "@/engines/orders/promotions";
+import {
+  evaluateRegisteredPhysicalRm10Expiry,
+  normalizePhysicalVoucherNumber,
+} from "@/engines/vouchers/physical-rm10";
 import { createClient } from "@/lib/supabase/server";
 import type {
   StorefrontOrder,
@@ -1576,6 +1585,42 @@ export type RedeemRm10State = {
   success: boolean;
 };
 
+async function rejectExpiredManagedRm10WithoutOverride(input: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  voucherNumber: string;
+  ownerOverride: boolean;
+  orderCreatedAt: string;
+  pickupDate: string;
+}): Promise<string | null> {
+  const normalized = normalizePhysicalVoucherNumber(input.voucherNumber);
+  if (!normalized) {
+    return null;
+  }
+
+  const { data } = await input.supabase
+    .from("physical_discount_vouchers")
+    .select("expiry_date, library_managed")
+    .eq("voucher_number_normalized", normalized)
+    .eq("library_managed", true)
+    .maybeSingle();
+
+  if (!data?.library_managed || !data.expiry_date) {
+    return null;
+  }
+
+  const evaluation = evaluateRegisteredPhysicalRm10Expiry({
+    registeredExpiry: String(data.expiry_date),
+    today: singaporeDateFromIso(new Date().toISOString()),
+    orderDate: singaporeDateFromIso(input.orderCreatedAt),
+    pickupDate: input.pickupDate,
+  });
+  if (!evaluation.expired || input.ownerOverride) {
+    return null;
+  }
+
+  return `This physical voucher expired on ${formatLongBusinessDayMonthYear(String(data.expiry_date))}. Using it requires Owner Override.`;
+}
+
 export async function redeemRm10VoucherAction(
   orderId: string,
   _prev: RedeemRm10State,
@@ -1613,6 +1658,17 @@ export async function redeemRm10VoucherAction(
   }
 
   const supabase = await createClient();
+  const managedExpiryError = await rejectExpiredManagedRm10WithoutOverride({
+    supabase,
+    voucherNumber,
+    ownerOverride,
+    orderCreatedAt: order.createdAt,
+    pickupDate: order.pickupDate,
+  });
+  if (managedExpiryError) {
+    return { error: managedExpiryError, success: false };
+  }
+
   const { error } = await supabase.rpc(
     "redeem_rm10_physical_voucher_for_guest_order",
     {
@@ -1641,6 +1697,7 @@ export async function redeemRm10VoucherAction(
   revalidatePath("/owner");
   revalidatePath(`/owner/orders/${orderId}`);
   revalidatePath(`/owner/orders/${orderId}/payment`);
+  revalidatePath("/library/vouchers/rm10");
   return { error: null, success: true };
 }
 
@@ -1720,6 +1777,17 @@ export async function changeAugustPromoToRm10Action(
   }
 
   const supabase = await createClient();
+  const managedExpiryError = await rejectExpiredManagedRm10WithoutOverride({
+    supabase,
+    voucherNumber,
+    ownerOverride,
+    orderCreatedAt: order.createdAt,
+    pickupDate: order.pickupDate,
+  });
+  if (managedExpiryError) {
+    return { error: managedExpiryError, success: false };
+  }
+
   const { error } = await supabase.rpc(
     "change_august_promo_to_rm10_physical_voucher",
     {
@@ -1748,6 +1816,7 @@ export async function changeAugustPromoToRm10Action(
   revalidatePath("/owner");
   revalidatePath(`/owner/orders/${orderId}`);
   revalidatePath(`/owner/orders/${orderId}/payment`);
+  revalidatePath("/library/vouchers/rm10");
   return { error: null, success: true };
 }
 

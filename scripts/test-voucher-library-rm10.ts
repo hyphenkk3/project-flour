@@ -19,9 +19,11 @@ import {
 import {
   buildRm10LibraryRows,
   deriveRm10LibraryStatus,
+  evaluateRegisteredPhysicalRm10Expiry,
   filterRm10LibraryRows,
   findRm10LibraryRowsByNumber,
   formatAlreadyExistMessage,
+  isRm10UsedAfterExpiry,
   normalizePhysicalVoucherNumber,
   parseSingleVoucherNumber,
   parseVoucherNumberList,
@@ -51,6 +53,8 @@ function redemption(
     fulfilmentMethodLabel: partial.fulfilmentMethodLabel ?? "Pickup",
     discountAmount: partial.discountAmount ?? -10,
     expiryDate: partial.expiryDate ?? "2026-12-31",
+    ownerOverride: partial.ownerOverride ?? false,
+    overrideByName: partial.overrideByName ?? null,
     ...partial,
   };
 }
@@ -363,58 +367,213 @@ assert.doesNotMatch(
   /update public\.physical_discount_vouchers v\n\s+set\n\s+expiry_date = p_expiry_date/,
 );
 
-// CASE A — registered voucher, normal redemption keeps library expiry
+const authoritativeExpiryMigration = readSrc(
+  "supabase/migrations/20260924180000_authoritative_library_rm10_expiry.sql",
+);
+assert.match(
+  authoritativeExpiryMigration,
+  /Library-managed original expiry is authoritative/,
+);
+assert.match(
+  authoritativeExpiryMigration,
+  /singapore_calendar_date\(now\(\)\) > voucher_row\.expiry_date/,
+);
+assert.match(
+  authoritativeExpiryMigration,
+  /when v\.library_managed then v\.expiry_date/,
+);
+assert.match(authoritativeExpiryMigration, /registered_expiry_date/);
+assert.match(authoritativeExpiryMigration, /v_found := found/);
+assert.doesNotMatch(
+  authoritativeExpiryMigration,
+  /create table public\.rm10_physical_vouchers/,
+);
+
+const directorySrc = readSrc(
+  "src/workspaces/library/vouchers/rm10/Rm10PhysicalDirectory.tsx",
+);
+const detailSrc = readSrc(
+  "src/app/(app)/library/vouchers/rm10/[voucherNumber]/page.tsx",
+);
+assert.match(directorySrc, /Original Expiry/);
+assert.match(directorySrc, /Used after expiry/);
+assert.match(detailSrc, /Original Expiry/);
+assert.match(detailSrc, /Used after expiry/);
+assert.match(detailSrc, /Override Date/);
+assert.match(detailSrc, /Override By/);
+
+// CASE A — unexpired managed voucher: no override, original expiry unchanged
+assert.equal(
+  evaluateRegisteredPhysicalRm10Expiry({
+    registeredExpiry: "2026-12-31",
+    today: "2026-09-24",
+    orderDate: "2026-09-24",
+    pickupDate: "2026-09-30",
+  }).expired,
+  false,
+);
 const caseA = buildRm10LibraryRows({
   today: "2026-09-24",
   managedCards: [
     {
-      id: "card-213",
-      voucherNumber: "213",
-      voucherNumberNormalized: "213",
-      expiryDate: "2026-07-31",
+      id: "card-3001",
+      voucherNumber: "3001",
+      voucherNumberNormalized: "3001",
+      expiryDate: "2026-12-31",
     },
   ],
   redemptions: [
     redemption({
-      adjustmentId: "adj-213-a",
-      voucherNumber: "213",
+      adjustmentId: "adj-3001",
+      voucherNumber: "3001",
       expiryDate: "2026-10-09",
-      orderNumber: "WB213A",
+      orderNumber: "WB3001A",
+      redeemedDate: "2026-09-24",
+      ownerOverride: false,
     }),
   ],
 });
 assert.equal(caseA.length, 1);
 assert.equal(caseA[0]?.status, "used");
 assert.equal(caseA[0]?.source, "library");
-assert.equal(caseA[0]?.expiryDate, "2026-07-31");
-assert.equal(caseA[0]?.redemption?.expiryDate, "2026-10-09");
+assert.equal(caseA[0]?.usedAfterExpiry, false);
+assert.equal(caseA[0]?.expiryDate, "2026-12-31");
+assert.equal(caseA[0]?.redemption?.ownerOverride, false);
 
-// CASE B — registered expired voucher + override metadata; library expiry stays July
+// CASE B — expired managed voucher + future form expiry is still expired
+const caseBExpiry = evaluateRegisteredPhysicalRm10Expiry({
+  registeredExpiry: "2026-07-31",
+  today: "2026-09-24",
+  orderDate: "2026-09-24",
+  pickupDate: "2026-10-09",
+});
+assert.equal(caseBExpiry.expired, true);
+assert.match(caseBExpiry.reason ?? "", /expired|after voucher expiry/i);
 const caseB = buildRm10LibraryRows({
   today: "2026-09-24",
   managedCards: [
     {
-      id: "card-213-b",
-      voucherNumber: "213",
-      voucherNumberNormalized: "213",
-      expiryDate: "2026-07-15",
+      id: "card-3002",
+      voucherNumber: "3002",
+      voucherNumberNormalized: "3002",
+      expiryDate: "2026-07-31",
     },
   ],
   redemptions: [
     redemption({
-      adjustmentId: "adj-213-b",
-      voucherNumber: "213",
+      adjustmentId: "adj-3002",
+      voucherNumber: "3002",
       expiryDate: "2026-10-09",
-      orderNumber: "WB213B",
+      orderNumber: "WB3002B",
     }),
   ],
 });
 assert.equal(caseB[0]?.status, "used");
-assert.equal(caseB[0]?.expiryDate, "2026-07-15");
+assert.equal(caseB[0]?.expiryDate, "2026-07-31");
 assert.notEqual(caseB[0]?.expiryDate, caseB[0]?.redemption?.expiryDate);
 
-// CASE C — unregistered/historical redemption still appears without a managed row
+// CASE C — expired managed voucher without override stays expired in library
 const caseC = buildRm10LibraryRows({
+  today: "2026-09-24",
+  managedCards: [
+    {
+      id: "card-3003",
+      voucherNumber: "3003",
+      voucherNumberNormalized: "3003",
+      expiryDate: "2026-07-31",
+    },
+  ],
+  redemptions: [],
+});
+assert.equal(caseC[0]?.status, "expired");
+assert.equal(caseC[0]?.expiryDate, "2026-07-31");
+assert.equal(caseC[0]?.usedAfterExpiry, false);
+assert.equal(caseC[0]?.redemption, null);
+
+// CASE D — expired managed voucher WITH Owner Override
+assert.equal(
+  isRm10UsedAfterExpiry({
+    ownerOverride: true,
+    originalExpiry: "2026-07-31",
+    redeemedDate: "2026-09-24",
+    orderDate: "2026-09-24",
+  }),
+  true,
+);
+const caseD = buildRm10LibraryRows({
+  today: "2026-09-24",
+  managedCards: [
+    {
+      id: "card-3004",
+      voucherNumber: "3004",
+      voucherNumberNormalized: "3004",
+      expiryDate: "2026-07-31",
+    },
+  ],
+  redemptions: [
+    redemption({
+      adjustmentId: "adj-3004",
+      voucherNumber: "3004",
+      expiryDate: "2026-10-09",
+      orderNumber: "WB3004D",
+      orderDate: "2026-09-24",
+      redeemedDate: "2026-09-24",
+      ownerOverride: true,
+      overrideByName: "Owner",
+    }),
+  ],
+});
+assert.equal(caseD[0]?.status, "used");
+assert.equal(caseD[0]?.expiryDate, "2026-07-31");
+assert.equal(caseD[0]?.usedAfterExpiry, true);
+assert.equal(caseD[0]?.redemption?.ownerOverride, true);
+assert.equal(caseD[0]?.redemption?.overrideByName, "Owner");
+assert.equal(caseD[0]?.redemption?.orderNumber, "WB3004D");
+
+// CASE E — Owner cannot silently override
+const discountPanel = readSrc(
+  "src/workspaces/owner/orders/OrderDiscountsPanel.tsx",
+);
+const expiredNotice = readSrc(
+  "src/workspaces/owner/orders/RegisteredRm10ExpiredNotice.tsx",
+);
+assert.match(expiredNotice, /Voucher Expired/);
+assert.match(expiredNotice, /This physical voucher expired on/);
+assert.match(expiredNotice, /Using it requires Owner Override/);
+assert.match(expiredNotice, /Use Owner Override/);
+assert.match(discountPanel, /expiredOverrideConfirmed/);
+assert.match(discountPanel, /setExpiredOverrideConfirmed\(true\)/);
+assert.match(discountPanel, /setOwnerOverride\(false\)/);
+assert.doesNotMatch(discountPanel, /setOwnerOverride\(true\);\n\s*setShowRm10Form/);
+assert.match(
+  readSrc("src/workspaces/owner/orders/actions.ts"),
+  /rejectExpiredManagedRm10WithoutOverride/,
+);
+
+// CASE F — form expiry cannot mutate library expiry
+const caseF = buildRm10LibraryRows({
+  today: "2026-09-24",
+  managedCards: [
+    {
+      id: "card-3005",
+      voucherNumber: "3005",
+      voucherNumberNormalized: "3005",
+      expiryDate: "2026-07-31",
+    },
+  ],
+  redemptions: [
+    redemption({
+      adjustmentId: "adj-3005",
+      voucherNumber: "3005",
+      expiryDate: "2026-10-09",
+    }),
+  ],
+});
+assert.equal(caseF[0]?.expiryDate, "2026-07-31");
+assert.equal(caseF[0]?.redemption?.expiryDate, "2026-10-09");
+
+// CASE G — unregistered/historical redemption still appears without a managed row
+const caseG = buildRm10LibraryRows({
   today: "2026-09-24",
   managedCards: [],
   redemptions: [
@@ -426,10 +585,11 @@ const caseC = buildRm10LibraryRows({
     }),
   ],
 });
-assert.equal(caseC.length, 1);
-assert.equal(caseC[0]?.source, "historical");
-assert.equal(caseC[0]?.status, "used");
-assert.equal(caseC[0]?.expiryDate, "2026-10-09");
+assert.equal(caseG.length, 1);
+assert.equal(caseG[0]?.source, "historical");
+assert.equal(caseG[0]?.status, "used");
+assert.equal(caseG[0]?.expiryDate, "2026-10-09");
+assert.equal(caseG[0]?.usedAfterExpiry, false);
 
 // 19. Existing voucher validation still works
 assert.equal(

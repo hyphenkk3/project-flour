@@ -14,6 +14,8 @@ export type Rm10LibraryRedemption = {
   discountAmount: number;
   voucherNumber: string;
   expiryDate: string | null;
+  ownerOverride: boolean;
+  overrideByName: string | null;
 };
 
 export type Rm10LibraryCard = {
@@ -31,6 +33,7 @@ export type Rm10LibraryRow = {
   status: Rm10LibraryStatus;
   source: Rm10LibrarySource;
   duplicateRedemption: boolean;
+  usedAfterExpiry: boolean;
   redemption: Rm10LibraryRedemption | null;
 };
 

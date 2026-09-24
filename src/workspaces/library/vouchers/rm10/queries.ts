@@ -30,6 +30,7 @@ type AdjustmentRow = {
   amount: number | string;
   metadata: Record<string, unknown> | null;
   created_at: string;
+  created_by: string | null;
   status: string | null;
   reverses_adjustment_id: string | null;
   orders:
@@ -69,7 +70,10 @@ function mapManagedCard(row: ManagedCardRow): Rm10LibraryCard {
   };
 }
 
-function mapRedemption(row: AdjustmentRow): Rm10LibraryRedemption | null {
+function mapRedemption(
+  row: AdjustmentRow,
+  staffNames: Map<string, string>,
+): Rm10LibraryRedemption | null {
   const extracted = redemptionFromAdjustmentMetadata(row.metadata);
   if (!extracted) {
     return null;
@@ -79,6 +83,9 @@ function mapRedemption(row: AdjustmentRow): Rm10LibraryRedemption | null {
     ? workspaceFulfilmentSectionTitle(
         order.fulfilment_method as StorefrontOrderFulfilmentMethod,
       )
+    : null;
+  const overrideByName = row.created_by
+    ? staffNames.get(row.created_by) ?? null
     : null;
 
   return {
@@ -93,6 +100,8 @@ function mapRedemption(row: AdjustmentRow): Rm10LibraryRedemption | null {
     discountAmount: Number(row.amount),
     voucherNumber: extracted.voucherNumber,
     expiryDate: extracted.expiryDate,
+    ownerOverride: extracted.ownerOverride,
+    overrideByName,
   };
 }
 
@@ -110,7 +119,7 @@ export async function listRm10LibraryRows(): Promise<Rm10LibraryRow[]> {
     supabase
       .from("order_adjustments")
       .select(
-        "id, order_id, amount, metadata, created_at, status, reverses_adjustment_id, orders!inner (id, order_number, guest_name, created_at, pickup_date, fulfilment_method)",
+        "id, order_id, amount, metadata, created_at, created_by, status, reverses_adjustment_id, orders!inner (id, order_number, guest_name, created_at, pickup_date, fulfilment_method)",
       )
       .eq("code", RM10_CARD_CODE),
   ]);
@@ -122,15 +131,40 @@ export async function listRm10LibraryRows(): Promise<Rm10LibraryRow[]> {
     throw new Error(adjustmentsResult.error.message);
   }
 
+  const adjustmentRows = adjustmentsResult.data as AdjustmentRow[];
+  const staffIds = [
+    ...new Set(
+      adjustmentRows
+        .map((row) => row.created_by)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ];
+  const staffNames = new Map<string, string>();
+  if (staffIds.length > 0) {
+    const { data: staffRows, error: staffError } = await supabase
+      .from("staff_profiles")
+      .select("id, display_name")
+      .in("id", staffIds);
+    if (staffError) {
+      throw new Error(staffError.message);
+    }
+    for (const staff of staffRows ?? []) {
+      const name = String(staff.display_name ?? "").trim();
+      if (name) {
+        staffNames.set(String(staff.id), name);
+      }
+    }
+  }
+
   const managedCards = (cardsResult.data as ManagedCardRow[]).map(mapManagedCard);
   const redemptions = getEffectiveAdjustments(
-    (adjustmentsResult.data as AdjustmentRow[]).map((row) => ({
+    adjustmentRows.map((row) => ({
       row,
       status: row.status ?? "active",
       reversesAdjustmentId: row.reverses_adjustment_id,
     })),
   )
-    .map((item) => mapRedemption(item.row))
+    .map((item) => mapRedemption(item.row, staffNames))
     .filter((row): row is Rm10LibraryRedemption => row !== null);
 
   return buildRm10LibraryRows({
@@ -138,6 +172,26 @@ export async function listRm10LibraryRows(): Promise<Rm10LibraryRow[]> {
     redemptions,
     today: singaporeDateFromIso(new Date().toISOString()),
   });
+}
+
+export async function getManagedRm10CardByNormalizedNumber(
+  normalized: string,
+): Promise<Rm10LibraryCard | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("physical_discount_vouchers")
+    .select("id, voucher_number, voucher_number_normalized, expiry_date")
+    .eq("library_managed", true)
+    .eq("voucher_number_normalized", normalized)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (!data) {
+    return null;
+  }
+  return mapManagedCard(data as ManagedCardRow);
 }
 
 export async function listExistingRm10NormalizedNumbers(): Promise<string[]> {

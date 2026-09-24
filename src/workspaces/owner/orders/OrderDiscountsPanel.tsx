@@ -43,6 +43,9 @@ import {
   type OperationsApprovalRecord,
 } from "@/engines/operations/approvals";
 import { createOperationsApprovalAction } from "@/workspaces/owner/approvals/actions";
+import { evaluateRegisteredPhysicalRm10Expiry } from "@/engines/vouchers/physical-rm10";
+import { lookupManagedRm10CardAction } from "@/workspaces/library/vouchers/rm10/lookup-action";
+import { RegisteredRm10ExpiredNotice } from "@/workspaces/owner/orders/RegisteredRm10ExpiredNotice";
 
 type OrderDiscountsPanelProps = {
   order: StorefrontOrder;
@@ -85,6 +88,14 @@ export function OrderDiscountsPanel({
   const [approvalReason, setApprovalReason] = useState("");
   const [approvalError, setApprovalError] = useState<string | null>(null);
   const [approvalPending, startApproval] = useTransition();
+  const [managedExpiry, setManagedExpiry] = useState<string | null>(null);
+  const [changeManagedExpiry, setChangeManagedExpiry] = useState<string | null>(
+    null,
+  );
+  const [expiredOverrideConfirmed, setExpiredOverrideConfirmed] =
+    useState(false);
+  const [changeExpiredOverrideConfirmed, setChangeExpiredOverrideConfirmed] =
+    useState(false);
 
   const effective = useMemo(
     () =>
@@ -97,6 +108,7 @@ export function OrderDiscountsPanel({
   const hasRm10 = hasActiveAdjustmentCode(order.adjustments, RM10_CARD_CODE);
   const canMutateDiscounts = isGuestOrderEditable(order.status);
   const orderDate = singaporeDateFromIso(order.createdAt);
+  const today = singaporeDateFromIso(new Date().toISOString());
 
   const activePromo = effective.find((row) => row.code === AUGUST_PROMO_CODE);
   const activeRm10 = effective.find((row) => row.code === RM10_CARD_CODE);
@@ -161,6 +173,55 @@ export function OrderDiscountsPanel({
       })
     : { canRequest: false, reason: null };
 
+  const registeredExpiryState = evaluateRegisteredPhysicalRm10Expiry({
+    registeredExpiry: managedExpiry,
+    today,
+    orderDate,
+    pickupDate: order.pickupDate,
+  });
+  const changeRegisteredExpiryState = evaluateRegisteredPhysicalRm10Expiry({
+    registeredExpiry: changeManagedExpiry,
+    today,
+    orderDate,
+    pickupDate: order.pickupDate,
+  });
+  const registeredExpired = Boolean(
+    managedExpiry && registeredExpiryState.expired,
+  );
+  const changeRegisteredExpired = Boolean(
+    changeManagedExpiry && changeRegisteredExpiryState.expired,
+  );
+
+  useEffect(() => {
+    const value = voucherNumber;
+    const handle = window.setTimeout(() => {
+      void lookupManagedRm10CardAction(value).then((result) => {
+        setManagedExpiry(result.found ? result.expiryDate : null);
+      });
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [voucherNumber]);
+
+  useEffect(() => {
+    const value = changeVoucherNumber;
+    const handle = window.setTimeout(() => {
+      void lookupManagedRm10CardAction(value).then((result) => {
+        setChangeManagedExpiry(result.found ? result.expiryDate : null);
+      });
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [changeVoucherNumber]);
+
+  function resetRedeemOverride() {
+    setExpiredOverrideConfirmed(false);
+    setOwnerOverride(false);
+  }
+
+  function resetChangeOverride() {
+    setChangeExpiredOverrideConfirmed(false);
+    setChangeOverride(false);
+  }
+
   function requestDiscountApproval(input: {
     action: "redeem_rm10" | "change_august_to_rm10";
     voucherNumber: string;
@@ -216,17 +277,15 @@ export function OrderDiscountsPanel({
   );
 
   useEffect(() => {
-    if (!redeemState.success) return;
-    setShowRm10Form(false);
-    setOwnerOverride(false);
-    router.refresh();
+    if (redeemState.success) {
+      router.refresh();
+    }
   }, [redeemState.success, router]);
 
   useEffect(() => {
-    if (!changeState.success) return;
-    setShowChangeForm(false);
-    setChangeOverride(false);
-    router.refresh();
+    if (changeState.success) {
+      router.refresh();
+    }
   }, [changeState.success, router]);
 
   function handleApplyAugust() {
@@ -324,6 +383,7 @@ export function OrderDiscountsPanel({
                   setShowChangeForm(true);
                   setShowRm10Form(false);
                   setLifecycleError(null);
+                  resetChangeOverride();
                 }}
                 type="button"
               >
@@ -364,7 +424,7 @@ export function OrderDiscountsPanel({
         </p>
       ) : null}
 
-      {showChangeForm && activePromo && canMutateDiscounts ? (
+      {showChangeForm && !changeState.success && activePromo && canMutateDiscounts ? (
         <form
           action={changeAction}
           className="border-fog space-y-3 rounded-lg border p-3"
@@ -381,7 +441,11 @@ export function OrderDiscountsPanel({
             <FormInput
               id="change_voucher_number"
               name="voucher_number"
-              onChange={(event) => setChangeVoucherNumber(event.target.value)}
+              onChange={(event) => {
+                setChangeVoucherNumber(event.target.value);
+                resetChangeOverride();
+                setChangeManagedExpiry(null);
+              }}
               placeholder="e.g. 325"
               required
               value={changeVoucherNumber}
@@ -397,7 +461,37 @@ export function OrderDiscountsPanel({
               value={changeExpiryDate}
             />
           </FormField>
-          {canOverrideDiscountEligibility ? (
+          {changeRegisteredExpired && changeManagedExpiry ? (
+            <RegisteredRm10ExpiredNotice
+              canOverride={canOverrideDiscountEligibility}
+              confirmed={changeExpiredOverrideConfirmed}
+              onBack={() => {
+                setChangeExpiredOverrideConfirmed(false);
+                setChangeOverride(false);
+              }}
+              onConfirm={() => {
+                setChangeExpiredOverrideConfirmed(true);
+                setChangeOverride(true);
+              }}
+              originalExpiry={changeManagedExpiry}
+            />
+          ) : null}
+          {changeRegisteredExpired &&
+          canOverrideDiscountEligibility &&
+          changeExpiredOverrideConfirmed ? (
+            <>
+              <input name="owner_override" type="hidden" value="1" />
+              <FormField htmlFor="change_override_reason" label="Override reason">
+                <FormTextarea
+                  id="change_override_reason"
+                  name="override_reason"
+                  placeholder="Required reason for the exception"
+                  required
+                  rows={2}
+                />
+              </FormField>
+            </>
+          ) : canOverrideDiscountEligibility && !changeRegisteredExpired ? (
             <>
               <label className="text-ink flex items-center gap-2 text-sm">
                 <input
@@ -423,7 +517,9 @@ export function OrderDiscountsPanel({
                 <input name="owner_override" type="hidden" value="0" />
               )}
             </>
-          ) : canRequestOperationsApproval && changeException.canRequest ? (
+          ) : canRequestOperationsApproval &&
+            changeException.canRequest &&
+            !changeRegisteredExpired ? (
             <div className="space-y-2">
               <p className="text-status-warning text-sm">
                 Voucher cannot be applied automatically.
@@ -448,7 +544,11 @@ export function OrderDiscountsPanel({
           )}
           <FormError message={changeState.error ?? approvalError} />
           <FormActions>
-            {canRequestOperationsApproval && changeException.canRequest ? (
+            {changeRegisteredExpired &&
+            (!canOverrideDiscountEligibility ||
+              !changeExpiredOverrideConfirmed) ? null : canRequestOperationsApproval &&
+              changeException.canRequest &&
+              !changeRegisteredExpired ? (
               <button
                 className="bg-ink text-mist hover:bg-skyline inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-medium disabled:opacity-60"
                 disabled={approvalPending || Boolean(pendingDiscountApproval)}
@@ -507,12 +607,13 @@ export function OrderDiscountsPanel({
 
           {canOfferRm10Form && !pendingDiscountApproval ? (
             <div className="space-y-2">
-              {!showRm10Form ? (
+              {!showRm10Form || redeemState.success ? (
                 <button
                   className="border-fog text-ink hover:bg-mist inline-flex min-h-10 items-center justify-center rounded-lg border px-4 text-sm font-medium"
                   onClick={() => {
                     setShowRm10Form(true);
                     setShowChangeForm(false);
+                    resetRedeemOverride();
                   }}
                   type="button"
                 >
@@ -534,7 +635,11 @@ export function OrderDiscountsPanel({
                     <FormInput
                       id="voucher_number"
                       name="voucher_number"
-                      onChange={(event) => setVoucherNumber(event.target.value)}
+                      onChange={(event) => {
+                        setVoucherNumber(event.target.value);
+                        resetRedeemOverride();
+                        setManagedExpiry(null);
+                      }}
                       placeholder="e.g. 325"
                       required
                       value={voucherNumber}
@@ -550,7 +655,37 @@ export function OrderDiscountsPanel({
                       value={expiryDate}
                     />
                   </FormField>
-                  {canOverrideDiscountEligibility ? (
+                  {registeredExpired && managedExpiry ? (
+                    <RegisteredRm10ExpiredNotice
+                      canOverride={canOverrideDiscountEligibility}
+                      confirmed={expiredOverrideConfirmed}
+                      onBack={() => {
+                        setExpiredOverrideConfirmed(false);
+                        setOwnerOverride(false);
+                      }}
+                      onConfirm={() => {
+                        setExpiredOverrideConfirmed(true);
+                        setOwnerOverride(true);
+                      }}
+                      originalExpiry={managedExpiry}
+                    />
+                  ) : null}
+                  {registeredExpired &&
+                  canOverrideDiscountEligibility &&
+                  expiredOverrideConfirmed ? (
+                    <>
+                      <input name="owner_override" type="hidden" value="1" />
+                      <FormField htmlFor="override_reason" label="Override reason">
+                        <FormTextarea
+                          id="override_reason"
+                          name="override_reason"
+                          placeholder="Required reason for the exception"
+                          required
+                          rows={2}
+                        />
+                      </FormField>
+                    </>
+                  ) : canOverrideDiscountEligibility && !registeredExpired ? (
                     <>
                       <label className="text-ink flex items-center gap-2 text-sm">
                         <input
@@ -578,7 +713,9 @@ export function OrderDiscountsPanel({
                         <input name="owner_override" type="hidden" value="0" />
                       )}
                     </>
-                  ) : canRequestOperationsApproval && redeemException.canRequest ? (
+                  ) : canRequestOperationsApproval &&
+                    redeemException.canRequest &&
+                    !registeredExpired ? (
                     <div className="space-y-2">
                       <p className="text-status-warning text-sm">
                         Voucher cannot be applied automatically.
@@ -610,8 +747,11 @@ export function OrderDiscountsPanel({
                   )}
                   <FormError message={redeemState.error ?? approvalError} />
                   <FormActions>
-                    {canRequestOperationsApproval &&
-                    redeemException.canRequest ? (
+                    {registeredExpired &&
+                    (!canOverrideDiscountEligibility ||
+                      !expiredOverrideConfirmed) ? null : canRequestOperationsApproval &&
+                      redeemException.canRequest &&
+                      !registeredExpired ? (
                       <button
                         className="bg-ink text-mist hover:bg-skyline inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-medium disabled:opacity-60"
                         disabled={approvalPending}

@@ -146,7 +146,7 @@ export function Rm10PhysicalDirectory({ rows }: Rm10PhysicalDirectoryProps) {
                         {row.voucherNumber}
                       </p>
                       <p className="text-skyline mt-1 text-sm">
-                        Expiry {formatExpiry(row.expiryDate)}
+                        Original Expiry {formatExpiry(row.expiryDate)}
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-1">
@@ -158,6 +158,12 @@ export function Rm10PhysicalDirectory({ rows }: Rm10PhysicalDirectoryProps) {
                         <StatusBadge
                           label={rm10LibrarySourceLabel(row.source)}
                           tone="neutral"
+                        />
+                      ) : null}
+                      {row.usedAfterExpiry ? (
+                        <StatusBadge
+                          label="Used after expiry"
+                          tone="warning"
                         />
                       ) : null}
                     </div>
@@ -182,7 +188,7 @@ export function Rm10PhysicalDirectory({ rows }: Rm10PhysicalDirectoryProps) {
               <thead className="text-skyline border-fog border-b text-xs tracking-wide uppercase">
                 <tr>
                   <th className="px-4 py-3 font-medium">Voucher No.</th>
-                  <th className="px-4 py-3 font-medium">Expiry</th>
+                  <th className="px-4 py-3 font-medium">Original Expiry</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium">Order No.</th>
                   <th className="px-4 py-3 font-medium">Order Date</th>
@@ -216,10 +222,18 @@ export function Rm10PhysicalDirectory({ rows }: Rm10PhysicalDirectoryProps) {
                       {formatExpiry(row.expiryDate)}
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge
-                        label={rm10LibraryStatusLabel(row.status)}
-                        tone={statusTone(row.status)}
-                      />
+                      <div className="flex flex-col items-start gap-1">
+                        <StatusBadge
+                          label={rm10LibraryStatusLabel(row.status)}
+                          tone={statusTone(row.status)}
+                        />
+                        {row.usedAfterExpiry ? (
+                          <StatusBadge
+                            label="Used after expiry"
+                            tone="warning"
+                          />
+                        ) : null}
+                      </div>
                     </td>
                     <td className="text-ink px-4 py-3">
                       {row.redemption ? dash(row.redemption.orderNumber) : "—"}
