@@ -48,6 +48,31 @@ function rowHref(row: Rm10LibraryRow): string {
   return `/library/vouchers/rm10/${encodeURIComponent(row.voucherNumberNormalized)}`;
 }
 
+function orderWorkspaceHref(orderId: string): string {
+  return `/owner/orders/${orderId}`;
+}
+
+function OrderNumberLink({
+  orderId,
+  orderNumber,
+}: {
+  orderId: string;
+  orderNumber: string;
+}) {
+  const label = dash(orderNumber);
+  if (!orderId || label === "—") {
+    return label;
+  }
+  return (
+    <Link
+      className="text-ink font-medium underline-offset-2 hover:underline"
+      href={orderWorkspaceHref(orderId)}
+    >
+      {label}
+    </Link>
+  );
+}
+
 export function Rm10PhysicalDirectory({ rows }: Rm10PhysicalDirectoryProps) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<Rm10LibraryFilterStatus>("all");
@@ -138,47 +163,56 @@ export function Rm10PhysicalDirectory({ rows }: Rm10PhysicalDirectoryProps) {
 
           <ul className="divide-fog border-fog divide-y rounded-xl border bg-white md:hidden">
             {filtered.map((row) => (
-              <li key={row.key}>
-                <Link className="block px-4 py-4" href={rowHref(row)}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-ink font-medium tracking-wide">
-                        {row.voucherNumber}
-                      </p>
-                      <p className="text-skyline mt-1 text-sm">
-                        Original Expiry {formatExpiry(row.expiryDate)}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <StatusBadge
-                        label={rm10LibraryStatusLabel(row.status)}
-                        tone={statusTone(row.status)}
-                      />
-                      {row.source === "historical" ? (
-                        <StatusBadge
-                          label={rm10LibrarySourceLabel(row.source)}
-                          tone="neutral"
-                        />
-                      ) : null}
-                      {row.usedAfterExpiry ? (
-                        <StatusBadge
-                          label="Used after expiry"
-                          tone="warning"
-                        />
-                      ) : null}
-                    </div>
-                  </div>
-                  <p className="text-skyline mt-3 text-sm">
-                    {row.redemption
-                      ? `${dash(row.redemption.orderNumber)} · ${dash(row.redemption.customerName)}`
-                      : "No order"}
-                  </p>
-                  {row.duplicateRedemption ? (
-                    <p className="text-status-danger mt-2 text-xs font-medium">
-                      Duplicate redemption recorded for this voucher number.
+              <li className="px-4 py-4" key={row.key}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <Link
+                      className="text-ink font-medium tracking-wide hover:underline"
+                      href={rowHref(row)}
+                    >
+                      {row.voucherNumber}
+                    </Link>
+                    <p className="text-skyline mt-1 text-sm">
+                      Original Expiry {formatExpiry(row.expiryDate)}
                     </p>
-                  ) : null}
-                </Link>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <StatusBadge
+                      label={rm10LibraryStatusLabel(row.status)}
+                      tone={statusTone(row.status)}
+                    />
+                    {row.source === "historical" ? (
+                      <StatusBadge
+                        label={rm10LibrarySourceLabel(row.source)}
+                        tone="neutral"
+                      />
+                    ) : null}
+                    {row.usedAfterExpiry ? (
+                      <StatusBadge
+                        label="Used after expiry"
+                        tone="warning"
+                      />
+                    ) : null}
+                  </div>
+                </div>
+                <p className="text-skyline mt-3 text-sm">
+                  {row.redemption ? (
+                    <>
+                      <OrderNumberLink
+                        orderId={row.redemption.orderId}
+                        orderNumber={row.redemption.orderNumber}
+                      />
+                      {` · ${dash(row.redemption.customerName)}`}
+                    </>
+                  ) : (
+                    "No order"
+                  )}
+                </p>
+                {row.duplicateRedemption ? (
+                  <p className="text-status-danger mt-2 text-xs font-medium">
+                    Duplicate redemption recorded for this voucher number.
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -236,7 +270,14 @@ export function Rm10PhysicalDirectory({ rows }: Rm10PhysicalDirectoryProps) {
                       </div>
                     </td>
                     <td className="text-ink px-4 py-3">
-                      {row.redemption ? dash(row.redemption.orderNumber) : "—"}
+                      {row.redemption ? (
+                        <OrderNumberLink
+                          orderId={row.redemption.orderId}
+                          orderNumber={row.redemption.orderNumber}
+                        />
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="text-ink px-4 py-3">
                       {row.redemption

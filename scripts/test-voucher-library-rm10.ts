@@ -397,6 +397,8 @@ const detailSrc = readSrc(
 );
 assert.match(directorySrc, /Original Expiry/);
 assert.match(directorySrc, /Used after expiry/);
+assert.match(directorySrc, /\/owner\/orders\/\$\{orderId\}/);
+assert.match(detailSrc, /\/owner\/orders\/\$\{row\.redemption\.orderId\}/);
 assert.match(detailSrc, /Original Expiry/);
 assert.match(detailSrc, /Used after expiry/);
 assert.match(detailSrc, /Override Date/);
