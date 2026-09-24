@@ -11,7 +11,10 @@ import { singaporeDateFromIso } from "@/engines/orders/promotions";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type { CatalogueVoucherRecord } from "@/types/catalogue-voucher";
 import type { StorefrontOrder } from "@/types/storefront";
-import { applyCatalogueVoucherAction } from "@/workspaces/owner/orders/actions";
+import {
+  applyCatalogueVoucherAction,
+  removeOrderDiscountAction,
+} from "@/workspaces/owner/orders/actions";
 import { listStaffCatalogueVouchersAction } from "@/workspaces/vouchers/catalogue-actions";
 import { isGuestOrderEditable } from "@/workspaces/owner/orders/labels";
 
@@ -54,6 +57,34 @@ export function CatalogueVoucherPaymentPanel({
         <p className="text-ink text-sm">
           {applied.label} · {formatRm(applied.amount)}
         </p>
+        {canApply ? (
+          <button
+            className="text-skyline hover:text-ink text-sm font-medium disabled:opacity-60"
+            disabled={pending}
+            onClick={() => {
+              setError(null);
+              start(async () => {
+                const result = await removeOrderDiscountAction(
+                  order.id,
+                  applied.id,
+                );
+                if (result.error) {
+                  setError(result.error);
+                  return;
+                }
+                router.refresh();
+              });
+            }}
+            type="button"
+          >
+            {pending ? "Updating…" : "Remove Discount"}
+          </button>
+        ) : null}
+        {error ? (
+          <p className="text-status-danger text-sm" role="alert">
+            {error}
+          </p>
+        ) : null}
       </div>
     );
   }
