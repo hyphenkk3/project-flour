@@ -150,6 +150,17 @@ const popularSrc = readSrc(
 assert.match(popularSrc, /href=\{`\/cakes\/\$\{cake\.id\}`\}/);
 assert.match(popularSrc, /prefetch=\{false\}/);
 
+const featuredSrc = readSrc(
+  "src/workspaces/storefront/home/HomeFeaturedCollection.tsx",
+);
+assert.match(featuredSrc, /StorefrontCakeDetailLink/);
+assert.match(featuredSrc, /<StorefrontCakeDetailLink className="group block" href=\{href\}>/);
+assert.doesNotMatch(
+  featuredSrc,
+  /<Link className="group block" href=\{href\}>/,
+);
+assert.match(featuredSrc, /href=\{viewAllHref\}/);
+
 const offersCardSrc = readSrc(
   "src/workspaces/storefront/offers/CatalogueOfferCard.tsx",
 );

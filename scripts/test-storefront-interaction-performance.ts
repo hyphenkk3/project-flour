@@ -51,6 +51,12 @@ const popular = readSrc(
   "src/workspaces/storefront/home/HomePopularCakes.tsx",
 );
 assert.match(popular, /prefetch=\{false\}/);
+
+const featured = readSrc(
+  "src/workspaces/storefront/home/HomeFeaturedCollection.tsx",
+);
+assert.match(featured, /StorefrontCakeDetailLink/);
+assert.doesNotMatch(featured, /<Link className="group block" href=\{href\}>/);
 assert.match(popular, /active:opacity-70/);
 
 const queries = readSrc("src/workspaces/storefront/catalog/queries.ts");

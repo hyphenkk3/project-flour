@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
+import { StorefrontCakeDetailLink } from "@/workspaces/storefront/catalog/StorefrontCakeDetailLink";
 import {
   HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX,
   takeHomepageCollectionPreviewCakes,
@@ -69,7 +70,7 @@ export function HomeFeaturedCollection({
                     className={`w-[8.5rem] shrink-0 lg:min-w-0 lg:w-[calc((100%-3.75rem)/6)]${hideOnMobile ? " max-lg:hidden" : ""}`}
                     key={cake.id}
                   >
-                    <Link className="group block" href={href}>
+                    <StorefrontCakeDetailLink className="group block" href={href}>
                       <div className="relative aspect-square w-[8.5rem] overflow-hidden rounded-[10px] lg:w-full">
                         {photo?.url ? (
                           <CakePhotoImage
@@ -96,7 +97,7 @@ export function HomeFeaturedCollection({
                           {preorder}
                         </p>
                       ) : null}
-                    </Link>
+                    </StorefrontCakeDetailLink>
                   </li>
                 );
               })}
