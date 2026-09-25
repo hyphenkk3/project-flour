@@ -144,6 +144,18 @@ const popularSrc = readSrc(
 assert.match(popularSrc, /href=\{`\/cakes\/\$\{cake\.id\}`\}/);
 assert.match(popularSrc, /prefetch/);
 
+const offersCardSrc = readSrc(
+  "src/workspaces/storefront/offers/CatalogueOfferCard.tsx",
+);
+assert.match(offersCardSrc, /href="\/browse"/);
+assert.doesNotMatch(offersCardSrc, /\/cakes\//);
+
+const cakeDetailSrc = readSrc(
+  "src/workspaces/storefront/catalog/StorefrontCakeDetail.tsx",
+);
+assert.match(cakeDetailSrc, /CakeOfferHint/);
+assert.doesNotMatch(cakeDetailSrc, /createClient|cookies\(/);
+
 const prefetchSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontCakePrefetch.tsx",
 );

@@ -3,7 +3,7 @@ import {
   parseCatalogueOrderType,
 } from "@/engines/vouchers/catalogue-voucher";
 import { createServiceClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createPublicClient } from "@/lib/supabase/server";
 import type {
   CatalogueVoucherRecord,
   CatalogueVoucherRuleType,
@@ -96,7 +96,7 @@ export async function listPublicCatalogueVouchers(): Promise<
   CatalogueVoucherRecord[]
 > {
   try {
-    const supabase = await createClient();
+    const supabase = createPublicClient();
     const { data, error } = await supabase.rpc("list_public_catalogue_vouchers");
     if (error) {
       throw new Error(error.message);

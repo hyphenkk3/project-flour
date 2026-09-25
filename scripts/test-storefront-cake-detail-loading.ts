@@ -63,6 +63,30 @@ assert.match(pageSrc, /StorefrontCakeDetail/);
 assert.doesNotMatch(pageSrc, /StorefrontCakeDetailLoading/);
 
 const queriesSrc = readSrc(detailQuery);
+assert.doesNotMatch(detailSrc, /createClient|cookies\(/);
+assert.match(detailSrc, /CakeOfferHint/);
+
+const offerHintSrc = readSrc("src/workspaces/storefront/offers/CakeOfferHint.tsx");
+assert.match(offerHintSrc, /listPublicCatalogueVouchers/);
+assert.doesNotMatch(offerHintSrc, /createClient|cookies\(/);
+assert.match(offerHintSrc, /try \{/);
+assert.match(offerHintSrc, /return null/);
+
+const publicVoucherQueries = readSrc(
+  "src/workspaces/vouchers/catalogue-queries.ts",
+);
+const publicListStart = publicVoucherQueries.indexOf(
+  "export async function listPublicCatalogueVouchers",
+);
+const staffListStart = publicVoucherQueries.indexOf(
+  "export async function listStaffCatalogueVouchers",
+);
+assert.ok(publicListStart >= 0 && staffListStart > publicListStart);
+const publicListFn = publicVoucherQueries.slice(publicListStart, staffListStart);
+assert.match(publicListFn, /createPublicClient/);
+assert.doesNotMatch(publicListFn, /createClient\(/);
+assert.doesNotMatch(publicListFn, /cookies\(/);
+
 const detailFnStart = queriesSrc.indexOf(
   "async function loadLibraryCakeDisplayById",
 );

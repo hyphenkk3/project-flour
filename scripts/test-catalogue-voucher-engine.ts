@@ -564,4 +564,20 @@ assert.match(
   /summarizeCatalogueVoucherRules|CatalogueOfferCard/,
 );
 
+const publicQueriesSrc = readSrc("src/workspaces/vouchers/catalogue-queries.ts");
+const publicListFn = publicQueriesSrc.slice(
+  publicQueriesSrc.indexOf("export async function listPublicCatalogueVouchers"),
+  publicQueriesSrc.indexOf("export async function listStaffCatalogueVouchers"),
+);
+assert.match(publicListFn, /createPublicClient/);
+assert.doesNotMatch(publicListFn, /createClient\(/);
+
+const middlewareSrc = readSrc("src/middleware.ts");
+assert.match(
+  middlewareSrc.split("const PUBLIC_PATHS")[1]?.split("function isPublicPath")[0] ??
+    "",
+  /"\/offers"/,
+);
+assert.match(middlewareSrc, /pathname\.startsWith\("\/cakes\/"\)/);
+
 console.log("catalogue voucher engine tests passed");

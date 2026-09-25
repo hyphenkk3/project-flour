@@ -9,12 +9,16 @@ import {
 } from "@/workspaces/vouchers/catalogue-queries";
 
 export async function CakeOfferHint({ cakeId }: { cakeId: string }) {
-  const today = singaporeDateFromIso(new Date().toISOString());
-  const vouchers = (await listPublicCatalogueVouchers()).filter(
-    (voucher) =>
-      isCatalogueVoucherDiscoverable(voucher, today) &&
-      voucherRelevantToCake(voucher, cakeId),
-  );
-  if (vouchers.length === 0) return null;
-  return <CakeOfferHintView vouchers={vouchers} />;
+  try {
+    const today = singaporeDateFromIso(new Date().toISOString());
+    const vouchers = (await listPublicCatalogueVouchers()).filter(
+      (voucher) =>
+        isCatalogueVoucherDiscoverable(voucher, today) &&
+        voucherRelevantToCake(voucher, cakeId),
+    );
+    if (vouchers.length === 0) return null;
+    return <CakeOfferHintView vouchers={vouchers} />;
+  } catch {
+    return null;
+  }
 }
