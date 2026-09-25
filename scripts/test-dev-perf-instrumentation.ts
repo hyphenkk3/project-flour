@@ -16,6 +16,9 @@ import {
 } from "@/lib/perf/dev-only-shared";
 import {
   elapsedPerfMs,
+  markCheckoutActionReturned,
+  markCheckoutNavigationCall,
+  readActiveSuccessNavigation,
   readCheckoutSubmitTiming,
   resetCheckoutAttemptTiming,
   resolveCheckoutLoadClock,
@@ -118,16 +121,18 @@ assert.match(
 );
 assert.match(probeSrc, /CHECKOUT_NAV/);
 assert.match(probeSrc, /useLayoutEffect/);
-assert.match(probeSrc, /successPageClientCommitMs/);
-assert.match(probeSrc, /successPageClientVisibleMs/);
-assert.match(probeSrc, /successPageStartToVisibleMs/);
+assert.match(probeSrc, /successPageNavigationToClientCommitMs/);
+assert.match(probeSrc, /successPageNavigationToVisibleMs/);
+assert.match(probeSrc, /readActiveSuccessNavigation/);
 assert.match(probeSrc, /actionReturnToNavigationCallMs/);
-assert.match(probeSrc, /clientCommitToVisibleMs/);
-assert.match(probeSrc, /success_page_local_performance_now/);
-assert.match(probeSrc, /successPageNow\(\)/);
+assert.match(probeSrc, /confirmToSuccessVisibleMs/);
+assert.match(probeSrc, /same_document_navigation_from_router_replace/);
+assert.match(probeSrc, /success_navigation_timing_unavailable_new_document/);
+assert.doesNotMatch(probeSrc, /successPageClientCommitMs/);
+assert.doesNotMatch(probeSrc, /successPageClientVisibleMs/);
+assert.doesNotMatch(probeSrc, /successPageStartToVisibleMs/);
 assert.doesNotMatch(probeSrc, /navigationStartToServerStartMs/);
 assert.doesNotMatch(probeSrc, /navigationStartToSuccessVisibleMs/);
-assert.doesNotMatch(probeSrc, /navigationToClientCommitMs/);
 assert.doesNotMatch(probeSrc, /Date\.now\(\)/);
 assert.match(
   formSrc,
@@ -172,8 +177,14 @@ assert.match(clientHelperSrc, /clientActionDispatchMs/);
 assert.match(clientHelperSrc, /actionReturnToNavigationCallMs/);
 assert.match(clientHelperSrc, /elapsedPerfMs/);
 assert.match(clientHelperSrc, /startCheckoutAttemptTiming/);
+assert.match(clientHelperSrc, /readActiveSuccessNavigation/);
+assert.match(clientHelperSrc, /activeSuccessNavigation/);
 assert.match(clientHelperSrc, /wb-perf-checkout-correlation-v2/);
 assert.match(clientHelperSrc, /JSON\.stringify\(\{ correlationId, flow \}\)/);
+assert.doesNotMatch(
+  clientHelperSrc,
+  /sessionStorage\.setItem\([^;]*navigationCallAt/,
+);
 assert.match(clientHelperSrc, /sessionStorage\.removeItem\(LEGACY_SUBMIT_STORAGE_KEY\)/);
 assert.doesNotMatch(clientHelperSrc, /navigationStartAt/);
 assert.doesNotMatch(clientHelperSrc, /writeCheckoutSubmitTiming/);
@@ -280,5 +291,38 @@ assert.notEqual(firstAttempt.correlationId, secondAttempt.correlationId);
 assert.equal(elapsedPerfMs(firstAttempt.confirmClickAt, secondAttempt.confirmClickAt) != null, true);
 resetCheckoutAttemptTiming();
 assert.equal(readCheckoutSubmitTiming(), null);
+assert.equal(readActiveSuccessNavigation("pfirst00001"), null);
+
+const navAttempt = startCheckoutAttemptTiming("pnav0000001", "preorder");
+assert.equal(readActiveSuccessNavigation("pnav0000001"), null);
+markCheckoutActionReturned();
+const afterReturn = readCheckoutSubmitTiming();
+assert.ok(afterReturn?.actionReturnAt != null);
+const afterNavCall = markCheckoutNavigationCall();
+assert.ok(afterNavCall?.navigationCallAt != null);
+assert.equal(
+  elapsedPerfMs(afterReturn?.actionReturnAt, afterNavCall?.navigationCallAt) !=
+    null,
+  true,
+);
+const matchedNav = readActiveSuccessNavigation("pnav0000001");
+assert.equal(matchedNav?.correlationId, "pnav0000001");
+assert.equal(matchedNav?.navigationCallAt, afterNavCall?.navigationCallAt);
+assert.equal(readActiveSuccessNavigation("pother00001"), null);
+assert.equal(readActiveSuccessNavigation(null), null);
+const visibleAt = afterNavCall!.navigationCallAt + 850;
+assert.equal(
+  elapsedPerfMs(matchedNav?.navigationCallAt, visibleAt),
+  850,
+);
+assert.equal(
+  elapsedPerfMs(navAttempt.confirmClickAt, visibleAt) != null,
+  true,
+);
+startCheckoutAttemptTiming("pnav0000002", "preorder");
+assert.equal(readActiveSuccessNavigation("pnav0000001"), null);
+assert.equal(readActiveSuccessNavigation("pnav0000002"), null);
+resetCheckoutAttemptTiming();
+assert.equal(readActiveSuccessNavigation("pnav0000002"), null);
 
 console.log("PASS dev perf instrumentation");

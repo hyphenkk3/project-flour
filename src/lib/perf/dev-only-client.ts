@@ -32,7 +32,13 @@ export type CheckoutSubmitTiming = {
   navigationCallAt: number | null;
 };
 
+export type ActiveSuccessNavigationPerf = {
+  correlationId: string;
+  navigationCallAt: number;
+};
+
 let currentAttempt: CheckoutSubmitTiming | null = null;
+let activeSuccessNavigation: ActiveSuccessNavigationPerf | null = null;
 
 function canUseBrowserTools(): boolean {
   return isDevPerfEnabled() && typeof window !== "undefined";
@@ -64,6 +70,7 @@ export function elapsedPerfMs(
 
 export function resetCheckoutAttemptTiming(): void {
   currentAttempt = null;
+  activeSuccessNavigation = null;
 }
 
 export function startCheckoutAttemptTiming(
@@ -80,6 +87,7 @@ export function startCheckoutAttemptTiming(
     actionReturnAt: null,
     navigationCallAt: null,
   };
+  activeSuccessNavigation = null;
   persistCheckoutCorrelation(correlationId, flow);
   return currentAttempt;
 }
@@ -88,6 +96,7 @@ export function readCheckoutSubmitTiming(): CheckoutSubmitTiming | null {
   if (!currentAttempt) return null;
   if (currentAttempt.timeOrigin !== currentTimeOrigin()) {
     currentAttempt = null;
+    activeSuccessNavigation = null;
     return null;
   }
   return currentAttempt;
@@ -147,7 +156,21 @@ export function markCheckoutNavigationCall(): CheckoutSubmitTiming | null {
   if (attempt.navigationCallAt == null) {
     attempt.navigationCallAt = nowMs();
   }
+  activeSuccessNavigation = {
+    correlationId: attempt.correlationId,
+    navigationCallAt: attempt.navigationCallAt,
+  };
   return attempt;
+}
+
+export function readActiveSuccessNavigation(
+  expectedCorrelationId: string | null | undefined,
+): ActiveSuccessNavigationPerf | null {
+  if (!activeSuccessNavigation || !expectedCorrelationId) return null;
+  if (activeSuccessNavigation.correlationId !== expectedCorrelationId) {
+    return null;
+  }
+  return activeSuccessNavigation;
 }
 
 export function logCheckoutClient(

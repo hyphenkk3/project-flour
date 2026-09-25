@@ -8,6 +8,7 @@ import {
   logCheckoutClient,
   logSubmitPhaseSummary,
   markCheckoutPerf,
+  readActiveSuccessNavigation,
   readCheckoutCorrelationId,
   readCheckoutSubmitTiming,
   type CheckoutServerPerf,
@@ -15,20 +16,6 @@ import {
 
 function successPageNow(): number {
   return typeof performance !== "undefined" ? performance.now() : 0;
-}
-
-function readSuccessPageBrowserLoadMs(sameDocumentAttempt: boolean): number | null {
-  if (sameDocumentAttempt) return null;
-  if (typeof performance === "undefined") return null;
-  try {
-    const entry = performance.getEntriesByType("navigation")[0] as
-      | PerformanceNavigationTiming
-      | undefined;
-    if (!entry || !Number.isFinite(entry.duration)) return null;
-    return elapsedPerfMs(0, entry.duration);
-  } catch {
-    return null;
-  }
 }
 
 /** Invisible DEV measurement hook. Does not change Order Received UI. */
@@ -67,6 +54,7 @@ export function StorefrontSuccessPerfProbe({
         note: "success_page_is_new_timing_origin",
       });
     }
+    const navigation = readActiveSuccessNavigation(correlationId);
     const clientCommitAt = commitAt.current;
     logCheckoutClient("CHECKOUT_NAV", {
       correlationId,
@@ -74,15 +62,23 @@ export function StorefrontSuccessPerfProbe({
         timing?.actionReturnAt,
         timing?.navigationCallAt,
       ),
-      successPageClientCommitMs:
-        clientCommitAt == null ? null : Math.round(clientCommitAt),
-      successPageClientVisibleMs: Math.round(visibleAt),
-      successPageStartToVisibleMs: Math.round(visibleAt),
-      clientCommitToVisibleMs: elapsedPerfMs(clientCommitAt, visibleAt),
+      successPageNavigationToClientCommitMs: elapsedPerfMs(
+        navigation?.navigationCallAt,
+        clientCommitAt,
+      ),
+      successPageNavigationToVisibleMs: elapsedPerfMs(
+        navigation?.navigationCallAt,
+        visibleAt,
+      ),
+      confirmToSuccessVisibleMs: elapsedPerfMs(
+        timing?.confirmClickAt,
+        visibleAt,
+      ),
       successPageReceiptDataMs: successServer?.serverReceiptDataMs ?? null,
       successPageServerRenderMs: successServer?.serverRenderMs ?? null,
-      successPageBrowserLoadMs: readSuccessPageBrowserLoadMs(timing != null),
-      note: "success_page_local_performance_now",
+      note: navigation
+        ? "same_document_navigation_from_router_replace"
+        : "success_navigation_timing_unavailable_new_document",
     });
   }, [markVisible, successServer]);
 
