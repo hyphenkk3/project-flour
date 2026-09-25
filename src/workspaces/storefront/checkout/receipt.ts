@@ -135,7 +135,132 @@ export async function getGuestPreorderReceipt(
   return loadGuestPreorderReceipt(orderId);
 }
 
-type ReceiptPhotoRow = StorefrontCakePhotoRow & { cake_id: string };
+type ReceiptPhotoRow = StorefrontCakePhotoRow & { cake_id?: string };
+
+type EmbeddedReceiptCake = {
+  name?: string;
+  library_cake_photos?: StorefrontCakePhotoRow[] | null;
+};
+
+type ReceiptOrderRow = {
+  order_number?: string | null;
+  guest_name?: string | null;
+  guest_phone?: string | null;
+  customer_notes?: string | null;
+  pickup_date: string;
+  pickup_time: string;
+  fulfilment_method?: string | null;
+  extra_stock_id?: string | null;
+  created_at?: string | null;
+  order_dine_in_reservations?:
+    | {
+        guest_count?: number | null;
+        venue?: string | null;
+        reservation_time?: string | null;
+      }
+    | {
+        guest_count?: number | null;
+        venue?: string | null;
+        reservation_time?: string | null;
+      }[]
+    | null;
+  order_items?: Array<{
+    id?: string;
+    cake_id?: string | null;
+    cake_size_id?: string | null;
+    quantity?: number;
+    unit_price?: number | string | null;
+    cake_name?: string | null;
+    size_label?: string | null;
+    library_cakes?: EmbeddedReceiptCake | EmbeddedReceiptCake[] | null;
+    library_cake_sizes?: { label: string } | { label: string }[] | null;
+  }> | null;
+  order_paid_addons?: Array<{
+    id?: string;
+    name?: string | null;
+    quantity?: number | string | null;
+    unit_price?: number | string | null;
+    sort_order?: number | null;
+  }> | null;
+  order_complimentary_items?: Array<{
+    id?: string;
+    name?: string | null;
+    quantity?: number | string | null;
+    sort_order?: number | null;
+  }> | null;
+};
+
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+function orderReceiptSelect(photoSelect: string | null): string {
+  const cakePhotos = photoSelect
+    ? `,
+            library_cake_photos (
+              ${photoSelect}
+            )`
+    : "";
+  return `
+        order_number,
+        guest_name,
+        guest_phone,
+        customer_notes,
+        pickup_date,
+        pickup_time,
+        fulfilment_method,
+        extra_stock_id,
+        created_at,
+        customer_id,
+        order_dine_in_reservations ( guest_count, venue, reservation_time ),
+        order_items (
+          id,
+          cake_id,
+          cake_size_id,
+          quantity,
+          unit_price,
+          cake_name,
+          size_label,
+          library_cakes (
+            name${cakePhotos}
+          ),
+          library_cake_sizes ( label )
+        ),
+        order_paid_addons (
+          id,
+          name,
+          quantity,
+          unit_price,
+          sort_order
+        ),
+        order_complimentary_items (
+          id,
+          name,
+          quantity,
+          sort_order
+        )
+      `;
+}
+
+export function collectReceiptPhotosByCake(
+  rows: ReadonlyArray<{
+    cake_id?: string | null;
+    library_cakes?: EmbeddedReceiptCake | EmbeddedReceiptCake[] | null;
+  }>,
+): Map<string, StorefrontCakePhoto[]> {
+  const photosByCake = new Map<string, StorefrontCakePhoto[]>();
+  for (const row of rows) {
+    const cakeId = String(row.cake_id ?? "").trim();
+    if (!cakeId || photosByCake.has(cakeId)) continue;
+    const cake = firstRelation(row.library_cakes);
+    const photos = [...(cake?.library_cake_photos ?? [])]
+      .filter((photo) => Boolean(photo.image_url))
+      .map((photo, index) => mapStorefrontCakePhoto(photo, index));
+    photosByCake.set(cakeId, photos);
+  }
+  return photosByCake;
+}
 
 export function attachReceiptItemPhotos(
   items: ReadonlyArray<Omit<GuestPreorderReceiptItem, "imageUrl" | "imageAlt">>,
@@ -209,53 +334,18 @@ export async function loadGuestPreorderReceipt(
     const totalStarted = performance.now();
     const supabase = createServiceClient();
     // Column is customer_notes. A `notes` select fails PostgREST and hides Save Order Details.
-    const ordersStarted = performance.now();
-    const adjustmentsStarted = performance.now();
-    const [{ data, error }, adjustmentsResult] = await Promise.all([
+    const loadOrder = (photoSelect: string | null) =>
       supabase
         .from("orders")
-        .select(
-          `
-        order_number,
-        guest_name,
-        guest_phone,
-        customer_notes,
-        pickup_date,
-        pickup_time,
-        fulfilment_method,
-        extra_stock_id,
-        created_at,
-        customer_id,
-        order_dine_in_reservations ( guest_count, venue, reservation_time ),
-        order_items (
-          id,
-          cake_id,
-          cake_size_id,
-          quantity,
-          unit_price,
-          cake_name,
-          size_label,
-          library_cakes ( name ),
-          library_cake_sizes ( label )
-        ),
-        order_paid_addons (
-          id,
-          name,
-          quantity,
-          unit_price,
-          sort_order
-        ),
-        order_complimentary_items (
-          id,
-          name,
-          quantity,
-          sort_order
-        )
-      `,
-        )
+        .select(orderReceiptSelect(photoSelect))
         .eq("id", orderId)
         .is("customer_id", null)
-        .maybeSingle(),
+        .maybeSingle();
+    const ordersStarted = performance.now();
+    const adjustmentsStarted = performance.now();
+    let photosEmbedded = true;
+    const [orderResult, adjustmentsResult] = await Promise.all([
+      loadOrder(STOREFRONT_CAKE_PHOTO_SELECT),
       supabase
         .from("order_adjustments")
         .select(
@@ -263,11 +353,22 @@ export async function loadGuestPreorderReceipt(
         )
         .eq("order_id", orderId),
     ]);
+    let { data, error } = orderResult;
+    if (error && isMissingCakePhotoSchema(error.message)) {
+      photosEmbedded = false;
+      const retried = await loadOrder(null);
+      data = retried.data;
+      error = retried.error;
+    }
     logPerf(
       "CHECKOUT_RECEIPT",
       "orders_query",
       performance.now() - ordersStarted,
-      { embeds: "items_addons_complimentary_dine_in" },
+      {
+        embeds: photosEmbedded
+          ? "items_addons_complimentary_dine_in_photos"
+          : "items_addons_complimentary_dine_in",
+      },
     );
     logPerf(
       "CHECKOUT_RECEIPT",
@@ -276,24 +377,12 @@ export async function loadGuestPreorderReceipt(
     );
 
     if (error || !data) return null;
+    const order = data as unknown as ReceiptOrderRow;
 
-    const rows = Array.isArray(data.order_items) ? data.order_items : [];
-    const mappedItems = rows.map((row, index) => {
-      const entry = row as {
-        id?: string;
-        cake_id?: string | null;
-        cake_size_id?: string | null;
-        quantity?: number;
-        unit_price?: number | string | null;
-        cake_name?: string | null;
-        size_label?: string | null;
-        library_cakes?: { name: string } | { name: string }[] | null;
-        library_cake_sizes?: { label: string } | { label: string }[] | null;
-      };
-      const cakeRel = entry.library_cakes;
-      const sizeRel = entry.library_cake_sizes;
-      const cake = Array.isArray(cakeRel) ? cakeRel[0] : cakeRel;
-      const size = Array.isArray(sizeRel) ? sizeRel[0] : sizeRel;
+    const rows = Array.isArray(order.order_items) ? order.order_items : [];
+    const mappedItems = rows.map((entry, index) => {
+      const cake = firstRelation(entry.library_cakes);
+      const size = firstRelation(entry.library_cake_sizes);
       const unitPrice =
         entry.unit_price == null ? null : Number(entry.unit_price);
       const cakeId = String(entry.cake_id ?? "").trim() || null;
@@ -315,23 +404,18 @@ export async function loadGuestPreorderReceipt(
           .filter((id): id is string => Boolean(id)),
       ),
     ];
-    const photosByCake = await loadReceiptCakePhotos(supabase, cakeIds);
+    let photosByCake = collectReceiptPhotosByCake(rows);
+    if (photosEmbedded) {
+      logPerfSkipped("CHECKOUT_RECEIPT", "cake_photos", {
+        source: "orders_embed",
+      });
+    } else {
+      photosByCake = await loadReceiptCakePhotos(supabase, cakeIds);
+    }
     const items = attachReceiptItemPhotos(mappedItems, photosByCake);
 
-    const addonRows = Array.isArray(
-      (data as { order_paid_addons?: unknown }).order_paid_addons,
-    )
-      ? (
-          data as {
-            order_paid_addons: Array<{
-              id?: string;
-              name?: string | null;
-              quantity?: number | string | null;
-              unit_price?: number | string | null;
-              sort_order?: number | null;
-            }>;
-          }
-        ).order_paid_addons
+    const addonRows = Array.isArray(order.order_paid_addons)
+      ? order.order_paid_addons
       : [];
     const paidAddons: GuestPreorderReceiptAddon[] = [...addonRows]
       .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))
@@ -343,19 +427,8 @@ export async function loadGuestPreorderReceipt(
       }))
       .filter((row) => row.quantity > 0);
 
-    const complimentaryRows = Array.isArray(
-      (data as { order_complimentary_items?: unknown }).order_complimentary_items,
-    )
-      ? (
-          data as {
-            order_complimentary_items: Array<{
-              id?: string;
-              name?: string | null;
-              quantity?: number | string | null;
-              sort_order?: number | null;
-            }>;
-          }
-        ).order_complimentary_items
+    const complimentaryRows = Array.isArray(order.order_complimentary_items)
+      ? order.order_complimentary_items
       : [];
     const complimentaryItems: GuestPreorderReceiptComplimentary[] = [
       ...complimentaryRows,
@@ -368,28 +441,11 @@ export async function loadGuestPreorderReceipt(
       }))
       .filter((row) => row.quantity > 0);
 
-    const reservationRel = (
-      data as {
-        order_dine_in_reservations?:
-          | {
-              guest_count?: number | null;
-              venue?: string | null;
-              reservation_time?: string | null;
-            }
-          | {
-              guest_count?: number | null;
-              venue?: string | null;
-              reservation_time?: string | null;
-            }[]
-          | null;
-      }
-    ).order_dine_in_reservations;
+    const reservationRel = order.order_dine_in_reservations;
     const reservation = Array.isArray(reservationRel)
       ? reservationRel[0]
       : reservationRel;
-    const methodRaw = String(
-      (data as { fulfilment_method?: string | null }).fulfilment_method ?? "",
-    );
+    const methodRaw = String(order.fulfilment_method ?? "");
     const fulfilmentMethod =
       methodRaw === "dine_in" || methodRaw === "delivery"
         ? methodRaw
@@ -400,9 +456,7 @@ export async function loadGuestPreorderReceipt(
       .toLowerCase();
     const dineInVenue =
       venueRaw === "hyphen" || venueRaw === "whitebird" ? venueRaw : null;
-    const notesRaw = String(
-      (data as { customer_notes?: string | null }).customer_notes ?? "",
-    ).trim();
+    const notesRaw = String(order.customer_notes ?? "").trim();
     const adjustmentRows = adjustmentsResult.data;
     const adjustments = getEffectiveAdjustments(
       (Array.isArray(adjustmentRows) ? adjustmentRows : []).map((row) => ({
@@ -441,22 +495,15 @@ export async function loadGuestPreorderReceipt(
     });
     logPerf("CHECKOUT_RECEIPT", "TOTAL", performance.now() - totalStarted);
     return {
-      orderNumber:
-        String(
-          (data as { order_number?: string | null }).order_number ?? "",
-        ).trim() || null,
-      guestName: String(
-        (data as { guest_name?: string | null }).guest_name ?? "",
-      ).trim(),
-      guestPhone: String(
-        (data as { guest_phone?: string | null }).guest_phone ?? "",
-      ).trim(),
+      orderNumber: String(order.order_number ?? "").trim() || null,
+      guestName: String(order.guest_name ?? "").trim(),
+      guestPhone: String(order.guest_phone ?? "").trim(),
       notes: notesRaw || null,
       items,
       paidAddons,
       complimentaryItems,
-      pickupDate: String(data.pickup_date),
-      pickupTime: String(data.pickup_time),
+      pickupDate: String(order.pickup_date),
+      pickupTime: String(order.pickup_time),
       fulfilmentMethod,
       guestCount:
         fulfilmentMethod === "dine_in" && Number.isInteger(guestCountRaw)
@@ -479,13 +526,8 @@ export async function loadGuestPreorderReceipt(
       }),
       adjustments,
       total: settlement.amountDue,
-      placedAt:
-        String(
-          (data as { created_at?: string | null }).created_at ?? "",
-        ).trim() || null,
-      isFreshPick: Boolean(
-        (data as { extra_stock_id?: string | null }).extra_stock_id,
-      ),
+      placedAt: String(order.created_at ?? "").trim() || null,
+      isFreshPick: Boolean(order.extra_stock_id),
     };
   } catch {
     return null;

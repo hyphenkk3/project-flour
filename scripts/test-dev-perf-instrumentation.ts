@@ -90,6 +90,7 @@ assert.match(receiptSrc, /order_adjustments/);
 assert.match(receiptSrc, /getEffectiveAdjustments/);
 assert.match(receiptSrc, /calculateOrderSettlement/);
 assert.match(receiptSrc, /library_cake_photos/);
+assert.match(receiptSrc, /source: "orders_embed"/);
 assert.match(receiptSrc, /\.is\("customer_id", null\)/);
 assert.doesNotMatch(receiptSrc, /evaluateCatalogueVoucher/);
 assert.doesNotMatch(receiptSrc, /apply_catalogue_voucher_to_guest_order/);

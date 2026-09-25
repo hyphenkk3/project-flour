@@ -11,6 +11,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   attachReceiptItemPhotos,
+  collectReceiptPhotosByCake,
   guestPreorderReceiptAuthorized,
   receiptCookieSecure,
 } from "@/workspaces/storefront/checkout/receipt";
@@ -114,6 +115,10 @@ assert.match(receiptSrc, /cake_size_id,/);
 assert.match(receiptSrc, /cakeId:/);
 assert.match(receiptSrc, /cakeSizeId:/);
 assert.match(receiptSrc, /library_cake_photos/);
+assert.match(receiptSrc, /library_cakes \(/);
+assert.match(receiptSrc, /STOREFRONT_CAKE_PHOTO_SELECT/);
+assert.match(receiptSrc, /source: "orders_embed"/);
+assert.match(receiptSrc, /loadReceiptCakePhotos/);
 assert.match(receiptSrc, /mapStorefrontCakePhoto/);
 assert.match(receiptSrc, /storefrontPhotoForSize\(photos, item\.cakeSizeId\)/);
 assert.doesNotMatch(receiptSrc, /resolveCatalogueListingPhoto/);
@@ -302,5 +307,50 @@ assert.equal(legacy.length, 1);
 assert.equal(legacy[0]?.cakeName, "Legacy Cake");
 assert.equal(legacy[0]?.imageUrl, null);
 assert.equal(legacy[0]?.imageAlt, null);
+
+const embedded = collectReceiptPhotosByCake([
+  {
+    cake_id: "cake-1",
+    library_cakes: {
+      name: "Avocado",
+      library_cake_photos: [
+        {
+          id: "p4",
+          image_url: "https://photos.example/4.jpg",
+          alt_text: "4",
+          sort_order: 1,
+          cake_size_id: size4,
+          is_default: false,
+        },
+        {
+          id: "p6",
+          image_url: "https://photos.example/6.jpg",
+          alt_text: "6",
+          sort_order: 2,
+          cake_size_id: size6,
+          is_default: true,
+        },
+      ],
+    },
+  },
+]);
+assert.equal(storefrontPhotoForSize(embedded.get("cake-1") ?? [], size6)?.url, "https://photos.example/6.jpg");
+assert.equal(storefrontPhotoForSize(embedded.get("cake-1") ?? [], size4)?.url, "https://photos.example/4.jpg");
+const embeddedAttached = attachReceiptItemPhotos(
+  [
+    {
+      key: "embed-6",
+      cakeId: "cake-1",
+      cakeSizeId: size6,
+      cakeName: "Avocado",
+      sizeLabel: '6"',
+      quantity: 1,
+      unitPrice: 140,
+    },
+  ],
+  embedded,
+);
+assert.equal(embeddedAttached[0]?.imageUrl, "https://photos.example/6.jpg");
+assert.equal(embeddedAttached[0]?.imageAlt, "6");
 
 console.log("PASS guest preorder receipt loader uses customer_notes");
