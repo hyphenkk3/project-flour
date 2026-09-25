@@ -220,7 +220,7 @@ const checkoutActionsSrc = readSrc(
 const checkoutFormSrc = readSrc(
   "src/workspaces/storefront/checkout/GuestCheckoutForm.tsx",
 );
-assert.match(checkoutActionsSrc, /await isPickupOrdersClosed\(pickupDate\)/);
+assert.match(checkoutActionsSrc, /isPickupOrdersClosed\(pickupDate\)/);
 assert.match(checkoutFormSrc, /isPickupOrdersClosed/);
 
 // 14–15. Opened Wednesday / method-specific hours come from existing loaders.

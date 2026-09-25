@@ -225,6 +225,18 @@ function parsePaidAddonOptions(rows: unknown): CustomerPaidAddonOption[] {
   );
 }
 
+async function timedSubmitStep<T>(
+  step: string,
+  work: Promise<T>,
+): Promise<T> {
+  const started = performance.now();
+  try {
+    return await work;
+  } finally {
+    logPerf("CHECKOUT_SUBMIT", step, performance.now() - started);
+  }
+}
+
 function consolidateItems(items: SubmitItem[]): SubmitItem[] {
   const map = new Map<string, SubmitItem>();
   for (const item of items) {
@@ -308,13 +320,18 @@ async function submitGuestPreorderActionBody(
           : "Please choose a date and time.",
     };
   }
-  const closedStarted = performance.now();
-  const pickupClosed = await isPickupOrdersClosed(pickupDate);
-  logPerf(
-    "CHECKOUT_SUBMIT",
-    "isPickupOrdersClosed",
-    performance.now() - closedStarted,
-  );
+  const [pickupClosed, hoursSnapshot, collection, supabase] = await Promise.all([
+    timedSubmitStep("isPickupOrdersClosed", isPickupOrdersClosed(pickupDate)),
+    timedSubmitStep(
+      "loadOperatingHoursSnapshot",
+      loadOperatingHoursSnapshot(),
+    ),
+    timedSubmitStep(
+      "getStorefrontCollectionForPickupDate",
+      getStorefrontCollectionForPickupDate(pickupDate),
+    ),
+    createClient(),
+  ]);
   if (pickupClosed) {
     return { error: ORDERS_CLOSED_RPC_MESSAGE };
   }
@@ -322,13 +339,6 @@ async function submitGuestPreorderActionBody(
   let dineInPayload: DineInReservationRpcPayload | null = null;
   let reservationTime = "";
   let deliveryDraft: DeliveryCreateDraft | null = null;
-  const hoursStarted = performance.now();
-  const hoursSnapshot = await loadOperatingHoursSnapshot();
-  logPerf(
-    "CHECKOUT_SUBMIT",
-    "loadOperatingHoursSnapshot",
-    performance.now() - hoursStarted,
-  );
 
   if (fulfilmentMethod === "pickup") {
     if (
@@ -426,23 +436,37 @@ async function submitGuestPreorderActionBody(
     return { error: "Please add at least one cake to your preorder." };
   }
 
-  const collectionStarted = performance.now();
-  const collection = await getStorefrontCollectionForPickupDate(pickupDate);
-  logPerf(
-    "CHECKOUT_SUBMIT",
-    "getStorefrontCollectionForPickupDate",
-    performance.now() - collectionStarted,
-  );
   if (!collection) {
     return { error: unpublishedCataloguePreorderMessage(pickupDate) };
   }
-  const cakesStarted = performance.now();
-  const offered = await listAvailableCakes(collection.id);
-  logPerf(
-    "CHECKOUT_SUBMIT",
-    "listAvailableCakes",
-    performance.now() - cakesStarted,
-  );
+  const emptyOptions = {
+    complimentary: [] as CustomerComplimentaryOption[],
+    paidAddons: [] as CustomerPaidAddonOption[],
+    ready: false,
+  };
+  const [offered, liveDays, businessDate, optionCatalog] = await Promise.all([
+    timedSubmitStep("listAvailableCakes", listAvailableCakes(collection.id)),
+    timedSubmitStep(
+      "loadLivePreorderDaysBySizeId",
+      loadLivePreorderDaysBySizeId(
+        items.map((item) => item.cake_size_id),
+        supabase,
+      ),
+    ),
+    timedSubmitStep(
+      "loadMalaysiaPreorderBusinessDate",
+      loadMalaysiaPreorderBusinessDate(supabase),
+    ),
+    persistOptions
+      ? timedSubmitStep(
+          "loadCustomerPreorderOptions",
+          loadCustomerPreorderOptions(supabase, collection.id),
+        )
+      : Promise.resolve(emptyOptions).then((value) => {
+          logPerfSkipped("CHECKOUT_SUBMIT", "loadCustomerPreorderOptions");
+          return value;
+        }),
+  ]);
   for (const item of items) {
     const cake = offered.find((entry) => entry.id === item.cake_id);
     const size = cake?.sizes.find((entry) => entry.id === item.cake_size_id);
@@ -471,30 +495,11 @@ async function submitGuestPreorderActionBody(
       };
     }
   }
-
-  const supabase = await createClient();
-  const liveDaysStarted = performance.now();
-  const liveDays = await loadLivePreorderDaysBySizeId(
-    items.map((item) => item.cake_size_id),
-    supabase,
-  );
-  logPerf(
-    "CHECKOUT_SUBMIT",
-    "loadLivePreorderDaysBySizeId",
-    performance.now() - liveDaysStarted,
-  );
   for (const item of items) {
     if (!liveDays.has(item.cake_size_id)) {
       return { error: "Cake size is not available" };
     }
   }
-  const businessDateStarted = performance.now();
-  const businessDate = await loadMalaysiaPreorderBusinessDate(supabase);
-  logPerf(
-    "CHECKOUT_SUBMIT",
-    "loadMalaysiaPreorderBusinessDate",
-    performance.now() - businessDateStarted,
-  );
   const lines = items.map((item) => {
     const cake = offered.find((entry) => entry.id === item.cake_id);
     const size = cake?.sizes.find((entry) => entry.id === item.cake_size_id);
@@ -508,22 +513,19 @@ async function submitGuestPreorderActionBody(
       preorderDays: liveDays.get(item.cake_size_id) ?? readPreorderDays(null),
     };
   });
-  const capacityStarted = performance.now();
-  const capacitySnapshot = await loadCustomerCartDateCapacity({
-    fromYmd: pickupDate,
-    toYmd: pickupDate,
-    collectionId: collection.id,
-    cart: lines.map((line) => ({
-      cakeId: line.cakeId,
-      cakeSizeId: line.cakeSizeId,
-      cakeName: line.cakeName,
-      quantity: line.quantity,
-    })),
-  });
-  logPerf(
-    "CHECKOUT_SUBMIT",
+  const capacitySnapshot = await timedSubmitStep(
     "loadCustomerCartDateCapacity",
-    performance.now() - capacityStarted,
+    loadCustomerCartDateCapacity({
+      fromYmd: pickupDate,
+      toYmd: pickupDate,
+      collectionId: collection.id,
+      cart: lines.map((line) => ({
+        cakeId: line.cakeId,
+        cakeSizeId: line.cakeSizeId,
+        cakeName: line.cakeName,
+        quantity: line.quantity,
+      })),
+    }),
   );
   const waitingListOffered =
     capacitySnapshot.waitingListDates?.includes(pickupDate) ?? false;
@@ -557,25 +559,6 @@ async function submitGuestPreorderActionBody(
           : detail,
     };
   }
-
-  const optionCatalog = persistOptions
-    ? await (async () => {
-        const optionsStarted = performance.now();
-        const loaded = await loadCustomerPreorderOptions(
-          supabase,
-          collection.id,
-        );
-        logPerf(
-          "CHECKOUT_SUBMIT",
-          "loadCustomerPreorderOptions",
-          performance.now() - optionsStarted,
-        );
-        return loaded;
-      })()
-    : ((() => {
-        logPerfSkipped("CHECKOUT_SUBMIT", "loadCustomerPreorderOptions");
-        return { complimentary: [], paidAddons: [], ready: false };
-      })());
   const complimentary = customerComplimentaryMutationPayload({
     options: optionCatalog.complimentary,
     selectedCodes: selections.complimentaryCodes,

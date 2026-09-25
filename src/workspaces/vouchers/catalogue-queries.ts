@@ -137,20 +137,22 @@ export async function getCatalogueVoucherForApply(
   voucherId: string,
 ): Promise<CatalogueVoucherRecord | null> {
   const admin = createServiceClient();
-  const { data, error } = await admin
-    .from("library_vouchers")
-    .select(
-      "id, code, voucher_type, value, valid_from, valid_until, status, image_url, asset_id",
-    )
-    .eq("id", voucherId)
-    .maybeSingle();
-  if (error) {
-    throw new Error(error.message);
+  const [voucherResult, rules] = await Promise.all([
+    admin
+      .from("library_vouchers")
+      .select(
+        "id, code, voucher_type, value, valid_from, valid_until, status, image_url, asset_id",
+      )
+      .eq("id", voucherId)
+      .maybeSingle(),
+    loadCatalogueRulesForVouchers(admin as never, [voucherId]),
+  ]);
+  if (voucherResult.error) {
+    throw new Error(voucherResult.error.message);
   }
-  if (!data) return null;
-  const rules = await loadCatalogueRulesForVouchers(admin as never, [voucherId]);
+  if (!voucherResult.data) return null;
   return {
-    ...mapPublicVoucher(data as PublicVoucher),
+    ...mapPublicVoucher(voucherResult.data as PublicVoucher),
     rules: rules.get(voucherId) ?? emptyCatalogueRules(),
   };
 }

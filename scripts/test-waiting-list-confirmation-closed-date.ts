@@ -141,7 +141,7 @@ assert.equal(
 );
 
 // D. Normal checkout still blocks 25 Sep.
-assert.match(checkoutActionsSrc, /await isPickupOrdersClosed\(pickupDate\)/);
+assert.match(checkoutActionsSrc, /isPickupOrdersClosed\(pickupDate\)/);
 assert.match(checkoutFormSrc, /isPickupOrdersClosed/);
 assert.match(guestPreorderSql, /is_pickup_orders_closed\(p_pickup_date\)/);
 assert.doesNotMatch(actionSrc, /isPickupOrdersClosed/);

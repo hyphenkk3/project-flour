@@ -10,13 +10,19 @@ import {
 
 export function ApplySelectedCatalogueVoucher({
   orderId,
+  alreadyApplied = false,
 }: {
   orderId?: string;
+  alreadyApplied?: boolean;
 }) {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!orderId) return;
+    if (alreadyApplied) {
+      writeSelectedCatalogueVoucherId(null);
+      return;
+    }
     const voucherId = readSelectedCatalogueVoucherId();
     if (!voucherId) return;
     let cancelled = false;
@@ -36,7 +42,7 @@ export function ApplySelectedCatalogueVoucher({
     return () => {
       cancelled = true;
     };
-  }, [orderId]);
+  }, [alreadyApplied, orderId]);
 
   if (!message) return null;
   return (

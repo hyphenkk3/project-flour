@@ -50,13 +50,13 @@ assert.match(serverHelperSrc, /isDevPerfEnabled\(\)/);
 assert.equal(typeof isDevPerfEnabled(), "boolean");
 
 assert.match(actionsSrc, /export async function submitGuestPreorderAction/);
-assert.match(actionsSrc, /await isPickupOrdersClosed\(pickupDate\)/);
-assert.match(actionsSrc, /await loadOperatingHoursSnapshot\(\)/);
-assert.match(actionsSrc, /await getStorefrontCollectionForPickupDate\(pickupDate\)/);
-assert.match(actionsSrc, /await listAvailableCakes\(collection.id\)/);
-assert.match(actionsSrc, /await loadLivePreorderDaysBySizeId\(/);
-assert.match(actionsSrc, /await loadMalaysiaPreorderBusinessDate\(supabase\)/);
-assert.match(actionsSrc, /await loadCustomerCartDateCapacity\(/);
+assert.match(actionsSrc, /isPickupOrdersClosed\(pickupDate\)/);
+assert.match(actionsSrc, /loadOperatingHoursSnapshot\(\)/);
+assert.match(actionsSrc, /getStorefrontCollectionForPickupDate\(pickupDate\)/);
+assert.match(actionsSrc, /listAvailableCakes\(collection.id\)/);
+assert.match(actionsSrc, /loadLivePreorderDaysBySizeId\(/);
+assert.match(actionsSrc, /loadMalaysiaPreorderBusinessDate\(supabase\)/);
+assert.match(actionsSrc, /loadCustomerCartDateCapacity\(/);
 assert.match(actionsSrc, /await supabase.rpc\("submit_guest_preorder", rpcArgs\)/);
 assert.match(actionsSrc, /await setGuestPreorderReceiptCookie\(orderId\)/);
 assert.match(actionsSrc, /await applyGuestCatalogueVoucherAction\(orderId, catalogueVoucherId\)/);
@@ -72,8 +72,8 @@ assert.match(
   /apply_catalogue_voucher_to_guest_order/,
 );
 assert.match(voucherActionsSrc, /evaluateCatalogueVoucherEligibility/);
-assert.match(voucherActionsSrc, /revalidatePath\("\/order\/success"\)/);
-assert.match(voucherActionsSrc, /getGuestPreorderReceipt\(orderId, cookieOrderId\)/);
+assert.doesNotMatch(voucherActionsSrc, /revalidatePath\("\/order\/success"\)/);
+assert.doesNotMatch(voucherActionsSrc, /getGuestPreorderReceipt\(/);
 assert.match(voucherActionsSrc, /loadCatalogueApplyOrder\(input.orderId\)/);
 assert.match(voucherActionsSrc, /getCatalogueVoucherForApply\(input.voucherId\)/);
 assert.doesNotMatch(voucherActionsSrc, /clientAmount != null \? input.clientAmount/);

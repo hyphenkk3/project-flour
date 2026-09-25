@@ -9,7 +9,6 @@ import { singaporeDateFromIso } from "@/engines/orders/promotions";
 import { CATALOGUE_VOUCHER_ADJUSTMENT_CODE } from "@/types/catalogue-voucher";
 import { createServiceClient } from "@/lib/supabase/admin";
 import {
-  getGuestPreorderReceipt,
   guestPreorderReceiptAuthorized,
   GUEST_PREORDER_RECEIPT_COOKIE,
 } from "@/workspaces/storefront/checkout/receipt";
@@ -49,27 +48,34 @@ export async function applyCatalogueVoucherAuthoritative(input: {
     return { error: "Client-provided discount amounts are not accepted." };
   }
 
-  const orderStarted = performance.now();
-  const order = await loadCatalogueApplyOrder(input.orderId);
-  if (getPerfContext()) {
-    logPerf(
-      "CHECKOUT_VOUCHER",
-      "loadCatalogueApplyOrder",
-      performance.now() - orderStarted,
-    );
-  }
+  const [order, voucher] = await Promise.all([
+    (async () => {
+      const started = performance.now();
+      const loaded = await loadCatalogueApplyOrder(input.orderId);
+      if (getPerfContext()) {
+        logPerf(
+          "CHECKOUT_VOUCHER",
+          "loadCatalogueApplyOrder",
+          performance.now() - started,
+        );
+      }
+      return loaded;
+    })(),
+    (async () => {
+      const started = performance.now();
+      const loaded = await getCatalogueVoucherForApply(input.voucherId);
+      if (getPerfContext()) {
+        logPerf(
+          "CHECKOUT_VOUCHER",
+          "getCatalogueVoucherForApply",
+          performance.now() - started,
+        );
+      }
+      return loaded;
+    })(),
+  ]);
   if (!order) {
     return { error: "Order not found." };
-  }
-
-  const voucherStarted = performance.now();
-  const voucher = await getCatalogueVoucherForApply(input.voucherId);
-  if (getPerfContext()) {
-    logPerf(
-      "CHECKOUT_VOUCHER",
-      "getCatalogueVoucherForApply",
-      performance.now() - voucherStarted,
-    );
   }
   if (!voucher) {
     return { error: "Voucher not found." };
@@ -222,16 +228,7 @@ async function applyGuestCatalogueVoucherActionTimed(
     if (!authorized) {
       return { error: "This order is not available for voucher application." };
     }
-    const receiptStarted = performance.now();
-    const receipt = await getGuestPreorderReceipt(orderId, cookieOrderId);
-    logPerf(
-      "CHECKOUT_VOUCHER",
-      "getGuestPreorderReceipt",
-      performance.now() - receiptStarted,
-    );
-    if (!receipt) {
-      return { error: "This order is not available for voucher application." };
-    }
+    logPerfSkipped("CHECKOUT_VOUCHER", "getGuestPreorderReceipt");
 
     const result = await applyCatalogueVoucherAuthoritative({
       orderId,
@@ -239,17 +236,10 @@ async function applyGuestCatalogueVoucherActionTimed(
       actorStaffId: null,
       clientAmount,
     });
-    if (!result.error) {
-      const revalidateStarted = performance.now();
-      revalidatePath("/order/success");
-      logPerf(
-        "CHECKOUT_VOUCHER",
-        "revalidatePath",
-        performance.now() - revalidateStarted,
-      );
-    } else {
-      logPerfSkipped("CHECKOUT_VOUCHER", "revalidatePath");
+    if (result.error === "Order not found.") {
+      return { error: "This order is not available for voucher application." };
     }
+    logPerfSkipped("CHECKOUT_VOUCHER", "revalidatePath");
     return result;
   } finally {
     logPerf("CHECKOUT_VOUCHER", "TOTAL", performance.now() - totalStarted);

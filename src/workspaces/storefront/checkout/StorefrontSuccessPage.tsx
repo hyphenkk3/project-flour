@@ -30,6 +30,7 @@ import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import { storefrontKickerClass } from "@/workspaces/storefront/StorefrontBrand";
 import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
 import { ApplySelectedCatalogueVoucher } from "@/workspaces/storefront/offers/ApplySelectedCatalogueVoucher";
+import { CATALOGUE_VOUCHER_ADJUSTMENT_CODE } from "@/types/catalogue-voucher";
 import { StorefrontSuccessPerfProbe } from "@/workspaces/storefront/checkout/StorefrontSuccessPerfProbe";
 
 type StorefrontSuccessPageProps = {
@@ -72,7 +73,14 @@ export async function StorefrontSuccessPage({
           <br />
           {contactLine}
         </p>
-        <ApplySelectedCatalogueVoucher orderId={orderId} />
+        <ApplySelectedCatalogueVoucher
+          alreadyApplied={Boolean(
+            receipt?.adjustments.some(
+              (row) => row.code === CATALOGUE_VOUCHER_ADJUSTMENT_CODE,
+            ),
+          )}
+          orderId={orderId}
+        />
       </div>
 
       <aside
