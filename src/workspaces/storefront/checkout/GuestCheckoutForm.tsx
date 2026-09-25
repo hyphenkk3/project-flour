@@ -169,6 +169,17 @@ import {
   type PreorderDraftItem,
 } from "@/workspaces/storefront/checkout/preorder-draft";
 import { useEligibleCatalogueVoucher } from "@/workspaces/storefront/offers/useEligibleCatalogueVoucher";
+import {
+  CheckoutLoadStepProbe,
+  CheckoutSubmitUsableProbe,
+  beginCheckoutSubmitPerf,
+  beginSuccessNavigationPerf,
+  useCheckoutActionReturnPerf,
+} from "@/workspaces/storefront/checkout/CheckoutDevPerf";
+import {
+  markCheckoutLoadOnce,
+  startCheckoutLoadClock,
+} from "@/lib/perf/dev-only-client";
 import { CustomerWaitingListAvailability } from "@/workspaces/storefront/waiting-list/CustomerWaitingListAvailability";
 import { JoinWaitingListForm } from "@/workspaces/storefront/waiting-list/JoinWaitingListForm";
 import { loadCustomerWaitingListAvailability } from "@/workspaces/storefront/waiting-list/actions";
@@ -324,6 +335,8 @@ export function GuestCheckoutForm({
     submitGuestPreorderAction,
     initialState,
   );
+  const checkoutLoadSeen = useRef(new Set<string>());
+  useCheckoutActionReturnPerf(pending, "preorder");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const pendingSubmitRef = useRef<FormData | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -348,6 +361,7 @@ export function GuestCheckoutForm({
   useEffect(() => {
     const orderId = state.orderId;
     if (!orderId || state.error) return;
+    beginSuccessNavigationPerf();
     window.location.assign(`/order/success?order=${orderId}`);
   }, [state.error, state.orderId]);
 
@@ -481,9 +495,23 @@ export function GuestCheckoutForm({
   const cartCapacityKey = checkoutCartCapacityKey(items);
 
   useEffect(() => {
+    startCheckoutLoadClock();
+    if (!hydrated) {
+      markCheckoutLoadOnce("preparing_hydration_gate", checkoutLoadSeen.current);
+      return;
+    }
+    markCheckoutLoadOnce("draft_hydration_complete", checkoutLoadSeen.current);
+    markCheckoutLoadOnce("voucher_list_start", checkoutLoadSeen.current);
+  }, [hydrated]);
+
+  useEffect(() => {
     if (!hydrated || !calendarReady || items.length === 0) {
       return;
     }
+    markCheckoutLoadOnce(
+      "capacity_availability_start",
+      checkoutLoadSeen.current,
+    );
     const fromYmd = effectivePickupBounds.min;
     const toYmd = effectivePickupBounds.max ?? fromYmd;
     let cancelled = false;
@@ -561,6 +589,7 @@ export function GuestCheckoutForm({
 
   useEffect(() => {
     if (!hydrated) return;
+    markCheckoutLoadOnce("calendar_context_start", checkoutLoadSeen.current);
     const cakeIds = cakeIdsKey.split(",").filter(Boolean);
     let cancelled = false;
     void loadCheckoutCalendarContext({
@@ -784,6 +813,7 @@ export function GuestCheckoutForm({
       });
     };
 
+    markCheckoutLoadOnce("live_pickup_offer_start", checkoutLoadSeen.current);
     const cached = checkoutPickupOfferCache.get(pickupDate);
     if (cached) {
       applyOffer(cached);
@@ -813,6 +843,7 @@ export function GuestCheckoutForm({
     if (!/^\d{4}-\d{2}-\d{2}$/.test(pickupDate) || sizeIds.length === 0) {
       return;
     }
+    markCheckoutLoadOnce("size_prices_start", checkoutLoadSeen.current);
     let cancelled = false;
     const applyPrices = (prices: Record<string, number>) => {
       if (cancelled) return;
@@ -1358,6 +1389,7 @@ export function GuestCheckoutForm({
     }
     const formData = pendingSubmitRef.current;
     if (!formData) return;
+    beginCheckoutSubmitPerf({ formData, flow: "preorder" });
     formAction(formData);
   }
 
@@ -1379,9 +1411,12 @@ export function GuestCheckoutForm({
 
   if (!hydrated) {
     return (
-      <p className="text-skyline text-sm" aria-live="polite">
-        Preparing your preorder…
-      </p>
+      <>
+        <CheckoutLoadStepProbe step="preparing_hydration_gate" />
+        <p className="text-skyline text-sm" aria-live="polite">
+          Preparing your preorder…
+        </p>
+      </>
     );
   }
 
@@ -2325,6 +2360,7 @@ export function GuestCheckoutForm({
         options={closedWaitingListOptions}
         pickupDate={fields.pickupDate}
       />
+      <CheckoutSubmitUsableProbe blocked={submitBlocked} />
       <CheckoutConfirmPrompt
         onConfirm={confirmOrder}
         onGoBack={goBackFromConfirm}

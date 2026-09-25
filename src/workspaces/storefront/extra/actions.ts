@@ -42,6 +42,12 @@ import { loadFreshPicksPreparationConfig } from "@/workspaces/storefront/extra/c
 import { getStorefrontExtraById } from "@/workspaces/storefront/extra/queries";
 import { setGuestPreorderReceiptCookie } from "@/workspaces/storefront/checkout/receipt";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
+import {
+  acceptPerfCorrelationId,
+  logPerf,
+  logPerfSkipped,
+  runWithPerfContext,
+} from "@/lib/perf/dev-only-server";
 
 export type ExtraOrderState = {
   error: string | null;
@@ -124,6 +130,33 @@ export async function loadExtraCustomerOptions(pickupDate: string): Promise<{
 
 export async function submitGuestExtraOrderAction(
   _prev: ExtraOrderState,
+  formData: FormData,
+): Promise<ExtraOrderState> {
+  const correlationId = acceptPerfCorrelationId(
+    String(formData.get("perf_correlation_id") ?? ""),
+  );
+  return runWithPerfContext(
+    { correlationId, source: "extra_submit" },
+    () => submitGuestExtraOrderActionTimed(formData, correlationId),
+  );
+}
+
+async function submitGuestExtraOrderActionTimed(
+  formData: FormData,
+  correlationId: string,
+): Promise<ExtraOrderState> {
+  const totalStarted = performance.now();
+  logPerf("EXTRA_SUBMIT", "action_start", 0);
+  try {
+    return await submitGuestExtraOrderActionBody(formData);
+  } finally {
+    logPerf("EXTRA_SUBMIT", "TOTAL", performance.now() - totalStarted, {
+      correlationId,
+    });
+  }
+}
+
+async function submitGuestExtraOrderActionBody(
   formData: FormData,
 ): Promise<ExtraOrderState> {
   const extraStockIds = formData
@@ -306,6 +339,7 @@ export async function submitGuestExtraOrderAction(
   });
 
   const supabase = await createClient();
+  const rpcStarted = performance.now();
   const { data, error } = await supabase.rpc("submit_guest_extra_order", {
     p_customer_name: customerName,
     p_phone: phone,
@@ -326,6 +360,11 @@ export async function submitGuestExtraOrderAction(
       ? { p_delivery_processing_fee_ack: deliveryProcessingAck }
       : {}),
   });
+  logPerf(
+    "EXTRA_SUBMIT",
+    "submit_guest_extra_order",
+    performance.now() - rpcStarted,
+  );
 
   if (error) {
     for (const extra of extras) {
@@ -353,11 +392,23 @@ export async function submitGuestExtraOrderAction(
     formData.get("catalogue_voucher_id") ?? "",
   ).trim();
   if (catalogueVoucherId) {
+    const voucherStarted = performance.now();
     const { applyGuestCatalogueVoucherAction } = await import(
       "@/workspaces/vouchers/catalogue-actions"
     );
     await applyGuestCatalogueVoucherAction(orderId, catalogueVoucherId);
+    logPerf(
+      "EXTRA_SUBMIT",
+      "applyGuestCatalogueVoucherAction",
+      performance.now() - voucherStarted,
+      { voucherApply: "executed" },
+    );
+  } else {
+    logPerfSkipped("EXTRA_SUBMIT", "applyGuestCatalogueVoucherAction", {
+      voucherApply: "skipped",
+    });
   }
   scheduleStaffNotificationDispatch();
+  logPerf("EXTRA_SUBMIT", "action_return", 0);
   return { error: null, orderId };
 }

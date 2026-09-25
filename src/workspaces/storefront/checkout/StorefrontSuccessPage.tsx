@@ -17,6 +17,7 @@ import { ClearPreorderDraftOnSuccess } from "@/workspaces/storefront/checkout/Cl
 import { ClearFreshPickCartOnSuccess } from "@/workspaces/storefront/extra/ClearFreshPickCartOnSuccess";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import { getGuestPreorderReceipt } from "@/workspaces/storefront/checkout/receipt";
+import { loadSuccessPageReceipt } from "@/workspaces/storefront/checkout/success-page-load";
 import {
   ORDER_DETAILS_CARD_CONTACT,
   ORDER_DETAILS_CARD_PAYMENT,
@@ -29,6 +30,7 @@ import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import { storefrontKickerClass } from "@/workspaces/storefront/StorefrontBrand";
 import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
 import { ApplySelectedCatalogueVoucher } from "@/workspaces/storefront/offers/ApplySelectedCatalogueVoucher";
+import { StorefrontSuccessPerfProbe } from "@/workspaces/storefront/checkout/StorefrontSuccessPerfProbe";
 
 type StorefrontSuccessPageProps = {
   orderId?: string;
@@ -39,7 +41,10 @@ export async function StorefrontSuccessPage({
   orderId,
   flow,
 }: StorefrontSuccessPageProps) {
-  const receipt = orderId ? await getGuestPreorderReceipt(orderId) : null;
+  const receipt = await loadSuccessPageReceipt(
+    orderId,
+    getGuestPreorderReceipt,
+  );
   const isFreshPick =
     flow === FRESH_PICKS_SUCCESS_FLOW || Boolean(receipt?.isFreshPick);
   const paymentStatus = isFreshPick
@@ -54,6 +59,7 @@ export async function StorefrontSuccessPage({
 
   return (
     <main className="bg-paper mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-16 sm:px-6">
+      <StorefrontSuccessPerfProbe />
       {isFreshPick ? <ClearFreshPickCartOnSuccess /> : <ClearPreorderDraftOnSuccess />}
       <StorefrontTheme />
       <div className="text-center">

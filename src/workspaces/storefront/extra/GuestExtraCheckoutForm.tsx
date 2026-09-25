@@ -117,6 +117,11 @@ import {
   catalogueVoucherPreviewPayable,
 } from "@/workspaces/storefront/offers/CatalogueVoucherAmountLines";
 import { useEligibleCatalogueVoucher } from "@/workspaces/storefront/offers/useEligibleCatalogueVoucher";
+import {
+  beginCheckoutSubmitPerf,
+  beginSuccessNavigationPerf,
+  useCheckoutActionReturnPerf,
+} from "@/workspaces/storefront/checkout/CheckoutDevPerf";
 
 const initialState: ExtraOrderState = { error: null };
 
@@ -136,6 +141,7 @@ export function GuestExtraCheckoutForm({
     submitGuestExtraOrderAction,
     initialState,
   );
+  useCheckoutActionReturnPerf(pending, "extra");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmSnapshot, setConfirmSnapshot] =
     useState<CheckoutConfirmSnapshot | null>(null);
@@ -247,6 +253,7 @@ export function GuestExtraCheckoutForm({
 
   useEffect(() => {
     if (!state.orderId) return;
+    beginSuccessNavigationPerf();
     window.location.assign(
       `/order/success?order=${state.orderId}&flow=${FRESH_PICKS_SUCCESS_FLOW}`,
     );
@@ -487,6 +494,7 @@ export function GuestExtraCheckoutForm({
     }
     const formData = pendingSubmitRef.current;
     if (!formData) return;
+    beginCheckoutSubmitPerf({ formData, flow: "extra" });
     formAction(formData);
   }
 

@@ -12,6 +12,7 @@ import {
   type StorefrontCakePhotoRow,
 } from "@/workspaces/storefront/catalog/cake-photo-map";
 import type { StorefrontCakePhoto } from "@/types/storefront";
+import { logPerf, logPerfSkipped } from "@/lib/perf/dev-only-server";
 
 export type GuestPreorderReceiptItem = {
   key: string;
@@ -116,11 +117,17 @@ export async function getGuestPreorderReceipt(
 ): Promise<GuestPreorderReceipt | null> {
   if (!orderId) return null;
 
+  const cookieStarted = performance.now();
   let allowed = cookieOrderId;
   if (allowed === undefined) {
     const store = await cookies();
     allowed = store.get(GUEST_PREORDER_RECEIPT_COOKIE)?.value ?? null;
   }
+  logPerf(
+    "CHECKOUT_RECEIPT",
+    "receipt_cookie_lookup",
+    performance.now() - cookieStarted,
+  );
   if (!guestPreorderReceiptAuthorized(orderId, allowed)) {
     return null;
   }
@@ -156,7 +163,10 @@ async function loadReceiptCakePhotos(
   cakeIds: string[],
 ): Promise<Map<string, StorefrontCakePhoto[]>> {
   const photosByCake = new Map<string, StorefrontCakePhoto[]>();
-  if (cakeIds.length === 0) return photosByCake;
+  if (cakeIds.length === 0) {
+    logPerfSkipped("CHECKOUT_RECEIPT", "cake_photos");
+    return photosByCake;
+  }
 
   const run = (photoSelect: string) =>
     supabase
@@ -165,10 +175,16 @@ async function loadReceiptCakePhotos(
       .in("cake_id", cakeIds)
       .order("sort_order", { ascending: true });
 
+  const photosStarted = performance.now();
   let result = await run(STOREFRONT_CAKE_PHOTO_SELECT);
   if (result.error && isMissingCakePhotoSchema(result.error.message)) {
     result = await run(STOREFRONT_CAKE_PHOTO_SELECT_LEGACY);
   }
+  logPerf(
+    "CHECKOUT_RECEIPT",
+    "cake_photos",
+    performance.now() - photosStarted,
+  );
   if (result.error) return photosByCake;
 
   for (const photo of (result.data ?? []) as unknown as ReceiptPhotoRow[]) {
@@ -190,8 +206,10 @@ export async function loadGuestPreorderReceipt(
   if (!orderId) return null;
 
   try {
+    const totalStarted = performance.now();
     const supabase = createServiceClient();
     // Column is customer_notes. A `notes` select fails PostgREST and hides Save Order Details.
+    const ordersStarted = performance.now();
     const { data, error } = await supabase
       .from("orders")
       .select(
@@ -236,6 +254,12 @@ export async function loadGuestPreorderReceipt(
       .eq("id", orderId)
       .is("customer_id", null)
       .maybeSingle();
+    logPerf(
+      "CHECKOUT_RECEIPT",
+      "orders_query",
+      performance.now() - ordersStarted,
+      { embeds: "items_addons_complimentary_dine_in" },
+    );
 
     if (error || !data) return null;
 
@@ -365,12 +389,18 @@ export async function loadGuestPreorderReceipt(
     const notesRaw = String(
       (data as { customer_notes?: string | null }).customer_notes ?? "",
     ).trim();
+    const adjustmentsStarted = performance.now();
     const { data: adjustmentRows } = await supabase
       .from("order_adjustments")
       .select(
         "code, label, amount, status, reverses_adjustment_id, metadata",
       )
       .eq("order_id", orderId);
+    logPerf(
+      "CHECKOUT_RECEIPT",
+      "order_adjustments",
+      performance.now() - adjustmentsStarted,
+    );
     const adjustments = getEffectiveAdjustments(
       (Array.isArray(adjustmentRows) ? adjustmentRows : []).map((row) => ({
         code: (row.code as string | null) ?? null,
@@ -406,6 +436,7 @@ export async function loadGuestPreorderReceipt(
       allocations: [],
       refunds: [],
     });
+    logPerf("CHECKOUT_RECEIPT", "TOTAL", performance.now() - totalStarted);
     return {
       orderNumber:
         String(

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { applyGuestCatalogueVoucherAction } from "@/workspaces/vouchers/catalogue-actions";
+import { logCheckoutClient } from "@/lib/perf/dev-only-client";
 import {
   readSelectedCatalogueVoucherId,
   writeSelectedCatalogueVoucherId,
@@ -19,6 +20,10 @@ export function ApplySelectedCatalogueVoucher({
     const voucherId = readSelectedCatalogueVoucherId();
     if (!voucherId) return;
     let cancelled = false;
+    logCheckoutClient("CHECKOUT_CLIENT", {
+      step: "success_retry_apply_start",
+      note: "ApplySelectedCatalogueVoucher_client_effect",
+    });
     void applyGuestCatalogueVoucherAction(orderId, voucherId).then((result) => {
       if (cancelled) return;
       writeSelectedCatalogueVoucherId(null);

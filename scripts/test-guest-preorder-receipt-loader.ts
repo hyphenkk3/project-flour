@@ -35,6 +35,9 @@ const receiptSrc = readSrc("src/workspaces/storefront/checkout/receipt.ts");
 const successSrc = readSrc(
   "src/workspaces/storefront/checkout/StorefrontSuccessPage.tsx",
 );
+const successLoadSrc = readSrc(
+  "src/workspaces/storefront/checkout/success-page-load.ts",
+);
 const extraActionsSrc = readSrc("src/workspaces/storefront/extra/actions.ts");
 const checkoutActionsSrc = readSrc(
   "src/workspaces/storefront/checkout/actions.ts",
@@ -93,6 +96,8 @@ assert.equal(
 );
 
 assert.match(successSrc, /getGuestPreorderReceipt/);
+assert.match(successSrc, /loadSuccessPageReceipt/);
+assert.match(successLoadSrc, /getGuestPreorderReceipt/);
 assert.match(successSrc, /receipt \? <SaveOrderDetailsButton receipt=\{receipt\} \/>/);
 assert.doesNotMatch(successSrc, /receipt && !isFreshPick/);
 assert.match(successSrc, /receipt\.items\.map/);

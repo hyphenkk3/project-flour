@@ -19,6 +19,13 @@ import {
   listStaffCatalogueVouchers,
   loadCatalogueApplyOrder,
 } from "@/workspaces/vouchers/catalogue-queries";
+import {
+  createPerfCorrelationId,
+  getPerfContext,
+  logPerf,
+  logPerfSkipped,
+  runWithPerfContext,
+} from "@/lib/perf/dev-only-server";
 
 async function requireDiscountStaff() {
   const staff = await requireStaff();
@@ -42,12 +49,28 @@ export async function applyCatalogueVoucherAuthoritative(input: {
     return { error: "Client-provided discount amounts are not accepted." };
   }
 
+  const orderStarted = performance.now();
   const order = await loadCatalogueApplyOrder(input.orderId);
+  if (getPerfContext()) {
+    logPerf(
+      "CHECKOUT_VOUCHER",
+      "loadCatalogueApplyOrder",
+      performance.now() - orderStarted,
+    );
+  }
   if (!order) {
     return { error: "Order not found." };
   }
 
+  const voucherStarted = performance.now();
   const voucher = await getCatalogueVoucherForApply(input.voucherId);
+  if (getPerfContext()) {
+    logPerf(
+      "CHECKOUT_VOUCHER",
+      "getCatalogueVoucherForApply",
+      performance.now() - voucherStarted,
+    );
+  }
   if (!voucher) {
     return { error: "Voucher not found." };
   }
@@ -64,26 +87,49 @@ export async function applyCatalogueVoucherAuthoritative(input: {
         ? applied.metadata.voucher_id
         : null;
     if (appliedId === input.voucherId || applied.label === voucher.code) {
+      if (getPerfContext()) {
+        logPerfSkipped("CHECKOUT_VOUCHER", "eligibility_evaluation");
+        logPerfSkipped(
+          "CHECKOUT_VOUCHER",
+          "apply_catalogue_voucher_to_guest_order",
+        );
+      }
       return { error: null };
     }
     return { error: "A catalogue voucher is already applied to this order." };
   }
 
   const today = singaporeDateFromIso(new Date().toISOString());
+  const eligibilityStarted = performance.now();
   const result = evaluateCatalogueVoucherEligibility(
     voucher,
     catalogueEligibilityInputFromOrder(order, today),
   );
+  if (getPerfContext()) {
+    logPerf(
+      "CHECKOUT_VOUCHER",
+      "eligibility_evaluation",
+      performance.now() - eligibilityStarted,
+    );
+  }
   if (!result.eligible) {
     return { error: result.reason ?? "This voucher cannot be applied." };
   }
 
   const admin = createServiceClient();
+  const rpcStarted = performance.now();
   const { error } = await admin.rpc("apply_catalogue_voucher_to_guest_order", {
     p_order_id: input.orderId,
     p_voucher_id: input.voucherId,
     p_actor_staff_id: input.actorStaffId,
   });
+  if (getPerfContext()) {
+    logPerf(
+      "CHECKOUT_VOUCHER",
+      "apply_catalogue_voucher_to_guest_order",
+      performance.now() - rpcStarted,
+    );
+  }
   if (error) {
     if (/already applied/i.test(error.message)) {
       const current = await loadCatalogueApplyOrder(input.orderId);
@@ -143,24 +189,69 @@ export async function applyGuestCatalogueVoucherAction(
   voucherId: string,
   clientAmount?: number | null,
 ): Promise<{ error: string | null }> {
-  const store = await cookies();
-  const cookieOrderId = store.get(GUEST_PREORDER_RECEIPT_COOKIE)?.value ?? null;
-  if (!guestPreorderReceiptAuthorized(orderId, cookieOrderId)) {
-    return { error: "This order is not available for voucher application." };
-  }
-  const receipt = await getGuestPreorderReceipt(orderId, cookieOrderId);
-  if (!receipt) {
-    return { error: "This order is not available for voucher application." };
-  }
+  const existing = getPerfContext();
+  const correlationId = existing?.correlationId ?? createPerfCorrelationId();
+  return runWithPerfContext(
+    {
+      correlationId,
+      source: existing?.source ?? "voucher_apply",
+    },
+    () =>
+      applyGuestCatalogueVoucherActionTimed(orderId, voucherId, clientAmount),
+  );
+}
 
-  const result = await applyCatalogueVoucherAuthoritative({
-    orderId,
-    voucherId,
-    actorStaffId: null,
-    clientAmount,
-  });
-  if (!result.error) {
-    revalidatePath("/order/success");
+async function applyGuestCatalogueVoucherActionTimed(
+  orderId: string,
+  voucherId: string,
+  clientAmount?: number | null,
+): Promise<{ error: string | null }> {
+  const totalStarted = performance.now();
+  logPerf("CHECKOUT_VOUCHER", "action_start", 0, { voucherApply: "executed" });
+  try {
+    const cookieStarted = performance.now();
+    const store = await cookies();
+    const cookieOrderId =
+      store.get(GUEST_PREORDER_RECEIPT_COOKIE)?.value ?? null;
+    const authorized = guestPreorderReceiptAuthorized(orderId, cookieOrderId);
+    logPerf(
+      "CHECKOUT_VOUCHER",
+      "receipt_cookie_auth",
+      performance.now() - cookieStarted,
+    );
+    if (!authorized) {
+      return { error: "This order is not available for voucher application." };
+    }
+    const receiptStarted = performance.now();
+    const receipt = await getGuestPreorderReceipt(orderId, cookieOrderId);
+    logPerf(
+      "CHECKOUT_VOUCHER",
+      "getGuestPreorderReceipt",
+      performance.now() - receiptStarted,
+    );
+    if (!receipt) {
+      return { error: "This order is not available for voucher application." };
+    }
+
+    const result = await applyCatalogueVoucherAuthoritative({
+      orderId,
+      voucherId,
+      actorStaffId: null,
+      clientAmount,
+    });
+    if (!result.error) {
+      const revalidateStarted = performance.now();
+      revalidatePath("/order/success");
+      logPerf(
+        "CHECKOUT_VOUCHER",
+        "revalidatePath",
+        performance.now() - revalidateStarted,
+      );
+    } else {
+      logPerfSkipped("CHECKOUT_VOUCHER", "revalidatePath");
+    }
+    return result;
+  } finally {
+    logPerf("CHECKOUT_VOUCHER", "TOTAL", performance.now() - totalStarted);
   }
-  return result;
 }

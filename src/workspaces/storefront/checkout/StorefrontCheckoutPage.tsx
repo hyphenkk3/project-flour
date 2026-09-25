@@ -8,6 +8,7 @@ import {
   resolveCheckoutPickupScope,
 } from "@/engines/menu/customer-browse";
 import { GuestCheckoutForm } from "@/workspaces/storefront/checkout/GuestCheckoutForm";
+import { CheckoutLoadStepProbe } from "@/workspaces/storefront/checkout/CheckoutDevPerf";
 import { StorefrontHomeLink } from "@/workspaces/storefront/StorefrontBrand";
 
 function ymdQuery(value: string | null | undefined): string | null {
@@ -26,6 +27,7 @@ function StorefrontCheckoutPreparing() {
     <main className="bg-paper mx-auto min-h-screen max-w-5xl px-5 py-10 sm:px-6">
       <StorefrontHomeLink />
       <h1 className="sr-only">Your Order</h1>
+      <CheckoutLoadStepProbe step="preparing_suspense" />
       <p className="text-skyline mt-8 text-sm" aria-live="polite">
         Preparing your preorder…
       </p>
@@ -60,6 +62,7 @@ function StorefrontCheckoutPageInner({
 
   return (
     <main className="bg-paper mx-auto min-h-screen max-w-5xl px-5 py-10 sm:px-6">
+      <CheckoutLoadStepProbe step="shell_visible" />
       <StorefrontHomeLink />
       <h1 className="sr-only">Your Order</h1>
       <p className="text-skyline mt-8 max-w-xl text-[0.95rem] leading-relaxed">

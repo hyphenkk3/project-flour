@@ -92,6 +92,12 @@ import {
 } from "@/engines/orders/delivery-processing-fee-ack";
 import { setGuestPreorderReceiptCookie } from "@/workspaces/storefront/checkout/receipt";
 import { customerNameValidationError } from "@/engines/orders/customer-name";
+import {
+  acceptPerfCorrelationId,
+  logPerf,
+  logPerfSkipped,
+  runWithPerfContext,
+} from "@/lib/perf/dev-only-server";
 
 export type CheckoutState = {
   error: string | null;
@@ -237,6 +243,34 @@ export async function submitGuestPreorderAction(
   _prev: CheckoutState,
   formData: FormData,
 ): Promise<CheckoutState> {
+  const correlationId = acceptPerfCorrelationId(
+    String(formData.get("perf_correlation_id") ?? ""),
+  );
+  return runWithPerfContext(
+    { correlationId, source: "preorder_submit" },
+    () => submitGuestPreorderActionTimed(formData, correlationId),
+  );
+}
+
+async function submitGuestPreorderActionTimed(
+  formData: FormData,
+  correlationId: string,
+): Promise<CheckoutState> {
+  const totalStarted = performance.now();
+  logPerf("CHECKOUT_SUBMIT", "action_start", 0);
+  try {
+    return await submitGuestPreorderActionBody(formData);
+  } finally {
+    logPerf("CHECKOUT_SUBMIT", "TOTAL", performance.now() - totalStarted, {
+      correlationId,
+    });
+  }
+}
+
+async function submitGuestPreorderActionBody(
+  formData: FormData,
+): Promise<CheckoutState> {
+  const parseStarted = performance.now();
   const customerName = String(formData.get("customer_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const includeReceipt = parseRequiredPhysicalReceipt(
@@ -252,6 +286,7 @@ export async function submitGuestPreorderAction(
   const persistOptions =
     String(formData.get("preorder_options_ready") ?? "") === "1";
   const selections = parseCustomerSelections(formData);
+  logPerf("CHECKOUT_SUBMIT", "parse_validation", performance.now() - parseStarted);
 
   if (!customerName || !phone) {
     return { error: "Please fill in your name and WhatsApp phone number." };
@@ -273,14 +308,27 @@ export async function submitGuestPreorderAction(
           : "Please choose a date and time.",
     };
   }
-  if (await isPickupOrdersClosed(pickupDate)) {
+  const closedStarted = performance.now();
+  const pickupClosed = await isPickupOrdersClosed(pickupDate);
+  logPerf(
+    "CHECKOUT_SUBMIT",
+    "isPickupOrdersClosed",
+    performance.now() - closedStarted,
+  );
+  if (pickupClosed) {
     return { error: ORDERS_CLOSED_RPC_MESSAGE };
   }
 
   let dineInPayload: DineInReservationRpcPayload | null = null;
   let reservationTime = "";
   let deliveryDraft: DeliveryCreateDraft | null = null;
+  const hoursStarted = performance.now();
   const hoursSnapshot = await loadOperatingHoursSnapshot();
+  logPerf(
+    "CHECKOUT_SUBMIT",
+    "loadOperatingHoursSnapshot",
+    performance.now() - hoursStarted,
+  );
 
   if (fulfilmentMethod === "pickup") {
     if (
@@ -378,11 +426,23 @@ export async function submitGuestPreorderAction(
     return { error: "Please add at least one cake to your preorder." };
   }
 
+  const collectionStarted = performance.now();
   const collection = await getStorefrontCollectionForPickupDate(pickupDate);
+  logPerf(
+    "CHECKOUT_SUBMIT",
+    "getStorefrontCollectionForPickupDate",
+    performance.now() - collectionStarted,
+  );
   if (!collection) {
     return { error: unpublishedCataloguePreorderMessage(pickupDate) };
   }
+  const cakesStarted = performance.now();
   const offered = await listAvailableCakes(collection.id);
+  logPerf(
+    "CHECKOUT_SUBMIT",
+    "listAvailableCakes",
+    performance.now() - cakesStarted,
+  );
   for (const item of items) {
     const cake = offered.find((entry) => entry.id === item.cake_id);
     const size = cake?.sizes.find((entry) => entry.id === item.cake_size_id);
@@ -413,16 +473,28 @@ export async function submitGuestPreorderAction(
   }
 
   const supabase = await createClient();
+  const liveDaysStarted = performance.now();
   const liveDays = await loadLivePreorderDaysBySizeId(
     items.map((item) => item.cake_size_id),
     supabase,
+  );
+  logPerf(
+    "CHECKOUT_SUBMIT",
+    "loadLivePreorderDaysBySizeId",
+    performance.now() - liveDaysStarted,
   );
   for (const item of items) {
     if (!liveDays.has(item.cake_size_id)) {
       return { error: "Cake size is not available" };
     }
   }
+  const businessDateStarted = performance.now();
   const businessDate = await loadMalaysiaPreorderBusinessDate(supabase);
+  logPerf(
+    "CHECKOUT_SUBMIT",
+    "loadMalaysiaPreorderBusinessDate",
+    performance.now() - businessDateStarted,
+  );
   const lines = items.map((item) => {
     const cake = offered.find((entry) => entry.id === item.cake_id);
     const size = cake?.sizes.find((entry) => entry.id === item.cake_size_id);
@@ -436,6 +508,7 @@ export async function submitGuestPreorderAction(
       preorderDays: liveDays.get(item.cake_size_id) ?? readPreorderDays(null),
     };
   });
+  const capacityStarted = performance.now();
   const capacitySnapshot = await loadCustomerCartDateCapacity({
     fromYmd: pickupDate,
     toYmd: pickupDate,
@@ -447,6 +520,11 @@ export async function submitGuestPreorderAction(
       quantity: line.quantity,
     })),
   });
+  logPerf(
+    "CHECKOUT_SUBMIT",
+    "loadCustomerCartDateCapacity",
+    performance.now() - capacityStarted,
+  );
   const waitingListOffered =
     capacitySnapshot.waitingListDates?.includes(pickupDate) ?? false;
   const capacity = capacitySnapshot.fullyBookedDates.includes(pickupDate)
@@ -481,8 +559,23 @@ export async function submitGuestPreorderAction(
   }
 
   const optionCatalog = persistOptions
-    ? await loadCustomerPreorderOptions(supabase, collection.id)
-    : { complimentary: [], paidAddons: [], ready: false };
+    ? await (async () => {
+        const optionsStarted = performance.now();
+        const loaded = await loadCustomerPreorderOptions(
+          supabase,
+          collection.id,
+        );
+        logPerf(
+          "CHECKOUT_SUBMIT",
+          "loadCustomerPreorderOptions",
+          performance.now() - optionsStarted,
+        );
+        return loaded;
+      })()
+    : ((() => {
+        logPerfSkipped("CHECKOUT_SUBMIT", "loadCustomerPreorderOptions");
+        return { complimentary: [], paidAddons: [], ready: false };
+      })());
   const complimentary = customerComplimentaryMutationPayload({
     options: optionCatalog.complimentary,
     selectedCodes: selections.complimentaryCodes,
@@ -535,7 +628,13 @@ export async function submitGuestPreorderAction(
     rpcArgs.p_delivery_processing_fee_ack = deliveryProcessingAck;
   }
 
+  const rpcStarted = performance.now();
   const { data, error } = await supabase.rpc("submit_guest_preorder", rpcArgs);
+  logPerf(
+    "CHECKOUT_SUBMIT",
+    "submit_guest_preorder",
+    performance.now() - rpcStarted,
+  );
 
   if (error) {
     if (/fully booked/i.test(error.message)) {
@@ -563,17 +662,38 @@ export async function submitGuestPreorderAction(
     return { error: "Order was created but could not be confirmed." };
   }
 
+  const cookieStarted = performance.now();
   await setGuestPreorderReceiptCookie(orderId);
+  logPerf(
+    "CHECKOUT_SUBMIT",
+    "setGuestPreorderReceiptCookie",
+    performance.now() - cookieStarted,
+  );
   const catalogueVoucherId = String(
     formData.get("catalogue_voucher_id") ?? "",
   ).trim();
   if (catalogueVoucherId) {
+    logPerf("CHECKOUT_SUBMIT", "voucherApply", 0, {
+      voucherApply: "executed",
+    });
+    const voucherStarted = performance.now();
     const { applyGuestCatalogueVoucherAction } = await import(
       "@/workspaces/vouchers/catalogue-actions"
     );
     await applyGuestCatalogueVoucherAction(orderId, catalogueVoucherId);
+    logPerf(
+      "CHECKOUT_SUBMIT",
+      "applyGuestCatalogueVoucherAction",
+      performance.now() - voucherStarted,
+      { voucherApply: "executed" },
+    );
+  } else {
+    logPerfSkipped("CHECKOUT_SUBMIT", "applyGuestCatalogueVoucherAction", {
+      voucherApply: "skipped",
+    });
   }
   scheduleStaffNotificationDispatch();
+  logPerf("CHECKOUT_SUBMIT", "action_return", 0);
   return { error: null, orderId };
 }
 
