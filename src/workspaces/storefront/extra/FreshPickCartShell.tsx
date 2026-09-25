@@ -21,6 +21,7 @@ import {
 } from "@/workspaces/storefront/extra/fresh-pick-cart";
 import { useFreshPickCart } from "@/workspaces/storefront/extra/useFreshPickCart";
 import { CatalogueVoucherCartPanel } from "@/workspaces/storefront/offers/CatalogueVoucherCartPanel";
+import { CatalogueVoucherCartTotals } from "@/workspaces/storefront/offers/CatalogueVoucherCartTotals";
 
 const DESKTOP_ORDER_RAIL_WIDTH = "20.5rem";
 
@@ -98,14 +99,22 @@ function ExtraOrderSummary({
               : "Not selected yet"}
           </dd>
         </div>
-        <div className="flex items-baseline justify-between gap-3 pt-1">
-          <dt className="text-ink text-sm">Total</dt>
-          <dd className="text-ink font-display text-xl tracking-tight tabular-nums">
-            {formatRm(total)}
-          </dd>
-        </div>
-      </dl>
+        </dl>
       <CatalogueVoucherCartPanel
+        draft={{
+          pickupDate: cart.pickupDate,
+          items: cart.items.map((item) => ({
+            cakeId: "",
+            sizeId: item.extraStockId,
+            sizeLabel: item.sizeLabel,
+            quantity: 1,
+            unitPrice: item.unitPrice ?? 0,
+          })),
+        }}
+        orderType="fresh_pick"
+      />
+      <CatalogueVoucherCartTotals
+        commercialTotal={total}
         draft={{
           pickupDate: cart.pickupDate,
           items: cart.items.map((item) => ({

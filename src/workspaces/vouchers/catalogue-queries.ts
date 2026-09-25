@@ -171,6 +171,8 @@ export type CatalogueApplyOrder = {
     code: string | null;
     status?: string;
     reversesAdjustmentId?: string | null;
+    label?: string | null;
+    metadata?: Record<string, unknown> | null;
   }>;
 };
 
@@ -196,7 +198,7 @@ export async function loadCatalogueApplyOrder(
         .eq("order_id", orderId),
       admin
         .from("order_adjustments")
-        .select("code, status, reverses_adjustment_id")
+        .select("code, status, reverses_adjustment_id, label, metadata")
         .eq("order_id", orderId),
     ]);
   if (itemError) throw new Error(itemError.message);
@@ -219,6 +221,11 @@ export async function loadCatalogueApplyOrder(
       status: (row.status as string | null) ?? "active",
       reversesAdjustmentId:
         (row.reverses_adjustment_id as string | null) ?? null,
+      label: (row.label as string | null) ?? null,
+      metadata:
+        row.metadata && typeof row.metadata === "object"
+          ? (row.metadata as Record<string, unknown>)
+          : null,
     })),
   };
 }

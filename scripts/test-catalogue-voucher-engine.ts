@@ -8,16 +8,23 @@ import { resolve } from "node:path";
 import {
   emptyCatalogueRules,
   evaluateCatalogueVoucherEligibility,
+  evaluateCatalogueVouchers,
   formatCatalogueVoucherHeadline,
   isCatalogueVoucherDiscoverable,
+  selectEligibleCatalogueVoucher,
 } from "@/engines/vouchers/catalogue-voucher";
+import { selectDraftCatalogueVoucher } from "@/engines/vouchers/catalogue-voucher-context";
 import { CATALOGUE_VOUCHER_ADJUSTMENT_CODE } from "@/types/catalogue-voucher";
 import type {
   CatalogueEligibilityInput,
   CatalogueVoucherRecord,
   CatalogueVoucherRules,
 } from "@/types/catalogue-voucher";
-import { evaluateAugustPromoEligibility } from "@/engines/orders/promotions";
+import {
+  evaluateAugustPromoEligibility,
+  getEffectiveAdjustments,
+} from "@/engines/orders/promotions";
+import { calculateOrderSettlement } from "@/engines/orders/settlement";
 import { parseCatalogueRulesFromForm } from "@/workspaces/library/vouchers/rules";
 
 function readSrc(rel: string): string {
@@ -351,19 +358,205 @@ assert.doesNotMatch(
   /physical_discount_vouchers/,
 );
 
-// X. No-rule catalogue voucher is a valid record and is not auto-applied
+// X. Eligible catalogue voucher is auto-selected; no customer Apply click
 const noRule = evaluateCatalogueVoucherEligibility(voucher(), input());
 assert.equal(noRule.eligible, true);
 assert.equal(noRule.applicable, true);
+const later = voucher({ id: "voucher-2", code: "ZZZ10" });
+const earlier = voucher({ id: "voucher-1", code: "AAA10" });
+const evaluated = evaluateCatalogueVouchers([later, earlier], input());
+const chosen = selectEligibleCatalogueVoucher(evaluated);
+assert.equal(chosen?.voucher.id, "voucher-2");
+const draftPick = selectDraftCatalogueVoucher(
+  [later, earlier],
+  {
+    pickupDate: "2026-08-15",
+    items: [
+      {
+        cakeId: "pistachio",
+        sizeId: "pistachio-6",
+        sizeLabel: '6"',
+        quantity: 1,
+        unitPrice: 120,
+      },
+    ],
+  },
+  "2026-08-05",
+);
+assert.equal(draftPick?.voucher.id, "voucher-2");
+assert.equal(
+  selectDraftCatalogueVoucher(
+    [voucher({ rules: { cakeIds: ["other"] } })],
+    {
+      pickupDate: "2026-08-15",
+      items: [
+        {
+          cakeId: "pistachio",
+          sizeId: "pistachio-6",
+          sizeLabel: '6"',
+          quantity: 1,
+          unitPrice: 120,
+        },
+      ],
+    },
+    "2026-08-05",
+  ),
+  null,
+);
+assert.equal(
+  selectDraftCatalogueVoucher(
+    [voucher({ rules: { sizeLabels: ['8"'] } })],
+    {
+      pickupDate: "2026-08-15",
+      items: [
+        {
+          cakeId: "pistachio",
+          sizeId: "pistachio-6",
+          sizeLabel: '6"',
+          quantity: 1,
+          unitPrice: 120,
+        },
+      ],
+    },
+    "2026-08-05",
+  ),
+  null,
+);
+assert.equal(
+  selectDraftCatalogueVoucher(
+    [
+      voucher({
+        rules: { fulfilmentDate: { from: "2026-10-01", until: "2026-10-31" } },
+      }),
+    ],
+    {
+      pickupDate: "2026-08-15",
+      items: [
+        {
+          cakeId: "pistachio",
+          sizeId: "pistachio-6",
+          sizeLabel: '6"',
+          quantity: 1,
+          unitPrice: 120,
+        },
+      ],
+    },
+    "2026-08-05",
+  ),
+  null,
+);
+assert.equal(
+  selectDraftCatalogueVoucher(
+    [voucher({ rules: { minimumCakeSubtotal: 200 } })],
+    {
+      pickupDate: "2026-08-15",
+      items: [
+        {
+          cakeId: "pistachio",
+          sizeId: "pistachio-6",
+          sizeLabel: '6"',
+          quantity: 1,
+          unitPrice: 120,
+        },
+      ],
+    },
+    "2026-08-05",
+  ),
+  null,
+);
+assert.equal(
+  selectDraftCatalogueVoucher(
+    [voucher({ rules: { orderTypes: ["preorder"] } })],
+    {
+      pickupDate: "2026-08-15",
+      items: [
+        {
+          cakeId: "pistachio",
+          sizeId: "pistachio-6",
+          sizeLabel: '6"',
+          quantity: 1,
+          unitPrice: 120,
+        },
+      ],
+    },
+    "2026-08-05",
+    "fresh_pick",
+  ),
+  null,
+);
+
 const cartSrc = readSrc(
   "src/workspaces/storefront/offers/CatalogueVoucherCartPanel.tsx",
 );
-assert.match(cartSrc, /writeSelectedCatalogueVoucherId/);
+assert.match(cartSrc, /Voucher applied/);
+assert.match(cartSrc, /useEligibleCatalogueVoucher/);
+assert.doesNotMatch(cartSrc, /"Apply"|Selected \? "Selected"/);
 assert.doesNotMatch(cartSrc, /applyGuestCatalogueVoucherAction/);
+assert.match(
+  readSrc("src/workspaces/storefront/offers/useEligibleCatalogueVoucher.ts"),
+  /selectDraftCatalogueVoucher/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/offers/useEligibleCatalogueVoucher.ts"),
+  /writeSelectedCatalogueVoucherId/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/checkout/GuestCheckoutForm.tsx"),
+  /name="catalogue_voucher_id"/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/checkout/GuestCheckoutForm.tsx"),
+  /useEligibleCatalogueVoucher/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/extra/GuestExtraCheckoutForm.tsx"),
+  /name="catalogue_voucher_id"/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/extra/GuestExtraCheckoutForm.tsx"),
+  /"fresh_pick"/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/extra/actions.ts"),
+  /applyGuestCatalogueVoucherAction/,
+);
+assert.match(
+  readSrc("src/workspaces/owner/orders/PaymentRequestPreview.tsx"),
+  /getEffectiveAdjustments\(order\.adjustments\)/,
+);
+assert.match(
+  readSrc("src/workspaces/owner/orders/PaymentRequestPreview.tsx"),
+  /settlement\.amountDue/,
+);
+assert.match(
+  readSrc("src/workspaces/owner/orders/CatalogueVoucherPaymentPanel.tsx"),
+  /if \(applied\)/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/checkout/CheckoutOrderSummary.tsx"),
+  /CatalogueVoucherAmountLines/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/checkout/actions.ts"),
+  /applyGuestCatalogueVoucherAction/,
+);
+assert.match(
+  readSrc("src/workspaces/vouchers/catalogue-actions.ts"),
+  /Client-provided discount amounts are not accepted/,
+);
+assert.match(
+  readSrc("src/workspaces/vouchers/catalogue-actions.ts"),
+  /already applied/,
+);
+assert.match(
+  readSrc("src/engines/orders/settlement.ts"),
+  /amountDue = Math.max\(0, addMoney\(subtotal, totalAdjustments\)\)/,
+);
 const crewSrc = readSrc(
   "src/workspaces/owner/orders/CatalogueVoucherPaymentPanel.tsx",
 );
 assert.match(crewSrc, /applyCatalogueVoucherAction/);
+assert.match(crewSrc, /order\.adjustments\.find/);
 assert.doesNotMatch(cartSrc, /automatically apply/);
 
 // Discovery is independent of an order
@@ -584,5 +777,21 @@ assert.match(
   /"\/offers"/,
 );
 assert.match(middlewareSrc, /pathname\.startsWith\("\/cakes\/"\)/);
+
+const crewPayable = calculateOrderSettlement({
+  items: [{ unitPrice: 135, quantity: 1 }],
+  adjustments: getEffectiveAdjustments([
+    {
+      amount: -5,
+      status: "active",
+      reversesAdjustmentId: null,
+    },
+  ]),
+  allocations: [],
+  refunds: [],
+});
+assert.equal(crewPayable.subtotal, 135);
+assert.equal(crewPayable.totalAdjustments, -5);
+assert.equal(crewPayable.amountDue, 130);
 
 console.log("catalogue voucher engine tests passed");

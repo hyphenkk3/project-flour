@@ -17,11 +17,17 @@ import {
   draftLinePreorderLabel,
 } from "@/workspaces/storefront/cart/cart-order-summary";
 import type { PreorderDraftItem } from "@/workspaces/storefront/checkout/preorder-draft";
+import {
+  CatalogueVoucherAmountLines,
+  catalogueVoucherPreviewPayable,
+} from "@/workspaces/storefront/offers/CatalogueVoucherAmountLines";
+import type { CatalogueVoucherPreview } from "@/workspaces/storefront/offers/useEligibleCatalogueVoucher";
 
 type CheckoutOrderSummaryProps = {
   items: PreorderDraftItem[];
   cakes: StorefrontCake[];
   total: number;
+  catalogueVoucher?: CatalogueVoucherPreview | null;
   deliveryCharges?: CheckoutDeliveryChargesBreakdown | null;
   pickupDateLabel: string | null;
   earliestLabel: string | null;
@@ -45,6 +51,7 @@ function CheckoutOrderSummaryView({
   items,
   cakes,
   total,
+  catalogueVoucher = null,
   deliveryCharges = null,
   pickupDateLabel,
   earliestLabel,
@@ -306,6 +313,14 @@ function CheckoutOrderSummaryView({
                   {formatRm(deliveryCharges.itemsSubtotal)}
                 </dd>
               </div>
+              {catalogueVoucher ? (
+                <div className="flex items-baseline justify-between gap-3">
+                  <dt className="text-ink text-sm">{catalogueVoucher.code}</dt>
+                  <dd className="text-ink text-sm font-medium tabular-nums">
+                    - {formatRm(Math.abs(catalogueVoucher.amount))}
+                  </dd>
+                </div>
+              ) : null}
               <div className="flex items-baseline justify-between gap-3">
                 <dt className="text-ink text-sm">
                   {DELIVERY_PROCESSING_FEE_LINE_LABEL}
@@ -323,10 +338,21 @@ function CheckoutOrderSummaryView({
                   {TOTAL_BEFORE_DELIVERY_FEE_LABEL}
                 </dt>
                 <dd className="text-ink font-display text-xl tracking-tight tabular-nums">
-                  {formatRm(deliveryCharges.totalBeforeDeliveryFee)}
+                  {formatRm(
+                    catalogueVoucherPreviewPayable(
+                      deliveryCharges.totalBeforeDeliveryFee,
+                      catalogueVoucher,
+                    ),
+                  )}
                 </dd>
               </div>
             </div>
+          ) : catalogueVoucher ? (
+            <CatalogueVoucherAmountLines
+              commercialTotal={total}
+              emphasizeTotal
+              voucher={catalogueVoucher}
+            />
           ) : (
             <div className="flex items-baseline justify-between gap-3 pt-1">
               <dt className="text-ink text-sm">Total</dt>

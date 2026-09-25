@@ -112,7 +112,11 @@ import {
   writeFreshPickCart,
 } from "@/workspaces/storefront/extra/fresh-pick-cart";
 import { useFreshPickCart } from "@/workspaces/storefront/extra/useFreshPickCart";
-import { CatalogueVoucherCheckoutField } from "@/workspaces/storefront/offers/CatalogueVoucherCheckoutField";
+import {
+  CatalogueVoucherAmountLines,
+  catalogueVoucherPreviewPayable,
+} from "@/workspaces/storefront/offers/CatalogueVoucherAmountLines";
+import { useEligibleCatalogueVoucher } from "@/workspaces/storefront/offers/useEligibleCatalogueVoucher";
 
 const initialState: ExtraOrderState = { error: null };
 
@@ -256,6 +260,20 @@ export function GuestExtraCheckoutForm({
     options: paidAddonOptions,
     selectedCodes: paidAddonCodes,
   });
+  const catalogueVoucherDraft = {
+    pickupDate: selectedDate,
+    items: (cart?.items ?? []).map((item) => ({
+      cakeId: "",
+      sizeId: item.extraStockId,
+      sizeLabel: item.sizeLabel,
+      quantity: 1,
+      unitPrice: item.unitPrice ?? 0,
+    })),
+  };
+  const catalogueVoucher = useEligibleCatalogueVoucher(
+    catalogueVoucherDraft,
+    "fresh_pick",
+  );
 
   const fulfilmentContext = {
     window: {
@@ -535,7 +553,11 @@ export function GuestExtraCheckoutForm({
           type="hidden"
           value={deliveryProcessingFeeAckJson}
         />
-        <CatalogueVoucherCheckoutField />
+        <input
+          name="catalogue_voucher_id"
+          type="hidden"
+          value={catalogueVoucher?.id ?? ""}
+        />
 
         <section className="space-y-3">
           <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
@@ -569,6 +591,12 @@ export function GuestExtraCheckoutForm({
               <p className="text-ink text-sm">
                 {ITEMS_SUBTOTAL_LABEL} · {formatRm(deliveryCharges.itemsSubtotal)}
               </p>
+              {catalogueVoucher ? (
+                <p className="text-ink text-sm">
+                  {catalogueVoucher.code} · -{" "}
+                  {formatRm(Math.abs(catalogueVoucher.amount))}
+                </p>
+              ) : null}
               <p className="text-ink text-sm">
                 {DELIVERY_PROCESSING_FEE_LINE_LABEL} ·{" "}
                 {formatRm(deliveryCharges.processingFee)}
@@ -578,9 +606,21 @@ export function GuestExtraCheckoutForm({
               </p>
               <p className="text-ink text-sm font-semibold">
                 {TOTAL_BEFORE_DELIVERY_FEE_LABEL} ·{" "}
-                {formatRm(deliveryCharges.totalBeforeDeliveryFee)}
+                {formatRm(
+                  catalogueVoucherPreviewPayable(
+                    deliveryCharges.totalBeforeDeliveryFee,
+                    catalogueVoucher,
+                  ),
+                )}
               </p>
             </div>
+          ) : catalogueVoucher ? (
+            <dl className="space-y-1.5">
+              <CatalogueVoucherAmountLines
+                commercialTotal={displayedTotal}
+                voucher={catalogueVoucher}
+              />
+            </dl>
           ) : (
             <p className="text-ink text-sm font-semibold">
               Total · {formatRm(displayedTotal)}

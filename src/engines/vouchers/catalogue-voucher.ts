@@ -457,6 +457,13 @@ export function evaluateCatalogueVouchers(
   }));
 }
 
+/** First eligible voucher in the supplied list order (public list is code order). */
+export function selectEligibleCatalogueVoucher<
+  T extends { result: { eligible: boolean } },
+>(evaluated: readonly T[]): T | null {
+  return evaluated.find((row) => row.result.eligible) ?? null;
+}
+
 export function summarizeCatalogueVoucherRules(
   voucher: CatalogueVoucherRecord,
 ): string[] {

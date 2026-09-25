@@ -6,6 +6,7 @@ import { requireStaff } from "@/foundation/auth/session";
 import { evaluateCatalogueVoucherEligibility } from "@/engines/vouchers/catalogue-voucher";
 import { catalogueEligibilityInputFromOrder } from "@/engines/vouchers/catalogue-voucher-context";
 import { singaporeDateFromIso } from "@/engines/orders/promotions";
+import { CATALOGUE_VOUCHER_ADJUSTMENT_CODE } from "@/types/catalogue-voucher";
 import { createServiceClient } from "@/lib/supabase/admin";
 import {
   getGuestPreorderReceipt,
@@ -51,6 +52,23 @@ export async function applyCatalogueVoucherAuthoritative(input: {
     return { error: "Voucher not found." };
   }
 
+  const applied = order.adjustments.find(
+    (row) =>
+      row.code === CATALOGUE_VOUCHER_ADJUSTMENT_CODE &&
+      (row.status ?? "active") === "active" &&
+      !row.reversesAdjustmentId,
+  );
+  if (applied) {
+    const appliedId =
+      applied.metadata && typeof applied.metadata.voucher_id === "string"
+        ? applied.metadata.voucher_id
+        : null;
+    if (appliedId === input.voucherId || applied.label === voucher.code) {
+      return { error: null };
+    }
+    return { error: "A catalogue voucher is already applied to this order." };
+  }
+
   const today = singaporeDateFromIso(new Date().toISOString());
   const result = evaluateCatalogueVoucherEligibility(
     voucher,
@@ -67,6 +85,26 @@ export async function applyCatalogueVoucherAuthoritative(input: {
     p_actor_staff_id: input.actorStaffId,
   });
   if (error) {
+    if (/already applied/i.test(error.message)) {
+      const current = await loadCatalogueApplyOrder(input.orderId);
+      const currentApplied = current?.adjustments.find(
+        (row) =>
+          row.code === CATALOGUE_VOUCHER_ADJUSTMENT_CODE &&
+          (row.status ?? "active") === "active" &&
+          !row.reversesAdjustmentId,
+      );
+      const currentId =
+        currentApplied?.metadata &&
+        typeof currentApplied.metadata.voucher_id === "string"
+          ? currentApplied.metadata.voucher_id
+          : null;
+      if (
+        currentApplied &&
+        (currentId === input.voucherId || currentApplied.label === voucher.code)
+      ) {
+        return { error: null };
+      }
+    }
     return { error: error.message };
   }
   return { error: null };

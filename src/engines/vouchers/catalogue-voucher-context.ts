@@ -3,6 +3,7 @@ import {
   emptyCatalogueRules,
   evaluateCatalogueVoucherEligibility,
   evaluateCatalogueVouchers,
+  selectEligibleCatalogueVoucher,
 } from "@/engines/vouchers/catalogue-voucher";
 import type { CatalogueOrderType } from "@/types/catalogue-voucher";
 import {
@@ -173,6 +174,26 @@ export function evaluateDraftCatalogueVouchers(
   return evaluateCatalogueVouchers(
     vouchers,
     catalogueEligibilityInputFromDraft(draft, today, { orderType }),
+  );
+}
+
+export function selectDraftCatalogueVoucher(
+  vouchers: CatalogueVoucherRecord[],
+  draft: {
+    pickupDate: string;
+    items: Array<{
+      cakeId: string;
+      sizeId: string;
+      sizeLabel: string;
+      quantity: number;
+      unitPrice: number;
+    }>;
+  },
+  today: string,
+  orderType: CatalogueOrderType = "preorder",
+) {
+  return selectEligibleCatalogueVoucher(
+    evaluateDraftCatalogueVouchers(vouchers, draft, today, orderType),
   );
 }
 

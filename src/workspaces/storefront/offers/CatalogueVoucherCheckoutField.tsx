@@ -1,17 +1,20 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import type { CatalogueOrderType } from "@/types/catalogue-voucher";
 import {
-  readSelectedCatalogueVoucherId,
-  subscribeCatalogueVoucherSelection,
-} from "@/workspaces/storefront/offers/catalogue-voucher-selection";
+  useEligibleCatalogueVoucher,
+  type CatalogueVoucherCartDraft,
+} from "@/workspaces/storefront/offers/useEligibleCatalogueVoucher";
 
-export function CatalogueVoucherCheckoutField() {
-  const voucherId = useSyncExternalStore(
-    subscribeCatalogueVoucherSelection,
-    readSelectedCatalogueVoucherId,
-    () => null,
+export function CatalogueVoucherCheckoutField({
+  draft,
+  orderType = "preorder",
+}: {
+  draft: CatalogueVoucherCartDraft;
+  orderType?: CatalogueOrderType;
+}) {
+  const voucher = useEligibleCatalogueVoucher(draft, orderType);
+  return (
+    <input name="catalogue_voucher_id" type="hidden" value={voucher?.id ?? ""} />
   );
-  if (!voucherId) return null;
-  return <input name="catalogue_voucher_id" type="hidden" value={voucherId} />;
 }

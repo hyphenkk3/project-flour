@@ -168,7 +168,7 @@ import {
   type PreorderDraftFields,
   type PreorderDraftItem,
 } from "@/workspaces/storefront/checkout/preorder-draft";
-import { CatalogueVoucherCheckoutField } from "@/workspaces/storefront/offers/CatalogueVoucherCheckoutField";
+import { useEligibleCatalogueVoucher } from "@/workspaces/storefront/offers/useEligibleCatalogueVoucher";
 import { CustomerWaitingListAvailability } from "@/workspaces/storefront/waiting-list/CustomerWaitingListAvailability";
 import { JoinWaitingListForm } from "@/workspaces/storefront/waiting-list/JoinWaitingListForm";
 import { loadCustomerWaitingListAvailability } from "@/workspaces/storefront/waiting-list/actions";
@@ -904,6 +904,20 @@ export function GuestCheckoutForm({
     fulfilmentMethod: fields.fulfilmentMethod,
     itemsSubtotal: total,
   });
+  const catalogueVoucherDraft = useMemo(
+    () => ({
+      pickupDate: fields.pickupDate,
+      items: pricedItems.map((item) => ({
+        cakeId: item.cakeId,
+        sizeId: item.sizeId,
+        sizeLabel: item.sizeLabel,
+        quantity: item.quantity,
+        unitPrice: chargedDraftItemUnitPrice(item),
+      })),
+    }),
+    [fields.pickupDate, pricedItems],
+  );
+  const catalogueVoucher = useEligibleCatalogueVoucher(catalogueVoucherDraft);
   const itemsJson = useMemo(
     () =>
       JSON.stringify(
@@ -1468,7 +1482,11 @@ export function GuestCheckoutForm({
           type="hidden"
           value={optionsReady ? "1" : "0"}
         />
-        <CatalogueVoucherCheckoutField />
+        <input
+          name="catalogue_voucher_id"
+          type="hidden"
+          value={catalogueVoucher?.id ?? ""}
+        />
 
         <div className="order-2 flex min-w-0 flex-col gap-12 lg:order-1">
           <FormRequiredLegend />
@@ -2286,6 +2304,7 @@ export function GuestCheckoutForm({
             pickupDateLabel={pickupDateLabel}
             preorderLabel={preorderLabel}
             total={total}
+            catalogueVoucher={catalogueVoucher}
             deliveryCharges={deliveryCharges}
             unavailableMessage={unavailableMessage}
           />

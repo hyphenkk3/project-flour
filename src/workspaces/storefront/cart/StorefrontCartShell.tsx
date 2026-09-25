@@ -35,6 +35,7 @@ import {
 
 import { STOREFRONT_OPEN_ORDER_EVENT } from "@/workspaces/storefront/cart/open-order";
 import { CatalogueVoucherCartPanel } from "@/workspaces/storefront/offers/CatalogueVoucherCartPanel";
+import { CatalogueVoucherCartTotals } from "@/workspaces/storefront/offers/CatalogueVoucherCartTotals";
 
 const DESKTOP_ORDER_RAIL_WIDTH = "20.5rem";
 
@@ -227,14 +228,7 @@ function OrderSummary({
         ) : null}
       </dl>
       <CatalogueVoucherCartPanel draft={draft} />
-      <dl className="space-y-3 text-sm">
-        <div className="flex items-baseline justify-between gap-3 pt-1">
-          <dt className="text-ink text-sm">Total</dt>
-          <dd className="text-ink font-display text-xl tracking-tight tabular-nums">
-            {formatRm(total)}
-          </dd>
-        </div>
-      </dl>
+      <CatalogueVoucherCartTotals commercialTotal={total} draft={draft} />
       {invalidCopy && showDatePrompt ? (
         <div className="space-y-3">
           <p className="font-display text-ink text-xl tracking-tight">
