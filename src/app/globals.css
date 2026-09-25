@@ -78,6 +78,11 @@ html.storefront-canvas {
   --color-skyline: #5a534c;
 }
 
+html.storefront-canvas,
+html.storefront-canvas body {
+  background-color: var(--color-paper);
+}
+
 html.storefront-canvas .storefront-hero-photo {
   -webkit-mask-image: none;
   mask-image: none;

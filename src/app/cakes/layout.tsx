@@ -1,4 +1,4 @@
-import { StorefrontPinchZoomLock } from "@/workspaces/storefront/StorefrontPinchZoomLock";
+import { StorefrontShell } from "@/workspaces/storefront/StorefrontShell";
 import { storefrontViewport } from "@/workspaces/storefront/storefront-viewport";
 
 export const viewport = storefrontViewport;
@@ -8,10 +8,5 @@ export default function StorefrontCakesLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return (
-    <>
-      <StorefrontPinchZoomLock />
-      {children}
-    </>
-  );
+  return <StorefrontShell>{children}</StorefrontShell>;
 }

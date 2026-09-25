@@ -46,6 +46,16 @@ assert.match(popularSrc, /overflow-x-auto/);
 assert.match(freshSrc, /max-lg:contents/);
 assert.match(freshSrc, /lg:overflow-x-auto/);
 
+const shellSrc = readSrc("src/workspaces/storefront/StorefrontShell.tsx");
+assert.match(shellSrc, /StorefrontPinchZoomLock/);
+assert.match(shellSrc, /StorefrontTheme/);
+assert.match(shellSrc, /bg-paper min-h-dvh/);
+assert.doesNotMatch(shellSrc, /#eef2f5/);
+
+assert.match(globalsSrc, /html\.storefront-canvas,\s*html\.storefront-canvas body/);
+assert.match(globalsSrc, /background-color:\s*var\(--color-paper\)/);
+assert.match(globalsSrc, /--color-paper:\s*#f5f0e9/);
+
 const publicLayouts = [
   "src/app/page.tsx",
   "src/app/browse/layout.tsx",
@@ -53,13 +63,14 @@ const publicLayouts = [
   "src/app/extra/layout.tsx",
   "src/app/faq/layout.tsx",
   "src/app/order/layout.tsx",
+  "src/app/offers/layout.tsx",
 ];
 for (const rel of publicLayouts) {
   assert.equal(existsSync(resolve(process.cwd(), rel)), true, rel);
   const src = readSrc(rel);
   assert.match(src, /storefrontViewport/, rel);
   assert.match(src, /export const viewport/, rel);
-  assert.match(src, /StorefrontPinchZoomLock/, rel);
+  assert.match(src, /StorefrontShell/, rel);
   assert.doesNotMatch(src, /<meta[^>]*name=["']viewport["']/, rel);
 }
 
@@ -77,6 +88,7 @@ for (const rel of staffLayouts) {
   const src = readSrc(rel);
   assert.doesNotMatch(src, /storefrontViewport/, rel);
   assert.doesNotMatch(src, /StorefrontPinchZoomLock/, rel);
+  assert.doesNotMatch(src, /StorefrontShell/, rel);
   assert.doesNotMatch(src, /userScalable: false/, rel);
   assert.doesNotMatch(src, /maximumScale: 1/, rel);
 }
