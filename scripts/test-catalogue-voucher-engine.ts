@@ -537,6 +537,14 @@ assert.match(
   /CatalogueVoucherAmountLines/,
 );
 assert.match(
+  readSrc("src/workspaces/storefront/checkout/CheckoutConfirmPrompt.tsx"),
+  /CatalogueVoucherAmountLines/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/checkout/GuestCheckoutForm.tsx"),
+  /catalogueVoucher,/,
+);
+assert.match(
   readSrc("src/workspaces/storefront/checkout/actions.ts"),
   /applyGuestCatalogueVoucherAction/,
 );

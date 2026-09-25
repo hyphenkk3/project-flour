@@ -1448,6 +1448,7 @@ export function GuestCheckoutForm({
     paidAddonOptions,
     pickupDateLabel,
     total,
+    catalogueVoucher,
   });
 
   return (

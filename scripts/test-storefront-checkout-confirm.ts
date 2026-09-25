@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { customerPreorderCommercialTotal } from "@/engines/orders/customer-preorder-options";
+import { catalogueVoucherPreviewPayable } from "@/workspaces/storefront/offers/CatalogueVoucherAmountLines";
 import {
   buildCheckoutConfirmSnapshot,
   buildExtraCheckoutConfirmSnapshot,
@@ -276,6 +277,67 @@ assert.equal(pickupSnapshot.lines[0]?.sizeLabel, '6"');
 assert.equal(pickupSnapshot.lines[0]?.quantity, 2);
 assert.equal(pickupSnapshot.lines[0]?.linePrice, 270);
 assert.equal(pickupSnapshot.total, 270);
+assert.equal(pickupSnapshot.catalogueVoucher ?? null, null);
+assert.equal(catalogueVoucherPreviewPayable(pickupSnapshot.total, null), 270);
+assert.match(formSrc, /catalogueVoucher,/);
+assert.match(promptSrc, /CatalogueVoucherAmountLines/);
+assert.match(promptSrc, /catalogueVoucherPreviewPayable/);
+assert.match(promptSrc, /snapshot\.catalogueVoucher\.code/);
+assert.doesNotMatch(promptSrc, /applyGuestCatalogueVoucherAction/);
+assert.doesNotMatch(promptSrc, /order_adjustments/);
+
+const octoberCake: PreorderDraftItem = {
+  cakeId: "earl-grey",
+  sizeId: "size-6",
+  quantity: 1,
+  cakeName: "Earl Grey Pistachio",
+  sizeLabel: '6"',
+  unitPrice: 135,
+  applicableUnitPrice: 140,
+};
+const octoberFields = emptyPreorderFields();
+octoberFields.customerName = "QA October Voucher";
+octoberFields.phone = "0123456789";
+octoberFields.pickupDate = "2026-10-10";
+octoberFields.pickupTime = "15:00";
+octoberFields.fulfilmentMethod = "pickup";
+const octoberCommercial = customerPreorderCommercialTotal({
+  items: [
+    {
+      unitPrice: 140,
+      quantity: 1,
+    },
+  ],
+  options: [],
+  selectedCodes: [],
+});
+assert.equal(octoberCommercial, 140);
+const oct265 = {
+  id: "oct265",
+  code: "OCT265",
+  headline: "RM5 OFF",
+  amount: -5,
+};
+const octoberSnapshot = buildCheckoutConfirmSnapshot({
+  items: [octoberCake],
+  total: octoberCommercial,
+  pickupDateLabel: "10 Oct 2026",
+  fields: octoberFields,
+  paidAddonOptions: [],
+  catalogueVoucher: oct265,
+});
+assert.equal(octoberSnapshot.lines[0]?.linePrice, 140);
+assert.equal(octoberSnapshot.total, 140);
+assert.equal(octoberSnapshot.catalogueVoucher?.code, "OCT265");
+assert.equal(octoberSnapshot.catalogueVoucher?.amount, -5);
+assert.equal(
+  catalogueVoucherPreviewPayable(
+    octoberSnapshot.total,
+    octoberSnapshot.catalogueVoucher ?? null,
+  ),
+  135,
+);
+assert.equal(octoberSnapshot.lines.filter((line) => line.name === "OCT265").length, 0);
 
 fields.notes = "Please keep this note after Go Back.";
 fields.fulfilmentMethod = "dine_in";

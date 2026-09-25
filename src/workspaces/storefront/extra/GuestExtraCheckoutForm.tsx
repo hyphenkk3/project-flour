@@ -472,6 +472,7 @@ export function GuestExtraCheckoutForm({
         complimentaryOptions,
         complimentaryCodes,
         total: displayedTotal,
+        catalogueVoucher,
       }),
     );
     setConfirmOpen(true);

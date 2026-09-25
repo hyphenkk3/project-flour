@@ -33,6 +33,11 @@ import type {
   PreorderDraftFields,
   PreorderDraftItem,
 } from "@/workspaces/storefront/checkout/preorder-draft";
+import {
+  CatalogueVoucherAmountLines,
+  catalogueVoucherPreviewPayable,
+} from "@/workspaces/storefront/offers/CatalogueVoucherAmountLines";
+import type { CatalogueVoucherPreview } from "@/workspaces/storefront/offers/useEligibleCatalogueVoucher";
 
 export type CheckoutConfirmLine = {
   key: string;
@@ -53,6 +58,7 @@ export type CheckoutConfirmSnapshot = {
   notes: string;
   lines: CheckoutConfirmLine[];
   total: number;
+  catalogueVoucher?: CatalogueVoucherPreview | null;
   deliveryCharges?: CheckoutDeliveryChargesBreakdown | null;
 };
 
@@ -62,6 +68,7 @@ export function buildCheckoutConfirmSnapshot(input: {
   pickupDateLabel: string | null;
   fields: PreorderDraftFields;
   paidAddonOptions: readonly CustomerPaidAddonOption[];
+  catalogueVoucher?: CatalogueVoucherPreview | null;
 }): CheckoutConfirmSnapshot {
   const cakeLines: CheckoutConfirmLine[] = input.items.map((item, index) => ({
     key: `${item.cakeId}:${item.sizeId}:${index}`,
@@ -92,6 +99,7 @@ export function buildCheckoutConfirmSnapshot(input: {
     notes: input.fields.notes.trim(),
     lines: [...cakeLines, ...addonLines],
     total: input.total,
+    catalogueVoucher: input.catalogueVoucher ?? null,
     deliveryCharges: checkoutDeliveryChargesBreakdown({
       fulfilmentMethod: input.fields.fulfilmentMethod,
       itemsSubtotal: input.total,
@@ -157,6 +165,7 @@ export function buildExtraCheckoutConfirmSnapshot(input: {
   complimentaryOptions: readonly CustomerComplimentaryOption[];
   complimentaryCodes: readonly string[];
   total: number;
+  catalogueVoucher?: CatalogueVoucherPreview | null;
   items?: readonly {
     extraStockId: string;
     cakeName: string;
@@ -215,6 +224,7 @@ export function buildExtraCheckoutConfirmSnapshot(input: {
     notes: input.notes.trim(),
     lines: [...cakeLines, ...addonLines, ...complimentaryLines],
     total: input.total,
+    catalogueVoucher: input.catalogueVoucher ?? null,
     deliveryCharges: checkoutDeliveryChargesBreakdown({
       fulfilmentMethod: input.fulfilmentMethod ?? "pickup",
       itemsSubtotal: input.total,
@@ -335,6 +345,16 @@ export function CheckoutConfirmPrompt({
                     {formatRm(snapshot.total)}
                   </p>
                 </div>
+                {snapshot.catalogueVoucher ? (
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="text-ink text-sm">
+                      {snapshot.catalogueVoucher.code}
+                    </p>
+                    <p className="text-sm font-medium tabular-nums">
+                      - {formatRm(Math.abs(snapshot.catalogueVoucher.amount))}
+                    </p>
+                  </div>
+                ) : null}
                 <div className="flex items-baseline justify-between gap-3">
                   <p className="text-ink text-sm">
                     {DELIVERY_PROCESSING_FEE_LINE_LABEL}
@@ -354,10 +374,23 @@ export function CheckoutConfirmPrompt({
                     {TOTAL_BEFORE_DELIVERY_FEE_LABEL}
                   </p>
                   <p className="font-display text-ink text-xl tracking-tight tabular-nums">
-                    {formatRm(snapshot.deliveryCharges.totalBeforeDeliveryFee)}
+                    {formatRm(
+                      catalogueVoucherPreviewPayable(
+                        snapshot.deliveryCharges.totalBeforeDeliveryFee,
+                        snapshot.catalogueVoucher ?? null,
+                      ),
+                    )}
                   </p>
                 </div>
               </>
+            ) : snapshot.catalogueVoucher ? (
+              <dl className="space-y-2">
+                <CatalogueVoucherAmountLines
+                  commercialTotal={snapshot.total}
+                  emphasizeTotal
+                  voucher={snapshot.catalogueVoucher}
+                />
+              </dl>
             ) : (
               <div className="flex items-baseline justify-between gap-3">
                 <p className="text-ink text-sm font-medium">Total</p>
