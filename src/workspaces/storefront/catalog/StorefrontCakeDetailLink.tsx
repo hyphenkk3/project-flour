@@ -69,7 +69,7 @@ export function StorefrontCakeDetailLink({
       onPointerDown={onPointerDown}
       onPointerEnter={onPointerEnter}
       onPointerLeave={onPointerLeave}
-      prefetch={Boolean(canonical)}
+      prefetch={false}
     >
       {children}
     </Link>

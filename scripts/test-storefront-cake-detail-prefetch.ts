@@ -9,6 +9,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { storefrontCakeDetailHref } from "@/engines/menu/customer-browse";
 import {
+  browseCakeViewportPrefetchCount,
+  cakeDetailPrefetchStartCount,
   canonicalCakeDetailPath,
   prefetchCanonicalCakeDetail,
   resetCakeDetailPrefetchStateForTests,
@@ -59,6 +61,8 @@ assert.equal(
 );
 assert.deepEqual(calls, [canonical]);
 assert.equal(wasCakeDetailPrefetchedForTests(canonical), true);
+assert.equal(cakeDetailPrefetchStartCount(), 1);
+assert.equal(browseCakeViewportPrefetchCount(9), 0);
 
 resetCakeDetailPrefetchStateForTests();
 const inflightCalls: string[] = [];
@@ -115,7 +119,9 @@ assert.doesNotMatch(cardSrc, /useState/);
 const linkSrc = readSrc(
   "src/workspaces/storefront/catalog/StorefrontCakeDetailLink.tsx",
 );
-assert.match(linkSrc, /prefetch=\{Boolean\(canonical\)\}/);
+assert.match(linkSrc, /prefetch=\{false\}/);
+assert.doesNotMatch(linkSrc, /prefetch=\{Boolean\(canonical\)\}/);
+assert.doesNotMatch(linkSrc, /prefetch=\{true\}/);
 assert.match(linkSrc, /onPointerDown/);
 assert.match(linkSrc, /onPointerEnter/);
 assert.match(linkSrc, /canonicalCakeDetailPath/);
@@ -142,7 +148,7 @@ const popularSrc = readSrc(
   "src/workspaces/storefront/home/HomePopularCakes.tsx",
 );
 assert.match(popularSrc, /href=\{`\/cakes\/\$\{cake\.id\}`\}/);
-assert.match(popularSrc, /prefetch/);
+assert.match(popularSrc, /prefetch=\{false\}/);
 
 const offersCardSrc = readSrc(
   "src/workspaces/storefront/offers/CatalogueOfferCard.tsx",
@@ -160,7 +166,8 @@ const prefetchSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontCakePrefetch.tsx",
 );
 assert.match(prefetchSrc, /canonicalCakeDetailPath/);
-assert.match(prefetchSrc, /storefrontCakeDetailHref/);
+assert.doesNotMatch(prefetchSrc, /<Link/);
+assert.doesNotMatch(prefetchSrc, /prefetch=/);
 assert.doesNotMatch(prefetchSrc, /\?pickup=/);
 
 const pickupSrc = readSrc(

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { BrowseCakeCatalogue } from "@/workspaces/storefront/catalog/BrowseCakeCatalogue";
+import { StorefrontBrowsePerfProbe } from "@/workspaces/storefront/catalog/StorefrontBrowsePerfProbe";
 import { CakePhotoDisclaimer } from "@/workspaces/storefront/catalog/CakePhotoDisclaimer";
 import {
   CakeEntryScopeCapture,
@@ -40,6 +41,7 @@ async function BrowseCatalogueIsland() {
         All cakes
       </h2>
       <CakeEntryScopeCapture scopes={cakeScopes}>
+        <StorefrontBrowsePerfProbe cakeCount={cakes.length} />
         <BrowseCakeCatalogue cakes={cakes} />
         <StorefrontListingRestore origin="browse" />
       </CakeEntryScopeCapture>

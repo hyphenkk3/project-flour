@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX_LG } from "@/engines/menu/homepage-collection-preview";
-import { storefrontCakeDetailHref } from "@/engines/menu/customer-browse";
 import { canonicalCakeDetailPath } from "@/workspaces/storefront/catalog/cake-detail-prefetch";
 
 type StorefrontCakePrefetchProps = {
@@ -8,7 +6,10 @@ type StorefrontCakePrefetchProps = {
   hrefs: readonly string[];
 };
 
-/** Canonical cake-detail prefetch for Home featured cakes already shown. */
+/**
+ * Featured Home cakes already have visible hrefs.
+ * Do not viewport-prefetch those cake-detail RSC trees on Home load.
+ */
 export function StorefrontCakePrefetch({
   excludeIds = [],
   hrefs,
@@ -25,19 +26,5 @@ export function StorefrontCakePrefetch({
     if (ids.length >= HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX_LG) break;
   }
   if (ids.length === 0) return null;
-
-  return (
-    <div aria-hidden="true" hidden>
-      {ids.map((id) => (
-        <Link
-          href={storefrontCakeDetailHref(id)}
-          key={id}
-          prefetch
-          tabIndex={-1}
-        >
-          Cake
-        </Link>
-      ))}
-    </div>
-  );
+  return null;
 }

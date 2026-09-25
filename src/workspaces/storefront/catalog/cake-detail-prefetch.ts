@@ -4,6 +4,7 @@ const MAX_INFLIGHT = 2;
 
 const prefetched = new Set<string>();
 const inflight = new Set<string>();
+let prefetchStartCount = 0;
 
 /**
  * Canonical cake-detail path only. Query-string URLs are never prefetched.
@@ -30,6 +31,17 @@ export function canonicalCakeDetailPath(href: string): string | null {
 export function resetCakeDetailPrefetchStateForTests(): void {
   prefetched.clear();
   inflight.clear();
+  prefetchStartCount = 0;
+}
+
+export function cakeDetailPrefetchStartCount(): number {
+  return prefetchStartCount;
+}
+
+/** Browse cards keep 3 hrefs; viewport must not prefetch any of them. */
+export function browseCakeViewportPrefetchCount(visibleCards: number): number {
+  if (!Number.isFinite(visibleCards) || visibleCards < 0) return 0;
+  return 0;
 }
 
 export function wasCakeDetailPrefetchedForTests(path: string): boolean {
@@ -63,6 +75,7 @@ export function prefetchCanonicalCakeDetail(
         prefetched.delete(path);
       },
     );
+    prefetchStartCount += 1;
     return true;
   } catch {
     inflight.delete(path);

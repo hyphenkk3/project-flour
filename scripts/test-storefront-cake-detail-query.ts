@@ -414,7 +414,7 @@ assert.doesNotMatch(cardSrc, /onIntent/);
 const detailLinkSrc = readSrc(
   "src/workspaces/storefront/catalog/StorefrontCakeDetailLink.tsx",
 );
-assert.match(detailLinkSrc, /prefetch=\{Boolean\(canonical\)\}/);
+assert.match(detailLinkSrc, /prefetch=\{false\}/);
 assert.match(detailLinkSrc, /canonicalCakeDetailPath/);
 assert.match(detailLinkSrc, /onPointerDown/);
 assert.match(detailLinkSrc, /prefetchCanonicalCakeDetail/);
@@ -424,15 +424,15 @@ assert.doesNotMatch(detailLinkSrc, /setDetailIntent|onIntent/);
 const popularSrc = readSrc(
   "src/workspaces/storefront/home/HomePopularCakes.tsx",
 );
-assert.match(popularSrc, /prefetch/);
+assert.match(popularSrc, /prefetch=\{false\}/);
 
 const homeSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontHomePage.tsx",
 );
 assert.match(homeSrc, /StorefrontCakePrefetch/);
-assert.match(
+assert.doesNotMatch(
   readSrc("src/workspaces/storefront/home/StorefrontCakePrefetch.tsx"),
-  /prefetch/,
+  /<Link/,
 );
 assert.match(
   readSrc("src/workspaces/storefront/home/StorefrontCakePrefetch.tsx"),

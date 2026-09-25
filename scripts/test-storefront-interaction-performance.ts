@@ -31,7 +31,7 @@ assert.doesNotMatch(cakeDetail, /force-dynamic/);
 const cakeLink = readSrc(
   "src/workspaces/storefront/catalog/StorefrontCakeDetailLink.tsx",
 );
-assert.match(cakeLink, /prefetch=\{Boolean\(canonical\)\}/);
+assert.match(cakeLink, /prefetch=\{false\}/);
 assert.match(cakeLink, /onPointerDown/);
 assert.match(cakeLink, /prefetchCanonicalCakeDetail/);
 assert.match(cakeLink, /urgent:\s*true/);
@@ -50,7 +50,7 @@ assert.match(cakeCard, /active:opacity-70/);
 const popular = readSrc(
   "src/workspaces/storefront/home/HomePopularCakes.tsx",
 );
-assert.match(popular, /prefetch/);
+assert.match(popular, /prefetch=\{false\}/);
 assert.match(popular, /active:opacity-70/);
 
 const queries = readSrc("src/workspaces/storefront/catalog/queries.ts");

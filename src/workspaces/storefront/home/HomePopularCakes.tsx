@@ -42,7 +42,11 @@ export function HomePopularCakes({ cakes }: HomePopularCakesProps) {
                 const preorder = cakeCardPreorderLabel(cake);
                 return (
                   <li className="w-24 shrink-0 lg:w-[10.5rem]" key={cake.id}>
-                    <Link className="group block active:opacity-70" href={`/cakes/${cake.id}`} prefetch>
+                    <Link
+                      className="group block active:opacity-70"
+                      href={`/cakes/${cake.id}`}
+                      prefetch={false}
+                    >
                       <div className="relative aspect-square h-24 w-24 overflow-hidden rounded-[10px] lg:h-[10.5rem] lg:w-[10.5rem]">
                         {photo?.url ? (
                           <CakePhotoImage
