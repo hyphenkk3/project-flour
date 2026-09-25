@@ -180,7 +180,9 @@ assert.match(formSrc, /imageUrl: item\.imageUrl/);
 
 assert.match(actionsSrc, /export async function submitGuestPreorderAction/);
 assert.match(actionsSrc, /listAvailableCakes\(collection\.id\)/);
-assert.match(actionsSrc, /inCatalogue: true/);
+assert.match(actionsSrc, /submit_guest_preorder/);
+assert.match(formSrc, /checkoutDraftItemsInCatalogue/);
+assert.match(formSrc, /evaluateCollectionDate/);
 assert.doesNotMatch(extraSrc, /checkoutDraftItemsInCatalogue/);
 assert.doesNotMatch(extraSrc, /CheckoutOrderSummary/);
 

@@ -48,6 +48,35 @@ export async function applyCatalogueVoucherAuthoritative(input: {
     return { error: "Client-provided discount amounts are not accepted." };
   }
 
+  if (!input.actorStaffId) {
+    if (getPerfContext()) {
+      logPerfSkipped("CHECKOUT_VOUCHER", "loadCatalogueApplyOrder");
+      logPerfSkipped("CHECKOUT_VOUCHER", "getCatalogueVoucherForApply");
+      logPerfSkipped("CHECKOUT_VOUCHER", "eligibility_evaluation");
+    }
+    const admin = createServiceClient();
+    const rpcStarted = performance.now();
+    const { error } = await admin.rpc("apply_catalogue_voucher_to_guest_order", {
+      p_order_id: input.orderId,
+      p_voucher_id: input.voucherId,
+      p_actor_staff_id: input.actorStaffId,
+    });
+    if (getPerfContext()) {
+      logPerf(
+        "CHECKOUT_VOUCHER",
+        "apply_catalogue_voucher_to_guest_order",
+        performance.now() - rpcStarted,
+      );
+    }
+    if (error) {
+      if (/already applied/i.test(error.message)) {
+        return { error: "A catalogue voucher is already applied to this order." };
+      }
+      return { error: error.message };
+    }
+    return { error: null };
+  }
+
   const [order, voucher] = await Promise.all([
     (async () => {
       const started = performance.now();

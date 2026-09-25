@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   CUSTOMER_FORM_HIGHLIGHT_SUMMARY,
   FormActions,
@@ -331,6 +332,7 @@ export function GuestCheckoutForm({
   pickupScopeTo = null,
   pickupScopeConstrainsBounds = false,
 }: GuestCheckoutFormProps) {
+  const router = useRouter();
   const [state, formAction, pending] = useActionState(
     submitGuestPreorderAction,
     initialState,
@@ -362,8 +364,8 @@ export function GuestCheckoutForm({
     const orderId = state.orderId;
     if (!orderId || state.error) return;
     beginSuccessNavigationPerf();
-    window.location.assign(`/order/success?order=${orderId}`);
-  }, [state.error, state.orderId]);
+    router.replace(`/order/success?order=${orderId}`);
+  }, [router, state.error, state.orderId]);
 
   const [items, setItems] = useState<PreorderDraftItem[]>([]);
   const [fields, setFields] = useState<PreorderDraftFields>(() =>

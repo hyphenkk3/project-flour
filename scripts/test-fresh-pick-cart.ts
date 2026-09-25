@@ -417,7 +417,7 @@ assert.match(extraCheckoutSrc, /CheckoutConfirmPrompt/);
 assert.match(extraCheckoutSrc, /name="extra_stock_id"/);
 assert.match(extraCheckoutSrc, /getAll\("extra_stock_id"\)|name="extra_stock_id"/);
 assert.match(extraCheckoutSrc, /FRESH_PICKS_SUCCESS_FLOW/);
-assert.match(extraCheckoutSrc, /window\.location\.assign/);
+assert.match(extraCheckoutSrc, /router\.replace/);
 
 assert.match(extraActionsSrc, /getAll\("extra_stock_id"\)/);
 assert.match(extraActionsSrc, /p_extra_stock_ids: extraStockIds/);

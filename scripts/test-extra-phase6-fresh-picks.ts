@@ -322,7 +322,7 @@ assert.equal(FRESH_PICKS_SUCCESS_FLOW, "fresh-picks");
 assert.match(extraCheckoutSrc, /FRESH_PICKS_SUCCESS_FLOW/);
 assert.match(
   extraCheckoutSrc,
-  /window\.location\.assign\(\s*`\/order\/success\?order=\$\{state\.orderId\}&flow=\$\{FRESH_PICKS_SUCCESS_FLOW\}`/,
+  /router\.replace\(\s*`\/order\/success\?order=\$\{state\.orderId\}&flow=\$\{FRESH_PICKS_SUCCESS_FLOW\}`/,
 );
 assert.match(extraActionsSrc, /return \{ error: null, orderId \}/);
 assert.doesNotMatch(extraActionsSrc, /from "next\/navigation"/);

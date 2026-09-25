@@ -210,10 +210,12 @@ export async function loadGuestPreorderReceipt(
     const supabase = createServiceClient();
     // Column is customer_notes. A `notes` select fails PostgREST and hides Save Order Details.
     const ordersStarted = performance.now();
-    const { data, error } = await supabase
-      .from("orders")
-      .select(
-        `
+    const adjustmentsStarted = performance.now();
+    const [{ data, error }, adjustmentsResult] = await Promise.all([
+      supabase
+        .from("orders")
+        .select(
+          `
         order_number,
         guest_name,
         guest_phone,
@@ -250,15 +252,27 @@ export async function loadGuestPreorderReceipt(
           sort_order
         )
       `,
-      )
-      .eq("id", orderId)
-      .is("customer_id", null)
-      .maybeSingle();
+        )
+        .eq("id", orderId)
+        .is("customer_id", null)
+        .maybeSingle(),
+      supabase
+        .from("order_adjustments")
+        .select(
+          "code, label, amount, status, reverses_adjustment_id, metadata",
+        )
+        .eq("order_id", orderId),
+    ]);
     logPerf(
       "CHECKOUT_RECEIPT",
       "orders_query",
       performance.now() - ordersStarted,
       { embeds: "items_addons_complimentary_dine_in" },
+    );
+    logPerf(
+      "CHECKOUT_RECEIPT",
+      "order_adjustments",
+      performance.now() - adjustmentsStarted,
     );
 
     if (error || !data) return null;
@@ -389,18 +403,7 @@ export async function loadGuestPreorderReceipt(
     const notesRaw = String(
       (data as { customer_notes?: string | null }).customer_notes ?? "",
     ).trim();
-    const adjustmentsStarted = performance.now();
-    const { data: adjustmentRows } = await supabase
-      .from("order_adjustments")
-      .select(
-        "code, label, amount, status, reverses_adjustment_id, metadata",
-      )
-      .eq("order_id", orderId);
-    logPerf(
-      "CHECKOUT_RECEIPT",
-      "order_adjustments",
-      performance.now() - adjustmentsStarted,
-    );
+    const adjustmentRows = adjustmentsResult.data;
     const adjustments = getEffectiveAdjustments(
       (Array.isArray(adjustmentRows) ? adjustmentRows : []).map((row) => ({
         code: (row.code as string | null) ?? null,

@@ -87,8 +87,11 @@ assert.match(guestFormSrc, /closedDates/);
 assert.match(guestFormSrc, /ORDERS_CLOSED_CUSTOMER_LABEL/);
 assert.doesNotMatch(guestFormSrc, /Owner note/);
 assert.doesNotMatch(ownerFieldsSrc, /closedDates/);
-assert.match(actionsSrc, /isPickupOrdersClosed/);
-assert.match(actionsSrc, /ORDERS_CLOSED_RPC_MESSAGE/);
+assert.match(
+  actionsSrc,
+  /logPerfSkipped\("CHECKOUT_SUBMIT", "isPickupOrdersClosed"\)/,
+);
+assert.match(migrationSrc, /Orders are closed for that pickup date/);
 assert.match(libraryActionsSrc, /canMutateOrderAvailability/);
 assert.match(libraryActionsSrc, /Not authorized to close or reopen pickup dates/);
 assert.match(libraryActionsSrc, /intent === "reopen"/);

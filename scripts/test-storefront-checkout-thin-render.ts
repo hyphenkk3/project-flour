@@ -54,10 +54,10 @@ assert.match(actionsSrc, /listClosedPickupOrderDates/);
 assert.match(actionsSrc, /getCustomerCakePickupMemberships/);
 assert.match(actionsSrc, /export async function submitGuestPreorderAction/);
 assert.match(actionsSrc, /loadOperatingHoursSnapshot\(\)/);
-assert.match(actionsSrc, /isPickupOrdersClosed\(pickupDate\)/);
 assert.match(actionsSrc, /getStorefrontCollectionForPickupDate/);
 assert.match(actionsSrc, /listAvailableCakes/);
 assert.match(actionsSrc, /loadCustomerCartDateCapacity/);
+assert.match(actionsSrc, /submit_guest_preorder/);
 
 assert.doesNotMatch(extraPageSrc, /loadCheckoutCalendarContext/);
 assert.doesNotMatch(extraPageSrc, /StorefrontCheckoutPage/);
@@ -76,13 +76,9 @@ const submitFn = actionsSrc.slice(
     submitStart + "export async function submitGuestPreorderAction".length,
   ),
 );
-assert.match(submitFn, /loadOperatingHoursSnapshot/);
-assert.match(submitFn, /isPickupOrdersClosed/);
-assert.match(submitFn, /getStorefrontCollectionForPickupDate/);
-assert.match(submitFn, /listAvailableCakes/);
-assert.match(submitFn, /loadLivePreorderDaysBySizeId/);
-assert.match(submitFn, /loadCustomerCartDateCapacity/);
-assert.match(submitFn, /evaluateCollectionDate/);
+assert.match(submitFn, /submit_guest_preorder/);
+assert.match(submitFn, /logPerfSkipped\("CHECKOUT_SUBMIT", "isPickupOrdersClosed"\)/);
+assert.doesNotMatch(submitFn, /evaluateCollectionDate/);
 assert.doesNotMatch(submitFn, /loadCheckoutCalendarContext/);
 
 console.log("PASS storefront checkout thin render");

@@ -220,7 +220,14 @@ const checkoutActionsSrc = readSrc(
 const checkoutFormSrc = readSrc(
   "src/workspaces/storefront/checkout/GuestCheckoutForm.tsx",
 );
-assert.match(checkoutActionsSrc, /isPickupOrdersClosed\(pickupDate\)/);
+assert.match(
+  checkoutActionsSrc,
+  /logPerfSkipped\("CHECKOUT_SUBMIT", "isPickupOrdersClosed"\)/,
+);
+assert.match(
+  readSrc("supabase/migrations/20260922180000_guest_preorder_delivery_processing_ack.sql"),
+  /is_pickup_orders_closed\(p_pickup_date\)/,
+);
 assert.match(checkoutFormSrc, /isPickupOrdersClosed/);
 
 // 14–15. Opened Wednesday / method-specific hours come from existing loaders.

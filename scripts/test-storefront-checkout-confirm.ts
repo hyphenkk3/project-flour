@@ -126,13 +126,12 @@ assert.match(formSrc, /pending=\{pending \|\| Boolean\(state\.orderId\)\}/);
 assert.doesNotMatch(formSrc, /submitGuestPreorderAction\(/);
 assert.match(formSrc, /useActionState\(\s*submitGuestPreorderAction/);
 assert.doesNotMatch(formSrc, /router\.refresh/);
-assert.doesNotMatch(formSrc, /router\.replace/);
 assert.doesNotMatch(formSrc, /router\.push/);
 assert.doesNotMatch(formSrc, /StorefrontCheckoutLoading/);
 assert.doesNotMatch(pageSrc, /StorefrontCheckoutLoading/);
 assert.match(
   formSrc,
-  /window\.location\.assign\(`\/order\/success\?order=\$\{orderId\}`\)/,
+  /router\.replace\(`\/order\/success\?order=\$\{orderId\}`\)/,
 );
 assert.match(formSrc, /if \(!orderId \|\| state\.error\) return/);
 assert.match(goBackSrc, /if \(pending \|\| state\.orderId\) return/);
@@ -216,7 +215,7 @@ assert.equal(
 );
 assert.match(
   extraCheckoutSrc,
-  /window\.location\.assign\(\s*`\/order\/success\?order=\$\{state\.orderId\}&flow=\$\{FRESH_PICKS_SUCCESS_FLOW\}`/,
+  /router\.replace\(\s*`\/order\/success\?order=\$\{state\.orderId\}&flow=\$\{FRESH_PICKS_SUCCESS_FLOW\}`/,
 );
 assert.match(extraCheckoutSrc, /if \(!state.orderId\) return/);
 assert.match(
@@ -224,7 +223,6 @@ assert.match(
   /pending=\{pending \|\| Boolean\(state\.orderId\)\}/,
 );
 assert.doesNotMatch(extraCheckoutSrc, /router\.push/);
-assert.doesNotMatch(extraCheckoutSrc, /router\.replace/);
 const extraActionsSrc = readSrc("src/workspaces/storefront/extra/actions.ts");
 assert.match(extraActionsSrc, /return \{ error: null, orderId \}/);
 assert.doesNotMatch(extraActionsSrc, /from "next\/navigation"/);

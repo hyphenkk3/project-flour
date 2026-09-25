@@ -763,7 +763,7 @@ assert.match(formSrc, /name="phone"/);
 assert.match(formSrc, /name="include_receipt"/);
 assert.match(
   formSrc,
-  /window\.location\.assign\(`\/order\/success\?order=\$\{orderId\}`\)/,
+  /router\.replace\(`\/order\/success\?order=\$\{orderId\}`\)/,
 );
 
 const actionsSrc = readSrc("src/workspaces/storefront/checkout/actions.ts");

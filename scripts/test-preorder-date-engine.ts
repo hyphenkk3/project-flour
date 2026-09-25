@@ -304,9 +304,13 @@ assert.match(phase3Sql, /submit_guest_extra_order is unchanged/);
 const actionsSrc = readSrc(
   "src/workspaces/storefront/checkout/actions.ts",
 );
-assert.match(actionsSrc, /loadLivePreorderDaysBySizeId/);
-assert.match(actionsSrc, /loadMalaysiaPreorderBusinessDate/);
-assert.match(actionsSrc, /evaluateCollectionDate/);
+assert.match(actionsSrc, /submit_guest_preorder/);
+assert.match(actionsSrc, /logPerfSkipped\("CHECKOUT_SUBMIT", "loadLivePreorderDaysBySizeId"\)/);
+assert.match(actionsSrc, /logPerfSkipped\("CHECKOUT_SUBMIT", "loadMalaysiaPreorderBusinessDate"\)/);
+assert.match(
+  readSrc("supabase/migrations/20260922180000_guest_preorder_delivery_processing_ack.sql"),
+  /earliest_preorder_collection_date/,
+);
 
 const librarySizeSrc = readSrc(
   "src/workspaces/library/cakes/CakeSizeFields.tsx",

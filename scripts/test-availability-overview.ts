@@ -382,7 +382,10 @@ const checkoutActionsSrc = readSrc(
   "src/workspaces/storefront/checkout/actions.ts",
 );
 assert.doesNotMatch(checkoutActionsSrc, /listAvailabilityOverview/);
-assert.match(checkoutActionsSrc, /isPickupOrdersClosed/);
+assert.match(
+  checkoutActionsSrc,
+  /logPerfSkipped\("CHECKOUT_SUBMIT", "isPickupOrdersClosed"\)/,
+);
 
 const storefrontQueriesSrc = readSrc(
   "src/workspaces/storefront/catalog/queries.ts",

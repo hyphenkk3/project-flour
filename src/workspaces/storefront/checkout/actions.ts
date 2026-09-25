@@ -1,34 +1,16 @@
 "use server";
 
-import { ORDERS_CLOSED_RPC_MESSAGE } from "@/engines/business-calendar/order-availability";
-import { isValidDeliverySlot } from "@/engines/business-calendar/delivery-hours";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import { loadDineInVenuePhotos } from "@/workspaces/storefront/dine-in/queries";
 import type { DineInVenuePhotoMap } from "@/engines/orders/dine-in-venue-photos";
-import {
-  isValidDineInReservationPair,
-  isValidDineInSlot,
-} from "@/engines/business-calendar/dine-in-hours";
 import {
   buildDineInReservationRpcPayload,
   validateDineInPartyFromForm,
   type DineInReservationRpcPayload,
 } from "@/engines/orders/dine-in-party";
-import {
-  earliestPickupDateYmd,
-  isValidPickupSlot,
-} from "@/engines/business-calendar/pickup-slots";
-import { preorderCartLineId, readPreorderDays } from "@/engines/preorder/lead";
-import {
-  loadLivePreorderDaysBySizeId,
-  loadMalaysiaPreorderBusinessDate,
-} from "@/engines/preorder/server";
+import { earliestPickupDateYmd } from "@/engines/business-calendar/pickup-slots";
 import { loadCustomerCartDateCapacity } from "@/workspaces/storefront/checkout/capacity-availability";
-import {
-  customerCollectionDateMessage,
-  customerSelectedDateInvalidatedMessage,
-  evaluateCollectionDate,
-} from "@/engines/preorder/validate";
+import { customerSelectedDateInvalidatedMessage } from "@/engines/preorder/validate";
 import {
   OWNER_DELIVERY_CITY,
   OWNER_DELIVERY_STATE,
@@ -42,6 +24,7 @@ import {
   customerComplimentaryMutationPayload,
   customerPaidAddonMutationPayload,
   emptyCustomerPreorderSelections,
+  isCustomerPaidAddonCode,
   selectCustomerComplimentaryOptions,
   selectCustomerPaidAddonOptions,
   type CustomerComplimentaryOption,
@@ -63,10 +46,6 @@ import {
   resolveCheckoutPickupScope,
 } from "@/engines/menu/customer-browse";
 import {
-  CART_PICKUP_INCOMPATIBLE_REVIEW_MESSAGE,
-  evaluateCartPickupCompatibility,
-} from "@/engines/preorder/cart-pickup-compatibility";
-import {
   getStorefrontCollectionForPickupDate,
   getCustomerCakePickupMemberships,
   listAvailableCakes,
@@ -75,10 +54,7 @@ import {
   unpublishedCataloguePreorderMessage,
   type CakePickupMembership,
 } from "@/workspaces/storefront/catalog/queries";
-import {
-  isPickupOrdersClosed,
-  listClosedPickupOrderDates,
-} from "@/workspaces/storefront/checkout/order-availability";
+import { listClosedPickupOrderDates } from "@/workspaces/storefront/checkout/order-availability";
 import { parseRequiredPhysicalReceipt } from "@/workspaces/storefront/checkout/preorder-draft";
 import {
   CAKE_PRICE_ACK_STALE_MESSAGE,
@@ -225,16 +201,40 @@ function parsePaidAddonOptions(rows: unknown): CustomerPaidAddonOption[] {
   );
 }
 
-async function timedSubmitStep<T>(
-  step: string,
-  work: Promise<T>,
-): Promise<T> {
-  const started = performance.now();
-  try {
-    return await work;
-  } finally {
-    logPerf("CHECKOUT_SUBMIT", step, performance.now() - started);
-  }
+function complimentaryPayloadFromForm(
+  selections: CustomerPreorderSelections,
+) {
+  const options = selections.complimentaryCodes
+    .map((code, index) => ({
+      typeId: "form",
+      code: String(code).trim(),
+      name: String(code).trim(),
+      sortOrder: index,
+    }))
+    .filter((option) => option.code);
+  return customerComplimentaryMutationPayload({
+    options,
+    selectedCodes: selections.complimentaryCodes,
+  });
+}
+
+function paidAddonPayloadFromForm(selections: CustomerPreorderSelections) {
+  const options = selections.paidAddonCodes
+    .filter((code) => isCustomerPaidAddonCode(code))
+    .map((code, index) => ({
+      code,
+      name: code,
+      unitPrice: 0,
+      financialShorthand: "",
+      sortOrder: index,
+    }));
+  return customerPaidAddonMutationPayload({ options, selections });
+}
+
+function isMissingCombinedSubmitRpc(message: string): boolean {
+  return /Could not find the function|schema cache|does not exist|submit_guest_preorder_with_catalogue_voucher/i.test(
+    message,
+  );
 }
 
 function consolidateItems(items: SubmitItem[]): SubmitItem[] {
@@ -320,49 +320,34 @@ async function submitGuestPreorderActionBody(
           : "Please choose a date and time.",
     };
   }
-  const [pickupClosed, hoursSnapshot, collection, supabase] = await Promise.all([
-    timedSubmitStep("isPickupOrdersClosed", isPickupOrdersClosed(pickupDate)),
-    timedSubmitStep(
-      "loadOperatingHoursSnapshot",
-      loadOperatingHoursSnapshot(),
-    ),
-    timedSubmitStep(
-      "getStorefrontCollectionForPickupDate",
-      getStorefrontCollectionForPickupDate(pickupDate),
-    ),
-    createClient(),
-  ]);
-  if (pickupClosed) {
-    return { error: ORDERS_CLOSED_RPC_MESSAGE };
-  }
+  // Closed dates, slots, collection, cakes, lead time, capacity, and
+  // add-on codes are revalidated inside submit_guest_preorder.
+  logPerfSkipped("CHECKOUT_SUBMIT", "isPickupOrdersClosed");
+  logPerfSkipped("CHECKOUT_SUBMIT", "loadOperatingHoursSnapshot");
+  logPerfSkipped("CHECKOUT_SUBMIT", "getStorefrontCollectionForPickupDate");
+  logPerfSkipped("CHECKOUT_SUBMIT", "listAvailableCakes");
+  logPerfSkipped("CHECKOUT_SUBMIT", "loadLivePreorderDaysBySizeId");
+  logPerfSkipped("CHECKOUT_SUBMIT", "loadMalaysiaPreorderBusinessDate");
+  logPerfSkipped("CHECKOUT_SUBMIT", "loadCustomerCartDateCapacity");
+  logPerfSkipped("CHECKOUT_SUBMIT", "loadCustomerPreorderOptions");
 
   let dineInPayload: DineInReservationRpcPayload | null = null;
-  let reservationTime = "";
   let deliveryDraft: DeliveryCreateDraft | null = null;
 
   if (fulfilmentMethod === "pickup") {
-    if (
-      !pickupTime ||
-      !isValidPickupSlot(pickupDate, pickupTime, hoursSnapshot)
-    ) {
-      return {
-        error: "Please choose a valid pickup time for that date.",
-      };
+    if (!pickupTime) {
+      return { error: "Please choose a pickup date and time." };
     }
   } else if (fulfilmentMethod === "dine_in") {
-    reservationTime = String(formData.get("reservation_time") ?? "").trim();
-    if (
-      !reservationTime ||
-      !isValidDineInSlot(pickupDate, reservationTime, hoursSnapshot)
-    ) {
+    const reservationTime = String(
+      formData.get("reservation_time") ?? "",
+    ).trim();
+    if (!reservationTime) {
       return {
         error: "Please choose a valid dine-in reservation time for that date.",
       };
     }
-    if (
-      !pickupTime ||
-      !isValidDineInSlot(pickupDate, pickupTime, hoursSnapshot)
-    ) {
+    if (!pickupTime) {
       return {
         error: "Please choose a valid cake serving time for that date.",
       };
@@ -371,20 +356,6 @@ async function submitGuestPreorderActionBody(
     if (!partyResult.ok) {
       return { error: partyResult.error };
     }
-    if (
-      !isValidDineInReservationPair({
-        dateYmd: pickupDate,
-        reservationTime,
-        servingTime: pickupTime,
-        venue: partyResult.party.venue,
-        snapshot: hoursSnapshot,
-      })
-    ) {
-      return {
-        error:
-          "Cake serving time must be within 1 hour of the reservation time, and the venue must be available for both times.",
-      };
-    }
     dineInPayload = buildDineInReservationRpcPayload({
       party: partyResult.party,
       reservationTime,
@@ -392,13 +363,8 @@ async function submitGuestPreorderActionBody(
         String(formData.get("reservation_note") ?? "").trim() || null,
     });
   } else {
-    if (
-      !pickupTime ||
-      !isValidDeliverySlot(pickupDate, pickupTime, hoursSnapshot)
-    ) {
-      return {
-        error: "Please choose a valid delivery time for that date.",
-      };
+    if (!pickupTime) {
+      return { error: "Please choose a valid delivery time for that date." };
     }
     const sameAsCustomer =
       String(formData.get("same_as_customer") ?? "") === "on" ||
@@ -436,138 +402,6 @@ async function submitGuestPreorderActionBody(
     return { error: "Please add at least one cake to your preorder." };
   }
 
-  if (!collection) {
-    return { error: unpublishedCataloguePreorderMessage(pickupDate) };
-  }
-  const emptyOptions = {
-    complimentary: [] as CustomerComplimentaryOption[],
-    paidAddons: [] as CustomerPaidAddonOption[],
-    ready: false,
-  };
-  const [offered, liveDays, businessDate, optionCatalog] = await Promise.all([
-    timedSubmitStep("listAvailableCakes", listAvailableCakes(collection.id)),
-    timedSubmitStep(
-      "loadLivePreorderDaysBySizeId",
-      loadLivePreorderDaysBySizeId(
-        items.map((item) => item.cake_size_id),
-        supabase,
-      ),
-    ),
-    timedSubmitStep(
-      "loadMalaysiaPreorderBusinessDate",
-      loadMalaysiaPreorderBusinessDate(supabase),
-    ),
-    persistOptions
-      ? timedSubmitStep(
-          "loadCustomerPreorderOptions",
-          loadCustomerPreorderOptions(supabase, collection.id),
-        )
-      : Promise.resolve(emptyOptions).then((value) => {
-          logPerfSkipped("CHECKOUT_SUBMIT", "loadCustomerPreorderOptions");
-          return value;
-        }),
-  ]);
-  for (const item of items) {
-    const cake = offered.find((entry) => entry.id === item.cake_id);
-    const size = cake?.sizes.find((entry) => entry.id === item.cake_size_id);
-    if (!cake || !size) {
-      const [memberships, specials, catalogues] = await Promise.all([
-        getCustomerCakePickupMemberships(items.map((item) => item.cake_id)),
-        listCustomerSpecialCatalogues(),
-        listOrderableMonthlyCatalogues(),
-      ]);
-      const compatibility = evaluateCartPickupCompatibility({
-        cakes: memberships,
-        selectedYmd: pickupDate,
-        earliestYmd: earliestPickupDateYmd(),
-        activeSpecialWindows: specials.map((special) => ({
-          from: special.startDate,
-          to: special.endDate,
-        })),
-        globalMax: latestOrderableCataloguePickupEnd(
-          catalogues.map((catalogue) => catalogue.month ?? ""),
-        ),
-      });
-      return {
-        error:
-          compatibility.dateLevelMessage ??
-          CART_PICKUP_INCOMPATIBLE_REVIEW_MESSAGE,
-      };
-    }
-  }
-  for (const item of items) {
-    if (!liveDays.has(item.cake_size_id)) {
-      return { error: "Cake size is not available" };
-    }
-  }
-  const lines = items.map((item) => {
-    const cake = offered.find((entry) => entry.id === item.cake_id);
-    const size = cake?.sizes.find((entry) => entry.id === item.cake_size_id);
-    return {
-      lineId: preorderCartLineId(item.cake_id, item.cake_size_id),
-      cakeId: item.cake_id,
-      cakeSizeId: item.cake_size_id,
-      cakeName: cake?.name ?? "",
-      sizeLabel: size?.size ?? "",
-      quantity: item.quantity,
-      preorderDays: liveDays.get(item.cake_size_id) ?? readPreorderDays(null),
-    };
-  });
-  const capacitySnapshot = await timedSubmitStep(
-    "loadCustomerCartDateCapacity",
-    loadCustomerCartDateCapacity({
-      fromYmd: pickupDate,
-      toYmd: pickupDate,
-      collectionId: collection.id,
-      cart: lines.map((line) => ({
-        cakeId: line.cakeId,
-        cakeSizeId: line.cakeSizeId,
-        cakeName: line.cakeName,
-        quantity: line.quantity,
-      })),
-    }),
-  );
-  const waitingListOffered =
-    capacitySnapshot.waitingListDates?.includes(pickupDate) ?? false;
-  const capacity = capacitySnapshot.fullyBookedDates.includes(pickupDate)
-    ? {
-        fullyBooked: true,
-        waitingListEnabled: waitingListOffered,
-        blockingCakeNames:
-          capacitySnapshot.blockingCakeNamesByDate[pickupDate] ?? [],
-        selectedYmd: pickupDate,
-        nextAvailableYmd: null,
-      }
-    : null;
-  const evaluation = evaluateCollectionDate({
-    selectedYmd: pickupDate,
-    businessDate,
-    lines,
-    operatingOpen: true,
-    closed: false,
-    inCatalogue: true,
-    capacity,
-  });
-  if (!evaluation.valid) {
-    const detail =
-      customerCollectionDateMessage(evaluation, lines) ??
-      "Please choose a valid date and time.";
-    return {
-      error:
-        evaluation.reason.code === "fully_booked"
-          ? customerSelectedDateInvalidatedMessage(detail)
-          : detail,
-    };
-  }
-  const complimentary = customerComplimentaryMutationPayload({
-    options: optionCatalog.complimentary,
-    selectedCodes: selections.complimentaryCodes,
-  });
-  const paidAddons = customerPaidAddonMutationPayload({
-    options: optionCatalog.paidAddons,
-    selections,
-  });
-
   const rpcArgs: Record<string, unknown> = {
     p_customer_name: customerName,
     p_phone: phone,
@@ -588,9 +422,9 @@ async function submitGuestPreorderActionBody(
         : null,
     p_dine_in: fulfilmentMethod === "dine_in" ? dineInPayload : null,
   };
-  if (optionCatalog.ready) {
-    rpcArgs.p_complimentary = complimentary;
-    rpcArgs.p_paid_addons = paidAddons;
+  if (persistOptions) {
+    rpcArgs.p_complimentary = complimentaryPayloadFromForm(selections);
+    rpcArgs.p_paid_addons = paidAddonPayloadFromForm(selections);
   }
 
   const priceAck = parsePriceAck(formData);
@@ -611,13 +445,54 @@ async function submitGuestPreorderActionBody(
     rpcArgs.p_delivery_processing_fee_ack = deliveryProcessingAck;
   }
 
+  const catalogueVoucherId = String(
+    formData.get("catalogue_voucher_id") ?? "",
+  ).trim();
+  const supabase = await createClient();
+  let usedCombinedSubmit = false;
   const rpcStarted = performance.now();
-  const { data, error } = await supabase.rpc("submit_guest_preorder", rpcArgs);
-  logPerf(
-    "CHECKOUT_SUBMIT",
-    "submit_guest_preorder",
-    performance.now() - rpcStarted,
-  );
+  let data: unknown;
+  let error: { message: string } | null = null;
+  if (catalogueVoucherId) {
+    const combined = await supabase.rpc(
+      "submit_guest_preorder_with_catalogue_voucher",
+      {
+        ...rpcArgs,
+        p_catalogue_voucher_id: catalogueVoucherId,
+      },
+    );
+    data = combined.data;
+    error = combined.error;
+    if (error && isMissingCombinedSubmitRpc(error.message)) {
+      logPerf(
+        "CHECKOUT_SUBMIT",
+        "submit_guest_preorder_with_catalogue_voucher",
+        performance.now() - rpcStarted,
+        { voucherApply: "missing_combined_rpc" },
+      );
+      const fallback = await supabase.rpc("submit_guest_preorder", rpcArgs);
+      data = fallback.data;
+      error = fallback.error;
+    } else {
+      usedCombinedSubmit = !combined.error;
+      logPerf(
+        "CHECKOUT_SUBMIT",
+        "submit_guest_preorder_with_catalogue_voucher",
+        performance.now() - rpcStarted,
+        { voucherApply: usedCombinedSubmit ? "combined" : "combined_failed" },
+      );
+    }
+  } else {
+    const submitted = await supabase.rpc("submit_guest_preorder", rpcArgs);
+    data = submitted.data;
+    error = submitted.error;
+    logPerf(
+      "CHECKOUT_SUBMIT",
+      "submit_guest_preorder",
+      performance.now() - rpcStarted,
+      { voucherApply: "skipped" },
+    );
+  }
 
   if (error) {
     if (/fully booked/i.test(error.message)) {
@@ -652,10 +527,7 @@ async function submitGuestPreorderActionBody(
     "setGuestPreorderReceiptCookie",
     performance.now() - cookieStarted,
   );
-  const catalogueVoucherId = String(
-    formData.get("catalogue_voucher_id") ?? "",
-  ).trim();
-  if (catalogueVoucherId) {
+  if (catalogueVoucherId && !usedCombinedSubmit) {
     logPerf("CHECKOUT_SUBMIT", "voucherApply", 0, {
       voucherApply: "executed",
     });
@@ -663,13 +535,23 @@ async function submitGuestPreorderActionBody(
     const { applyGuestCatalogueVoucherAction } = await import(
       "@/workspaces/vouchers/catalogue-actions"
     );
-    await applyGuestCatalogueVoucherAction(orderId, catalogueVoucherId);
+    const applied = await applyGuestCatalogueVoucherAction(
+      orderId,
+      catalogueVoucherId,
+    );
     logPerf(
       "CHECKOUT_SUBMIT",
       "applyGuestCatalogueVoucherAction",
       performance.now() - voucherStarted,
       { voucherApply: "executed" },
     );
+    if (applied.error) {
+      return { error: applied.error };
+    }
+  } else if (catalogueVoucherId) {
+    logPerfSkipped("CHECKOUT_SUBMIT", "applyGuestCatalogueVoucherAction", {
+      voucherApply: "combined",
+    });
   } else {
     logPerfSkipped("CHECKOUT_SUBMIT", "applyGuestCatalogueVoucherAction", {
       voucherApply: "skipped",

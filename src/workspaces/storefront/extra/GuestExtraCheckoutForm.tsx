@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   CUSTOMER_FORM_HIGHLIGHT_SUMMARY,
   FormActions,
@@ -137,6 +138,7 @@ export function GuestExtraCheckoutForm({
   venuePhotos = EMPTY_DINE_IN_VENUE_PHOTOS,
 }: GuestExtraCheckoutFormProps) {
   const cart = useFreshPickCart();
+  const router = useRouter();
   const [state, formAction, pending] = useActionState(
     submitGuestExtraOrderAction,
     initialState,
@@ -254,10 +256,10 @@ export function GuestExtraCheckoutForm({
   useEffect(() => {
     if (!state.orderId) return;
     beginSuccessNavigationPerf();
-    window.location.assign(
+    router.replace(
       `/order/success?order=${state.orderId}&flow=${FRESH_PICKS_SUCCESS_FLOW}`,
     );
-  }, [state.orderId]);
+  }, [router, state.orderId]);
 
   const displayedTotal = customerPreorderCommercialTotal({
     items: (cart?.items ?? []).map((item) => ({

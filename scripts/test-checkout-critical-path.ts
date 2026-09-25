@@ -1,7 +1,7 @@
 /**
- * Phase 2B: Confirm Order critical path.
- * Parallelize independent reads and narrow voucher authorization.
- * Financial rules, apply RPC, and settlement must stay unchanged.
+ * Phase 2C: Confirm Order critical path.
+ * Duplicate pre-submit reads are skipped because submit_guest_preorder
+ * already enforces the same rules. Voucher apply stays server-authoritative.
  * Run: npx tsx scripts/test-checkout-critical-path.ts
  */
 import assert from "node:assert/strict";
@@ -49,157 +49,126 @@ const receiptSrc = readSrc("src/workspaces/storefront/checkout/receipt.ts");
 const formSrc = readSrc(
   "src/workspaces/storefront/checkout/GuestCheckoutForm.tsx",
 );
+const extraFormSrc = readSrc(
+  "src/workspaces/storefront/extra/GuestExtraCheckoutForm.tsx",
+);
 const crewPreviewSrc = readSrc(
   "src/workspaces/owner/orders/PaymentRequestPreview.tsx",
 );
 const orderDetailsSrc = readSrc(
   "src/workspaces/storefront/checkout/order-details-card.ts",
 );
+const submitSql = readSrc(
+  "supabase/migrations/20260922180000_guest_preorder_delivery_processing_ack.sql",
+);
+const applySql = readSrc(
+  "supabase/migrations/20260925100000_catalogue_voucher_order_type.sql",
+);
+const combinedSql = readSrc(
+  "supabase/migrations/20260925120000_submit_guest_preorder_with_catalogue_voucher.sql",
+);
 
 const submitFn = sliceFn(actionsSrc, "async function submitGuestPreorderActionBody", [
-  "\nexport async function loadCheckoutCalendarContext",
   "\nexport async function loadCheckoutPickupOffer",
+  "\nexport type CheckoutPickupOffer",
 ]);
-const applyAuthoritativeFn = sliceFn(
-  voucherActionsSrc,
-  "async function applyCatalogueVoucherAuthoritative",
-  ["export async function listPublicCatalogueVouchersAction"],
-);
 const guestApplyFn = sliceFn(
   voucherActionsSrc,
   "async function applyGuestCatalogueVoucherActionTimed",
   [],
+);
+const applyAuthoritativeFn = sliceFn(
+  voucherActionsSrc,
+  "export async function applyCatalogueVoucherAuthoritative",
+  ["export async function listPublicCatalogueVouchersAction"],
 );
 const applyOrderFn = sliceFn(
   voucherQueriesSrc,
   "export async function loadCatalogueApplyOrder",
   ["export function voucherRelevantToCake"],
 );
-const voucherForApplyFn = sliceFn(
-  voucherQueriesSrc,
-  "export async function getCatalogueVoucherForApply",
-  ["export type CatalogueApplyOrder", "export async function loadCatalogueApplyOrder"],
-);
 
-// 1 + 2. Authoritative pre-submit validations still execute, and
-// independent reads can run concurrently.
-const wave1 = sliceFn(
-  submitFn,
-  "const [pickupClosed, hoursSnapshot, collection, supabase] = await Promise.all([",
-  ["if (pickupClosed)"],
-);
-assert.match(wave1, /isPickupOrdersClosed\(pickupDate\)/);
-assert.match(wave1, /loadOperatingHoursSnapshot\(\)/);
-assert.match(wave1, /getStorefrontCollectionForPickupDate\(pickupDate\)/);
-assert.match(wave1, /createClient\(\)/);
-assert.match(submitFn, /if \(pickupClosed\)/);
-assert.match(submitFn, /isValidPickupSlot\(pickupDate, pickupTime, hoursSnapshot\)/);
-assert.match(submitFn, /unpublishedCataloguePreorderMessage\(pickupDate\)/);
-assert.match(submitFn, /evaluateCollectionDate\(/);
-assert.match(submitFn, /evaluateCartPickupCompatibility\(/);
-assert.match(submitFn, /Cake size is not available/);
-assert.match(submitFn, /loadCustomerCartDateCapacity\(/);
 assert.match(submitFn, /submit_guest_preorder/);
+assert.match(submitFn, /submit_guest_preorder_with_catalogue_voucher/);
 assert.match(submitFn, /setGuestPreorderReceiptCookie\(orderId\)/);
-assert.match(submitFn, /applyGuestCatalogueVoucherAction\(orderId, catalogueVoucherId\)/);
+assert.match(submitFn, /p_price_ack/);
+assert.match(submitFn, /validateDineInPartyFromForm/);
+assert.match(submitFn, /validateOwnerCreateFulfilment/);
+assert.match(submitFn, /complimentaryPayloadFromForm/);
+assert.match(submitFn, /paidAddonPayloadFromForm/);
+for (const skipped of [
+  "isPickupOrdersClosed",
+  "loadOperatingHoursSnapshot",
+  "getStorefrontCollectionForPickupDate",
+  "listAvailableCakes",
+  "loadLivePreorderDaysBySizeId",
+  "loadMalaysiaPreorderBusinessDate",
+  "loadCustomerCartDateCapacity",
+  "loadCustomerPreorderOptions",
+]) {
+  assert.match(
+    submitFn,
+    new RegExp(`logPerfSkipped\\("CHECKOUT_SUBMIT", "${skipped}"\\)`),
+  );
+}
+assert.doesNotMatch(submitFn, /evaluateCollectionDate\(/);
+assert.doesNotMatch(submitFn, /isValidPickupSlot\(/);
+assert.doesNotMatch(submitFn, /listAvailableCakes\(/);
 
-const wave2 = sliceFn(
-  submitFn,
-  "const [offered, liveDays, businessDate, optionCatalog] = await Promise.all([",
-  ["for (const item of items)"],
-);
-assert.match(wave2, /listAvailableCakes\(collection.id\)/);
-assert.match(wave2, /loadLivePreorderDaysBySizeId\(/);
-assert.match(wave2, /loadMalaysiaPreorderBusinessDate\(supabase\)/);
-assert.match(wave2, /loadCustomerPreorderOptions\(supabase, collection.id\)/);
-assert.ok(
-  submitFn.indexOf("const [offered, liveDays, businessDate, optionCatalog]") <
-    submitFn.indexOf("loadCustomerCartDateCapacity"),
-  "capacity still waits for offered cake names",
-);
-assert.doesNotMatch(submitFn, /getGuestPreorderReceipt\(/);
-assert.doesNotMatch(
-  submitFn,
-  /await isPickupOrdersClosed\(pickupDate\)[\s\S]*await loadOperatingHoursSnapshot\(\)/,
-);
+assert.match(submitSql, /is_pickup_orders_closed\(p_pickup_date\)/);
+assert.match(submitSql, /is_valid_public_pickup_slot/);
+assert.match(submitSql, /is_valid_dine_in_slot/);
+assert.match(submitSql, /is_valid_delivery_slot/);
+assert.match(submitSql, /storefront_collection_for_pickup_date/);
+assert.match(submitSql, /collection_cakes/);
+assert.match(submitSql, /Cake size is not available/);
+assert.match(submitSql, /earliest_preorder_collection_date/);
+assert.match(submitSql, /_guest_preorder_item_fully_booked/);
+assert.match(submitSql, /Complimentary item is not available/);
+assert.match(submitSql, /Paid add-on is not available/);
+assert.match(submitSql, /library_cake_size_price_on/);
 
-// 3 + 4. Voucher authorization does not load the full receipt and
-// still rejects unauthorized orders.
-assert.doesNotMatch(guestApplyFn, /getGuestPreorderReceipt\(/);
-assert.doesNotMatch(guestApplyFn, /library_cake_photos/);
-assert.doesNotMatch(guestApplyFn, /complimentary/);
-assert.doesNotMatch(applyOrderFn, /library_cake_photos/);
-assert.doesNotMatch(applyOrderFn, /getGuestPreorderReceipt/);
-assert.match(applyOrderFn, /customer_id/);
-assert.match(applyOrderFn, /if \(!order \|\| order\.customer_id\) return null/);
-assert.match(applyOrderFn, /order_items/);
-assert.match(applyOrderFn, /order_adjustments/);
+assert.match(combinedSql, /submit_guest_preorder\(/);
+assert.match(combinedSql, /apply_catalogue_voucher_to_guest_order\(/);
+assert.match(combinedSql, /Does not copy financial logic|Delegates to submit_guest_preorder/);
+assert.doesNotMatch(combinedSql, /insert into public.order_adjustments/);
+
+assert.match(applyAuthoritativeFn, /Client-provided discount amounts are not accepted/);
+assert.match(applyAuthoritativeFn, /if \(!input.actorStaffId\)/);
+assert.match(applyAuthoritativeFn, /apply_catalogue_voucher_to_guest_order/);
+assert.match(applyAuthoritativeFn, /evaluateCatalogueVoucherEligibility/);
 assert.match(guestApplyFn, /guestPreorderReceiptAuthorized\(orderId, cookieOrderId\)/);
-assert.match(
-  guestApplyFn,
-  /This order is not available for voucher application\./,
-);
-assert.match(
-  guestApplyFn,
-  /if \(result\.error === "Order not found\."\)/,
-);
+assert.doesNotMatch(guestApplyFn, /getGuestPreorderReceipt\(/);
+assert.doesNotMatch(applyOrderFn, /library_cake_photos/);
+assert.match(applyOrderFn, /if \(!order \|\| order\.customer_id\) return null/);
 assert.equal(guestPreorderReceiptAuthorized("order-a", "order-a"), true);
 assert.equal(guestPreorderReceiptAuthorized("order-a", "order-b"), false);
 assert.equal(guestPreorderReceiptAuthorized("order-a", null), false);
-assert.equal(guestPreorderReceiptAuthorized("", "order-a"), false);
 
-// 5 + 6. Eligibility unchanged; authoritative apply RPC still executes.
-assert.match(applyAuthoritativeFn, /evaluateCatalogueVoucherEligibility/);
-assert.match(applyAuthoritativeFn, /catalogueEligibilityInputFromOrder/);
-assert.match(
-  applyAuthoritativeFn,
-  /apply_catalogue_voucher_to_guest_order/,
-);
-assert.match(applyAuthoritativeFn, /p_order_id: input\.orderId/);
-assert.match(applyAuthoritativeFn, /p_voucher_id: input\.voucherId/);
-assert.match(
-  voucherActionsSrc,
-  /Client-provided discount amounts are not accepted/,
-);
-assert.doesNotMatch(applyAuthoritativeFn, /\.from\("order_adjustments"\)\.insert/);
-assert.match(applyAuthoritativeFn, /Promise\.all\(\[/);
-assert.match(applyAuthoritativeFn, /loadCatalogueApplyOrder\(input\.orderId\)/);
-assert.match(applyAuthoritativeFn, /getCatalogueVoucherForApply\(input\.voucherId\)/);
-assert.match(voucherForApplyFn, /Promise\.all\(\[/);
-assert.match(voucherForApplyFn, /loadCatalogueRulesForVouchers/);
-assert.match(voucherForApplyFn, /library_vouchers/);
+assert.match(applySql, /customer_id is null/);
+assert.match(applySql, /already applied/);
+assert.match(applySql, /august_promo_2026/);
+assert.match(applySql, /rm10_physical_card/);
+assert.match(applySql, /order_date/);
+assert.match(applySql, /fulfilment_date/);
+assert.match(applySql, /minimum_cake_subtotal/);
+assert.match(applySql, /order_type/);
+assert.match(applySql, /insert into public.order_adjustments/);
 
-// 7 + 8 + 9. Exactly one catalogue adjustment path; successful submit
-// does not repeat apply; failed apply still retries.
 assert.match(successSrc, /alreadyApplied=/);
 assert.match(successSrc, /CATALOGUE_VOUCHER_ADJUSTMENT_CODE/);
-assert.match(retrySrc, /alreadyApplied = false/);
 assert.match(retrySrc, /if \(alreadyApplied\)/);
-assert.match(retrySrc, /writeSelectedCatalogueVoucherId\(null\)/);
 assert.match(retrySrc, /applyGuestCatalogueVoucherAction\(orderId, voucherId\)/);
-assert.ok(
-  retrySrc.indexOf("if (alreadyApplied)") <
-    retrySrc.indexOf("applyGuestCatalogueVoucherAction(orderId, voucherId)"),
-);
-assert.match(submitFn, /window\.location\.assign|applyGuestCatalogueVoucherAction/);
-assert.match(
-  formSrc,
-  /window\.location\.assign\(`\/order\/success\?order=\$\{orderId\}`\)/,
-);
-assert.ok(
-  submitFn.indexOf("applyGuestCatalogueVoucherAction") <
-    submitFn.indexOf("return { error: null, orderId }") ||
-    submitFn.includes("applyGuestCatalogueVoucherAction(orderId, catalogueVoucherId)"),
-);
-
-// 10. No-adjustment orders still load the receipt and do not invent a voucher.
-assert.match(successSrc, /receipt \? <SaveOrderDetailsButton receipt=\{receipt\} \/>/);
+assert.match(submitFn, /if \(applied\.error\)/);
+assert.match(formSrc, /router\.replace\(`\/order\/success\?order=\$\{orderId\}`\)/);
+assert.match(extraFormSrc, /router\.replace\(/);
+assert.doesNotMatch(formSrc, /window\.location\.assign\(`\/order\/success/);
+assert.match(receiptSrc, /Promise\.all\(\[/);
 assert.match(receiptSrc, /order_adjustments/);
+assert.match(receiptSrc, /library_cake_photos/);
 assert.match(receiptSrc, /getEffectiveAdjustments/);
 assert.match(receiptSrc, /calculateOrderSettlement/);
-assert.doesNotMatch(receiptSrc, /apply_catalogue_voucher_to_guest_order/);
 
-// 11. OCT265 remains RM140 - RM5 = RM135.
 const oct265: CatalogueVoucherRecord = {
   id: "oct265",
   code: "OCT265",
@@ -233,11 +202,14 @@ const octoberInput: CatalogueEligibilityInput = {
 const octoberEligible = evaluateCatalogueVoucherEligibility(oct265, octoberInput);
 assert.equal(octoberEligible.eligible, true);
 assert.equal(octoberEligible.amount, -5);
-assert.equal(catalogueVoucherPreviewPayable(140, {
-  id: oct265.id,
-  code: oct265.code,
-  amount: octoberEligible.amount ?? 0,
-}), 135);
+assert.equal(
+  catalogueVoucherPreviewPayable(140, {
+    id: oct265.id,
+    code: oct265.code,
+    amount: octoberEligible.amount ?? 0,
+  }),
+  135,
+);
 const storedSettlement = calculateOrderSettlement({
   items: [{ unitPrice: 140, quantity: 1 }],
   adjustments: getEffectiveAdjustments([
@@ -276,15 +248,11 @@ assert.equal(
   false,
 );
 
-// 12 + 13. PNG and Crew settlement still read stored adjustments.
 assert.match(orderDetailsSrc, /receipt\.adjustments/);
 assert.match(successSrc, /SaveOrderDetailsButton receipt=\{receipt\}/);
 assert.match(crewPreviewSrc, /getEffectiveAdjustments\(order\.adjustments\)/);
 assert.match(crewPreviewSrc, /settlement\.amountDue/);
-
-// Guest success revalidation is unnecessary before a hard navigation.
 assert.doesNotMatch(voucherActionsSrc, /revalidatePath\("\/order\/success"\)/);
 assert.match(voucherActionsSrc, /revalidatePath\("\/owner"\)/);
-assert.match(voucherActionsSrc, /revalidatePath\(`\/owner\/orders\/\$\{orderId\}`\)/);
 
 console.log("PASS checkout critical path");

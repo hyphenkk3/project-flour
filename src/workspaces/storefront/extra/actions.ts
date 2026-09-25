@@ -396,13 +396,19 @@ async function submitGuestExtraOrderActionBody(
     const { applyGuestCatalogueVoucherAction } = await import(
       "@/workspaces/vouchers/catalogue-actions"
     );
-    await applyGuestCatalogueVoucherAction(orderId, catalogueVoucherId);
+    const applied = await applyGuestCatalogueVoucherAction(
+      orderId,
+      catalogueVoucherId,
+    );
     logPerf(
       "EXTRA_SUBMIT",
       "applyGuestCatalogueVoucherAction",
       performance.now() - voucherStarted,
       { voucherApply: "executed" },
     );
+    if (applied.error) {
+      return { error: applied.error };
+    }
   } else {
     logPerfSkipped("EXTRA_SUBMIT", "applyGuestCatalogueVoucherAction", {
       voucherApply: "skipped",

@@ -173,7 +173,10 @@ assert.doesNotMatch(guestFormSrc, /canMutateOrderAvailability/);
 const checkoutActionsSrc = readSrc(
   "src/workspaces/storefront/checkout/actions.ts",
 );
-assert.match(checkoutActionsSrc, /isPickupOrdersClosed/);
+assert.match(
+  checkoutActionsSrc,
+  /logPerfSkipped\("CHECKOUT_SUBMIT", "isPickupOrdersClosed"\)/,
+);
 assert.doesNotMatch(checkoutActionsSrc, /canMutateOrderAvailability/);
 
 console.log("PASS order availability staff");

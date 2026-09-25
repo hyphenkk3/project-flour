@@ -59,8 +59,8 @@ assert.doesNotMatch(formSrc, /StorefrontCheckoutLoading/);
 assert.doesNotMatch(formSrc, /Opening order/);
 assert.doesNotMatch(promptSrc, /StorefrontCheckoutLoading/);
 assert.doesNotMatch(formSrc, /router\.refresh/);
-assert.doesNotMatch(formSrc, /router\.replace/);
 assert.doesNotMatch(formSrc, /router\.push/);
+assert.doesNotMatch(handleSubmitSrc, /router\.replace/);
 
 assert.match(handleSubmitSrc, /setConfirmOpen\(true\)/);
 assert.doesNotMatch(handleSubmitSrc, /formAction\(/);
