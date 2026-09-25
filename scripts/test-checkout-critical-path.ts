@@ -249,7 +249,11 @@ assert.equal(
 );
 
 assert.match(orderDetailsSrc, /receipt\.adjustments/);
-assert.match(successSrc, /SaveOrderDetailsButton receipt=\{receipt\}/);
+assert.match(successSrc, /SuccessReceiptRecap/);
+assert.match(
+  readSrc("src/workspaces/storefront/checkout/SuccessReceiptRecap.tsx"),
+  /SaveOrderDetailsButton/,
+);
 assert.match(crewPreviewSrc, /getEffectiveAdjustments\(order\.adjustments\)/);
 assert.match(crewPreviewSrc, /settlement\.amountDue/);
 assert.doesNotMatch(voucherActionsSrc, /revalidatePath\("\/order\/success"\)/);

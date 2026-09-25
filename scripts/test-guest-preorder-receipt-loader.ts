@@ -96,15 +96,24 @@ assert.equal(
   138,
 );
 
+const recapSrc = readSrc(
+  "src/workspaces/storefront/checkout/SuccessReceiptRecap.tsx",
+);
+const photoActionSrc = readSrc(
+  "src/workspaces/storefront/checkout/receipt-photos-action.ts",
+);
 assert.match(successSrc, /getGuestPreorderReceipt/);
 assert.match(successSrc, /loadSuccessPageReceipt/);
 assert.match(successLoadSrc, /getGuestPreorderReceipt/);
-assert.match(successSrc, /receipt \? <SaveOrderDetailsButton receipt=\{receipt\} \/>/);
+assert.match(successSrc, /receipt \? \(/);
+assert.match(successSrc, /<SuccessReceiptRecap orderId=\{orderId\} receipt=\{receipt\} \/>/);
+assert.match(recapSrc, /SaveOrderDetailsButton/);
+assert.match(recapSrc, /resolveReceipt/);
 assert.doesNotMatch(successSrc, /receipt && !isFreshPick/);
-assert.match(successSrc, /receipt\.items\.map/);
-assert.match(successSrc, /receipt\.paidAddons\.map/);
-assert.match(successSrc, /receipt\.notes/);
-assert.match(successSrc, /formatRm\(receipt\.total\)/);
+assert.match(recapSrc, /items\.map/);
+assert.match(recapSrc, /receipt\.paidAddons\.map/);
+assert.match(recapSrc, /receipt\.notes/);
+assert.match(recapSrc, /formatRm\(receipt\.total\)/);
 assert.match(successSrc, /FRESH_PICKS_SUCCESS_FLOW/);
 
 assert.match(extraActionsSrc, /setGuestPreorderReceiptCookie/);
@@ -115,10 +124,22 @@ assert.match(receiptSrc, /cake_size_id,/);
 assert.match(receiptSrc, /cakeId:/);
 assert.match(receiptSrc, /cakeSizeId:/);
 assert.match(receiptSrc, /library_cake_photos/);
-assert.match(receiptSrc, /library_cakes \(/);
+assert.match(receiptSrc, /library_cakes \( name \)/);
 assert.match(receiptSrc, /STOREFRONT_CAKE_PHOTO_SELECT/);
-assert.match(receiptSrc, /source: "orders_embed"/);
+assert.match(receiptSrc, /source: "deferred_client"/);
 assert.match(receiptSrc, /loadReceiptCakePhotos/);
+assert.match(
+  receiptSrc,
+  /async \(\) => \{\s*const started = performance\.now\(\);[\s\S]*orders_query/,
+);
+assert.match(
+  receiptSrc,
+  /async \(\) => \{\s*const started = performance\.now\(\);[\s\S]*order_adjustments/,
+);
+assert.doesNotMatch(
+  receiptSrc,
+  /const ordersStarted = performance\.now\(\);\s*const adjustmentsStarted = performance\.now\(\);/,
+);
 assert.match(receiptSrc, /mapStorefrontCakePhoto/);
 assert.match(receiptSrc, /storefrontPhotoForSize\(photos, item\.cakeSizeId\)/);
 assert.doesNotMatch(receiptSrc, /resolveCatalogueListingPhoto/);
@@ -133,8 +154,16 @@ assert.match(
 assert.doesNotMatch(extraQueriesSrc, /resolveCatalogueListingPhoto/);
 assert.doesNotMatch(extraQueriesSrc, /storefrontCatalogueListingPhoto/);
 
-assert.match(successSrc, /CakePhotoImage/);
-assert.match(successSrc, /item\.imageUrl/);
+assert.match(successSrc, /SuccessReceiptRecap/);
+assert.match(recapSrc, /CakePhotoImage/);
+assert.match(recapSrc, /item\.imageUrl/);
+assert.match(recapSrc, /h-16 w-16/);
+assert.match(recapSrc, /loadGuestReceiptPhotosAction/);
+assert.match(recapSrc, /CHECKOUT_SUCCESS_PHOTO/);
+assert.match(recapSrc, /formatRm\(receipt\.total\)/);
+assert.match(photoActionSrc, /guestPreorderReceiptAuthorized/);
+assert.match(photoActionSrc, /loadReceiptCakePhotos/);
+assert.match(photoActionSrc, /attachReceiptItemPhotos/);
 assert.match(successSrc, /ORDER_DETAILS_NOTICE_TITLE/);
 assert.match(successSrc, /orderDetailsNoticeBody\(isFreshPick\)/);
 assert.match(successSrc, /orderDetailsNoticeMark\(isFreshPick\)/);
@@ -157,7 +186,10 @@ assert.doesNotMatch(orderDetailsNoticeBody(true), /24 hours/);
 assert.ok(
   successSrc.indexOf("{contactLine}") < successSrc.indexOf("<aside"),
 );
-assert.ok(successSrc.indexOf("<aside") < successSrc.indexOf("Order recap"));
+assert.ok(
+  successSrc.indexOf("<aside") < successSrc.indexOf("<SuccessReceiptRecap"),
+);
+assert.match(recapSrc, /Order recap/);
 assert.doesNotMatch(successSrc, /resolveCatalogueListingPhoto/);
 assert.doesNotMatch(successSrc, /storefrontCatalogueListingPhoto/);
 

@@ -90,7 +90,25 @@ assert.match(receiptSrc, /order_adjustments/);
 assert.match(receiptSrc, /getEffectiveAdjustments/);
 assert.match(receiptSrc, /calculateOrderSettlement/);
 assert.match(receiptSrc, /library_cake_photos/);
-assert.match(receiptSrc, /source: "orders_embed"/);
+assert.match(receiptSrc, /source: "deferred_client"/);
+assert.match(receiptSrc, /loadReceiptCakePhotos/);
+assert.doesNotMatch(
+  receiptSrc,
+  /const ordersStarted = performance\.now\(\);\s*const adjustmentsStarted = performance\.now\(\);/,
+);
+assert.match(
+  receiptSrc,
+  /async \(\) => \{\s*const started = performance\.now\(\);[\s\S]*orders_query/,
+);
+assert.match(
+  receiptSrc,
+  /async \(\) => \{\s*const started = performance\.now\(\);[\s\S]*order_adjustments/,
+);
+assert.match(clientHelperSrc, /CHECKOUT_SUCCESS_PHOTO/);
+assert.match(
+  readSrc("src/workspaces/storefront/checkout/SuccessReceiptRecap.tsx"),
+  /CHECKOUT_SUCCESS_PHOTO/,
+);
 assert.match(receiptSrc, /\.is\("customer_id", null\)/);
 assert.doesNotMatch(receiptSrc, /evaluateCatalogueVoucher/);
 assert.doesNotMatch(receiptSrc, /apply_catalogue_voucher_to_guest_order/);
@@ -99,7 +117,11 @@ assert.doesNotMatch(receiptSrc, /\.insert\(/);
 assert.match(successSrc, /getGuestPreorderReceipt/);
 assert.match(successSrc, /loadSuccessPageReceipt/);
 assert.match(successSrc, /<StorefrontSuccessPerfProbe successServer=\{perf\} \/>/);
-assert.match(successSrc, /receipt \? <SaveOrderDetailsButton receipt=\{receipt\} \/>/);
+assert.match(successSrc, /<SuccessReceiptRecap orderId=\{orderId\} receipt=\{receipt\} \/>/);
+assert.match(
+  readSrc("src/workspaces/storefront/checkout/SuccessReceiptRecap.tsx"),
+  /SaveOrderDetailsButton/,
+);
 assert.match(formSrc, /router\.replace\(`\/order\/success\?order=\$\{orderId\}`\)/);
 assert.match(formSrc, /Preparing your preorder…/);
 assert.match(pageSrc, /Preparing your preorder…/);

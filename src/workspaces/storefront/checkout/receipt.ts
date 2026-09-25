@@ -195,13 +195,7 @@ function firstRelation<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
-function orderReceiptSelect(photoSelect: string | null): string {
-  const cakePhotos = photoSelect
-    ? `,
-            library_cake_photos (
-              ${photoSelect}
-            )`
-    : "";
+function orderReceiptSelect(): string {
   return `
         order_number,
         guest_name,
@@ -222,9 +216,7 @@ function orderReceiptSelect(photoSelect: string | null): string {
           unit_price,
           cake_name,
           size_label,
-          library_cakes (
-            name${cakePhotos}
-          ),
+          library_cakes ( name ),
           library_cake_sizes ( label )
         ),
         order_paid_addons (
@@ -283,7 +275,7 @@ export function attachReceiptItemPhotos(
   });
 }
 
-async function loadReceiptCakePhotos(
+export async function loadReceiptCakePhotos(
   supabase: ReturnType<typeof createServiceClient>,
   cakeIds: string[],
 ): Promise<Map<string, StorefrontCakePhoto[]>> {
@@ -334,47 +326,41 @@ export async function loadGuestPreorderReceipt(
     const totalStarted = performance.now();
     const supabase = createServiceClient();
     // Column is customer_notes. A `notes` select fails PostgREST and hides Save Order Details.
-    const loadOrder = (photoSelect: string | null) =>
-      supabase
-        .from("orders")
-        .select(orderReceiptSelect(photoSelect))
-        .eq("id", orderId)
-        .is("customer_id", null)
-        .maybeSingle();
-    const ordersStarted = performance.now();
-    const adjustmentsStarted = performance.now();
-    let photosEmbedded = true;
+    // Time each query inside its own promise so Promise.all wall-clock is not shared.
     const [orderResult, adjustmentsResult] = await Promise.all([
-      loadOrder(STOREFRONT_CAKE_PHOTO_SELECT),
-      supabase
-        .from("order_adjustments")
-        .select(
-          "code, label, amount, status, reverses_adjustment_id, metadata",
-        )
-        .eq("order_id", orderId),
+      (async () => {
+        const started = performance.now();
+        const result = await supabase
+          .from("orders")
+          .select(orderReceiptSelect())
+          .eq("id", orderId)
+          .is("customer_id", null)
+          .maybeSingle();
+        logPerf(
+          "CHECKOUT_RECEIPT",
+          "orders_query",
+          performance.now() - started,
+          { embeds: "items_addons_complimentary_dine_in" },
+        );
+        return result;
+      })(),
+      (async () => {
+        const started = performance.now();
+        const result = await supabase
+          .from("order_adjustments")
+          .select(
+            "code, label, amount, status, reverses_adjustment_id, metadata",
+          )
+          .eq("order_id", orderId);
+        logPerf(
+          "CHECKOUT_RECEIPT",
+          "order_adjustments",
+          performance.now() - started,
+        );
+        return result;
+      })(),
     ]);
-    let { data, error } = orderResult;
-    if (error && isMissingCakePhotoSchema(error.message)) {
-      photosEmbedded = false;
-      const retried = await loadOrder(null);
-      data = retried.data;
-      error = retried.error;
-    }
-    logPerf(
-      "CHECKOUT_RECEIPT",
-      "orders_query",
-      performance.now() - ordersStarted,
-      {
-        embeds: photosEmbedded
-          ? "items_addons_complimentary_dine_in_photos"
-          : "items_addons_complimentary_dine_in",
-      },
-    );
-    logPerf(
-      "CHECKOUT_RECEIPT",
-      "order_adjustments",
-      performance.now() - adjustmentsStarted,
-    );
+    const { data, error } = orderResult;
 
     if (error || !data) return null;
     const order = data as unknown as ReceiptOrderRow;
@@ -397,22 +383,10 @@ export async function loadGuestPreorderReceipt(
         unitPrice,
       };
     });
-    const cakeIds = [
-      ...new Set(
-        mappedItems
-          .map((item) => item.cakeId)
-          .filter((id): id is string => Boolean(id)),
-      ),
-    ];
-    let photosByCake = collectReceiptPhotosByCake(rows);
-    if (photosEmbedded) {
-      logPerfSkipped("CHECKOUT_RECEIPT", "cake_photos", {
-        source: "orders_embed",
-      });
-    } else {
-      photosByCake = await loadReceiptCakePhotos(supabase, cakeIds);
-    }
-    const items = attachReceiptItemPhotos(mappedItems, photosByCake);
+    logPerfSkipped("CHECKOUT_RECEIPT", "cake_photos", {
+      source: "deferred_client",
+    });
+    const items = attachReceiptItemPhotos(mappedItems, new Map());
 
     const addonRows = Array.isArray(order.order_paid_addons)
       ? order.order_paid_addons

@@ -1,21 +1,12 @@
 import Link from "next/link";
-import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
-import { formatDdMmYyyy } from "@/lib/dates";
-import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
 import {
   FRESH_PICKS_SUCCESS_CONTACT,
   FRESH_PICKS_SUCCESS_FLOW,
   FRESH_PICKS_SUCCESS_PAYMENT,
   FRESH_PICKS_SUCCESS_TITLE,
 } from "@/engines/extra/customer-fresh-picks";
-import {
-  workspaceFulfilmentSectionTitle,
-  workspaceScheduleDateLabel,
-  workspaceScheduleTimeLabel,
-} from "@/engines/orders/fulfilment";
 import { ClearPreorderDraftOnSuccess } from "@/workspaces/storefront/checkout/ClearPreorderDraft";
 import { ClearFreshPickCartOnSuccess } from "@/workspaces/storefront/extra/ClearFreshPickCartOnSuccess";
-import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import { getGuestPreorderReceipt } from "@/workspaces/storefront/checkout/receipt";
 import { loadSuccessPageReceipt } from "@/workspaces/storefront/checkout/success-page-load";
 import {
@@ -25,8 +16,7 @@ import {
   orderDetailsNoticeBody,
   orderDetailsNoticeMark,
 } from "@/workspaces/storefront/checkout/order-details-card";
-import { SaveOrderDetailsButton } from "@/workspaces/storefront/checkout/SaveOrderDetailsButton";
-import { formatRm } from "@/workspaces/storefront/catalog/pricing";
+import { SuccessReceiptRecap } from "@/workspaces/storefront/checkout/SuccessReceiptRecap";
 import { storefrontKickerClass } from "@/workspaces/storefront/StorefrontBrand";
 import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
 import { ApplySelectedCatalogueVoucher } from "@/workspaces/storefront/offers/ApplySelectedCatalogueVoucher";
@@ -104,113 +94,8 @@ export async function StorefrontSuccessPage({
       </aside>
 
       {receipt ? (
-        <section className="border-fog mt-8 border-t pt-8 text-left">
-          <p className="text-skyline text-[11px] font-medium tracking-[0.18em] uppercase">
-            Order recap
-          </p>
-          <ul className="mt-3 space-y-3">
-            {receipt.items.map((item) => (
-              <li className="flex items-start gap-3" key={item.key}>
-                {item.imageUrl ? (
-                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] sm:h-[4.5rem] sm:w-[4.5rem]">
-                    <CakePhotoImage
-                      alt={item.imageAlt ?? item.cakeName}
-                      sizes="72px"
-                      src={item.imageUrl}
-                    />
-                  </div>
-                ) : null}
-                <div className="min-w-0 flex-1">
-                  <p className="text-ink text-sm font-medium">{item.cakeName}</p>
-                  <p className="text-skyline text-sm">
-                    {item.sizeLabel} × {item.quantity}
-                    {item.unitPrice != null
-                      ? ` · ${formatRm(item.unitPrice * item.quantity)}`
-                      : ""}
-                  </p>
-                </div>
-              </li>
-            ))}
-            {receipt.paidAddons.map((addon) => (
-              <li className="text-ink text-sm" key={addon.key}>
-                <span className="font-medium">{addon.name}</span>
-                <span className="text-skyline">
-                  {" "}
-                  · × {addon.quantity} ·{" "}
-                  {formatRm(addon.unitPrice * addon.quantity)}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <dl className="border-fog mt-4 space-y-2 border-t pt-3 text-sm">
-            <div className="flex justify-between gap-4">
-              <dt className="text-skyline">Fulfilment</dt>
-              <dd className="text-ink text-right font-medium">
-                {workspaceFulfilmentSectionTitle(receipt.fulfilmentMethod)}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-skyline">
-                {workspaceScheduleDateLabel(receipt.fulfilmentMethod)}
-              </dt>
-              <dd className="text-ink text-right font-medium">
-                {formatDdMmYyyy(receipt.pickupDate)}
-              </dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-skyline">
-                {workspaceScheduleTimeLabel(receipt.fulfilmentMethod)}
-              </dt>
-              <dd className="text-ink text-right font-medium">
-                {formatPickupTime(receipt.pickupTime)}
-              </dd>
-            </div>
-            {receipt.fulfilmentMethod === "dine_in" &&
-            receipt.reservationTime ? (
-              <div className="flex justify-between gap-4">
-                <dt className="text-skyline">Dine-in reservation time</dt>
-                <dd className="text-ink text-right font-medium">
-                  {formatPickupTime(receipt.reservationTime)}
-                </dd>
-              </div>
-            ) : null}
-            {receipt.fulfilmentMethod === "dine_in" && receipt.dineInVenue ? (
-              <div className="flex justify-between gap-4">
-                <dt className="text-skyline">Venue</dt>
-                <dd className="text-ink text-right font-medium">
-                  {dineInVenueLabel(receipt.dineInVenue)}
-                </dd>
-              </div>
-            ) : null}
-            {receipt.fulfilmentMethod === "dine_in" &&
-            receipt.guestCount != null ? (
-              <div className="flex justify-between gap-4">
-                <dt className="text-skyline">Guests</dt>
-                <dd className="text-ink text-right font-medium">
-                  {receipt.guestCount}{" "}
-                  {receipt.guestCount === 1 ? "guest" : "guests"}
-                </dd>
-              </div>
-            ) : null}
-            <div className="flex justify-between gap-4">
-              <dt className="text-skyline">Total</dt>
-              <dd className="font-display text-ink text-right text-xl tracking-tight tabular-nums">
-                {formatRm(receipt.total)}
-              </dd>
-            </div>
-            {receipt.notes ? (
-              <div className="flex justify-between gap-4">
-                <dt className="text-skyline">Notes</dt>
-                <dd className="text-ink text-right font-medium whitespace-pre-wrap">
-                  {receipt.notes}
-                </dd>
-              </div>
-            ) : null}
-          </dl>
-        </section>
+        <SuccessReceiptRecap orderId={orderId} receipt={receipt} />
       ) : null}
-
-      {receipt ? <SaveOrderDetailsButton receipt={receipt} /> : null}
 
       <section className="mt-8 space-y-2 text-left text-sm">
         {isFreshPick ? (

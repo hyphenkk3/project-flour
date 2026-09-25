@@ -15,10 +15,12 @@ import {
 
 type SaveOrderDetailsButtonProps = {
   receipt: GuestPreorderReceipt;
+  resolveReceipt?: () => Promise<GuestPreorderReceipt>;
 };
 
 export function SaveOrderDetailsButton({
   receipt,
+  resolveReceipt,
 }: SaveOrderDetailsButtonProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,14 +49,15 @@ export function SaveOrderDetailsButton({
     setBusy(true);
     try {
       await ensureStorefrontCanvasFonts();
-      const model = buildOrderDetailsCardModel(receipt);
+      const current = resolveReceipt ? await resolveReceipt() : receipt;
+      const model = buildOrderDetailsCardModel(current);
       const images = await preloadOrderDetailsImages(
         orderDetailsCakeImageUrls(model),
       );
       const blob = renderOrderDetailsPng(model, images);
       const result = await shareOrDownloadOrderDetailsImage({
         blob,
-        fileName: orderDetailsFileName(receipt.orderNumber),
+        fileName: orderDetailsFileName(current.orderNumber),
         title: "Whitebird order details",
       });
       if (result.action === "preview" && result.objectUrl) {

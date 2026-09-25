@@ -816,21 +816,29 @@ assert.doesNotMatch(successSrc, /const noticeMark = "30 minutes"/);
 assert.ok(
   successSrc.indexOf("{contactLine}") < successSrc.indexOf("<aside"),
 );
-assert.ok(successSrc.indexOf("<aside") < successSrc.indexOf("Order recap"));
-assert.match(successSrc, /CakePhotoImage/);
-assert.match(successSrc, /item\.imageUrl/);
-assert.match(successSrc, /receipt\.items\.map/);
+const recapSrc = readSrc(
+  "src/workspaces/storefront/checkout/SuccessReceiptRecap.tsx",
+);
+assert.ok(
+  successSrc.indexOf("<aside") < successSrc.indexOf("<SuccessReceiptRecap"),
+);
+assert.match(recapSrc, /Order recap/);
+assert.match(recapSrc, /CakePhotoImage/);
+assert.match(recapSrc, /item\.imageUrl/);
+assert.match(recapSrc, /items\.map/);
 assert.doesNotMatch(successSrc, /resolveCatalogueListingPhoto/);
 assert.doesNotMatch(successSrc, /storefrontCatalogueListingPhoto/);
 assert.doesNotMatch(successSrc, /status-danger/);
-assert.match(successSrc, /SaveOrderDetailsButton/);
-assert.match(successSrc, /receipt \? <SaveOrderDetailsButton receipt=\{receipt\} \/>/);
+assert.match(successSrc, /SuccessReceiptRecap/);
+assert.match(recapSrc, /SaveOrderDetailsButton/);
+assert.match(recapSrc, /resolveReceipt/);
 assert.doesNotMatch(successSrc, /receipt && !isFreshPick/);
 assert.doesNotMatch(successSrc, /Email me a copy/);
 
 const buttonSrc = readSrc(
   "src/workspaces/storefront/checkout/SaveOrderDetailsButton.tsx",
 );
+assert.match(buttonSrc, /resolveReceipt/);
 assert.match(buttonSrc, /Save Order Details/);
 assert.match(buttonSrc, /shareOrDownloadOrderDetailsImage/);
 assert.match(buttonSrc, /renderOrderDetailsPng/);
