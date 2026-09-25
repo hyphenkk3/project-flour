@@ -68,7 +68,11 @@ assert.match(detailSrc, /CakeOfferHint/);
 
 const offerHintSrc = readSrc("src/workspaces/storefront/offers/CakeOfferHint.tsx");
 assert.match(offerHintSrc, /listPublicCatalogueVouchers/);
-assert.doesNotMatch(offerHintSrc, /createClient|cookies\(/);
+assert.match(offerHintSrc, /catalogueVoucherAllowsOrderType/);
+assert.match(offerHintSrc, /<aside/);
+assert.match(offerHintSrc, /href="\/offers"/);
+assert.doesNotMatch(offerHintSrc, /["']use client["']/);
+assert.doesNotMatch(offerHintSrc, /CakeOfferHintView|fresh-pick-cart|createClient|cookies\(/);
 assert.match(offerHintSrc, /try \{/);
 assert.match(offerHintSrc, /return null/);
 

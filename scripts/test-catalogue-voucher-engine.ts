@@ -564,6 +564,11 @@ assert.match(
   /summarizeCatalogueVoucherRules|CatalogueOfferCard/,
 );
 
+const cakeHintSrc = readSrc("src/workspaces/storefront/offers/CakeOfferHint.tsx");
+assert.doesNotMatch(cakeHintSrc, /["']use client["']/);
+assert.doesNotMatch(cakeHintSrc, /CakeOfferHintView|fresh-pick-cart/);
+assert.match(cakeHintSrc, /catalogueVoucherAllowsOrderType/);
+
 const publicQueriesSrc = readSrc("src/workspaces/vouchers/catalogue-queries.ts");
 const publicListFn = publicQueriesSrc.slice(
   publicQueriesSrc.indexOf("export async function listPublicCatalogueVouchers"),
