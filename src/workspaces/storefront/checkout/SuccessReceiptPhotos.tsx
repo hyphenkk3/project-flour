@@ -17,7 +17,7 @@ import type {
 } from "@/workspaces/storefront/checkout/receipt";
 import {
   logCheckoutClient,
-  readCheckoutSubmitTiming,
+  readCheckoutCorrelationId,
 } from "@/lib/perf/dev-only-client";
 
 const PhotoItemsContext = createContext<GuestPreorderReceiptItem[] | null>(
@@ -44,9 +44,8 @@ export function SuccessReceiptPhotoController({
       (result) => {
         const nextItems = result.items ?? base.items;
         setItems(nextItems);
-        const timing = readCheckoutSubmitTiming();
         logCheckoutClient("CHECKOUT_SUCCESS_PHOTO", {
-          correlationId: timing?.correlationId ?? null,
+          correlationId: readCheckoutCorrelationId(),
           cake_photos: result.elapsedMs,
           clientWaitMs: Math.round(performance.now() - started),
         });

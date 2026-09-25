@@ -18,20 +18,109 @@ export const CHECKOUT_ACTION_RETURN = "whitebird-checkout-action-return";
 export const SUCCESS_NAVIGATION_START = "whitebird-success-navigation-start";
 export const SUCCESS_PAGE_VISIBLE = "whitebird-success-page-visible";
 
-const SUBMIT_STORAGE_KEY = "wb-perf-checkout-submit-v1";
+const CORRELATION_STORAGE_KEY = "wb-perf-checkout-correlation-v2";
+const LEGACY_SUBMIT_STORAGE_KEY = "wb-perf-checkout-submit-v1";
 const LOAD_STORAGE_KEY = "wb-perf-checkout-load-v1";
 
 export type CheckoutSubmitTiming = {
   correlationId: string;
   flow: "preorder" | "extra";
+  timeOrigin: number;
   confirmClickAt: number;
   actionDispatchAt: number | null;
   actionReturnAt: number | null;
-  navigationStartAt: number | null;
+  navigationCallAt: number | null;
 };
+
+let currentAttempt: CheckoutSubmitTiming | null = null;
 
 function canUseBrowserTools(): boolean {
   return isDevPerfEnabled() && typeof window !== "undefined";
+}
+
+function nowMs(): number {
+  return typeof performance !== "undefined" ? performance.now() : 0;
+}
+
+function currentTimeOrigin(): number {
+  return typeof performance !== "undefined" ? performance.timeOrigin : 0;
+}
+
+/** Rejects mixed clocks, missing marks, negatives, and implausible spans. */
+const MAX_CLIENT_INTERVAL_MS = 10 * 60 * 1000;
+
+export function elapsedPerfMs(
+  from: number | null | undefined,
+  to: number | null | undefined,
+): number | null {
+  if (from == null || to == null) return null;
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
+  const ms = Math.round(to - from);
+  if (!Number.isFinite(ms) || ms < 0 || ms > MAX_CLIENT_INTERVAL_MS) {
+    return null;
+  }
+  return ms;
+}
+
+export function resetCheckoutAttemptTiming(): void {
+  currentAttempt = null;
+}
+
+export function startCheckoutAttemptTiming(
+  correlationId: string,
+  flow: "preorder" | "extra",
+): CheckoutSubmitTiming {
+  const started = nowMs();
+  currentAttempt = {
+    correlationId,
+    flow,
+    timeOrigin: currentTimeOrigin(),
+    confirmClickAt: started,
+    actionDispatchAt: started,
+    actionReturnAt: null,
+    navigationCallAt: null,
+  };
+  persistCheckoutCorrelation(correlationId, flow);
+  return currentAttempt;
+}
+
+export function readCheckoutSubmitTiming(): CheckoutSubmitTiming | null {
+  if (!currentAttempt) return null;
+  if (currentAttempt.timeOrigin !== currentTimeOrigin()) {
+    currentAttempt = null;
+    return null;
+  }
+  return currentAttempt;
+}
+
+export function readCheckoutCorrelationId(): string | null {
+  const live = readCheckoutSubmitTiming();
+  if (live?.correlationId) return live.correlationId;
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(CORRELATION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { correlationId?: string };
+    return parsed.correlationId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function persistCheckoutCorrelation(
+  correlationId: string,
+  flow: "preorder" | "extra",
+): void {
+  if (!canUseBrowserTools()) return;
+  try {
+    sessionStorage.removeItem(LEGACY_SUBMIT_STORAGE_KEY);
+    sessionStorage.setItem(
+      CORRELATION_STORAGE_KEY,
+      JSON.stringify({ correlationId, flow }),
+    );
+  } catch {
+    // Private mode / quota — skip persistence.
+  }
 }
 
 export function markCheckoutPerf(name: string): void {
@@ -43,40 +132,22 @@ export function markCheckoutPerf(name: string): void {
   }
 }
 
-export function writeCheckoutSubmitTiming(
-  patch: Partial<CheckoutSubmitTiming> &
-    Pick<CheckoutSubmitTiming, "correlationId" | "flow">,
-): CheckoutSubmitTiming {
-  const current = readCheckoutSubmitTiming();
-  const next: CheckoutSubmitTiming = {
-    correlationId: patch.correlationId,
-    flow: patch.flow,
-    confirmClickAt: patch.confirmClickAt ?? current?.confirmClickAt ?? Date.now(),
-    actionDispatchAt: patch.actionDispatchAt ?? current?.actionDispatchAt ?? null,
-    actionReturnAt: patch.actionReturnAt ?? current?.actionReturnAt ?? null,
-    navigationStartAt:
-      patch.navigationStartAt ?? current?.navigationStartAt ?? null,
-  };
-  if (!canUseBrowserTools()) return next;
-  try {
-    sessionStorage.setItem(SUBMIT_STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    // Private mode / quota — skip persistence.
+export function markCheckoutActionReturned(): CheckoutSubmitTiming | null {
+  const attempt = readCheckoutSubmitTiming();
+  if (!attempt) return null;
+  if (attempt.actionReturnAt == null) {
+    attempt.actionReturnAt = nowMs();
   }
-  return next;
+  return attempt;
 }
 
-export function readCheckoutSubmitTiming(): CheckoutSubmitTiming | null {
-  if (!canUseBrowserTools()) return null;
-  try {
-    const raw = sessionStorage.getItem(SUBMIT_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as CheckoutSubmitTiming;
-    if (!parsed?.correlationId) return null;
-    return parsed;
-  } catch {
-    return null;
+export function markCheckoutNavigationCall(): CheckoutSubmitTiming | null {
+  const attempt = readCheckoutSubmitTiming();
+  if (!attempt) return null;
+  if (attempt.navigationCallAt == null) {
+    attempt.navigationCallAt = nowMs();
   }
+  return attempt;
 }
 
 export function logCheckoutClient(
@@ -224,37 +295,26 @@ export function logSubmitPhaseSummary(
   timing: CheckoutSubmitTiming,
   successVisibleAt: number | null,
 ): void {
-  const confirmToActionReturnMs =
-    timing.actionReturnAt == null
-      ? null
-      : timing.actionReturnAt - timing.confirmClickAt;
-  const actionReturnToNavigationStartMs =
-    timing.actionReturnAt == null || timing.navigationStartAt == null
-      ? null
-      : timing.navigationStartAt - timing.actionReturnAt;
-  const navigationStartToSuccessVisibleMs =
-    timing.navigationStartAt == null || successVisibleAt == null
-      ? null
-      : successVisibleAt - timing.navigationStartAt;
-  const confirmToSuccessVisibleMs =
-    successVisibleAt == null ? null : successVisibleAt - timing.confirmClickAt;
-  const confirmToClientDispatchMs =
-    timing.actionDispatchAt == null
-      ? null
-      : timing.actionDispatchAt - timing.confirmClickAt;
+  const sameOrigin = timing.timeOrigin === currentTimeOrigin();
+  const visibleAt = sameOrigin ? successVisibleAt : null;
+  const confirmToClientDispatchMs = elapsedPerfMs(
+    timing.confirmClickAt,
+    timing.actionDispatchAt,
+  );
   logCheckoutClient(timing.flow === "extra" ? "EXTRA_CLIENT" : "CHECKOUT_CLIENT", {
     correlationId: timing.correlationId,
     confirmClickMs: 0,
     clientActionDispatchMs: confirmToClientDispatchMs,
     confirmToClientDispatchMs,
-    confirmToActionReturnMs,
-    actionReturnToNavigationStartMs,
-    actionReturnToSuccessVisibleMs:
-      timing.actionReturnAt == null || successVisibleAt == null
-        ? null
-        : successVisibleAt - timing.actionReturnAt,
-    navigationStartToSuccessVisibleMs,
-    confirmToSuccessVisibleMs,
-    note: "action_return_is_server_action_promise_resolve",
+    confirmToActionReturnMs: elapsedPerfMs(
+      timing.confirmClickAt,
+      timing.actionReturnAt,
+    ),
+    actionReturnToNavigationCallMs: elapsedPerfMs(
+      timing.actionReturnAt,
+      timing.navigationCallAt,
+    ),
+    confirmToSuccessVisibleMs: elapsedPerfMs(timing.confirmClickAt, visibleAt),
+    note: "same_document_performance_now_only",
   });
 }

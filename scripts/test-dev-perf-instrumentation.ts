@@ -14,7 +14,13 @@ import {
   formatPerfLine,
   isDevPerfEnabled,
 } from "@/lib/perf/dev-only-shared";
-import { resolveCheckoutLoadClock } from "@/lib/perf/dev-only-client";
+import {
+  elapsedPerfMs,
+  readCheckoutSubmitTiming,
+  resetCheckoutAttemptTiming,
+  resolveCheckoutLoadClock,
+  startCheckoutAttemptTiming,
+} from "@/lib/perf/dev-only-client";
 
 function readSrc(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -112,9 +118,17 @@ assert.match(
 );
 assert.match(probeSrc, /CHECKOUT_NAV/);
 assert.match(probeSrc, /useLayoutEffect/);
-assert.match(probeSrc, /navigationStartToServerStartMs/);
-assert.match(probeSrc, /navigationToClientCommitMs/);
+assert.match(probeSrc, /successPageClientCommitMs/);
+assert.match(probeSrc, /successPageClientVisibleMs/);
+assert.match(probeSrc, /successPageStartToVisibleMs/);
+assert.match(probeSrc, /actionReturnToNavigationCallMs/);
 assert.match(probeSrc, /clientCommitToVisibleMs/);
+assert.match(probeSrc, /success_page_local_performance_now/);
+assert.match(probeSrc, /successPageNow\(\)/);
+assert.doesNotMatch(probeSrc, /navigationStartToServerStartMs/);
+assert.doesNotMatch(probeSrc, /navigationStartToSuccessVisibleMs/);
+assert.doesNotMatch(probeSrc, /navigationToClientCommitMs/);
+assert.doesNotMatch(probeSrc, /Date\.now\(\)/);
 assert.match(
   formSrc,
   /useLayoutEffect\(\(\) => \{[\s\S]*beginSuccessNavigationPerf/,
@@ -147,8 +161,30 @@ assert.match(extraFormSrc, /submitGuestOrderAndNavigate/);
 assert.match(checkoutPerfSrc, /submitGuestOrderAndNavigate/);
 assert.match(checkoutPerfSrc, /markCheckoutActionReturned/);
 assert.match(checkoutPerfSrc, /server_action_promise_resolved/);
+assert.match(checkoutPerfSrc, /startCheckoutAttemptTiming/);
+assert.match(checkoutPerfSrc, /actionReturnToNavigationCallMs/);
+assert.match(checkoutPerfSrc, /elapsedPerfMs/);
+assert.doesNotMatch(checkoutPerfSrc, /navigationStartAt/);
+assert.doesNotMatch(checkoutPerfSrc, /writeCheckoutSubmitTiming/);
+assert.doesNotMatch(checkoutPerfSrc, /Date\.now\(\)/);
 assert.match(clientHelperSrc, /confirmClickMs/);
 assert.match(clientHelperSrc, /clientActionDispatchMs/);
+assert.match(clientHelperSrc, /actionReturnToNavigationCallMs/);
+assert.match(clientHelperSrc, /elapsedPerfMs/);
+assert.match(clientHelperSrc, /startCheckoutAttemptTiming/);
+assert.match(clientHelperSrc, /wb-perf-checkout-correlation-v2/);
+assert.match(clientHelperSrc, /JSON\.stringify\(\{ correlationId, flow \}\)/);
+assert.match(clientHelperSrc, /sessionStorage\.removeItem\(LEGACY_SUBMIT_STORAGE_KEY\)/);
+assert.doesNotMatch(clientHelperSrc, /navigationStartAt/);
+assert.doesNotMatch(clientHelperSrc, /writeCheckoutSubmitTiming/);
+assert.match(
+  readSrc("src/workspaces/storefront/checkout/SuccessReceiptPhotos.tsx"),
+  /readCheckoutCorrelationId/,
+);
+assert.doesNotMatch(
+  readSrc("src/workspaces/storefront/checkout/SuccessReceiptPhotos.tsx"),
+  /readCheckoutSubmitTiming/,
+);
 assert.match(extraFormSrc, /router\.replace\(/);
 assert.match(extraActionsSrc, /await supabase.rpc\("submit_guest_extra_order"/);
 assert.match(extraActionsSrc, /applyGuestCatalogueVoucherAction/);
@@ -220,5 +256,29 @@ const staleVisit = resolveCheckoutLoadClock({
   timeOrigin: 500,
 });
 assert.equal(staleVisit.reset, true);
+
+assert.equal(elapsedPerfMs(10, 20), 10);
+assert.equal(elapsedPerfMs(20, 10), null);
+assert.equal(elapsedPerfMs(null, 20), null);
+assert.equal(elapsedPerfMs(10, null), null);
+assert.equal(elapsedPerfMs(Number.NaN, 20), null);
+assert.equal(elapsedPerfMs(0, 3_109_627), null);
+assert.equal(elapsedPerfMs(3_109_627, 0), null);
+
+resetCheckoutAttemptTiming();
+assert.equal(readCheckoutSubmitTiming(), null);
+const firstAttempt = startCheckoutAttemptTiming("pfirst00001", "preorder");
+assert.equal(firstAttempt.correlationId, "pfirst00001");
+assert.equal(firstAttempt.actionReturnAt, null);
+assert.equal(firstAttempt.navigationCallAt, null);
+assert.equal(readCheckoutSubmitTiming()?.correlationId, "pfirst00001");
+const secondAttempt = startCheckoutAttemptTiming("psecond0002", "extra");
+assert.equal(secondAttempt.correlationId, "psecond0002");
+assert.equal(secondAttempt.flow, "extra");
+assert.equal(readCheckoutSubmitTiming()?.correlationId, "psecond0002");
+assert.notEqual(firstAttempt.correlationId, secondAttempt.correlationId);
+assert.equal(elapsedPerfMs(firstAttempt.confirmClickAt, secondAttempt.confirmClickAt) != null, true);
+resetCheckoutAttemptTiming();
+assert.equal(readCheckoutSubmitTiming(), null);
 
 console.log("PASS dev perf instrumentation");

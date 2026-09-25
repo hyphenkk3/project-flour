@@ -8,13 +8,16 @@ import {
   SUCCESS_NAVIGATION_START,
   consumeCheckoutServerLogKey,
   createPerfCorrelationId,
+  elapsedPerfMs,
   logCheckoutClient,
   logCheckoutServerPerf,
+  markCheckoutActionReturned as stampActionReturned,
   markCheckoutLoadOnce,
+  markCheckoutNavigationCall,
   markCheckoutPerf,
   readCheckoutSubmitTiming,
+  startCheckoutAttemptTiming,
   startCheckoutLoadClock,
-  writeCheckoutSubmitTiming,
   type CheckoutServerPerf,
 } from "@/lib/perf/dev-only-client";
 
@@ -60,13 +63,6 @@ export function useCheckoutActionReturnPerf(
     wasPending.current = false;
     markCheckoutPerf(CHECKOUT_ACTION_RETURN);
     const existing = readCheckoutSubmitTiming();
-    const returned =
-      existing && existing.actionReturnAt == null
-        ? writeCheckoutSubmitTiming({
-            ...existing,
-            actionReturnAt: Date.now(),
-          })
-        : existing;
     logCheckoutClient(flow === "extra" ? "EXTRA_CLIENT" : "CHECKOUT_CLIENT", {
       correlationId: existing?.correlationId ?? serverPerf?.correlationId ?? null,
       step: "action_return",
@@ -78,14 +74,13 @@ export function useCheckoutActionReturnPerf(
     if (!consumeCheckoutServerLogKey(key)) return;
     loggedServerKey.current = key;
     logCheckoutServerPerf(serverPerf);
-    const confirmToActionReturnMs =
-      returned && returned.actionReturnAt != null
-        ? returned.actionReturnAt - returned.confirmClickAt
-        : null;
     logCheckoutClient("CHECKOUT_SERVER_SUMMARY", {
       correlationId: serverPerf.correlationId,
       totalServerMs: serverPerf.totalServerMs,
-      confirmToActionReturnMs,
+      confirmToActionReturnMs: elapsedPerfMs(
+        existing?.confirmClickAt,
+        existing?.actionReturnAt,
+      ),
       confirmToSuccessVisibleMs: null,
     });
   }, [flow, pending, serverPerf]);
@@ -101,10 +96,10 @@ export function useCheckoutActionReturnPerf(
     logCheckoutClient("CHECKOUT_SERVER_SUMMARY", {
       correlationId: serverPerf.correlationId,
       totalServerMs: serverPerf.totalServerMs,
-      confirmToActionReturnMs:
-        existing?.actionReturnAt == null
-          ? null
-          : existing.actionReturnAt - existing.confirmClickAt,
+      confirmToActionReturnMs: elapsedPerfMs(
+        existing?.confirmClickAt,
+        existing?.actionReturnAt,
+      ),
       confirmToSuccessVisibleMs: null,
     });
   }, [pending, serverPerf]);
@@ -116,15 +111,9 @@ export function beginCheckoutSubmitPerf(input: {
 }): string {
   const correlationId = createPerfCorrelationId();
   input.formData.set("perf_correlation_id", correlationId);
-  const now = Date.now();
   markCheckoutPerf(CHECKOUT_CONFIRM_CLICK);
   markCheckoutPerf(CHECKOUT_ACTION_START);
-  writeCheckoutSubmitTiming({
-    correlationId,
-    flow: input.flow,
-    confirmClickAt: now,
-    actionDispatchAt: now,
-  });
+  startCheckoutAttemptTiming(correlationId, input.flow);
   logCheckoutClient(input.flow === "extra" ? "EXTRA_CLIENT" : "CHECKOUT_CLIENT", {
     correlationId,
     step: "confirm_click",
@@ -135,22 +124,12 @@ export function beginCheckoutSubmitPerf(input: {
 
 export function beginSuccessNavigationPerf(): void {
   markCheckoutPerf(SUCCESS_NAVIGATION_START);
-  const existing = readCheckoutSubmitTiming();
-  if (!existing) return;
-  writeCheckoutSubmitTiming({
-    ...existing,
-    navigationStartAt: existing.navigationStartAt ?? Date.now(),
-  });
+  markCheckoutNavigationCall();
 }
 
 export function markCheckoutActionReturned(): void {
-  const existing = readCheckoutSubmitTiming();
-  if (!existing || existing.actionReturnAt != null) return;
   markCheckoutPerf(CHECKOUT_ACTION_RETURN);
-  writeCheckoutSubmitTiming({
-    ...existing,
-    actionReturnAt: Date.now(),
-  });
+  stampActionReturned();
 }
 
 type GuestSubmitResult = {
@@ -180,10 +159,10 @@ export async function submitGuestOrderAndNavigate<T extends GuestSubmitResult>(
   logCheckoutClient(input.flow === "extra" ? "EXTRA_CLIENT" : "CHECKOUT_CLIENT", {
     correlationId: timing?.correlationId ?? result.perf?.correlationId ?? null,
     step: "action_return",
-    confirmToActionReturnMs:
-      timing?.actionReturnAt == null
-        ? null
-        : timing.actionReturnAt - timing.confirmClickAt,
+    confirmToActionReturnMs: elapsedPerfMs(
+      timing?.confirmClickAt,
+      timing?.actionReturnAt,
+    ),
     note: "server_action_promise_resolved",
   });
   if (result.error || !result.orderId) {
@@ -195,10 +174,10 @@ export async function submitGuestOrderAndNavigate<T extends GuestSubmitResult>(
   logCheckoutClient(input.flow === "extra" ? "EXTRA_CLIENT" : "CHECKOUT_CLIENT", {
     correlationId: afterNav?.correlationId ?? result.perf?.correlationId ?? null,
     step: "navigation_call",
-    actionReturnToNavigationStartMs:
-      afterNav?.actionReturnAt == null || afterNav.navigationStartAt == null
-        ? null
-        : afterNav.navigationStartAt - afterNav.actionReturnAt,
+    actionReturnToNavigationCallMs: elapsedPerfMs(
+      afterNav?.actionReturnAt,
+      afterNav?.navigationCallAt,
+    ),
   });
   input.replace(input.hrefForOrderId(result.orderId));
   return result;
