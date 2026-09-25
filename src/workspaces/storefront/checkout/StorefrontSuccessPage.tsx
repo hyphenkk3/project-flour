@@ -66,9 +66,7 @@ export async function StorefrontSuccessPage({
           <br />
           {contactLine}
         </p>
-        {!isFreshPick ? (
-          <ApplySelectedCatalogueVoucher orderId={orderId} />
-        ) : null}
+        <ApplySelectedCatalogueVoucher orderId={orderId} />
       </div>
 
       <aside

@@ -1,4 +1,7 @@
-import { emptyCatalogueRules } from "@/engines/vouchers/catalogue-voucher";
+import {
+  emptyCatalogueRules,
+  parseCatalogueOrderType,
+} from "@/engines/vouchers/catalogue-voucher";
 import type {
   CatalogueVoucherRuleType,
   CatalogueVoucherRules,
@@ -21,6 +24,7 @@ type RuleValueRow = {
   cake_id: string | null;
   cake_size_id: string | null;
   size_label: string | null;
+  value_code: string | null;
   library_cakes?: { name: string } | { name: string }[] | null;
 };
 
@@ -68,6 +72,10 @@ export function mapRuleRowsToCatalogueRules(
       next.sizeLabels = ruleValues
         .map((row) => row.size_label)
         .filter((label): label is string => Boolean(label));
+    } else if (rule.rule_type === "order_type") {
+      next.orderTypes = ruleValues
+        .map((row) => parseCatalogueOrderType(row.value_code))
+        .filter((value): value is NonNullable<typeof value> => Boolean(value));
     }
   }
 
@@ -95,7 +103,9 @@ export async function loadCatalogueRulesForVouchers(
   if (ruleIds.length > 0) {
     const { data: valueRows, error: valueError } = await supabase
       .from("library_voucher_rule_values")
-      .select("rule_id, cake_id, cake_size_id, size_label, library_cakes(name)")
+      .select(
+        "rule_id, cake_id, cake_size_id, size_label, value_code, library_cakes(name)",
+      )
       .in("rule_id", ruleIds);
     if (valueError) {
       throw new Error(valueError.message);
@@ -148,6 +158,7 @@ export async function replaceLibraryVoucherRules(
       cake_id?: string | null;
       cake_size_id?: string | null;
       size_label?: string | null;
+      value_code?: string | null;
     }>,
   ) {
     const { data, error } = await supabase
@@ -173,6 +184,7 @@ export async function replaceLibraryVoucherRules(
           cake_id: value.cake_id ?? null,
           cake_size_id: value.cake_size_id ?? null,
           size_label: value.size_label ?? null,
+          value_code: value.value_code ?? null,
         })),
       );
     if (valueError) {
@@ -211,6 +223,13 @@ export async function replaceLibraryVoucherRules(
       "cake",
       {},
       rules.cakeIds.map((cake_id) => ({ cake_id })),
+    );
+  }
+  if (rules.orderTypes.length > 0) {
+    await insertRule(
+      "order_type",
+      {},
+      rules.orderTypes.map((value_code) => ({ value_code })),
     );
   }
 }

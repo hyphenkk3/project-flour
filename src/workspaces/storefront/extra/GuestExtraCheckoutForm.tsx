@@ -112,6 +112,7 @@ import {
   writeFreshPickCart,
 } from "@/workspaces/storefront/extra/fresh-pick-cart";
 import { useFreshPickCart } from "@/workspaces/storefront/extra/useFreshPickCart";
+import { CatalogueVoucherCheckoutField } from "@/workspaces/storefront/offers/CatalogueVoucherCheckoutField";
 
 const initialState: ExtraOrderState = { error: null };
 
@@ -534,6 +535,7 @@ export function GuestExtraCheckoutForm({
           type="hidden"
           value={deliveryProcessingFeeAckJson}
         />
+        <CatalogueVoucherCheckoutField />
 
         <section className="space-y-3">
           <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">

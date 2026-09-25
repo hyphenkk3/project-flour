@@ -177,6 +177,12 @@ function HomeHeroHeader() {
           </Link>
           <Link
             className="hover:text-ink active:opacity-70 transition-colors duration-200"
+            href="/offers"
+          >
+            Current Offers
+          </Link>
+          <Link
+            className="hover:text-ink active:opacity-70 transition-colors duration-200"
             href="/extra"
           >
             Fresh Picks

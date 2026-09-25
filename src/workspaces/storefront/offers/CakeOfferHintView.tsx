@@ -1,0 +1,59 @@
+"use client";
+
+import { useMemo, useSyncExternalStore } from "react";
+import Link from "next/link";
+import {
+  catalogueVoucherAllowsOrderType,
+  formatCatalogueVoucherHeadline,
+  summarizeCatalogueVoucherRules,
+} from "@/engines/vouchers/catalogue-voucher";
+import type { CatalogueVoucherRecord } from "@/types/catalogue-voucher";
+import { freshPickCartHasItems, readFreshPickCart } from "@/workspaces/storefront/extra/fresh-pick-cart";
+import { FRESH_PICK_CART_CHANGED_EVENT } from "@/workspaces/storefront/extra/fresh-pick-cart";
+
+function subscribeFreshPickCart(onChange: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(FRESH_PICK_CART_CHANGED_EVENT, onChange);
+  return () => window.removeEventListener(FRESH_PICK_CART_CHANGED_EVENT, onChange);
+}
+
+export function CakeOfferHintView({
+  vouchers,
+}: {
+  vouchers: CatalogueVoucherRecord[];
+}) {
+  const freshPickCart = useSyncExternalStore(
+    subscribeFreshPickCart,
+    readFreshPickCart,
+    () => null,
+  );
+  const knownFreshPick = freshPickCartHasItems(freshPickCart);
+  const voucher = useMemo(() => {
+    return (
+      vouchers.find((entry) =>
+        knownFreshPick
+          ? catalogueVoucherAllowsOrderType(entry.rules, "fresh_pick")
+          : true,
+      ) ?? null
+    );
+  }, [knownFreshPick, vouchers]);
+  if (!voucher) return null;
+  const details = summarizeCatalogueVoucherRules(voucher);
+
+  return (
+    <aside className="border-fog mt-6 rounded-[10px] border bg-white px-4 py-3">
+      <p className="text-signal text-[11px] font-medium tracking-[0.16em] uppercase">
+        {formatCatalogueVoucherHeadline(voucher)}
+      </p>
+      <p className="text-ink mt-1 text-sm font-medium">{voucher.code}</p>
+      {details.length > 0 ? (
+        <p className="text-skyline mt-1 text-sm">{details.join(" · ")}</p>
+      ) : null}
+      <p className="mt-2">
+        <Link className="text-ink hover:text-skyline text-sm font-medium" href="/offers">
+          View details
+        </Link>
+      </p>
+    </aside>
+  );
+}

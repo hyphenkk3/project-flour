@@ -1,8 +1,12 @@
 import {
   emptyCatalogueRules,
   normalizeCatalogueSizeLabel,
+  parseCatalogueOrderType,
 } from "@/engines/vouchers/catalogue-voucher";
-import type { CatalogueVoucherRules } from "@/types/catalogue-voucher";
+import type {
+  CatalogueOrderType,
+  CatalogueVoucherRules,
+} from "@/types/catalogue-voucher";
 import { parseOptionalDate } from "@/workspaces/library/labels";
 
 function uniqueStrings(values: string[]): string[] {
@@ -35,6 +39,17 @@ export function parseCatalogueRulesFromForm(
   const sizeLabels = uniqueStrings(
     formData.getAll("eligible_size").map((value) => String(value)),
   );
+  const orderTypeRaw = uniqueStrings(
+    formData.getAll("eligible_order_type").map((value) => String(value)),
+  );
+  const orderTypes: CatalogueOrderType[] = [];
+  for (const value of orderTypeRaw) {
+    const parsedType = parseCatalogueOrderType(value);
+    if (!parsedType) {
+      return "One or more eligible order types are not valid.";
+    }
+    orderTypes.push(parsedType);
+  }
 
   if (orderFrom && orderUntil && orderUntil < orderFrom) {
     return "Order date until must be on or after order date from.";
@@ -80,6 +95,7 @@ export function parseCatalogueRulesFromForm(
     cakeIds,
     sizeLabels,
     cakeNames: [],
+    orderTypes,
   };
 }
 
@@ -89,7 +105,8 @@ export function catalogueRulesAreEmpty(rules: CatalogueVoucherRules): boolean {
     rules.fulfilmentDate == null &&
     rules.minimumCakeSubtotal == null &&
     rules.cakeIds.length === 0 &&
-    rules.sizeLabels.length === 0
+    rules.sizeLabels.length === 0 &&
+    rules.orderTypes.length === 0
   );
 }
 

@@ -349,6 +349,15 @@ export async function submitGuestExtraOrderAction(
   }
 
   await setGuestPreorderReceiptCookie(orderId);
+  const catalogueVoucherId = String(
+    formData.get("catalogue_voucher_id") ?? "",
+  ).trim();
+  if (catalogueVoucherId) {
+    const { applyGuestCatalogueVoucherAction } = await import(
+      "@/workspaces/vouchers/catalogue-actions"
+    );
+    await applyGuestCatalogueVoucherAction(orderId, catalogueVoucherId);
+  }
   scheduleStaffNotificationDispatch();
   return { error: null, orderId };
 }

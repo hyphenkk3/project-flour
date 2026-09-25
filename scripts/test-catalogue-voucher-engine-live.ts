@@ -102,7 +102,51 @@ async function main() {
   );
   assert.equal(found, true, "active catalogue voucher should be discoverable");
 
+  const { data: typeRule, error: typeRuleError } = await admin
+    .from("library_voucher_rules")
+    .insert({
+      voucher_id: voucher.id,
+      rule_type: "order_type",
+    })
+    .select("id")
+    .single();
+  if (typeRuleError || !typeRule) {
+    await admin.from("library_vouchers").delete().eq("id", voucher.id);
+    throw new Error(typeRuleError?.message ?? "Could not create order_type rule.");
+  }
+  const { error: valueError } = await admin
+    .from("library_voucher_rule_values")
+    .insert({
+      rule_id: typeRule.id,
+      value_code: "preorder",
+    });
+  if (valueError) {
+    await admin.from("library_vouchers").delete().eq("id", voucher.id);
+    throw new Error(valueError.message);
+  }
+
+  const listedWithType = await admin.rpc("list_public_catalogue_vouchers");
+  const publicVoucher = (
+    listedWithType.data as Array<{
+      code?: string;
+      rules?: Array<{
+        rule_type?: string;
+        values?: Array<{ value_code?: string | null }>;
+      }>;
+    }> | null
+  )?.find((row) => row.code === code);
+  assert.ok(publicVoucher, "order-type voucher should remain discoverable");
+  assert.ok(
+    publicVoucher?.rules?.some(
+      (rule) =>
+        rule.rule_type === "order_type" &&
+        rule.values?.some((value) => value.value_code === "preorder"),
+    ),
+    "public list should include the order-type rule",
+  );
+
   await admin.from("library_voucher_rules").delete().eq("id", rule.id);
+  await admin.from("library_voucher_rules").delete().eq("id", typeRule.id);
   await admin.from("library_vouchers").delete().eq("id", voucher.id);
   console.log("catalogue voucher live DEV probe passed");
 }

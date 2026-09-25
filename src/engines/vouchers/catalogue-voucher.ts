@@ -18,10 +18,14 @@ import type {
   CatalogueEligibilityInput,
   CatalogueEligibilityResult,
   CatalogueOrderItem,
+  CatalogueOrderType,
   CatalogueVoucherRecord,
   CatalogueVoucherRules,
 } from "@/types/catalogue-voucher";
-import { CATALOGUE_VOUCHER_ADJUSTMENT_CODE } from "@/types/catalogue-voucher";
+import {
+  CATALOGUE_ORDER_TYPES,
+  CATALOGUE_VOUCHER_ADJUSTMENT_CODE,
+} from "@/types/catalogue-voucher";
 import type { LibraryVoucherType } from "@/types/library-voucher";
 
 export { CATALOGUE_VOUCHER_ADJUSTMENT_CODE };
@@ -34,7 +38,52 @@ export function emptyCatalogueRules(): CatalogueVoucherRules {
     cakeIds: [],
     sizeLabels: [],
     cakeNames: [],
+    orderTypes: [],
   };
+}
+
+export function catalogueOrderTypeFromExtraStockId(
+  extraStockId: string | null | undefined,
+): CatalogueOrderType {
+  return extraStockId ? "fresh_pick" : "preorder";
+}
+
+export function formatCatalogueOrderTypeLabel(
+  orderType: CatalogueOrderType,
+): string {
+  return orderType === "fresh_pick" ? "Fresh Picks" : "Pre-order";
+}
+
+export function parseCatalogueOrderType(
+  value: string | null | undefined,
+): CatalogueOrderType | null {
+  const key = String(value ?? "").trim().toLowerCase();
+  return (CATALOGUE_ORDER_TYPES as readonly string[]).includes(key)
+    ? (key as CatalogueOrderType)
+    : null;
+}
+
+export function catalogueVoucherAllowsOrderType(
+  rules: CatalogueVoucherRules,
+  orderType: CatalogueOrderType,
+): boolean {
+  return (
+    rules.orderTypes.length === 0 || rules.orderTypes.includes(orderType)
+  );
+}
+
+export function summarizeCatalogueOrderTypes(
+  orderTypes: CatalogueOrderType[],
+): string | null {
+  if (orderTypes.length === 0) return null;
+  const hasPreorder = orderTypes.includes("preorder");
+  const hasFreshPick = orderTypes.includes("fresh_pick");
+  if (hasPreorder && hasFreshPick) {
+    return "Eligible for: Pre-order · Fresh Picks";
+  }
+  if (hasPreorder) return "Pre-order only";
+  if (hasFreshPick) return "Fresh Picks only";
+  return null;
 }
 
 export const COMMON_CATALOGUE_SIZE_LABELS = ['4"', '6"', '8"'] as const;
@@ -348,6 +397,22 @@ export function evaluateCatalogueVoucherEligibility(
     pushCondition(ok ? passed : failed, condition);
   }
 
+  if (voucher.rules.orderTypes.length > 0) {
+    const ok = catalogueVoucherAllowsOrderType(
+      voucher.rules,
+      input.orderType,
+    );
+    const condition = {
+      key: "order_type",
+      label: "Order type",
+      passed: ok,
+      detail: ok
+        ? `${formatCatalogueOrderTypeLabel(input.orderType)} is eligible.`
+        : `${formatCatalogueOrderTypeLabel(input.orderType)} is not eligible for this voucher.`,
+    };
+    pushCondition(ok ? passed : failed, condition);
+  }
+
   const needsLine =
     voucher.rules.cakeIds.length > 0 || voucher.rules.sizeLabels.length > 0;
   const qualifying = needsLine
@@ -420,6 +485,10 @@ export function summarizeCatalogueVoucherRules(
         ? `Cakes ${voucher.rules.cakeNames.join(", ")}`
         : "Selected cakes only",
     );
+  }
+  const orderTypeLine = summarizeCatalogueOrderTypes(voucher.rules.orderTypes);
+  if (orderTypeLine) {
+    lines.push(orderTypeLine);
   }
   return lines;
 }

@@ -55,6 +55,7 @@ function input(
     hasAugustPromo: false,
     hasRm10Card: false,
     hasCatalogueVoucher: false,
+    orderType: "preorder",
     items: [
       {
         cakeId: "pistachio",
@@ -458,6 +459,109 @@ if (typeof parsed !== "string") {
   assert.equal(parsed.minimumCakeSubtotal, 100);
   assert.deepEqual(parsed.sizeLabels, ['6"']);
   assert.deepEqual(parsed.cakeIds, ["cake-1"]);
+  assert.deepEqual(parsed.orderTypes, []);
 }
+
+const preorderOnly = voucher({ rules: { orderTypes: ["preorder"] } });
+const freshOnly = voucher({ rules: { orderTypes: ["fresh_pick"] } });
+const bothTypes = voucher({
+  rules: { orderTypes: ["preorder", "fresh_pick"] },
+});
+const restricted = voucher({
+  rules: {
+    ...fullRules,
+    orderTypes: ["preorder"],
+  },
+});
+
+assert.equal(
+  evaluateCatalogueVoucherEligibility(voucher(), input()).eligible,
+  true,
+);
+assert.equal(
+  evaluateCatalogueVoucherEligibility(
+    voucher(),
+    input({ orderType: "fresh_pick" }),
+  ).eligible,
+  true,
+);
+assert.equal(
+  evaluateCatalogueVoucherEligibility(preorderOnly, input()).eligible,
+  true,
+);
+assert.equal(
+  evaluateCatalogueVoucherEligibility(
+    preorderOnly,
+    input({ orderType: "fresh_pick" }),
+  ).eligible,
+  false,
+);
+assert.equal(
+  evaluateCatalogueVoucherEligibility(
+    freshOnly,
+    input({ orderType: "fresh_pick" }),
+  ).eligible,
+  true,
+);
+assert.equal(
+  evaluateCatalogueVoucherEligibility(freshOnly, input()).eligible,
+  false,
+);
+assert.equal(
+  evaluateCatalogueVoucherEligibility(bothTypes, input()).eligible,
+  true,
+);
+assert.equal(
+  evaluateCatalogueVoucherEligibility(
+    bothTypes,
+    input({ orderType: "fresh_pick" }),
+  ).eligible,
+  true,
+);
+assert.equal(
+  evaluateCatalogueVoucherEligibility(
+    restricted,
+    input({ orderType: "fresh_pick" }),
+  ).eligible,
+  false,
+);
+
+const applyMigration = readSrc(
+  "supabase/migrations/20260925100000_catalogue_voucher_order_type.sql",
+);
+assert.match(applyMigration, /extra_stock_id/);
+assert.match(applyMigration, /This voucher is not available for this order type/);
+assert.match(applyMigration, /value_code/);
+assert.doesNotMatch(applyMigration, /physical_discount_vouchers/);
+
+assert.match(cartSrc, /orderType/);
+assert.match(
+  readSrc("src/workspaces/storefront/extra/FreshPickCartShell.tsx"),
+  /orderType="fresh_pick"/,
+);
+assert.match(
+  readSrc("src/workspaces/owner/orders/CatalogueVoucherPaymentPanel.tsx"),
+  /evaluateOrderCatalogueVouchers/,
+);
+assert.match(
+  readSrc("src/engines/vouchers/catalogue-voucher-context.ts"),
+  /catalogueOrderTypeFromExtraStockId/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/home/HomeMobileNav.tsx"),
+  /href: "\/order", label: "Order"[\s\S]*href: "\/browse", label: "Browse Cakes"[\s\S]*href: "\/offers", label: "Current Offers"[\s\S]*href: "\/extra", label: "Fresh Picks"[\s\S]*href: "\/faq", label: "FAQ"/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx"),
+  /href="\/browse"[\s\S]*Browse Cakes[\s\S]*href="\/offers"[\s\S]*Current Offers[\s\S]*href="\/extra"[\s\S]*Fresh Picks[\s\S]*href="\/faq"[\s\S]*FAQ/,
+);
+assert.match(
+  readSrc("src/workspaces/library/vouchers/VoucherForm.tsx"),
+  /Eligible order type/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/offers/StorefrontOffersPage.tsx"),
+  /summarizeCatalogueVoucherRules|CatalogueOfferCard/,
+);
 
 console.log("catalogue voucher engine tests passed");

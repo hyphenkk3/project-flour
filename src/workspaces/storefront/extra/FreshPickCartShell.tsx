@@ -20,6 +20,7 @@ import {
   type FreshPickCartItem,
 } from "@/workspaces/storefront/extra/fresh-pick-cart";
 import { useFreshPickCart } from "@/workspaces/storefront/extra/useFreshPickCart";
+import { CatalogueVoucherCartPanel } from "@/workspaces/storefront/offers/CatalogueVoucherCartPanel";
 
 const DESKTOP_ORDER_RAIL_WIDTH = "20.5rem";
 
@@ -104,6 +105,19 @@ function ExtraOrderSummary({
           </dd>
         </div>
       </dl>
+      <CatalogueVoucherCartPanel
+        draft={{
+          pickupDate: cart.pickupDate,
+          items: cart.items.map((item) => ({
+            cakeId: "",
+            sizeId: item.extraStockId,
+            sizeLabel: item.sizeLabel,
+            quantity: 1,
+            unitPrice: item.unitPrice ?? 0,
+          })),
+        }}
+        orderType="fresh_pick"
+      />
       <Link
         className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200"
         href={freshPickCheckoutHref()}

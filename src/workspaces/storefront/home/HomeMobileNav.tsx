@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 
-const MENU_ITEMS = [
+export const STOREFRONT_CUSTOMER_NAV = [
   { href: "/order", label: "Order" },
   { href: "/browse", label: "Browse Cakes" },
+  { href: "/offers", label: "Current Offers" },
   { href: "/extra", label: "Fresh Picks" },
   { href: "/faq", label: "FAQ" },
 ] as const;
@@ -70,7 +71,7 @@ export function HomeMobileNav() {
           className="border-fog/80 bg-paper absolute top-full right-0 z-30 mt-1 min-w-[12.75rem] rounded-[10px] border py-1 shadow-[0_8px_30px_rgba(28,25,22,0.08)]"
           id={menuId}
         >
-          {MENU_ITEMS.map((item) => (
+          {STOREFRONT_CUSTOMER_NAV.map((item) => (
             <Link
               className="text-ink hover:bg-ink/[0.035] active:bg-ink/[0.06] flex min-h-11 items-center px-4 text-sm transition-colors duration-200"
               href={item.href}

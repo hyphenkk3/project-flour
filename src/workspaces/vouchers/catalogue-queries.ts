@@ -1,4 +1,7 @@
-import { emptyCatalogueRules } from "@/engines/vouchers/catalogue-voucher";
+import {
+  emptyCatalogueRules,
+  parseCatalogueOrderType,
+} from "@/engines/vouchers/catalogue-voucher";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -14,6 +17,7 @@ type PublicRuleValue = {
   cake_name?: string | null;
   cake_size_id?: string | null;
   size_label?: string | null;
+  value_code?: string | null;
 };
 
 type PublicRule = {
@@ -64,6 +68,10 @@ function rulesFromPublic(raw: PublicRule[] | undefined): CatalogueVoucherRules {
       next.sizeLabels = (rule.values ?? [])
         .map((value) => value.size_label)
         .filter((label): label is string => Boolean(label));
+    } else if (rule.rule_type === "order_type") {
+      next.orderTypes = (rule.values ?? [])
+        .map((value) => parseCatalogueOrderType(value.value_code))
+        .filter((value): value is NonNullable<typeof value> => Boolean(value));
     }
   }
   return next;
@@ -151,6 +159,7 @@ export type CatalogueApplyOrder = {
   id: string;
   createdAt: string;
   pickupDate: string;
+  extraStockId: string | null;
   items: Array<{
     cakeId: string;
     cakeSizeId: string;
@@ -171,7 +180,7 @@ export async function loadCatalogueApplyOrder(
   const admin = createServiceClient();
   const { data: order, error: orderError } = await admin
     .from("orders")
-    .select("id, created_at, pickup_date, customer_id")
+    .select("id, created_at, pickup_date, customer_id, extra_stock_id")
     .eq("id", orderId)
     .maybeSingle();
   if (orderError) {
@@ -197,6 +206,7 @@ export async function loadCatalogueApplyOrder(
     id: order.id,
     createdAt: order.created_at,
     pickupDate: order.pickup_date,
+    extraStockId: order.extra_stock_id ?? null,
     items: (items ?? []).map((item) => ({
       cakeId: String(item.cake_id ?? ""),
       cakeSizeId: String(item.cake_size_id ?? ""),

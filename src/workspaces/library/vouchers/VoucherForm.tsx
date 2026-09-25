@@ -210,6 +210,35 @@ export function VoucherForm({
 
         <fieldset className="space-y-2">
           <legend className="text-ink text-sm font-medium">
+            Eligible order type
+          </legend>
+          <p className="text-skyline text-xs">
+            Leave both unchecked for no order-type restriction.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <label className="text-ink inline-flex min-h-10 items-center gap-2 text-sm">
+              <input
+                defaultChecked={rules.orderTypes.includes("preorder")}
+                name="eligible_order_type"
+                type="checkbox"
+                value="preorder"
+              />
+              Pre-order
+            </label>
+            <label className="text-ink inline-flex min-h-10 items-center gap-2 text-sm">
+              <input
+                defaultChecked={rules.orderTypes.includes("fresh_pick")}
+                name="eligible_order_type"
+                type="checkbox"
+                value="fresh_pick"
+              />
+              Fresh Picks
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset className="space-y-2">
+          <legend className="text-ink text-sm font-medium">
             Eligible cake sizes
           </legend>
           <div className="flex flex-wrap gap-3">

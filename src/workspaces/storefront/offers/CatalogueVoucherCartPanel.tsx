@@ -8,8 +8,10 @@ import {
 import { evaluateDraftCatalogueVouchers } from "@/engines/vouchers/catalogue-voucher-context";
 import { singaporeDateFromIso } from "@/engines/orders/promotions";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
-import type { CatalogueVoucherRecord } from "@/types/catalogue-voucher";
-import type { PreorderDraft } from "@/workspaces/storefront/checkout/preorder-draft";
+import type {
+  CatalogueOrderType,
+  CatalogueVoucherRecord,
+} from "@/types/catalogue-voucher";
 import {
   readSelectedCatalogueVoucherId,
   subscribeCatalogueVoucherSelection,
@@ -17,7 +19,24 @@ import {
 } from "@/workspaces/storefront/offers/catalogue-voucher-selection";
 import { listPublicCatalogueVouchersAction } from "@/workspaces/vouchers/catalogue-actions";
 
-export function CatalogueVoucherCartPanel({ draft }: { draft: PreorderDraft }) {
+export type CatalogueVoucherCartDraft = {
+  pickupDate: string;
+  items: Array<{
+    cakeId: string;
+    sizeId: string;
+    sizeLabel: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
+};
+
+export function CatalogueVoucherCartPanel({
+  draft,
+  orderType = "preorder",
+}: {
+  draft: CatalogueVoucherCartDraft;
+  orderType?: CatalogueOrderType;
+}) {
   const [vouchers, setVouchers] = useState<CatalogueVoucherRecord[]>([]);
   const selectedId = useSyncExternalStore(
     subscribeCatalogueVoucherSelection,
@@ -31,8 +50,8 @@ export function CatalogueVoucherCartPanel({ draft }: { draft: PreorderDraft }) {
 
   const today = singaporeDateFromIso(new Date().toISOString());
   const evaluated = useMemo(
-    () => evaluateDraftCatalogueVouchers(vouchers, draft, today),
-    [draft, today, vouchers],
+    () => evaluateDraftCatalogueVouchers(vouchers, draft, today, orderType),
+    [draft, orderType, today, vouchers],
   );
   const applicable = evaluated.filter((row) => row.result.eligible);
   if (applicable.length === 0) return null;

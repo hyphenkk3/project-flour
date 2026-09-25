@@ -8,7 +8,12 @@ export const CATALOGUE_VOUCHER_RULE_TYPES = [
   "minimum_cake_subtotal",
   "cake_size",
   "cake",
+  "order_type",
 ] as const;
+
+export const CATALOGUE_ORDER_TYPES = ["preorder", "fresh_pick"] as const;
+
+export type CatalogueOrderType = (typeof CATALOGUE_ORDER_TYPES)[number];
 
 export type CatalogueVoucherRuleType =
   (typeof CATALOGUE_VOUCHER_RULE_TYPES)[number];
@@ -25,6 +30,7 @@ export type CatalogueVoucherRules = {
   cakeIds: string[];
   sizeLabels: string[];
   cakeNames: string[];
+  orderTypes: CatalogueOrderType[];
 };
 
 export type CatalogueVoucherRecord = {
@@ -56,6 +62,8 @@ export type CatalogueEligibilityInput = {
   hasAugustPromo: boolean;
   hasRm10Card: boolean;
   hasCatalogueVoucher: boolean;
+  /** Authoritative order class. Fresh Picks = orders.extra_stock_id is set. */
+  orderType: CatalogueOrderType;
 };
 
 export type CatalogueConditionResult = {

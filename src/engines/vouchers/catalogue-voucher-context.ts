@@ -1,8 +1,10 @@
 import {
+  catalogueOrderTypeFromExtraStockId,
   emptyCatalogueRules,
   evaluateCatalogueVoucherEligibility,
   evaluateCatalogueVouchers,
 } from "@/engines/vouchers/catalogue-voucher";
+import type { CatalogueOrderType } from "@/types/catalogue-voucher";
 import {
   AUGUST_PROMO_CODE,
   hasActiveAdjustmentCode,
@@ -68,6 +70,7 @@ export function catalogueEligibilityInputFromOrder(
       status?: string;
       reversesAdjustmentId?: string | null;
     }>;
+    extraStockId?: string | null;
   },
   today: string,
 ): CatalogueEligibilityInput {
@@ -76,6 +79,7 @@ export function catalogueEligibilityInputFromOrder(
     fulfilmentDate: order.pickupDate,
     items: catalogueItemsFromOrderItems(order.items),
     today,
+    orderType: catalogueOrderTypeFromExtraStockId(order.extraStockId),
     hasAugustPromo: hasActiveAdjustmentCode(
       order.adjustments,
       AUGUST_PROMO_CODE,
@@ -104,6 +108,7 @@ export function catalogueEligibilityInputFromDraft(
     hasAugustPromo?: boolean;
     hasRm10Card?: boolean;
     hasCatalogueVoucher?: boolean;
+    orderType?: CatalogueOrderType;
   },
 ): CatalogueEligibilityInput {
   return {
@@ -120,6 +125,7 @@ export function catalogueEligibilityInputFromDraft(
     hasAugustPromo: stacking?.hasAugustPromo === true,
     hasRm10Card: stacking?.hasRm10Card === true,
     hasCatalogueVoucher: stacking?.hasCatalogueVoucher === true,
+    orderType: stacking?.orderType ?? "preorder",
   };
 }
 
@@ -139,6 +145,7 @@ export function evaluateOrderCatalogueVouchers(
       status?: string;
       reversesAdjustmentId?: string | null;
     }>;
+    extraStockId?: string | null;
   },
   today: string,
 ) {
@@ -161,10 +168,11 @@ export function evaluateDraftCatalogueVouchers(
     }>;
   },
   today: string,
+  orderType: CatalogueOrderType = "preorder",
 ) {
   return evaluateCatalogueVouchers(
     vouchers,
-    catalogueEligibilityInputFromDraft(draft, today),
+    catalogueEligibilityInputFromDraft(draft, today, { orderType }),
   );
 }
 
