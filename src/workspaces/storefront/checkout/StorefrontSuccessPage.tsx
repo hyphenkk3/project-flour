@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import {
   FRESH_PICKS_SUCCESS_CONTACT,
@@ -18,7 +19,6 @@ import {
 } from "@/workspaces/storefront/checkout/order-details-card";
 import { SuccessReceiptRecap } from "@/workspaces/storefront/checkout/SuccessReceiptRecap";
 import { storefrontKickerClass } from "@/workspaces/storefront/StorefrontBrand";
-import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
 import { ApplySelectedCatalogueVoucher } from "@/workspaces/storefront/offers/ApplySelectedCatalogueVoucher";
 import { CATALOGUE_VOUCHER_ADJUSTMENT_CODE } from "@/types/catalogue-voucher";
 import { StorefrontSuccessPerfProbe } from "@/workspaces/storefront/checkout/StorefrontSuccessPerfProbe";
@@ -28,49 +28,42 @@ type StorefrontSuccessPageProps = {
   flow?: string;
 };
 
+function successCopy(isFreshPick: boolean) {
+  return {
+    title: isFreshPick ? FRESH_PICKS_SUCCESS_TITLE : "Order Received",
+    paymentStatus: isFreshPick
+      ? FRESH_PICKS_SUCCESS_PAYMENT
+      : ORDER_DETAILS_CARD_PAYMENT,
+    contactLine: isFreshPick
+      ? FRESH_PICKS_SUCCESS_CONTACT
+      : ORDER_DETAILS_CARD_CONTACT,
+  };
+}
+
 export async function StorefrontSuccessPage({
   orderId,
   flow,
 }: StorefrontSuccessPageProps) {
-  const { receipt, perf } = await loadSuccessPageReceipt(
-    orderId,
-    getGuestPreorderReceipt,
-  );
-  const isFreshPick =
-    flow === FRESH_PICKS_SUCCESS_FLOW || Boolean(receipt?.isFreshPick);
-  const paymentStatus = isFreshPick
-    ? FRESH_PICKS_SUCCESS_PAYMENT
-    : ORDER_DETAILS_CARD_PAYMENT;
-  const contactLine = isFreshPick
-    ? FRESH_PICKS_SUCCESS_CONTACT
-    : ORDER_DETAILS_CARD_CONTACT;
+  const isFreshPick = flow === FRESH_PICKS_SUCCESS_FLOW;
+  const { title, paymentStatus, contactLine } = successCopy(isFreshPick);
   const noticeBody = orderDetailsNoticeBody(isFreshPick);
   const noticeMark = orderDetailsNoticeMark(isFreshPick);
   const noticeMarkAt = noticeBody.indexOf(noticeMark);
 
   return (
     <main className="bg-paper mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-16 sm:px-6">
-      <StorefrontSuccessPerfProbe successServer={perf} />
+      <StorefrontSuccessPerfProbe markVisible />
       {isFreshPick ? <ClearFreshPickCartOnSuccess /> : <ClearPreorderDraftOnSuccess />}
-      <StorefrontTheme />
       <div className="text-center">
         <p className={storefrontKickerClass}>Whitebird</p>
         <h1 className="font-display text-ink mt-3 text-3xl tracking-tight sm:text-4xl">
-          {isFreshPick ? FRESH_PICKS_SUCCESS_TITLE : "Order Received"}
+          {title}
         </h1>
         <p className="text-skyline mt-4 text-base leading-relaxed">
           {paymentStatus}
           <br />
           {contactLine}
         </p>
-        <ApplySelectedCatalogueVoucher
-          alreadyApplied={Boolean(
-            receipt?.adjustments.some(
-              (row) => row.code === CATALOGUE_VOUCHER_ADJUSTMENT_CODE,
-            ),
-          )}
-          orderId={orderId}
-        />
       </div>
 
       <aside
@@ -93,9 +86,16 @@ export async function StorefrontSuccessPage({
         </p>
       </aside>
 
-      {receipt ? (
-        <SuccessReceiptRecap orderId={orderId} receipt={receipt} />
-      ) : null}
+      <Suspense
+        fallback={
+          <div
+            aria-hidden
+            className="border-fog mt-8 min-h-40 border-t pt-8"
+          />
+        }
+      >
+        <SuccessReceiptSection orderId={orderId} />
+      </Suspense>
 
       <section className="mt-8 space-y-2 text-left text-sm">
         {isFreshPick ? (
@@ -149,5 +149,30 @@ export async function StorefrontSuccessPage({
         )}
       </div>
     </main>
+  );
+}
+
+async function SuccessReceiptSection({
+  orderId,
+}: Pick<StorefrontSuccessPageProps, "orderId">) {
+  const { receipt, perf } = await loadSuccessPageReceipt(
+    orderId,
+    getGuestPreorderReceipt,
+  );
+  return (
+    <>
+      <StorefrontSuccessPerfProbe successServer={perf} />
+      <ApplySelectedCatalogueVoucher
+        alreadyApplied={Boolean(
+          receipt?.adjustments.some(
+            (row) => row.code === CATALOGUE_VOUCHER_ADJUSTMENT_CODE,
+          ),
+        )}
+        orderId={orderId}
+      />
+      {receipt ? (
+        <SuccessReceiptRecap orderId={orderId} receipt={receipt} />
+      ) : null}
+    </>
   );
 }

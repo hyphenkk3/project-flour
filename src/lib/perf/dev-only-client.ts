@@ -87,7 +87,8 @@ export function logCheckoutClient(
     | "CHECKOUT_SERVER"
     | "CHECKOUT_SERVER_SUMMARY"
     | "CHECKOUT_SUCCESS_SERVER"
-    | "CHECKOUT_SUCCESS_PHOTO",
+    | "CHECKOUT_SUCCESS_PHOTO"
+    | "CHECKOUT_NAV",
   fields: Record<string, string | number | boolean | null | undefined>,
 ): void {
   if (!canUseBrowserTools()) return;

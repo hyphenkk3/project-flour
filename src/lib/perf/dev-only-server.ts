@@ -27,6 +27,9 @@ type PerfStore = {
   correlationId: string;
   source?: string;
   steps: CheckoutServerPerfStep[];
+  serverRequestAt?: number;
+  serverReceiptDataMs?: number;
+  serverRenderMs?: number;
 };
 
 const perfStore = new AsyncLocalStorage<PerfStore>();
@@ -44,6 +47,9 @@ export function runWithPerfContext<T>(
       correlationId: store.correlationId,
       source: store.source,
       steps: store.steps ?? [],
+      serverRequestAt: store.serverRequestAt,
+      serverReceiptDataMs: store.serverReceiptDataMs,
+      serverRenderMs: store.serverRenderMs,
     },
     fn,
   );
@@ -64,6 +70,9 @@ export function snapshotDevCheckoutPerf(
       name: step.name,
       ms: Math.round(step.ms),
     })),
+    serverRequestAt: ctx.serverRequestAt,
+    serverReceiptDataMs: ctx.serverReceiptDataMs,
+    serverRenderMs: ctx.serverRenderMs,
   };
 }
 

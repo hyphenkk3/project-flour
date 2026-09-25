@@ -819,19 +819,23 @@ assert.ok(
 const recapSrc = readSrc(
   "src/workspaces/storefront/checkout/SuccessReceiptRecap.tsx",
 );
+const receiptPhotosSrc = readSrc(
+  "src/workspaces/storefront/checkout/SuccessReceiptPhotos.tsx",
+);
 assert.ok(
   successSrc.indexOf("<aside") < successSrc.indexOf("<SuccessReceiptRecap"),
 );
+assert.match(successSrc, /<Suspense/);
 assert.match(recapSrc, /Order recap/);
-assert.match(recapSrc, /CakePhotoImage/);
-assert.match(recapSrc, /item\.imageUrl/);
-assert.match(recapSrc, /items\.map/);
+assert.match(receiptPhotosSrc, /CakePhotoImage/);
+assert.match(receiptPhotosSrc, /imageUrl/);
+assert.match(recapSrc, /receipt\.items\.map/);
 assert.doesNotMatch(successSrc, /resolveCatalogueListingPhoto/);
 assert.doesNotMatch(successSrc, /storefrontCatalogueListingPhoto/);
 assert.doesNotMatch(successSrc, /status-danger/);
 assert.match(successSrc, /SuccessReceiptRecap/);
-assert.match(recapSrc, /SaveOrderDetailsButton/);
-assert.match(recapSrc, /resolveReceipt/);
+assert.match(receiptPhotosSrc, /SaveOrderDetailsButton/);
+assert.match(receiptPhotosSrc, /resolveReceipt/);
 assert.doesNotMatch(successSrc, /receipt && !isFreshPick/);
 assert.doesNotMatch(successSrc, /Email me a copy/);
 

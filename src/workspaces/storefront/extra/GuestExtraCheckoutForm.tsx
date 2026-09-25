@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -253,7 +253,7 @@ export function GuestExtraCheckoutForm({
     };
   }, [selectedDate]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!state.orderId) return;
     beginSuccessNavigationPerf();
     router.replace(

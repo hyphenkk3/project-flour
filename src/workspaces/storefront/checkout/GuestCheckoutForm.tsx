@@ -360,7 +360,7 @@ export function GuestCheckoutForm({
     }
   }, [state.error]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const orderId = state.orderId;
     if (!orderId || state.error) return;
     beginSuccessNavigationPerf();

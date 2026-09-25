@@ -1,7 +1,3 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
-import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import { formatDdMmYyyy } from "@/lib/dates";
 import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
 import {
@@ -11,13 +7,11 @@ import {
 } from "@/engines/orders/fulfilment";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
-import { SaveOrderDetailsButton } from "@/workspaces/storefront/checkout/SaveOrderDetailsButton";
-import { loadGuestReceiptPhotosAction } from "@/workspaces/storefront/checkout/receipt-photos-action";
-import type { GuestPreorderReceipt } from "@/workspaces/storefront/checkout/receipt";
 import {
-  logCheckoutClient,
-  readCheckoutSubmitTiming,
-} from "@/lib/perf/dev-only-client";
+  ReceiptPhotoBox,
+  SuccessReceiptPhotoController,
+} from "@/workspaces/storefront/checkout/SuccessReceiptPhotos";
+import type { GuestPreorderReceipt } from "@/workspaces/storefront/checkout/receipt";
 
 export function SuccessReceiptRecap({
   orderId,
@@ -26,52 +20,16 @@ export function SuccessReceiptRecap({
   orderId?: string;
   receipt: GuestPreorderReceipt;
 }) {
-  const [items, setItems] = useState(receipt.items);
-  const photosPromise = useRef<Promise<GuestPreorderReceipt> | null>(null);
-
-  useEffect(() => {
-    if (!orderId || receipt.items.length === 0) return;
-    const started = performance.now();
-    const base = receipt;
-    const pending = loadGuestReceiptPhotosAction(orderId, base.items).then(
-      (result) => {
-        const nextItems = result.items ?? base.items;
-        setItems(nextItems);
-        const timing = readCheckoutSubmitTiming();
-        logCheckoutClient("CHECKOUT_SUCCESS_PHOTO", {
-          correlationId: timing?.correlationId ?? null,
-          cake_photos: result.elapsedMs,
-          clientWaitMs: Math.round(performance.now() - started),
-        });
-        return { ...base, items: nextItems };
-      },
-    );
-    photosPromise.current = pending;
-  }, [orderId, receipt]);
-
-  async function resolveReceipt(): Promise<GuestPreorderReceipt> {
-    if (photosPromise.current) return photosPromise.current;
-    return { ...receipt, items };
-  }
-
   return (
-    <>
+    <SuccessReceiptPhotoController orderId={orderId} receipt={receipt}>
       <section className="border-fog mt-8 border-t pt-8 text-left">
         <p className="text-skyline text-[11px] font-medium tracking-[0.18em] uppercase">
           Order recap
         </p>
         <ul className="mt-3 space-y-3">
-          {items.map((item) => (
+          {receipt.items.map((item) => (
             <li className="flex items-start gap-3" key={item.key}>
-              <div className="bg-fog/40 relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] sm:h-[4.5rem] sm:w-[4.5rem]">
-                {item.imageUrl ? (
-                  <CakePhotoImage
-                    alt={item.imageAlt ?? item.cakeName}
-                    sizes="72px"
-                    src={item.imageUrl}
-                  />
-                ) : null}
-              </div>
+              <ReceiptPhotoBox item={item} />
               <div className="min-w-0 flex-1">
                 <p className="text-ink text-sm font-medium">{item.cakeName}</p>
                 <p className="text-skyline text-sm">
@@ -159,10 +117,6 @@ export function SuccessReceiptRecap({
           ) : null}
         </dl>
       </section>
-      <SaveOrderDetailsButton
-        receipt={{ ...receipt, items }}
-        resolveReceipt={resolveReceipt}
-      />
-    </>
+    </SuccessReceiptPhotoController>
   );
 }

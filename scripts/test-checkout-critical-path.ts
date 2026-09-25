@@ -250,9 +250,18 @@ assert.equal(
 
 assert.match(orderDetailsSrc, /receipt\.adjustments/);
 assert.match(successSrc, /SuccessReceiptRecap/);
+assert.match(successSrc, /<Suspense/);
 assert.match(
-  readSrc("src/workspaces/storefront/checkout/SuccessReceiptRecap.tsx"),
+  readSrc("src/workspaces/storefront/checkout/SuccessReceiptPhotos.tsx"),
   /SaveOrderDetailsButton/,
+);
+assert.match(
+  formSrc,
+  /useLayoutEffect\(\(\) => \{[\s\S]*beginSuccessNavigationPerf/,
+);
+assert.match(
+  extraFormSrc,
+  /useLayoutEffect\(\(\) => \{[\s\S]*beginSuccessNavigationPerf/,
 );
 assert.match(crewPreviewSrc, /getEffectiveAdjustments\(order\.adjustments\)/);
 assert.match(crewPreviewSrc, /settlement\.amountDue/);

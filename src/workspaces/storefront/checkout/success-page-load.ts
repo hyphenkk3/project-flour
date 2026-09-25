@@ -1,6 +1,7 @@
 import { getGuestPreorderReceipt } from "@/workspaces/storefront/checkout/receipt";
 import {
   createPerfCorrelationId,
+  getPerfContext,
   logPerf,
   runWithPerfContext,
   snapshotDevCheckoutPerf,
@@ -17,29 +18,29 @@ export async function loadSuccessPageReceipt(
   loadReceipt: typeof getGuestPreorderReceipt = getGuestPreorderReceipt,
 ): Promise<SuccessPageLoadResult> {
   const correlationId = createPerfCorrelationId();
+  const serverRequestAt = Date.now();
   const pageStarted = performance.now();
   return runWithPerfContext(
-    { correlationId, source: "success_page" },
+    { correlationId, source: "success_page", serverRequestAt },
     async () => {
       logPerf("CHECKOUT_SUCCESS", "page_start", 0);
       const receiptStarted = performance.now();
       const loaded = orderId ? await loadReceipt(orderId) : null;
-      logPerf(
-        "CHECKOUT_SUCCESS",
-        "receipt_loading",
-        performance.now() - receiptStarted,
-        { hasOrderId: Boolean(orderId) },
-      );
-      logPerf(
-        "CHECKOUT_SUCCESS",
-        "page_data_ready",
-        performance.now() - pageStarted,
-      );
-      const totalMs = performance.now() - pageStarted;
-      logPerf("CHECKOUT_SUCCESS", "TOTAL", totalMs);
+      const receiptMs = performance.now() - receiptStarted;
+      logPerf("CHECKOUT_SUCCESS", "receipt_loading", receiptMs, {
+        hasOrderId: Boolean(orderId),
+      });
+      const pageMs = performance.now() - pageStarted;
+      logPerf("CHECKOUT_SUCCESS", "page_data_ready", pageMs);
+      const ctx = getPerfContext();
+      if (ctx) {
+        ctx.serverReceiptDataMs = Math.round(receiptMs);
+        ctx.serverRenderMs = Math.round(pageMs - receiptMs);
+      }
+      logPerf("CHECKOUT_SUCCESS", "TOTAL", pageMs);
       return {
         receipt: loaded,
-        perf: snapshotDevCheckoutPerf(totalMs),
+        perf: snapshotDevCheckoutPerf(pageMs),
       };
     },
   );

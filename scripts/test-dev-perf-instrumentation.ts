@@ -105,9 +105,23 @@ assert.match(
   /async \(\) => \{\s*const started = performance\.now\(\);[\s\S]*order_adjustments/,
 );
 assert.match(clientHelperSrc, /CHECKOUT_SUCCESS_PHOTO/);
+assert.match(clientHelperSrc, /CHECKOUT_NAV/);
 assert.match(
-  readSrc("src/workspaces/storefront/checkout/SuccessReceiptRecap.tsx"),
+  readSrc("src/workspaces/storefront/checkout/SuccessReceiptPhotos.tsx"),
   /CHECKOUT_SUCCESS_PHOTO/,
+);
+assert.match(probeSrc, /CHECKOUT_NAV/);
+assert.match(probeSrc, /useLayoutEffect/);
+assert.match(probeSrc, /navigationStartToServerStartMs/);
+assert.match(probeSrc, /navigationToClientCommitMs/);
+assert.match(probeSrc, /clientCommitToVisibleMs/);
+assert.match(
+  formSrc,
+  /useLayoutEffect\(\(\) => \{[\s\S]*beginSuccessNavigationPerf/,
+);
+assert.match(
+  extraFormSrc,
+  /useLayoutEffect\(\(\) => \{[\s\S]*beginSuccessNavigationPerf/,
 );
 assert.match(receiptSrc, /\.is\("customer_id", null\)/);
 assert.doesNotMatch(receiptSrc, /evaluateCatalogueVoucher/);
@@ -116,12 +130,15 @@ assert.doesNotMatch(receiptSrc, /\.insert\(/);
 
 assert.match(successSrc, /getGuestPreorderReceipt/);
 assert.match(successSrc, /loadSuccessPageReceipt/);
-assert.match(successSrc, /<StorefrontSuccessPerfProbe successServer=\{perf\} \/>/);
+assert.match(successSrc, /<StorefrontSuccessPerfProbe/);
+assert.match(successSrc, /markVisible/);
+assert.match(successSrc, /<Suspense/);
 assert.match(successSrc, /<SuccessReceiptRecap orderId=\{orderId\} receipt=\{receipt\} \/>/);
 assert.match(
-  readSrc("src/workspaces/storefront/checkout/SuccessReceiptRecap.tsx"),
+  readSrc("src/workspaces/storefront/checkout/SuccessReceiptPhotos.tsx"),
   /SaveOrderDetailsButton/,
 );
+assert.doesNotMatch(successSrc, /<StorefrontTheme/);
 assert.match(formSrc, /router\.replace\(`\/order\/success\?order=\$\{orderId\}`\)/);
 assert.match(formSrc, /Preparing your preorder…/);
 assert.match(pageSrc, /Preparing your preorder…/);
@@ -143,6 +160,9 @@ assert.match(checkoutPerfSrc, /logCheckoutServerPerf/);
 assert.match(formSrc, /useCheckoutActionReturnPerf\(pending, "preorder", state\.perf\)/);
 assert.match(extraFormSrc, /useCheckoutActionReturnPerf\(pending, "extra", state\.perf\)/);
 assert.match(successSrc, /successServer=\{perf\}/);
+assert.match(successLoadSrc, /serverRequestAt/);
+assert.match(successLoadSrc, /serverReceiptDataMs/);
+assert.match(successLoadSrc, /serverRenderMs/);
 assert.match(successLoadSrc, /snapshotDevCheckoutPerf/);
 assert.match(probeSrc, /CHECKOUT_SUCCESS_SERVER/);
 assert.match(probeSrc, /consumeCheckoutServerLogKey/);

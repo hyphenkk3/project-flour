@@ -46,6 +46,10 @@ export type CheckoutServerPerf = {
   correlationId: string;
   totalServerMs: number;
   steps: CheckoutServerPerfStep[];
+  /** Epoch ms when the success-page request began. DEV only. */
+  serverRequestAt?: number;
+  serverReceiptDataMs?: number;
+  serverRenderMs?: number;
 };
 
 export function attachCheckoutServerPerf<T extends object>(
