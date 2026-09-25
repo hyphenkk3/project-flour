@@ -96,6 +96,8 @@ function sampleReceipt(
     guestCount: null,
     dineInVenue: null,
     reservationTime: null,
+    subtotal: 351,
+    adjustments: [],
     total: 351,
     placedAt: "2026-09-09T00:38:00.000Z",
     isFreshPick: false,
@@ -150,6 +152,8 @@ assert.equal(model.complimentary[0]?.name, "Candle");
 assert.match(model.complimentary[0]?.meta ?? "", /Complimentary/);
 assert.equal(model.complimentary[0]?.price, null);
 assert.equal(model.total, "RM351");
+assert.equal(model.subtotal, null);
+assert.deepEqual(model.adjustments, []);
 assert.equal(model.notes, "Write Happy Birthday on the card.");
 assert.doesNotMatch(model.customer, /email/i);
 
@@ -227,6 +231,130 @@ assert.equal(
 assert.equal(dineIn.notes, null);
 assert.equal(dineIn.addons.length, 0);
 assert.equal(dineIn.complimentary.length, 0);
+assert.equal(dineIn.subtotal, null);
+assert.deepEqual(dineIn.adjustments, []);
+
+const octoberVoucherReceipt = sampleReceipt({
+  orderNumber: "WB-1401",
+  items: [
+    {
+      key: "egp",
+      cakeId: "earl-grey",
+      cakeSizeId: "size-6",
+      cakeName: "Earl Grey Pistachio",
+      sizeLabel: '6"',
+      quantity: 1,
+      unitPrice: 140,
+      imageUrl: null,
+      imageAlt: null,
+    },
+  ],
+  paidAddons: [],
+  complimentaryItems: [],
+  notes: null,
+  subtotal: 140,
+  adjustments: [
+    {
+      code: "catalogue_voucher",
+      label: "OCT265",
+      amount: -5,
+    },
+  ],
+  total: 135,
+});
+const octoberModel = buildOrderDetailsCardModel(octoberVoucherReceipt);
+assert.equal(octoberModel.cakes[0]?.name, "Earl Grey Pistachio");
+assert.equal(octoberModel.cakes[0]?.price, "RM140");
+assert.equal(octoberModel.subtotal, "RM140");
+assert.equal(octoberModel.adjustments.length, 1);
+assert.equal(octoberModel.adjustments[0]?.label, "OCT265");
+assert.equal(octoberModel.adjustments[0]?.amount, "-RM5");
+assert.equal(octoberModel.total, "RM135");
+
+const otherVoucherModel = buildOrderDetailsCardModel(
+  sampleReceipt({
+    items: [
+      {
+        key: "egp",
+        cakeId: "earl-grey",
+        cakeSizeId: "size-6",
+        cakeName: "Earl Grey Pistachio",
+        sizeLabel: '6"',
+        quantity: 1,
+        unitPrice: 140,
+        imageUrl: null,
+        imageAlt: null,
+      },
+    ],
+    paidAddons: [],
+    complimentaryItems: [],
+    subtotal: 140,
+    adjustments: [
+      {
+        code: "catalogue_voucher",
+        label: "NOV10",
+        amount: -10,
+      },
+    ],
+    total: 130,
+  }),
+);
+assert.equal(otherVoucherModel.adjustments[0]?.label, "NOV10");
+assert.equal(otherVoucherModel.adjustments[0]?.amount, "-RM10");
+assert.equal(otherVoucherModel.total, "RM130");
+assert.doesNotMatch(otherVoucherModel.adjustments[0]?.label ?? "", /OCT265/);
+
+const rm10Model = buildOrderDetailsCardModel(
+  sampleReceipt({
+    subtotal: 140,
+    adjustments: [
+      {
+        code: "rm10_physical_card",
+        label: "RM10 Discount Card",
+        amount: -10,
+        metadata: { voucher_number: "12345" },
+      },
+    ],
+    total: 130,
+  }),
+);
+assert.equal(rm10Model.adjustments[0]?.label, "RM10 Discount Card #12345");
+assert.equal(rm10Model.adjustments[0]?.amount, "-RM10");
+assert.equal(rm10Model.total, "RM130");
+
+const augustModel = buildOrderDetailsCardModel(
+  sampleReceipt({
+    subtotal: 140,
+    adjustments: [
+      {
+        code: "august_promo_2026",
+        label: "August Promo",
+        amount: -20,
+      },
+    ],
+    total: 120,
+  }),
+);
+assert.equal(augustModel.adjustments[0]?.label, "August Promo");
+assert.equal(augustModel.adjustments[0]?.amount, "-RM20");
+assert.equal(augustModel.total, "RM120");
+
+const correctionModel = buildOrderDetailsCardModel(
+  sampleReceipt({
+    subtotal: 140,
+    adjustments: [
+      {
+        code: "payment_correction",
+        label: "Payment correction",
+        amount: 5,
+      },
+    ],
+    total: 145,
+  }),
+);
+assert.equal(correctionModel.adjustments[0]?.label, "Payment correction");
+assert.equal(correctionModel.adjustments[0]?.amount, "+RM5");
+assert.equal(correctionModel.total, "RM145");
 
 assert.equal(orderDetailsFileName("WB-1001"), "whitebird-order-WB-1001.png");
 assert.equal(orderDetailsFileName(null), "whitebird-order-details.png");
@@ -437,6 +565,36 @@ assertReceiptLayout(sampleReceipt(), {
   complimentary: ["Candle"],
   notes: "Write Happy Birthday on the card.",
 });
+assertReceiptLayout(octoberVoucherReceipt, {
+  cakes: ["Earl Grey Pistachio"],
+  sizes: ['6"'],
+  quantities: ["× 1"],
+  prices: ["RM140", "-RM5", "RM135"],
+});
+{
+  const { ctx, texts } = createMockCtx();
+  drawOrderDetailsCard(ctx, buildOrderDetailsCardModel(octoberVoucherReceipt));
+  const joined = reconstructedLines(texts)
+    .map((line) => line.text)
+    .join("\n");
+  assert.match(joined, /SUBTOTAL/);
+  assert.match(joined, /OCT265/);
+  assert.match(joined, /-RM5/);
+  assert.match(joined, /RM135/);
+  assert.equal((joined.match(/OCT265/g) ?? []).length, 1);
+  assert.equal((joined.match(/-RM5/g) ?? []).length, 1);
+  assert.doesNotMatch(joined, /evaluateCatalogueVoucher/);
+}
+
+{
+  const { ctx, texts } = createMockCtx();
+  drawOrderDetailsCard(ctx, buildOrderDetailsCardModel(sampleReceipt()));
+  const joined = reconstructedLines(texts)
+    .map((line) => line.text)
+    .join("\n");
+  assert.doesNotMatch(joined, /SUBTOTAL/);
+  assert.doesNotMatch(joined, /OCT265/);
+}
 
 assertReceiptLayout(
   sampleReceipt({
@@ -712,6 +870,12 @@ assert.match(receiptSrc, /guest_name/);
 assert.match(receiptSrc, /guest_phone/);
 assert.match(receiptSrc, /order_paid_addons/);
 assert.match(receiptSrc, /calculateCommercialSubtotal/);
+assert.match(receiptSrc, /order_adjustments/);
+assert.match(receiptSrc, /getEffectiveAdjustments/);
+assert.match(receiptSrc, /calculateOrderSettlement/);
+assert.doesNotMatch(receiptSrc, /evaluateCatalogueVoucher/);
+assert.doesNotMatch(receiptSrc, /apply_catalogue_voucher_to_guest_order/);
+assert.doesNotMatch(receiptSrc, /\.insert\(/);
 assert.doesNotMatch(
   receiptSrc,
   /from\("orders"\)[\s\S]*eq\("id", orderId\)[\s\S]*maybeSingle\(\)[\s\S]*return data/,
@@ -725,6 +889,12 @@ assert.match(cardSrc, /navigator\.share|nav\.share/);
 assert.match(cardSrc, /download/);
 assert.match(cardSrc, /complimentaryItems/);
 assert.match(cardSrc, /Complimentary/);
+assert.match(cardSrc, /customerFacingAdjustmentLabel/);
+assert.match(cardSrc, /formatSignedRm/);
+assert.match(cardSrc, /SUBTOTAL/);
+assert.doesNotMatch(cardSrc, /evaluateCatalogueVoucher/);
+assert.doesNotMatch(cardSrc, /OCT265/);
+assert.doesNotMatch(cardSrc, /apply_catalogue_voucher_to_guest_order/);
 assert.match(cardSrc, /ORDER_DETAILS_PNG_WIDTH = 1080/);
 assert.match(cardSrc, /ORDER_DETAILS_PNG_HEIGHT = 1800/);
 assert.match(cardSrc, /Order placed/);

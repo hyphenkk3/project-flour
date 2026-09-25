@@ -9,6 +9,10 @@ import {
   formatLongBusinessDayMonthYear,
 } from "@/lib/dates";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
+import {
+  customerFacingAdjustmentLabel,
+  formatSignedRm,
+} from "@/engines/orders/payment-message";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type { GuestPreorderReceipt } from "@/workspaces/storefront/checkout/receipt";
 
@@ -116,6 +120,8 @@ export type OrderDetailsCardModel = {
   cakes: OrderDetailsCardLine[];
   addons: OrderDetailsCardLine[];
   complimentary: OrderDetailsCardLine[];
+  subtotal: string | null;
+  adjustments: Array<{ label: string; amount: string }>;
   total: string;
   notes: string | null;
   footer: string;
@@ -180,6 +186,14 @@ export function buildOrderDetailsCardModel(
       name: item.name,
       meta: `× ${item.quantity} · Complimentary`,
       price: null,
+    })),
+    subtotal:
+      (receipt.adjustments ?? []).length > 0
+        ? formatRm(receipt.subtotal ?? receipt.total)
+        : null,
+    adjustments: (receipt.adjustments ?? []).map((adjustment) => ({
+      label: customerFacingAdjustmentLabel(adjustment),
+      amount: formatSignedRm(adjustment.amount),
     })),
     total: formatRm(receipt.total),
     notes: receipt.notes,
@@ -914,6 +928,43 @@ export function drawOrderDetailsCard(
     const afterOrder = y;
     ops.push(() => rule(ctx, afterOrder));
     y += block(28);
+
+    if (model.subtotal && model.adjustments.length > 0) {
+      const summaryFont = `400 ${fs(17)}px ${sansFont}`;
+      const subtotalY = y;
+      ops.push(() => {
+        ctx.fillStyle = SKYLINE;
+        ctx.font = totalLabelFont;
+        fillSpacedText(
+          ctx,
+          "SUBTOTAL",
+          PAD_X,
+          subtotalY,
+          emTracking(sectionSize, 0.18),
+        );
+        ctx.fillStyle = INK;
+        ctx.font = summaryFont;
+        ctx.textAlign = "right";
+        ctx.fillText(model.subtotal ?? "", PAD_X + CONTENT_WIDTH, subtotalY);
+        ctx.textAlign = "left";
+      });
+      y += line(28);
+      for (const adjustment of model.adjustments) {
+        const adjY = y;
+        const adjLabel = adjustment.label;
+        const adjAmount = adjustment.amount;
+        ops.push(() => {
+          ctx.fillStyle = INK;
+          ctx.font = summaryFont;
+          ctx.fillText(adjLabel, PAD_X, adjY);
+          ctx.textAlign = "right";
+          ctx.fillText(adjAmount, PAD_X + CONTENT_WIDTH, adjY);
+          ctx.textAlign = "left";
+        });
+        y += line(28);
+      }
+      y += block(10);
+    }
 
     const totalLabelY = y;
     ops.push(() => {

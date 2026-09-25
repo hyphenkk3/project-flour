@@ -1,5 +1,7 @@
 import { cookies, headers } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/admin";
+import { getEffectiveAdjustments } from "@/engines/orders/promotions";
+import { calculateOrderSettlement } from "@/engines/orders/settlement";
 import { calculateCommercialSubtotal } from "@/engines/orders/totals";
 import { isMissingCakePhotoSchema } from "@/workspaces/library/cakes/photo-storage";
 import {
@@ -36,6 +38,13 @@ export type GuestPreorderReceiptComplimentary = {
   quantity: number;
 };
 
+export type GuestPreorderReceiptAdjustment = {
+  code: string | null;
+  label: string;
+  amount: number;
+  metadata?: Record<string, unknown> | null;
+};
+
 export type GuestPreorderReceipt = {
   orderNumber: string | null;
   guestName: string;
@@ -50,6 +59,10 @@ export type GuestPreorderReceipt = {
   guestCount: number | null;
   dineInVenue: "hyphen" | "whitebird" | null;
   reservationTime: string | null;
+  /** Commercial cakes + paid add-ons before effective adjustments. */
+  subtotal: number;
+  adjustments: GuestPreorderReceiptAdjustment[];
+  /** Settlement amount due after effective adjustments. */
   total: number;
   /** ISO timestamptz from `orders.created_at`. Order submission, not pickup. */
   placedAt: string | null;
@@ -352,6 +365,47 @@ export async function loadGuestPreorderReceipt(
     const notesRaw = String(
       (data as { customer_notes?: string | null }).customer_notes ?? "",
     ).trim();
+    const { data: adjustmentRows } = await supabase
+      .from("order_adjustments")
+      .select(
+        "code, label, amount, status, reverses_adjustment_id, metadata",
+      )
+      .eq("order_id", orderId);
+    const adjustments = getEffectiveAdjustments(
+      (Array.isArray(adjustmentRows) ? adjustmentRows : []).map((row) => ({
+        code: (row.code as string | null) ?? null,
+        label: String(row.label ?? "").trim() || "Adjustment",
+        amount: Number(row.amount ?? 0),
+        status: (row.status as string | null) ?? "active",
+        reversesAdjustmentId:
+          (row.reverses_adjustment_id as string | null) ?? null,
+        metadata:
+          row.metadata && typeof row.metadata === "object"
+            ? (row.metadata as Record<string, unknown>)
+            : null,
+      })),
+    ).map(({ code, label, amount, metadata }) => ({
+      code,
+      label,
+      amount,
+      metadata,
+    }));
+    const commercialItems = [
+      ...items.map((item) => ({
+        unitPrice: item.unitPrice ?? 0,
+        quantity: item.quantity,
+      })),
+      ...paidAddons.map((addon) => ({
+        unitPrice: addon.unitPrice,
+        quantity: addon.quantity,
+      })),
+    ];
+    const settlement = calculateOrderSettlement({
+      items: commercialItems,
+      adjustments,
+      allocations: [],
+      refunds: [],
+    });
     return {
       orderNumber:
         String(
@@ -379,7 +433,7 @@ export async function loadGuestPreorderReceipt(
         fulfilmentMethod === "dine_in"
           ? String(reservation?.reservation_time ?? "").slice(0, 5) || null
           : null,
-      total: calculateCommercialSubtotal({
+      subtotal: calculateCommercialSubtotal({
         items: items.map((item) => ({
           unitPrice: item.unitPrice ?? 0,
           quantity: item.quantity,
@@ -389,6 +443,8 @@ export async function loadGuestPreorderReceipt(
           quantity: addon.quantity,
         })),
       }),
+      adjustments,
+      total: settlement.amountDue,
       placedAt:
         String(
           (data as { created_at?: string | null }).created_at ?? "",

@@ -60,6 +60,12 @@ assert.match(receiptSrc, /httpOnly: true/);
 assert.match(receiptSrc, /sameSite: "lax"/);
 assert.match(receiptSrc, /\.is\("customer_id", null\)/);
 assert.match(receiptSrc, /calculateCommercialSubtotal/);
+assert.match(receiptSrc, /order_adjustments/);
+assert.match(receiptSrc, /getEffectiveAdjustments/);
+assert.match(receiptSrc, /calculateOrderSettlement/);
+assert.doesNotMatch(receiptSrc, /evaluateCatalogueVoucher/);
+assert.doesNotMatch(receiptSrc, /apply_catalogue_voucher_to_guest_order/);
+assert.doesNotMatch(receiptSrc, /\.insert\(/);
 
 assert.equal(guestPreorderReceiptAuthorized("", "abc"), false);
 assert.equal(guestPreorderReceiptAuthorized("a", null), false);
