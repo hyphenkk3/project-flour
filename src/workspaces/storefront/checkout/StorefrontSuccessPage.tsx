@@ -42,7 +42,7 @@ export async function StorefrontSuccessPage({
   orderId,
   flow,
 }: StorefrontSuccessPageProps) {
-  const receipt = await loadSuccessPageReceipt(
+  const { receipt, perf } = await loadSuccessPageReceipt(
     orderId,
     getGuestPreorderReceipt,
   );
@@ -60,7 +60,7 @@ export async function StorefrontSuccessPage({
 
   return (
     <main className="bg-paper mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-16 sm:px-6">
-      <StorefrontSuccessPerfProbe />
+      <StorefrontSuccessPerfProbe successServer={perf} />
       {isFreshPick ? <ClearFreshPickCartOnSuccess /> : <ClearPreorderDraftOnSuccess />}
       <StorefrontTheme />
       <div className="text-center">

@@ -143,7 +143,7 @@ export function GuestExtraCheckoutForm({
     submitGuestExtraOrderAction,
     initialState,
   );
-  useCheckoutActionReturnPerf(pending, "extra");
+  useCheckoutActionReturnPerf(pending, "extra", state.perf);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmSnapshot, setConfirmSnapshot] =
     useState<CheckoutConfirmSnapshot | null>(null);

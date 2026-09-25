@@ -47,11 +47,14 @@ import {
   logPerf,
   logPerfSkipped,
   runWithPerfContext,
+  withDevCheckoutPerf,
+  type CheckoutServerPerf,
 } from "@/lib/perf/dev-only-server";
 
 export type ExtraOrderState = {
   error: string | null;
   orderId?: string;
+  perf?: CheckoutServerPerf;
 };
 
 function parseDeliveryProcessingFeeAck(formData: FormData) {
@@ -148,7 +151,8 @@ async function submitGuestExtraOrderActionTimed(
   const totalStarted = performance.now();
   logPerf("EXTRA_SUBMIT", "action_start", 0);
   try {
-    return await submitGuestExtraOrderActionBody(formData);
+    const state = await submitGuestExtraOrderActionBody(formData);
+    return withDevCheckoutPerf(state, performance.now() - totalStarted);
   } finally {
     logPerf("EXTRA_SUBMIT", "TOTAL", performance.now() - totalStarted, {
       correlationId,
@@ -387,7 +391,13 @@ async function submitGuestExtraOrderActionBody(
     return { error: "Order was created but could not be confirmed." };
   }
 
+  const cookieStarted = performance.now();
   await setGuestPreorderReceiptCookie(orderId);
+  logPerf(
+    "EXTRA_SUBMIT",
+    "setGuestPreorderReceiptCookie",
+    performance.now() - cookieStarted,
+  );
   const catalogueVoucherId = String(
     formData.get("catalogue_voucher_id") ?? "",
   ).trim();

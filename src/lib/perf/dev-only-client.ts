@@ -4,9 +4,13 @@ import {
   createPerfCorrelationId,
   formatPerfLine,
   isDevPerfEnabled,
+  type CheckoutServerPerf,
 } from "@/lib/perf/dev-only-shared";
 
 export { createPerfCorrelationId, isDevPerfEnabled };
+export type { CheckoutServerPerf };
+
+export const CHECKOUT_LOAD_STALE_MS = 30 * 60 * 1000;
 
 export const CHECKOUT_CONFIRM_CLICK = "whitebird-checkout-confirm-click";
 export const CHECKOUT_ACTION_START = "whitebird-checkout-action-start";
@@ -76,7 +80,13 @@ export function readCheckoutSubmitTiming(): CheckoutSubmitTiming | null {
 }
 
 export function logCheckoutClient(
-  scope: "CHECKOUT_CLIENT" | "CHECKOUT_LOAD" | "EXTRA_CLIENT",
+  scope:
+    | "CHECKOUT_CLIENT"
+    | "CHECKOUT_LOAD"
+    | "EXTRA_CLIENT"
+    | "CHECKOUT_SERVER"
+    | "CHECKOUT_SERVER_SUMMARY"
+    | "CHECKOUT_SUCCESS_SERVER",
   fields: Record<string, string | number | boolean | null | undefined>,
 ): void {
   if (!canUseBrowserTools()) return;
@@ -102,24 +112,110 @@ export function markCheckoutLoadOnce(
   });
 }
 
-function readCheckoutLoadStartedAt(): number | null {
+type CheckoutLoadClock = {
+  startedAt: number;
+  timeOrigin: number;
+};
+
+export function resolveCheckoutLoadClock(input: {
+  stored: CheckoutLoadClock | null;
+  now: number;
+  timeOrigin: number;
+  staleMs?: number;
+}): { clock: CheckoutLoadClock; reset: boolean } {
+  const staleMs = input.staleMs ?? CHECKOUT_LOAD_STALE_MS;
+  const stored = input.stored;
+  const shouldReset =
+    !stored ||
+    !Number.isFinite(stored.startedAt) ||
+    !Number.isFinite(stored.timeOrigin) ||
+    stored.timeOrigin !== input.timeOrigin ||
+    stored.startedAt < input.timeOrigin ||
+    input.now - stored.startedAt > staleMs;
+  if (!shouldReset && stored) {
+    return { clock: stored, reset: false };
+  }
+  return {
+    clock: { startedAt: input.now, timeOrigin: input.timeOrigin },
+    reset: true,
+  };
+}
+
+function readStoredCheckoutLoadClock(): CheckoutLoadClock | null {
   if (!canUseBrowserTools()) return null;
   try {
     const raw = sessionStorage.getItem(LOAD_STORAGE_KEY);
-    if (raw) {
-      const parsed = Number(raw);
-      return Number.isFinite(parsed) ? parsed : null;
+    if (!raw) return null;
+    if (/^\d+$/.test(raw)) {
+      const startedAt = Number(raw);
+      return Number.isFinite(startedAt)
+        ? { startedAt, timeOrigin: 0 }
+        : null;
     }
-    const now = Date.now();
-    sessionStorage.setItem(LOAD_STORAGE_KEY, String(now));
-    return now;
+    const parsed = JSON.parse(raw) as CheckoutLoadClock;
+    if (!parsed || !Number.isFinite(parsed.startedAt)) return null;
+    return {
+      startedAt: parsed.startedAt,
+      timeOrigin: Number(parsed.timeOrigin) || 0,
+    };
   } catch {
     return null;
   }
 }
 
+function writeCheckoutLoadClock(clock: CheckoutLoadClock): void {
+  if (!canUseBrowserTools()) return;
+  try {
+    sessionStorage.setItem(LOAD_STORAGE_KEY, JSON.stringify(clock));
+  } catch {
+    // Private mode / quota — skip persistence.
+  }
+}
+
+function readCheckoutLoadStartedAt(): number | null {
+  if (!canUseBrowserTools()) return null;
+  const resolved = resolveCheckoutLoadClock({
+    stored: readStoredCheckoutLoadClock(),
+    now: Date.now(),
+    timeOrigin: performance.timeOrigin,
+  });
+  if (resolved.reset) writeCheckoutLoadClock(resolved.clock);
+  return resolved.clock.startedAt;
+}
+
 export function startCheckoutLoadClock(): void {
   readCheckoutLoadStartedAt();
+}
+
+const LOGGED_SERVER_KEYS = "wb-perf-logged-server-v1";
+
+export function consumeCheckoutServerLogKey(key: string): boolean {
+  if (!canUseBrowserTools() || !key) return false;
+  try {
+    const raw = sessionStorage.getItem(LOGGED_SERVER_KEYS);
+    const seen = raw ? (JSON.parse(raw) as string[]) : [];
+    if (seen.includes(key)) return false;
+    sessionStorage.setItem(
+      LOGGED_SERVER_KEYS,
+      JSON.stringify([...seen, key].slice(-20)),
+    );
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+export function logCheckoutServerPerf(
+  perf: CheckoutServerPerf,
+  extra: Record<string, string | number | boolean | null | undefined> = {},
+): void {
+  if (!canUseBrowserTools()) return;
+  logCheckoutClient("CHECKOUT_SERVER", {
+    correlationId: perf.correlationId,
+    totalServerMs: perf.totalServerMs,
+    ...Object.fromEntries(perf.steps.map((step) => [step.name, `${step.ms}ms`])),
+    ...extra,
+  });
 }
 
 export function logSubmitPhaseSummary(

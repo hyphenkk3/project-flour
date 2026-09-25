@@ -3,12 +3,19 @@ import {
   createPerfCorrelationId,
   logPerf,
   runWithPerfContext,
+  snapshotDevCheckoutPerf,
+  type CheckoutServerPerf,
 } from "@/lib/perf/dev-only-server";
+
+export type SuccessPageLoadResult = {
+  receipt: Awaited<ReturnType<typeof getGuestPreorderReceipt>>;
+  perf?: CheckoutServerPerf;
+};
 
 export async function loadSuccessPageReceipt(
   orderId?: string,
   loadReceipt: typeof getGuestPreorderReceipt = getGuestPreorderReceipt,
-) {
+): Promise<SuccessPageLoadResult> {
   const correlationId = createPerfCorrelationId();
   const pageStarted = performance.now();
   return runWithPerfContext(
@@ -28,8 +35,12 @@ export async function loadSuccessPageReceipt(
         "page_data_ready",
         performance.now() - pageStarted,
       );
-      logPerf("CHECKOUT_SUCCESS", "TOTAL", performance.now() - pageStarted);
-      return loaded;
+      const totalMs = performance.now() - pageStarted;
+      logPerf("CHECKOUT_SUCCESS", "TOTAL", totalMs);
+      return {
+        receipt: loaded,
+        perf: snapshotDevCheckoutPerf(totalMs),
+      };
     },
   );
 }

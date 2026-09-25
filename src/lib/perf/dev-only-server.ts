@@ -1,15 +1,20 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import {
+  attachCheckoutServerPerf,
   createPerfCorrelationId,
   formatPerfLine,
   isDevPerfEnabled,
+  type CheckoutServerPerf,
+  type CheckoutServerPerfStep,
 } from "@/lib/perf/dev-only-shared";
 
 export {
   acceptPerfCorrelationId,
+  attachCheckoutServerPerf,
   createPerfCorrelationId,
   isDevPerfEnabled,
 } from "@/lib/perf/dev-only-shared";
+export type { CheckoutServerPerf, CheckoutServerPerfStep } from "@/lib/perf/dev-only-shared";
 
 export type PerfScope =
   | "CHECKOUT_SUBMIT"
@@ -21,6 +26,7 @@ export type PerfScope =
 type PerfStore = {
   correlationId: string;
   source?: string;
+  steps: CheckoutServerPerfStep[];
 };
 
 const perfStore = new AsyncLocalStorage<PerfStore>();
@@ -30,10 +36,46 @@ export function getPerfContext(): PerfStore | null {
 }
 
 export function runWithPerfContext<T>(
-  store: PerfStore,
+  store: Omit<PerfStore, "steps"> & { steps?: CheckoutServerPerfStep[] },
   fn: () => T,
 ): T {
-  return perfStore.run(store, fn);
+  return perfStore.run(
+    {
+      correlationId: store.correlationId,
+      source: store.source,
+      steps: store.steps ?? [],
+    },
+    fn,
+  );
+}
+
+const UNCOLLECTED_STEPS = new Set(["TOTAL", "action_start", "action_return"]);
+
+export function snapshotDevCheckoutPerf(
+  totalServerMs: number,
+): CheckoutServerPerf | undefined {
+  if (!isDevPerfEnabled()) return undefined;
+  const ctx = getPerfContext();
+  if (!ctx) return undefined;
+  return {
+    correlationId: ctx.correlationId,
+    totalServerMs: Math.round(totalServerMs),
+    steps: ctx.steps.map((step) => ({
+      name: step.name,
+      ms: Math.round(step.ms),
+    })),
+  };
+}
+
+export function withDevCheckoutPerf<T extends object>(
+  state: T,
+  totalServerMs: number,
+): T {
+  return attachCheckoutServerPerf(
+    state,
+    snapshotDevCheckoutPerf(totalServerMs),
+    isDevPerfEnabled(),
+  );
 }
 
 export function logPerf(
@@ -44,6 +86,15 @@ export function logPerf(
 ): void {
   if (!isDevPerfEnabled()) return;
   const ctx = getPerfContext();
+  const roundedMs = Math.round(elapsedMs);
+  if (
+    ctx &&
+    extra.skipped !== true &&
+    roundedMs > 0 &&
+    !UNCOLLECTED_STEPS.has(step)
+  ) {
+    ctx.steps.push({ name: step, ms: roundedMs });
+  }
   const correlationId =
     ctx?.correlationId ??
     (typeof extra.correlationId === "string"
@@ -52,7 +103,7 @@ export function logPerf(
   const fields = [
     `correlationId=${correlationId}`,
     `step=${step}`,
-    `elapsedMs=${Math.round(elapsedMs)}`,
+    `elapsedMs=${roundedMs}`,
     ctx?.source ? `source=${ctx.source}` : null,
     ...Object.entries(extra)
       .filter(([key]) => key !== "correlationId")

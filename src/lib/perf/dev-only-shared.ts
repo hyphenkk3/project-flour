@@ -36,3 +36,23 @@ export function formatPerfLine(
 ): string {
   return `[PERF][${scope}] ${parts.filter(Boolean).join(" ")}`;
 }
+
+export type CheckoutServerPerfStep = {
+  name: string;
+  ms: number;
+};
+
+export type CheckoutServerPerf = {
+  correlationId: string;
+  totalServerMs: number;
+  steps: CheckoutServerPerfStep[];
+};
+
+export function attachCheckoutServerPerf<T extends object>(
+  state: T,
+  perf: CheckoutServerPerf | undefined,
+  enabled: boolean,
+): T {
+  if (!enabled || !perf) return state;
+  return { ...state, perf };
+}

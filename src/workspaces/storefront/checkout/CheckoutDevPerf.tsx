@@ -6,13 +6,16 @@ import {
   CHECKOUT_ACTION_START,
   CHECKOUT_CONFIRM_CLICK,
   SUCCESS_NAVIGATION_START,
+  consumeCheckoutServerLogKey,
   createPerfCorrelationId,
   logCheckoutClient,
+  logCheckoutServerPerf,
   markCheckoutLoadOnce,
   markCheckoutPerf,
   readCheckoutSubmitTiming,
   startCheckoutLoadClock,
   writeCheckoutSubmitTiming,
+  type CheckoutServerPerf,
 } from "@/lib/perf/dev-only-client";
 
 export function CheckoutLoadStepProbe({
@@ -44,8 +47,10 @@ export function CheckoutSubmitUsableProbe({
 export function useCheckoutActionReturnPerf(
   pending: boolean,
   flow: "preorder" | "extra",
+  serverPerf?: CheckoutServerPerf,
 ): void {
   const wasPending = useRef(false);
+  const loggedServerKey = useRef<string | null>(null);
   useEffect(() => {
     if (pending) {
       wasPending.current = true;
@@ -55,18 +60,53 @@ export function useCheckoutActionReturnPerf(
     wasPending.current = false;
     markCheckoutPerf(CHECKOUT_ACTION_RETURN);
     const existing = readCheckoutSubmitTiming();
-    if (existing) {
-      writeCheckoutSubmitTiming({
-        ...existing,
-        actionReturnAt: Date.now(),
-      });
-    }
+    const returned = existing
+      ? writeCheckoutSubmitTiming({
+          ...existing,
+          actionReturnAt: Date.now(),
+        })
+      : null;
     logCheckoutClient(flow === "extra" ? "EXTRA_CLIENT" : "CHECKOUT_CLIENT", {
-      correlationId: existing?.correlationId ?? null,
+      correlationId: existing?.correlationId ?? serverPerf?.correlationId ?? null,
       step: "action_return",
       note: "pending_became_false_after_formAction",
     });
-  }, [flow, pending]);
+    if (!serverPerf) return;
+    const key = `submit:${serverPerf.correlationId}:${serverPerf.totalServerMs}`;
+    if (loggedServerKey.current === key) return;
+    if (!consumeCheckoutServerLogKey(key)) return;
+    loggedServerKey.current = key;
+    logCheckoutServerPerf(serverPerf);
+    const confirmToActionReturnMs =
+      returned && returned.actionReturnAt != null
+        ? returned.actionReturnAt - returned.confirmClickAt
+        : null;
+    logCheckoutClient("CHECKOUT_SERVER_SUMMARY", {
+      correlationId: serverPerf.correlationId,
+      totalServerMs: serverPerf.totalServerMs,
+      confirmToActionReturnMs,
+      confirmToSuccessVisibleMs: null,
+    });
+  }, [flow, pending, serverPerf]);
+
+  useEffect(() => {
+    if (pending || !serverPerf) return;
+    const key = `submit:${serverPerf.correlationId}:${serverPerf.totalServerMs}`;
+    if (loggedServerKey.current === key) return;
+    if (!consumeCheckoutServerLogKey(key)) return;
+    loggedServerKey.current = key;
+    logCheckoutServerPerf(serverPerf);
+    const existing = readCheckoutSubmitTiming();
+    logCheckoutClient("CHECKOUT_SERVER_SUMMARY", {
+      correlationId: serverPerf.correlationId,
+      totalServerMs: serverPerf.totalServerMs,
+      confirmToActionReturnMs:
+        existing?.actionReturnAt == null
+          ? null
+          : existing.actionReturnAt - existing.confirmClickAt,
+      confirmToSuccessVisibleMs: null,
+    });
+  }, [pending, serverPerf]);
 }
 
 export function beginCheckoutSubmitPerf(input: {

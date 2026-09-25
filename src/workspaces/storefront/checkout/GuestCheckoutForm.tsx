@@ -338,7 +338,7 @@ export function GuestCheckoutForm({
     initialState,
   );
   const checkoutLoadSeen = useRef(new Set<string>());
-  useCheckoutActionReturnPerf(pending, "preorder");
+  useCheckoutActionReturnPerf(pending, "preorder", state.perf);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const pendingSubmitRef = useRef<FormData | null>(null);
   const formRef = useRef<HTMLFormElement>(null);

@@ -73,11 +73,14 @@ import {
   logPerf,
   logPerfSkipped,
   runWithPerfContext,
+  withDevCheckoutPerf,
+  type CheckoutServerPerf,
 } from "@/lib/perf/dev-only-server";
 
 export type CheckoutState = {
   error: string | null;
   orderId?: string;
+  perf?: CheckoutServerPerf;
 };
 
 type SubmitItem = {
@@ -271,7 +274,8 @@ async function submitGuestPreorderActionTimed(
   const totalStarted = performance.now();
   logPerf("CHECKOUT_SUBMIT", "action_start", 0);
   try {
-    return await submitGuestPreorderActionBody(formData);
+    const state = await submitGuestPreorderActionBody(formData);
+    return withDevCheckoutPerf(state, performance.now() - totalStarted);
   } finally {
     logPerf("CHECKOUT_SUBMIT", "TOTAL", performance.now() - totalStarted, {
       correlationId,
@@ -448,7 +452,9 @@ async function submitGuestPreorderActionBody(
   const catalogueVoucherId = String(
     formData.get("catalogue_voucher_id") ?? "",
   ).trim();
+  const clientStarted = performance.now();
   const supabase = await createClient();
+  logPerf("CHECKOUT_SUBMIT", "createClient", performance.now() - clientStarted);
   let usedCombinedSubmit = false;
   const rpcStarted = performance.now();
   let data: unknown;
@@ -470,9 +476,16 @@ async function submitGuestPreorderActionBody(
         performance.now() - rpcStarted,
         { voucherApply: "missing_combined_rpc" },
       );
+      const fallbackStarted = performance.now();
       const fallback = await supabase.rpc("submit_guest_preorder", rpcArgs);
       data = fallback.data;
       error = fallback.error;
+      logPerf(
+        "CHECKOUT_SUBMIT",
+        "submit_guest_preorder",
+        performance.now() - fallbackStarted,
+        { voucherApply: "fallback" },
+      );
     } else {
       usedCombinedSubmit = !combined.error;
       logPerf(
