@@ -113,17 +113,24 @@ assert.doesNotMatch(goBackSrc, /emptyPreorderFields/);
 assert.doesNotMatch(goBackSrc, /writePreorderDraft/);
 assert.doesNotMatch(goBackSrc, /redirect/);
 
-assert.match(confirmOrderSrc, /formAction\(formData\)/);
-assert.match(confirmOrderSrc, /if \(pending \|\| state\.orderId\) return/);
+assert.match(confirmOrderSrc, /submitGuestOrderAndNavigate/);
+assert.match(confirmOrderSrc, /action: submitGuestPreorderAction/);
+assert.match(
+  confirmOrderSrc,
+  /if \(submitPending \|\| viewState\.orderId \|\| navigatedRef\.current\) return/,
+);
 assert.doesNotMatch(handleSubmitSrc, /formAction\(/);
 assert.equal(
-  (formSrc.match(/formAction\(formData\)/g) ?? []).length,
+  (confirmOrderSrc.match(/submitGuestOrderAndNavigate/g) ?? []).length,
   1,
-  "Confirm Order is the only formAction submission path",
+  "Confirm Order is the only guest submit-and-navigate path",
 );
+assert.doesNotMatch(confirmOrderSrc, /formAction\(formData\)/);
 assert.match(promptSrc, /disabled=\{pending\}/);
-assert.match(formSrc, /pending=\{pending \|\| Boolean\(state\.orderId\)\}/);
-assert.doesNotMatch(formSrc, /submitGuestPreorderAction\(/);
+assert.match(
+  formSrc,
+  /pending=\{submitPending \|\| Boolean\(viewState\.orderId\)\}/,
+);
 assert.match(formSrc, /useActionState\(\s*submitGuestPreorderAction/);
 assert.doesNotMatch(formSrc, /router\.refresh/);
 assert.doesNotMatch(formSrc, /router\.push/);
@@ -133,15 +140,18 @@ assert.match(
   formSrc,
   /router\.replace\(`\/order\/success\?order=\$\{orderId\}`\)/,
 );
-assert.match(formSrc, /if \(!orderId \|\| state\.error\) return/);
-assert.match(goBackSrc, /if \(pending \|\| state\.orderId\) return/);
+assert.match(
+  formSrc,
+  /if \(!orderId \|\| viewState\.error \|\| navigatedRef\.current\) return/,
+);
+assert.match(goBackSrc, /if \(submitPending \|\| viewState\.orderId\) return/);
 assert.equal(
   (actionsSrc.match(/return \{ error: null, orderId \}/g) ?? []).length,
   1,
 );
 const errorEffectSrc = formSrc.slice(
-  formSrc.indexOf("if (state.error) {"),
-  formSrc.indexOf("}, [state.error]);"),
+  formSrc.indexOf("if (viewState.error) {"),
+  formSrc.indexOf("}, [viewState.error]);"),
 );
 assert.doesNotMatch(errorEffectSrc, /location\.assign/);
 assert.doesNotMatch(handleSubmitSrc, /location\.assign/);
@@ -200,27 +210,32 @@ const extraGoBackSrc = extraCheckoutSrc.slice(
 assert.match(extraOpenConfirmSrc, /setConfirmOpen\(true\)/);
 assert.match(extraOpenConfirmSrc, /new FormData\(form\)/);
 assert.doesNotMatch(extraOpenConfirmSrc, /formAction\(/);
-assert.match(extraConfirmOrderSrc, /formAction\(formData\)/);
-assert.match(extraConfirmOrderSrc, /if \(pending \|\| state\.orderId\) return/);
+assert.match(extraConfirmOrderSrc, /submitGuestOrderAndNavigate/);
+assert.match(extraConfirmOrderSrc, /action: submitGuestExtraOrderAction/);
+assert.match(
+  extraConfirmOrderSrc,
+  /if \(submitPending \|\| viewState\.orderId \|\| navigatedRef\.current\) return/,
+);
 assert.doesNotMatch(extraGoBackSrc, /formAction\(/);
 assert.match(extraGoBackSrc, /setConfirmOpen\(false\)/);
-assert.match(extraGoBackSrc, /if \(pending \|\| state\.orderId\) return/);
+assert.match(extraGoBackSrc, /if \(submitPending \|\| viewState\.orderId\) return/);
 assert.doesNotMatch(extraGoBackSrc, /setPickupDate/);
 assert.doesNotMatch(extraGoBackSrc, /setPaidAddonCodes/);
 assert.doesNotMatch(extraGoBackSrc, /setComplimentaryCodes/);
 assert.equal(
-  (extraCheckoutSrc.match(/formAction\(formData\)/g) ?? []).length,
+  (extraConfirmOrderSrc.match(/submitGuestOrderAndNavigate/g) ?? []).length,
   1,
-  "Fresh Pick Confirm Order is the only formAction submission path",
+  "Fresh Pick Confirm Order is the only guest submit-and-navigate path",
 );
+assert.doesNotMatch(extraConfirmOrderSrc, /formAction\(formData\)/);
 assert.match(
   extraCheckoutSrc,
-  /router\.replace\(\s*`\/order\/success\?order=\$\{state\.orderId\}&flow=\$\{FRESH_PICKS_SUCCESS_FLOW\}`/,
+  /router\.replace\(\s*`\/order\/success\?order=\$\{viewState\.orderId\}&flow=\$\{FRESH_PICKS_SUCCESS_FLOW\}`/,
 );
-assert.match(extraCheckoutSrc, /if \(!state.orderId\) return/);
+assert.match(extraCheckoutSrc, /if \(!viewState.orderId \|\| navigatedRef\.current\) return/);
 assert.match(
   extraCheckoutSrc,
-  /pending=\{pending \|\| Boolean\(state\.orderId\)\}/,
+  /pending=\{submitPending \|\| Boolean\(viewState\.orderId\)\}/,
 );
 assert.doesNotMatch(extraCheckoutSrc, /router\.push/);
 const extraActionsSrc = readSrc("src/workspaces/storefront/extra/actions.ts");

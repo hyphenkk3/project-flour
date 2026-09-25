@@ -160,6 +160,7 @@ assert.match(successSrc, /CATALOGUE_VOUCHER_ADJUSTMENT_CODE/);
 assert.match(retrySrc, /if \(alreadyApplied\)/);
 assert.match(retrySrc, /applyGuestCatalogueVoucherAction\(orderId, voucherId\)/);
 assert.match(submitFn, /if \(applied\.error\)/);
+assert.match(formSrc, /submitGuestOrderAndNavigate/);
 assert.match(formSrc, /router\.replace\(`\/order\/success\?order=\$\{orderId\}`\)/);
 assert.match(extraFormSrc, /router\.replace\(/);
 assert.doesNotMatch(formSrc, /window\.location\.assign\(`\/order\/success/);

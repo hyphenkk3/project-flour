@@ -60,12 +60,13 @@ export function useCheckoutActionReturnPerf(
     wasPending.current = false;
     markCheckoutPerf(CHECKOUT_ACTION_RETURN);
     const existing = readCheckoutSubmitTiming();
-    const returned = existing
-      ? writeCheckoutSubmitTiming({
-          ...existing,
-          actionReturnAt: Date.now(),
-        })
-      : null;
+    const returned =
+      existing && existing.actionReturnAt == null
+        ? writeCheckoutSubmitTiming({
+            ...existing,
+            actionReturnAt: Date.now(),
+          })
+        : existing;
     logCheckoutClient(flow === "extra" ? "EXTRA_CLIENT" : "CHECKOUT_CLIENT", {
       correlationId: existing?.correlationId ?? serverPerf?.correlationId ?? null,
       step: "action_return",
@@ -127,7 +128,7 @@ export function beginCheckoutSubmitPerf(input: {
   logCheckoutClient(input.flow === "extra" ? "EXTRA_CLIENT" : "CHECKOUT_CLIENT", {
     correlationId,
     step: "confirm_click",
-    note: "client_action_start_is_formAction_dispatch_not_server_start",
+    note: "confirm_click_dispatches_server_action",
   });
   return correlationId;
 }
@@ -138,6 +139,67 @@ export function beginSuccessNavigationPerf(): void {
   if (!existing) return;
   writeCheckoutSubmitTiming({
     ...existing,
-    navigationStartAt: Date.now(),
+    navigationStartAt: existing.navigationStartAt ?? Date.now(),
   });
+}
+
+export function markCheckoutActionReturned(): void {
+  const existing = readCheckoutSubmitTiming();
+  if (!existing || existing.actionReturnAt != null) return;
+  markCheckoutPerf(CHECKOUT_ACTION_RETURN);
+  writeCheckoutSubmitTiming({
+    ...existing,
+    actionReturnAt: Date.now(),
+  });
+}
+
+type GuestSubmitResult = {
+  error: string | null;
+  orderId?: string;
+  perf?: CheckoutServerPerf;
+};
+
+/** Await the server action, then navigate on success without a second render. */
+export async function submitGuestOrderAndNavigate<T extends GuestSubmitResult>(
+  input: {
+    formData: FormData;
+    flow: "preorder" | "extra";
+    action: (prev: T, formData: FormData) => Promise<T>;
+    hrefForOrderId: (orderId: string) => string;
+    replace: (href: string) => void;
+    markNavigated: () => void;
+  },
+): Promise<T> {
+  beginCheckoutSubmitPerf({ formData: input.formData, flow: input.flow });
+  const result = await input.action({ error: null } as T, input.formData);
+  markCheckoutActionReturned();
+  if (result.perf) {
+    logCheckoutServerPerf(result.perf);
+  }
+  const timing = readCheckoutSubmitTiming();
+  logCheckoutClient(input.flow === "extra" ? "EXTRA_CLIENT" : "CHECKOUT_CLIENT", {
+    correlationId: timing?.correlationId ?? result.perf?.correlationId ?? null,
+    step: "action_return",
+    confirmToActionReturnMs:
+      timing?.actionReturnAt == null
+        ? null
+        : timing.actionReturnAt - timing.confirmClickAt,
+    note: "server_action_promise_resolved",
+  });
+  if (result.error || !result.orderId) {
+    return result;
+  }
+  input.markNavigated();
+  beginSuccessNavigationPerf();
+  const afterNav = readCheckoutSubmitTiming();
+  logCheckoutClient(input.flow === "extra" ? "EXTRA_CLIENT" : "CHECKOUT_CLIENT", {
+    correlationId: afterNav?.correlationId ?? result.perf?.correlationId ?? null,
+    step: "navigation_call",
+    actionReturnToNavigationStartMs:
+      afterNav?.actionReturnAt == null || afterNav.navigationStartAt == null
+        ? null
+        : afterNav.navigationStartAt - afterNav.actionReturnAt,
+  });
+  input.replace(input.hrefForOrderId(result.orderId));
+  return result;
 }

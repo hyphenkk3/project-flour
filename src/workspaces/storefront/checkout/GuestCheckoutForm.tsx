@@ -173,8 +173,9 @@ import { useEligibleCatalogueVoucher } from "@/workspaces/storefront/offers/useE
 import {
   CheckoutLoadStepProbe,
   CheckoutSubmitUsableProbe,
-  beginCheckoutSubmitPerf,
   beginSuccessNavigationPerf,
+  markCheckoutActionReturned,
+  submitGuestOrderAndNavigate,
   useCheckoutActionReturnPerf,
 } from "@/workspaces/storefront/checkout/CheckoutDevPerf";
 import {
@@ -333,13 +334,20 @@ export function GuestCheckoutForm({
   pickupScopeConstrainsBounds = false,
 }: GuestCheckoutFormProps) {
   const router = useRouter();
-  const [state, formAction, pending] = useActionState(
+  const [state, , pending] = useActionState(
     submitGuestPreorderAction,
     initialState,
   );
   const checkoutLoadSeen = useRef(new Set<string>());
   useCheckoutActionReturnPerf(pending, "preorder", state.perf);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [actionState, setActionState] = useState<typeof initialState | null>(
+    null,
+  );
+  const [actionPending, setActionPending] = useState(false);
+  const navigatedRef = useRef(false);
+  const viewState = actionState ?? state;
+  const submitPending = pending || actionPending;
   const pendingSubmitRef = useRef<FormData | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -350,22 +358,24 @@ export function GuestCheckoutForm({
     useState("");
 
   useEffect(() => {
-    if (state.error) {
+    if (viewState.error) {
       setConfirmOpen(false);
-      if (isCakePriceAckStaleError(state.error)) {
+      if (isCakePriceAckStaleError(viewState.error)) {
         checkoutCakeSizePriceCache.clear();
         setAcknowledgedSnapshot("");
         setPriceRefreshKey((key) => key + 1);
       }
     }
-  }, [state.error]);
+  }, [viewState.error]);
 
   useLayoutEffect(() => {
-    const orderId = state.orderId;
-    if (!orderId || state.error) return;
+    const orderId = viewState.orderId;
+    if (!orderId || viewState.error || navigatedRef.current) return;
+    navigatedRef.current = true;
+    markCheckoutActionReturned();
     beginSuccessNavigationPerf();
     router.replace(`/order/success?order=${orderId}`);
-  }, [router, state.error, state.orderId]);
+  }, [router, viewState.error, viewState.orderId]);
 
   const [items, setItems] = useState<PreorderDraftItem[]>([]);
   const [fields, setFields] = useState<PreorderDraftFields>(() =>
@@ -1377,8 +1387,8 @@ export function GuestCheckoutForm({
     setConfirmOpen(true);
   }
 
-  function confirmOrder() {
-    if (pending || state.orderId) return;
+  async function confirmOrder() {
+    if (submitPending || viewState.orderId || navigatedRef.current) return;
     if (ackRequired && !pricesAcknowledged) {
       setConfirmOpen(false);
       setItemError(CAKE_PRICE_ACK_REQUIRED_MESSAGE);
@@ -1391,12 +1401,25 @@ export function GuestCheckoutForm({
     }
     const formData = pendingSubmitRef.current;
     if (!formData) return;
-    beginCheckoutSubmitPerf({ formData, flow: "preorder" });
-    formAction(formData);
+    setActionPending(true);
+    const result = await submitGuestOrderAndNavigate({
+      formData,
+      flow: "preorder",
+      action: submitGuestPreorderAction,
+      hrefForOrderId: (orderId) => `/order/success?order=${orderId}`,
+      replace: (href) => router.replace(href),
+      markNavigated: () => {
+        navigatedRef.current = true;
+      },
+    });
+    if (result.error) {
+      setActionState(result);
+      setActionPending(false);
+    }
   }
 
   function goBackFromConfirm() {
-    if (pending || state.orderId) return;
+    if (submitPending || viewState.orderId) return;
     setConfirmOpen(false);
   }
 
@@ -2302,13 +2325,13 @@ export function GuestCheckoutForm({
               {itemError}
             </p>
           ) : null}
-          <FormError message={state.error} />
+          <FormError message={viewState.error} />
 
           <FormActions className="border-fog border-t pt-8 sm:items-center">
             <FormSubmitButton
               className="w-full rounded-md sm:w-auto"
               disabled={submitBlocked || confirmOpen}
-              pending={pending}
+              pending={submitPending}
               pendingLabel="Submitting…"
             >
               Submit Order
@@ -2367,7 +2390,7 @@ export function GuestCheckoutForm({
         onConfirm={confirmOrder}
         onGoBack={goBackFromConfirm}
         open={confirmOpen}
-        pending={pending || Boolean(state.orderId)}
+        pending={submitPending || Boolean(viewState.orderId)}
         snapshot={confirmSnapshot}
       />
     </div>

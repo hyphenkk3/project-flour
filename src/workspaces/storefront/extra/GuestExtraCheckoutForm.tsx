@@ -119,8 +119,9 @@ import {
 } from "@/workspaces/storefront/offers/CatalogueVoucherAmountLines";
 import { useEligibleCatalogueVoucher } from "@/workspaces/storefront/offers/useEligibleCatalogueVoucher";
 import {
-  beginCheckoutSubmitPerf,
   beginSuccessNavigationPerf,
+  markCheckoutActionReturned,
+  submitGuestOrderAndNavigate,
   useCheckoutActionReturnPerf,
 } from "@/workspaces/storefront/checkout/CheckoutDevPerf";
 
@@ -139,11 +140,18 @@ export function GuestExtraCheckoutForm({
 }: GuestExtraCheckoutFormProps) {
   const cart = useFreshPickCart();
   const router = useRouter();
-  const [state, formAction, pending] = useActionState(
+  const [state, , pending] = useActionState(
     submitGuestExtraOrderAction,
     initialState,
   );
   useCheckoutActionReturnPerf(pending, "extra", state.perf);
+  const [actionState, setActionState] = useState<typeof initialState | null>(
+    null,
+  );
+  const [actionPending, setActionPending] = useState(false);
+  const navigatedRef = useRef(false);
+  const viewState = actionState ?? state;
+  const submitPending = pending || actionPending;
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmSnapshot, setConfirmSnapshot] =
     useState<CheckoutConfirmSnapshot | null>(null);
@@ -254,12 +262,14 @@ export function GuestExtraCheckoutForm({
   }, [selectedDate]);
 
   useLayoutEffect(() => {
-    if (!state.orderId) return;
+    if (!viewState.orderId || navigatedRef.current) return;
+    navigatedRef.current = true;
+    markCheckoutActionReturned();
     beginSuccessNavigationPerf();
     router.replace(
-      `/order/success?order=${state.orderId}&flow=${FRESH_PICKS_SUCCESS_FLOW}`,
+      `/order/success?order=${viewState.orderId}&flow=${FRESH_PICKS_SUCCESS_FLOW}`,
     );
-  }, [router, state.orderId]);
+  }, [router, viewState.orderId]);
 
   const displayedTotal = customerPreorderCommercialTotal({
     items: (cart?.items ?? []).map((item) => ({
@@ -487,8 +497,8 @@ export function GuestExtraCheckoutForm({
     setConfirmOpen(true);
   }
 
-  function confirmOrder() {
-    if (pending || state.orderId) return;
+  async function confirmOrder() {
+    if (submitPending || viewState.orderId || navigatedRef.current) return;
     if (deliveryAckRequired && !deliveryProcessingFeeAcknowledged) {
       setConfirmOpen(false);
       setClientError(DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE);
@@ -496,12 +506,26 @@ export function GuestExtraCheckoutForm({
     }
     const formData = pendingSubmitRef.current;
     if (!formData) return;
-    beginCheckoutSubmitPerf({ formData, flow: "extra" });
-    formAction(formData);
+    setActionPending(true);
+    const result = await submitGuestOrderAndNavigate({
+      formData,
+      flow: "extra",
+      action: submitGuestExtraOrderAction,
+      hrefForOrderId: (orderId) =>
+        `/order/success?order=${orderId}&flow=${FRESH_PICKS_SUCCESS_FLOW}`,
+      replace: (href) => router.replace(href),
+      markNavigated: () => {
+        navigatedRef.current = true;
+      },
+    });
+    if (result.error) {
+      setActionState(result);
+      setActionPending(false);
+    }
   }
 
   function goBackFromConfirm() {
-    if (pending || state.orderId) return;
+    if (submitPending || viewState.orderId) return;
     setConfirmOpen(false);
   }
 
@@ -1113,7 +1137,7 @@ export function GuestExtraCheckoutForm({
           />
         </section>
 
-        <FormError message={clientError ?? state.error} />
+        <FormError message={clientError ?? viewState.error} />
 
         <FormActions>
           <FormSubmitButton
@@ -1121,7 +1145,7 @@ export function GuestExtraCheckoutForm({
               confirmOpen ||
               (deliveryAckRequired && !deliveryProcessingFeeAcknowledged)
             }
-            pending={pending || Boolean(state.orderId)}
+            pending={submitPending || Boolean(viewState.orderId)}
           >
             Place order
           </FormSubmitButton>
@@ -1138,7 +1162,7 @@ export function GuestExtraCheckoutForm({
           onConfirm={confirmOrder}
           onGoBack={goBackFromConfirm}
           open={confirmOpen}
-          pending={pending || Boolean(state.orderId)}
+          pending={submitPending || Boolean(viewState.orderId)}
           snapshot={confirmSnapshot}
         />
       ) : null}

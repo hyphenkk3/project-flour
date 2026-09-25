@@ -238,12 +238,15 @@ export function logSubmitPhaseSummary(
       : successVisibleAt - timing.navigationStartAt;
   const confirmToSuccessVisibleMs =
     successVisibleAt == null ? null : successVisibleAt - timing.confirmClickAt;
+  const confirmToClientDispatchMs =
+    timing.actionDispatchAt == null
+      ? null
+      : timing.actionDispatchAt - timing.confirmClickAt;
   logCheckoutClient(timing.flow === "extra" ? "EXTRA_CLIENT" : "CHECKOUT_CLIENT", {
     correlationId: timing.correlationId,
-    confirmToClientDispatchMs:
-      timing.actionDispatchAt == null
-        ? null
-        : timing.actionDispatchAt - timing.confirmClickAt,
+    confirmClickMs: 0,
+    clientActionDispatchMs: confirmToClientDispatchMs,
+    confirmToClientDispatchMs,
     confirmToActionReturnMs,
     actionReturnToNavigationStartMs,
     actionReturnToSuccessVisibleMs:
@@ -252,6 +255,6 @@ export function logSubmitPhaseSummary(
         : successVisibleAt - timing.actionReturnAt,
     navigationStartToSuccessVisibleMs,
     confirmToSuccessVisibleMs,
-    note: "client_action_start_is_formAction_dispatch_not_server_start",
+    note: "action_return_is_server_action_promise_resolve",
   });
 }
