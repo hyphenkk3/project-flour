@@ -11,6 +11,7 @@ import {
   ReceiptPhotoBox,
   SuccessReceiptPhotoController,
 } from "@/workspaces/storefront/checkout/SuccessReceiptPhotos";
+import { SuccessRecapPerfProbe } from "@/workspaces/storefront/checkout/SuccessRecapPerfProbe";
 import type { GuestPreorderReceipt } from "@/workspaces/storefront/checkout/receipt";
 
 export function SuccessReceiptRecap({
@@ -22,6 +23,13 @@ export function SuccessReceiptRecap({
 }) {
   return (
     <SuccessReceiptPhotoController orderId={orderId} receipt={receipt}>
+      <SuccessRecapPerfProbe
+        hasAdjustment={receipt.adjustments.length > 0}
+        hasDate={Boolean(receipt.pickupDate)}
+        hasItem={receipt.items.length > 0}
+        hasOrderNumber={Boolean(receipt.orderNumber)}
+        hasTotal={Number.isFinite(receipt.total)}
+      />
       <section className="border-fog mt-8 border-t pt-8 text-left">
         <p className="text-skyline text-[11px] font-medium tracking-[0.18em] uppercase">
           Order recap

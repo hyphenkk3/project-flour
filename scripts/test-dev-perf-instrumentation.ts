@@ -158,6 +158,19 @@ assert.match(successSrc, /<StorefrontSuccessPerfProbe/);
 assert.match(successSrc, /markVisible/);
 assert.match(successSrc, /<Suspense/);
 assert.match(successSrc, /<SuccessReceiptRecap orderId=\{orderId\} receipt=\{receipt\} \/>/);
+assert.match(successSrc, /StorefrontSuccessRecapSkeleton/);
+assert.match(
+  readSrc("src/workspaces/storefront/checkout/SuccessReceiptRecap.tsx"),
+  /SuccessRecapPerfProbe/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/checkout/SuccessRecapPerfProbe.tsx"),
+  /confirmToRecapTotalMs/,
+);
+assert.match(
+  readSrc("src/app/order/success/loading.tsx"),
+  /StorefrontSuccessLoading/,
+);
 assert.match(
   readSrc("src/workspaces/storefront/checkout/SuccessReceiptPhotos.tsx"),
   /SaveOrderDetailsButton/,

@@ -18,6 +18,7 @@ import {
   orderDetailsNoticeMark,
 } from "@/workspaces/storefront/checkout/order-details-card";
 import { SuccessReceiptRecap } from "@/workspaces/storefront/checkout/SuccessReceiptRecap";
+import { StorefrontSuccessRecapSkeleton } from "@/workspaces/storefront/checkout/StorefrontSuccessLoading";
 import { storefrontKickerClass } from "@/workspaces/storefront/StorefrontBrand";
 import { ApplySelectedCatalogueVoucher } from "@/workspaces/storefront/offers/ApplySelectedCatalogueVoucher";
 import { CATALOGUE_VOUCHER_ADJUSTMENT_CODE } from "@/types/catalogue-voucher";
@@ -86,14 +87,7 @@ export async function StorefrontSuccessPage({
         </p>
       </aside>
 
-      <Suspense
-        fallback={
-          <div
-            aria-hidden
-            className="border-fog mt-8 min-h-40 border-t pt-8"
-          />
-        }
-      >
+      <Suspense fallback={<StorefrontSuccessRecapSkeleton />}>
         <SuccessReceiptSection orderId={orderId} />
       </Suspense>
 
