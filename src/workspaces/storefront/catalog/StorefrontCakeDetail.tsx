@@ -7,7 +7,10 @@ import { CakeDetailPickupScope } from "@/workspaces/storefront/catalog/CakeDetai
 import { StorefrontCakeDetailPerfProbe } from "@/workspaces/storefront/catalog/StorefrontCakeDetailPerfProbe";
 import { StorefrontCakeDetailView } from "@/workspaces/storefront/catalog/StorefrontCakeDetailView";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
-import { loadCakeOfferVoucher } from "@/workspaces/storefront/offers/CakeOfferHint";
+import {
+  loadCakeOfferVoucher,
+  type CakeOfferVoucher,
+} from "@/workspaces/storefront/offers/CakeOfferHint";
 import {
   browseCakePreviewFromDisplay,
   getBrowseCakeDisplayById,
@@ -15,12 +18,6 @@ import {
   mergeBrowseCakeDisplay,
 } from "@/workspaces/storefront/catalog/queries";
 import type { StorefrontCake } from "@/types/storefront";
-import type { CatalogueVoucherRecord } from "@/types/catalogue-voucher";
-
-type CakeOffer = {
-  voucher: CatalogueVoucherRecord;
-  today: string;
-};
 
 type CakeDetailSearchParams = Promise<
   Record<string, string | string[] | undefined>
@@ -46,7 +43,7 @@ function CakeDetailFallback({
 }: {
   availabilityNote?: string | null;
   cake: StorefrontCake;
-  offer: CakeOffer | null;
+  offer: CakeOfferVoucher | null;
 }) {
   return (
     <>
@@ -95,11 +92,10 @@ async function CakeDetailLive({
   offerPromise: ReturnType<typeof loadCakeOfferVoucher>;
   searchParams: CakeDetailSearchParams;
 }) {
-  const [display, cake, query, offer] = await Promise.all([
+  const [display, cake, query] = await Promise.all([
     displayPromise,
     livePromise,
     searchParams,
-    offerPromise,
   ]);
   if (!cake) {
     notFound();
@@ -115,8 +111,7 @@ async function CakeDetailLive({
         availabilityNote={merged.availabilityNote}
         cake={merged}
         hideAddToOrder={cake.currentlyOffered === false}
-        offerToday={offer?.today ?? null}
-        offerVoucher={offer?.voucher ?? null}
+        offerPromise={offerPromise}
         pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
         urlFrom={ymdQueryValue(query.from)}
         urlPickup={ymdQueryValue(query.pickup)}

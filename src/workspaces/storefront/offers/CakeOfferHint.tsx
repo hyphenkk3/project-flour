@@ -8,10 +8,15 @@ import { singaporeDateFromIso } from "@/engines/orders/promotions";
 import { listPublicCatalogueVouchers } from "@/workspaces/vouchers/catalogue-queries";
 import type { CatalogueVoucherRecord } from "@/types/catalogue-voucher";
 
+export type CakeOfferVoucher = {
+  voucher: CatalogueVoucherRecord;
+  today: string;
+};
+
 export async function loadCakeOfferVoucher(
   cakeId: string,
   window?: { fulfilmentFrom?: string | null; fulfilmentTo?: string | null },
-): Promise<{ voucher: CatalogueVoucherRecord; today: string } | null> {
+): Promise<CakeOfferVoucher | null> {
   try {
     const today = singaporeDateFromIso(new Date().toISOString());
     const from = window?.fulfilmentFrom?.trim().slice(0, 10) ?? "";

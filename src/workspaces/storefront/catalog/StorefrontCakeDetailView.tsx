@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { CatalogueVoucherRecord } from "@/types/catalogue-voucher";
 import type { StorefrontCake } from "@/types/storefront";
+import type { CakeOfferVoucher } from "@/workspaces/storefront/offers/CakeOfferHint";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import { CakeDetailPurchasePanel } from "@/workspaces/storefront/catalog/CakeDetailPurchasePanel";
 import { CakePhotoDisclaimer } from "@/workspaces/storefront/catalog/CakePhotoDisclaimer";
@@ -22,6 +23,7 @@ type StorefrontCakeDetailViewProps = {
   pickupScopePickup?: string | null;
   offerToday?: string | null;
   offerVoucher?: CatalogueVoucherRecord | null;
+  offerPromise?: Promise<CakeOfferVoucher | null>;
 };
 
 export function StorefrontCakeDetailView({
@@ -34,6 +36,7 @@ export function StorefrontCakeDetailView({
   pickupScopePickup,
   offerToday = null,
   offerVoucher = null,
+  offerPromise,
 }: StorefrontCakeDetailViewProps) {
   const [selectedSizeId, setSelectedSizeId] = useState(cake.sizes[0]?.id ?? "");
   const hero = storefrontPhotoForSize(cake.photos, selectedSizeId);
@@ -90,6 +93,7 @@ export function StorefrontCakeDetailView({
         hideAddToOrder={hideAddToOrder}
         offerToday={offerToday}
         offerVoucher={offerVoucher}
+        offerPromise={offerPromise}
         onSelectedSizeIdChange={setSelectedSizeId}
         pickupDateNotice={pickupDateNotice}
         pickupScopeFrom={pickupScopeFrom}

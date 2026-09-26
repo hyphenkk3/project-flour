@@ -65,6 +65,17 @@ assert.doesNotMatch(pageSrc, /StorefrontCakeDetailLoading/);
 const queriesSrc = readSrc(detailQuery);
 assert.doesNotMatch(detailSrc, /createClient|cookies\(/);
 assert.match(detailSrc, /loadCakeOfferVoucher|CakeOfferHint/);
+assert.match(detailSrc, /offerPromise=\{offerPromise\}/);
+const liveFn = detailSrc.slice(
+  detailSrc.indexOf("async function CakeDetailLive"),
+  detailSrc.indexOf("async function CakeDetailWithDisplay"),
+);
+const liveAll = liveFn.slice(
+  liveFn.indexOf("Promise.all"),
+  liveFn.indexOf("]);") + 2,
+);
+assert.match(liveAll, /livePromise/);
+assert.doesNotMatch(liveAll, /offerPromise/);
 
 const offerHintSrc = readSrc("src/workspaces/storefront/offers/CakeOfferHint.tsx");
 assert.match(offerHintSrc, /listPublicCatalogueVouchers/);

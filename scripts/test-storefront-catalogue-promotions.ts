@@ -53,6 +53,7 @@ const detail = readSrc(
   "src/workspaces/storefront/catalog/StorefrontCakeDetail.tsx",
 );
 assert.match(detail, /loadCakeOfferVoucher/);
+assert.match(detail, /offerPromise=\{offerPromise\}/);
 assert.doesNotMatch(detail, /<CakeOfferHint/);
 
 const panel = readSrc(
@@ -61,6 +62,8 @@ const panel = readSrc(
 assert.match(panel, /CakeOfferCard/);
 assert.match(panel, /selectedSizeLabel=\{selectedSize\?\.size/);
 assert.match(panel, /catalogueVoucherAppliesToPromotionPeriod/);
+assert.match(panel, /CakeDetailOfferFromPromise/);
+assert.match(panel, /<Suspense fallback=\{null\}>/);
 
 const hint = readSrc("src/workspaces/storefront/offers/CakeOfferHint.tsx");
 assert.match(hint, /cataloguePromotionPeriodFromWindow/);

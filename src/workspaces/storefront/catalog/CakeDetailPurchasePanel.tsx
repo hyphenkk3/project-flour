@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { Suspense, use, useMemo } from "react";
 import type { CatalogueVoucherRecord } from "@/types/catalogue-voucher";
 import type { StorefrontCake } from "@/types/storefront";
 import { CakeOfferCard } from "@/workspaces/storefront/offers/CakeOfferCard";
+import type { CakeOfferVoucher } from "@/workspaces/storefront/offers/CakeOfferHint";
 import { AddToOrderButton } from "@/workspaces/storefront/cart/AddToOrderSheet";
 import { usePreorderDraft } from "@/workspaces/storefront/cart/usePreorderDraft";
 import { draftLineQuantity } from "@/workspaces/storefront/checkout/preorder-draft";
@@ -19,6 +20,43 @@ import {
   storefrontTagLabel,
 } from "@/workspaces/storefront/catalog/pricing";
 
+function CakeDetailOfferFromPromise({
+  fulfilmentFrom,
+  fulfilmentTo,
+  offerPromise,
+  selectedSizeLabel,
+}: {
+  fulfilmentFrom: string;
+  fulfilmentTo: string;
+  offerPromise: Promise<CakeOfferVoucher | null>;
+  selectedSizeLabel: string | null;
+}) {
+  const offer = use(offerPromise);
+  if (!offer) return null;
+  const scoped =
+    /^\d{4}-\d{2}-\d{2}$/.test(fulfilmentFrom) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(fulfilmentTo)
+      ? catalogueVoucherAppliesToPromotionPeriod(
+          offer.voucher,
+          cataloguePromotionPeriodFromWindow({
+            today: offer.today,
+            fulfilmentFrom,
+            fulfilmentTo,
+          }),
+        )
+        ? offer
+        : null
+      : offer;
+  if (!scoped) return null;
+  return (
+    <CakeOfferCard
+      selectedSizeLabel={selectedSizeLabel}
+      today={scoped.today}
+      voucher={scoped.voucher}
+    />
+  );
+}
+
 type CakeDetailPurchasePanelProps = {
   cake: StorefrontCake;
   availabilityNote?: string | null;
@@ -31,6 +69,7 @@ type CakeDetailPurchasePanelProps = {
   onSelectedSizeIdChange: (sizeId: string) => void;
   offerToday?: string | null;
   offerVoucher?: CatalogueVoucherRecord | null;
+  offerPromise?: Promise<CakeOfferVoucher | null>;
 };
 
 export function CakeDetailPurchasePanel({
@@ -45,6 +84,7 @@ export function CakeDetailPurchasePanel({
   onSelectedSizeIdChange,
   offerToday = null,
   offerVoucher = null,
+  offerPromise,
 }: CakeDetailPurchasePanelProps) {
   const draft = usePreorderDraft();
   const selectedSize = cake.sizes.find((size) => size.id === selectedSizeId);
@@ -169,7 +209,16 @@ export function CakeDetailPurchasePanel({
         </ul>
       </section>
 
-      {scopedOfferVoucher && offerToday ? (
+      {offerPromise ? (
+        <Suspense fallback={null}>
+          <CakeDetailOfferFromPromise
+            fulfilmentFrom={from}
+            fulfilmentTo={to}
+            offerPromise={offerPromise}
+            selectedSizeLabel={selectedSize?.size ?? null}
+          />
+        </Suspense>
+      ) : scopedOfferVoucher && offerToday ? (
         <CakeOfferCard
           selectedSizeLabel={selectedSize?.size ?? null}
           today={offerToday}
