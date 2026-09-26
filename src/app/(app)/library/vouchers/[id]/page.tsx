@@ -15,27 +15,41 @@ import {
 } from "@/workspaces/library/labels";
 import { summarizeCatalogueVoucherRules } from "@/engines/vouchers/catalogue-voucher";
 import { toCatalogueVoucherRecord } from "@/engines/vouchers/catalogue-voucher-context";
+import { CatalogueVoucherRedemptionHistory } from "@/workspaces/library/vouchers/CatalogueVoucherRedemptionHistory";
 import { deleteVoucherAction } from "@/workspaces/library/vouchers/actions";
-import { getVoucherById } from "@/workspaces/library/vouchers/queries";
+import {
+  getVoucherById,
+  listCatalogueVoucherRedemptionEvents,
+} from "@/workspaces/library/vouchers/queries";
 import { VoucherLibraryTabs } from "@/workspaces/library/vouchers/VoucherLibraryTabs";
 
 export const dynamic = "force-dynamic";
 
 type VoucherDetailPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 export default async function LibraryVoucherDetailPage({
   params,
+  searchParams,
 }: VoucherDetailPageProps) {
   const staff = await requireStaff();
   const canManage = canManageLibrary(staff.role.code);
   const { id } = await params;
+  const query = await searchParams;
+  const historyRaw = Array.isArray(query.history) ? query.history[0] : query.history;
+  const historyFilter =
+    historyRaw === "redeemed" || historyRaw === "released" ? historyRaw : "all";
   const voucher = await getVoucherById(id);
 
   if (!voucher) {
     notFound();
   }
+
+  const history = canManage
+    ? await listCatalogueVoucherRedemptionEvents(voucher.id, historyFilter)
+    : [];
 
   return (
     <div className="space-y-6">
@@ -96,6 +110,28 @@ export default async function LibraryVoucherDetailPage({
           <dt className="text-skyline">Valid until</dt>
           <dd className="text-ink mt-1">{voucher.validUntil ?? "—"}</dd>
         </div>
+        <div>
+          <dt className="text-skyline">Redemption limit</dt>
+          <dd className="text-ink mt-1">
+            {voucher.redemptionLimit == null ? "Unlimited" : voucher.redemptionLimit}
+          </dd>
+        </div>
+        {voucher.redemptionLimit != null ? (
+          <>
+            <div>
+              <dt className="text-skyline">Active</dt>
+              <dd className="text-ink mt-1">{voucher.redemptionActive ?? 0}</dd>
+            </div>
+            <div>
+              <dt className="text-skyline">Released</dt>
+              <dd className="text-ink mt-1">{voucher.redemptionReleased ?? 0}</dd>
+            </div>
+            <div>
+              <dt className="text-skyline">Remaining</dt>
+              <dd className="text-ink mt-1">{voucher.redemptionRemaining ?? 0}</dd>
+            </div>
+          </>
+        ) : null}
         <div className="sm:col-span-2">
           <dt className="text-skyline">Image URL</dt>
           <dd className="text-ink mt-1 break-all">
@@ -146,6 +182,14 @@ export default async function LibraryVoucherDetailPage({
           </dd>
         </div>
       </dl>
+
+      {canManage ? (
+        <CatalogueVoucherRedemptionHistory
+          events={history}
+          filter={historyFilter}
+          href={`/library/vouchers/${voucher.id}`}
+        />
+      ) : null}
     </div>
   );
 }

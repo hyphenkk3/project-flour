@@ -457,11 +457,55 @@ export function evaluateCatalogueVouchers(
   }));
 }
 
-/** First eligible voucher in the supplied list order (public list is code order). */
+/** Targeted + narrower cake/size rules beat broader or storewide rules. */
+export function compareCatalogueVoucherSpecificity(
+  left: Pick<CatalogueVoucherRecord, "id" | "code" | "rules">,
+  right: Pick<CatalogueVoucherRecord, "id" | "code" | "rules">,
+): number {
+  const leftTargeted = left.rules.cakeIds.length > 0 ? 1 : 0;
+  const rightTargeted = right.rules.cakeIds.length > 0 ? 1 : 0;
+  if (leftTargeted !== rightTargeted) return rightTargeted - leftTargeted;
+
+  if (leftTargeted) {
+    const cakeDelta = left.rules.cakeIds.length - right.rules.cakeIds.length;
+    if (cakeDelta !== 0) return cakeDelta;
+  }
+
+  const leftSized = left.rules.sizeLabels.length > 0 ? 1 : 0;
+  const rightSized = right.rules.sizeLabels.length > 0 ? 1 : 0;
+  if (leftSized !== rightSized) return rightSized - leftSized;
+
+  if (leftSized) {
+    const sizeDelta = left.rules.sizeLabels.length - right.rules.sizeLabels.length;
+    if (sizeDelta !== 0) return sizeDelta;
+  }
+
+  const code = left.code.localeCompare(right.code);
+  if (code !== 0) return code;
+  return left.id.localeCompare(right.id);
+}
+
+export function selectCatalogueVoucherBySpecificity<
+  T extends Pick<CatalogueVoucherRecord, "id" | "code" | "rules">,
+>(vouchers: readonly T[]): T | null {
+  if (vouchers.length === 0) return null;
+  return [...vouchers].sort(compareCatalogueVoucherSpecificity)[0] ?? null;
+}
+
+/** Most specific eligible voucher; public code order breaks remaining ties. */
 export function selectEligibleCatalogueVoucher<
-  T extends { result: { eligible: boolean } },
+  T extends {
+    voucher: Pick<CatalogueVoucherRecord, "id" | "code" | "rules">;
+    result: { eligible: boolean };
+  },
 >(evaluated: readonly T[]): T | null {
-  return evaluated.find((row) => row.result.eligible) ?? null;
+  const eligible = evaluated.filter((row) => row.result.eligible);
+  if (eligible.length === 0) return null;
+  return (
+    [...eligible].sort((left, right) =>
+      compareCatalogueVoucherSpecificity(left.voucher, right.voucher),
+    )[0] ?? null
+  );
 }
 
 export function summarizeCatalogueVoucherRules(

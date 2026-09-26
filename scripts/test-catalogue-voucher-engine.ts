@@ -11,6 +11,7 @@ import {
   evaluateCatalogueVouchers,
   formatCatalogueVoucherHeadline,
   isCatalogueVoucherDiscoverable,
+  compareCatalogueVoucherSpecificity,
   selectEligibleCatalogueVoucher,
 } from "@/engines/vouchers/catalogue-voucher";
 import { selectDraftCatalogueVoucher } from "@/engines/vouchers/catalogue-voucher-context";
@@ -366,7 +367,39 @@ const later = voucher({ id: "voucher-2", code: "ZZZ10" });
 const earlier = voucher({ id: "voucher-1", code: "AAA10" });
 const evaluated = evaluateCatalogueVouchers([later, earlier], input());
 const chosen = selectEligibleCatalogueVoucher(evaluated);
-assert.equal(chosen?.voucher.id, "voucher-2");
+assert.equal(chosen?.voucher.id, "voucher-1");
+assert.equal(
+  selectEligibleCatalogueVoucher(
+    evaluateCatalogueVouchers([earlier, later], input()),
+  )?.voucher.id,
+  "voucher-1",
+);
+const targeted = voucher({
+  id: "voucher-target",
+  code: "ZZZTARGET",
+  rules: { cakeIds: ["pistachio"], sizeLabels: ['6"'] },
+});
+const generic = voucher({ id: "voucher-generic", code: "AAAALL" });
+assert.equal(
+  selectEligibleCatalogueVoucher(
+    evaluateCatalogueVouchers([generic, targeted], input()),
+  )?.voucher.id,
+  "voucher-target",
+);
+assert.ok(
+  compareCatalogueVoucherSpecificity(
+    voucher({
+      id: "one-size",
+      code: "B",
+      rules: { cakeIds: ["pistachio"], sizeLabels: ['6"'] },
+    }),
+    voucher({
+      id: "two-size",
+      code: "A",
+      rules: { cakeIds: ["pistachio"], sizeLabels: ['6"', '8"'] },
+    }),
+  ) < 0,
+);
 const draftPick = selectDraftCatalogueVoucher(
   [later, earlier],
   {
@@ -383,7 +416,7 @@ const draftPick = selectDraftCatalogueVoucher(
   },
   "2026-08-05",
 );
-assert.equal(draftPick?.voucher.id, "voucher-2");
+assert.equal(draftPick?.voucher.id, "voucher-1");
 assert.equal(
   selectDraftCatalogueVoucher(
     [voucher({ rules: { cakeIds: ["other"] } })],
@@ -607,6 +640,10 @@ assert.match(
   /Eligibility/,
 );
 assert.match(
+  readSrc("src/workspaces/library/vouchers/VoucherForm.tsx"),
+  /name="redemption_limit"/,
+);
+assert.match(
   readSrc("src/workspaces/library/vouchers/actions.ts"),
   /replaceLibraryVoucherRules/,
 );
@@ -629,6 +666,12 @@ assert.match(migration, /c_code constant text := 'catalogue_voucher'/);
 assert.match(migration, /Cannot stack with August Promo/);
 assert.match(migration, /list_public_catalogue_vouchers/);
 assert.match(migration, /grant execute on function public.list_public_catalogue_vouchers\(\) to anon, authenticated/);
+assert.match(
+  readSrc(
+    "supabase/migrations/20260926120000_catalogue_voucher_redemption_controls.sql",
+  ),
+  /create table if not exists public.catalogue_voucher_redemptions/,
+);
 assert.match(
   migration,
   /grant execute on function public.apply_catalogue_voucher_to_guest_order\(uuid, uuid, uuid\) to authenticated/,

@@ -5,9 +5,11 @@
 import { compareCakeSizeLabels } from "@/engines/menu/cake-size-order";
 import {
   catalogueVoucherAllowsOrderType,
+  compareCatalogueVoucherSpecificity,
   formatCatalogueVoucherHeadline,
   isCatalogueVoucherDiscoverable,
   normalizeCatalogueSizeLabel,
+  selectCatalogueVoucherBySpecificity,
   summarizeCatalogueOrderTypes,
 } from "@/engines/vouchers/catalogue-voucher";
 import {
@@ -98,8 +100,8 @@ export function selectPublicCakePromotion(
     targetedOnly?: boolean;
   },
 ): CatalogueVoucherRecord | null {
-  return (
-    listDiscoverableCatalogueVouchers(vouchers, input.today).find((voucher) => {
+  const candidates = listDiscoverableCatalogueVouchers(vouchers, input.today).filter(
+    (voucher) => {
       if (!catalogueVoucherAllowsOrderType(voucher.rules, input.orderType)) {
         return false;
       }
@@ -110,8 +112,9 @@ export function selectPublicCakePromotion(
         voucher.rules.cakeIds.length === 0 ||
         voucher.rules.cakeIds.includes(input.cakeId)
       );
-    }) ?? null
+    },
   );
+  return selectCatalogueVoucherBySpecificity(candidates);
 }
 
 export function cataloguePromotionGroup(input: {
@@ -355,9 +358,14 @@ export function buildTargetedPromotionBadgeByCakeId(
   orderType: CatalogueOrderType,
 ): Map<string, CataloguePromotionBadge> {
   const badges = new Map<string, CataloguePromotionBadge>();
-  for (const voucher of listDiscoverableCatalogueVouchers(vouchers, today)) {
-    if (!catalogueVoucherAllowsOrderType(voucher.rules, orderType)) continue;
-    if (!isCatalogueVoucherCakeTargeted(voucher)) continue;
+  const ranked = listDiscoverableCatalogueVouchers(vouchers, today)
+    .filter(
+      (voucher) =>
+        catalogueVoucherAllowsOrderType(voucher.rules, orderType) &&
+        isCatalogueVoucherCakeTargeted(voucher),
+    )
+    .sort(compareCatalogueVoucherSpecificity);
+  for (const voucher of ranked) {
     const badge = formatCataloguePromotionBadge(voucher, today);
     for (const cakeId of voucher.rules.cakeIds) {
       if (!badges.has(cakeId)) badges.set(cakeId, badge);

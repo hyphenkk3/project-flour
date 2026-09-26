@@ -49,6 +49,15 @@ function parseVoucherInput(formData: FormData): LibraryVoucherInput | string {
   const status = String(
     formData.get("status") ?? "",
   ).trim() as LibraryVoucherStatus;
+  const rawLimit = String(formData.get("redemption_limit") ?? "").trim();
+  let redemptionLimit: number | null = null;
+  if (rawLimit) {
+    const parsedLimit = Number(rawLimit);
+    if (!Number.isInteger(parsedLimit) || parsedLimit < 1) {
+      return "Redemption limit must be a whole number of 1 or more, or left blank for unlimited.";
+    }
+    redemptionLimit = parsedLimit;
+  }
 
   if (!code) return "Voucher code is required.";
   if (!LIBRARY_VOUCHER_TYPES.includes(voucherType)) {
@@ -73,6 +82,7 @@ function parseVoucherInput(formData: FormData): LibraryVoucherInput | string {
     imageUrl,
     assetId,
     status,
+    redemptionLimit,
   };
 }
 
@@ -125,6 +135,7 @@ export async function createVoucherAction(
       image_url: parsed.imageUrl,
       asset_id: parsed.assetId,
       status: parsed.status,
+      redemption_limit: parsed.redemptionLimit,
       created_by: staff.id,
       updated_by: staff.id,
     })
@@ -186,6 +197,7 @@ export async function updateVoucherAction(
       image_url: parsed.imageUrl,
       asset_id: parsed.assetId,
       status: parsed.status,
+      redemption_limit: parsed.redemptionLimit,
       updated_by: staff.id,
     })
     .eq("id", id);

@@ -53,6 +53,11 @@ export function VoucherDirectory({ vouchers, canManage }: VoucherDirectoryProps)
                 <p className="text-skyline mt-1 text-sm">
                   {voucherTypeLabel(voucher.voucherType)} · {voucher.value}
                 </p>
+                <p className="text-skyline mt-1 text-sm">
+                  {voucher.redemptionLimit == null
+                    ? "Redemption limit: Unlimited"
+                    : `Limit ${voucher.redemptionLimit} · Active ${voucher.redemptionActive ?? 0} · Remaining ${voucher.redemptionRemaining ?? voucher.redemptionLimit}`}
+                </p>
               </div>
               <div className="flex items-center gap-3">
                 <StatusBadge

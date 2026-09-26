@@ -19,6 +19,10 @@ export type LibraryVoucher = {
   createdAt: string;
   updatedAt: string;
   rules: CatalogueVoucherRules;
+  redemptionLimit: number | null;
+  redemptionActive?: number;
+  redemptionReleased?: number;
+  redemptionRemaining?: number | null;
 };
 
 export type LibraryVoucherInput = {
@@ -30,4 +34,5 @@ export type LibraryVoucherInput = {
   imageUrl: string | null;
   assetId: string | null;
   status: LibraryVoucherStatus;
+  redemptionLimit: number | null;
 };

@@ -170,6 +170,14 @@ assert.equal(
   targetedSix.id,
 );
 assert.equal(
+  selectPublicCakePromotion([generic, targetedSix], {
+    cakeId: strawberry,
+    today,
+    orderType: "preorder",
+  })?.id,
+  targetedSix.id,
+);
+assert.equal(
   selectPublicCakePromotion([generic], {
     cakeId: strawberry,
     today,

@@ -97,6 +97,21 @@ export function VoucherForm({
         />
       </FormField>
 
+      <FormField
+        help="Leave blank for unlimited redemptions. Staff only — customers never see this number."
+        htmlFor="redemption_limit"
+        label="Redemption limit"
+      >
+        <FormInput
+          defaultValue={voucher?.redemptionLimit ?? ""}
+          id="redemption_limit"
+          min={1}
+          name="redemption_limit"
+          step="1"
+          type="number"
+        />
+      </FormField>
+
       <div className="grid gap-5 sm:grid-cols-2">
         <FormField htmlFor="valid_from" label="Valid from">
           <FormInput
