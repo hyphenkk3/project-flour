@@ -120,50 +120,98 @@ export type CakePickupMembership = {
   specialWindows: Array<{ from: string; to: string }>;
 };
 
+export type CakePickupCatalogueIndex = {
+  monthly: ReadonlyArray<{ id: string; month: string }>;
+  specials: ReadonlyArray<{ id: string; from: string; to: string }>;
+};
+
 /** Customer-orderable catalogue windows a cake belongs to (checkout calendar bounds). */
 export async function getCustomerCakePickupMemberships(
   cakeIds: readonly string[],
-  todayYmd: string = toBusinessDateKey(),
+  options?: {
+    todayYmd?: string;
+    catalogueIndex?: CakePickupCatalogueIndex;
+  },
 ): Promise<CakePickupMembership[]> {
   const ids = [...new Set(cakeIds.map((id) => id.trim()).filter(Boolean))];
   if (ids.length === 0) return [];
 
+  const todayYmd = options?.todayYmd ?? toBusinessDateKey();
   const supabase = await createClient();
-  const { data: catalogues, error: catalogueError } = await supabase
-    .from("collections")
-    .select(
-      "id, month, purpose, status, start_date, end_date, website_override",
-    )
-    .eq("status", "active");
+  const monthlyMonthById = new Map<string, string>();
+  const specialWindowById = new Map<string, { from: string; to: string }>();
+  let activeCatalogueIds: string[] = [];
 
-  if (catalogueError) {
-    throw new Error(catalogueError.message);
+  if (options?.catalogueIndex) {
+    for (const row of options.catalogueIndex.monthly) {
+      const month = String(row.month).slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(month)) continue;
+      monthlyMonthById.set(row.id, month);
+    }
+    for (const row of options.catalogueIndex.specials) {
+      const from = String(row.from).slice(0, 10);
+      const to = String(row.to).slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+        continue;
+      }
+      specialWindowById.set(row.id, { from, to });
+    }
+    activeCatalogueIds = [
+      ...monthlyMonthById.keys(),
+      ...specialWindowById.keys(),
+    ];
+  } else {
+    const { data: catalogues, error: catalogueError } = await supabase
+      .from("collections")
+      .select(
+        "id, month, purpose, status, start_date, end_date, website_override",
+      )
+      .eq("status", "active");
+
+    if (catalogueError) {
+      throw new Error(catalogueError.message);
+    }
+
+    const activeCatalogues = (
+      (catalogues ?? []) as Array<{
+        id: string;
+        month: string | null;
+        purpose: string | null;
+        status: string;
+        start_date: string | null;
+        end_date: string | null;
+        website_override: boolean | null;
+      }>
+    ).filter((row) =>
+      isCurrentlyCustomerOrderable(
+        {
+          purpose: row.purpose ?? "monthly",
+          status: row.status,
+          month: row.month ? String(row.month).slice(0, 10) : null,
+          endDate: row.end_date ? String(row.end_date).slice(0, 10) : null,
+          websiteOverride: row.website_override === true,
+        },
+        todayYmd,
+      ),
+    );
+
+    for (const row of activeCatalogues) {
+      if (row.purpose === "monthly" && row.month) {
+        monthlyMonthById.set(row.id, String(row.month).slice(0, 10));
+        continue;
+      }
+      if (row.purpose === "special" && row.website_override === true) {
+        const from = row.start_date ? String(row.start_date).slice(0, 10) : "";
+        const to = row.end_date ? String(row.end_date).slice(0, 10) : "";
+        if (/^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to)) {
+          specialWindowById.set(row.id, { from, to });
+        }
+      }
+    }
+    activeCatalogueIds = activeCatalogues.map((row) => row.id);
   }
 
-  const activeCatalogues = (
-    (catalogues ?? []) as Array<{
-      id: string;
-      month: string | null;
-      purpose: string | null;
-      status: string;
-      start_date: string | null;
-      end_date: string | null;
-      website_override: boolean | null;
-    }>
-  ).filter((row) =>
-    isCurrentlyCustomerOrderable(
-      {
-        purpose: row.purpose ?? "monthly",
-        status: row.status,
-        month: row.month ? String(row.month).slice(0, 10) : null,
-        endDate: row.end_date ? String(row.end_date).slice(0, 10) : null,
-        websiteOverride: row.website_override === true,
-      },
-      todayYmd,
-    ),
-  );
-
-  if (activeCatalogues.length === 0) {
+  if (activeCatalogueIds.length === 0) {
     return ids.map((cakeId) => ({
       cakeId,
       monthlyMonths: [],
@@ -171,31 +219,12 @@ export async function getCustomerCakePickupMemberships(
     }));
   }
 
-  const monthlyMonthById = new Map<string, string>();
-  const specialWindowById = new Map<string, { from: string; to: string }>();
-  for (const row of activeCatalogues) {
-    if (row.purpose === "monthly" && row.month) {
-      monthlyMonthById.set(row.id, String(row.month).slice(0, 10));
-      continue;
-    }
-    if (row.purpose === "special" && row.website_override === true) {
-      const from = row.start_date ? String(row.start_date).slice(0, 10) : "";
-      const to = row.end_date ? String(row.end_date).slice(0, 10) : "";
-      if (/^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to)) {
-        specialWindowById.set(row.id, { from, to });
-      }
-    }
-  }
-
   const { data, error } = await supabase
     .from("collection_cakes")
     .select("collection_id, library_cake_id")
     .eq("available", true)
     .in("library_cake_id", ids)
-    .in(
-      "collection_id",
-      activeCatalogues.map((row) => row.id),
-    );
+    .in("collection_id", activeCatalogueIds);
 
   if (error) {
     throw new Error(error.message);
@@ -777,6 +806,57 @@ export async function listAvailableCheckoutCakes(
     throw new Error(error.message);
   }
   return mapAvailableCollectionCakes(data as CatalogRow[] | null);
+}
+
+/** Cart cakes only — used on the checkout date-confirmation path. */
+export async function listCheckoutCakesForCakeIds(
+  cakeIds: readonly string[],
+): Promise<Array<{ collectionId: string; cake: StorefrontCake }>> {
+  const ids = [...new Set(cakeIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) return [];
+  const supabase = createPublicClient();
+  const { data, error } = await supabase
+    .from("collection_cakes")
+    .select(
+      `
+      collection_id,
+      sort_order,
+      library_cakes (
+        id,
+        name,
+        description,
+        category_id,
+        status,
+        sharing_guide,
+        allergens,
+        library_cake_sizes (
+          id,
+          cake_id,
+          label,
+          price,
+          sort_order,
+          preorder_days
+        )
+      )
+    `,
+    )
+    .eq("available", true)
+    .in("library_cake_id", ids);
+  if (error) {
+    throw new Error(error.message);
+  }
+  return ((data ?? []) as Array<CatalogRow & { collection_id: string }>)
+    .map((row) => {
+      const cake = unwrapOne(row.library_cakes);
+      if (!cake || !isOfferableStatus(cake.status)) return null;
+      const mapped = mapStorefrontCake(cake);
+      if (mapped.sizes.length === 0) return null;
+      return { collectionId: row.collection_id, cake: mapped };
+    })
+    .filter(
+      (row): row is { collectionId: string; cake: StorefrontCake } =>
+        Boolean(row),
+    );
 }
 
 /**

@@ -2,7 +2,10 @@
 
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import { loadDineInVenuePhotos } from "@/workspaces/storefront/dine-in/queries";
-import type { DineInVenuePhotoMap } from "@/engines/orders/dine-in-venue-photos";
+import {
+  EMPTY_DINE_IN_VENUE_PHOTOS,
+  type DineInVenuePhotoMap,
+} from "@/engines/orders/dine-in-venue-photos";
 import {
   buildDineInReservationRpcPayload,
   validateDineInPartyFromForm,
@@ -60,6 +63,7 @@ import {
   getStorefrontCollectionForPickupDate,
   getCustomerCakePickupMemberships,
   listAvailableCheckoutCakes,
+  listCheckoutCakesForCakeIds,
   listCustomerSpecialCatalogues,
   listOrderableMonthlyCatalogues,
   unpublishedCataloguePreorderMessage,
@@ -658,6 +662,10 @@ async function loadCustomerPreorderOptions(
 
 export async function loadCheckoutPickupOffer(
   pickupDate: string,
+  options?: {
+    cakeIds?: readonly string[];
+    includeOptions?: boolean;
+  },
 ): Promise<CheckoutPickupOffer> {
   const emptyOffer = {
     complimentaryOptions: [] as CustomerComplimentaryOption[],
@@ -673,12 +681,21 @@ export async function loadCheckoutPickupOffer(
       ...emptyOffer,
     };
   }
+  const cartCakeIds = [
+    ...new Set((options?.cakeIds ?? []).map((id) => id.trim()).filter(Boolean)),
+  ];
+  const includeOptions = options?.includeOptions !== false;
   const offerStarted = performance.now();
-  const [collection, supabase] = await Promise.all([
+  const [collection, cartCakes, supabase] = await Promise.all([
     timeCheckoutDateStage("collection", () =>
       getStorefrontCollectionForPickupDate(key),
     ),
-    createClient(),
+    cartCakeIds.length > 0
+      ? timeCheckoutDateStage("cakes", () =>
+          listCheckoutCakesForCakeIds(cartCakeIds),
+        )
+      : Promise.resolve([]),
+    includeOptions ? createClient() : Promise.resolve(null),
   ]);
   if (!collection) {
     logPerf("CHECKOUT_DATE", "pickup_offer_unpublished", performance.now() - offerStarted);
@@ -689,14 +706,21 @@ export async function loadCheckoutPickupOffer(
       ...emptyOffer,
     };
   }
-  const [cakes, options] = await Promise.all([
-    timeCheckoutDateStage("cakes", () =>
-      listAvailableCheckoutCakes(collection.id),
-    ),
-    timeCheckoutDateStage("options", () =>
-      loadCustomerPreorderOptions(supabase, collection.id),
-    ),
-  ]);
+  const cakes =
+    cartCakeIds.length > 0
+      ? uniqueCakesForCollection(cartCakes, collection.id)
+      : await timeCheckoutDateStage("cakes", () =>
+          listAvailableCheckoutCakes(collection.id),
+        );
+  const optionResult = includeOptions && supabase
+    ? await timeCheckoutDateStage("options", () =>
+        loadCustomerPreorderOptions(supabase, collection.id),
+      )
+    : {
+        complimentary: [] as CustomerComplimentaryOption[],
+        paidAddons: [] as CustomerPaidAddonOption[],
+        ready: false,
+      };
   logPerf("CHECKOUT_DATE", "pickup_offer", performance.now() - offerStarted, {
     cakeCount: cakes.length,
   });
@@ -704,10 +728,24 @@ export async function loadCheckoutPickupOffer(
     collection,
     cakes,
     unavailableMessage: null,
-    complimentaryOptions: options.complimentary,
-    paidAddonOptions: options.paidAddons,
-    optionsReady: options.ready,
+    complimentaryOptions: optionResult.complimentary,
+    paidAddonOptions: optionResult.paidAddons,
+    optionsReady: optionResult.ready,
   };
+}
+
+function uniqueCakesForCollection(
+  rows: Awaited<ReturnType<typeof listCheckoutCakesForCakeIds>>,
+  collectionId: string,
+): StorefrontCake[] {
+  const cakes: StorefrontCake[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    if (row.collectionId !== collectionId || seen.has(row.cake.id)) continue;
+    seen.add(row.cake.id);
+    cakes.push(row.cake);
+  }
+  return cakes;
 }
 
 export async function loadCheckoutDateConfirmation(input: {
@@ -732,8 +770,14 @@ export async function loadCheckoutDateConfirmation(input: {
     });
     const [calendar, offer] = await timeCheckoutDateStage("promise_all", () =>
       Promise.all([
-        loadCheckoutCalendarContext(input),
-        loadCheckoutPickupOffer(input.pickupDate),
+        loadCheckoutCalendarContext({
+          ...input,
+          includeVenuePhotos: false,
+        }),
+        loadCheckoutPickupOffer(input.pickupDate, {
+          cakeIds: input.cakeIds,
+          includeOptions: false,
+        }),
       ]),
     );
     const buildStarted = performance.now();
@@ -884,32 +928,26 @@ export type CheckoutCalendarContext = {
 
 /**
  * Hours, closed dates, catalogue bounds, and cart date window in one round-trip.
- * Catalogues, specials, hours, and cake memberships load in parallel.
- * Closed dates wait only for the resolved pickup range.
+ * Cached catalogues resolve the closure window first, then hours, memberships,
+ * closures, and optional venue photos load in parallel.
  */
 export async function loadCheckoutCalendarContext(input: {
   cakeIds?: readonly string[];
   fromQuery?: string | null;
   pickupQuery?: string | null;
   toQuery?: string | null;
+  includeVenuePhotos?: boolean;
 }): Promise<CheckoutCalendarContext> {
   const cakeIds = [
     ...new Set((input.cakeIds ?? []).map((id) => id.trim()).filter(Boolean)),
   ];
+  const includeVenuePhotos = input.includeVenuePhotos !== false;
   const calendarStarted = performance.now();
   const earliest = earliestPickupDateYmd();
-  const [catalogues, specials, hoursSnapshot, memberships, venuePhotos] =
-    await Promise.all([
-      timeCheckoutDateStage("catalogues", () => listOrderableMonthlyCatalogues()),
-      timeCheckoutDateStage("specials", () => listCustomerSpecialCatalogues()),
-      timeCheckoutDateStage("hours", () => loadOperatingHoursSnapshot()),
-      cakeIds.length > 0
-        ? timeCheckoutDateStage("memberships", () =>
-            getCustomerCakePickupMemberships(cakeIds),
-          )
-        : Promise.resolve([]),
-      timeCheckoutDateStage("venue_photos", () => loadDineInVenuePhotos()),
-    ]);
+  const [catalogues, specials] = await Promise.all([
+    timeCheckoutDateStage("catalogues", () => listOrderableMonthlyCatalogues()),
+    timeCheckoutDateStage("specials", () => listCustomerSpecialCatalogues()),
+  ]);
   const globalMax = latestOrderableCataloguePickupEnd(
     catalogues.map((catalogue) => catalogue.month ?? ""),
   );
@@ -928,21 +966,46 @@ export async function loadCheckoutCalendarContext(input: {
     (!scope.maxPickupDate || pickupFromQuery <= scope.maxPickupDate)
       ? pickupFromQuery
       : scope.suggestedPickupDate;
+  let rangeMin = scope.minPickupDate;
+  let rangeMax = scope.maxPickupDate ?? scope.minPickupDate;
+  for (const special of specials) {
+    if (special.startDate < rangeMin) rangeMin = special.startDate;
+    if (special.endDate > rangeMax) rangeMax = special.endDate;
+  }
+  const catalogueIndex = {
+    monthly: catalogues
+      .filter((catalogue) => catalogue.month)
+      .map((catalogue) => ({
+        id: catalogue.id,
+        month: String(catalogue.month).slice(0, 10),
+      })),
+    specials: specials.map((special) => ({
+      id: special.id,
+      from: special.startDate,
+      to: special.endDate,
+    })),
+  };
+  const [hoursSnapshot, memberships, venuePhotos, closedDates] =
+    await Promise.all([
+      timeCheckoutDateStage("hours", () => loadOperatingHoursSnapshot()),
+      cakeIds.length > 0
+        ? timeCheckoutDateStage("memberships", () =>
+            getCustomerCakePickupMemberships(cakeIds, { catalogueIndex }),
+          )
+        : Promise.resolve([]),
+      includeVenuePhotos
+        ? timeCheckoutDateStage("venue_photos", () => loadDineInVenuePhotos())
+        : Promise.resolve(EMPTY_DINE_IN_VENUE_PHOTOS),
+      timeCheckoutDateStage("closures", () =>
+        listClosedPickupOrderDates(rangeMin, rangeMax),
+      ),
+    ]);
   const cartPickupBounds = cartPickupBoundsFromSources({
     cakeIds,
     catalogues,
     memberships,
     specials,
   });
-  let rangeMin = scope.minPickupDate;
-  let rangeMax = scope.maxPickupDate ?? scope.minPickupDate;
-  if (cartPickupBounds) {
-    if (cartPickupBounds.min < rangeMin) rangeMin = cartPickupBounds.min;
-    if (cartPickupBounds.max > rangeMax) rangeMax = cartPickupBounds.max;
-  }
-  const closedDates = await timeCheckoutDateStage("closures", () =>
-    listClosedPickupOrderDates(rangeMin, rangeMax),
-  );
   const entrySpecialUnavailableDates =
     scopeFrom && scopeTo && isFullMonthPickupScope(scopeFrom, scopeTo)
       ? [
@@ -986,16 +1049,34 @@ export async function loadCheckoutCalendarContext(input: {
   };
 }
 
+export async function loadCheckoutVenuePhotos(): Promise<DineInVenuePhotoMap> {
+  return loadDineInVenuePhotos();
+}
+
 export async function resolveCartPickupDateBounds(
   cakeIds: readonly string[],
 ): Promise<CartPickupBounds | null> {
   const ids = [...new Set(cakeIds.map((id) => id.trim()).filter(Boolean))];
   if (ids.length === 0) return null;
-  const [catalogues, specials, memberships] = await Promise.all([
+  const [catalogues, specials] = await Promise.all([
     listOrderableMonthlyCatalogues(),
     listCustomerSpecialCatalogues(),
-    getCustomerCakePickupMemberships(ids),
   ]);
+  const memberships = await getCustomerCakePickupMemberships(ids, {
+    catalogueIndex: {
+      monthly: catalogues
+        .filter((catalogue) => catalogue.month)
+        .map((catalogue) => ({
+          id: catalogue.id,
+          month: String(catalogue.month).slice(0, 10),
+        })),
+      specials: specials.map((special) => ({
+        id: special.id,
+        from: special.startDate,
+        to: special.endDate,
+      })),
+    },
+  });
   return cartPickupBoundsFromSources({
     cakeIds: ids,
     catalogues,

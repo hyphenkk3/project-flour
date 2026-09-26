@@ -153,6 +153,8 @@ import {
   loadCartDateCapacityAvailability,
   loadCheckoutCalendarContext,
   loadCheckoutDateConfirmation,
+  loadCheckoutPickupOffer,
+  loadCheckoutVenuePhotos,
   resolveCheckoutCakeSizePrices,
   submitGuestPreorderAction,
   type CheckoutPickupOffer,
@@ -634,9 +636,11 @@ export function GuestCheckoutForm({
       setCakes(offer.cakes);
       setUnavailableMessage(offer.unavailableMessage);
       setCollectionId(offer.collection?.id ?? null);
-      setComplimentaryOptions(offer.complimentaryOptions);
-      setPaidAddonOptions(offer.paidAddonOptions);
-      setOptionsReady(offer.optionsReady);
+      if (offer.optionsReady) {
+        setComplimentaryOptions(offer.complimentaryOptions);
+        setPaidAddonOptions(offer.paidAddonOptions);
+        setOptionsReady(true);
+      }
       setOfferLabel(
         offer.collection
           ? formatCollectionAvailabilityLabel(offer.collection)
@@ -672,26 +676,28 @@ export function GuestCheckoutForm({
         return changed ? next : current;
       });
       setResolvedOfferDate(offerDate);
-      setFields((current) => {
-        const complimentaryCodes = current.complimentaryCodes.filter((code) =>
-          offer.complimentaryOptions.some((option) => option.code === code),
-        );
-        const paidAddonCodes = current.paidAddonCodes.filter((code) =>
-          offer.paidAddonOptions.some((option) => option.code === code),
-        );
-        const paidAddonUnitPriceByCode = Object.fromEntries(
-          offer.paidAddonOptions.map((option) => [
-            option.code,
-            option.unitPrice,
-          ]),
-        );
-        return {
-          ...current,
-          complimentaryCodes,
-          paidAddonCodes,
-          paidAddonUnitPriceByCode,
-        };
-      });
+      if (offer.optionsReady) {
+        setFields((current) => {
+          const complimentaryCodes = current.complimentaryCodes.filter((code) =>
+            offer.complimentaryOptions.some((option) => option.code === code),
+          );
+          const paidAddonCodes = current.paidAddonCodes.filter((code) =>
+            offer.paidAddonOptions.some((option) => option.code === code),
+          );
+          const paidAddonUnitPriceByCode = Object.fromEntries(
+            offer.paidAddonOptions.map((option) => [
+              option.code,
+              option.unitPrice,
+            ]),
+          );
+          return {
+            ...current,
+            complimentaryCodes,
+            paidAddonCodes,
+            paidAddonUnitPriceByCode,
+          };
+        });
+      }
     };
 
     markCheckoutLoadOnce("calendar_context_start", checkoutLoadSeen.current);
@@ -758,6 +764,21 @@ export function GuestCheckoutForm({
           resourceFromIndex,
           perf,
         });
+        void loadCheckoutPickupOffer(pickupDate).then(
+          (fullOffer) => {
+            if (cancelled) return;
+            checkoutPickupOfferCache.set(pickupDate, fullOffer);
+            applyOffer(fullOffer, pickupDate);
+          },
+          () => undefined,
+        );
+        void loadCheckoutVenuePhotos().then(
+          (photos) => {
+            if (cancelled) return;
+            setVenuePhotos(photos);
+          },
+          () => undefined,
+        );
       },
       () => {
         if (cancelled) return;

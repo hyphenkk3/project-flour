@@ -28,7 +28,8 @@ assert.match(formSrc, /Confirming opening hours/);
 assert.match(summarySrc, /Checking availability for that date/);
 assert.match(formSrc, /date_confirmation_start/);
 assert.match(formSrc, /date_confirmed/);
-assert.doesNotMatch(formSrc, /void loadCheckoutPickupOffer\(pickupDate\)/);
+assert.match(formSrc, /void loadCheckoutPickupOffer\(pickupDate\)/);
+assert.match(formSrc, /void loadCheckoutVenuePhotos\(\)/);
 
 const confirmFn = actionsSrc.slice(
   actionsSrc.indexOf("export async function loadCheckoutDateConfirmation"),
@@ -36,11 +37,14 @@ const confirmFn = actionsSrc.slice(
     "export async function resolveCheckoutCakeSizePrices",
   ),
 );
-assert.match(confirmFn, /Promise\.all\(\[\s*loadCheckoutCalendarContext\(input\),\s*loadCheckoutPickupOffer\(input\.pickupDate\),/);
+assert.match(confirmFn, /includeVenuePhotos: false/);
+assert.match(confirmFn, /includeOptions: false/);
+assert.match(confirmFn, /cakeIds: input\.cakeIds/);
 assert.match(confirmFn, /logPerf\("CHECKOUT_DATE", "date_confirmation"/);
 assert.match(confirmFn, /runWithCheckoutDatePerf/);
 assert.match(confirmFn, /snapshotCheckoutDateConfirmationPerf/);
 assert.match(confirmFn, /timeCheckoutDateStage\("promise_all"/);
+assert.doesNotMatch(confirmFn, /listAvailableCheckoutCakes/);
 assert.match(formSrc, /logCheckoutDateConfirmationWaterfall/);
 assert.match(formSrc, /client_wait_ms/);
 
@@ -54,12 +58,27 @@ const offerFn = actionsSrc.slice(
   actionsSrc.indexOf("export async function loadCheckoutDateConfirmation"),
 );
 assert.match(offerFn, /listAvailableCheckoutCakes/);
+assert.match(offerFn, /listCheckoutCakesForCakeIds/);
 assert.match(offerFn, /getStorefrontCollectionForPickupDate/);
 assert.match(offerFn, /timeCheckoutDateStage\("collection"/);
 assert.match(offerFn, /timeCheckoutDateStage\("cakes"/);
-assert.match(offerFn, /timeCheckoutDateStage\("options"/);
 assert.match(offerFn, /Promise\.all\(\[/);
 assert.doesNotMatch(offerFn, /listAvailableCakes\(/);
+
+const calendarFn = actionsSrc.slice(
+  actionsSrc.indexOf("export async function loadCheckoutCalendarContext"),
+  actionsSrc.indexOf("export async function loadCheckoutVenuePhotos"),
+);
+assert.match(calendarFn, /catalogueIndex/);
+assert.match(calendarFn, /listClosedPickupOrderDates/);
+assert.match(calendarFn, /includeVenuePhotos/);
+
+const cartCakesFn = queriesSrc.slice(
+  queriesSrc.indexOf("export async function listCheckoutCakesForCakeIds"),
+  queriesSrc.indexOf("async function loadHomepageCollectionPreviewCakes"),
+);
+assert.match(cartCakesFn, /library_cake_id/);
+assert.doesNotMatch(cartCakesFn, /library_cake_photos/);
 
 const checkoutCakesFn = queriesSrc.slice(
   queriesSrc.indexOf("export async function listAvailableCheckoutCakes"),
