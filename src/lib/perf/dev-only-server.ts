@@ -18,6 +18,7 @@ export type { CheckoutServerPerf, CheckoutServerPerfStep } from "@/lib/perf/dev-
 
 export type PerfScope =
   | "CHECKOUT_SUBMIT"
+  | "CHECKOUT_DATE"
   | "CHECKOUT_VOUCHER"
   | "CHECKOUT_RECEIPT"
   | "CHECKOUT_SUCCESS"

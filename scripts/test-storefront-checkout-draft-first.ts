@@ -179,7 +179,7 @@ assert.doesNotMatch(formSrc, /setLoadingOffer/);
 assert.match(formSrc, /imageUrl: item\.imageUrl/);
 
 assert.match(actionsSrc, /export async function submitGuestPreorderAction/);
-assert.match(actionsSrc, /listAvailableCakes\(collection\.id\)/);
+assert.match(actionsSrc, /listAvailableCheckoutCakes\(collection\.id\)/);
 assert.match(actionsSrc, /submit_guest_preorder/);
 assert.match(formSrc, /checkoutDraftItemsInCatalogue/);
 assert.match(formSrc, /evaluateCollectionDate/);

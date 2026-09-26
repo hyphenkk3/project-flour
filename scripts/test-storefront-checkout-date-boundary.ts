@@ -208,7 +208,7 @@ assert.match(
   formSrc,
   /Please choose a date in a published catalogue/,
 );
-assert.match(formSrc, /loadCheckoutPickupOffer/);
+assert.match(formSrc, /loadCheckoutDateConfirmation/);
 
 const actionsSrc = readSrc("src/workspaces/storefront/checkout/actions.ts");
 assert.match(actionsSrc, /resolveCartPickupDateBounds/);

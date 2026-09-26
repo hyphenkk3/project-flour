@@ -70,7 +70,7 @@ assert.match(formSrc, /applicableUnitPrice: undefined/);
 assert.match(formSrc, /unitPrice: size.price/);
 assert.match(formSrc, /unitPrice: liveSize.price/);
 const offerRefreshSrc = formSrc.slice(
-  formSrc.indexOf("void loadCheckoutPickupOffer"),
+  formSrc.indexOf("const applyOffer = ("),
   formSrc.indexOf("setResolvedOfferDate"),
 );
 assert.doesNotMatch(offerRefreshSrc, /unitPrice: size\.price/);

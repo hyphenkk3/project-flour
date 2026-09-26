@@ -37,21 +37,23 @@ assert.match(pageSrc, /globalMax: null/);
 assert.match(pageSrc, /GuestCheckoutForm/);
 
 assert.match(formSrc, /loadCheckoutCalendarContext/);
+assert.match(formSrc, /loadCheckoutDateConfirmation/);
 assert.match(formSrc, /Confirming collection dates/);
 assert.match(formSrc, /Confirming opening hours/);
 assert.match(formSrc, /calendarPending/);
 assert.match(formSrc, /isCheckoutCalendarPending/);
 assert.match(formSrc, /if \(calendarPending \|\| liveOfferPending(?: \|\| sizePricesPending)?\)/);
-assert.match(formSrc, /loadCheckoutPickupOffer/);
 assert.match(formSrc, /liveOfferPending/);
 assert.doesNotMatch(formSrc, /Loading cakes for that date/);
 
 assert.match(actionsSrc, /export async function loadCheckoutCalendarContext/);
+assert.match(actionsSrc, /export async function loadCheckoutDateConfirmation/);
 assert.match(actionsSrc, /Promise\.all\(/);
 assert.match(actionsSrc, /listOrderableMonthlyCatalogues/);
 assert.match(actionsSrc, /loadOperatingHoursSnapshot/);
 assert.match(actionsSrc, /listClosedPickupOrderDates/);
 assert.match(actionsSrc, /getCustomerCakePickupMemberships/);
+assert.match(actionsSrc, /listAvailableCheckoutCakes/);
 assert.match(actionsSrc, /export async function submitGuestPreorderAction/);
 assert.match(actionsSrc, /loadOperatingHoursSnapshot\(\)/);
 assert.match(actionsSrc, /getStorefrontCollectionForPickupDate/);

@@ -152,7 +152,7 @@ import {
 import {
   loadCartDateCapacityAvailability,
   loadCheckoutCalendarContext,
-  loadCheckoutPickupOffer,
+  loadCheckoutDateConfirmation,
   resolveCheckoutCakeSizePrices,
   submitGuestPreorderAction,
   type CheckoutPickupOffer,
@@ -601,31 +601,145 @@ export function GuestCheckoutForm({
 
   useEffect(() => {
     if (!hydrated) return;
-    markCheckoutLoadOnce("calendar_context_start", checkoutLoadSeen.current);
     const cakeIds = cakeIdsKey.split(",").filter(Boolean);
+    const pickupDate = fields.pickupDate.trim().slice(0, 10);
     let cancelled = false;
-    void loadCheckoutCalendarContext({
+
+    const applyCalendar = (
+      context: Awaited<ReturnType<typeof loadCheckoutCalendarContext>>,
+    ) => {
+      setClosedDates(context.closedDates);
+      setEntrySpecialUnavailableDates(context.entrySpecialUnavailableDates);
+      setHoursSnapshot(context.hoursSnapshot);
+      setVenuePhotos(context.venuePhotos);
+      setLiveMinPickupDate(context.minPickupDate);
+      setLiveMaxPickupDate(context.maxPickupDate);
+      setLiveScopeConstrainsBounds(context.pickupScopeConstrainsBounds);
+      setCartPickupBounds(context.cartPickupBounds);
+      setCakePickupMemberships(context.cakePickupMemberships);
+      setActiveSpecialWindows(context.activeSpecialWindows);
+      setCalendarEarliestYmd(context.earliestPickupYmd);
+      setLoadedCakeIdsKey(cakeIds.join(","));
+      setCalendarError(null);
+      setCalendarReady(true);
+      markCheckoutLoadOnce("calendar_context_ready", checkoutLoadSeen.current);
+    };
+
+    const applyOffer = (
+      offer: CheckoutPickupOffer,
+      offerDate: string,
+    ) => {
+      setCakes(offer.cakes);
+      setUnavailableMessage(offer.unavailableMessage);
+      setCollectionId(offer.collection?.id ?? null);
+      setComplimentaryOptions(offer.complimentaryOptions);
+      setPaidAddonOptions(offer.paidAddonOptions);
+      setOptionsReady(offer.optionsReady);
+      setOfferLabel(
+        offer.collection
+          ? formatCollectionAvailabilityLabel(offer.collection)
+          : null,
+      );
+      setAddSizeByCake(
+        Object.fromEntries(
+          offer.cakes.map((cake) => [cake.id, cake.sizes[0]?.id ?? ""]),
+        ),
+      );
+      setItems((current) => {
+        let changed = false;
+        const next = current.map((item) => {
+          const cake = offer.cakes.find((entry) => entry.id === item.cakeId);
+          const size = cake?.sizes.find((entry) => entry.id === item.sizeId);
+          if (!cake || !size) return item;
+          if (
+            item.cakeName === cake.name &&
+            item.sizeLabel === size.size &&
+            item.preorderDays === size.preorderDays
+          ) {
+            return item;
+          }
+          changed = true;
+          return {
+            ...item,
+            cakeName: cake.name,
+            sizeLabel: size.size,
+            preorderDays: size.preorderDays,
+            imageUrl: item.imageUrl,
+          };
+        });
+        return changed ? next : current;
+      });
+      setResolvedOfferDate(offerDate);
+      setFields((current) => {
+        const complimentaryCodes = current.complimentaryCodes.filter((code) =>
+          offer.complimentaryOptions.some((option) => option.code === code),
+        );
+        const paidAddonCodes = current.paidAddonCodes.filter((code) =>
+          offer.paidAddonOptions.some((option) => option.code === code),
+        );
+        const paidAddonUnitPriceByCode = Object.fromEntries(
+          offer.paidAddonOptions.map((option) => [
+            option.code,
+            option.unitPrice,
+          ]),
+        );
+        return {
+          ...current,
+          complimentaryCodes,
+          paidAddonCodes,
+          paidAddonUnitPriceByCode,
+        };
+      });
+    };
+
+    markCheckoutLoadOnce("calendar_context_start", checkoutLoadSeen.current);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(pickupDate)) {
+      void loadCheckoutCalendarContext({
+        cakeIds,
+        fromQuery: pickupScopeFrom,
+        pickupQuery: suggestedPickupDate,
+        toQuery: pickupScopeTo,
+      }).then(
+        (context) => {
+          if (cancelled) return;
+          setCakes([]);
+          setUnavailableMessage(null);
+          setOfferLabel(null);
+          setCollectionId(null);
+          setComplimentaryOptions([]);
+          setPaidAddonOptions([]);
+          setOptionsReady(false);
+          setResolvedOfferDate(null);
+          applyCalendar(context);
+        },
+        () => {
+          if (cancelled) return;
+          setCalendarError(
+            "We couldn't confirm collection dates and opening hours. Please try again.",
+          );
+        },
+      );
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    markCheckoutLoadOnce("live_pickup_offer_start", checkoutLoadSeen.current);
+    markCheckoutLoadOnce("date_confirmation_start", checkoutLoadSeen.current);
+    void loadCheckoutDateConfirmation({
       cakeIds,
+      pickupDate,
       fromQuery: pickupScopeFrom,
       pickupQuery: suggestedPickupDate,
       toQuery: pickupScopeTo,
     }).then(
-      (context) => {
+      ({ calendar, offer }) => {
         if (cancelled) return;
-        setClosedDates(context.closedDates);
-        setEntrySpecialUnavailableDates(context.entrySpecialUnavailableDates);
-        setHoursSnapshot(context.hoursSnapshot);
-        setVenuePhotos(context.venuePhotos);
-        setLiveMinPickupDate(context.minPickupDate);
-        setLiveMaxPickupDate(context.maxPickupDate);
-        setLiveScopeConstrainsBounds(context.pickupScopeConstrainsBounds);
-        setCartPickupBounds(context.cartPickupBounds);
-        setCakePickupMemberships(context.cakePickupMemberships);
-        setActiveSpecialWindows(context.activeSpecialWindows);
-        setCalendarEarliestYmd(context.earliestPickupYmd);
-        setLoadedCakeIdsKey(cakeIds.join(","));
-        setCalendarError(null);
-        setCalendarReady(true);
+        checkoutPickupOfferCache.set(pickupDate, offer);
+        applyCalendar(calendar);
+        applyOffer(offer, pickupDate);
+        markCheckoutLoadOnce("live_pickup_offer_ready", checkoutLoadSeen.current);
+        markCheckoutLoadOnce("date_confirmed", checkoutLoadSeen.current);
       },
       () => {
         if (cancelled) return;
@@ -639,6 +753,7 @@ export function GuestCheckoutForm({
     };
   }, [
     cakeIdsKey,
+    fields.pickupDate,
     hydrated,
     pickupScopeFrom,
     pickupScopeTo,
@@ -743,103 +858,6 @@ export function GuestCheckoutForm({
     if (!hydrated) return;
     persistDraft(items, fields);
   }, [items, fields, hydrated]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    const pickupDate = fields.pickupDate;
-    if (!pickupDate) {
-      setCakes([]);
-      setUnavailableMessage(null);
-      setOfferLabel(null);
-      setCollectionId(null);
-      setComplimentaryOptions([]);
-      setPaidAddonOptions([]);
-      setOptionsReady(false);
-      setResolvedOfferDate(null);
-      return;
-    }
-
-    let cancelled = false;
-    const applyOffer = (offer: CheckoutPickupOffer) => {
-      if (cancelled) return;
-      setCakes(offer.cakes);
-      setUnavailableMessage(offer.unavailableMessage);
-      setCollectionId(offer.collection?.id ?? null);
-      setComplimentaryOptions(offer.complimentaryOptions);
-      setPaidAddonOptions(offer.paidAddonOptions);
-      setOptionsReady(offer.optionsReady);
-      setOfferLabel(
-        offer.collection
-          ? formatCollectionAvailabilityLabel(offer.collection)
-          : null,
-      );
-      setAddSizeByCake(
-        Object.fromEntries(
-          offer.cakes.map((cake) => [cake.id, cake.sizes[0]?.id ?? ""]),
-        ),
-      );
-      setItems((current) => {
-        let changed = false;
-        const next = current.map((item) => {
-          const cake = offer.cakes.find((entry) => entry.id === item.cakeId);
-          const size = cake?.sizes.find((entry) => entry.id === item.sizeId);
-          if (!cake || !size) return item;
-          if (
-            item.cakeName === cake.name &&
-            item.sizeLabel === size.size &&
-            item.preorderDays === size.preorderDays
-          ) {
-            return item;
-          }
-          changed = true;
-          return {
-            ...item,
-            cakeName: cake.name,
-            sizeLabel: size.size,
-            preorderDays: size.preorderDays,
-            imageUrl: item.imageUrl,
-          };
-        });
-        return changed ? next : current;
-      });
-      setResolvedOfferDate(pickupDate);
-      setFields((current) => {
-        const complimentaryCodes = current.complimentaryCodes.filter((code) =>
-          offer.complimentaryOptions.some((option) => option.code === code),
-        );
-        const paidAddonCodes = current.paidAddonCodes.filter((code) =>
-          offer.paidAddonOptions.some((option) => option.code === code),
-        );
-        const paidAddonUnitPriceByCode = Object.fromEntries(
-          offer.paidAddonOptions.map((option) => [
-            option.code,
-            option.unitPrice,
-          ]),
-        );
-        return {
-          ...current,
-          complimentaryCodes,
-          paidAddonCodes,
-          paidAddonUnitPriceByCode,
-        };
-      });
-    };
-
-    markCheckoutLoadOnce("live_pickup_offer_start", checkoutLoadSeen.current);
-    const cached = checkoutPickupOfferCache.get(pickupDate);
-    if (cached) {
-      applyOffer(cached);
-    } else {
-      void loadCheckoutPickupOffer(pickupDate).then((offer) => {
-        checkoutPickupOfferCache.set(pickupDate, offer);
-        applyOffer(offer);
-      });
-    }
-
-    return () => {
-      cancelled = true;
-    };
-  }, [fields.pickupDate, hydrated]);
 
   const sizeIdsKey = [...new Set(items.map((item) => item.sizeId).filter(Boolean))]
     .sort()

@@ -68,7 +68,7 @@ assert.doesNotMatch(handleSubmitSrc, /submitGuestPreorderAction\(/);
 assert.doesNotMatch(handleSubmitSrc, /loadCheckoutPickupOffer/);
 assert.doesNotMatch(handleSubmitSrc, /resolveCheckoutCakeSizePrices/);
 
-assert.match(confirmOrderSrc, /formAction\(formData\)/);
+assert.match(confirmOrderSrc, /submitGuestOrderAndNavigate/);
 assert.doesNotMatch(confirmOrderSrc, /setHydrated\(false\)/);
 assert.doesNotMatch(confirmOrderSrc, /StorefrontCheckoutLoading/);
 
@@ -77,7 +77,7 @@ assert.doesNotMatch(ackToggleSrc, /formAction\(/);
 assert.doesNotMatch(ackToggleSrc, /loadCheckoutPickupOffer/);
 assert.doesNotMatch(ackToggleSrc, /resolveCheckoutCakeSizePrices/);
 
-assert.match(formSrc, /void loadCheckoutPickupOffer\(pickupDate\)/);
+assert.match(formSrc, /loadCheckoutDateConfirmation\(/);
 assert.match(formSrc, /resolveCheckoutCakeSizePrices\(pickupDate, sizeIds\)/);
 assert.match(formSrc, /liveOfferPending/);
 assert.match(formSrc, /Price updated for your selected pickup date/);

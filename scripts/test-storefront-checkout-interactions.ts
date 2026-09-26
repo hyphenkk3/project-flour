@@ -62,7 +62,7 @@ assert.match(formSrc, /useLayoutEffect/);
 assert.match(formSrc, /checkoutCartCapacityKey/);
 assert.match(formSrc, /checkoutPickupOfferCache/);
 assert.match(formSrc, /checkoutCakeSizePriceCache/);
-assert.match(formSrc, /void loadCheckoutPickupOffer\(pickupDate\)/);
+assert.match(formSrc, /loadCheckoutDateConfirmation\(/);
 assert.match(formSrc, /resolveCheckoutCakeSizePrices\(pickupDate, sizeIds\)/);
 assert.match(formSrc, /checkoutCakeSizePriceCache\.clear/);
 assert.match(formSrc, /Price updated for your selected pickup date/);

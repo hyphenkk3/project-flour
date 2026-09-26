@@ -692,7 +692,7 @@ assert.doesNotMatch(actionsSrc, /getCurrentCollection/);
 assert.match(actionsSrc, /storefront_customer_preorder_options/);
 
 const formSrc = readSrc("src/workspaces/storefront/checkout/GuestCheckoutForm.tsx");
-assert.match(formSrc, /loadCheckoutPickupOffer/);
+assert.match(formSrc, /loadCheckoutDateConfirmation/);
 assert.match(formSrc, /suggestedPickupDate/);
 assert.match(formSrc, /loadCheckoutCalendarContext/);
 assert.match(formSrc, /effectivePickupBounds/);

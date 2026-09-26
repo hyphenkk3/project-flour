@@ -100,7 +100,7 @@ type LibraryCakeEmbed = {
     sort_order: number;
     preorder_days?: number | string | null;
   }> | null;
-  library_cake_photos: StorefrontCakePhotoRow[] | null;
+  library_cake_photos?: StorefrontCakePhotoRow[] | null;
 };
 
 type CatalogRow = {
@@ -704,6 +704,17 @@ export async function getStorefrontCollectionForPickupDate(
   return collectionFromRpc(data);
 }
 
+function mapAvailableCollectionCakes(
+  data: CatalogRow[] | null,
+): StorefrontCake[] {
+  return ((data ?? []) as unknown as CatalogRow[])
+    .map((row) => unwrapOne(row.library_cakes))
+    .filter((cake): cake is LibraryCakeEmbed => Boolean(cake))
+    .filter((cake) => isOfferableStatus(cake.status))
+    .map(mapStorefrontCake)
+    .filter((cake) => cake.sizes.length > 0);
+}
+
 export async function listAvailableCakes(
   collectionId: string,
 ): Promise<StorefrontCake[]> {
@@ -724,12 +735,48 @@ export async function listAvailableCakes(
       .order("sort_order", { ascending: true }),
   );
 
-  return ((data ?? []) as unknown as CatalogRow[])
-    .map((row) => unwrapOne(row.library_cakes))
-    .filter((cake): cake is LibraryCakeEmbed => Boolean(cake))
-    .filter((cake) => isOfferableStatus(cake.status))
-    .map(mapStorefrontCake)
-    .filter((cake) => cake.sizes.length > 0);
+  return mapAvailableCollectionCakes(data as CatalogRow[] | null);
+}
+
+/**
+ * Checkout date confirmation + add-another-cake list.
+ * Identity, sizes, and preorder days only — no photo/tag/category embeds.
+ */
+export async function listAvailableCheckoutCakes(
+  collectionId: string,
+): Promise<StorefrontCake[]> {
+  const supabase = createPublicClient();
+  const { data, error } = await supabase
+    .from("collection_cakes")
+    .select(
+      `
+      sort_order,
+      library_cakes (
+        id,
+        name,
+        description,
+        category_id,
+        status,
+        sharing_guide,
+        allergens,
+        library_cake_sizes (
+          id,
+          cake_id,
+          label,
+          price,
+          sort_order,
+          preorder_days
+        )
+      )
+    `,
+    )
+    .eq("collection_id", collectionId)
+    .eq("available", true)
+    .order("sort_order", { ascending: true });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return mapAvailableCollectionCakes(data as CatalogRow[] | null);
 }
 
 /**

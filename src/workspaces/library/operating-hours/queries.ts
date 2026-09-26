@@ -49,21 +49,23 @@ function missingTable(message: string): boolean {
 export async function loadOperatingHoursSnapshot(): Promise<OperatingHoursSnapshot> {
   try {
     const supabase = await createClient();
-    const weeklyResult = await supabase
-      .from("operating_hours_weekly")
-      .select(
-        "capability, weekday, enabled, opens_at, closes_at, latest_bookable, usual_start, usual_end",
-      );
+    const [weeklyResult, overrideResult] = await Promise.all([
+      supabase
+        .from("operating_hours_weekly")
+        .select(
+          "capability, weekday, enabled, opens_at, closes_at, latest_bookable, usual_start, usual_end",
+        ),
+      supabase
+        .from("operating_hours_date_overrides")
+        .select(
+          "override_date, capability, enabled, opens_at, closes_at, latest_bookable, usual_start, usual_end, note",
+        )
+        .order("override_date"),
+    ]);
     if (weeklyResult.error) {
       if (missingTable(weeklyResult.error.message)) return OPERATING_HOURS_SEED;
       throw new Error(weeklyResult.error.message);
     }
-    const overrideResult = await supabase
-      .from("operating_hours_date_overrides")
-      .select(
-        "override_date, capability, enabled, opens_at, closes_at, latest_bookable, usual_start, usual_end, note",
-      )
-      .order("override_date");
     if (overrideResult.error) {
       if (missingTable(overrideResult.error.message)) return OPERATING_HOURS_SEED;
       throw new Error(overrideResult.error.message);

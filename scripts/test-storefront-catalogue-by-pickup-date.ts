@@ -58,7 +58,7 @@ assert.doesNotMatch(checkoutSrc, /rpcArgs\.p_collection_id/);
 const formSrc = readSrc(
   "src/workspaces/storefront/checkout/GuestCheckoutForm.tsx",
 );
-assert.match(formSrc, /loadCheckoutPickupOffer/);
+assert.match(formSrc, /loadCheckoutDateConfirmation/);
 assert.match(formSrc, /unavailableMessage/);
 assert.match(
   formSrc,

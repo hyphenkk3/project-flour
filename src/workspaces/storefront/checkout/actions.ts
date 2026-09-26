@@ -48,7 +48,7 @@ import {
 import {
   getStorefrontCollectionForPickupDate,
   getCustomerCakePickupMemberships,
-  listAvailableCakes,
+  listAvailableCheckoutCakes,
   listCustomerSpecialCatalogues,
   listOrderableMonthlyCatalogues,
   unpublishedCataloguePreorderMessage,
@@ -662,8 +662,13 @@ export async function loadCheckoutPickupOffer(
       ...emptyOffer,
     };
   }
-  const collection = await getStorefrontCollectionForPickupDate(key);
+  const offerStarted = performance.now();
+  const [collection, supabase] = await Promise.all([
+    getStorefrontCollectionForPickupDate(key),
+    createClient(),
+  ]);
   if (!collection) {
+    logPerf("CHECKOUT_DATE", "pickup_offer_unpublished", performance.now() - offerStarted);
     return {
       collection: null,
       cakes: [],
@@ -671,9 +676,13 @@ export async function loadCheckoutPickupOffer(
       ...emptyOffer,
     };
   }
-  const cakes = await listAvailableCakes(collection.id);
-  const supabase = await createClient();
-  const options = await loadCustomerPreorderOptions(supabase, collection.id);
+  const [cakes, options] = await Promise.all([
+    listAvailableCheckoutCakes(collection.id),
+    loadCustomerPreorderOptions(supabase, collection.id),
+  ]);
+  logPerf("CHECKOUT_DATE", "pickup_offer", performance.now() - offerStarted, {
+    cakeCount: cakes.length,
+  });
   return {
     collection,
     cakes,
@@ -682,6 +691,28 @@ export async function loadCheckoutPickupOffer(
     paidAddonOptions: options.paidAddons,
     optionsReady: options.ready,
   };
+}
+
+export async function loadCheckoutDateConfirmation(input: {
+  cakeIds?: readonly string[];
+  pickupDate: string;
+  fromQuery?: string | null;
+  pickupQuery?: string | null;
+  toQuery?: string | null;
+}): Promise<{
+  calendar: CheckoutCalendarContext;
+  offer: CheckoutPickupOffer;
+}> {
+  const started = performance.now();
+  const [calendar, offer] = await Promise.all([
+    loadCheckoutCalendarContext(input),
+    loadCheckoutPickupOffer(input.pickupDate),
+  ]);
+  logPerf("CHECKOUT_DATE", "date_confirmation", performance.now() - started, {
+    pickupDate: input.pickupDate,
+    cakeCount: input.cakeIds?.length ?? 0,
+  });
+  return { calendar, offer };
 }
 
 export async function resolveCheckoutCakeSizePrices(
@@ -820,6 +851,7 @@ export async function loadCheckoutCalendarContext(input: {
   const cakeIds = [
     ...new Set((input.cakeIds ?? []).map((id) => id.trim()).filter(Boolean)),
   ];
+  const calendarStarted = performance.now();
   const earliest = earliestPickupDateYmd();
   const [catalogues, specials, hoursSnapshot, memberships, venuePhotos] =
     await Promise.all([
@@ -881,6 +913,10 @@ export async function loadCheckoutCalendarContext(input: {
         ].sort()
       : [];
 
+  logPerf("CHECKOUT_DATE", "calendar_context", performance.now() - calendarStarted, {
+    cakeCount: cakeIds.length,
+    closedDateCount: closedDates.length,
+  });
   return {
     cartPickupBounds,
     cakePickupMemberships: memberships,
