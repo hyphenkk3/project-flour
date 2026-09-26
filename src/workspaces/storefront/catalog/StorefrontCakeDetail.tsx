@@ -7,7 +7,7 @@ import { CakeDetailPickupScope } from "@/workspaces/storefront/catalog/CakeDetai
 import { StorefrontCakeDetailPerfProbe } from "@/workspaces/storefront/catalog/StorefrontCakeDetailPerfProbe";
 import { StorefrontCakeDetailView } from "@/workspaces/storefront/catalog/StorefrontCakeDetailView";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
-import { CakeOfferHint } from "@/workspaces/storefront/offers/CakeOfferHint";
+import { loadCakeOfferVoucher } from "@/workspaces/storefront/offers/CakeOfferHint";
 import {
   browseCakePreviewFromDisplay,
   getBrowseCakeDisplayById,
@@ -15,6 +15,12 @@ import {
   mergeBrowseCakeDisplay,
 } from "@/workspaces/storefront/catalog/queries";
 import type { StorefrontCake } from "@/types/storefront";
+import type { CatalogueVoucherRecord } from "@/types/catalogue-voucher";
+
+type CakeOffer = {
+  voucher: CatalogueVoucherRecord;
+  today: string;
+};
 
 type CakeDetailSearchParams = Promise<
   Record<string, string | string[] | undefined>
@@ -36,9 +42,11 @@ function ymdQueryValue(
 function CakeDetailFallback({
   availabilityNote,
   cake,
+  offer,
 }: {
   availabilityNote?: string | null;
   cake: StorefrontCake;
+  offer: CakeOffer | null;
 }) {
   return (
     <>
@@ -49,6 +57,8 @@ function CakeDetailFallback({
         availabilityNote={availabilityNote}
         cake={cake}
         hideAddToOrder
+        offerToday={offer?.today ?? null}
+        offerVoucher={offer?.voucher ?? null}
         pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
       />
     </>
@@ -77,16 +87,19 @@ function CakeDetailBodyFallback() {
 async function CakeDetailLive({
   displayPromise,
   livePromise,
+  offerPromise,
   searchParams,
 }: {
   displayPromise: ReturnType<typeof getBrowseCakeDisplayById>;
   livePromise: ReturnType<typeof getBrowsePublishedCakeById>;
+  offerPromise: ReturnType<typeof loadCakeOfferVoucher>;
   searchParams: CakeDetailSearchParams;
 }) {
-  const [display, cake, query] = await Promise.all([
+  const [display, cake, query, offer] = await Promise.all([
     displayPromise,
     livePromise,
     searchParams,
+    offerPromise,
   ]);
   if (!cake) {
     notFound();
@@ -102,6 +115,8 @@ async function CakeDetailLive({
         availabilityNote={merged.availabilityNote}
         cake={merged}
         hideAddToOrder={cake.currentlyOffered === false}
+        offerToday={offer?.today ?? null}
+        offerVoucher={offer?.voucher ?? null}
         pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
         urlFrom={ymdQueryValue(query.from)}
         urlPickup={ymdQueryValue(query.pickup)}
@@ -120,6 +135,7 @@ async function CakeDetailWithDisplay({
 }) {
   const displayPromise = getBrowseCakeDisplayById(cakeId);
   const livePromise = getBrowsePublishedCakeById(cakeId);
+  const offerPromise = loadCakeOfferVoucher(cakeId);
   const display = await displayPromise;
   const preview = browseCakePreviewFromDisplay(cakeId, display);
 
@@ -127,7 +143,7 @@ async function CakeDetailWithDisplay({
     <Suspense
       fallback={
         preview ? (
-          <CakeDetailFallback cake={preview} />
+          <CakeDetailFallback cake={preview} offer={null} />
         ) : (
           <CakeDetailBodyFallback />
         )
@@ -136,6 +152,7 @@ async function CakeDetailWithDisplay({
       <CakeDetailLive
         displayPromise={displayPromise}
         livePromise={livePromise}
+        offerPromise={offerPromise}
         searchParams={searchParams}
       />
     </Suspense>
@@ -151,9 +168,6 @@ async function CakeDetailResolved({
     <>
       <CakeDetailBackNav cakeId={id} />
       <PreorderInProgressBar />
-      <Suspense fallback={null}>
-        <CakeOfferHint cakeId={id} />
-      </Suspense>
       <Suspense fallback={<CakeDetailBodyFallback />}>
         <CakeDetailWithDisplay cakeId={id} searchParams={searchParams} />
       </Suspense>

@@ -41,6 +41,7 @@ const probeSrc = readSrc(
 assert.match(browsePage, /StorefrontBrowsePage/);
 assert.match(browseSrc, /listBrowsePublishedCakes/);
 assert.match(browseSrc, /BrowseCakeCatalogue cakes=\{cakes\}/);
+assert.match(browseSrc, /promotions=\{promotions\}/);
 assert.match(browseSrc, /StorefrontBrowsePerfProbe cakeCount=\{cakes\.length\}/);
 assert.match(catalogueSrc, /StorefrontCakeCard/);
 assert.match(catalogueSrc, /detailHref=\{detailHrefs\?\.\[cake\.id\]\}/);

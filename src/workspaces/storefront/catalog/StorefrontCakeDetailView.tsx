@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { CatalogueVoucherRecord } from "@/types/catalogue-voucher";
 import type { StorefrontCake } from "@/types/storefront";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import { CakeDetailPurchasePanel } from "@/workspaces/storefront/catalog/CakeDetailPurchasePanel";
@@ -19,6 +20,8 @@ type StorefrontCakeDetailViewProps = {
   pickupScopeFrom?: string | null;
   pickupScopeTo?: string | null;
   pickupScopePickup?: string | null;
+  offerToday?: string | null;
+  offerVoucher?: CatalogueVoucherRecord | null;
 };
 
 export function StorefrontCakeDetailView({
@@ -29,6 +32,8 @@ export function StorefrontCakeDetailView({
   pickupScopeFrom,
   pickupScopeTo,
   pickupScopePickup,
+  offerToday = null,
+  offerVoucher = null,
 }: StorefrontCakeDetailViewProps) {
   const [selectedSizeId, setSelectedSizeId] = useState(cake.sizes[0]?.id ?? "");
   const hero = storefrontPhotoForSize(cake.photos, selectedSizeId);
@@ -83,6 +88,8 @@ export function StorefrontCakeDetailView({
         availabilityNote={availabilityNote}
         cake={cake}
         hideAddToOrder={hideAddToOrder}
+        offerToday={offerToday}
+        offerVoucher={offerVoucher}
         onSelectedSizeIdChange={setSelectedSizeId}
         pickupDateNotice={pickupDateNotice}
         pickupScopeFrom={pickupScopeFrom}

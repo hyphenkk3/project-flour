@@ -19,6 +19,7 @@ import {
   viewBrowseCatalogue,
   type BrowseSortId,
 } from "@/workspaces/storefront/catalog/browse-sort";
+import type { CataloguePromotionBadge } from "@/engines/vouchers/catalogue-promotion-presentation";
 import { StorefrontCakeCard } from "@/workspaces/storefront/catalog/StorefrontCakeCard";
 
 type BrowseCake = StorefrontCake & {
@@ -44,6 +45,7 @@ type BrowseCakeCatalogueProps = {
   emptyMessage?: string;
   pickupScope?: AddToOrderPickupScope | null;
   detailHrefs?: Readonly<Record<string, string>>;
+  promotions?: Readonly<Record<string, CataloguePromotionBadge>>;
 };
 
 type FilterFieldsProps = {
@@ -275,6 +277,7 @@ export function BrowseCakeCatalogue({
   emptyMessage = DEFAULT_EMPTY_MESSAGE,
   pickupScope = null,
   detailHrefs,
+  promotions,
 }: BrowseCakeCatalogueProps) {
   const searchId = useId();
   const sortId = useId();
@@ -479,6 +482,7 @@ export function BrowseCakeCatalogue({
                 detailHref={detailHrefs?.[cake.id]}
                 hideAddToOrder={cake.currentlyOffered === false}
                 pickupScope={pickupScope}
+                promotion={promotions?.[cake.id] ?? null}
               />
             </li>
           ))}

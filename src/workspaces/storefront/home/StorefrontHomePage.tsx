@@ -51,6 +51,17 @@ import { HomePopularCakes } from "@/workspaces/storefront/home/HomePopularCakes"
 import { HomeVisitFooter } from "@/workspaces/storefront/home/HomeVisitFooter";
 import { StorefrontCakePrefetch } from "@/workspaces/storefront/home/StorefrontCakePrefetch";
 import type { StorefrontCake } from "@/types/storefront";
+import { singaporeDateFromIso } from "@/engines/orders/promotions";
+import {
+  buildTargetedPromotionBadgeByCakeId,
+  cakeHasNewMerchandisingTag,
+  catalogueVoucherTargetsCake,
+  isCatalogueVoucherCakeTargeted,
+  listDiscoverableCatalogueVouchers,
+  sortCakesForCataloguePromotionPresentation,
+} from "@/engines/vouchers/catalogue-promotion-presentation";
+import { catalogueVoucherAllowsOrderType } from "@/engines/vouchers/catalogue-voucher";
+import { listPublicCatalogueVouchers } from "@/workspaces/vouchers/catalogue-queries";
 
 function monthDisplayName(monthYmd: string): string {
   return orderCollectionHeadline(monthYmd).replace(/ \d{4}/, "");
@@ -265,7 +276,7 @@ async function HomeMerchandisingIsland() {
     monthlies: catalogues,
   });
 
-  const [popular, featured] = await Promise.all([
+  const [popular, featured, vouchers] = await Promise.all([
     popularPromise,
     Promise.all(
       selection.featured.map(async (candidate) => {
@@ -297,7 +308,31 @@ async function HomeMerchandisingIsland() {
       };
       }),
     ),
+    listPublicCatalogueVouchers(),
   ]);
+  const offerToday = singaporeDateFromIso(new Date().toISOString());
+  const targetedPromotions = listDiscoverableCatalogueVouchers(
+    vouchers,
+    offerToday,
+  ).filter(
+    (voucher) =>
+      isCatalogueVoucherCakeTargeted(voucher) &&
+      catalogueVoucherAllowsOrderType(voucher.rules, "preorder"),
+  );
+  const promotionBadges = Object.fromEntries(
+    buildTargetedPromotionBadgeByCakeId(vouchers, offerToday, "preorder"),
+  );
+  const featuredWithPromotions = featured.map((collection) => ({
+    ...collection,
+    cakes: sortCakesForCataloguePromotionPresentation(collection.cakes, {
+      isNew: cakeHasNewMerchandisingTag,
+      isTargetedPromotion: (cake) =>
+        targetedPromotions.some((voucher) =>
+          catalogueVoucherTargetsCake(voucher, cake.id),
+        ),
+      manualOrder: (_cake, index) => index + 1,
+    }),
+  }));
 
   const more = selection.more.map((candidate) => {
     const monthly =
@@ -320,11 +355,11 @@ async function HomeMerchandisingIsland() {
     <>
       <StorefrontCakePrefetch
         excludeIds={popular.map((cake) => cake.id)}
-        hrefs={featured.flatMap((collection) =>
+        hrefs={featuredWithPromotions.flatMap((collection) =>
           Object.values(collection.cakeHrefs),
         )}
       />
-      {featured.map((collection) => (
+      {featuredWithPromotions.map((collection) => (
         <CakeEntryScopeCapture
           key={collection.id}
           scopes={collection.cakeScopes}
@@ -335,6 +370,7 @@ async function HomeMerchandisingIsland() {
             description={collection.description}
             heading={collection.heading}
             kicker={collection.kicker}
+            promotions={promotionBadges}
             viewAllHref={collection.href}
             viewAllLabel={collection.viewAllLabel}
           />

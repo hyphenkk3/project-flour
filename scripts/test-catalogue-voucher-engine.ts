@@ -616,7 +616,7 @@ assert.match(
 );
 assert.match(
   readSrc("src/workspaces/storefront/catalog/StorefrontCakeDetail.tsx"),
-  /CakeOfferHint/,
+  /loadCakeOfferVoucher|CakeOfferHint/,
 );
 assert.equal(CATALOGUE_VOUCHER_ADJUSTMENT_CODE, "catalogue_voucher");
 assert.equal(formatCatalogueVoucherHeadline(voucher()), "RM10 OFF");
@@ -762,7 +762,7 @@ assert.match(
 );
 assert.match(
   readSrc("src/workspaces/storefront/offers/StorefrontOffersPage.tsx"),
-  /summarizeCatalogueVoucherRules|CatalogueOfferCard/,
+  /CatalogueOfferCard/,
 );
 
 const cakeHintSrc = readSrc("src/workspaces/storefront/offers/CakeOfferHint.tsx");
@@ -772,10 +772,11 @@ assert.match(cakeHintSrc, /catalogueVoucherAllowsOrderType/);
 
 const publicQueriesSrc = readSrc("src/workspaces/vouchers/catalogue-queries.ts");
 const publicListFn = publicQueriesSrc.slice(
-  publicQueriesSrc.indexOf("export async function listPublicCatalogueVouchers"),
+  publicQueriesSrc.indexOf("async function loadPublicCatalogueVouchers"),
   publicQueriesSrc.indexOf("export async function listStaffCatalogueVouchers"),
 );
 assert.match(publicListFn, /createPublicClient/);
+assert.match(publicListFn, /export async function listPublicCatalogueVouchers/);
 assert.doesNotMatch(publicListFn, /createClient\(/);
 
 const middlewareSrc = readSrc("src/middleware.ts");

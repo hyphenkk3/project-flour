@@ -4,6 +4,7 @@ import {
 } from "@/engines/vouchers/catalogue-voucher";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { createClient, createPublicClient } from "@/lib/supabase/server";
+import { cache } from "react";
 import type {
   CatalogueVoucherRecord,
   CatalogueVoucherRuleType,
@@ -92,9 +93,7 @@ function mapPublicVoucher(row: PublicVoucher): CatalogueVoucherRecord {
   };
 }
 
-export async function listPublicCatalogueVouchers(): Promise<
-  CatalogueVoucherRecord[]
-> {
+async function loadPublicCatalogueVouchers(): Promise<CatalogueVoucherRecord[]> {
   try {
     const supabase = createPublicClient();
     const { data, error } = await supabase.rpc("list_public_catalogue_vouchers");
@@ -106,6 +105,14 @@ export async function listPublicCatalogueVouchers(): Promise<
   } catch {
     return [];
   }
+}
+
+const readPublicCatalogueVouchers = cache(loadPublicCatalogueVouchers);
+
+export async function listPublicCatalogueVouchers(): Promise<
+  CatalogueVoucherRecord[]
+> {
+  return readPublicCatalogueVouchers();
 }
 
 export async function listStaffCatalogueVouchers(): Promise<

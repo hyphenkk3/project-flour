@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
+import type { CatalogueVoucherRecord } from "@/types/catalogue-voucher";
 import type { StorefrontCake } from "@/types/storefront";
+import { CakeOfferCard } from "@/workspaces/storefront/offers/CakeOfferCard";
 import { AddToOrderButton } from "@/workspaces/storefront/cart/AddToOrderSheet";
 import { usePreorderDraft } from "@/workspaces/storefront/cart/usePreorderDraft";
 import { draftLineQuantity } from "@/workspaces/storefront/checkout/preorder-draft";
@@ -23,6 +25,8 @@ type CakeDetailPurchasePanelProps = {
   pickupScopePickup?: string | null;
   selectedSizeId: string;
   onSelectedSizeIdChange: (sizeId: string) => void;
+  offerToday?: string | null;
+  offerVoucher?: CatalogueVoucherRecord | null;
 };
 
 export function CakeDetailPurchasePanel({
@@ -35,6 +39,8 @@ export function CakeDetailPurchasePanel({
   pickupScopePickup = null,
   selectedSizeId,
   onSelectedSizeIdChange,
+  offerToday = null,
+  offerVoucher = null,
 }: CakeDetailPurchasePanelProps) {
   const draft = usePreorderDraft();
   const selectedSize = cake.sizes.find((size) => size.id === selectedSizeId);
@@ -141,6 +147,14 @@ export function CakeDetailPurchasePanel({
           })}
         </ul>
       </section>
+
+      {offerVoucher && offerToday ? (
+        <CakeOfferCard
+          selectedSizeLabel={selectedSize?.size ?? null}
+          today={offerToday}
+          voucher={offerVoucher}
+        />
+      ) : null}
 
       {availabilityNote ? (
         <p

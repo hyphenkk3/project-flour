@@ -5,7 +5,9 @@ import {
   HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX,
   takeHomepageCollectionPreviewCakes,
 } from "@/engines/menu/homepage-collection-preview";
+import type { CataloguePromotionBadge } from "@/engines/vouchers/catalogue-promotion-presentation";
 import type { StorefrontCake } from "@/types/storefront";
+import { StorefrontPromotionBadge } from "@/workspaces/storefront/offers/StorefrontPromotionBadge";
 import { storefrontCatalogueListingPhoto } from "@/workspaces/storefront/catalog/cake-photo-map";
 import {
   cakeCardPreorderLabel,
@@ -21,6 +23,7 @@ export type HomeFeaturedCollectionProps = {
   viewAllLabel: string;
   cakes: readonly StorefrontCake[];
   cakeHrefs: Readonly<Record<string, string>>;
+  promotions?: Readonly<Record<string, CataloguePromotionBadge>>;
 };
 
 export function HomeFeaturedCollection({
@@ -31,6 +34,7 @@ export function HomeFeaturedCollection({
   viewAllLabel,
   cakes,
   cakeHrefs,
+  promotions,
 }: HomeFeaturedCollectionProps) {
   const previewCakes = takeHomepageCollectionPreviewCakes(cakes);
 
@@ -87,6 +91,12 @@ export function HomeFeaturedCollection({
                       <h3 className="font-display text-ink group-hover:text-skyline mt-1.5 line-clamp-2 min-h-[2.3em] text-[0.88rem] leading-snug tracking-tight">
                         {cake.name}
                       </h3>
+                      {promotions?.[cake.id] ? (
+                        <StorefrontPromotionBadge
+                          badge={promotions[cake.id]!}
+                          compact
+                        />
+                      ) : null}
                       {price ? (
                         <p className="text-ink mt-0.5 text-xs tabular-nums">
                           {price}

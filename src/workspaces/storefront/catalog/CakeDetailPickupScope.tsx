@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import type { CatalogueVoucherRecord } from "@/types/catalogue-voucher";
 import type { StorefrontCake } from "@/types/storefront";
 import {
   getStoredCakeEntryScopeSnapshot,
@@ -14,6 +15,8 @@ type CakeDetailPickupScopeProps = {
   cake: StorefrontCake;
   hideAddToOrder?: boolean;
   pickupDateNotice?: string | null;
+  offerToday?: string | null;
+  offerVoucher?: CatalogueVoucherRecord | null;
   urlFrom?: string | null;
   urlPickup?: string | null;
   urlTo?: string | null;
@@ -23,6 +26,8 @@ export function CakeDetailPickupScope({
   availabilityNote,
   cake,
   hideAddToOrder = false,
+  offerToday = null,
+  offerVoucher = null,
   pickupDateNotice,
   urlFrom = null,
   urlPickup = null,
@@ -52,6 +57,8 @@ export function CakeDetailPickupScope({
       availabilityNote={availabilityNote}
       cake={cake}
       hideAddToOrder={hideAddToOrder}
+      offerToday={offerToday}
+      offerVoucher={offerVoucher}
       pickupDateNotice={pickupDateNotice}
       pickupScopeFrom={scope?.from ?? null}
       pickupScopePickup={scope?.pickup ?? null}

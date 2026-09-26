@@ -28,7 +28,11 @@ export async function StorefrontOffersPage() {
       {vouchers.length > 0 ? (
         <section className="mt-8 grid gap-5 sm:grid-cols-2">
           {vouchers.map((voucher) => (
-            <CatalogueOfferCard key={voucher.id} voucher={voucher} />
+            <CatalogueOfferCard
+              key={voucher.id}
+              today={today}
+              voucher={voucher}
+            />
           ))}
         </section>
       ) : (

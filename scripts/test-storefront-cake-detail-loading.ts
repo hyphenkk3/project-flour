@@ -64,23 +64,31 @@ assert.doesNotMatch(pageSrc, /StorefrontCakeDetailLoading/);
 
 const queriesSrc = readSrc(detailQuery);
 assert.doesNotMatch(detailSrc, /createClient|cookies\(/);
-assert.match(detailSrc, /CakeOfferHint/);
+assert.match(detailSrc, /loadCakeOfferVoucher|CakeOfferHint/);
 
 const offerHintSrc = readSrc("src/workspaces/storefront/offers/CakeOfferHint.tsx");
 assert.match(offerHintSrc, /listPublicCatalogueVouchers/);
 assert.match(offerHintSrc, /catalogueVoucherAllowsOrderType/);
-assert.match(offerHintSrc, /<aside/);
-assert.match(offerHintSrc, /href="\/offers"/);
 assert.doesNotMatch(offerHintSrc, /["']use client["']/);
 assert.doesNotMatch(offerHintSrc, /CakeOfferHintView|fresh-pick-cart|createClient|cookies\(/);
 assert.match(offerHintSrc, /try \{/);
 assert.match(offerHintSrc, /return null/);
 
+const offerCardSrc = readSrc("src/workspaces/storefront/offers/CakeOfferCard.tsx");
+assert.match(offerCardSrc, /<aside/);
+assert.match(offerCardSrc, /href="\/offers"/);
+assert.match(offerCardSrc, /offer\.autoApplyNote/);
+assert.match(
+  readSrc("src/engines/vouchers/catalogue-promotion-presentation.ts"),
+  /Automatically applied at checkout when eligible/,
+);
+assert.doesNotMatch(offerCardSrc, /Available for this cake|Discount available/);
+
 const publicVoucherQueries = readSrc(
   "src/workspaces/vouchers/catalogue-queries.ts",
 );
 const publicListStart = publicVoucherQueries.indexOf(
-  "export async function listPublicCatalogueVouchers",
+  "async function loadPublicCatalogueVouchers",
 );
 const staffListStart = publicVoucherQueries.indexOf(
   "export async function listStaffCatalogueVouchers",

@@ -9,6 +9,9 @@ import {
 } from "@/workspaces/storefront/catalog/CakeEntryScopeCapture";
 import { StorefrontListingRestore } from "@/workspaces/storefront/catalog/StorefrontListingRestore";
 import { listBrowsePublishedCakes } from "@/workspaces/storefront/catalog/queries";
+import { singaporeDateFromIso } from "@/engines/orders/promotions";
+import { buildTargetedPromotionBadgeByCakeId } from "@/engines/vouchers/catalogue-promotion-presentation";
+import { listPublicCatalogueVouchers } from "@/workspaces/vouchers/catalogue-queries";
 import {
   StorefrontHomeLink,
   StorefrontStaffSignIn,
@@ -31,7 +34,14 @@ function BrowseCatalogueFallback() {
 }
 
 async function BrowseCatalogueIsland() {
-  const cakes = await listBrowsePublishedCakes();
+  const [cakes, vouchers] = await Promise.all([
+    listBrowsePublishedCakes(),
+    listPublicCatalogueVouchers(),
+  ]);
+  const today = singaporeDateFromIso(new Date().toISOString());
+  const promotions = Object.fromEntries(
+    buildTargetedPromotionBadgeByCakeId(vouchers, today, "preorder"),
+  );
   const cakeScopes = Object.fromEntries(
     cakes.map((cake) => [cake.id, { origin: "browse" as const }]),
   );
@@ -42,7 +52,7 @@ async function BrowseCatalogueIsland() {
       </h2>
       <CakeEntryScopeCapture scopes={cakeScopes}>
         <StorefrontBrowsePerfProbe cakeCount={cakes.length} />
-        <BrowseCakeCatalogue cakes={cakes} />
+        <BrowseCakeCatalogue cakes={cakes} promotions={promotions} />
         <StorefrontListingRestore origin="browse" />
       </CakeEntryScopeCapture>
     </section>

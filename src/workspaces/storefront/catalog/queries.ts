@@ -326,7 +326,7 @@ function libraryCakeEmbedSelect(
 
 /** Homepage Popular/Featured cards: name, photo, sizes (display price + preorder). */
 function homepageCakeCardEmbedSelect(photoSelect: string): string {
-  return libraryCakeEmbedSelect(photoSelect, false, false, true);
+  return libraryCakeEmbedSelect(photoSelect, false, true, true);
 }
 
 async function withCakePhotoSelectFallback<T>(

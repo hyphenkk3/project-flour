@@ -5,7 +5,9 @@ import { StorefrontCakeDetailLink } from "@/workspaces/storefront/catalog/Storef
 import { BROWSE_CURRENTLY_UNAVAILABLE_NOTE } from "@/engines/menu/homepage-collection-preview";
 import type { StorefrontCake } from "@/types/storefront";
 import { AddToOrderButton, type AddToOrderPickupScope } from "@/workspaces/storefront/cart/AddToOrderSheet";
+import type { CataloguePromotionBadge } from "@/engines/vouchers/catalogue-promotion-presentation";
 import { storefrontCatalogueListingPhoto } from "@/workspaces/storefront/catalog/cake-photo-map";
+import { StorefrontPromotionBadge } from "@/workspaces/storefront/offers/StorefrontPromotionBadge";
 import {
   cakeCardPreorderBadgeTone,
   cakeCardPreorderLabel,
@@ -25,6 +27,7 @@ type StorefrontCakeCardProps = {
   /** Collection entry scope forwarded to cake detail. */
   detailHref?: string;
   pickupScope?: AddToOrderPickupScope | null;
+  promotion?: CataloguePromotionBadge | null;
 };
 
 const PREORDER_BADGE_BASE =
@@ -43,6 +46,7 @@ export function StorefrontCakeCard({
   hideAddToOrder = false,
   detailHref,
   pickupScope = null,
+  promotion = null,
 }: StorefrontCakeCardProps) {
   const from = startingPrice(cake);
   const sizes = formatAvailableSizes(cake);
@@ -123,6 +127,7 @@ export function StorefrontCakeCard({
               </StorefrontCakeDetailLink>
             )}
           </h2>
+          {promotion ? <StorefrontPromotionBadge badge={promotion} /> : null}
           {preorder ? (
             <p className="text-skyline mt-1.5 hidden text-[11px] font-medium tracking-[0.16em] uppercase sm:block">
               {preorder}
