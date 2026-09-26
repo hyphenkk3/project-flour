@@ -23,6 +23,7 @@ import {
   parseCollectionScrollY,
   readStoredCakeEntryScope,
   resolveCakeDetailBackNav,
+  shouldRestoreCakeDetailBackFromHistory,
   resolveCakeDetailPickupScope,
   resolveCollectionBrowseRestore,
   resolveListingBrowseRestore,
@@ -240,6 +241,42 @@ assert.deepEqual(
     origin: "browse",
   }),
   CAKE_DETAIL_BROWSE_BACK,
+);
+assert.equal(
+  shouldRestoreCakeDetailBackFromHistory({
+    destHref: "/browse",
+    storedOrigin: "browse",
+    historyLength: 3,
+    modifiedClick: false,
+  }),
+  true,
+);
+assert.equal(
+  shouldRestoreCakeDetailBackFromHistory({
+    destHref: "/browse",
+    storedOrigin: "browse",
+    historyLength: 1,
+    modifiedClick: false,
+  }),
+  false,
+);
+assert.equal(
+  shouldRestoreCakeDetailBackFromHistory({
+    destHref: "/browse",
+    storedOrigin: "browse",
+    historyLength: 3,
+    modifiedClick: true,
+  }),
+  false,
+);
+assert.equal(
+  shouldRestoreCakeDetailBackFromHistory({
+    destHref: "/",
+    storedOrigin: undefined,
+    historyLength: 3,
+    modifiedClick: false,
+  }),
+  false,
 );
 assert.deepEqual(
   resolveCakeDetailBackNav({
@@ -779,6 +816,8 @@ const backNavSrc = readSrc(
   "src/workspaces/storefront/catalog/CakeDetailBackNav.tsx",
 );
 assert.match(backNavSrc, /resolveCakeDetailBackNav/);
+assert.match(backNavSrc, /shouldRestoreCakeDetailBackFromHistory/);
+assert.match(backNavSrc, /router\.back\(\)/);
 assert.match(backNavSrc, /getStoredCakeEntryScopeSnapshot/);
 assert.doesNotMatch(backNavSrc, /useSearchParams/);
 assert.doesNotMatch(backNavSrc, /Choose your collection/);

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, type PointerEvent, type ReactNode } from "react";
+import { markStorefrontNavIntent } from "@/lib/perf/storefront-nav-client";
 import {
   canonicalCakeDetailPath,
   prefetchCanonicalCakeDetail,
@@ -53,10 +54,12 @@ export function StorefrontCakeDetailLink({
 
   function onPointerDown() {
     window.clearTimeout(hoverTimer.current);
+    if (canonical) markStorefrontNavIntent(canonical, "cake");
     startPrefetch();
   }
 
   function onFocus() {
+    if (canonical) markStorefrontNavIntent(canonical, "cake");
     startPrefetch();
   }
 

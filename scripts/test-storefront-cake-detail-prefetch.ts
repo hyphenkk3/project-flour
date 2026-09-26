@@ -129,6 +129,7 @@ assert.match(linkSrc, /prefetchCanonicalCakeDetail/);
 assert.match(linkSrc, /router\.prefetch/);
 assert.match(linkSrc, /urgent:\s*true/);
 assert.match(linkSrc, /active:opacity-70/);
+assert.match(linkSrc, /markStorefrontNavIntent/);
 assert.doesNotMatch(linkSrc, /onIntent/);
 assert.doesNotMatch(linkSrc, /intent && canonical/);
 

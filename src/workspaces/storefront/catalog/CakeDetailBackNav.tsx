@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
+import { useSyncExternalStore, type MouseEvent } from "react";
+import { markStorefrontNavIntent } from "@/lib/perf/storefront-nav-client";
 import {
   getStoredCakeEntryScopeSnapshot,
   resolveCakeDetailBackNav,
+  shouldRestoreCakeDetailBackFromHistory,
   subscribeCakeEntryScope,
 } from "@/workspaces/storefront/catalog/cake-entry-scope";
 
@@ -20,6 +23,7 @@ type CakeDetailBackNavLinkProps = {
 };
 
 export function CakeDetailBackNav({ cakeId }: CakeDetailBackNavLinkProps) {
+  const router = useRouter();
   const ready = useSyncExternalStore(
     subscribeClientReady,
     () => true,
@@ -43,8 +47,40 @@ export function CakeDetailBackNav({ cakeId }: CakeDetailBackNavLinkProps) {
   }
 
   const dest = resolveCakeDetailBackNav(stored);
+
+  function onPointerDown() {
+    markStorefrontNavIntent(dest.href, "back");
+  }
+
+  function onClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (
+      !shouldRestoreCakeDetailBackFromHistory({
+        destHref: dest.href,
+        storedOrigin: stored?.origin,
+        historyLength: window.history.length,
+        modifiedClick:
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey ||
+          event.button !== 0,
+      })
+    ) {
+      return;
+    }
+    event.preventDefault();
+    router.back();
+  }
+
   return (
-    <Link className={BACK_LINK_CLASS} href={dest.href} prefetch>
+    <Link
+      className={BACK_LINK_CLASS}
+      data-cake-detail-back=""
+      href={dest.href}
+      onClick={onClick}
+      onPointerDown={onPointerDown}
+      prefetch
+    >
       {dest.label}
     </Link>
   );

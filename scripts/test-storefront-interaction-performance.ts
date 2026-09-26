@@ -34,6 +34,7 @@ const cakeLink = readSrc(
 assert.match(cakeLink, /prefetch=\{false\}/);
 assert.match(cakeLink, /onPointerDown/);
 assert.match(cakeLink, /prefetchCanonicalCakeDetail/);
+assert.match(cakeLink, /markStorefrontNavIntent/);
 assert.match(cakeLink, /urgent:\s*true/);
 assert.match(cakeLink, /active:opacity-70/);
 assert.doesNotMatch(cakeLink, /onIntent/);

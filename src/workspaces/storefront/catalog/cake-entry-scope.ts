@@ -219,6 +219,30 @@ export function resolveCakeDetailBackNav(
   return CAKE_DETAIL_HOME_BACK;
 }
 
+/** In-app Back should restore history, not refetch force-dynamic listings. */
+export function shouldRestoreCakeDetailBackFromHistory(input: {
+  destHref: string;
+  storedOrigin: CakeEntryOriginKind | undefined;
+  historyLength: number;
+  modifiedClick: boolean;
+}): boolean {
+  if (input.modifiedClick) return false;
+  if (input.historyLength < 2) return false;
+  if (input.storedOrigin === "browse" && input.destHref === "/browse") {
+    return true;
+  }
+  if (input.storedOrigin === "home" && input.destHref === "/") {
+    return true;
+  }
+  if (
+    input.storedOrigin === "collection" &&
+    input.destHref.startsWith("/order/collection/")
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function resolveListingBrowseRestore(input: {
   stored: CakeEntryScopeRecord | null;
   origin: CakeEntryOriginKind;

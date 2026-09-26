@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { StorefrontListingIntentPrefetch } from "@/workspaces/storefront/catalog/StorefrontListingIntentPrefetch";
 import { StorefrontPinchZoomLock } from "@/workspaces/storefront/StorefrontPinchZoomLock";
 import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
 
@@ -12,6 +13,7 @@ export function StorefrontShell({
     <div className="bg-paper min-h-dvh">
       <StorefrontPinchZoomLock />
       <StorefrontTheme />
+      <StorefrontListingIntentPrefetch />
       {children}
     </div>
   );

@@ -60,7 +60,20 @@ assert.doesNotMatch(linkSrc, /prefetch=\{true\}/);
 assert.doesNotMatch(linkSrc, /prefetch=\{Boolean\(canonical\)\}/);
 
 assert.match(backSrc, /resolveCakeDetailBackNav/);
+assert.match(backSrc, /shouldRestoreCakeDetailBackFromHistory/);
+assert.match(backSrc, /router\.back\(\)/);
 assert.match(backSrc, /prefetch/);
+
+const listingIntentSrc = readSrc(
+  "src/workspaces/storefront/catalog/StorefrontListingIntentPrefetch.tsx",
+);
+assert.match(listingIntentSrc, /router\.prefetch/);
+assert.match(listingIntentSrc, /href === "\/browse"/);
+assert.doesNotMatch(listingIntentSrc, /\/cakes\//);
+assert.match(
+  readSrc("src/workspaces/storefront/StorefrontShell.tsx"),
+  /StorefrontListingIntentPrefetch/,
+);
 
 assert.match(probeSrc, /BROWSE_NAV/);
 assert.match(probeSrc, /viewportCakePrefetches: 0/);

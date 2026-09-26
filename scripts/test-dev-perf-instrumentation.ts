@@ -24,6 +24,11 @@ import {
   resolveCheckoutLoadClock,
   startCheckoutAttemptTiming,
 } from "@/lib/perf/dev-only-client";
+import {
+  consumeStorefrontNavIntent,
+  markStorefrontNavIntent,
+  resetStorefrontNavIntentForTests,
+} from "@/lib/perf/storefront-nav-client";
 
 function readSrc(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -324,5 +329,34 @@ assert.equal(readActiveSuccessNavigation("pnav0000001"), null);
 assert.equal(readActiveSuccessNavigation("pnav0000002"), null);
 resetCheckoutAttemptTiming();
 assert.equal(readActiveSuccessNavigation("pnav0000002"), null);
+
+resetStorefrontNavIntentForTests();
+assert.equal(
+  consumeStorefrontNavIntent({ href: "/browse", kinds: ["browse"] }),
+  null,
+);
+const marked = markStorefrontNavIntent("/browse", "browse");
+assert.ok(marked?.correlationId);
+assert.equal(
+  consumeStorefrontNavIntent({ href: "/cakes/x", kinds: ["browse"] }),
+  null,
+);
+const consumed = consumeStorefrontNavIntent({
+  href: "/browse",
+  kinds: ["browse", "back"],
+});
+assert.equal(consumed?.correlationId, marked?.correlationId);
+assert.equal(consumed?.kind, "browse");
+assert.equal(typeof consumed?.intentToVisibleMs, "number");
+assert.equal(
+  consumeStorefrontNavIntent({ href: "/browse", kinds: ["browse"] }),
+  null,
+);
+resetStorefrontNavIntentForTests();
+
+const navClientSrc = readSrc("src/lib/perf/storefront-nav-client.ts");
+assert.match(navClientSrc, /timeOrigin/);
+assert.match(navClientSrc, /elapsedPerfMs/);
+assert.doesNotMatch(navClientSrc, /Date\.now\(\)/);
 
 console.log("PASS dev perf instrumentation");

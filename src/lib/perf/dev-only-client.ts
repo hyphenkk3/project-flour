@@ -183,7 +183,8 @@ export function logCheckoutClient(
     | "CHECKOUT_SUCCESS_SERVER"
     | "CHECKOUT_SUCCESS_PHOTO"
     | "CHECKOUT_NAV"
-    | "BROWSE_NAV",
+    | "BROWSE_NAV"
+    | "STOREFRONT_NAV",
   fields: Record<string, string | number | boolean | null | undefined>,
 ): void {
   if (!canUseBrowserTools()) return;

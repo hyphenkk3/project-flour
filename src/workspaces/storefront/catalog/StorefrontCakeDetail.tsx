@@ -1,8 +1,10 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { CUSTOMER_PICKUP_DATE_CAKE_NOTICE } from "@/engines/menu/customer-browse";
+import { isDevPerfEnabled } from "@/lib/perf/dev-only-shared";
 import { CakeDetailBackNav } from "@/workspaces/storefront/catalog/CakeDetailBackNav";
 import { CakeDetailPickupScope } from "@/workspaces/storefront/catalog/CakeDetailPickupScope";
+import { StorefrontCakeDetailPerfProbe } from "@/workspaces/storefront/catalog/StorefrontCakeDetailPerfProbe";
 import { StorefrontCakeDetailView } from "@/workspaces/storefront/catalog/StorefrontCakeDetailView";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
 import { CakeOfferHint } from "@/workspaces/storefront/offers/CakeOfferHint";
@@ -39,12 +41,17 @@ function CakeDetailFallback({
   cake: StorefrontCake;
 }) {
   return (
-    <StorefrontCakeDetailView
-      availabilityNote={availabilityNote}
-      cake={cake}
-      hideAddToOrder
-      pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
-    />
+    <>
+      {isDevPerfEnabled() ? (
+        <StorefrontCakeDetailPerfProbe cakeId={cake.id} phase="preview" />
+      ) : null}
+      <StorefrontCakeDetailView
+        availabilityNote={availabilityNote}
+        cake={cake}
+        hideAddToOrder
+        pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
+      />
+    </>
   );
 }
 
@@ -87,15 +94,20 @@ async function CakeDetailLive({
   const merged = mergeBrowseCakeDisplay(cake, display);
 
   return (
-    <CakeDetailPickupScope
-      availabilityNote={merged.availabilityNote}
-      cake={merged}
-      hideAddToOrder={cake.currentlyOffered === false}
-      pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
-      urlFrom={ymdQueryValue(query.from)}
-      urlPickup={ymdQueryValue(query.pickup)}
-      urlTo={ymdQueryValue(query.to)}
-    />
+    <>
+      {isDevPerfEnabled() ? (
+        <StorefrontCakeDetailPerfProbe cakeId={merged.id} phase="live" />
+      ) : null}
+      <CakeDetailPickupScope
+        availabilityNote={merged.availabilityNote}
+        cake={merged}
+        hideAddToOrder={cake.currentlyOffered === false}
+        pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
+        urlFrom={ymdQueryValue(query.from)}
+        urlPickup={ymdQueryValue(query.pickup)}
+        urlTo={ymdQueryValue(query.to)}
+      />
+    </>
   );
 }
 
