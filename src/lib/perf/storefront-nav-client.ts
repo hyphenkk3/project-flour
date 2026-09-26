@@ -13,6 +13,7 @@ export type StorefrontNavIntent = {
   kind: StorefrontNavKind;
   intentAt: number;
   timeOrigin: number;
+  prefetchCompletedAt: number | null;
 };
 
 let pending: StorefrontNavIntent | null = null;
@@ -37,8 +38,17 @@ export function markStorefrontNavIntent(
     kind,
     intentAt: nowMs(),
     timeOrigin: currentTimeOrigin(),
+    prefetchCompletedAt: null,
   };
   return pending;
+}
+
+export function markStorefrontPrefetchComplete(href: string): void {
+  if (!pending) return;
+  if (pending.href !== href.trim()) return;
+  if (pending.timeOrigin !== currentTimeOrigin()) return;
+  if (pending.prefetchCompletedAt != null) return;
+  pending.prefetchCompletedAt = nowMs();
 }
 
 export function consumeStorefrontNavIntent(input: {
@@ -48,6 +58,8 @@ export function consumeStorefrontNavIntent(input: {
   correlationId: string;
   kind: StorefrontNavKind;
   intentToVisibleMs: number | null;
+  prefetchCompletedMs: number | null;
+  prefetchReused: boolean | null;
 } | null {
   const intent = pending;
   if (!intent) return null;
@@ -60,11 +72,19 @@ export function consumeStorefrontNavIntent(input: {
   if (intent.href !== dest && !dest.startsWith(`${intent.href}?`)) {
     return null;
   }
+  const visibleAt = nowMs();
   pending = null;
   return {
     correlationId: intent.correlationId,
     kind: intent.kind,
-    intentToVisibleMs: elapsedPerfMs(intent.intentAt, nowMs()),
+    intentToVisibleMs: elapsedPerfMs(intent.intentAt, visibleAt),
+    prefetchCompletedMs: elapsedPerfMs(
+      intent.intentAt,
+      intent.prefetchCompletedAt,
+    ),
+    prefetchReused:
+      intent.prefetchCompletedAt != null &&
+      intent.prefetchCompletedAt <= visibleAt,
   };
 }
 

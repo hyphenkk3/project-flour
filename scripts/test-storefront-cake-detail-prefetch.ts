@@ -16,6 +16,7 @@ import {
   resetCakeDetailPrefetchStateForTests,
   wasCakeDetailPrefetchedForTests,
 } from "@/workspaces/storefront/catalog/cake-detail-prefetch";
+import { cakeHeroImageSrcSet } from "@/workspaces/storefront/catalog/cake-hero-preload";
 
 function readSrc(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -112,6 +113,7 @@ const cardSrc = readSrc(
 );
 assert.match(cardSrc, /StorefrontCakeDetailLink/);
 assert.match(cardSrc, /detailHref \?\? `\/cakes\/\$\{cake\.id\}`/);
+assert.equal((cardSrc.match(/imageSrc=\{imageUrl\}/g) ?? []).length, 3);
 assert.doesNotMatch(cardSrc, /detailIntent/);
 assert.doesNotMatch(cardSrc, /onIntent/);
 assert.doesNotMatch(cardSrc, /useState/);
@@ -130,6 +132,8 @@ assert.match(linkSrc, /router\.prefetch/);
 assert.match(linkSrc, /urgent:\s*true/);
 assert.match(linkSrc, /active:opacity-70/);
 assert.match(linkSrc, /markStorefrontNavIntent/);
+assert.match(linkSrc, /preloadStorefrontCakeHero/);
+assert.match(linkSrc, /imageSrc/);
 assert.doesNotMatch(linkSrc, /onIntent/);
 assert.doesNotMatch(linkSrc, /intent && canonical/);
 
@@ -188,5 +192,13 @@ const pickupSrc = readSrc(
 assert.match(pickupSrc, /resolveCakeDetailPickupScope/);
 assert.match(pickupSrc, /getStoredCakeEntryScopeSnapshot/);
 assert.doesNotMatch(pickupSrc, /useSearchParams/);
+
+const heroSrcSet = cakeHeroImageSrcSet(
+  "https://example.supabase.co/storage/v1/object/public/library-cake-photos/cake.png",
+);
+assert.match(heroSrcSet, /\/_next\/image\?url=/);
+assert.match(heroSrcSet, /&w=1080&q=75 1080w/);
+assert.match(heroSrcSet, /&w=384&q=75 384w/);
+assert.doesNotMatch(heroSrcSet, /q=80/);
 
 console.log("PASS storefront cake detail prefetch");

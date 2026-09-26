@@ -76,6 +76,7 @@ export function StorefrontCakeCard({
             aria-label={`View ${cake.name}`}
             className="absolute inset-0"
             href={href}
+            imageSrc={imageUrl}
           >
             {imageUrl ? (
               <CakePhotoImage
@@ -114,6 +115,7 @@ export function StorefrontCakeCard({
               <StorefrontCakeDetailLink
                 className="hover:text-skyline transition-colors duration-200"
                 href={href}
+                imageSrc={imageUrl}
               >
                 {cake.name}
               </StorefrontCakeDetailLink>
@@ -163,6 +165,7 @@ export function StorefrontCakeCard({
             <StorefrontCakeDetailLink
               className="text-skyline hover:text-ink hidden min-h-11 w-full items-center justify-center text-sm font-medium transition-colors duration-200 sm:inline-flex"
               href={href}
+              imageSrc={imageUrl}
             >
               View cake
             </StorefrontCakeDetailLink>

@@ -3,11 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, type PointerEvent, type ReactNode } from "react";
-import { markStorefrontNavIntent } from "@/lib/perf/storefront-nav-client";
+import {
+  markStorefrontNavIntent,
+  markStorefrontPrefetchComplete,
+} from "@/lib/perf/storefront-nav-client";
 import {
   canonicalCakeDetailPath,
   prefetchCanonicalCakeDetail,
 } from "@/workspaces/storefront/catalog/cake-detail-prefetch";
+import { preloadStorefrontCakeHero } from "@/workspaces/storefront/catalog/cake-hero-preload";
 
 const HOVER_PREFETCH_MS = 120;
 
@@ -19,6 +23,7 @@ type StorefrontCakeDetailLinkProps = {
   children: ReactNode;
   className?: string;
   "aria-label"?: string;
+  imageSrc?: string | null;
 };
 
 export function StorefrontCakeDetailLink({
@@ -26,6 +31,7 @@ export function StorefrontCakeDetailLink({
   children,
   className,
   "aria-label": ariaLabel,
+  imageSrc,
 }: StorefrontCakeDetailLinkProps) {
   const router = useRouter();
   const canonical = canonicalCakeDetailPath(href);
@@ -33,10 +39,15 @@ export function StorefrontCakeDetailLink({
 
   function startPrefetch() {
     if (!canonical) return;
+    preloadStorefrontCakeHero(imageSrc);
     prefetchCanonicalCakeDetail(
       href,
       (path) => {
-        void router.prefetch(path);
+        const result = router.prefetch(path);
+        void Promise.resolve(result).then(() => {
+          markStorefrontPrefetchComplete(canonical);
+        });
+        return result;
       },
       { urgent: true },
     );

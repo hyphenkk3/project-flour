@@ -55,6 +55,7 @@ assert.doesNotMatch(cardSrc, /href=""/);
 assert.match(linkSrc, /prefetch=\{false\}/);
 assert.match(linkSrc, /onPointerDown/);
 assert.match(linkSrc, /prefetchCanonicalCakeDetail/);
+assert.match(linkSrc, /preloadStorefrontCakeHero/);
 assert.match(linkSrc, /router\.prefetch/);
 assert.doesNotMatch(linkSrc, /prefetch=\{true\}/);
 assert.doesNotMatch(linkSrc, /prefetch=\{Boolean\(canonical\)\}/);

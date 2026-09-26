@@ -24,6 +24,8 @@ export function StorefrontCakeDetailPerfProbe({
       cakeId,
       correlationId: nav?.correlationId,
       intentToVisibleMs: nav?.intentToVisibleMs,
+      prefetchCompletedMs: nav?.prefetchCompletedMs,
+      prefetchReused: nav?.prefetchReused,
     });
 
     const hero = document.querySelector("main img");

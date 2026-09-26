@@ -348,6 +348,8 @@ const consumed = consumeStorefrontNavIntent({
 assert.equal(consumed?.correlationId, marked?.correlationId);
 assert.equal(consumed?.kind, "browse");
 assert.equal(typeof consumed?.intentToVisibleMs, "number");
+assert.equal(consumed?.prefetchReused, false);
+assert.equal(consumed?.prefetchCompletedMs, null);
 assert.equal(
   consumeStorefrontNavIntent({ href: "/browse", kinds: ["browse"] }),
   null,
