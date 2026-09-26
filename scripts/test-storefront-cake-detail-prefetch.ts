@@ -114,6 +114,7 @@ const cardSrc = readSrc(
 assert.match(cardSrc, /StorefrontCakeDetailLink/);
 assert.match(cardSrc, /detailHref \?\? `\/cakes\/\$\{cake\.id\}`/);
 assert.equal((cardSrc.match(/imageSrc=\{imageUrl\}/g) ?? []).length, 3);
+assert.equal((cardSrc.match(/cakeName=\{cake\.name\}/g) ?? []).length, 3);
 assert.doesNotMatch(cardSrc, /detailIntent/);
 assert.doesNotMatch(cardSrc, /onIntent/);
 assert.doesNotMatch(cardSrc, /useState/);
@@ -134,6 +135,10 @@ assert.match(linkSrc, /active:opacity-70/);
 assert.match(linkSrc, /markStorefrontNavIntent/);
 assert.match(linkSrc, /preloadStorefrontCakeHero/);
 assert.match(linkSrc, /imageSrc/);
+assert.match(linkSrc, /cakeName/);
+assert.match(linkSrc, /rememberStorefrontCakePaintHint/);
+assert.match(linkSrc, /showStorefrontCakePaintOverlay/);
+assert.match(linkSrc, /onClick/);
 assert.doesNotMatch(linkSrc, /onIntent/);
 assert.doesNotMatch(linkSrc, /intent && canonical/);
 

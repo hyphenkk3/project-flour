@@ -56,6 +56,7 @@ assert.match(linkSrc, /prefetch=\{false\}/);
 assert.match(linkSrc, /onPointerDown/);
 assert.match(linkSrc, /prefetchCanonicalCakeDetail/);
 assert.match(linkSrc, /preloadStorefrontCakeHero/);
+assert.match(linkSrc, /rememberStorefrontCakePaintHint/);
 assert.match(linkSrc, /router\.prefetch/);
 assert.doesNotMatch(linkSrc, /prefetch=\{true\}/);
 assert.doesNotMatch(linkSrc, /prefetch=\{Boolean\(canonical\)\}/);
@@ -74,6 +75,10 @@ assert.doesNotMatch(listingIntentSrc, /\/cakes\//);
 assert.match(
   readSrc("src/workspaces/storefront/StorefrontShell.tsx"),
   /StorefrontListingIntentPrefetch/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/StorefrontShell.tsx"),
+  /StorefrontCakePaintRouteSync/,
 );
 
 assert.match(probeSrc, /BROWSE_NAV/);

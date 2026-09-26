@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { StorefrontCake } from "@/types/storefront";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import { CakeDetailPurchasePanel } from "@/workspaces/storefront/catalog/CakeDetailPurchasePanel";
@@ -9,6 +9,7 @@ import {
   storefrontPhotoForSize,
   storefrontPhotoGallery,
 } from "@/workspaces/storefront/catalog/cake-photo-map";
+import { markStorefrontCakeDetailPaintReady } from "@/workspaces/storefront/catalog/storefront-cake-paint-hint";
 
 type StorefrontCakeDetailViewProps = {
   cake: StorefrontCake;
@@ -32,6 +33,10 @@ export function StorefrontCakeDetailView({
   const [selectedSizeId, setSelectedSizeId] = useState(cake.sizes[0]?.id ?? "");
   const hero = storefrontPhotoForSize(cake.photos, selectedSizeId);
   const gallery = storefrontPhotoGallery(cake.photos, hero);
+
+  useEffect(() => {
+    markStorefrontCakeDetailPaintReady(cake.id);
+  }, [cake.id]);
 
   return (
     <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start lg:gap-10">

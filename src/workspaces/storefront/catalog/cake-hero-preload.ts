@@ -1,5 +1,5 @@
 const HERO_WIDTHS = [384, 640, 750, 828, 1080, 1200, 1920, 2048, 3840] as const;
-const HERO_SIZES = "(min-width: 1024px) 50vw, 100vw";
+export const CAKE_HERO_SIZES = "(min-width: 1024px) 50vw, 100vw";
 const HERO_QUALITY = 75;
 
 const preloaded = new Set<string>();
@@ -12,10 +12,13 @@ export function wasCakeHeroPreloadedForTests(src: string): boolean {
   return preloaded.has(src);
 }
 
+export function cakeHeroImageSrc(src: string, width = 1080): string {
+  return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=${HERO_QUALITY}`;
+}
+
 export function cakeHeroImageSrcSet(src: string): string {
   return HERO_WIDTHS.map(
-    (width) =>
-      `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=${HERO_QUALITY} ${width}w`,
+    (width) => `${cakeHeroImageSrc(src, width)} ${width}w`,
   ).join(", ");
 }
 
@@ -29,7 +32,7 @@ export function preloadStorefrontCakeHero(src: string | null | undefined): boole
   link.rel = "preload";
   link.as = "image";
   link.setAttribute("imageSrcSet", cakeHeroImageSrcSet(url));
-  link.setAttribute("imageSizes", HERO_SIZES);
+  link.setAttribute("imageSizes", CAKE_HERO_SIZES);
   document.head.appendChild(link);
   return true;
 }

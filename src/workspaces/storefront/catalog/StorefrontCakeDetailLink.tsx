@@ -12,6 +12,10 @@ import {
   prefetchCanonicalCakeDetail,
 } from "@/workspaces/storefront/catalog/cake-detail-prefetch";
 import { preloadStorefrontCakeHero } from "@/workspaces/storefront/catalog/cake-hero-preload";
+import {
+  rememberStorefrontCakePaintHint,
+  showStorefrontCakePaintOverlay,
+} from "@/workspaces/storefront/catalog/storefront-cake-paint-hint";
 
 const HOVER_PREFETCH_MS = 120;
 
@@ -23,6 +27,7 @@ type StorefrontCakeDetailLinkProps = {
   children: ReactNode;
   className?: string;
   "aria-label"?: string;
+  cakeName?: string | null;
   imageSrc?: string | null;
 };
 
@@ -31,14 +36,24 @@ export function StorefrontCakeDetailLink({
   children,
   className,
   "aria-label": ariaLabel,
+  cakeName,
   imageSrc,
 }: StorefrontCakeDetailLinkProps) {
   const router = useRouter();
   const canonical = canonicalCakeDetailPath(href);
   const hoverTimer = useRef<number>(0);
 
+  function rememberPaint() {
+    rememberStorefrontCakePaintHint({
+      href,
+      name: cakeName,
+      imageSrc,
+    });
+  }
+
   function startPrefetch() {
     if (!canonical) return;
+    rememberPaint();
     preloadStorefrontCakeHero(imageSrc);
     prefetchCanonicalCakeDetail(
       href,
@@ -79,6 +94,10 @@ export function StorefrontCakeDetailLink({
       aria-label={ariaLabel}
       className={[className, STOREFRONT_PRESS_CLASS].filter(Boolean).join(" ")}
       href={href}
+      onClick={() => {
+        rememberPaint();
+        showStorefrontCakePaintOverlay();
+      }}
       onFocus={onFocus}
       onPointerDown={onPointerDown}
       onPointerEnter={onPointerEnter}

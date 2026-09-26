@@ -36,6 +36,8 @@ assert.match(cakeLink, /onPointerDown/);
 assert.match(cakeLink, /prefetchCanonicalCakeDetail/);
 assert.match(cakeLink, /markStorefrontNavIntent/);
 assert.match(cakeLink, /preloadStorefrontCakeHero/);
+assert.match(cakeLink, /rememberStorefrontCakePaintHint/);
+assert.match(cakeLink, /showStorefrontCakePaintOverlay/);
 assert.match(cakeLink, /urgent:\s*true/);
 assert.match(cakeLink, /active:opacity-70/);
 assert.doesNotMatch(cakeLink, /onIntent/);
