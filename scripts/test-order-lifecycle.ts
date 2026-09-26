@@ -334,6 +334,20 @@ assert.match(postPaymentSql, /post_payment_customer_change_count = 1/);
 assert.match(postPaymentSql, /post_payment_change_override_at/);
 assert.match(postPaymentSql, /post_payment_change_override_by/);
 assert.match(postPaymentSql, /p_override boolean default false/);
+assert.match(
+  postPaymentSql,
+  /create or replace function public\.cancel_guest_order\(\s*p_order_id uuid,\s*p_actor_staff_id uuid,\s*p_override boolean default false/,
+);
+const restoreCancelSql = read(
+  "supabase/migrations/20260926140000_restore_cancel_guest_order_override.sql",
+);
+assert.match(
+  restoreCancelSql,
+  /create or replace function public\.cancel_guest_order\(\s*p_order_id uuid,\s*p_actor_staff_id uuid,\s*p_override boolean default false/,
+);
+assert.match(actionsSrc, /rpc\("cancel_guest_order"/);
+assert.match(actionsSrc, /p_order_id: orderId/);
+assert.match(actionsSrc, /p_actor_staff_id: staff\.id/);
 assert.match(actionsSrc, /guard_post_payment_customer_change/);
 assert.match(actionsSrc, /post_payment_change_override/);
 assert.match(actionsSrc, /decidePostPaymentSave/);

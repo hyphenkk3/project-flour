@@ -111,5 +111,14 @@ assert.doesNotMatch(
   readSrc("supabase/migrations/20260926120000_catalogue_voucher_redemption_controls.sql"),
   /create or replace function public.cancel_guest_order/,
 );
+const restoreCancel = readSrc(
+  "supabase/migrations/20260926140000_restore_cancel_guest_order_override.sql",
+);
+assert.match(
+  restoreCancel,
+  /create or replace function public\.cancel_guest_order\(\s*p_order_id uuid,\s*p_actor_staff_id uuid,\s*p_override boolean default false/,
+);
+assert.match(restoreCancel, /Catalogue voucher release stays on the cancel trigger/);
+assert.doesNotMatch(restoreCancel, /release_catalogue_voucher_redemptions_for_order\(/);
 
 console.log("PASS catalogue voucher redemption controls");
