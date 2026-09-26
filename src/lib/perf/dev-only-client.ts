@@ -17,6 +17,7 @@ export const CHECKOUT_CONFIRM_CLICK = "whitebird-checkout-confirm-click";
 export const CHECKOUT_ACTION_START = "whitebird-checkout-action-start";
 export const CHECKOUT_ACTION_RETURN = "whitebird-checkout-action-return";
 export const SUCCESS_NAVIGATION_START = "whitebird-success-navigation-start";
+export const SUCCESS_RECEIVED_SHELL = "whitebird-success-received-shell";
 export const SUCCESS_PAGE_VISIBLE = "whitebird-success-page-visible";
 
 const CORRELATION_STORAGE_KEY = "wb-perf-checkout-correlation-v2";

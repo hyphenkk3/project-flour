@@ -114,6 +114,7 @@ assert.doesNotMatch(goBackSrc, /writePreorderDraft/);
 assert.doesNotMatch(goBackSrc, /redirect/);
 
 assert.match(confirmOrderSrc, /submitGuestOrderAndNavigate/);
+assert.match(confirmOrderSrc, /onCommitted: \(\) => \{\s*setReceivedShell\(true\);/);
 assert.match(confirmOrderSrc, /action: submitGuestPreorderAction/);
 assert.match(
   confirmOrderSrc,
@@ -211,6 +212,7 @@ assert.match(extraOpenConfirmSrc, /setConfirmOpen\(true\)/);
 assert.match(extraOpenConfirmSrc, /new FormData\(form\)/);
 assert.doesNotMatch(extraOpenConfirmSrc, /formAction\(/);
 assert.match(extraConfirmOrderSrc, /submitGuestOrderAndNavigate/);
+assert.match(extraConfirmOrderSrc, /onCommitted: \(\) => \{\s*setReceivedShell\(true\);/);
 assert.match(extraConfirmOrderSrc, /action: submitGuestExtraOrderAction/);
 assert.match(
   extraConfirmOrderSrc,

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import {
   CHECKOUT_ACTION_RETURN,
   CHECKOUT_ACTION_START,
   CHECKOUT_CONFIRM_CLICK,
   SUCCESS_NAVIGATION_START,
+  SUCCESS_RECEIVED_SHELL,
   consumeCheckoutServerLogKey,
   createPerfCorrelationId,
   elapsedPerfMs,
@@ -44,6 +45,29 @@ export function CheckoutSubmitUsableProbe({
     if (blocked) return;
     markCheckoutLoadOnce("submit_usable", seen.current);
   }, [blocked]);
+  return null;
+}
+
+/** DEV-only: first committed Order Received chrome after a successful write. */
+export function CheckoutReceivedShellProbe({
+  flow,
+}: {
+  flow: "preorder" | "extra";
+}) {
+  const logged = useRef(false);
+  useLayoutEffect(() => {
+    if (logged.current) return;
+    logged.current = true;
+    const now = typeof performance !== "undefined" ? performance.now() : 0;
+    const timing = readCheckoutSubmitTiming();
+    markCheckoutPerf(SUCCESS_RECEIVED_SHELL);
+    logCheckoutClient(flow === "extra" ? "EXTRA_CLIENT" : "CHECKOUT_CLIENT", {
+      correlationId: timing?.correlationId ?? null,
+      step: "received_shell",
+      confirmToReceivedShellMs: elapsedPerfMs(timing?.confirmClickAt, now),
+      note: "committed_order_received_shell",
+    });
+  }, [flow]);
   return null;
 }
 
@@ -147,6 +171,7 @@ export async function submitGuestOrderAndNavigate<T extends GuestSubmitResult>(
     hrefForOrderId: (orderId: string) => string;
     replace: (href: string) => void;
     markNavigated: () => void;
+    onCommitted?: () => void;
   },
 ): Promise<T> {
   beginCheckoutSubmitPerf({ formData: input.formData, flow: input.flow });
@@ -169,6 +194,7 @@ export async function submitGuestOrderAndNavigate<T extends GuestSubmitResult>(
     return result;
   }
   input.markNavigated();
+  input.onCommitted?.();
   beginSuccessNavigationPerf();
   const afterNav = readCheckoutSubmitTiming();
   logCheckoutClient(input.flow === "extra" ? "EXTRA_CLIENT" : "CHECKOUT_CLIENT", {

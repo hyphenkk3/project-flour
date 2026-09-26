@@ -120,10 +120,12 @@ import {
 import { useEligibleCatalogueVoucher } from "@/workspaces/storefront/offers/useEligibleCatalogueVoucher";
 import {
   beginSuccessNavigationPerf,
+  CheckoutReceivedShellProbe,
   markCheckoutActionReturned,
   submitGuestOrderAndNavigate,
   useCheckoutActionReturnPerf,
 } from "@/workspaces/storefront/checkout/CheckoutDevPerf";
+import { StorefrontSuccessLoading } from "@/workspaces/storefront/checkout/StorefrontSuccessLoading";
 
 const initialState: ExtraOrderState = { error: null };
 
@@ -149,6 +151,7 @@ export function GuestExtraCheckoutForm({
     null,
   );
   const [actionPending, setActionPending] = useState(false);
+  const [receivedShell, setReceivedShell] = useState(false);
   const navigatedRef = useRef(false);
   const viewState = actionState ?? state;
   const submitPending = pending || actionPending;
@@ -517,6 +520,9 @@ export function GuestExtraCheckoutForm({
       markNavigated: () => {
         navigatedRef.current = true;
       },
+      onCommitted: () => {
+        setReceivedShell(true);
+      },
     });
     if (result.error) {
       setActionState(result);
@@ -538,6 +544,15 @@ export function GuestExtraCheckoutForm({
   function togglePaidAddon(code: string, checked: boolean) {
     setPaidAddonCodes((current) =>
       checked ? [...current, code] : current.filter((value) => value !== code),
+    );
+  }
+
+  if (receivedShell) {
+    return (
+      <>
+        <CheckoutReceivedShellProbe flow="extra" />
+        <StorefrontSuccessLoading />
+      </>
     );
   }
 

@@ -67,4 +67,25 @@ assert.match(recapSrc, /receipt\.adjustments/);
 assert.match(readSrc(submitSrc), /submit_guest_preorder_with_catalogue_voucher/);
 assert.doesNotMatch(readSrc(submitSrc), /StorefrontSuccessLoading/);
 
+const formSrc = readSrc("src/workspaces/storefront/checkout/GuestCheckoutForm.tsx");
+const extraFormSrc = readSrc(
+  "src/workspaces/storefront/extra/GuestExtraCheckoutForm.tsx",
+);
+const navigateSrc = readSrc(
+  "src/workspaces/storefront/checkout/CheckoutDevPerf.tsx",
+);
+assert.match(formSrc, /onCommitted: \(\) => \{\s*setReceivedShell\(true\);/);
+assert.match(formSrc, /<StorefrontSuccessLoading \/>/);
+assert.match(formSrc, /CheckoutReceivedShellProbe flow="preorder"/);
+assert.match(extraFormSrc, /onCommitted: \(\) => \{\s*setReceivedShell\(true\);/);
+assert.match(extraFormSrc, /<StorefrontSuccessLoading \/>/);
+assert.match(
+  navigateSrc,
+  /if \(result\.error \|\| !result\.orderId\) \{\s*return result;\s*\}\s*input\.markNavigated\(\);\s*input\.onCommitted\?\.\(\);/,
+);
+assert.match(
+  navigateSrc,
+  /input\.onCommitted\?\.\(\);[\s\S]*input\.replace\(input\.hrefForOrderId\(result\.orderId\)\)/,
+);
+
 console.log("PASS storefront success loading shell");

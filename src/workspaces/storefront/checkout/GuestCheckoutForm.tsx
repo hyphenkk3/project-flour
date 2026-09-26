@@ -174,12 +174,14 @@ import {
 import { useEligibleCatalogueVoucher } from "@/workspaces/storefront/offers/useEligibleCatalogueVoucher";
 import {
   CheckoutLoadStepProbe,
+  CheckoutReceivedShellProbe,
   CheckoutSubmitUsableProbe,
   beginSuccessNavigationPerf,
   markCheckoutActionReturned,
   submitGuestOrderAndNavigate,
   useCheckoutActionReturnPerf,
 } from "@/workspaces/storefront/checkout/CheckoutDevPerf";
+import { StorefrontSuccessLoading } from "@/workspaces/storefront/checkout/StorefrontSuccessLoading";
 import {
   checkoutActionResourceMark,
   logCheckoutDateConfirmationWaterfall,
@@ -349,6 +351,7 @@ export function GuestCheckoutForm({
     null,
   );
   const [actionPending, setActionPending] = useState(false);
+  const [receivedShell, setReceivedShell] = useState(false);
   const navigatedRef = useRef(false);
   const viewState = actionState ?? state;
   const submitPending = pending || actionPending;
@@ -1470,6 +1473,9 @@ export function GuestCheckoutForm({
       markNavigated: () => {
         navigatedRef.current = true;
       },
+      onCommitted: () => {
+        setReceivedShell(true);
+      },
     });
     if (result.error) {
       setActionState(result);
@@ -1492,6 +1498,15 @@ export function GuestCheckoutForm({
     !unavailableMessage &&
     !liveOfferPending &&
     !calendarPending;
+
+  if (receivedShell) {
+    return (
+      <>
+        <CheckoutReceivedShellProbe flow="preorder" />
+        <StorefrontSuccessLoading />
+      </>
+    );
+  }
 
   if (!hydrated) {
     return (
