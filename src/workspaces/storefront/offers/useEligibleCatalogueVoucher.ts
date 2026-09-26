@@ -37,12 +37,15 @@ export type CatalogueVoucherPreview = {
 export function useEligibleCatalogueVoucher(
   draft: CatalogueVoucherCartDraft,
   orderType: CatalogueOrderType = "preorder",
+  options?: { enabled?: boolean },
 ): CatalogueVoucherPreview | null {
   const [vouchers, setVouchers] = useState<CatalogueVoucherRecord[]>([]);
+  const enabled = options?.enabled !== false;
 
   useEffect(() => {
+    if (!enabled) return;
     void listPublicCatalogueVouchersAction().then(setVouchers);
-  }, []);
+  }, [enabled]);
 
   const today = singaporeDateFromIso(new Date().toISOString());
   const selected = useMemo(

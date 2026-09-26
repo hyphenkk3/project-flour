@@ -867,7 +867,7 @@ export function GuestCheckoutForm({
     : "";
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !calendarReady) return;
     const pickupDate = fields.pickupDate.trim().slice(0, 10);
     const sizeIds = sizeIdsKey.split(",").filter(Boolean);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(pickupDate) || sizeIds.length === 0) {
@@ -897,7 +897,7 @@ export function GuestCheckoutForm({
     return () => {
       cancelled = true;
     };
-  }, [fields.pickupDate, hydrated, priceRefreshKey, sizeIdsKey]);
+  }, [calendarReady, fields.pickupDate, hydrated, priceRefreshKey, sizeIdsKey]);
 
   const pricesReady =
     items.length === 0 ||
@@ -978,7 +978,9 @@ export function GuestCheckoutForm({
     }),
     [fields.pickupDate, pricedItems],
   );
-  const catalogueVoucher = useEligibleCatalogueVoucher(catalogueVoucherDraft);
+  const catalogueVoucher = useEligibleCatalogueVoucher(catalogueVoucherDraft, "preorder", {
+    enabled: calendarReady,
+  });
   const itemsJson = useMemo(
     () =>
       JSON.stringify(

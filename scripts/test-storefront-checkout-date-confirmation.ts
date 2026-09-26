@@ -57,7 +57,9 @@ assert.doesNotMatch(checkoutCakesFn, /library_cake_photos/);
 
 assert.match(hoursSrc, /const \[weeklyResult, overrideResult\] = await Promise\.all\(/);
 
-assert.match(formSrc, /useEligibleCatalogueVoucher/);
+assert.match(formSrc, /useEligibleCatalogueVoucher\(catalogueVoucherDraft, "preorder"/);
+assert.match(formSrc, /enabled: calendarReady/);
+assert.match(formSrc, /if \(!hydrated \|\| !calendarReady\) return;/);
 assert.doesNotMatch(
   confirmFn,
   /listPublicCatalogueVouchersAction|evaluateCatalogueVoucherEligibility/,
