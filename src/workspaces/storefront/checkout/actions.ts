@@ -32,7 +32,18 @@ import {
   type CustomerPreorderSelections,
 } from "@/engines/orders/customer-preorder-options";
 import type { StorefrontCake, StorefrontCollection } from "@/types/storefront";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import {
+  recordCheckoutDateHeaders,
+  recordCheckoutDateStage,
+  recordCheckoutDateTopology,
+  runWithCheckoutDatePerf,
+  sanitizeVercelIdRegions,
+  snapshotCheckoutDateConfirmationPerf,
+  timeCheckoutDateStage,
+  type CheckoutDateConfirmationPerf,
+} from "@/lib/perf/checkout-date-confirmation-perf";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
@@ -664,7 +675,9 @@ export async function loadCheckoutPickupOffer(
   }
   const offerStarted = performance.now();
   const [collection, supabase] = await Promise.all([
-    getStorefrontCollectionForPickupDate(key),
+    timeCheckoutDateStage("collection", () =>
+      getStorefrontCollectionForPickupDate(key),
+    ),
     createClient(),
   ]);
   if (!collection) {
@@ -677,8 +690,12 @@ export async function loadCheckoutPickupOffer(
     };
   }
   const [cakes, options] = await Promise.all([
-    listAvailableCheckoutCakes(collection.id),
-    loadCustomerPreorderOptions(supabase, collection.id),
+    timeCheckoutDateStage("cakes", () =>
+      listAvailableCheckoutCakes(collection.id),
+    ),
+    timeCheckoutDateStage("options", () =>
+      loadCustomerPreorderOptions(supabase, collection.id),
+    ),
   ]);
   logPerf("CHECKOUT_DATE", "pickup_offer", performance.now() - offerStarted, {
     cakeCount: cakes.length,
@@ -702,17 +719,45 @@ export async function loadCheckoutDateConfirmation(input: {
 }): Promise<{
   calendar: CheckoutCalendarContext;
   offer: CheckoutPickupOffer;
+  perf?: CheckoutDateConfirmationPerf;
 }> {
-  const started = performance.now();
-  const [calendar, offer] = await Promise.all([
-    loadCheckoutCalendarContext(input),
-    loadCheckoutPickupOffer(input.pickupDate),
-  ]);
-  logPerf("CHECKOUT_DATE", "date_confirmation", performance.now() - started, {
-    pickupDate: input.pickupDate,
-    cakeCount: input.cakeIds?.length ?? 0,
+  return runWithCheckoutDatePerf(async () => {
+    const started = performance.now();
+    const headersStarted = performance.now();
+    const headerStore = await headers();
+    recordCheckoutDateHeaders(performance.now() - headersStarted);
+    recordCheckoutDateTopology({
+      vercelRegion: process.env.VERCEL_REGION ?? null,
+      vercelIdRegions: sanitizeVercelIdRegions(headerStore.get("x-vercel-id")),
+    });
+    const [calendar, offer] = await timeCheckoutDateStage("promise_all", () =>
+      Promise.all([
+        loadCheckoutCalendarContext(input),
+        loadCheckoutPickupOffer(input.pickupDate),
+      ]),
+    );
+    const buildStarted = performance.now();
+    const result = { calendar, offer };
+    recordCheckoutDateStage("response_build", performance.now() - buildStarted);
+    const totalMs = performance.now() - started;
+    const perf = snapshotCheckoutDateConfirmationPerf(totalMs);
+    logPerf("CHECKOUT_DATE", "date_confirmation", totalMs, {
+      pickupDate: input.pickupDate,
+      cakeCount: input.cakeIds?.length ?? 0,
+      cookiesMs: perf?.cookies_ms,
+      createClientMs: perf?.create_client_ms,
+      createClientCount: perf?.create_client_count,
+      dbRpcSumMs: perf?.db_rpc_sum_ms,
+      dbRpcCount: perf?.db_rpc_count,
+      dbRpcMaxMs: perf?.db_rpc_max_ms,
+      outsideDbMs: perf?.outside_db_ms,
+      promiseAllMs: perf?.promise_all_ms,
+      vercelRegion: perf?.vercel_region,
+      vercelIdRegions: perf?.vercel_id_regions,
+      runtime: perf?.runtime,
+    });
+    return perf ? { ...result, perf } : result;
   });
-  return { calendar, offer };
 }
 
 export async function resolveCheckoutCakeSizePrices(
@@ -855,13 +900,15 @@ export async function loadCheckoutCalendarContext(input: {
   const earliest = earliestPickupDateYmd();
   const [catalogues, specials, hoursSnapshot, memberships, venuePhotos] =
     await Promise.all([
-      listOrderableMonthlyCatalogues(),
-      listCustomerSpecialCatalogues(),
-      loadOperatingHoursSnapshot(),
+      timeCheckoutDateStage("catalogues", () => listOrderableMonthlyCatalogues()),
+      timeCheckoutDateStage("specials", () => listCustomerSpecialCatalogues()),
+      timeCheckoutDateStage("hours", () => loadOperatingHoursSnapshot()),
       cakeIds.length > 0
-        ? getCustomerCakePickupMemberships(cakeIds)
+        ? timeCheckoutDateStage("memberships", () =>
+            getCustomerCakePickupMemberships(cakeIds),
+          )
         : Promise.resolve([]),
-      loadDineInVenuePhotos(),
+      timeCheckoutDateStage("venue_photos", () => loadDineInVenuePhotos()),
     ]);
   const globalMax = latestOrderableCataloguePickupEnd(
     catalogues.map((catalogue) => catalogue.month ?? ""),
@@ -893,7 +940,9 @@ export async function loadCheckoutCalendarContext(input: {
     if (cartPickupBounds.min < rangeMin) rangeMin = cartPickupBounds.min;
     if (cartPickupBounds.max > rangeMax) rangeMax = cartPickupBounds.max;
   }
-  const closedDates = await listClosedPickupOrderDates(rangeMin, rangeMax);
+  const closedDates = await timeCheckoutDateStage("closures", () =>
+    listClosedPickupOrderDates(rangeMin, rangeMax),
+  );
   const entrySpecialUnavailableDates =
     scopeFrom && scopeTo && isFullMonthPickupScope(scopeFrom, scopeTo)
       ? [
@@ -913,6 +962,7 @@ export async function loadCheckoutCalendarContext(input: {
         ].sort()
       : [];
 
+  recordCheckoutDateStage("calendar", performance.now() - calendarStarted);
   logPerf("CHECKOUT_DATE", "calendar_context", performance.now() - calendarStarted, {
     cakeCount: cakeIds.length,
     closedDateCount: closedDates.length,

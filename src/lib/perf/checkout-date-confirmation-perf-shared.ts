@@ -1,0 +1,41 @@
+export type CheckoutDateConfirmationPerfCall = {
+  label: string;
+  ms: number;
+};
+
+export type CheckoutDateConfirmationPerf = {
+  date_confirmation_total_ms: number;
+  cookies_ms: number;
+  create_client_ms: number;
+  create_client_count: number;
+  create_public_client_ms: number;
+  create_public_client_count: number;
+  headers_ms: number;
+  auth_ms: number;
+  calendar_ms: number;
+  catalogues_ms: number;
+  specials_ms: number;
+  hours_ms: number;
+  memberships_ms: number;
+  venue_photos_ms: number;
+  closures_ms: number;
+  collection_ms: number;
+  cakes_ms: number;
+  options_ms: number;
+  capacity_ms: number;
+  preorder_days_ms: number;
+  voucher_ms: number;
+  promise_all_ms: number;
+  response_build_ms: number;
+  db_rpc_sum_ms: number;
+  db_rpc_count: number;
+  db_rpc_max_ms: number;
+  outside_db_ms: number;
+  db_overlap_ms: number;
+  unexplained_ms: number;
+  vercel_region: string | null;
+  vercel_id_regions: string | null;
+  runtime: string;
+  middleware_auth: "skipped_public_path";
+  db_rpc_calls: CheckoutDateConfirmationPerfCall[];
+};

@@ -38,14 +38,27 @@ const confirmFn = actionsSrc.slice(
 );
 assert.match(confirmFn, /Promise\.all\(\[\s*loadCheckoutCalendarContext\(input\),\s*loadCheckoutPickupOffer\(input\.pickupDate\),/);
 assert.match(confirmFn, /logPerf\("CHECKOUT_DATE", "date_confirmation"/);
+assert.match(confirmFn, /runWithCheckoutDatePerf/);
+assert.match(confirmFn, /snapshotCheckoutDateConfirmationPerf/);
+assert.match(confirmFn, /timeCheckoutDateStage\("promise_all"/);
+assert.match(formSrc, /logCheckoutDateConfirmationWaterfall/);
+assert.match(formSrc, /client_wait_ms/);
+
+const serverSrc = readSrc("src/lib/supabase/server.ts");
+assert.match(serverSrc, /recordCheckoutDateDbCall/);
+assert.match(serverSrc, /recordCheckoutDateCookies/);
+assert.match(serverSrc, /fetchForCheckoutDateTiming/);
 
 const offerFn = actionsSrc.slice(
   actionsSrc.indexOf("export async function loadCheckoutPickupOffer"),
   actionsSrc.indexOf("export async function loadCheckoutDateConfirmation"),
 );
 assert.match(offerFn, /listAvailableCheckoutCakes/);
-assert.match(offerFn, /Promise\.all\(\[\s*getStorefrontCollectionForPickupDate/);
-assert.match(offerFn, /Promise\.all\(\[\s*listAvailableCheckoutCakes/);
+assert.match(offerFn, /getStorefrontCollectionForPickupDate/);
+assert.match(offerFn, /timeCheckoutDateStage\("collection"/);
+assert.match(offerFn, /timeCheckoutDateStage\("cakes"/);
+assert.match(offerFn, /timeCheckoutDateStage\("options"/);
+assert.match(offerFn, /Promise\.all\(\[/);
 assert.doesNotMatch(offerFn, /listAvailableCakes\(/);
 
 const checkoutCakesFn = queriesSrc.slice(

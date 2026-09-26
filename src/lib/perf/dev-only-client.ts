@@ -6,9 +6,10 @@ import {
   isDevPerfEnabled,
   type CheckoutServerPerf,
 } from "@/lib/perf/dev-only-shared";
+import type { CheckoutDateConfirmationPerf } from "@/lib/perf/checkout-date-confirmation-perf-shared";
 
 export { createPerfCorrelationId, isDevPerfEnabled };
-export type { CheckoutServerPerf };
+export type { CheckoutServerPerf, CheckoutDateConfirmationPerf };
 
 export const CHECKOUT_LOAD_STALE_MS = 30 * 60 * 1000;
 
@@ -177,6 +178,7 @@ export function logCheckoutClient(
   scope:
     | "CHECKOUT_CLIENT"
     | "CHECKOUT_LOAD"
+    | "CHECKOUT_DATE"
     | "EXTRA_CLIENT"
     | "CHECKOUT_SERVER"
     | "CHECKOUT_SERVER_SUMMARY"
@@ -207,6 +209,93 @@ export function markCheckoutLoadOnce(
     step,
     elapsedMs: startedAt == null ? 0 : Date.now() - startedAt,
     ...extra,
+  });
+}
+
+export function checkoutActionResourceMark(): number {
+  if (typeof performance === "undefined") return 0;
+  return performance.getEntriesByType("resource").length;
+}
+
+function readCheckoutActionResourceTiming(fromIndex: number): {
+  ttfbMs: number;
+  transferMs: number;
+} | null {
+  if (typeof performance === "undefined") return null;
+  const entries = performance.getEntriesByType(
+    "resource",
+  ) as PerformanceResourceTiming[];
+  const candidates = entries
+    .slice(fromIndex)
+    .filter(
+      (entry) =>
+        entry.initiatorType === "fetch" &&
+        Number.isFinite(entry.duration) &&
+        entry.duration > 50,
+    )
+    .sort((left, right) => right.duration - left.duration);
+  const best = candidates[0];
+  if (!best || best.requestStart <= 0 || best.responseStart <= 0) return null;
+  return {
+    ttfbMs: Math.round(best.responseStart - best.requestStart),
+    transferMs: Math.round(best.responseEnd - best.responseStart),
+  };
+}
+
+export function logCheckoutDateConfirmationWaterfall(input: {
+  clientWaitMs: number;
+  clientProcessMs: number;
+  resourceFromIndex?: number;
+  perf?: CheckoutDateConfirmationPerf;
+}): void {
+  if (!isDevPerfEnabled()) return;
+  const resource =
+    input.resourceFromIndex == null
+      ? null
+      : readCheckoutActionResourceTiming(input.resourceFromIndex);
+  const perf = input.perf;
+  logCheckoutClient("CHECKOUT_DATE", {
+    step: "waterfall",
+    client_wait_ms: input.clientWaitMs,
+    request_to_first_byte_ms: resource?.ttfbMs ?? null,
+    response_transfer_ms: resource?.transferMs ?? null,
+    client_process_ms: input.clientProcessMs,
+    date_confirmation_total_ms: perf?.date_confirmation_total_ms ?? null,
+    create_client_ms: perf?.create_client_ms ?? null,
+    create_client_count: perf?.create_client_count ?? null,
+    cookies_ms: perf?.cookies_ms ?? null,
+    create_public_client_ms: perf?.create_public_client_ms ?? null,
+    headers_ms: perf?.headers_ms ?? null,
+    auth_ms: perf?.auth_ms ?? 0,
+    calendar_ms: perf?.calendar_ms ?? null,
+    catalogues_ms: perf?.catalogues_ms ?? null,
+    specials_ms: perf?.specials_ms ?? null,
+    hours_ms: perf?.hours_ms ?? null,
+    memberships_ms: perf?.memberships_ms ?? null,
+    venue_photos_ms: perf?.venue_photos_ms ?? null,
+    closures_ms: perf?.closures_ms ?? null,
+    collection_ms: perf?.collection_ms ?? null,
+    cakes_ms: perf?.cakes_ms ?? null,
+    options_ms: perf?.options_ms ?? null,
+    capacity_ms: perf?.capacity_ms ?? 0,
+    preorder_days_ms: perf?.preorder_days_ms ?? 0,
+    voucher_ms: perf?.voucher_ms ?? 0,
+    promise_all_ms: perf?.promise_all_ms ?? null,
+    response_build_ms: perf?.response_build_ms ?? null,
+    db_rpc_sum_ms: perf?.db_rpc_sum_ms ?? null,
+    db_rpc_count: perf?.db_rpc_count ?? null,
+    db_rpc_max_ms: perf?.db_rpc_max_ms ?? null,
+    outside_db_ms: perf?.outside_db_ms ?? null,
+    db_overlap_ms: perf?.db_overlap_ms ?? null,
+    unexplained_ms: perf?.unexplained_ms ?? null,
+    vercel_region: perf?.vercel_region ?? null,
+    vercel_id_regions: perf?.vercel_id_regions ?? null,
+    runtime: perf?.runtime ?? null,
+    middleware_auth: perf?.middleware_auth ?? "skipped_public_path",
+    db_rpc_calls:
+      perf?.db_rpc_calls
+        .map((call) => `${call.label}:${call.ms}`)
+        .join("|") ?? null,
   });
 }
 

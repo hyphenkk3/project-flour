@@ -179,6 +179,8 @@ import {
   useCheckoutActionReturnPerf,
 } from "@/workspaces/storefront/checkout/CheckoutDevPerf";
 import {
+  checkoutActionResourceMark,
+  logCheckoutDateConfirmationWaterfall,
   markCheckoutLoadOnce,
   startCheckoutLoadClock,
 } from "@/lib/perf/dev-only-client";
@@ -726,6 +728,8 @@ export function GuestCheckoutForm({
 
     markCheckoutLoadOnce("live_pickup_offer_start", checkoutLoadSeen.current);
     markCheckoutLoadOnce("date_confirmation_start", checkoutLoadSeen.current);
+    const requestSent = performance.now();
+    const resourceFromIndex = checkoutActionResourceMark();
     void loadCheckoutDateConfirmation({
       cakeIds,
       pickupDate,
@@ -733,13 +737,27 @@ export function GuestCheckoutForm({
       pickupQuery: suggestedPickupDate,
       toQuery: pickupScopeTo,
     }).then(
-      ({ calendar, offer }) => {
+      ({ calendar, offer, perf }) => {
+        const responseComplete = performance.now();
         if (cancelled) return;
+        const processStarted = performance.now();
         checkoutPickupOfferCache.set(pickupDate, offer);
         applyCalendar(calendar);
         applyOffer(offer, pickupDate);
+        const clientProcessMs = Math.round(performance.now() - processStarted);
+        const clientWaitMs = Math.round(responseComplete - requestSent);
         markCheckoutLoadOnce("live_pickup_offer_ready", checkoutLoadSeen.current);
-        markCheckoutLoadOnce("date_confirmed", checkoutLoadSeen.current);
+        markCheckoutLoadOnce("date_confirmed", checkoutLoadSeen.current, {
+          client_wait_ms: clientWaitMs,
+          client_process_ms: clientProcessMs,
+          date_confirmation_total_ms: perf?.date_confirmation_total_ms ?? null,
+        });
+        logCheckoutDateConfirmationWaterfall({
+          clientWaitMs,
+          clientProcessMs,
+          resourceFromIndex,
+          perf,
+        });
       },
       () => {
         if (cancelled) return;
