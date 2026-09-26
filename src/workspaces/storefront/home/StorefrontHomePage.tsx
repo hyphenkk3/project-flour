@@ -55,12 +55,9 @@ import { singaporeDateFromIso } from "@/engines/orders/promotions";
 import {
   buildTargetedPromotionBadgeByCakeId,
   cakeHasNewMerchandisingTag,
-  catalogueVoucherTargetsCake,
-  isCatalogueVoucherCakeTargeted,
-  listDiscoverableCatalogueVouchers,
   sortCakesForCataloguePromotionPresentation,
 } from "@/engines/vouchers/catalogue-promotion-presentation";
-import { catalogueVoucherAllowsOrderType } from "@/engines/vouchers/catalogue-voucher";
+import { cataloguePromotionPeriodFromWindow } from "@/engines/vouchers/catalogue-voucher";
 import { listPublicCatalogueVouchers } from "@/workspaces/vouchers/catalogue-queries";
 
 function monthDisplayName(monthYmd: string): string {
@@ -76,6 +73,8 @@ function collectionCakeEntries(input: {
 }): {
   hrefs: Record<string, string>;
   scopes: Record<string, CakeEntryCaptureScope>;
+  fulfilmentFrom: string | null;
+  fulfilmentTo: string | null;
 } {
   const earliest = earliestPickupDateYmd();
   let from = "";
@@ -88,12 +87,14 @@ function collectionCakeEntries(input: {
     pickup = input.startDate;
   } else if (input.month) {
     const bounds = catalogueMonthPickupBounds(input.month);
-    if (!bounds) return { hrefs: {}, scopes: {} };
+    if (!bounds) {
+      return { hrefs: {}, scopes: {}, fulfilmentFrom: null, fulfilmentTo: null };
+    }
     from = bounds.from;
     to = bounds.to;
     pickup = suggestedPickupDateForCatalogueMonth(input.month, earliest);
   } else {
-    return { hrefs: {}, scopes: {} };
+    return { hrefs: {}, scopes: {}, fulfilmentFrom: null, fulfilmentTo: null };
   }
 
   const scope: CakeEntryCaptureScope = {
@@ -109,6 +110,8 @@ function collectionCakeEntries(input: {
     scopes: Object.fromEntries(
       input.cakes.map((cake) => [cake.id, scope]),
     ),
+    fulfilmentFrom: from,
+    fulfilmentTo: to,
   };
 }
 
@@ -304,6 +307,8 @@ async function HomeMerchandisingIsland() {
         cakes,
         cakeHrefs: cakeEntries.hrefs,
         cakeScopes: cakeEntries.scopes,
+        fulfilmentFrom: cakeEntries.fulfilmentFrom,
+        fulfilmentTo: cakeEntries.fulfilmentTo,
         ...copy,
       };
       }),
@@ -311,28 +316,34 @@ async function HomeMerchandisingIsland() {
     listPublicCatalogueVouchers(),
   ]);
   const offerToday = singaporeDateFromIso(new Date().toISOString());
-  const targetedPromotions = listDiscoverableCatalogueVouchers(
-    vouchers,
-    offerToday,
-  ).filter(
-    (voucher) =>
-      isCatalogueVoucherCakeTargeted(voucher) &&
-      catalogueVoucherAllowsOrderType(voucher.rules, "preorder"),
-  );
-  const promotionBadges = Object.fromEntries(
-    buildTargetedPromotionBadgeByCakeId(vouchers, offerToday, "preorder"),
-  );
-  const featuredWithPromotions = featured.map((collection) => ({
-    ...collection,
-    cakes: sortCakesForCataloguePromotionPresentation(collection.cakes, {
-      isNew: cakeHasNewMerchandisingTag,
-      isTargetedPromotion: (cake) =>
-        targetedPromotions.some((voucher) =>
-          catalogueVoucherTargetsCake(voucher, cake.id),
-        ),
-      manualOrder: (_cake, index) => index + 1,
-    }),
-  }));
+  const featuredWithPromotions = featured.map((collection) => {
+    const period =
+      collection.fulfilmentFrom && collection.fulfilmentTo
+        ? cataloguePromotionPeriodFromWindow({
+            today: offerToday,
+            fulfilmentFrom: collection.fulfilmentFrom,
+            fulfilmentTo: collection.fulfilmentTo,
+          })
+        : null;
+    const promotions = Object.fromEntries(
+      buildTargetedPromotionBadgeByCakeId(
+        vouchers,
+        offerToday,
+        "preorder",
+        period,
+        { collectionMerchandising: true },
+      ),
+    );
+    return {
+      ...collection,
+      promotions,
+      cakes: sortCakesForCataloguePromotionPresentation(collection.cakes, {
+        isNew: cakeHasNewMerchandisingTag,
+        isTargetedPromotion: (cake) => Boolean(promotions[cake.id]),
+        manualOrder: (_cake, index) => index + 1,
+      }),
+    };
+  });
 
   const more = selection.more.map((candidate) => {
     const monthly =
@@ -370,7 +381,7 @@ async function HomeMerchandisingIsland() {
             description={collection.description}
             heading={collection.heading}
             kicker={collection.kicker}
-            promotions={promotionBadges}
+            promotions={collection.promotions}
             viewAllHref={collection.href}
             viewAllLabel={collection.viewAllLabel}
           />

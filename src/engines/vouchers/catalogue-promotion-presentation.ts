@@ -5,12 +5,15 @@
 import { compareCakeSizeLabels } from "@/engines/menu/cake-size-order";
 import {
   catalogueVoucherAllowsOrderType,
+  catalogueVoucherAppliesToPromotionPeriod,
+  catalogueVoucherPromotesInCollectionPeriod,
   compareCatalogueVoucherSpecificity,
   formatCatalogueVoucherHeadline,
   isCatalogueVoucherDiscoverable,
   normalizeCatalogueSizeLabel,
   selectCatalogueVoucherBySpecificity,
   summarizeCatalogueOrderTypes,
+  type CataloguePromotionPeriod,
 } from "@/engines/vouchers/catalogue-voucher";
 import {
   formatBusinessCalendarDate,
@@ -98,11 +101,18 @@ export function selectPublicCakePromotion(
     today: string;
     orderType: CatalogueOrderType;
     targetedOnly?: boolean;
+    period?: CataloguePromotionPeriod | null;
   },
 ): CatalogueVoucherRecord | null {
   const candidates = listDiscoverableCatalogueVouchers(vouchers, input.today).filter(
     (voucher) => {
       if (!catalogueVoucherAllowsOrderType(voucher.rules, input.orderType)) {
+        return false;
+      }
+      if (
+        input.period &&
+        !catalogueVoucherAppliesToPromotionPeriod(voucher, input.period)
+      ) {
         return false;
       }
       if (input.targetedOnly) {
@@ -207,26 +217,27 @@ export function cataloguePromotionSizeState(
   return matches ? "qualifies" : "not_eligible";
 }
 
-function promotionMonthSource(
-  voucher: CatalogueVoucherRecord,
-  today: string,
-): string {
-  return (
+function promotionMonthSource(voucher: CatalogueVoucherRecord): string | null {
+  const source =
     voucher.rules.fulfilmentDate?.from ??
     voucher.rules.fulfilmentDate?.until ??
+    voucher.rules.orderDate?.from ??
+    voucher.rules.orderDate?.until ??
     voucher.validFrom ??
     voucher.validUntil ??
-    today
-  );
+    null;
+  const key = source?.slice(0, 10) ?? "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : null;
 }
 
 export function formatCataloguePromotionMonthEyebrow(
   voucher: CatalogueVoucherRecord,
-  today: string,
+  _today: string,
   suffix = "OFFER",
 ): string {
-  const source = promotionMonthSource(voucher, today);
-  const monthYear = formatBusinessMonthYear(source.slice(0, 10));
+  const source = promotionMonthSource(voucher);
+  if (!source) return suffix;
+  const monthYear = formatBusinessMonthYear(source);
   const month = monthYear.split(" ")[0]?.toUpperCase() ?? "";
   if (!month || month === source.toUpperCase()) {
     return suffix;
@@ -356,14 +367,21 @@ export function buildTargetedPromotionBadgeByCakeId(
   vouchers: readonly CatalogueVoucherRecord[],
   today: string,
   orderType: CatalogueOrderType,
+  period?: CataloguePromotionPeriod | null,
+  options?: { collectionMerchandising?: boolean },
 ): Map<string, CataloguePromotionBadge> {
   const badges = new Map<string, CataloguePromotionBadge>();
   const ranked = listDiscoverableCatalogueVouchers(vouchers, today)
-    .filter(
-      (voucher) =>
-        catalogueVoucherAllowsOrderType(voucher.rules, orderType) &&
-        isCatalogueVoucherCakeTargeted(voucher),
-    )
+    .filter((voucher) => {
+      if (!catalogueVoucherAllowsOrderType(voucher.rules, orderType)) {
+        return false;
+      }
+      if (!isCatalogueVoucherCakeTargeted(voucher)) return false;
+      if (!period) return true;
+      return options?.collectionMerchandising
+        ? catalogueVoucherPromotesInCollectionPeriod(voucher, period)
+        : catalogueVoucherAppliesToPromotionPeriod(voucher, period);
+    })
     .sort(compareCatalogueVoucherSpecificity);
   for (const voucher of ranked) {
     const badge = formatCataloguePromotionBadge(voucher, today);

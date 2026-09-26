@@ -12,6 +12,9 @@ import {
   formatCatalogueVoucherHeadline,
   isCatalogueVoucherDiscoverable,
   compareCatalogueVoucherSpecificity,
+  cataloguePromotionPeriodFromWindow,
+  catalogueVoucherAppliesToPromotionPeriod,
+  catalogueVoucherPromotesInCollectionPeriod,
   selectEligibleCatalogueVoucher,
 } from "@/engines/vouchers/catalogue-voucher";
 import { selectDraftCatalogueVoucher } from "@/engines/vouchers/catalogue-voucher-context";
@@ -845,5 +848,46 @@ const crewPayable = calculateOrderSettlement({
 assert.equal(crewPayable.subtotal, 135);
 assert.equal(crewPayable.totalAdjustments, -5);
 assert.equal(crewPayable.amountDue, 130);
+
+const septPeriod = cataloguePromotionPeriodFromWindow({
+  today: "2026-09-26",
+  fulfilmentFrom: "2026-09-01",
+  fulfilmentTo: "2026-09-30",
+});
+const octPeriod = cataloguePromotionPeriodFromWindow({
+  today: "2026-09-26",
+  fulfilmentFrom: "2026-10-01",
+  fulfilmentTo: "2026-10-31",
+});
+const septTarget = voucher({
+  rules: {
+    cakeIds: ["pistachio"],
+    sizeLabels: ['6"'],
+    orderTypes: ["preorder"],
+    fulfilmentDate: { from: "2026-09-01", until: "2026-09-30" },
+  },
+});
+const openTarget = voucher({
+  code: "JAP10",
+  rules: {
+    cakeIds: ["pistachio"],
+    sizeLabels: ['6"'],
+    orderTypes: ["preorder"],
+  },
+});
+assert.equal(catalogueVoucherPromotesInCollectionPeriod(septTarget, septPeriod), true);
+assert.equal(catalogueVoucherPromotesInCollectionPeriod(septTarget, octPeriod), false);
+assert.equal(catalogueVoucherAppliesToPromotionPeriod(openTarget, octPeriod), true);
+assert.equal(catalogueVoucherPromotesInCollectionPeriod(openTarget, octPeriod), false);
+assert.equal(
+  evaluateCatalogueVoucherEligibility(openTarget, input()).eligible,
+  true,
+);
+assert.equal(
+  evaluateCatalogueVoucherEligibility(septTarget, input({
+    fulfilmentDate: "2026-10-15",
+  })).eligible,
+  false,
+);
 
 console.log("catalogue voucher engine tests passed");

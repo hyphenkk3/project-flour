@@ -135,7 +135,11 @@ async function CakeDetailWithDisplay({
 }) {
   const displayPromise = getBrowseCakeDisplayById(cakeId);
   const livePromise = getBrowsePublishedCakeById(cakeId);
-  const offerPromise = loadCakeOfferVoucher(cakeId);
+  const query = await searchParams;
+  const offerPromise = loadCakeOfferVoucher(cakeId, {
+    fulfilmentFrom: ymdQueryValue(query.from) ?? ymdQueryValue(query.pickup),
+    fulfilmentTo: ymdQueryValue(query.to) ?? ymdQueryValue(query.pickup),
+  });
   const display = await displayPromise;
   const preview = browseCakePreviewFromDisplay(cakeId, display);
 

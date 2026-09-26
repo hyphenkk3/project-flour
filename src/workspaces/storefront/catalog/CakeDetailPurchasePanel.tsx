@@ -9,6 +9,10 @@ import { usePreorderDraft } from "@/workspaces/storefront/cart/usePreorderDraft"
 import { draftLineQuantity } from "@/workspaces/storefront/checkout/preorder-draft";
 import { BROWSE_CURRENTLY_UNAVAILABLE_NOTE } from "@/engines/menu/homepage-collection-preview";
 import {
+  cataloguePromotionPeriodFromWindow,
+  catalogueVoucherAppliesToPromotionPeriod,
+} from "@/engines/vouchers/catalogue-voucher";
+import {
   formatPreorderRequirement,
   formatRm,
   storefrontCategoryLabel,
@@ -52,6 +56,23 @@ export function CakeDetailPurchasePanel({
     /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to)
       ? { from, to, pickup: pickupScopePickup }
       : null;
+  const scopedOfferVoucher = useMemo(() => {
+    if (!offerVoucher || !offerToday) return null;
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(from) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(to)
+    ) {
+      return offerVoucher;
+    }
+    const period = cataloguePromotionPeriodFromWindow({
+      today: offerToday,
+      fulfilmentFrom: from,
+      fulfilmentTo: to,
+    });
+    return catalogueVoucherAppliesToPromotionPeriod(offerVoucher, period)
+      ? offerVoucher
+      : null;
+  }, [from, offerToday, offerVoucher, to]);
 
   const existingQuantity = useMemo(
     () =>
@@ -148,11 +169,11 @@ export function CakeDetailPurchasePanel({
         </ul>
       </section>
 
-      {offerVoucher && offerToday ? (
+      {scopedOfferVoucher && offerToday ? (
         <CakeOfferCard
           selectedSizeLabel={selectedSize?.size ?? null}
           today={offerToday}
-          voucher={offerVoucher}
+          voucher={scopedOfferVoucher}
         />
       ) : null}
 

@@ -28,6 +28,14 @@ import {
 } from "@/workspaces/storefront/catalog/queries";
 import { StorefrontHomeLink } from "@/workspaces/storefront/StorefrontBrand";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
+import { singaporeDateFromIso } from "@/engines/orders/promotions";
+import {
+  buildTargetedPromotionBadgeByCakeId,
+  cakeHasNewMerchandisingTag,
+  sortCakesForCataloguePromotionPresentation,
+} from "@/engines/vouchers/catalogue-promotion-presentation";
+import { cataloguePromotionPeriodFromWindow } from "@/engines/vouchers/catalogue-voucher";
+import { listPublicCatalogueVouchers } from "@/workspaces/vouchers/catalogue-queries";
 import { Suspense } from "react";
 
 type StorefrontCollectionCakesPageProps = {
@@ -95,11 +103,12 @@ function CollectionCakesFallback() {
 async function CollectionCakesBody({
   collectionId,
 }: CollectionCakesBodyProps) {
-  const [monthly, specialCandidate, cakes, specials] = await Promise.all([
+  const [monthly, specialCandidate, cakes, specials, vouchers] = await Promise.all([
     getOrderableMonthlyCatalogueById(collectionId),
     getCustomerSpecialCatalogueById(collectionId),
     listAvailableCakes(collectionId),
     listCustomerSpecialCatalogues(),
+    listPublicCatalogueVouchers(),
   ]);
   const special = monthly ? null : specialCandidate;
   if (!monthly?.month && !special) {
@@ -164,6 +173,28 @@ async function CollectionCakesBody({
   }
 
   const scope = collectionScope;
+  const offerToday = singaporeDateFromIso(new Date().toISOString());
+  const period = scope
+    ? cataloguePromotionPeriodFromWindow({
+        today: offerToday,
+        fulfilmentFrom: scope.from,
+        fulfilmentTo: scope.to,
+      })
+    : null;
+  const promotions = Object.fromEntries(
+    buildTargetedPromotionBadgeByCakeId(
+      vouchers,
+      offerToday,
+      "preorder",
+      period,
+      { collectionMerchandising: true },
+    ),
+  );
+  const orderedCakes = sortCakesForCataloguePromotionPresentation(cakes, {
+    isNew: cakeHasNewMerchandisingTag,
+    isTargetedPromotion: (cake) => Boolean(promotions[cake.id]),
+    manualOrder: (_cake, index) => index + 1,
+  });
   const detailHrefs =
     scope == null
       ? undefined
@@ -214,8 +245,9 @@ async function CollectionCakesBody({
         </h2>
         <CakeEntryScopeCapture scopes={cakeScopes}>
           <BrowseCakeCatalogue
-            cakes={cakes}
+            cakes={orderedCakes}
             detailHrefs={detailHrefs}
+            promotions={promotions}
             emptyMessage="No cakes are listed in this collection yet."
             pickupScope={
               scope

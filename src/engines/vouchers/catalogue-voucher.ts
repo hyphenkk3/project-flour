@@ -125,6 +125,96 @@ function dateBoundsConfigured(bounds: CatalogueDateBounds | null): boolean {
   return Boolean(bounds && (bounds.from || bounds.until));
 }
 
+function dateBoundsOverlapWindow(
+  bounds: CatalogueDateBounds | null,
+  from: string,
+  to: string,
+): boolean {
+  if (!dateBoundsConfigured(bounds) || !bounds) return true;
+  if (bounds.from && bounds.from > to) return false;
+  if (bounds.until && bounds.until < from) return false;
+  return true;
+}
+
+export type CataloguePromotionPeriod = {
+  today: string;
+  orderDate: string;
+  fulfilmentFrom: string;
+  fulfilmentTo: string;
+  orderType: CatalogueOrderType;
+};
+
+export function cataloguePromotionPeriodFromWindow(input: {
+  today: string;
+  fulfilmentFrom: string;
+  fulfilmentTo: string;
+  orderDate?: string;
+  orderType?: CatalogueOrderType;
+}): CataloguePromotionPeriod {
+  return {
+    today: input.today,
+    orderDate: input.orderDate ?? input.today,
+    fulfilmentFrom: input.fulfilmentFrom,
+    fulfilmentTo: input.fulfilmentTo,
+    orderType: input.orderType ?? "preorder",
+  };
+}
+
+/**
+ * Shared date/type check for collection merchandising.
+ * Uses the same validity, order-date, fulfilment-date, and order-type
+ * rules as evaluateCatalogueVoucherEligibility. Does not invent a month
+ * from voucher copy and does not decide discounts.
+ */
+export function catalogueVoucherAppliesToPromotionPeriod(
+  voucher: CatalogueVoucherRecord,
+  period: CataloguePromotionPeriod,
+): boolean {
+  if (!isCatalogueVoucherDiscoverable(voucher, period.today)) return false;
+  if (!catalogueVoucherAllowsOrderType(voucher.rules, period.orderType)) {
+    return false;
+  }
+  if (
+    dateBoundsConfigured(voucher.rules.orderDate) &&
+    !inclusiveDateContains(
+      voucher.rules.orderDate as CatalogueDateBounds,
+      period.orderDate,
+    )
+  ) {
+    return false;
+  }
+  return dateBoundsOverlapWindow(
+    voucher.rules.fulfilmentDate,
+    period.fulfilmentFrom,
+    period.fulfilmentTo,
+  );
+}
+
+export function catalogueVoucherHasConfiguredPeriodRules(
+  voucher: Pick<CatalogueVoucherRecord, "rules">,
+): boolean {
+  return (
+    dateBoundsConfigured(voucher.rules.fulfilmentDate) ||
+    dateBoundsConfigured(voucher.rules.orderDate)
+  );
+}
+
+/**
+ * Collection merchandising only. A cake enters a collection's promotion
+ * group when a targeted voucher is date-applicable to that collection.
+ * Vouchers with no order/fulfilment dates stay generally eligible but do
+ * not invent a collection month.
+ */
+export function catalogueVoucherPromotesInCollectionPeriod(
+  voucher: CatalogueVoucherRecord,
+  period: CataloguePromotionPeriod,
+): boolean {
+  return (
+    catalogueVoucherHasConfiguredPeriodRules(voucher) &&
+    catalogueVoucherAppliesToPromotionPeriod(voucher, period)
+  );
+}
+
 export function isCatalogueVoucherTypeApplicable(
   voucherType: LibraryVoucherType,
 ): boolean {

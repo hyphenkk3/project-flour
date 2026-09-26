@@ -19,6 +19,11 @@ import {
   selectPublicCakePromotion,
   sortCakesForCataloguePromotionPresentation,
 } from "@/engines/vouchers/catalogue-promotion-presentation";
+import {
+  cataloguePromotionPeriodFromWindow,
+  catalogueVoucherAppliesToPromotionPeriod,
+  catalogueVoucherPromotesInCollectionPeriod,
+} from "@/engines/vouchers/catalogue-voucher";
 import type {
   CatalogueVoucherRecord,
   CatalogueVoucherRules,
@@ -225,6 +230,131 @@ assert.match(badges.get(strawberry)?.detail ?? "", /6"/);
 assert.doesNotMatch(badges.get(strawberry)?.detail ?? "", /^RM10 OFF$/);
 assert.match(badges.get(earlGrey)?.detail ?? "", /6" & 8"/);
 assert.match(formatCataloguePromotionBadge(targetedSix, today).eyebrow, /OCTOBER/);
+
+const septemberOnly = voucher({
+  id: "jap10-sept",
+  code: "JAP10",
+  validFrom: null,
+  validUntil: null,
+  rules: {
+    cakeIds: [strawberry],
+    cakeNames: ["Japanese Strawberry"],
+    sizeLabels: ['6"'],
+    orderTypes: ["preorder"],
+    fulfilmentDate: { from: "2026-09-01", until: "2026-09-30" },
+  },
+});
+const undatedJap = voucher({
+  id: "jap10-open",
+  code: "JAP10",
+  validFrom: null,
+  validUntil: null,
+  rules: {
+    cakeIds: [strawberry],
+    cakeNames: ["Japanese Strawberry"],
+    sizeLabels: ['6"'],
+    orderTypes: ["preorder"],
+  },
+});
+const septPeriod = cataloguePromotionPeriodFromWindow({
+  today,
+  fulfilmentFrom: "2026-09-01",
+  fulfilmentTo: "2026-09-30",
+});
+const octPeriod = cataloguePromotionPeriodFromWindow({
+  today,
+  fulfilmentFrom: "2026-10-01",
+  fulfilmentTo: "2026-10-31",
+});
+assert.equal(
+  catalogueVoucherPromotesInCollectionPeriod(septemberOnly, septPeriod),
+  true,
+);
+assert.equal(
+  catalogueVoucherPromotesInCollectionPeriod(septemberOnly, octPeriod),
+  false,
+);
+assert.equal(catalogueVoucherAppliesToPromotionPeriod(undatedJap, octPeriod), true);
+assert.equal(catalogueVoucherPromotesInCollectionPeriod(undatedJap, septPeriod), false);
+assert.equal(catalogueVoucherPromotesInCollectionPeriod(undatedJap, octPeriod), false);
+assert.doesNotMatch(
+  formatCataloguePromotionBadge(undatedJap, today).eyebrow,
+  /SEPTEMBER|OCTOBER|JAP10/,
+);
+assert.doesNotMatch(undatedJap.code, /SEPTEMBER/);
+
+const septBadges = buildTargetedPromotionBadgeByCakeId(
+  [generic, undatedJap, septemberOnly],
+  today,
+  "preorder",
+  septPeriod,
+  { collectionMerchandising: true },
+);
+assert.equal(septBadges.get(strawberry)?.voucherId, septemberOnly.id);
+assert.match(septBadges.get(strawberry)?.eyebrow ?? "", /SEPTEMBER/);
+assert.equal(septBadges.has(mango), false);
+
+const octBadges = buildTargetedPromotionBadgeByCakeId(
+  [generic, undatedJap, septemberOnly],
+  today,
+  "preorder",
+  octPeriod,
+  { collectionMerchandising: true },
+);
+assert.equal(octBadges.has(strawberry), false);
+
+const octoberManual = [
+  { id: "thai", name: "Thai Milk Tea Mango" },
+  { id: strawberry, name: "Japanese Strawberry" },
+  { id: "dubai", name: "Dubai Chocolate Kunafa" },
+  { id: "peanut", name: "Salted Peanut" },
+  { id: "pistachio", name: "Pistachio Raspberry Kiss" },
+];
+assert.deepEqual(
+  sortCakesForCataloguePromotionPresentation(octoberManual, {
+    isNew: () => false,
+    isTargetedPromotion: (cake) => octBadges.has(cake.id),
+    manualOrder: (_cake, index) => index + 1,
+  }).map((cake) => cake.id),
+  octoberManual.map((cake) => cake.id),
+);
+assert.deepEqual(
+  sortCakesForCataloguePromotionPresentation(octoberManual, {
+    isNew: () => false,
+    isTargetedPromotion: (cake) => septBadges.has(cake.id),
+    manualOrder: (_cake, index) => index + 1,
+  }).map((cake) => cake.id),
+  [strawberry, "thai", "dubai", "peanut", "pistachio"],
+);
+
+assert.equal(
+  selectPublicCakePromotion([generic, septemberOnly], {
+    cakeId: strawberry,
+    today,
+    orderType: "preorder",
+    targetedOnly: true,
+    period: octPeriod,
+  }),
+  null,
+);
+assert.equal(
+  selectPublicCakePromotion([generic, septemberOnly], {
+    cakeId: strawberry,
+    today,
+    orderType: "preorder",
+    period: octPeriod,
+  })?.id,
+  generic.id,
+);
+assert.equal(
+  selectPublicCakePromotion([generic, undatedJap], {
+    cakeId: strawberry,
+    today,
+    orderType: "preorder",
+    period: octPeriod,
+  })?.id,
+  undatedJap.id,
+);
 
 assert.equal(formatCataloguePromotionSizeList(['8"', '6"']), '6" & 8"');
 assert.equal(cataloguePromotionSizeState(['6"', '8"'], '4"'), "not_eligible");

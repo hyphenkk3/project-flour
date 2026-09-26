@@ -14,7 +14,16 @@ const home = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
 assert.match(home, /listPublicCatalogueVouchers/);
 assert.match(home, /sortCakesForCataloguePromotionPresentation/);
 assert.match(home, /buildTargetedPromotionBadgeByCakeId/);
+assert.match(home, /collectionMerchandising: true/);
+assert.match(home, /cataloguePromotionPeriodFromWindow/);
 assert.equal((home.match(/listPublicCatalogueVouchers\(\)/g) ?? []).length, 1);
+
+const collectionPage = readSrc(
+  "src/workspaces/storefront/home/StorefrontCollectionCakesPage.tsx",
+);
+assert.match(collectionPage, /listPublicCatalogueVouchers/);
+assert.match(collectionPage, /collectionMerchandising: true/);
+assert.match(collectionPage, /sortCakesForCataloguePromotionPresentation/);
 
 const browse = readSrc("src/workspaces/storefront/home/StorefrontBrowsePage.tsx");
 assert.match(browse, /listPublicCatalogueVouchers/);
@@ -51,6 +60,10 @@ const panel = readSrc(
 );
 assert.match(panel, /CakeOfferCard/);
 assert.match(panel, /selectedSizeLabel=\{selectedSize\?\.size/);
+assert.match(panel, /catalogueVoucherAppliesToPromotionPeriod/);
+
+const hint = readSrc("src/workspaces/storefront/offers/CakeOfferHint.tsx");
+assert.match(hint, /cataloguePromotionPeriodFromWindow/);
 
 const offerCard = readSrc("src/workspaces/storefront/offers/CakeOfferCard.tsx");
 assert.match(offerCard, /View offer details/);
