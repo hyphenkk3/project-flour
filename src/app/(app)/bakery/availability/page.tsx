@@ -91,6 +91,7 @@ export default async function BakeryAvailabilityPage({
         <PagePanel>
           <AvailabilityDateBar
             month={month}
+            overviewFrom={overviewFrom || undefined}
             pickupDate={pickupDate}
             wlCake={wlCake}
             wlSize={wlSize}

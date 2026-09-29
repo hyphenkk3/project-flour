@@ -13,8 +13,10 @@ const ghostButtonClass =
 type AvailabilityOverviewPanelProps = {
   from: string;
   to: string;
-  prevHref: string | null;
+  prevHref: string;
   nextHref: string;
+  upcomingHref: string | null;
+  historical: boolean;
   days: AvailabilityOverviewDay[];
 };
 
@@ -40,6 +42,8 @@ export function AvailabilityOverviewPanel({
   to,
   prevHref,
   nextHref,
+  upcomingHref,
+  historical,
   days,
   month,
   overviewFrom,
@@ -57,7 +61,9 @@ export function AvailabilityOverviewPanel({
   return (
     <section aria-labelledby="availability-overview-heading" className="space-y-4">
       <p className="text-skyline max-w-2xl text-sm">
-        Staff only. Upcoming pickup dates with closures and production limits.
+        {historical
+          ? "Staff only. Past pickup dates with closures and production limits."
+          : "Staff only. Upcoming pickup dates with closures and production limits."}{" "}
         Customers never see these numbers. Each limit is its own scope — size
         limits are not added to a whole-cake limit.
       </p>
@@ -66,12 +72,15 @@ export function AvailabilityOverviewPanel({
         <p className="text-ink text-sm font-medium">
           {formatBusinessCalendarDate(from)} – {formatBusinessCalendarDate(to)}
         </p>
-        <div className="flex gap-2">
-          {prevHref ? (
-            <Link className={ghostButtonClass} href={prevHref}>
-              Previous 14 days
+        <div className="flex flex-wrap gap-2">
+          {upcomingHref ? (
+            <Link className={ghostButtonClass} href={upcomingHref}>
+              Show upcoming
             </Link>
           ) : null}
+          <Link className={ghostButtonClass} href={prevHref}>
+            Previous 14 days
+          </Link>
           <Link className={ghostButtonClass} href={nextHref}>
             Next 14 days
           </Link>

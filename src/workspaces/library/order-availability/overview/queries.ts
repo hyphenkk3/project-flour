@@ -3,9 +3,8 @@ import {
   AVAILABILITY_OVERVIEW_FLOOR_ORDER_STATUSES,
   availabilityOverviewDates,
   buildAvailabilityOverviewDays,
-  clampAvailabilityOverviewFrom,
   committedQuantityForOverviewRow,
-  parseAvailabilityOverviewFrom,
+  resolveAvailabilityOverviewFrom,
   type AvailabilityOverviewCapacityRow,
   type AvailabilityOverviewCommittedLine,
   type AvailabilityOverviewDay,
@@ -216,10 +215,7 @@ export async function listAvailabilityOverview(
   fromParam: string | null | undefined,
   todayYmd: string,
 ): Promise<AvailabilityOverviewWindow> {
-  const from = clampAvailabilityOverviewFrom(
-    parseAvailabilityOverviewFrom(fromParam, todayYmd),
-    todayYmd,
-  );
+  const from = resolveAvailabilityOverviewFrom(fromParam, todayYmd);
   const dates = availabilityOverviewDates(from);
   const first = dates[0];
   const last = dates[dates.length - 1];

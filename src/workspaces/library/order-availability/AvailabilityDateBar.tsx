@@ -14,6 +14,7 @@ const fieldClass =
 type AvailabilityDateBarProps = {
   pickupDate: string;
   month: string;
+  overviewFrom?: string;
   wlCake?: string;
   wlSize?: string;
   wlStatus?: string;
@@ -26,6 +27,7 @@ export function AvailabilityDateBar(props: AvailabilityDateBarProps) {
 function AvailabilityDateBarForm({
   pickupDate,
   month,
+  overviewFrom = "",
   wlCake = "",
   wlSize = "",
   wlStatus = "",
@@ -35,6 +37,7 @@ function AvailabilityDateBarForm({
   const prevMonth = shiftOrderAvailabilityMonth(month, -1);
   const nextMonth = shiftOrderAvailabilityMonth(month, 1);
   const monthQuery = {
+    overviewFrom: overviewFrom || undefined,
     wlCake: wlCake || undefined,
     wlSize: wlSize || undefined,
     wlStatus: wlStatus || undefined,
@@ -52,6 +55,9 @@ function AvailabilityDateBarForm({
         {wlSize ? <input name="wlSize" type="hidden" value={wlSize} /> : null}
         {wlStatus ? (
           <input name="wlStatus" type="hidden" value={wlStatus} />
+        ) : null}
+        {overviewFrom ? (
+          <input name="overviewFrom" type="hidden" value={overviewFrom} />
         ) : null}
         <label className="text-ink text-sm font-medium">
           Pickup date

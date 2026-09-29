@@ -1,10 +1,10 @@
-import { parseBusinessDate, toBusinessDateKey } from "@/lib/dates";
+import { toBusinessDateKey } from "@/lib/dates";
 import { isTransientDataLoadError } from "@/lib/supabase/fetch-timeout";
 import {
   availabilityOverviewDates,
   buildAvailabilityOverviewDays,
-  clampAvailabilityOverviewFrom,
-  parseAvailabilityOverviewFrom,
+  isAvailabilityOverviewHistorical,
+  resolveAvailabilityOverviewFrom,
   shiftAvailabilityOverviewFrom,
 } from "@/engines/orders/availability-overview";
 import { AvailabilityOverviewPanel } from "@/workspaces/library/order-availability/overview/AvailabilityOverviewPanel";
@@ -17,7 +17,7 @@ type AvailabilityOverviewSectionProps = {
 };
 
 function overviewHref(input: {
-  overviewFrom: string;
+  overviewFrom?: string | null;
   month: string;
   dateParam?: string;
 }): string {
@@ -25,7 +25,8 @@ function overviewHref(input: {
   params.set("month", input.month);
   const date = input.dateParam?.trim().slice(0, 10) ?? "";
   if (date) params.set("date", date);
-  params.set("overviewFrom", input.overviewFrom);
+  const overviewFrom = input.overviewFrom?.trim().slice(0, 10) ?? "";
+  if (overviewFrom) params.set("overviewFrom", overviewFrom);
   return `/bakery/availability?${params.toString()}`;
 }
 
@@ -35,21 +36,10 @@ export async function AvailabilityOverviewSection({
   dateParam,
 }: AvailabilityOverviewSectionProps) {
   const today = toBusinessDateKey();
-  const selectedDate = dateParam?.trim().slice(0, 10) ?? "";
-  const from = clampAvailabilityOverviewFrom(
-    parseAvailabilityOverviewFrom(
-      fromParam,
-      parseBusinessDate(selectedDate) ? selectedDate : today,
-    ),
-    today,
-  );
+  const from = resolveAvailabilityOverviewFrom(fromParam, today);
   const dates = availabilityOverviewDates(from);
   const to = dates[dates.length - 1] ?? from;
-  const previousFrom = clampAvailabilityOverviewFrom(
-    shiftAvailabilityOverviewFrom(from, -1),
-    today,
-  );
-  const canGoPrevious = previousFrom !== from;
+  const historical = isAvailabilityOverviewHistorical(from, today);
 
   let days = buildAvailabilityOverviewDays({
     dates,
@@ -76,6 +66,7 @@ export async function AvailabilityOverviewSection({
     <AvailabilityOverviewPanel
       days={days}
       from={from}
+      historical={historical}
       month={month}
       nextHref={overviewHref({
         overviewFrom: shiftAvailabilityOverviewFrom(from, 1),
@@ -83,16 +74,15 @@ export async function AvailabilityOverviewSection({
         dateParam,
       })}
       overviewFrom={from}
-      prevHref={
-        canGoPrevious
-          ? overviewHref({
-              overviewFrom: previousFrom,
-              month,
-              dateParam,
-            })
-          : null
-      }
+      prevHref={overviewHref({
+        overviewFrom: shiftAvailabilityOverviewFrom(from, -1),
+        month,
+        dateParam,
+      })}
       to={to}
+      upcomingHref={
+        historical ? overviewHref({ month, dateParam }) : null
+      }
     />
   );
 }

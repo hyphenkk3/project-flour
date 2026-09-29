@@ -77,8 +77,32 @@ export function parseAvailabilityOverviewFrom(
 }
 
 /**
- * Upcoming Overview never starts before today's Malaysia business date.
- * Future candidates are unchanged. Invalid candidates fall back to today.
+ * Overview window start.
+ * A valid `overviewFrom` (including past) is used as-is.
+ * Missing or invalid `overviewFrom` falls back to today.
+ * Production Capacity `date` is never a window start.
+ */
+export function resolveAvailabilityOverviewFrom(
+  overviewFrom: string | null | undefined,
+  todayYmd: string,
+): string {
+  const today = parseBusinessDate(todayYmd) ? todayYmd : "";
+  const resolved = parseAvailabilityOverviewFrom(overviewFrom, today);
+  return parseBusinessDate(resolved) ? resolved : todayYmd;
+}
+
+export function isAvailabilityOverviewHistorical(
+  fromYmd: string,
+  todayYmd: string,
+): boolean {
+  if (!parseBusinessDate(fromYmd) || !parseBusinessDate(todayYmd)) {
+    return false;
+  }
+  return fromYmd < todayYmd;
+}
+
+/**
+ * Default upcoming window only. Do not apply to an explicit `overviewFrom`.
  */
 export function clampAvailabilityOverviewFrom(
   candidateYmd: string,

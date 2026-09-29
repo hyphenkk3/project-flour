@@ -14,9 +14,11 @@ import {
   buildAvailabilityOverviewDays,
   clampAvailabilityOverviewFrom,
   committedQuantityForOverviewRow,
+  isAvailabilityOverviewHistorical,
   overviewScopeStatus,
   parseAvailabilityOverviewFrom,
   remainingCapacityQuantity,
+  resolveAvailabilityOverviewFrom,
   shiftAvailabilityOverviewFrom,
 } from "@/engines/orders/availability-overview";
 import { PRODUCTION_CAPACITY_FLOOR_ORDER_STATUSES } from "@/engines/orders/production-capacity";
@@ -52,12 +54,10 @@ assert.equal(parseAvailabilityOverviewFrom("2026-09-10", from), "2026-09-10");
 assert.deepEqual(availabilityOverviewDates("bad"), []);
 
 const today = "2026-09-29";
-assert.equal(clampAvailabilityOverviewFrom("2026-09-21", today), today);
-assert.equal(clampAvailabilityOverviewFrom("2026-09-25", today), today);
-assert.equal(clampAvailabilityOverviewFrom(today, today), today);
-assert.equal(clampAvailabilityOverviewFrom("2026-10-04", today), "2026-10-04");
-assert.equal(clampAvailabilityOverviewFrom("not-a-date", today), today);
-assert.deepEqual(availabilityOverviewDates(clampAvailabilityOverviewFrom("2026-09-21", today)), [
+assert.equal(resolveAvailabilityOverviewFrom(null, today), today);
+assert.equal(resolveAvailabilityOverviewFrom("", today), today);
+assert.equal(resolveAvailabilityOverviewFrom("not-a-date", today), today);
+assert.deepEqual(availabilityOverviewDates(resolveAvailabilityOverviewFrom(null, today)), [
   "2026-09-29",
   "2026-09-30",
   "2026-10-01",
@@ -73,32 +73,37 @@ assert.deepEqual(availabilityOverviewDates(clampAvailabilityOverviewFrom("2026-0
   "2026-10-11",
   "2026-10-12",
 ]);
-assert.equal(
-  clampAvailabilityOverviewFrom(shiftAvailabilityOverviewFrom(today, -1), today),
-  today,
+assert.equal(resolveAvailabilityOverviewFrom("2026-09-21", today), "2026-09-21");
+assert.deepEqual(
+  availabilityOverviewDates(resolveAvailabilityOverviewFrom("2026-09-15", today)),
+  [
+    "2026-09-15",
+    "2026-09-16",
+    "2026-09-17",
+    "2026-09-18",
+    "2026-09-19",
+    "2026-09-20",
+    "2026-09-21",
+    "2026-09-22",
+    "2026-09-23",
+    "2026-09-24",
+    "2026-09-25",
+    "2026-09-26",
+    "2026-09-27",
+    "2026-09-28",
+  ],
 );
-assert.equal(
-  clampAvailabilityOverviewFrom(
-    shiftAvailabilityOverviewFrom("2026-10-04", -1),
-    today,
-  ),
-  today,
-);
+assert.equal(resolveAvailabilityOverviewFrom(today, today), today);
+assert.equal(resolveAvailabilityOverviewFrom("2026-10-04", today), "2026-10-04");
+assert.equal(shiftAvailabilityOverviewFrom(today, -1), "2026-09-15");
+assert.equal(shiftAvailabilityOverviewFrom("2026-09-15", -1), "2026-09-01");
+assert.equal(shiftAvailabilityOverviewFrom("2026-09-15", 1), today);
 assert.equal(shiftAvailabilityOverviewFrom(today, 1), "2026-10-13");
-assert.notEqual(
-  clampAvailabilityOverviewFrom(
-    shiftAvailabilityOverviewFrom("2026-10-13", -1),
-    today,
-  ),
-  "2026-10-13",
-);
-assert.equal(
-  clampAvailabilityOverviewFrom(
-    shiftAvailabilityOverviewFrom("2026-10-13", -1),
-    today,
-  ),
-  today,
-);
+assert.equal(isAvailabilityOverviewHistorical("2026-09-15", today), true);
+assert.equal(isAvailabilityOverviewHistorical(today, today), false);
+assert.equal(isAvailabilityOverviewHistorical("2026-10-04", today), false);
+assert.equal(clampAvailabilityOverviewFrom("2026-09-21", today), today);
+assert.equal(clampAvailabilityOverviewFrom("2026-10-04", today), "2026-10-04");
 
 const cakeA = "cake-a";
 const size6 = "size-6";
@@ -363,11 +368,14 @@ assert.doesNotMatch(bakeryPageSrc, /set_production_capacity/);
 const overviewSectionSrc = readSrc(
   "src/workspaces/library/order-availability/overview/AvailabilityOverviewSection.tsx",
 );
-assert.match(overviewSectionSrc, /parseBusinessDate\(selectedDate\)/);
-assert.match(overviewSectionSrc, /clampAvailabilityOverviewFrom/);
+assert.match(overviewSectionSrc, /resolveAvailabilityOverviewFrom\(fromParam, today\)/);
 assert.match(overviewSectionSrc, /listAvailabilityOverview\(from, today\)/);
-assert.match(overviewSectionSrc, /canGoPrevious/);
+assert.match(overviewSectionSrc, /isAvailabilityOverviewHistorical/);
+assert.match(overviewSectionSrc, /Show upcoming|upcomingHref/);
+assert.doesNotMatch(overviewSectionSrc, /parseBusinessDate\(selectedDate\)/);
+assert.doesNotMatch(overviewSectionSrc, /clampAvailabilityOverviewFrom/);
 assert.doesNotMatch(overviewSectionSrc, /resolveCapacityDate/);
+assert.doesNotMatch(overviewSectionSrc, /canGoPrevious/);
 
 const bakeryLayoutSrc = readSrc("src/app/(app)/bakery/layout.tsx");
 assert.match(bakeryLayoutSrc, /canViewOrderAvailability/);
@@ -398,7 +406,10 @@ assert.match(panelSrc, /Fully Booked/);
 assert.match(panelSrc, /Unrestricted/);
 assert.match(panelSrc, /Previous 14 days/);
 assert.match(panelSrc, /Next 14 days/);
-assert.match(panelSrc, /prevHref \? /);
+assert.match(panelSrc, /Show upcoming/);
+assert.match(panelSrc, /Past pickup dates/);
+assert.match(panelSrc, /Upcoming pickup dates/);
+assert.doesNotMatch(panelSrc, /prevHref \? /);
 assert.doesNotMatch(panelSrc, /saveProductionCapacityAction/);
 assert.doesNotMatch(panelSrc, /removeProductionCapacityAction/);
 assert.doesNotMatch(panelSrc, /updateOrderAvailabilityAction/);
@@ -417,14 +428,17 @@ const querySrc = readSrc(
 );
 assert.match(querySrc, /committedQuantityForOverviewRow/);
 assert.match(querySrc, /AVAILABILITY_OVERVIEW_FLOOR_ORDER_STATUSES/);
-assert.match(querySrc, /clampAvailabilityOverviewFrom/);
+assert.match(querySrc, /resolveAvailabilityOverviewFrom/);
+assert.doesNotMatch(querySrc, /clampAvailabilityOverviewFrom/);
 assert.doesNotMatch(querySrc, /set_production_capacity/);
 assert.doesNotMatch(querySrc, /production_capacity_holds/);
 assert.doesNotMatch(querySrc, /waiting_list/);
 
 const engineSrc = readSrc("src/engines/orders/availability-overview.ts");
 assert.match(engineSrc, /PRODUCTION_CAPACITY_FLOOR_ORDER_STATUSES/);
-assert.match(engineSrc, /clampAvailabilityOverviewFrom/);
+assert.match(engineSrc, /resolveAvailabilityOverviewFrom/);
+assert.match(engineSrc, /isAvailabilityOverviewHistorical/);
+assert.match(engineSrc, /Production Capacity `date` is never a window start/);
 assert.doesNotMatch(engineSrc, /submitted/);
 assert.doesNotMatch(engineSrc, /pending_confirmation/);
 
@@ -433,7 +447,14 @@ const dateBarSrc = readSrc(
 );
 assert.match(dateBarSrc, /type="date"/);
 assert.doesNotMatch(dateBarSrc, /\bmin=/);
+assert.match(dateBarSrc, /name="overviewFrom"/);
+assert.match(dateBarSrc, /overviewFrom: overviewFrom \|\| undefined/);
 assert.doesNotMatch(dateBarSrc, /clampAvailabilityOverviewFrom/);
+
+const bakeryAvailabilityPageSrc = readSrc(
+  "src/app/(app)/bakery/availability/page.tsx",
+);
+assert.match(bakeryAvailabilityPageSrc, /overviewFrom=\{overviewFrom \|\| undefined\}/);
 
 const capacitySectionSrc = readSrc(
   "src/workspaces/library/order-availability/capacity/ProductionCapacitySection.tsx",
@@ -444,6 +465,7 @@ assert.match(
   /if \(parseBusinessDate\(fromQuery\)\) return fromQuery;/,
 );
 assert.doesNotMatch(capacitySectionSrc, /clampAvailabilityOverviewFrom/);
+assert.doesNotMatch(capacitySectionSrc, /resolveAvailabilityOverviewFrom/);
 
 // 18. Customer-facing routes/data unchanged
 const guestFormSrc = readSrc(
