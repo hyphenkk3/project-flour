@@ -35,6 +35,11 @@ import { OrderPaidAddonsEditor } from "@/workspaces/owner/orders/OrderPaidAddons
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import { OrderFulfilmentCreateFields } from "@/workspaces/owner/orders/OrderFulfilmentCreateFields";
+import {
+  displayCakeSizeUnitPrice,
+  offerableCakeSizeIds,
+} from "@/workspaces/owner/orders/pickup-date-cake-size-prices";
+import { usePickupDateCakeSizePrices } from "@/workspaces/owner/orders/use-pickup-date-cake-size-prices";
 
 type EditableItem = {
   key: string;
@@ -74,6 +79,7 @@ export function StaffGuestOrderForm({
 
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
+  const [pickupDate, setPickupDate] = useState("");
   const [fulfilmentMethod, setFulfilmentMethod] =
     useState<OwnerCreateFulfilmentMethod>(defaultOwnerCreateFulfilmentMethod);
   const [deliveryDraft, setDeliveryDraft] = useState<DeliveryCreateDraft>(
@@ -107,6 +113,15 @@ export function StaffGuestOrderForm({
   >(() => buildEditablePaidAddonDrafts({ catalog: paidAddonCatalog }));
 
   const [needsAttention, setNeedsAttention] = useState(false);
+
+  const offerableSizeIds = useMemo(
+    () => offerableCakeSizeIds(cakes),
+    [cakes],
+  );
+  const pickupDatePrices = usePickupDateCakeSizePrices(
+    pickupDate,
+    offerableSizeIds,
+  );
 
   const itemsJson = useMemo(() => JSON.stringify(items), [items]);
   const complimentaryJson = useMemo(
@@ -228,6 +243,7 @@ export function StaffGuestOrderForm({
         delivery={deliveryDraft}
         hoursSnapshot={hoursSnapshot}
         method={fulfilmentMethod}
+        onDateChange={setPickupDate}
         onDeliveryChange={setDeliveryDraft}
         onMethodChange={setFulfilmentMethod}
       />
@@ -286,7 +302,14 @@ export function StaffGuestOrderForm({
                     >
                       {(cake?.sizes ?? []).map((size) => (
                         <option key={size.id} value={size.id}>
-                          {size.size} — {formatRm(size.price)}
+                          {size.size} —{" "}
+                          {formatRm(
+                            displayCakeSizeUnitPrice(
+                              size.price,
+                              size.id,
+                              pickupDatePrices,
+                            ),
+                          )}
                         </option>
                       ))}
                     </FormSelect>

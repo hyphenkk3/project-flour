@@ -29,6 +29,11 @@ import {
 } from "@/workspaces/customer-operations/orders/actions";
 import { AssistedOrderFulfilmentFields } from "@/workspaces/customer-operations/orders/AssistedOrderFulfilmentFields";
 import { STAFF_GUEST_ORDER_SOURCES } from "@/workspaces/owner/orders/labels";
+import {
+  displayCakeSizeUnitPrice,
+  offerableCakeSizeIds,
+} from "@/workspaces/owner/orders/pickup-date-cake-size-prices";
+import { usePickupDateCakeSizePrices } from "@/workspaces/owner/orders/use-pickup-date-cake-size-prices";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 
@@ -84,6 +89,16 @@ export function AssistedOrderForm({
   const [items, setItems] = useState<CakeLine[]>(() => [
     initialCakeLine(cakes),
   ]);
+  const [pickupDate, setPickupDate] = useState("");
+
+  const offerableSizeIds = useMemo(
+    () => offerableCakeSizeIds(cakes),
+    [cakes],
+  );
+  const pickupDatePrices = usePickupDateCakeSizePrices(
+    pickupDate,
+    offerableSizeIds,
+  );
 
   const selectedCustomer =
     customers.find((customer) => customer.id === customerId) ?? null;
@@ -189,6 +204,7 @@ export function AssistedOrderForm({
         onDeliveryChange={setDeliveryDraft}
         onDineInChange={setDineInDraft}
         onMethodChange={setFulfilmentMethod}
+        onPickupDateChange={setPickupDate}
       />
 
       <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
@@ -245,7 +261,14 @@ export function AssistedOrderForm({
                     >
                       {(cake?.sizes ?? []).map((size) => (
                         <option key={size.id} value={size.id}>
-                          {size.size} — {formatRm(size.price)}
+                          {size.size} —{" "}
+                          {formatRm(
+                            displayCakeSizeUnitPrice(
+                              size.price,
+                              size.id,
+                              pickupDatePrices,
+                            ),
+                          )}
                         </option>
                       ))}
                     </FormSelect>

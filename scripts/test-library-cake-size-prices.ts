@@ -15,6 +15,10 @@ import {
   resolveCakeSizePriceOn,
 } from "@/engines/orders/cake-size-price";
 import { canManageLibrary } from "@/foundation/navigation/access";
+import {
+  displayCakeSizeUnitPrice,
+  offerableCakeSizeIds,
+} from "@/workspaces/owner/orders/pickup-date-cake-size-prices";
 
 function readSrc(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -127,6 +131,50 @@ assert.doesNotMatch(freshPicksSql, /library_cake_size_price_on/);
 assert.doesNotMatch(extraActionsSrc, /library_cake_size_price_on/);
 assert.match(extraSql, /coalesce\(size_row\.price, 0\)/);
 assert.match(freshPicksSql, /coalesce\(size_row\.price, 0\)/);
+
+const opsPriceDisplaySrc = readSrc(
+  "src/workspaces/owner/orders/pickup-date-cake-size-prices.ts",
+);
+const opsPriceHookSrc = readSrc(
+  "src/workspaces/owner/orders/use-pickup-date-cake-size-prices.ts",
+);
+const staffGuestFormSrc = readSrc(
+  "src/workspaces/owner/orders/StaffGuestOrderForm.tsx",
+);
+const assistedFormSrc = readSrc(
+  "src/workspaces/customer-operations/orders/AssistedOrderForm.tsx",
+);
+const workspaceFormSrc = readSrc(
+  "src/workspaces/owner/orders/OrderWorkspaceForm.tsx",
+);
+const createStaffSrc = readSrc(
+  "src/workspaces/owner/orders/create-staff-preorder.ts",
+);
+
+assert.match(opsPriceDisplaySrc, /displayCakeSizeUnitPrice/);
+assert.match(opsPriceHookSrc, /resolveCheckoutCakeSizePrices/);
+assert.match(opsPriceHookSrc, /usePickupDateCakeSizePrices/);
+assert.doesNotMatch(opsPriceDisplaySrc, /2026-10-01/);
+assert.doesNotMatch(opsPriceHookSrc, /2026-10-01/);
+assert.doesNotMatch(opsPriceDisplaySrc, /Earl Grey/);
+assert.doesNotMatch(opsPriceHookSrc, /Earl Grey/);
+
+for (const src of [staffGuestFormSrc, assistedFormSrc, workspaceFormSrc]) {
+  assert.match(src, /usePickupDateCakeSizePrices/);
+  assert.match(src, /displayCakeSizeUnitPrice/);
+  assert.doesNotMatch(src, /formatRm\(size\.price\)/);
+}
+
+assert.match(createStaffSrc, /cake_id: item.cakeId/);
+assert.match(createStaffSrc, /cake_size_id: item.cakeSizeId/);
+assert.match(createStaffSrc, /quantity: item.quantity/);
+assert.doesNotMatch(
+  createStaffSrc.slice(
+    createStaffSrc.indexOf("p_items: input.items.map"),
+    createStaffSrc.indexOf("p_complimentary"),
+  ),
+  /unit_price|unitPrice/,
+);
 
 const base = {
   basePrice: 120,
@@ -278,6 +326,18 @@ assert.throws(() =>
     ],
     pickupDate: "2026-10-16",
   }),
+);
+
+assert.equal(displayCakeSizeUnitPrice(135, "s1", {}), 135);
+assert.equal(displayCakeSizeUnitPrice(135, "s1", { s1: 140 }), 140);
+assert.equal(displayCakeSizeUnitPrice(135, "s1", { s1: Number.NaN }), 135);
+assert.equal(displayCakeSizeUnitPrice(135, "s2", { s1: 140 }), 135);
+assert.deepEqual(
+  offerableCakeSizeIds([
+    { sizes: [{ id: "a" }, { id: "b" }] },
+    { sizes: [{ id: "b" }, { id: " c " }] },
+  ]),
+  ["a", "b", "c"],
 );
 
 console.log("PASS library cake size prices (static)");

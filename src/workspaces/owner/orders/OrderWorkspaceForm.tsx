@@ -143,6 +143,11 @@ import {
   STAFF_GUEST_ORDER_SOURCES,
 } from "@/workspaces/owner/orders/labels";
 import { withOwnerReturnTo } from "@/workspaces/owner/navigation/return-to";
+import {
+  displayCakeSizeUnitPrice,
+  offerableCakeSizeIds,
+} from "@/workspaces/owner/orders/pickup-date-cake-size-prices";
+import { usePickupDateCakeSizePrices } from "@/workspaces/owner/orders/use-pickup-date-cake-size-prices";
 
 const initialSaveState: OrderWorkspaceSaveState = {
   error: null,
@@ -297,6 +302,14 @@ export function OrderWorkspaceForm({
 
   const selectedPickupDate =
     mode === "edit" ? editPickupDate : order.pickupDate;
+  const offerableSizeIds = useMemo(
+    () => offerableCakeSizeIds(cakes),
+    [cakes],
+  );
+  const pickupDatePrices = usePickupDateCakeSizePrices(
+    selectedPickupDate,
+    offerableSizeIds,
+  );
   const preorderLines = preorderLinesFromWorkspaceItems({
     items:
       mode === "edit"
@@ -1615,7 +1628,14 @@ export function OrderWorkspaceForm({
                     >
                       {(cake?.sizes ?? []).map((size) => (
                         <option key={size.id} value={size.id}>
-                          {size.size} — {formatRm(size.price)}
+                          {size.size} —{" "}
+                          {formatRm(
+                            displayCakeSizeUnitPrice(
+                              size.price,
+                              size.id,
+                              pickupDatePrices,
+                            ),
+                          )}
                         </option>
                       ))}
                     </FormSelect>

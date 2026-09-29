@@ -50,6 +50,7 @@ type AssistedOrderFulfilmentFieldsProps = {
   closedDates?: readonly string[];
   hoursSnapshot?: OperatingHoursSnapshot;
   canOverrideCustomerFulfilmentSchedule?: boolean;
+  onPickupDateChange?: (date: string) => void;
 };
 
 export function AssistedOrderFulfilmentFields({
@@ -64,8 +65,14 @@ export function AssistedOrderFulfilmentFields({
   closedDates = [],
   hoursSnapshot = OPERATING_HOURS_SEED,
   canOverrideCustomerFulfilmentSchedule = false,
+  onPickupDateChange,
 }: AssistedOrderFulfilmentFieldsProps) {
   const [selectedDate, setSelectedDate] = useState("");
+
+  function updateSelectedDate(next: string) {
+    setSelectedDate(next);
+    onPickupDateChange?.(next);
+  }
   const [servingTime, setServingTime] = useState("");
   const [specialArrangement, setSpecialArrangement] = useState(false);
   const isDelivery = method === "delivery";
@@ -145,7 +152,7 @@ export function AssistedOrderFulfilmentFields({
             const next = event.target.checked;
             setSpecialArrangement(next);
             if (next) return;
-            setSelectedDate("");
+            updateSelectedDate("");
             setServingTime("");
             onDineInChange({
               ...dineIn,
@@ -170,7 +177,7 @@ export function AssistedOrderFulfilmentFields({
                   name="pickup_date"
                   onChange={(event) => {
                     const date = event.target.value;
-                    setSelectedDate(date);
+                    updateSelectedDate(date);
                     setServingTime("");
                     onDineInChange({
                       ...dineIn,
@@ -227,7 +234,7 @@ export function AssistedOrderFulfilmentFields({
                 hoursSnapshot={hoursSnapshot}
                 key={`assisted-dine-in-reservation-${method}`}
                 onDateChange={(date) => {
-                  setSelectedDate(date);
+                  updateSelectedDate(date);
                   setServingTime("");
                   onDineInChange({
                     ...dineIn,
@@ -373,7 +380,7 @@ export function AssistedOrderFulfilmentFields({
             <FormInput
               id="pickup_date"
               name="pickup_date"
-              onChange={(event) => setSelectedDate(event.target.value)}
+              onChange={(event) => updateSelectedDate(event.target.value)}
               required
               type="date"
               value={selectedDate}
@@ -400,7 +407,7 @@ export function AssistedOrderFulfilmentFields({
           dateLabel={dateLabel}
           hoursSnapshot={hoursSnapshot}
           key={`assisted-${method}-schedule`}
-          onDateChange={setSelectedDate}
+          onDateChange={updateSelectedDate}
           onTimeChange={setServingTime}
           slotsForDate={(date, closed) =>
             customerFulfilmentSlotsForDate(method, date, closed, hoursSnapshot)
