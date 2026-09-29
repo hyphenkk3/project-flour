@@ -197,24 +197,19 @@ export function StaffGuestOrderForm({
             value={guestName}
           />
         </FormField>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FormField
-            help="Optional for staff-created orders (e.g. Lex-mediated)."
-            htmlFor="guest_phone"
-            label="WhatsApp phone (optional)"
-          >
-            <FormInput
-              id="guest_phone"
-              name="guest_phone"
-              onChange={(event) => setGuestPhone(event.target.value)}
-              type="tel"
-              value={guestPhone}
-            />
-          </FormField>
-          <FormField htmlFor="guest_email" label="Email (optional)">
-            <FormInput id="guest_email" name="guest_email" type="email" />
-          </FormField>
-        </div>
+        <FormField
+          help="Optional for staff-created orders (e.g. Lex-mediated)."
+          htmlFor="guest_phone"
+          label="WhatsApp phone (optional)"
+        >
+          <FormInput
+            id="guest_phone"
+            name="guest_phone"
+            onChange={(event) => setGuestPhone(event.target.value)}
+            type="tel"
+            value={guestPhone}
+          />
+        </FormField>
         <FormField htmlFor="order_source" label="Order source">
           <FormSelect
             defaultValue="jotform"

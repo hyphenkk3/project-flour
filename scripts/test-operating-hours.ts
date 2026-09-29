@@ -166,6 +166,8 @@ function readSrc(rel: string): string {
 }
 
 const ownerPickupSrc = readSrc("src/components/ui/OwnerPickupFields.tsx");
+assert.doesNotMatch(ownerPickupSrc, /earliestPickupDateYmd/);
+assert.doesNotMatch(ownerPickupSrc, /min=\{minDate\}/);
 assert.match(ownerPickupSrc, /hoursSnapshot = OPERATING_HOURS_SEED/);
 assert.match(ownerPickupSrc, /getPickupSlotsForDate\(date, hoursSnapshot\)/);
 assert.match(
@@ -176,6 +178,7 @@ assert.doesNotMatch(ownerPickupSrc, /WEEKLY_PROFILES/);
 assert.doesNotMatch(ownerPickupSrc, /getPickupSlotsForDate\([^,\n]+\)/);
 
 const pickupSlotSrc = readSrc("src/components/ui/PickupSlotFields.tsx");
+assert.match(pickupSlotSrc, /earliestPickupDateYmd/);
 assert.match(
   pickupSlotSrc,
   /customerPickupSlotsForDate\(dateYmd, closed, hoursSnapshot\)/,
@@ -195,6 +198,8 @@ const staffFormSrc = readSrc(
   "src/workspaces/owner/orders/StaffGuestOrderForm.tsx",
 );
 assert.match(staffFormSrc, /hoursSnapshot=\{hoursSnapshot\}/);
+assert.doesNotMatch(staffFormSrc, /guest_email/);
+assert.doesNotMatch(staffFormSrc, /Email \(optional\)/);
 
 const newOrderPageSrc = readSrc("src/app/(app)/owner/orders/new/page.tsx");
 assert.match(newOrderPageSrc, /loadOperatingHoursSnapshot/);

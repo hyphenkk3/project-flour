@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
-  earliestPickupDateYmd,
   getPickupSlotsForDate,
   isValidPickupSlot,
   normalizePickupTimeValue,
@@ -44,7 +43,6 @@ export function OwnerPickupFields({
   timeLabel = "Pickup time",
   hoursSnapshot = OPERATING_HOURS_SEED,
 }: OwnerPickupFieldsProps) {
-  const minDate = earliestPickupDateYmd();
   const initialTime = defaultTime
     ? normalizePickupTimeValue(defaultTime)
     : "";
@@ -96,7 +94,6 @@ export function OwnerPickupFields({
         <FormField htmlFor="pickup_date" label={dateLabel}>
           <FormInput
             id="pickup_date"
-            min={minDate}
             name="pickup_date"
             onChange={(event) => {
               const next = event.target.value;
