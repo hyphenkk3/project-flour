@@ -15,11 +15,13 @@ export function StaffPasswordSettings() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [currentPasswordUnlocked, setCurrentPasswordUnlocked] = useState(false);
 
   function clearPasswordFields() {
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
+    setCurrentPasswordUnlocked(false);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -77,6 +79,8 @@ export function StaffPasswordSettings() {
             disabled={saving}
             name="currentPassword"
             onChange={(event) => setCurrentPassword(event.target.value)}
+            onFocus={() => setCurrentPasswordUnlocked(true)}
+            readOnly={!currentPasswordUnlocked}
             type="password"
             value={currentPassword}
           />
