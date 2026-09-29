@@ -174,6 +174,9 @@ assert.match(
   settingsSource,
   /deleteError[\s\S]*return;[\s\S]*recordOwnPasskeyCredentialEventAction/,
 );
+assert.match(settingsSource, /supabase\.auth\.registerPasskey\(\)/);
+assert.doesNotMatch(settingsSource, /formatPasskeyDiagnostic/);
+assert.doesNotMatch(settingsSource, /Passkey diagnostic/);
 assert.doesNotMatch(settingsSource, /credential_id|rawId|privateKey/);
 
 const browse = readFileSync(

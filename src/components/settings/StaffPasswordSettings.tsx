@@ -64,7 +64,11 @@ export function StaffPasswordSettings() {
         Change your Whitebird login password.
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+      <form
+        autoComplete="off"
+        className="mt-4 space-y-4"
+        onSubmit={handleSubmit}
+      >
         <label className="text-skyline flex flex-col gap-1.5 text-xs">
           Current password
           <input

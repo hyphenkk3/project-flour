@@ -243,6 +243,9 @@ assert.match(usernameForm, /STAFF_USERNAME_COPY\.helper/);
 assert.match(usernameForm, /STAFF_USERNAME_COPY\.success/);
 assert.match(usernameForm, /STAFF_USERNAME_COPY\.unchanged/);
 assert.match(usernameForm, /disabled=\{saving \|\| !usernameChanged\}/);
+assert.match(usernameForm, /autoComplete="off"/);
+assert.match(usernameForm, /name="staffAccountHandle"/);
+assert.doesNotMatch(usernameForm, /autoComplete="username"/);
 assert.doesNotMatch(usernameForm, /staffId|staff_id|authUserId/);
 
 const passwordForm = readFileSync(
@@ -264,6 +267,10 @@ assert.match(passwordForm, /STAFF_PASSWORD_COPY\.helperTitle/);
 assert.match(passwordForm, /STAFF_PASSWORD_COPY\.helperMinLength/);
 assert.match(passwordForm, /STAFF_PASSWORD_COPY\.helperDifferent/);
 assert.match(passwordForm, /STAFF_PASSWORD_COPY\.helperCurrent/);
+assert.match(passwordForm, /autoComplete="off"/);
+assert.match(passwordForm, /autoComplete="current-password"/);
+assert.match(passwordForm, /autoComplete="new-password"/);
+assert.doesNotMatch(passwordForm, /autoComplete="username"/);
 assert.equal(STAFF_PASSWORD_COPY.helperMinLength, "At least 6 characters.");
 assert.equal(
   STAFF_PASSWORD_COPY.helperDifferent,
@@ -319,11 +326,16 @@ const passkeySettings = readFileSync(
 assert.match(passkeySettings, /registerPasskey/);
 assert.match(passkeySettings, /passkey\.list/);
 assert.match(passkeySettings, /passkey\.delete/);
+assert.match(passkeySettings, /supabase\.auth\.registerPasskey\(\)/);
+assert.doesNotMatch(passkeySettings, /formatPasskeyDiagnostic/);
+assert.doesNotMatch(passkeySettings, /Passkey diagnostic/);
 
 const loginForm = readFileSync(resolve("src/components/LoginForm.tsx"), "utf8");
 assert.match(loginForm, /loginAction/);
 assert.match(loginForm, /signInWithPasskey/);
 assert.match(loginForm, /completePasskeyLoginAction/);
+assert.match(loginForm, /autoComplete="username"/);
+assert.match(loginForm, /autoComplete="current-password"/);
 
 const authActions = readFileSync(
   resolve("src/foundation/auth/actions.ts"),

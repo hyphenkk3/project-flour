@@ -64,22 +64,22 @@ export function StaffUsernameForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-2">
-      <label htmlFor="staff-username" className="text-skyline text-xs">
+    <form autoComplete="off" className="space-y-2" onSubmit={handleSubmit}>
+      <label htmlFor="staff-account-handle" className="text-skyline text-xs">
         Username
       </label>
 
       <div className="mt-1 flex flex-col gap-2 sm:flex-row">
         <input
-          id="staff-username"
-          name="username"
-          type="text"
-          autoComplete="username"
-          spellCheck={false}
-          value={username}
-          onChange={(event) => setUsername(event.target.value)}
+          autoComplete="off"
           className="border-fog text-ink placeholder:text-skyline min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm outline-none transition focus:border-signal focus:ring-2 focus:ring-signal/10"
           disabled={saving}
+          id="staff-account-handle"
+          name="staffAccountHandle"
+          onChange={(event) => setUsername(event.target.value)}
+          spellCheck={false}
+          type="text"
+          value={username}
         />
 
         <button

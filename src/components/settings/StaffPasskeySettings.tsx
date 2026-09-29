@@ -32,23 +32,6 @@ function mapPasskeys(
   }));
 }
 
-/** Temporary iPhone registration diagnostic. Name/code/message only. */
-function formatPasskeyDiagnostic(error: unknown): string {
-  if (error && typeof error === "object") {
-    const name = "name" in error ? error.name : undefined;
-    const code = "code" in error ? error.code : undefined;
-    const message = "message" in error ? error.message : undefined;
-    if (name !== undefined || code !== undefined || message !== undefined) {
-      return [
-        `name: ${name == null || name === "" ? "(missing)" : String(name)}`,
-        `code: ${code == null || code === "" ? "(missing)" : String(code)}`,
-        `message: ${message == null || message === "" ? "(missing)" : String(message)}`,
-      ].join("\n");
-    }
-  }
-  return String(error);
-}
-
 export function StaffPasskeySettings() {
   const [passkeys, setPasskeys] = useState<PasskeyRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,7 +40,6 @@ export function StaffPasskeySettings() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [diagnostic, setDiagnostic] = useState<string | null>(null);
 
   const loadPasskeys = useCallback(async () => {
     try {
@@ -109,7 +91,6 @@ export function StaffPasskeySettings() {
   async function registerPasskey() {
     setMessage(null);
     setError(null);
-    setDiagnostic(null);
 
     if (!browserSupportsPasskeySignIn()) {
       setError(passkeySetupMessage("unsupported"));
@@ -132,7 +113,6 @@ export function StaffPasskeySettings() {
       const { error: registerError } = await supabase.auth.registerPasskey();
       if (registerError) {
         logPasskeyError("registerPasskey", registerError);
-        setDiagnostic(formatPasskeyDiagnostic(registerError));
         const kind = classifyPasskeyFailure(registerError);
         if (kind === "cancelled") {
           setMessage(passkeySetupMessage(kind));
@@ -154,7 +134,6 @@ export function StaffPasskeySettings() {
       setMessage(PASSKEY_COPY.successSetup);
     } catch (registerError) {
       logPasskeyError("registerPasskey", registerError);
-      setDiagnostic(formatPasskeyDiagnostic(registerError));
       const kind = classifyPasskeyFailure(registerError);
       if (kind === "cancelled") {
         setMessage(passkeySetupMessage(kind));
@@ -169,7 +148,6 @@ export function StaffPasskeySettings() {
   async function removePasskey(id: string) {
     setMessage(null);
     setError(null);
-    setDiagnostic(null);
     setRemovingId(id);
 
     try {
@@ -280,11 +258,6 @@ export function StaffPasskeySettings() {
         <p className="mt-3 text-sm text-red-700" role="alert">
           {error}
         </p>
-      ) : null}
-      {diagnostic ? (
-        <pre className="text-skyline mt-3 overflow-x-auto text-xs whitespace-pre-wrap">
-          {`Passkey diagnostic:\n${diagnostic}`}
-        </pre>
       ) : null}
     </section>
   );
