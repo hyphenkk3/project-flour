@@ -74,14 +74,18 @@ export function AvailabilityOverviewPanel({
         </p>
         <div className="flex flex-wrap gap-2">
           {upcomingHref ? (
-            <Link className={ghostButtonClass} href={upcomingHref}>
+            <Link
+              className={ghostButtonClass}
+              href={upcomingHref}
+              scroll={false}
+            >
               Show upcoming
             </Link>
           ) : null}
-          <Link className={ghostButtonClass} href={prevHref}>
+          <Link className={ghostButtonClass} href={prevHref} scroll={false}>
             Previous 14 days
           </Link>
-          <Link className={ghostButtonClass} href={nextHref}>
+          <Link className={ghostButtonClass} href={nextHref} scroll={false}>
             Next 14 days
           </Link>
         </div>
