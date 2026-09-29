@@ -13,7 +13,7 @@ const ghostButtonClass =
 type AvailabilityOverviewPanelProps = {
   from: string;
   to: string;
-  prevHref: string;
+  prevHref: string | null;
   nextHref: string;
   days: AvailabilityOverviewDay[];
 };
@@ -67,9 +67,11 @@ export function AvailabilityOverviewPanel({
           {formatBusinessCalendarDate(from)} – {formatBusinessCalendarDate(to)}
         </p>
         <div className="flex gap-2">
-          <Link className={ghostButtonClass} href={prevHref}>
-            Previous 14 days
-          </Link>
+          {prevHref ? (
+            <Link className={ghostButtonClass} href={prevHref}>
+              Previous 14 days
+            </Link>
+          ) : null}
           <Link className={ghostButtonClass} href={nextHref}>
             Next 14 days
           </Link>

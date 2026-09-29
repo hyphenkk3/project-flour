@@ -3,6 +3,7 @@ import { isTransientDataLoadError } from "@/lib/supabase/fetch-timeout";
 import {
   availabilityOverviewDates,
   buildAvailabilityOverviewDays,
+  clampAvailabilityOverviewFrom,
   parseAvailabilityOverviewFrom,
   shiftAvailabilityOverviewFrom,
 } from "@/engines/orders/availability-overview";
@@ -35,12 +36,20 @@ export async function AvailabilityOverviewSection({
 }: AvailabilityOverviewSectionProps) {
   const today = toBusinessDateKey();
   const selectedDate = dateParam?.trim().slice(0, 10) ?? "";
-  const from = parseAvailabilityOverviewFrom(
-    fromParam,
-    parseBusinessDate(selectedDate) ? selectedDate : today,
+  const from = clampAvailabilityOverviewFrom(
+    parseAvailabilityOverviewFrom(
+      fromParam,
+      parseBusinessDate(selectedDate) ? selectedDate : today,
+    ),
+    today,
   );
   const dates = availabilityOverviewDates(from);
   const to = dates[dates.length - 1] ?? from;
+  const previousFrom = clampAvailabilityOverviewFrom(
+    shiftAvailabilityOverviewFrom(from, -1),
+    today,
+  );
+  const canGoPrevious = previousFrom !== from;
 
   let days = buildAvailabilityOverviewDays({
     dates,
@@ -49,7 +58,7 @@ export async function AvailabilityOverviewSection({
   });
 
   try {
-    const window = await listAvailabilityOverview(from, from);
+    const window = await listAvailabilityOverview(from, today);
     days = window.days;
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
@@ -74,11 +83,15 @@ export async function AvailabilityOverviewSection({
         dateParam,
       })}
       overviewFrom={from}
-      prevHref={overviewHref({
-        overviewFrom: shiftAvailabilityOverviewFrom(from, -1),
-        month,
-        dateParam,
-      })}
+      prevHref={
+        canGoPrevious
+          ? overviewHref({
+              overviewFrom: previousFrom,
+              month,
+              dateParam,
+            })
+          : null
+      }
       to={to}
     />
   );

@@ -12,6 +12,7 @@ import {
   AVAILABILITY_OVERVIEW_FLOOR_ORDER_STATUSES,
   availabilityOverviewDates,
   buildAvailabilityOverviewDays,
+  clampAvailabilityOverviewFrom,
   committedQuantityForOverviewRow,
   overviewScopeStatus,
   parseAvailabilityOverviewFrom,
@@ -49,6 +50,55 @@ assert.equal(shiftAvailabilityOverviewFrom(from, -1), "2026-08-20");
 assert.equal(parseAvailabilityOverviewFrom("not-a-date", from), from);
 assert.equal(parseAvailabilityOverviewFrom("2026-09-10", from), "2026-09-10");
 assert.deepEqual(availabilityOverviewDates("bad"), []);
+
+const today = "2026-09-29";
+assert.equal(clampAvailabilityOverviewFrom("2026-09-21", today), today);
+assert.equal(clampAvailabilityOverviewFrom("2026-09-25", today), today);
+assert.equal(clampAvailabilityOverviewFrom(today, today), today);
+assert.equal(clampAvailabilityOverviewFrom("2026-10-04", today), "2026-10-04");
+assert.equal(clampAvailabilityOverviewFrom("not-a-date", today), today);
+assert.deepEqual(availabilityOverviewDates(clampAvailabilityOverviewFrom("2026-09-21", today)), [
+  "2026-09-29",
+  "2026-09-30",
+  "2026-10-01",
+  "2026-10-02",
+  "2026-10-03",
+  "2026-10-04",
+  "2026-10-05",
+  "2026-10-06",
+  "2026-10-07",
+  "2026-10-08",
+  "2026-10-09",
+  "2026-10-10",
+  "2026-10-11",
+  "2026-10-12",
+]);
+assert.equal(
+  clampAvailabilityOverviewFrom(shiftAvailabilityOverviewFrom(today, -1), today),
+  today,
+);
+assert.equal(
+  clampAvailabilityOverviewFrom(
+    shiftAvailabilityOverviewFrom("2026-10-04", -1),
+    today,
+  ),
+  today,
+);
+assert.equal(shiftAvailabilityOverviewFrom(today, 1), "2026-10-13");
+assert.notEqual(
+  clampAvailabilityOverviewFrom(
+    shiftAvailabilityOverviewFrom("2026-10-13", -1),
+    today,
+  ),
+  "2026-10-13",
+);
+assert.equal(
+  clampAvailabilityOverviewFrom(
+    shiftAvailabilityOverviewFrom("2026-10-13", -1),
+    today,
+  ),
+  today,
+);
 
 const cakeA = "cake-a";
 const size6 = "size-6";
@@ -314,6 +364,10 @@ const overviewSectionSrc = readSrc(
   "src/workspaces/library/order-availability/overview/AvailabilityOverviewSection.tsx",
 );
 assert.match(overviewSectionSrc, /parseBusinessDate\(selectedDate\)/);
+assert.match(overviewSectionSrc, /clampAvailabilityOverviewFrom/);
+assert.match(overviewSectionSrc, /listAvailabilityOverview\(from, today\)/);
+assert.match(overviewSectionSrc, /canGoPrevious/);
+assert.doesNotMatch(overviewSectionSrc, /resolveCapacityDate/);
 
 const bakeryLayoutSrc = readSrc("src/app/(app)/bakery/layout.tsx");
 assert.match(bakeryLayoutSrc, /canViewOrderAvailability/);
@@ -342,6 +396,9 @@ const panelSrc = readSrc(
 );
 assert.match(panelSrc, /Fully Booked/);
 assert.match(panelSrc, /Unrestricted/);
+assert.match(panelSrc, /Previous 14 days/);
+assert.match(panelSrc, /Next 14 days/);
+assert.match(panelSrc, /prevHref \? /);
 assert.doesNotMatch(panelSrc, /saveProductionCapacityAction/);
 assert.doesNotMatch(panelSrc, /removeProductionCapacityAction/);
 assert.doesNotMatch(panelSrc, /updateOrderAvailabilityAction/);
@@ -360,14 +417,33 @@ const querySrc = readSrc(
 );
 assert.match(querySrc, /committedQuantityForOverviewRow/);
 assert.match(querySrc, /AVAILABILITY_OVERVIEW_FLOOR_ORDER_STATUSES/);
+assert.match(querySrc, /clampAvailabilityOverviewFrom/);
 assert.doesNotMatch(querySrc, /set_production_capacity/);
 assert.doesNotMatch(querySrc, /production_capacity_holds/);
 assert.doesNotMatch(querySrc, /waiting_list/);
 
 const engineSrc = readSrc("src/engines/orders/availability-overview.ts");
 assert.match(engineSrc, /PRODUCTION_CAPACITY_FLOOR_ORDER_STATUSES/);
+assert.match(engineSrc, /clampAvailabilityOverviewFrom/);
 assert.doesNotMatch(engineSrc, /submitted/);
 assert.doesNotMatch(engineSrc, /pending_confirmation/);
+
+const dateBarSrc = readSrc(
+  "src/workspaces/library/order-availability/AvailabilityDateBar.tsx",
+);
+assert.match(dateBarSrc, /type="date"/);
+assert.doesNotMatch(dateBarSrc, /\bmin=/);
+assert.doesNotMatch(dateBarSrc, /clampAvailabilityOverviewFrom/);
+
+const capacitySectionSrc = readSrc(
+  "src/workspaces/library/order-availability/capacity/ProductionCapacitySection.tsx",
+);
+assert.match(capacitySectionSrc, /export function resolveCapacityDate/);
+assert.match(
+  capacitySectionSrc,
+  /if \(parseBusinessDate\(fromQuery\)\) return fromQuery;/,
+);
+assert.doesNotMatch(capacitySectionSrc, /clampAvailabilityOverviewFrom/);
 
 // 18. Customer-facing routes/data unchanged
 const guestFormSrc = readSrc(

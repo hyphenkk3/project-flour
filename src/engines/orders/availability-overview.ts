@@ -76,6 +76,21 @@ export function parseAvailabilityOverviewFrom(
   return fallbackYmd;
 }
 
+/**
+ * Upcoming Overview never starts before today's Malaysia business date.
+ * Future candidates are unchanged. Invalid candidates fall back to today.
+ */
+export function clampAvailabilityOverviewFrom(
+  candidateYmd: string,
+  todayYmd: string,
+): string {
+  if (!parseBusinessDate(todayYmd)) return candidateYmd;
+  if (!parseBusinessDate(candidateYmd) || candidateYmd < todayYmd) {
+    return todayYmd;
+  }
+  return candidateYmd;
+}
+
 export function availabilityOverviewDates(fromYmd: string): string[] {
   if (!parseBusinessDate(fromYmd)) return [];
   const dates: string[] = [];
