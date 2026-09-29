@@ -9,19 +9,24 @@ import {
 import { updateStaffPasswordAction } from "@/foundation/staff/profile-actions";
 
 export function StaffPasswordSettings() {
+  const [editing, setEditing] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [currentPasswordUnlocked, setCurrentPasswordUnlocked] = useState(false);
 
   function clearPasswordFields() {
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
-    setCurrentPasswordUnlocked(false);
+  }
+
+  function collapseEditor() {
+    clearPasswordFields();
+    setError(null);
+    setEditing(false);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -53,6 +58,7 @@ export function StaffPasswordSettings() {
       setError(result.error);
     } else {
       clearPasswordFields();
+      setEditing(false);
       setMessage(result.warning ?? STAFF_PASSWORD_COPY.success);
     }
 
@@ -66,81 +72,104 @@ export function StaffPasswordSettings() {
         Change your Whitebird login password.
       </p>
 
-      <form
-        autoComplete="off"
-        className="mt-4 space-y-4"
-        onSubmit={handleSubmit}
-      >
-        <label className="text-skyline flex flex-col gap-1.5 text-xs">
-          Current password
-          <input
-            autoComplete="current-password"
-            className="border-fog text-ink rounded-lg border bg-white px-3 py-2 text-sm outline-none transition focus:border-signal focus:ring-2 focus:ring-signal/10"
-            disabled={saving}
-            name="currentPassword"
-            onChange={(event) => setCurrentPassword(event.target.value)}
-            onFocus={() => setCurrentPasswordUnlocked(true)}
-            readOnly={!currentPasswordUnlocked}
-            type="password"
-            value={currentPassword}
-          />
-        </label>
-
-        <label className="text-skyline flex flex-col gap-1.5 text-xs">
-          New password
-          <input
-            autoComplete="new-password"
-            className="border-fog text-ink rounded-lg border bg-white px-3 py-2 text-sm outline-none transition focus:border-signal focus:ring-2 focus:ring-signal/10"
-            disabled={saving}
-            name="newPassword"
-            onChange={(event) => setNewPassword(event.target.value)}
-            type="password"
-            value={newPassword}
-          />
-        </label>
-
-        <label className="text-skyline flex flex-col gap-1.5 text-xs">
-          Confirm new password
-          <input
-            autoComplete="new-password"
-            className="border-fog text-ink rounded-lg border bg-white px-3 py-2 text-sm outline-none transition focus:border-signal focus:ring-2 focus:ring-signal/10"
-            disabled={saving}
-            name="confirmPassword"
-            onChange={(event) => setConfirmPassword(event.target.value)}
-            type="password"
-            value={confirmPassword}
-          />
-        </label>
-
-        <div className="text-skyline space-y-1.5 text-xs">
-          <p>{STAFF_PASSWORD_COPY.helperTitle}</p>
-          <ul className="list-disc space-y-0.5 pl-4">
-            <li>{STAFF_PASSWORD_COPY.helperMinLength}</li>
-            <li>{STAFF_PASSWORD_COPY.helperDifferent}</li>
-          </ul>
-          <p>{STAFF_PASSWORD_COPY.helperCurrent}</p>
-        </div>
-
-        <button
-          className="bg-signal text-white rounded-lg px-4 py-2.5 text-sm font-medium transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
-          disabled={saving}
-          type="submit"
+      {editing ? (
+        <form
+          autoComplete="off"
+          className="mt-4 space-y-4"
+          onSubmit={handleSubmit}
         >
-          {saving ? "Changing password…" : "Change password"}
-        </button>
+          <label className="text-skyline flex flex-col gap-1.5 text-xs">
+            Current password
+            <input
+              autoComplete="current-password"
+              className="border-fog text-ink rounded-lg border bg-white px-3 py-2 text-sm outline-none transition focus:border-signal focus:ring-2 focus:ring-signal/10"
+              disabled={saving}
+              name="currentPassword"
+              onChange={(event) => setCurrentPassword(event.target.value)}
+              type="password"
+              value={currentPassword}
+            />
+          </label>
 
-        {message ? (
-          <p className="text-sm text-signal" role="status">
-            {message}
-          </p>
-        ) : null}
+          <label className="text-skyline flex flex-col gap-1.5 text-xs">
+            New password
+            <input
+              autoComplete="new-password"
+              className="border-fog text-ink rounded-lg border bg-white px-3 py-2 text-sm outline-none transition focus:border-signal focus:ring-2 focus:ring-signal/10"
+              disabled={saving}
+              name="newPassword"
+              onChange={(event) => setNewPassword(event.target.value)}
+              type="password"
+              value={newPassword}
+            />
+          </label>
 
-        {error ? (
-          <p className="text-sm text-red-600" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </form>
+          <label className="text-skyline flex flex-col gap-1.5 text-xs">
+            Confirm new password
+            <input
+              autoComplete="new-password"
+              className="border-fog text-ink rounded-lg border bg-white px-3 py-2 text-sm outline-none transition focus:border-signal focus:ring-2 focus:ring-signal/10"
+              disabled={saving}
+              name="confirmPassword"
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              type="password"
+              value={confirmPassword}
+            />
+          </label>
+
+          <div className="text-skyline space-y-1.5 text-xs">
+            <p>{STAFF_PASSWORD_COPY.helperTitle}</p>
+            <ul className="list-disc space-y-0.5 pl-4">
+              <li>{STAFF_PASSWORD_COPY.helperMinLength}</li>
+              <li>{STAFF_PASSWORD_COPY.helperDifferent}</li>
+            </ul>
+            <p>{STAFF_PASSWORD_COPY.helperCurrent}</p>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              className="bg-signal text-white rounded-lg px-4 py-2.5 text-sm font-medium transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+              disabled={saving}
+              type="submit"
+            >
+              {saving ? "Changing password…" : "Change password"}
+            </button>
+            <button
+              className="border-fog text-ink rounded-lg border bg-white px-4 py-2.5 text-sm font-medium transition hover:opacity-90 disabled:opacity-60"
+              disabled={saving}
+              onClick={collapseEditor}
+              type="button"
+            >
+              Cancel
+            </button>
+          </div>
+
+          {error ? (
+            <p className="text-sm text-red-600" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </form>
+      ) : (
+        <div className="mt-4 space-y-3">
+          <button
+            className="bg-signal text-white rounded-lg px-4 py-2.5 text-sm font-medium transition hover:opacity-90"
+            onClick={() => {
+              setError(null);
+              setEditing(true);
+            }}
+            type="button"
+          >
+            Change password
+          </button>
+
+          {message ? (
+            <p className="text-sm text-signal" role="status">
+              {message}
+            </p>
+          ) : null}
+        </div>
+      )}
     </section>
   );
 }
