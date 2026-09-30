@@ -29,7 +29,10 @@ import {
   calendarCustomerSignalClass,
 } from "@/workspaces/owner/calendar/CalendarGuide";
 import { buildCalendarMatrix } from "@/workspaces/owner/calendar/matrix";
-import { normalizeCalendarFulfilmentMethod } from "@/workspaces/owner/calendar/queries";
+import {
+  calendarNeedsBakeryAttention,
+  normalizeCalendarFulfilmentMethod,
+} from "@/workspaces/owner/calendar/queries";
 import type { CalendarEntry } from "@/workspaces/owner/calendar/types";
 import { guestOrderStatusTextClass } from "@/workspaces/owner/orders/labels";
 import type {
@@ -74,6 +77,46 @@ const cakeItem = {
   sizeLabel: '6"',
   quantity: 1,
 };
+
+// Early Pickup names use the same authoritative schedule rule as Bakery.
+{
+  const cases: Array<[string, string, boolean]> = [
+    ["2026-10-01", "12:00", true], // Thursday
+    ["2026-10-01", "12:30", true],
+    ["2026-10-06", "14:30", true], // Tuesday
+    ["2026-10-01", "15:00", false],
+    ["2026-10-07", "12:00", true], // Wednesday
+    ["2026-10-07", "12:30", true],
+    ["2026-10-07", "13:00", false],
+    ["2026-10-01", "17:30", false],
+  ];
+
+  for (const [pickupDate, pickupTime, expected] of cases) {
+    const needsBakeryAttention = calendarNeedsBakeryAttention({
+      needsBakeryAttention: false,
+      pickupDate,
+      pickupTime,
+    });
+    assert.equal(needsBakeryAttention, expected, `${pickupDate} ${pickupTime}`);
+    assert.equal(
+      calendarCustomerSignalClass(
+        entry({ pickupDate, pickupTime, needsBakeryAttention }),
+      ).includes("font-bold"),
+      expected,
+      `bold signal ${pickupDate} ${pickupTime}`,
+    );
+  }
+
+  assert.equal(
+    calendarNeedsBakeryAttention({
+      needsBakeryAttention: true,
+      pickupDate: "2026-10-01",
+      pickupTime: "15:00",
+    }),
+    true,
+    "manual attention remains true outside Early Pickup",
+  );
+}
 
 // ---------------------------------------------------------------------------
 // A–E Presentation mapping + normalization

@@ -2,6 +2,7 @@ import {
   hasActiveAdjustmentCode,
   RM10_CARD_CODE,
 } from "@/engines/orders/promotions";
+import { isEarlyPickupAttention } from "@/engines/business-calendar/early-pickup";
 import { createClient } from "@/lib/supabase/server";
 import type {
   GuestOrderStatus,
@@ -88,6 +89,17 @@ function normalizePickupTime(value: string): string {
   return `${match[1]}:${match[2]}:${match[3] ?? "00"}`;
 }
 
+export function calendarNeedsBakeryAttention(input: {
+  needsBakeryAttention: boolean | null;
+  pickupDate: string;
+  pickupTime: string;
+}): boolean {
+  return (
+    Boolean(input.needsBakeryAttention) ||
+    isEarlyPickupAttention(input.pickupDate, input.pickupTime)
+  );
+}
+
 /**
  * Calendar list normalisation — never invent Delivery.
  * Known enum values preserved; null/unknown → pickup (baseline presentation).
@@ -155,7 +167,11 @@ function mapEntry(
       crewOrder,
     }),
     status,
-    needsBakeryAttention: Boolean(row.needs_bakery_attention),
+    needsBakeryAttention: calendarNeedsBakeryAttention({
+      needsBakeryAttention: row.needs_bakery_attention,
+      pickupDate: row.pickup_date,
+      pickupTime: row.pickup_time,
+    }),
     hasEffectiveRm10,
     readyAt: row.ready_at,
     pickedUpAt: row.picked_up_at,
