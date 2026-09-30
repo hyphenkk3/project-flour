@@ -171,6 +171,7 @@ assert.equal(bakeryOpen.assign, true);
 assert.equal(bakeryOpen.move, true);
 assert.equal(bakeryOpen.cut, true);
 assert.equal(bakeryOpen.unconfirm, true);
+assert.equal(bakeryOpen.sell, false);
 
 const bakeryHeld = extraOperationalActionFlags({
   capabilities: bakery,
@@ -180,6 +181,8 @@ assert.equal(bakeryHeld.assign, false);
 assert.equal(bakeryHeld.move, false);
 assert.equal(bakeryHeld.cut, false);
 assert.equal(bakeryHeld.unconfirm, false);
+assert.equal(bakeryHeld.sell, false);
+assert.equal(bakery.canCompleteWalkInSale, false);
 
 const coOpen = extraOperationalActionFlags({
   capabilities: co,
@@ -189,12 +192,15 @@ assert.equal(coOpen.assign, false);
 assert.equal(coOpen.move, false);
 assert.equal(coOpen.cut, false);
 assert.equal(coOpen.unconfirm, false);
+assert.equal(coOpen.sell, false);
+assert.equal(co.canCompleteWalkInSale, true);
 
 const ownerHeld = extraOperationalActionFlags({
   capabilities: owner,
   walkInHeld: true,
 });
 assert.equal(ownerHeld.assign, false, "held Extra hides bakery mutations");
+assert.equal(ownerHeld.sell, true, "Sold is only offered from Walk-in Hold");
 
 assert.equal(
   extraFreshPickOperationalStatusLabel(
@@ -335,6 +341,7 @@ const boardSrc = readFileSync(
   "utf8",
 );
 assert.match(boardSrc, /WalkInHoldPanel/);
+assert.match(boardSrc, /WalkInHoldCompleteSaleDialog/);
 assert.match(boardSrc, /AssignExtraToOrderDialog/);
 assert.match(boardSrc, /MoveExtraWindowDialog/);
 assert.match(boardSrc, /CutExtraIntoSlicesDialog/);
@@ -348,6 +355,7 @@ const actionsSrc = readFileSync(
 assert.match(actionsSrc, /revalidatePath\("\/home"\)/);
 assert.match(actionsSrc, /requireWalkInHoldStaff/);
 assert.match(actionsSrc, /requireExtraStaff/);
+assert.match(actionsSrc, /complete_extra_stock_walk_in_sale/);
 
 const migration = readFileSync(
   resolve("supabase/migrations/20260917140000_extra_walk_in_hold.sql"),

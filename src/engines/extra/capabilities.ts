@@ -43,6 +43,8 @@ export type ExtraWorkspaceCapabilities = {
   canExtendWalkInHold: boolean;
   /** Release an active Walk-in Hold. */
   canReleaseWalkInHold: boolean;
+  /** Complete an active Walk-in Hold as a paid walk-in Extra order. */
+  canCompleteWalkInSale: boolean;
 };
 
 export function canMutateExtraStock(role: RoleCode): boolean {
@@ -85,6 +87,7 @@ export function buildExtraWorkspaceCapabilities(input: {
     canCreateWalkInHold: canHold,
     canExtendWalkInHold: canHold,
     canReleaseWalkInHold: canHold,
+    canCompleteWalkInSale: canHold,
   };
 }
 
@@ -104,6 +107,7 @@ export function canSeeHomeFreshPicks(
 /**
  * State-aware Extra mutation buttons for Home / ExtraBoard.
  * Hold / extend / release stay on WalkInHoldPanel via existing hold capabilities.
+ * Sold is only offered from an active Walk-in Hold.
  */
 export function extraOperationalActionFlags(input: {
   capabilities: ExtraWorkspaceCapabilities;
@@ -113,6 +117,7 @@ export function extraOperationalActionFlags(input: {
   move: boolean;
   cut: boolean;
   unconfirm: boolean;
+  sell: boolean;
 } {
   const open = !input.walkInHeld;
   return {
@@ -120,6 +125,7 @@ export function extraOperationalActionFlags(input: {
     move: input.capabilities.canMoveExtraWindow && open,
     cut: input.capabilities.canCutExtraIntoSlices && open,
     unconfirm: input.capabilities.canUnconfirmExtra && open,
+    sell: input.capabilities.canCompleteWalkInSale && input.walkInHeld,
   };
 }
 

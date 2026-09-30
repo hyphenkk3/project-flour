@@ -78,6 +78,16 @@ assert.equal(coFlags.assign, false, "CO does not gain Bakery assign on Home");
 assert.equal(coFlags.cut, false);
 assert.equal(coFlags.move, false);
 assert.equal(coFlags.unconfirm, false);
+assert.equal(coFlags.sell, false);
+
+const coHeld = extraOperationalActionFlags({
+  capabilities: co,
+  walkInHeld: true,
+});
+assert.equal(coHeld.assign, false);
+assert.equal(coHeld.sell, true);
+assert.equal(co.canCompleteWalkInSale, true);
+assert.equal(bakery.canCompleteWalkInSale, false);
 
 const bakeryHeld = extraOperationalActionFlags({
   capabilities: bakery,
@@ -214,7 +224,9 @@ assert.match(homeOpsSrc, /CutExtraIntoSlicesDialog/);
 assert.match(homeOpsSrc, /WalkInHoldPanel/);
 assert.match(homeOpsSrc, /unconfirmExtraStockAction/);
 assert.match(homeOpsSrc, /listHomeFreshPickUnitsAction/);
-assert.match(homeOpsSrc, /extraOperationalActionFlags/);
+assert.match(homeOpsSrc, /WalkInHoldCompleteSaleDialog/);
+assert.match(homeOpsSrc, /flags\.sell/);
+assert.match(homeOpsSrc, /variant="extend-only"/);
 assert.match(homeOpsSrc, /Assign to order/);
 assert.match(homeOpsSrc, /Move pickup window/);
 assert.match(homeOpsSrc, /Cut into slices/);
@@ -268,9 +280,12 @@ assert.match(actionsSrc, /requireWalkInHoldStaff/);
 assert.match(actionsSrc, /listHomeFreshPickUnitsAction/);
 assert.match(actionsSrc, /if \(!caps\.canAssignExtraToOrder\)/);
 assert.match(actionsSrc, /if \(!caps\.canCreateWalkInHold\)/);
+assert.match(actionsSrc, /completeExtraStockWalkInSaleAction/);
+assert.match(actionsSrc, /complete_extra_stock_walk_in_sale/);
 
 const boardSrc = readSrc("src/workspaces/extra/ExtraBoard.tsx");
 assert.match(boardSrc, /WalkInHoldPanel/);
+assert.match(boardSrc, /WalkInHoldCompleteSaleDialog/);
 assert.match(boardSrc, /AssignExtraToOrderDialog/);
 assert.match(boardSrc, /surface === "full"/);
 assert.match(boardSrc, /surface === "walk-in-hold"/);
@@ -278,6 +293,7 @@ assert.doesNotMatch(boardSrc, /layout="actions"/);
 
 const panelSrc = readSrc("src/workspaces/extra/WalkInHoldPanel.tsx");
 assert.match(panelSrc, /Walk-in Hold/);
+assert.match(panelSrc, />\s*Sold\s*</);
 assert.match(panelSrc, /holdExtraStockWalkInAction/);
 assert.match(panelSrc, /extendExtraWalkInHoldAction/);
 assert.match(panelSrc, /releaseExtraWalkInHoldAction/);

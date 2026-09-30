@@ -316,6 +316,22 @@ export async function countExtraStockProposed(): Promise<number> {
   return count ?? 0;
 }
 
+export async function getExtraStockUnitById(
+  extraStockId: string,
+): Promise<ExtraStockUnit | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("extra_stock")
+    .select(EXTRA_SELECT)
+    .eq("id", extraStockId)
+    .maybeSingle();
+  if (error) {
+    throw new Error(error.message);
+  }
+  if (!data) return null;
+  return mapExtraStockRow(data as unknown as ExtraStockRow);
+}
+
 /**
  * Home operational Fresh Picks: confirmed, unsold, uncut, still within
  * order cutoff — including active walk-in holds. Same extra_stock source.

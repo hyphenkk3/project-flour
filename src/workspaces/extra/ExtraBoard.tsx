@@ -32,6 +32,7 @@ import { AssignExtraToOrderDialog } from "@/workspaces/extra/AssignExtraToOrderD
 import { CutExtraIntoSlicesDialog } from "@/workspaces/extra/CutExtraIntoSlicesDialog";
 import { ExtraWindowFields } from "@/workspaces/extra/ExtraWindowFields";
 import { MoveExtraWindowDialog } from "@/workspaces/extra/MoveExtraWindowDialog";
+import { WalkInHoldCompleteSaleDialog } from "@/workspaces/extra/WalkInHoldCompleteSaleDialog";
 import { WalkInHoldPanel } from "@/workspaces/extra/WalkInHoldPanel";
 import {
   initialExtraWindow,
@@ -75,6 +76,7 @@ export function ExtraBoard({
   );
   const [movingUnit, setMovingUnit] = useState<ExtraStockUnit | null>(null);
   const [slicingUnit, setSlicingUnit] = useState<ExtraStockUnit | null>(null);
+  const [sellingUnit, setSellingUnit] = useState<ExtraStockUnit | null>(null);
   const [drafts, setDrafts] = useState<Record<string, ExtraWindowDraft>>({});
 
   const proposed = useMemo(
@@ -695,6 +697,14 @@ export function ExtraBoard({
                 <WalkInHoldPanel
                   capabilities={capabilities}
                   disabled={pending}
+                  onSold={
+                    capabilities.canCompleteWalkInSale
+                      ? () => {
+                          setError(null);
+                          setSellingUnit(unit);
+                        }
+                      : undefined
+                  }
                   unit={unit}
                 />
               </li>
@@ -869,6 +879,13 @@ export function ExtraBoard({
         onClose={() => setSlicingUnit(null)}
         onCut={() => setSlicingUnit(null)}
         open={slicingUnit != null}
+      />
+
+      <WalkInHoldCompleteSaleDialog
+        extra={sellingUnit}
+        onClose={() => setSellingUnit(null)}
+        onSold={() => setSellingUnit(null)}
+        open={sellingUnit != null}
       />
     </main>
   );

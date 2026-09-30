@@ -25,10 +25,19 @@ type WalkInHoldPanelProps = {
   disabled?: boolean;
   /** Home cards use actions-only; ExtraBoard keeps the full hold copy. */
   layout?: "full" | "actions";
+  /**
+   * Home held More menu: Extend only.
+   * Default shows place / Sold / Release (and ExtraBoard Extend).
+   */
+  variant?: "default" | "extend-only";
+  onSold?: () => void;
 };
 
 const btnSecondary =
   "border-fog text-ink hover:bg-mist inline-flex min-h-11 items-center justify-center rounded-xl border bg-white px-4 text-sm font-medium transition disabled:opacity-60";
+
+const btnPrimary =
+  "bg-ink text-mist hover:bg-skyline inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-medium transition disabled:opacity-60";
 
 export function WalkInHoldPanel({
   unit,
@@ -36,6 +45,8 @@ export function WalkInHoldPanel({
   className,
   disabled = false,
   layout = "full",
+  variant = "default",
+  onSold,
 }: WalkInHoldPanelProps) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -84,10 +95,21 @@ export function WalkInHoldPanel({
   if (!unit.walkInHeld && !capabilities.canCreateWalkInHold) return null;
 
   const actionsOnly = layout === "actions";
+  const extendOnly = variant === "extend-only";
   const until = formatWalkInHoldUntilClock(unit.walkInHeldUntil);
   const extended = Boolean(unit.walkInHoldExtendedAt);
-  const canMutate =
-    capabilities.canExtendWalkInHold || capabilities.canReleaseWalkInHold;
+  const showExtend =
+    unit.walkInHeld &&
+    capabilities.canExtendWalkInHold &&
+    (extendOnly || !actionsOnly);
+  const showSold =
+    unit.walkInHeld &&
+    !extendOnly &&
+    capabilities.canCompleteWalkInSale &&
+    onSold != null;
+  const showRelease =
+    unit.walkInHeld && !extendOnly && capabilities.canReleaseWalkInHold;
+  const canMutate = showExtend || showRelease || showSold;
 
   return (
     <div
@@ -96,7 +118,7 @@ export function WalkInHoldPanel({
       }
       onClick={(event) => event.stopPropagation()}
     >
-      {!unit.walkInHeld ? (
+      {!unit.walkInHeld && !extendOnly ? (
         capabilities.canCreateWalkInHold ? (
           <button
             className={btnSecondary}
@@ -110,9 +132,9 @@ export function WalkInHoldPanel({
             Walk-in Hold
           </button>
         ) : null
-      ) : (
+      ) : unit.walkInHeld ? (
         <>
-          {actionsOnly ? null : (
+          {actionsOnly || extendOnly ? null : (
             <>
               <p className="text-ink text-sm font-medium">Walk-in Hold</p>
               <p className="text-skyline text-sm">Held until {until}</p>
@@ -123,7 +145,20 @@ export function WalkInHoldPanel({
           )}
           {canMutate ? (
             <div className={actionsOnly ? "contents" : "flex flex-wrap gap-2"}>
-              {capabilities.canExtendWalkInHold ? (
+              {showSold ? (
+                <button
+                  className={btnPrimary}
+                  disabled={busy}
+                  onClick={() => {
+                    setError(null);
+                    onSold();
+                  }}
+                  type="button"
+                >
+                  Sold
+                </button>
+              ) : null}
+              {showExtend ? (
                 <button
                   className={btnSecondary}
                   disabled={busy || extended}
@@ -138,7 +173,7 @@ export function WalkInHoldPanel({
                     : `Extend ${EXTRA_WALK_IN_HOLD_EXTENSION_MINUTES} min`}
                 </button>
               ) : null}
-              {capabilities.canReleaseWalkInHold ? (
+              {showRelease ? (
                 <button
                   className={btnSecondary}
                   disabled={busy}
@@ -152,19 +187,19 @@ export function WalkInHoldPanel({
                 </button>
               ) : null}
             </div>
-          ) : (
+          ) : extendOnly ? null : (
             <p className="text-skyline text-xs leading-relaxed">
               Bakery can see this hold but cannot place, extend, or release it.
             </p>
           )}
-          {canMutate && extended ? (
+          {showExtend && extended && !actionsOnly ? (
             <p className="text-skyline text-xs leading-relaxed">
               The one {EXTRA_WALK_IN_HOLD_EXTENSION_MINUTES}-minute extension
               has been used.
             </p>
           ) : null}
         </>
-      )}
+      ) : null}
       {error ? (
         <p className="text-status-danger text-sm" role="alert">
           {error}

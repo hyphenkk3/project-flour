@@ -10,16 +10,20 @@ import {
 import { canAccessWorkspace } from "@/foundation/navigation/access";
 import { evaluateExtraConfirm } from "@/engines/extra/fresh-picks-eligibility";
 import { normalizeExtraRejectReason } from "@/engines/extra/reject-reason";
+import { extraWalkInSalePickupDate } from "@/engines/extra/walk-in-sale";
 import { toBusinessDateKey } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
+import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import {
   findAssignableOrderForExtra,
+  getExtraStockUnitById,
   listExtraCakeOptions,
   listExtraStockUnits,
   listHomeFreshPickUnits,
   type ExtraAssignableOrder,
 } from "@/workspaces/extra/queries";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
+import type { PaymentMethod } from "@/engines/orders/payment-details";
 
 async function requireExtraStaff() {
   const staff = await requireStaff();
@@ -514,4 +518,129 @@ export async function releaseExtraWalkInHoldAction(
   }
   revalidateExtraPaths();
   return { error: null };
+}
+
+export type ExtraWalkInSalePreview = {
+  extraStockId: string;
+  cakeName: string;
+  sizeLabel: string;
+  cakeId: string;
+  sizeId: string;
+  pickupDate: string;
+  unitPrice: number;
+};
+
+export async function previewExtraWalkInSaleAction(
+  extraStockId: string,
+): Promise<{ preview: ExtraWalkInSalePreview | null; error: string | null }> {
+  const staff = await requireWalkInHoldStaff();
+  const caps = buildExtraWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canCompleteWalkInSale) {
+    return { preview: null, error: "Not authorized to complete a walk-in sale." };
+  }
+
+  const unit = await getExtraStockUnitById(extraStockId);
+  if (!unit) {
+    return { preview: null, error: "EXTRA stock not found." };
+  }
+  if (!unit.walkInHeld) {
+    return {
+      preview: null,
+      error: "Sold is only available from an active Walk-in Hold.",
+    };
+  }
+  if (!unit.libraryCakeId || !unit.libraryCakeSizeId) {
+    return { preview: null, error: "This Extra cake cannot be ordered." };
+  }
+
+  const pickupDate = extraWalkInSalePickupDate({
+    preparedOn: unit.preparedOn,
+    pickupAvailableFromAt: unit.pickupAvailableFromAt,
+    pickupThroughAt: unit.pickupThroughAt,
+  });
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("library_cake_size_price_on", {
+    p_cake_size_id: unit.libraryCakeSizeId,
+    p_pickup_date: pickupDate,
+  });
+  if (error) {
+    return { preview: null, error: error.message };
+  }
+  const unitPrice = Number(data);
+  if (!Number.isFinite(unitPrice)) {
+    return { preview: null, error: "This Extra cake cannot be ordered." };
+  }
+
+  return {
+    preview: {
+      extraStockId: unit.id,
+      cakeName: unit.cakeName,
+      sizeLabel: unit.sizeLabel,
+      cakeId: unit.libraryCakeId,
+      sizeId: unit.libraryCakeSizeId,
+      pickupDate,
+      unitPrice,
+    },
+    error: null,
+  };
+}
+
+export async function completeExtraStockWalkInSaleAction(input: {
+  extraStockId: string;
+  paymentMethod: PaymentMethod;
+  paymentMethodDescription?: string | null;
+  catalogueVoucherId?: string | null;
+}): Promise<{ error: string | null; orderId?: string }> {
+  const staff = await requireWalkInHoldStaff();
+  const caps = buildExtraWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canCompleteWalkInSale) {
+    return { error: "Not authorized to complete a walk-in sale." };
+  }
+  if (
+    input.paymentMethod !== "wb_qr" &&
+    input.paymentMethod !== "online_transfer" &&
+    input.paymentMethod !== "others"
+  ) {
+    return { error: "Choose a payment method." };
+  }
+  const methodDescription = input.paymentMethodDescription?.trim() || null;
+  if (input.paymentMethod === "others" && !methodDescription) {
+    return {
+      error: "Description is required when payment method is Others.",
+    };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
+    "complete_extra_stock_walk_in_sale",
+    {
+      p_extra_stock_id: input.extraStockId,
+      p_actor_staff_id: staff.id,
+      p_payment_method: input.paymentMethod,
+      p_payment_method_description:
+        input.paymentMethod === "others" ? methodDescription : null,
+      p_catalogue_voucher_id: input.catalogueVoucherId?.trim() || null,
+    },
+  );
+  if (error) {
+    return { error: error.message };
+  }
+
+  scheduleStaffNotificationDispatch();
+  revalidateExtraPaths();
+  revalidatePath("/owner/orders");
+  const orderId =
+    data && typeof data === "object" && "order_id" in data
+      ? String((data as { order_id?: string }).order_id ?? "")
+      : "";
+  if (orderId) {
+    revalidatePath(`/owner/orders/${orderId}`);
+  }
+  return { error: null, orderId: orderId || undefined };
 }

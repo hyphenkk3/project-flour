@@ -25,6 +25,7 @@ import {
 import { AssignExtraToOrderDialog } from "@/workspaces/extra/AssignExtraToOrderDialog";
 import { CutExtraIntoSlicesDialog } from "@/workspaces/extra/CutExtraIntoSlicesDialog";
 import { MoveExtraWindowDialog } from "@/workspaces/extra/MoveExtraWindowDialog";
+import { WalkInHoldCompleteSaleDialog } from "@/workspaces/extra/WalkInHoldCompleteSaleDialog";
 import { WalkInHoldPanel } from "@/workspaces/extra/WalkInHoldPanel";
 import type { ExtraStockUnit } from "@/workspaces/extra/types";
 
@@ -89,6 +90,7 @@ export function HomeFreshPicksOperations({
   );
   const [movingUnit, setMovingUnit] = useState<ExtraStockUnit | null>(null);
   const [slicingUnit, setSlicingUnit] = useState<ExtraStockUnit | null>(null);
+  const [sellingUnit, setSellingUnit] = useState<ExtraStockUnit | null>(null);
   const [undoingUnit, setUndoingUnit] = useState<ExtraStockUnit | null>(null);
   const extraLink = extraWorkspaceHref(capabilities);
   const preview = previewHomeFreshPicks(units);
@@ -208,6 +210,10 @@ export function HomeFreshPicksOperations({
                 setError(null);
                 setUndoingUnit(unit);
               }}
+              onSold={() => {
+                setError(null);
+                setSellingUnit(unit);
+              }}
             />
           ))}
         </ul>
@@ -231,6 +237,12 @@ export function HomeFreshPicksOperations({
         onClose={() => setSlicingUnit(null)}
         onCut={() => setSlicingUnit(null)}
         open={slicingUnit != null}
+      />
+      <WalkInHoldCompleteSaleDialog
+        extra={sellingUnit}
+        onClose={() => setSellingUnit(null)}
+        onSold={() => setSellingUnit(null)}
+        open={sellingUnit != null}
       />
       <ConfirmDialog
         allowDismiss={!pending}
@@ -260,6 +272,7 @@ function HomeFreshPickCard({
   onMove,
   onCut,
   onUndo,
+  onSold,
 }: {
   unit: ExtraStockUnit;
   capabilities: ExtraWorkspaceCapabilities;
@@ -270,6 +283,7 @@ function HomeFreshPickCard({
   onMove: () => void;
   onCut: () => void;
   onUndo: () => void;
+  onSold: () => void;
 }) {
   const flags = extraOperationalActionFlags({
     capabilities,
@@ -289,7 +303,13 @@ function HomeFreshPickCard({
     pickupThroughAt: unit.pickupThroughAt,
     todayYmd,
   });
-  const hasMore = flags.move || flags.cut || flags.unconfirm;
+  const heldMore =
+    unit.walkInHeld &&
+    capabilities.canExtendWalkInHold &&
+    !unit.walkInHoldExtendedAt;
+  const hasMore = unit.walkInHeld
+    ? heldMore
+    : flags.move || flags.cut || flags.unconfirm;
   const photoAlt = unit.imageAlt?.trim() || unit.cakeName;
 
   return (
@@ -353,6 +373,7 @@ function HomeFreshPickCard({
               capabilities={capabilities}
               className="contents"
               layout="actions"
+              onSold={flags.sell ? onSold : undefined}
               unit={unit}
             />
           </div>
@@ -364,6 +385,15 @@ function HomeFreshPickCard({
                 More ▾
               </summary>
               <div className="border-fog absolute left-0 z-20 mt-1 flex min-w-[12.5rem] flex-col gap-1 rounded-xl border bg-white p-2 shadow-lg">
+                {heldMore ? (
+                  <WalkInHoldPanel
+                    capabilities={capabilities}
+                    className="contents"
+                    layout="actions"
+                    unit={unit}
+                    variant="extend-only"
+                  />
+                ) : null}
                 {flags.move ? (
                   <button
                     className={btnSecondary}
