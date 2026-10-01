@@ -106,7 +106,7 @@ async function CollectionCakesBody({
   const [monthly, specialCandidate, cakes, specials, vouchers] = await Promise.all([
     getOrderableMonthlyCatalogueById(collectionId),
     getCustomerSpecialCatalogueById(collectionId),
-    listAvailableCakes(collectionId),
+    listAvailableCakes(collectionId, { currentEffectivePrice: true }),
     listCustomerSpecialCatalogues(),
     listPublicCatalogueVouchers(),
   ]);

@@ -11,6 +11,7 @@ import { BROWSE_CURRENTLY_UNAVAILABLE_NOTE } from "@/engines/menu/homepage-colle
 import type { StorefrontCake } from "@/types/storefront";
 import { startingPrice } from "@/workspaces/storefront/catalog/pricing";
 import {
+  applyEffectiveStorefrontPrices,
   browseCakePreviewFromDisplay,
   mergeBrowseCakeDisplay,
   resolveBrowsePublishedCake,
@@ -117,6 +118,22 @@ const staffOnlySpecial: BrowsePublicationCatalogue = {
 };
 
 const avocado = cake("avocado");
+const currentPricedAvocado = applyEffectiveStorefrontPrices(
+  [avocado],
+  new Map([
+    [`${avocado.id}-6`, 140],
+    [`${avocado.id}-8`, 168],
+  ]),
+)[0]!;
+assert.equal(currentPricedAvocado.sizes[0]?.price, 140);
+assert.equal(currentPricedAvocado.sizes[1]?.price, 168);
+assert.equal(avocado.sizes[0]?.price, 128, "base cake data remains unchanged");
+const baseFallback = applyEffectiveStorefrontPrices(
+  [avocado],
+  new Map([[`${avocado.id}-8`, 175]]),
+)[0]!;
+assert.equal(baseFallback.sizes[0]?.price, 128, "unresolved prices keep base fallback");
+assert.equal(baseFallback.sizes[1]?.price, 175);
 
 const published = resolveBrowsePublishedCake({
   cake: avocado,
@@ -348,6 +365,19 @@ assert.equal(
 );
 
 const queriesSrc = readSrc("src/workspaces/storefront/catalog/queries.ts");
+assert.match(queriesSrc, /library_cake_size_price_on/);
+assert.match(queriesSrc, /p_pickup_date: priceDate/);
+assert.match(queriesSrc, /currentEffectivePrice/);
+assert.match(queriesSrc, /withEffectiveStorefrontPrices\(cakes, todayYmd\)/);
+assert.match(
+  readSrc("src/workspaces/storefront/home/StorefrontCollectionCakesPage.tsx"),
+  /listAvailableCakes\(collectionId, \{ currentEffectivePrice: true \}\)/,
+);
+assert.match(
+  readSrc("src/workspaces/storefront/checkout/actions.ts"),
+  /p_pickup_date: key/,
+  "checkout still resolves price for its selected pickup date",
+);
 const membershipFn = queriesSrc.slice(
   queriesSrc.indexOf("async function listCakePublicationCatalogues"),
   queriesSrc.indexOf("type CurrentCollectionRpcRow"),

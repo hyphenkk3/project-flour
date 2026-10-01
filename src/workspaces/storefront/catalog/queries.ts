@@ -744,8 +744,49 @@ function mapAvailableCollectionCakes(
     .filter((cake) => cake.sizes.length > 0);
 }
 
+/** Apply authoritative effective prices for a customer-facing listing date. */
+export function applyEffectiveStorefrontPrices(
+  cakes: readonly StorefrontCake[],
+  pricesBySizeId: ReadonlyMap<string, number>,
+): StorefrontCake[] {
+  return cakes.map((cake) => ({
+    ...cake,
+    sizes: cake.sizes.map((size) => ({
+      ...size,
+      price: pricesBySizeId.get(size.id) ?? size.price,
+    })),
+  }));
+}
+
+async function withEffectiveStorefrontPrices(
+  cakes: readonly StorefrontCake[],
+  priceDate: string,
+): Promise<StorefrontCake[]> {
+  const sizes = cakes.flatMap((cake) => cake.sizes);
+  if (sizes.length === 0) return cakes.map((cake) => ({ ...cake }));
+
+  const supabase = createPublicClient();
+  const pricesBySizeId = new Map<string, number>();
+  for (let offset = 0; offset < sizes.length; offset += 20) {
+    const batch = sizes.slice(offset, offset + 20);
+    const resolved = await Promise.all(
+      batch.map(async (size) => {
+        const { data, error } = await supabase.rpc(
+          "library_cake_size_price_on",
+          { p_cake_size_id: size.id, p_pickup_date: priceDate },
+        );
+        if (error) throw new Error(error.message);
+        return [size.id, Number(data)] as const;
+      }),
+    );
+    for (const [sizeId, price] of resolved) pricesBySizeId.set(sizeId, price);
+  }
+  return applyEffectiveStorefrontPrices(cakes, pricesBySizeId);
+}
+
 export async function listAvailableCakes(
   collectionId: string,
+  options: { currentEffectivePrice?: boolean } = {},
 ): Promise<StorefrontCake[]> {
   const supabase = createPublicClient();
   const data = await withCakePhotoSelectFallback((photoSelect, includeAssignments, includeTags) =>
@@ -764,7 +805,10 @@ export async function listAvailableCakes(
       .order("sort_order", { ascending: true }),
   );
 
-  return mapAvailableCollectionCakes(data as CatalogRow[] | null);
+  const cakes = mapAvailableCollectionCakes(data as CatalogRow[] | null);
+  return options.currentEffectivePrice
+    ? withEffectiveStorefrontPrices(cakes, toBusinessDateKey())
+    : cakes;
 }
 
 /**
@@ -865,6 +909,7 @@ export async function listCheckoutCakesForCakeIds(
  */
 async function loadHomepageCollectionPreviewCakes(
   collectionId: string,
+  priceDate: string,
 ): Promise<StorefrontCake[]> {
   const supabase = createPublicClient();
   try {
@@ -885,7 +930,7 @@ async function loadHomepageCollectionPreviewCakes(
         .order("homepage_sort_order", { ascending: true }),
     );
 
-    return takeHomepageCollectionPreviewCakes(
+    const cakes = takeHomepageCollectionPreviewCakes(
       ((data ?? []) as unknown as CatalogRow[])
         .map((row) => unwrapOne(row.library_cakes))
         .filter((cake): cake is LibraryCakeEmbed => Boolean(cake))
@@ -893,27 +938,32 @@ async function loadHomepageCollectionPreviewCakes(
         .map(mapStorefrontCake)
         .filter((cake) => cake.sizes.length > 0),
     );
+    return withEffectiveStorefrontPrices(cakes, priceDate);
   } catch {
     return [];
   }
 }
 
-const readCachedHomepageCollectionPreviewCakes = cache((collectionId: string) =>
-  unstable_cache(
-    () => loadHomepageCollectionPreviewCakes(collectionId),
-    ["homepage-collection-preview", collectionId],
-    {
-      revalidate: STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS,
-      tags: [STOREFRONT_PUBLISHED_CAKES_CACHE_TAG],
-    },
-  )(),
+const readCachedHomepageCollectionPreviewCakes = cache(
+  (collectionId: string, priceDate: string) =>
+    unstable_cache(
+      () => loadHomepageCollectionPreviewCakes(collectionId, priceDate),
+      ["homepage-collection-preview", collectionId, priceDate],
+      {
+        revalidate: STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS,
+        tags: [STOREFRONT_PUBLISHED_CAKES_CACHE_TAG],
+      },
+    )(),
 );
 
 export async function listHomepageCollectionPreviewCakes(
   collectionId: string,
 ): Promise<StorefrontCake[]> {
   if (!collectionId) return [];
-  return readCachedHomepageCollectionPreviewCakes(collectionId);
+  return readCachedHomepageCollectionPreviewCakes(
+    collectionId,
+    toBusinessDateKey(),
+  );
 }
 
 /**
@@ -925,7 +975,9 @@ export async function getStorefrontOfferedCakeById(
 ): Promise<StorefrontCake | null> {
   const collection = await getCurrentCollection();
   if (!collection) return null;
-  const cakes = await listAvailableCakes(collection.id);
+  const cakes = await listAvailableCakes(collection.id, {
+    currentEffectivePrice: true,
+  });
   return cakes.find((cake) => cake.id === id) ?? null;
 }
 
@@ -1471,8 +1523,13 @@ async function loadBrowsePublishedCakes(
     cakeById.set(cake.id, cake);
   }
 
+  const pricedCakes = await withEffectiveStorefrontPrices(
+    [...cakeById.values()],
+    todayYmd,
+  );
+  const pricedCakeById = new Map(pricedCakes.map((cake) => [cake.id, cake]));
   return sortBrowsePublicationCakes(
-    [...cakeById.values()].map((cake) => {
+    [...pricedCakeById.values()].map((cake) => {
       const currentlyOffered = currentlyOfferedIds.has(cake.id);
       return {
         ...cake,
@@ -1675,13 +1732,22 @@ async function loadBrowsePublishedCakeById(
     library_cake_photos: [],
   };
 
-  return resolveBrowsePublishedCake({
+  const published = resolveBrowsePublishedCake({
     cake: mapStorefrontCake(row),
     cakeStatus: commercial.status,
     catalogues,
     showInPopularCakes: commercial.show_in_popular_cakes === true,
     todayYmd,
   });
+  if (!published) return null;
+  const [priced] = await withEffectiveStorefrontPrices([published], todayYmd);
+  return priced
+    ? {
+        ...priced,
+        currentlyOffered: published.currentlyOffered,
+        availabilityNote: published.availabilityNote,
+      }
+    : published;
 }
 
 const readCachedBrowsePublishedCakeById = cache(
@@ -1700,7 +1766,9 @@ export async function getBrowsePublishedCakeById(
  * Owner-curated homepage Popular Cakes. Explicit Library selection only.
  * Independent of catalogues, sales, and inferred ranking.
  */
-async function loadHomepagePopularCakes(): Promise<StorefrontCake[]> {
+async function loadHomepagePopularCakes(
+  todayYmd: string,
+): Promise<StorefrontCake[]> {
   try {
     const supabase = createPublicClient();
     const data = await withCakePhotoSelectFallback((photoSelect) =>
@@ -1747,19 +1815,23 @@ async function loadHomepagePopularCakes(): Promise<StorefrontCake[]> {
       )
       .map((row) => row.cake);
 
-    return selected;
+    return withEffectiveStorefrontPrices(selected, todayYmd);
   } catch {
     return [];
   }
 }
 
-const readCachedHomepagePopularCakes = cache(() =>
-  unstable_cache(loadHomepagePopularCakes, ["homepage-popular-cakes"], {
-    revalidate: STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS,
-    tags: [STOREFRONT_PUBLISHED_CAKES_CACHE_TAG],
-  })(),
+const readCachedHomepagePopularCakes = cache((todayYmd: string) =>
+  unstable_cache(
+    () => loadHomepagePopularCakes(todayYmd),
+    ["homepage-popular-cakes", todayYmd],
+    {
+      revalidate: STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS,
+      tags: [STOREFRONT_PUBLISHED_CAKES_CACHE_TAG],
+    },
+  )(),
 );
 
 export async function listHomepagePopularCakes(): Promise<StorefrontCake[]> {
-  return readCachedHomepagePopularCakes();
+  return readCachedHomepagePopularCakes(toBusinessDateKey());
 }
