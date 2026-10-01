@@ -156,7 +156,7 @@ export const FRESH_PICKS_SUCCESS_TITLE = "Order Received";
 export const FRESH_PICKS_SUCCESS_PAYMENT = "Payment Pending";
 
 export const FRESH_PICKS_SUCCESS_CONTACT =
-  "Whitebird will contact you via WhatsApp to proceed with payment and confirm your order.";
+  "Whitebird will contact you via WhatsApp to confirm your order. Once your order is confirmed, we will provide the payment details.";
 
 export const FRESH_PICKS_SUCCESS_NOTICE =
   "If you do not receive a confirmation from us within 30 minutes, please contact us via WhatsApp.";
