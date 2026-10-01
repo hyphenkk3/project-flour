@@ -103,9 +103,11 @@ import {
 } from "@/workspaces/storefront/checkout/CheckoutConfirmPrompt";
 import type { PhysicalReceiptChoice } from "@/workspaces/storefront/checkout/preorder-draft";
 import {
+  loadFreshPickPrices,
   loadExtraCustomerOptions,
   submitGuestExtraOrderAction,
   type ExtraOrderState,
+  type FreshPickPrice,
 } from "@/workspaces/storefront/extra/actions";
 import {
   patchFreshPickCart,
@@ -210,6 +212,27 @@ export function GuestExtraCheckoutForm({
   );
   const [selectedDate, setSelectedDate] = useState(pickupDate);
   const [selectedTime, setSelectedTime] = useState(pickupTime);
+  const cartItemIds = (cart?.items ?? []).map((item) => item.extraStockId);
+  const pricingKey = `${selectedDate}|${cartItemIds.join(",")}`;
+  const [pricing, setPricing] = useState<{
+    key: string;
+    items: FreshPickPrice[];
+    error: string | null;
+  }>({ key: "", items: [], error: null });
+  const pricingReady = pricing.key === pricingKey && !pricing.error;
+  const pricingError = pricing.key === pricingKey ? pricing.error : null;
+  const priceByExtraId = new Map(
+    pricing.items.map((item) => [item.extraStockId, item]),
+  );
+  const pricedItems = (cart?.items ?? []).map((item) => {
+    const resolved = priceByExtraId.get(item.extraStockId);
+    return {
+      ...item,
+      cakeId: resolved?.cakeId ?? item.cakeId ?? "",
+      cakeSizeId: resolved?.cakeSizeId ?? item.cakeSizeId ?? "",
+      unitPrice: pricingReady ? (resolved?.unitPrice ?? null) : null,
+    };
+  });
   const [deliveryProcessingAckSnapshot, setDeliveryProcessingAckSnapshot] =
     useState("");
   const [clientError, setClientError] = useState<string | null>(null);
@@ -264,6 +287,19 @@ export function GuestExtraCheckoutForm({
     };
   }, [selectedDate]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const extraStockIds = (cart?.items ?? []).map((item) => item.extraStockId);
+    if (extraStockIds.length === 0 || !selectedDate) return;
+    void loadFreshPickPrices(extraStockIds, selectedDate).then((result) => {
+      if (cancelled) return;
+      setPricing({ key: pricingKey, ...result });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [cart, pricingKey, selectedDate]);
+
   useLayoutEffect(() => {
     if (!viewState.orderId || navigatedRef.current) return;
     navigatedRef.current = true;
@@ -275,18 +311,19 @@ export function GuestExtraCheckoutForm({
   }, [router, viewState.orderId]);
 
   const displayedTotal = customerPreorderCommercialTotal({
-    items: (cart?.items ?? []).map((item) => ({
+    items: pricedItems.map((item) => ({
       unitPrice: item.unitPrice ?? 0,
       quantity: 1,
     })),
     options: paidAddonOptions,
     selectedCodes: paidAddonCodes,
   });
+  const displayedTotalLabel = pricingReady ? formatRm(displayedTotal) : "—";
   const catalogueVoucherDraft = {
     pickupDate: selectedDate,
-    items: (cart?.items ?? []).map((item) => ({
-      cakeId: "",
-      sizeId: item.extraStockId,
+    items: pricedItems.map((item) => ({
+      cakeId: item.cakeId,
+      sizeId: item.cakeSizeId,
       sizeLabel: item.sizeLabel,
       quantity: 1,
       unitPrice: item.unitPrice ?? 0,
@@ -295,6 +332,7 @@ export function GuestExtraCheckoutForm({
   const catalogueVoucher = useEligibleCatalogueVoucher(
     catalogueVoucherDraft,
     "fresh_pick",
+    { enabled: pricingReady },
   );
 
   const fulfilmentContext = {
@@ -455,6 +493,10 @@ export function GuestExtraCheckoutForm({
   function openConfirm() {
     const form = formRef.current;
     if (!form || !cart || cart.items.length === 0) return;
+    if (!pricingReady || pricedItems.some((item) => item.unitPrice == null)) {
+      setClientError(pricingError || "Fresh Pick pricing is still loading.");
+      return;
+    }
     const errors = collectInvalidFieldMessages(form);
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -478,10 +520,10 @@ export function GuestExtraCheckoutForm({
     pendingSubmitRef.current = data;
     setConfirmSnapshot(
       buildExtraCheckoutConfirmSnapshot({
-        items: cart.items,
-        cakeName: cart.items[0]?.cakeName ?? "",
-        sizeLabel: cart.items[0]?.sizeLabel ?? "",
-        unitPrice: cart.items[0]?.unitPrice ?? null,
+        items: pricedItems,
+        cakeName: pricedItems[0]?.cakeName ?? "",
+        sizeLabel: pricedItems[0]?.sizeLabel ?? "",
+        unitPrice: pricedItems[0]?.unitPrice ?? null,
         pickupDate: selectedDate,
         pickupTime: timeStillValid ? selectedTime : "",
         fulfilmentMethod: resolvedMethod,
@@ -502,6 +544,11 @@ export function GuestExtraCheckoutForm({
 
   async function confirmOrder() {
     if (submitPending || viewState.orderId || navigatedRef.current) return;
+    if (!pricingReady || pricedItems.some((item) => item.unitPrice == null)) {
+      setConfirmOpen(false);
+      setClientError(pricingError || "Fresh Pick pricing is still loading.");
+      return;
+    }
     if (deliveryAckRequired && !deliveryProcessingFeeAcknowledged) {
       setConfirmOpen(false);
       setClientError(DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE);
@@ -581,7 +628,7 @@ export function GuestExtraCheckoutForm({
         ref={formRef}
       >
         <FormRequiredLegend />
-        {cart.items.map((item) => (
+        {pricedItems.map((item) => (
           <span key={item.extraStockId}>
             <input
               name="extra_stock_id"
@@ -614,7 +661,7 @@ export function GuestExtraCheckoutForm({
             Your order
           </h2>
           <ul className="divide-fog divide-y">
-            {cart.items.map((item) => (
+            {pricedItems.map((item) => (
               <li
                 className="flex items-start justify-between gap-3 py-3"
                 key={item.extraStockId}
@@ -631,6 +678,16 @@ export function GuestExtraCheckoutForm({
               </li>
             ))}
           </ul>
+          {pricingError ? (
+            <p className="text-signal text-sm" role="alert">
+              {pricingError}
+            </p>
+          ) : null}
+          {!pricingReady && !pricingError ? (
+            <p className="text-skyline text-sm" role="status">
+              Updating prices for your selected pickup date…
+            </p>
+          ) : null}
           <p className="text-skyline text-sm">
             {workspaceFulfilmentSectionTitle(resolvedMethod)} ·{" "}
             {formatShortBusinessDate(selectedDate) || selectedDate} ·{" "}
@@ -639,7 +696,8 @@ export function GuestExtraCheckoutForm({
           {deliveryCharges ? (
             <div className="space-y-1.5">
               <p className="text-ink text-sm">
-                {ITEMS_SUBTOTAL_LABEL} · {formatRm(deliveryCharges.itemsSubtotal)}
+                {ITEMS_SUBTOTAL_LABEL} ·{" "}
+                {pricingReady ? formatRm(deliveryCharges.itemsSubtotal) : "—"}
               </p>
               {catalogueVoucher ? (
                 <p className="text-ink text-sm">
@@ -656,12 +714,12 @@ export function GuestExtraCheckoutForm({
               </p>
               <p className="text-ink text-sm font-semibold">
                 {TOTAL_BEFORE_DELIVERY_FEE_LABEL} ·{" "}
-                {formatRm(
+                {pricingReady ? formatRm(
                   catalogueVoucherPreviewPayable(
                     deliveryCharges.totalBeforeDeliveryFee,
                     catalogueVoucher,
                   ),
-                )}
+                ) : "—"}
               </p>
             </div>
           ) : catalogueVoucher ? (
@@ -673,7 +731,7 @@ export function GuestExtraCheckoutForm({
             </dl>
           ) : (
             <p className="text-ink text-sm font-semibold">
-              Total · {formatRm(displayedTotal)}
+              Total · {displayedTotalLabel}
             </p>
           )}
         </section>

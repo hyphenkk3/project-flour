@@ -302,6 +302,8 @@ export function OrderWorkspaceForm({
 
   const selectedPickupDate =
     mode === "edit" ? editPickupDate : order.pickupDate;
+  const isFreshPickCustomerOrder =
+    order.orderSource === "customer_website" && Boolean(order.extraStockId);
   const offerableSizeIds = useMemo(
     () => offerableCakeSizeIds(cakes),
     [cakes],
@@ -327,15 +329,17 @@ export function OrderWorkspaceForm({
     preorderLines,
     preorderBusinessDate,
   ).earliestYmd;
-  const preorderNeedsException = selectedPickupDate < preorderEarliestYmd;
+  const preorderNeedsException =
+    !isFreshPickCustomerOrder && selectedPickupDate < preorderEarliestYmd;
   const preorderForSelectedDate = preorderExceptionForPickupDate(
     approvals,
     selectedPickupDate,
   );
   const showPreorderExceptionNotice =
-    preorderNeedsException ||
-    preorderForSelectedDate?.status === "pending" ||
-    preorderForSelectedDate?.status === "approved";
+    !isFreshPickCustomerOrder &&
+    (preorderNeedsException ||
+      preorderForSelectedDate?.status === "pending" ||
+      preorderForSelectedDate?.status === "approved");
 
   function renderPreorderExceptionNotice() {
     if (!showPreorderExceptionNotice) return null;

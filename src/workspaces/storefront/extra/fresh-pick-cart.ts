@@ -22,6 +22,8 @@ export const FRESH_PICK_CART_OPEN_EVENT = "whitebird-open-fresh-pick-cart";
 
 export type FreshPickCartItem = {
   extraStockId: string;
+  cakeId: string | null;
+  cakeSizeId: string | null;
   cakeName: string;
   sizeLabel: string;
   unitPrice: number | null;
@@ -65,6 +67,8 @@ export type FreshPickCart = {
 
 export type FreshPickCartAddInput = {
   extraStockId: string;
+  cakeId: string | null;
+  cakeSizeId: string | null;
   cakeName: string;
   sizeLabel: string;
   unitPrice: number | null;
@@ -162,6 +166,8 @@ function parseItem(value: unknown): FreshPickCartItem | null {
         : Number(row.unitPrice);
   return {
     extraStockId,
+    cakeId: typeof row.cakeId === "string" ? row.cakeId : null,
+    cakeSizeId: typeof row.cakeSizeId === "string" ? row.cakeSizeId : null,
     cakeName,
     sizeLabel,
     unitPrice:
@@ -395,6 +401,8 @@ export function addFreshPickToCart(
 
   const item: FreshPickCartItem = {
     extraStockId,
+    cakeId: input.cakeId,
+    cakeSizeId: input.cakeSizeId,
     cakeName: input.cakeName.trim() || "Fresh Pick",
     sizeLabel: input.sizeLabel.trim(),
     unitPrice: input.unitPrice,

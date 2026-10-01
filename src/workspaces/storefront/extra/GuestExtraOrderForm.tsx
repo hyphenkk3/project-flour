@@ -51,6 +51,7 @@ import {
   writeFreshPickCart,
 } from "@/workspaces/storefront/extra/fresh-pick-cart";
 import { useFreshPickCart } from "@/workspaces/storefront/extra/useFreshPickCart";
+import { loadFreshPickPrices } from "@/workspaces/storefront/extra/actions";
 
 type GuestExtraOrderFormProps = {
   extra: StorefrontExtraPick;
@@ -81,6 +82,15 @@ export function GuestExtraOrderForm({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [added, setAdded] = useState(false);
+  const [priceResult, setPriceResult] = useState<{
+    key: string;
+    unitPrice: number | null;
+    error: string | null;
+  }>({ key: "", unitPrice: null, error: null });
+  const priceKey = `${extra.id}|${pickupDate}`;
+  const priceReady = priceResult.key === priceKey && priceResult.unitPrice != null;
+  const unitPrice = priceReady ? priceResult.unitPrice : null;
+  const priceError = priceResult.key === priceKey ? priceResult.error : null;
   const addedTimer = useRef<number | null>(null);
   const cart = useFreshPickCart();
   const inCart = freshPickCartHasExtra(cart, extra.id);
@@ -104,6 +114,23 @@ export function GuestExtraOrderForm({
     : null;
   const usableSlots = methodAvailability?.slots ?? [];
   const timeStillValid = usableSlots.some((slot) => slot.value === pickupTime);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!pickupDate) return;
+    void loadFreshPickPrices([extra.id], pickupDate).then((result) => {
+      if (cancelled) return;
+      const price = result.items[0]?.unitPrice;
+      setPriceResult({
+        key: priceKey,
+        unitPrice: result.error ? null : (price ?? null),
+        error: result.error,
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [extra.id, pickupDate, priceKey]);
 
   useEffect(() => {
     const existing = readFreshPickCart();
@@ -154,9 +181,11 @@ export function GuestExtraOrderForm({
       readFreshPickCart(),
       {
         extraStockId: extra.id,
+        cakeId: extra.libraryCakeId,
+        cakeSizeId: extra.libraryCakeSizeId,
         cakeName: extra.cakeName,
         sizeLabel: extra.sizeLabel,
-        unitPrice: extra.unitPrice,
+        unitPrice,
         imageUrl: extra.imageUrl,
         pickupDate,
         pickupTime: timeStillValid ? pickupTime : "",
@@ -327,11 +356,19 @@ export function GuestExtraOrderForm({
         </div>
       </section>
 
-      {extra.unitPrice != null ? (
+      {priceReady && unitPrice != null ? (
         <p className="text-ink text-sm font-semibold">
-          {formatRm(extra.unitPrice)}
+          {formatRm(unitPrice)}
         </p>
-      ) : null}
+      ) : priceError ? (
+        <p className="text-signal text-sm" role="alert">
+          {priceError}
+        </p>
+      ) : (
+        <p className="text-skyline text-sm" role="status">
+          Updating price for your selected pickup date…
+        </p>
+      )}
 
       {Object.keys(fieldErrors).length > 0 ? (
         <FormError message={CUSTOMER_FORM_HIGHLIGHT_SUMMARY} />
@@ -344,7 +381,7 @@ export function GuestExtraOrderForm({
       ) : null}
 
       <FormActions>
-        <FormSubmitButton disabled={usableSlots.length === 0}>
+        <FormSubmitButton disabled={usableSlots.length === 0 || !priceReady}>
           {inCart ? FRESH_PICKS_ADDED_TO_CART_CTA : FRESH_PICKS_ADD_TO_CART_CTA}
         </FormSubmitButton>
         <Link

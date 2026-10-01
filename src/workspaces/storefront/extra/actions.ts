@@ -34,7 +34,7 @@ import {
   type CustomerComplimentaryOption,
   type CustomerPaidAddonOption,
 } from "@/engines/orders/customer-preorder-options";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createPublicClient } from "@/lib/supabase/server";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import { getStorefrontCollectionForPickupDate } from "@/workspaces/storefront/catalog/queries";
 import { parseRequiredPhysicalReceipt } from "@/workspaces/storefront/checkout/preorder-draft";
@@ -56,6 +56,65 @@ export type ExtraOrderState = {
   orderId?: string;
   perf?: CheckoutServerPerf;
 };
+
+export type FreshPickPrice = {
+  extraStockId: string;
+  cakeId: string;
+  cakeSizeId: string;
+  cakeName: string;
+  sizeLabel: string;
+  unitPrice: number;
+};
+
+export async function loadFreshPickPrices(
+  extraStockIds: string[],
+  pickupDate: string,
+): Promise<{ items: FreshPickPrice[]; error: string | null }> {
+  const date = pickupDate.trim().slice(0, 10);
+  const ids = [...new Set(extraStockIds.map((id) => id.trim()).filter(Boolean))];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || ids.length === 0) {
+    return { items: [], error: "Choose a valid Fresh Pick pickup date." };
+  }
+
+  const supabase = createPublicClient();
+  const { data, error } = await supabase
+    .from("extra_stock")
+    .select("id, library_cake_id, library_cake_size_id, cake_name, size_label")
+    .in("id", ids);
+  if (error || !data || data.length !== ids.length) {
+    return { items: [], error: "Fresh Pick pricing is temporarily unavailable." };
+  }
+
+  const items: FreshPickPrice[] = [];
+  for (const row of data) {
+    if (!row.library_cake_id || !row.library_cake_size_id) {
+      return { items: [], error: "This Fresh Pick cannot be priced." };
+    }
+    const { data: price, error: priceError } = await supabase.rpc(
+      "library_cake_size_price_on",
+      {
+        p_cake_size_id: row.library_cake_size_id,
+        p_pickup_date: date,
+      },
+    );
+    if (priceError || price == null) {
+      return { items: [], error: "Fresh Pick pricing is temporarily unavailable." };
+    }
+    const unitPrice = Number(price);
+    if (!Number.isFinite(unitPrice)) {
+      return { items: [], error: "Fresh Pick pricing is temporarily unavailable." };
+    }
+    items.push({
+      extraStockId: row.id,
+      cakeId: row.library_cake_id,
+      cakeSizeId: row.library_cake_size_id,
+      cakeName: row.cake_name,
+      sizeLabel: row.size_label,
+      unitPrice,
+    });
+  }
+  return { items, error: null };
+}
 
 function parseDeliveryProcessingFeeAck(formData: FormData) {
   const raw = String(

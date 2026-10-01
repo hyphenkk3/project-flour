@@ -59,6 +59,7 @@ type ExtraRow = {
   pickup_through_at: string | null;
   confirmed_at: string | null;
   sold_at: string | null;
+  order_id?: string | null;
   cut_into_slices_at?: string | null;
   walk_in_held_until?: string | null;
 };
@@ -67,18 +68,13 @@ type PhotoRow = StorefrontCakePhotoRow & {
   cake_id: string;
 };
 
-type SizePriceRow = {
-  id: string;
-  price: number | string;
-};
-
 type CakeDescriptionRow = {
   id: string;
   description: string | null;
 };
 
 function publishedNow(row: ExtraRow, now: Date): boolean {
-  return isPublishedFreshPick({
+  return !row.order_id && isPublishedFreshPick({
     lifecycle: row.lifecycle,
     pickupThroughAt: row.pickup_through_at,
     confirmedAt: row.confirmed_at,
@@ -156,24 +152,19 @@ async function extraDescriptionsByCake(
   return descriptions;
 }
 
-async function extraPricesBySize(
+async function extraPriceOn(
   supabase: ReturnType<typeof createPublicClient>,
-  sizeIds: string[],
-): Promise<Map<string, number>> {
-  const prices = new Map<string, number>();
-  if (sizeIds.length === 0) return prices;
-  const { data, error } = await supabase
-    .from("library_cake_sizes")
-    .select("id, price")
-    .in("id", sizeIds);
-  if (error) return prices;
-  for (const row of (data ?? []) as SizePriceRow[]) {
-    if (row.price == null) continue;
-    const price = Number(row.price);
-    if (!Number.isFinite(price)) continue;
-    prices.set(row.id, price);
-  }
-  return prices;
+  sizeId: string | null,
+  pickupDate: string | null,
+): Promise<number | null> {
+  if (!sizeId || !pickupDate) return null;
+  const { data, error } = await supabase.rpc("library_cake_size_price_on", {
+    p_cake_size_id: sizeId,
+    p_pickup_date: pickupDate,
+  });
+  if (error || data == null) return null;
+  const price = Number(data);
+  return Number.isFinite(price) ? price : null;
 }
 
 async function extraListingDetails(
@@ -182,7 +173,6 @@ async function extraListingDetails(
 ): Promise<{
   photosByCake: Map<string, ReturnType<typeof mapStorefrontCakePhoto>[]>;
   descriptionByCake: Map<string, string | null>;
-  priceBySize: Map<string, number>;
 }> {
   const cakeIds = [
     ...new Set(
@@ -191,19 +181,11 @@ async function extraListingDetails(
         .filter((id): id is string => Boolean(id)),
     ),
   ];
-  const sizeIds = [
-    ...new Set(
-      rows
-        .map((row) => row.library_cake_size_id)
-        .filter((id): id is string => Boolean(id)),
-    ),
-  ];
-  const [photosByCake, descriptionByCake, priceBySize] = await Promise.all([
+  const [photosByCake, descriptionByCake] = await Promise.all([
     extraPhotosByCake(supabase, cakeIds),
     extraDescriptionsByCake(supabase, cakeIds),
-    extraPricesBySize(supabase, sizeIds),
   ]);
-  return { photosByCake, descriptionByCake, priceBySize };
+  return { photosByCake, descriptionByCake };
 }
 
 function mapPick(
@@ -272,7 +254,7 @@ export async function listStorefrontAvailableExtra(): Promise<
     const { data, error } = await supabase
       .from("extra_stock")
       .select(
-        "id, lifecycle, cake_name, size_label, library_cake_id, library_cake_size_id, prepared_on, pickup_available_from_at, pickup_through_at, confirmed_at, sold_at, cut_into_slices_at, walk_in_held_until",
+        "id, lifecycle, cake_name, size_label, library_cake_id, library_cake_size_id, prepared_on, pickup_available_from_at, pickup_through_at, confirmed_at, sold_at, order_id, cut_into_slices_at, walk_in_held_until",
       )
       .eq("lifecycle", "confirmed")
       .is("sold_at", null)
@@ -291,6 +273,24 @@ export async function listStorefrontAvailableExtra(): Promise<
       loadOperatingHoursSnapshot(),
       loadFreshPicksPreparationConfig(),
     ]);
+    const priceByExtraId = new Map<string, number | null>();
+    await Promise.all(
+      live.map(async (row) => {
+        const pickupDate = extraCustomerVisibleFulfilmentDates({
+          window: {
+            pickupAvailableFromAt: row.pickup_available_from_at ?? "",
+            orderCutoffAt: row.pickup_through_at ?? "",
+          },
+          now,
+          snapshot: hoursSnapshot,
+          config,
+        })[0];
+        priceByExtraId.set(
+          row.id,
+          await extraPriceOn(supabase, row.library_cake_size_id, pickupDate ?? null),
+        );
+      }),
+    );
     const units = live
       .map((row) =>
         mapPick(
@@ -298,9 +298,7 @@ export async function listStorefrontAvailableExtra(): Promise<
           todayYmd,
           now,
           details.photosByCake,
-          row.library_cake_size_id
-            ? (details.priceBySize.get(row.library_cake_size_id) ?? null)
-            : null,
+          priceByExtraId.get(row.id) ?? null,
           row.library_cake_id
             ? (details.descriptionByCake.get(row.library_cake_id) ?? null)
             : null,
@@ -335,7 +333,7 @@ export async function getStorefrontExtraById(
     const { data, error } = await supabase
       .from("extra_stock")
       .select(
-        "id, lifecycle, cake_name, size_label, library_cake_id, library_cake_size_id, prepared_on, pickup_available_from_at, pickup_through_at, confirmed_at, sold_at, cut_into_slices_at, walk_in_held_until",
+        "id, lifecycle, cake_name, size_label, library_cake_id, library_cake_size_id, prepared_on, pickup_available_from_at, pickup_through_at, confirmed_at, sold_at, order_id, cut_into_slices_at, walk_in_held_until",
       )
       .eq("id", id)
       .maybeSingle();
@@ -349,8 +347,7 @@ export async function getStorefrontExtraById(
       loadFreshPicksPreparationConfig(),
       extraListingDetails(supabase, [row]),
     ]);
-    if (
-      extraCustomerVisibleFulfilmentDates({
+    const pickupDates = extraCustomerVisibleFulfilmentDates({
         window: {
           pickupAvailableFromAt: row.pickup_available_from_at,
           orderCutoffAt: row.pickup_through_at,
@@ -358,19 +355,22 @@ export async function getStorefrontExtraById(
         now,
         snapshot: hoursSnapshot,
         config,
-      }).length === 0
-    ) {
+      });
+    if (pickupDates.length === 0) {
       return null;
     }
+    const unitPrice = await extraPriceOn(
+      supabase,
+      row.library_cake_size_id,
+      pickupDates[0] ?? null,
+    );
 
     return mapPick(
       row,
       todayYmd,
       now,
       details.photosByCake,
-      row.library_cake_size_id
-        ? (details.priceBySize.get(row.library_cake_size_id) ?? null)
-        : null,
+      unitPrice,
       row.library_cake_id
         ? (details.descriptionByCake.get(row.library_cake_id) ?? null)
         : null,
