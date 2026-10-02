@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useLayoutEffect, useState, useTransition } from "react";
 import {
   markCollectionOrderCollectedAction,
   undoCollectionOrderCollectedAction,
@@ -29,6 +29,32 @@ export function CollectionHandoffActions({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"mark" | "undo" | null>(null);
+  const [mobileNavigationHeight, setMobileNavigationHeight] = useState<
+    number | null
+  >(null);
+
+  useLayoutEffect(() => {
+    const navigation = document.querySelector<HTMLElement>(
+      'nav[aria-label="Workspaces"]',
+    );
+    if (!navigation) return;
+
+    const updateNavigationHeight = () => {
+      const height = navigation.getBoundingClientRect().height;
+      setMobileNavigationHeight(height > 0 ? height : null);
+    };
+
+    updateNavigationHeight();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(updateNavigationHeight);
+      observer.observe(navigation);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener("resize", updateNavigationHeight);
+    return () => window.removeEventListener("resize", updateNavigationHeight);
+  }, []);
 
   function run(kind: "mark" | "undo", action: () => Promise<{ error: string | null }>) {
     setError(null);
@@ -51,10 +77,17 @@ export function CollectionHandoffActions({
       className={[
         // Default (tablet/desktop): in-flow, attached to order content
         "sm:mt-0",
-        // Narrow mobile: sticky handoff bar (single instance)
-        "max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-20 max-sm:mt-0",
+        // Narrow mobile: sit directly above the measured, content-sized shared navigation.
+        mobileNavigationHeight === null
+          ? "max-sm:mt-0"
+          : "max-sm:fixed max-sm:inset-x-0 max-sm:z-20 max-sm:mt-0",
         "max-sm:border-fog max-sm:border-t max-sm:bg-white/95 max-sm:px-5 max-sm:py-3 max-sm:backdrop-blur",
       ].join(" ")}
+      style={
+        mobileNavigationHeight === null
+          ? undefined
+          : { bottom: `${mobileNavigationHeight}px` }
+      }
     >
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 sm:max-w-none">
         {error ? (
