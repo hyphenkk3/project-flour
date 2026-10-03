@@ -47,12 +47,14 @@ function SummaryChip({
   label,
   value,
   emphasize,
+  showZero = false,
 }: {
   label: string;
   value: number;
   emphasize?: boolean;
+  showZero?: boolean;
 }) {
-  if (value === 0 && !emphasize) return null;
+  if (value === 0 && !emphasize && !showZero) return null;
   return (
     <div
       className={[
@@ -186,12 +188,6 @@ export function HomeCockpit({
     value: number;
     emphasize?: boolean;
   }> = [
-    { label: "Orders", value: summary.ordersToday },
-    { label: "Pickups", value: summary.pickupsToday },
-    { label: "Deliveries", value: summary.deliveriesToday },
-    { label: "Dine-in", value: summary.dineInsToday },
-    { label: "Ready", value: summary.ready },
-    { label: "Completed", value: summary.completed },
     {
       label: "Attention",
       value: summary.needAttention,
@@ -242,15 +238,71 @@ export function HomeCockpit({
         {!hasAnyTodayActivity ? (
           <p className="text-skyline text-sm">No orders today.</p>
         ) : (
-          <div className="flex flex-wrap gap-2">
-            {visibleSummary.map((chip) => (
+          <div className="space-y-3">
+            <div
+              aria-label="Today's orders and fulfilment breakdown"
+              className="border-fog rounded-2xl border bg-white p-4 sm:p-5"
+              role="group"
+            >
+              <div className="flex items-end justify-between gap-3">
+                <p className="text-skyline text-[11px] font-semibold tracking-wide uppercase">
+                  Orders
+                </p>
+                <p className="text-ink text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
+                  {summary.ordersToday}
+                </p>
+              </div>
+              <div
+                aria-label="Fulfilment method breakdown"
+                className="border-fog mt-4 grid grid-cols-3 gap-2 border-t pt-3 sm:gap-4 sm:pt-4"
+                role="group"
+              >
+                {[
+                  { label: "Pickups", value: summary.pickupsToday },
+                  { label: "Deliveries", value: summary.deliveriesToday },
+                  { label: "Dine-in", value: summary.dineInsToday },
+                ].map((item) => (
+                  <div className="min-w-0" key={item.label}>
+                    <p className="text-skyline text-[10px] font-medium tracking-wide uppercase sm:text-[11px]">
+                      {item.label}
+                    </p>
+                    <p className="text-ink mt-1 text-xl font-semibold tracking-tight tabular-nums sm:text-2xl">
+                      {item.value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div
+              aria-label="Order lifecycle counts"
+              className="grid grid-cols-2 gap-2"
+              role="group"
+            >
               <SummaryChip
-                emphasize={chip.emphasize}
-                key={chip.label}
-                label={chip.label}
-                value={chip.value}
+                label="Ready"
+                showZero
+                value={summary.ready}
               />
-            ))}
+              <SummaryChip
+                label="Completed"
+                showZero
+                value={summary.completed}
+              />
+            </div>
+
+            {visibleSummary.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {visibleSummary.map((chip) => (
+                  <SummaryChip
+                    emphasize={chip.emphasize}
+                    key={chip.label}
+                    label={chip.label}
+                    value={chip.value}
+                  />
+                ))}
+              </div>
+            ) : null}
           </div>
         )}
       </section>

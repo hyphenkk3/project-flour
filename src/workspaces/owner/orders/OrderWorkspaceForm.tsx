@@ -1137,6 +1137,12 @@ export function OrderWorkspaceForm({
           </ViewBlock>
         ) : null}
 
+        <ViewBlock title="Order Notes">
+          <p className="text-skyline text-sm leading-relaxed whitespace-pre-wrap">
+            {order.notes?.trim() ? order.notes : "No order notes."}
+          </p>
+        </ViewBlock>
+
         <ViewBlock title="Internal notes">
           <p className="text-skyline text-sm leading-relaxed whitespace-pre-wrap">
             {order.internalNotes?.trim()

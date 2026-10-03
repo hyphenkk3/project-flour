@@ -644,6 +644,15 @@ const uiSrc = readFileSync(
   "utf8",
 );
 assert.match(uiSrc, /HomeFreshPicksOperations/);
+assert.match(uiSrc, /aria-label="Today's orders and fulfilment breakdown"/);
+assert.match(uiSrc, /aria-label="Fulfilment method breakdown"/);
+assert.match(uiSrc, /aria-label="Order lifecycle counts"/);
+assert.match(uiSrc, /value: summary\.pickupsToday/);
+assert.match(uiSrc, /value: summary\.deliveriesToday/);
+assert.match(uiSrc, /value: summary\.dineInsToday/);
+assert.match(uiSrc, /grid grid-cols-3 gap-2 border-t/);
+assert.match(uiSrc, /label="Ready"\s+showZero/);
+assert.match(uiSrc, /label="Completed"\s+showZero/);
 assert.match(uiSrc, /Needs Attention/);
 assert.match(uiSrc, /Today's Handoffs/);
 assert.match(uiSrc, /Today's Schedule/);

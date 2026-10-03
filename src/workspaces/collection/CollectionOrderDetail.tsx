@@ -321,7 +321,7 @@ export function CollectionOrderDetail({
         {order.customerNotes?.trim() ? (
           <section className="border-fog rounded-2xl border bg-white px-4 py-3.5">
             <h2 className="text-ink text-xs font-semibold tracking-wide uppercase">
-              Customer notes
+              Order Notes
             </h2>
             <p className="text-ink mt-1.5 text-sm leading-relaxed whitespace-pre-wrap">
               {order.customerNotes.trim()}

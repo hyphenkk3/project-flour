@@ -223,7 +223,9 @@ const deliveryConf = generateConfirmationMessage(
 assert.ok(deliveryConf.includes("RM125+RM5(Processing)+RM15(Delivery)= RM145"));
 assert.ok(deliveryConf.includes(CONFIRMATION_SECTION_SEPARATOR));
 assert.equal(
-  (deliveryConf.match(/_{60}/g) ?? []).length,
+  deliveryConf
+    .split(/\r?\n/)
+    .filter((line) => line === CONFIRMATION_SECTION_SEPARATOR).length,
   2,
 );
 assert.ok(!deliveryConf.includes("DeliveryProce"));

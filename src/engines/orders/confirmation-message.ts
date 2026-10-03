@@ -33,10 +33,10 @@ const MESSAGE_SEPARATOR = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~";
 
 /**
  * Shared Confirmation section rails — opening and closing MUST be identical.
- * Product-approved long underscore separator (60 characters).
+ * Short horizontal glyphs stay on one line in narrow WhatsApp screens.
  */
 export const CONFIRMATION_SECTION_SEPARATOR =
-  "____________________________________________________________";
+  "──────────";
 
 /** Single customer-facing order-type colour. Not month-coded. */
 export const CUSTOMER_ORDER_TYPE_COLOUR = "🟠";

@@ -170,11 +170,14 @@ function storefrontOrder(
 // A–E Shared separators (Pickup + Delivery identical rails)
 // ---------------------------------------------------------------------------
 {
-  assert.equal(CONFIRMATION_SECTION_SEPARATOR.length, 60);
+  assert.equal(CONFIRMATION_SECTION_SEPARATOR.length, 10);
   assert.equal(
     CONFIRMATION_SECTION_SEPARATOR,
-    "____________________________________________________________",
+    "──────────",
   );
+  assert.doesNotMatch(CONFIRMATION_SECTION_SEPARATOR, /[\r\n_]/);
+  // Ten connected line glyphs are a short visual rule, comfortably narrower
+  // than normal mobile WhatsApp text widths (unlike the previous 60 underscores).
 
   const pickupBody = generateConfirmationMessage(basePayload());
   const deliveryBody = generateConfirmationMessage(
@@ -189,6 +192,12 @@ function storefrontOrder(
     const closerPrefix = `\n\n${CONFIRMATION_SECTION_SEPARATOR}\n\nKindly review ALL the details`;
     assert.ok(body.includes(opener));
     assert.ok(body.includes(closerPrefix));
+    assert.equal(
+      body.split(/\r?\n/).filter((line) => line === CONFIRMATION_SECTION_SEPARATOR)
+        .length,
+      2,
+      "both short separator rails occupy one complete WhatsApp message line",
+    );
 
     const first = body.indexOf(CONFIRMATION_SECTION_SEPARATOR);
     const second = body.indexOf(

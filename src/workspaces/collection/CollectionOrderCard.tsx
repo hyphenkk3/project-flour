@@ -156,7 +156,7 @@ export function CollectionOrderCard({
           ) : null}
           {notes ? (
             <p className="text-ink mt-0.5 line-clamp-1 text-xs font-medium">
-              {notes}
+              <span className="text-skyline">Order note:</span> {notes}
             </p>
           ) : null}
 
