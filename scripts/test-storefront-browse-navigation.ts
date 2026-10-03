@@ -31,6 +31,9 @@ const cardSrc = readSrc(
 const linkSrc = readSrc(
   "src/workspaces/storefront/catalog/StorefrontCakeDetailLink.tsx",
 );
+const featuredSrc = readSrc(
+  "src/workspaces/storefront/home/HomeFeaturedCollection.tsx",
+);
 const backSrc = readSrc(
   "src/workspaces/storefront/catalog/CakeDetailBackNav.tsx",
 );
@@ -62,6 +65,17 @@ assert.match(linkSrc, /router\.prefetch/);
 assert.doesNotMatch(linkSrc, /prefetch=\{true\}/);
 assert.doesNotMatch(linkSrc, /prefetch=\{Boolean\(canonical\)\}/);
 
+assert.equal((featuredSrc.match(/href=\{viewAllHref\}/g) ?? []).length, 3);
+assert.equal(
+  (featuredSrc.match(/data-storefront-collection-intent/g) ?? []).length,
+  3,
+);
+assert.equal((featuredSrc.match(/prefetch=\{false\}/g) ?? []).length, 3);
+assert.match(
+  featuredSrc,
+  /<StorefrontCakeDetailLink className="group block" href=\{href\}>/,
+);
+
 assert.match(backSrc, /resolveCakeDetailBackNav/);
 assert.match(backSrc, /shouldRestoreCakeDetailBackFromHistory/);
 assert.match(backSrc, /router\.back\(\)/);
@@ -72,6 +86,15 @@ const listingIntentSrc = readSrc(
 );
 assert.match(listingIntentSrc, /router\.prefetch/);
 assert.match(listingIntentSrc, /href === "\/browse"/);
+assert.match(listingIntentSrc, /data-storefront-collection-intent/);
+assert.match(listingIntentSrc, /\/order\/collection\//);
+assert.match(
+  listingIntentSrc,
+  /markStorefrontNavIntent\(href, "collection"\)/,
+);
+assert.match(listingIntentSrc, /pointerdown/);
+assert.match(listingIntentSrc, /focusin/);
+assert.match(listingIntentSrc, /pointerover/);
 assert.doesNotMatch(listingIntentSrc, /\/cakes\//);
 assert.match(
   readSrc("src/workspaces/storefront/StorefrontShell.tsx"),

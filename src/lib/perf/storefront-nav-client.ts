@@ -5,7 +5,7 @@ import {
   elapsedPerfMs,
 } from "@/lib/perf/dev-only-client";
 
-export type StorefrontNavKind = "browse" | "cake" | "back";
+export type StorefrontNavKind = "browse" | "cake" | "back" | "collection";
 
 export type StorefrontNavIntent = {
   correlationId: string;

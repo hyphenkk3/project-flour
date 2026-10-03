@@ -48,7 +48,9 @@ export function HomeFeaturedCollection({
           </h2>
           <Link
             className="text-skyline hover:text-ink shrink-0 text-[13px] font-medium"
+            data-storefront-collection-intent
             href={viewAllHref}
+            prefetch={false}
           >
             View all →
           </Link>
@@ -115,7 +117,9 @@ export function HomeFeaturedCollection({
                 <Link
                   aria-label={viewAllLabel}
                   className="group block"
+                  data-storefront-collection-intent
                   href={viewAllHref}
+                  prefetch={false}
                 >
                   <div className="flex aspect-square w-[8.5rem] items-end rounded-[10px] bg-ink/[0.035] px-3.5 py-3.5 lg:w-full">
                     <span
@@ -138,7 +142,9 @@ export function HomeFeaturedCollection({
         ) : (
           <Link
             className="text-ink mt-4 inline-flex items-center text-[13px] font-medium"
+            data-storefront-collection-intent
             href={viewAllHref}
+            prefetch={false}
           >
             {viewAllLabel}
           </Link>
