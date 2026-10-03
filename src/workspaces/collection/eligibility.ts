@@ -326,6 +326,7 @@ export function isVisibleOnCollectionDetail(input: {
 
 export type CollectionDeskPresentation =
   | "ready"
+  | "delivery_ready"
   | "out_for_delivery"
   | "collected"
   | "picked_up"
@@ -354,6 +355,9 @@ export function collectionDeskPresentation(input: {
   ) {
     return "out_for_delivery";
   }
+  if (isCollectionDeliveryMethod(input.fulfilmentMethod) && input.readyAt) {
+    return "delivery_ready";
+  }
   if (isCollectionDineInMethod(input.fulfilmentMethod)) {
     if (input.pickedUpAt) return "dine_in_complete";
     return input.readyAt ? "dine_in_ready" : "dine_in_pending";
@@ -372,6 +376,8 @@ export function collectionDeskLabel(
   switch (presentation) {
     case "delivered":
       return "Delivered";
+    case "delivery_ready":
+      return "Ready for Delivery";
     case "out_for_delivery":
       return "Out for Delivery";
     case "picked_up":
@@ -394,10 +400,36 @@ export function collectionDeskBadgeTone(
 ): StatusTone {
   if (presentation === "dine_in_pending") return "neutral";
   if (presentation === "out_for_delivery") return "warning";
-  if (presentation === "ready" || presentation === "dine_in_ready") {
+  if (
+    presentation === "ready" ||
+    presentation === "delivery_ready" ||
+    presentation === "dine_in_ready"
+  ) {
     return "info";
   }
   return "success";
+}
+
+export type CollectionDeliveryAction =
+  | "mark_out_for_delivery"
+  | "mark_delivered"
+  | "undo_out_for_delivery"
+  | "undo_delivered";
+
+/** Delivery-only action surface; deliberately never returns a pickup action. */
+export function collectionDeliveryActions(input: {
+  canManageDelivery: boolean;
+  readyAt: string | null;
+  outForDeliveryAt: string | null;
+  deliveredAt: string | null;
+}): CollectionDeliveryAction[] {
+  if (!input.canManageDelivery) return [];
+  if (input.deliveredAt) return ["undo_delivered"];
+  if (input.outForDeliveryAt) {
+    return ["mark_delivered", "undo_out_for_delivery"];
+  }
+  if (input.readyAt) return ["mark_out_for_delivery"];
+  return [];
 }
 
 const PICKUP_TIME_RE = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/;

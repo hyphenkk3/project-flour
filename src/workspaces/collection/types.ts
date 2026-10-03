@@ -4,6 +4,7 @@
 
 import type {
   GuestOrderStatus,
+  RecipientNotifyPreference,
   StorefrontOrderFulfilmentMethod,
 } from "@/types/storefront";
 
@@ -46,6 +47,13 @@ export type CollectionDineInReservation = {
   reservationNote: string | null;
 };
 
+export type CollectionDeliveryDetails = {
+  recipientName: string;
+  recipientPhone: string;
+  addressLines: string[];
+  recipientNotifyPreference: RecipientNotifyPreference;
+};
+
 export type CollectionBoardOrder = {
   id: string;
   orderNumber: string;
@@ -63,6 +71,7 @@ export type CollectionBoardOrder = {
   deliveredAt: string | null;
   includeReceipt: boolean;
   dineIn: CollectionDineInReservation | null;
+  delivery: CollectionDeliveryDetails | null;
   cakeLines: CollectionCakeLine[];
   complimentaryItems: CollectionComplimentaryLine[];
   paidAddons: CollectionPaidAddonLine[];

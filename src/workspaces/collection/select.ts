@@ -29,6 +29,16 @@ export const COLLECTION_ORDER_SELECT = `
     reservation_note,
     status
   ),
+  order_delivery_details (
+    recipient_name,
+    recipient_phone,
+    address_line_1,
+    address_line_2,
+    postcode,
+    city,
+    state,
+    recipient_notify_preference
+  ),
   order_items (
     id,
     cake_name,

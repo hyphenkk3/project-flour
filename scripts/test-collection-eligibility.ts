@@ -5,6 +5,8 @@
 import assert from "node:assert/strict";
 import {
   collectionDeskPresentation,
+  collectionDeskLabel,
+  collectionDeliveryActions,
   collectionHandoffSurface,
   hasCollectionPaymentAttention,
   isActiveOnCollectionBoard,
@@ -96,6 +98,7 @@ assert.equal(
   isActiveOnCollectionReadyQueue({
     ...base,
     fulfilmentMethod: "dine_in",
+    reservationDate: base.pickupDate,
     deliveredAt: null,
   }),
   true,
@@ -203,8 +206,24 @@ assert.equal(
     outForDeliveryAt: null,
     deliveredAt: null,
   }),
-  "ready",
-  "Delivery ready (not yet OFD) shows Ready",
+  "delivery_ready",
+  "Delivery ready has distinct state from Pickup Ready",
+);
+const deliveryReadyPresentation = collectionDeskPresentation({
+  readyAt: base.readyAt,
+  pickedUpAt: null,
+  fulfilmentMethod: "delivery",
+  outForDeliveryAt: null,
+  deliveredAt: null,
+});
+assert.equal(deliveryReadyPresentation, "delivery_ready");
+assert.equal(
+  collectionDeskLabel(deliveryReadyPresentation),
+  "Ready for Delivery",
+);
+assert.notEqual(
+  collectionDeskLabel(deliveryReadyPresentation),
+  "Ready for Collection",
 );
 assert.equal(
   collectionDeskPresentation({
@@ -239,6 +258,43 @@ assert.equal(
   }),
   true,
   "Delivery-ready (and OFD with deliveredAt null) stays on Delivery tab",
+);
+assert.deepEqual(
+  collectionDeliveryActions({
+    canManageDelivery: true,
+    readyAt: base.readyAt,
+    outForDeliveryAt: null,
+    deliveredAt: null,
+  }),
+  ["mark_out_for_delivery"],
+  "Ready Delivery exposes Mark Out for Delivery only",
+);
+assert.deepEqual(
+  collectionDeliveryActions({
+    canManageDelivery: true,
+    readyAt: base.readyAt,
+    outForDeliveryAt: "2026-10-23T03:00:00Z",
+    deliveredAt: null,
+  }),
+  ["mark_delivered", "undo_out_for_delivery"],
+);
+assert.deepEqual(
+  collectionDeliveryActions({
+    canManageDelivery: true,
+    readyAt: base.readyAt,
+    outForDeliveryAt: "2026-10-23T03:00:00Z",
+    deliveredAt: "2026-10-23T05:00:00Z",
+  }),
+  ["undo_delivered"],
+);
+assert.deepEqual(
+  collectionDeliveryActions({
+    canManageDelivery: false,
+    readyAt: base.readyAt,
+    outForDeliveryAt: null,
+    deliveredAt: null,
+  }),
+  [],
 );
 
 const readySurface = collectionHandoffSurface({

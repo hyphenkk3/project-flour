@@ -20,6 +20,8 @@ export type CollectionWorkspaceCapabilities = {
   canMarkCollected: boolean;
   /** Undo Collected on Collection detail. */
   canUndoCollected: boolean;
+  /** May operate Out for Delivery / Delivered lifecycle controls. */
+  canManageDelivery: boolean;
 };
 
 export function canAccessCollectionWorkspace(role: RoleCode): boolean {
@@ -48,5 +50,9 @@ export function buildCollectionWorkspaceCapabilities(input: {
     canAccessCollectionWorkspace: canAccess,
     canMarkCollected: canMutate,
     canUndoCollected: canMutate,
+    canManageDelivery:
+      input.role === "owner" ||
+      input.role === "manager" ||
+      input.role === "customer_operations",
   };
 }

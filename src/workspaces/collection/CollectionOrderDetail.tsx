@@ -14,6 +14,7 @@ import {
   guestOrderStatusLabel,
 } from "@/workspaces/owner/orders/labels";
 import { CollectionHandoffActions } from "@/workspaces/collection/CollectionHandoffActions";
+import { CollectionDeliveryActions } from "@/workspaces/collection/CollectionDeliveryActions";
 import { CollectionPackingChecklist } from "@/workspaces/collection/CollectionPackingChecklist";
 import { collectionDateNavHref } from "@/workspaces/collection/date";
 import {
@@ -29,6 +30,7 @@ import {
   isCollectionUndoDineInEligible,
   type CollectionBoardTab,
 } from "@/workspaces/collection/eligibility";
+import { recipientNotifyPreferenceLabel } from "@/engines/orders/fulfilment";
 import { deriveCollectionPackingReminders } from "@/workspaces/collection/packing";
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
 
@@ -69,6 +71,7 @@ export function CollectionOrderDetail({
   });
   const packing = deriveCollectionPackingReminders(order);
   const dineIn = isCollectionDineInMethod(order.fulfilmentMethod);
+  const isDelivery = order.fulfilmentMethod === "delivery";
   const surface = collectionHandoffSurface({
     presentation,
     canMarkCollected: capabilities.canMarkCollected,
@@ -246,6 +249,47 @@ export function CollectionOrderDetail({
           </dl>
         </section>
 
+        {isDelivery && order.delivery ? (
+          <section
+            aria-label="Delivery details"
+            className="border-fog rounded-2xl border bg-white px-4 py-3.5"
+          >
+            <h2 className="text-ink text-xs font-semibold tracking-wide uppercase">
+              DELIVERY
+            </h2>
+            <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-skyline">Recipient</dt>
+                <dd className="text-ink mt-0.5 font-medium">
+                  {order.delivery.recipientName}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-skyline">Phone</dt>
+                <dd className="text-ink mt-0.5 font-medium">
+                  {order.delivery.recipientPhone}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-skyline">Address</dt>
+                <dd className="text-ink mt-0.5 space-y-0.5 font-medium">
+                  {order.delivery.addressLines.map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-skyline">Notification</dt>
+                <dd className="text-ink mt-0.5 font-medium">
+                  {recipientNotifyPreferenceLabel(
+                    order.delivery.recipientNotifyPreference,
+                  ) ?? "—"}
+                </dd>
+              </div>
+            </dl>
+          </section>
+        ) : null}
+
         <section className="border-fog rounded-2xl border bg-white px-4 py-3.5">
           <h2 className="text-ink text-xs font-semibold tracking-wide uppercase">
             Cakes
@@ -285,13 +329,23 @@ export function CollectionOrderDetail({
           </section>
         ) : null}
 
-        <CollectionHandoffActions
-          canMarkCollected={surface.canMarkCollected}
-          canUndoCollected={surface.canUndoCollected}
-          completeLabel={dineIn ? "Complete Dine-in" : "Mark Collected"}
-          undoLabel={dineIn ? "Undo Complete" : "Undo Collected"}
-          orderId={order.id}
-        />
+        {isDelivery ? (
+          <CollectionDeliveryActions
+            canManageDelivery={capabilities.canManageDelivery}
+            deliveredAt={order.deliveredAt}
+            orderId={order.id}
+            outForDeliveryAt={order.outForDeliveryAt}
+            readyAt={order.readyAt}
+          />
+        ) : (
+          <CollectionHandoffActions
+            canMarkCollected={surface.canMarkCollected}
+            canUndoCollected={surface.canUndoCollected}
+            completeLabel={dineIn ? "Complete Dine-in" : "Mark Collected"}
+            undoLabel={dineIn ? "Undo Complete" : "Undo Collected"}
+            orderId={order.id}
+          />
+        )}
 
         <CollectionPackingChecklist items={packing} />
       </div>

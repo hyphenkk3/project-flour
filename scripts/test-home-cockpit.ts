@@ -115,6 +115,7 @@ const readyCollection: CollectionBoardOrder[] = [
     deliveredAt: null,
     includeReceipt: false,
     dineIn: null,
+    delivery: null,
     cakeLines: [],
     complimentaryItems: [],
     paidAddons: [],

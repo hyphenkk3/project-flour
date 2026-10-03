@@ -3,7 +3,9 @@
  */
 
 import {
+  formatDeliveryAddressLines,
   mapOrderDineInReservation,
+  mapOrderDeliveryDetails,
   normalizeFulfilmentMethod,
 } from "@/engines/orders/fulfilment";
 import type { GuestOrderStatus } from "@/types/storefront";
@@ -12,6 +14,7 @@ import type {
   CollectionCakeLine,
   CollectionComplimentaryLine,
   CollectionDineInReservation,
+  CollectionDeliveryDetails,
   CollectionPaidAddonLine,
 } from "@/workspaces/collection/types";
 
@@ -54,6 +57,28 @@ export type CollectionOrderRow = {
         toddler_count?: number | string | null;
         reservation_note: string | null;
         status: string | null;
+      }[]
+    | null;
+  order_delivery_details?:
+    | {
+        recipient_name: string | null;
+        recipient_phone: string | null;
+        address_line_1: string | null;
+        address_line_2: string | null;
+        postcode: string | null;
+        city: string | null;
+        state: string | null;
+        recipient_notify_preference: string | null;
+      }
+    | {
+        recipient_name: string | null;
+        recipient_phone: string | null;
+        address_line_1: string | null;
+        address_line_2: string | null;
+        postcode: string | null;
+        city: string | null;
+        state: string | null;
+        recipient_notify_preference: string | null;
       }[]
     | null;
   order_items?: Array<{
@@ -156,6 +181,21 @@ function mapDineIn(
   };
 }
 
+function mapDelivery(
+  row: CollectionOrderRow,
+): CollectionDeliveryDetails | null {
+  const value = row.order_delivery_details;
+  const deliveryRow = Array.isArray(value) ? (value[0] ?? null) : value;
+  const mapped = mapOrderDeliveryDetails(deliveryRow);
+  if (!mapped) return null;
+  return {
+    recipientName: mapped.recipientName,
+    recipientPhone: mapped.recipientPhone,
+    addressLines: formatDeliveryAddressLines(mapped),
+    recipientNotifyPreference: mapped.recipientNotifyPreference,
+  };
+}
+
 export function mapCollectionBoardOrder(
   row: CollectionOrderRow,
 ): CollectionBoardOrder {
@@ -177,6 +217,7 @@ export function mapCollectionBoardOrder(
     deliveredAt: row.delivered_at,
     includeReceipt: Boolean(row.include_receipt),
     dineIn: mapDineIn(row),
+    delivery: mapDelivery(row),
     cakeLines: mapCakeLines(row),
     complimentaryItems: mapComplimentary(row),
     paidAddons: mapPaidAddons(row),
