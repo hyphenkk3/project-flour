@@ -20,7 +20,6 @@ import type {
   CalendarEntry,
 } from "@/workspaces/owner/calendar/types";
 import { monthVisibleRange } from "@/workspaces/owner/calendar/month-grid";
-import { hasCalendarCustomerNote } from "@/workspaces/owner/calendar/calendar-note-presentation";
 
 const GUEST_CALENDAR_STATUSES: GuestOrderStatus[] = [
   "submitted",
@@ -38,7 +37,6 @@ const CALENDAR_ORDER_SELECT = `
   status,
   order_source,
   crew_order,
-  customer_notes,
   needs_bakery_attention,
   ready_at,
   picked_up_at,
@@ -70,7 +68,6 @@ type CalendarOrderRow = {
   status: string;
   order_source: string;
   crew_order: boolean | null;
-  customer_notes: string | null;
   needs_bakery_attention: boolean | null;
   ready_at: string | null;
   picked_up_at: string | null;
@@ -170,7 +167,6 @@ function mapEntry(
       crewOrder,
     }),
     status,
-    hasCustomerNote: hasCalendarCustomerNote(row.customer_notes),
     needsBakeryAttention: calendarNeedsBakeryAttention({
       needsBakeryAttention: row.needs_bakery_attention,
       pickupDate: row.pickup_date,

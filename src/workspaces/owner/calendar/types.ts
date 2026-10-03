@@ -36,8 +36,6 @@ export type CalendarEntry = {
   /** Display name including source/crew suffix. */
   displayName: string;
   status: GuestOrderStatus;
-  /** Informational marker only; it does not affect bakery attention styling. */
-  hasCustomerNote: boolean;
   needsBakeryAttention: boolean;
   /** Effective rm10_physical_card only (reversed rows do not count). */
   hasEffectiveRm10: boolean;

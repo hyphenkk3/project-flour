@@ -34,10 +34,6 @@ import {
   normalizeCalendarFulfilmentMethod,
 } from "@/workspaces/owner/calendar/queries";
 import type { CalendarEntry } from "@/workspaces/owner/calendar/types";
-import {
-  CALENDAR_ORDER_NOTE_LABEL,
-  hasCalendarCustomerNote,
-} from "@/workspaces/owner/calendar/calendar-note-presentation";
 import { guestOrderStatusTextClass } from "@/workspaces/owner/orders/labels";
 import type {
   GuestOrderStatus,
@@ -57,7 +53,6 @@ function entry(
     customerName: "Amy",
     displayName: "Amy",
     status: "paid",
-    hasCustomerNote: false,
     needsBakeryAttention: false,
     hasEffectiveRm10: false,
     readyAt: null,
@@ -82,45 +77,6 @@ const cakeItem = {
   sizeLabel: '6"',
   quantity: 1,
 };
-
-// Customer Order Note is visible as its own badge and never drives attention.
-{
-  assert.equal(CALENDAR_ORDER_NOTE_LABEL, "Order Note");
-  assert.equal(hasCalendarCustomerNote("Please write happy birthday\nThank you!"), true);
-  assert.equal(hasCalendarCustomerNote("  \n  "), false);
-  assert.equal(hasCalendarCustomerNote(null), false);
-
-  const notedOrder = entry({ hasCustomerNote: true });
-  assert.equal(notedOrder.hasCustomerNote, true, "customer note badge signal is carried separately");
-  assert.equal(
-    calendarCustomerSignalClass(notedOrder).includes("font-bold"),
-    false,
-    "a customer note alone does not add bold attention styling",
-  );
-  assert.equal(
-    calendarNeedsBakeryAttention({
-      needsBakeryAttention: false,
-      pickupDate: "2026-10-01",
-      pickupTime: "15:00",
-    }),
-    false,
-    "a customer note outside Early Pickup does not create bakery attention",
-  );
-  assert.equal(
-    calendarCustomerSignalClass(entry({ hasCustomerNote: true, needsBakeryAttention: true })).includes("font-bold"),
-    true,
-    "explicit Bakery Attention retains its existing bold styling",
-  );
-
-  const querySource = readFileSync(resolve("src/workspaces/owner/calendar/queries.ts"), "utf8");
-  assert.ok(querySource.includes("customer_notes"));
-  assert.ok(querySource.includes("hasCustomerNote: hasCalendarCustomerNote(row.customer_notes)"));
-  const matrixSource = readFileSync(resolve("src/workspaces/owner/calendar/CalendarMatrixView.tsx"), "utf8");
-  const monthGridSource = readFileSync(resolve("src/workspaces/owner/calendar/CalendarMonthGrid.tsx"), "utf8");
-  assert.ok(matrixSource.includes("customer.hasCustomerNote"));
-  assert.ok(monthGridSource.includes("entry.hasCustomerNote"));
-  assert.ok(monthGridSource.includes("line.entry.hasCustomerNote"));
-}
 
 // Early Pickup names use the same authoritative schedule rule as Bakery.
 {

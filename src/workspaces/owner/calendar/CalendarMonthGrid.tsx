@@ -14,7 +14,6 @@ import type {
   CalendarViewMode,
 } from "@/workspaces/owner/calendar/types";
 import { withOperationalMarker } from "@/engines/orders/operational-state";
-import { CALENDAR_ORDER_NOTE_LABEL } from "@/workspaces/owner/calendar/calendar-note-presentation";
 
 const ORDERS_COLLAPSED_VISIBLE = 4;
 const CAKES_COLLAPSED_VISIBLE = 5;
@@ -161,23 +160,14 @@ function CalendarDayCellView({
                   className={[
                     calendarCustomerSignalClass(entry),
                     calendarFulfilmentBackgroundClass(entry.fulfilmentMethod),
-                    "flex w-full min-w-0 cursor-pointer items-center gap-1 text-left text-[11px] leading-snug hover:underline sm:text-xs",
+                    "block w-full cursor-pointer truncate text-left text-[11px] leading-snug hover:underline sm:text-xs",
                     cell.inMonth ? "" : "opacity-50",
                   ].join(" ")}
                   onClick={() => onOpenQuickView(entry.id)}
-                  title={
-                    entry.hasCustomerNote
-                      ? `${label} — ${CALENDAR_ORDER_NOTE_LABEL}`
-                      : label
-                  }
+                  title={label}
                   type="button"
                 >
-                  <span className="min-w-0 flex-1 truncate">{label}</span>
-                  {entry.hasCustomerNote ? (
-                    <span className="bg-status-info-soft text-status-info inline-flex shrink-0 rounded px-1 py-0.5 text-[9px] font-medium leading-none">
-                      {CALENDAR_ORDER_NOTE_LABEL}
-                    </span>
-                  ) : null}
+                  {label}
                 </button>
               </li>
             );
@@ -203,11 +193,7 @@ function CalendarDayCellView({
                     cell.inMonth ? "" : "opacity-50",
                   ].join(" ")}
                   onClick={() => onOpenQuickView(line.entry.id)}
-                  title={
-                    line.entry.hasCustomerNote
-                      ? `${title} — ${CALENDAR_ORDER_NOTE_LABEL}`
-                      : title
-                  }
+                  title={title}
                   type="button"
                 >
                   <span className="text-ink">{cakeLabel}</span>
@@ -222,11 +208,6 @@ function CalendarDayCellView({
                   >
                     {customerLabel}
                   </span>
-                  {line.entry.hasCustomerNote ? (
-                    <span className="bg-status-info-soft text-status-info ml-1 inline-flex shrink-0 rounded px-1 py-0.5 text-[9px] font-medium leading-none">
-                      {CALENDAR_ORDER_NOTE_LABEL}
-                    </span>
-                  ) : null}
                 </button>
               </li>
             );
