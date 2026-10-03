@@ -21,6 +21,7 @@ import type {
 import { calendarFulfilmentBackgroundClass } from "@/workspaces/owner/calendar/calendar-fulfilment-presentation";
 import { guestOrderStatusTextClass } from "@/workspaces/owner/orders/labels";
 import { withOperationalMarker } from "@/engines/orders/operational-state";
+import { CALENDAR_ORDER_NOTE_LABEL } from "@/workspaces/owner/calendar/calendar-note-presentation";
 
 type CalendarMatrixViewProps = {
   columns: CalendarDayCell[];
@@ -442,15 +443,26 @@ export function CalendarMatrixView({
                                         calendarFulfilmentBackgroundClass(
                                           customer.fulfilmentMethod,
                                         ),
-                                        "block w-full cursor-pointer text-left leading-snug hover:underline",
+                                        "flex w-full min-w-0 cursor-pointer items-center text-left leading-snug hover:underline",
                                       ].join(" ")}
                                       onClick={() =>
                                         onOpenQuickView(customer.orderId)
                                       }
-                                      title={label}
+                                      title={
+                                        customer.hasCustomerNote
+                                          ? `${label} — ${CALENDAR_ORDER_NOTE_LABEL}`
+                                          : label
+                                      }
                                       type="button"
                                     >
-                                      {label}
+                                      <span className="min-w-0 flex-1 truncate">
+                                        {label}
+                                      </span>
+                                      {customer.hasCustomerNote ? (
+                                        <span className="bg-status-info-soft text-status-info ml-1 inline-flex shrink-0 rounded px-1 py-0.5 text-[9px] font-medium leading-none">
+                                          {CALENDAR_ORDER_NOTE_LABEL}
+                                        </span>
+                                      ) : null}
                                     </button>
                                   </li>
                                 );

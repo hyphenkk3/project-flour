@@ -105,6 +105,7 @@ const orderEntry: CalendarEntry = {
   customerName: "Amy",
   displayName: "Amy",
   status: "paid",
+  hasCustomerNote: false,
   needsBakeryAttention: false,
   hasEffectiveRm10: false,
   readyAt: null,

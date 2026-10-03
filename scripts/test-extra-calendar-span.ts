@@ -231,6 +231,7 @@ const chocolateOrder = {
   customerName: "Mei",
   displayName: "Mei",
   status: "paid" as const,
+  hasCustomerNote: false,
   needsBakeryAttention: false,
   hasEffectiveRm10: false,
   readyAt: null,
