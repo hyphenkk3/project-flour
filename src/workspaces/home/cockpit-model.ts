@@ -173,7 +173,8 @@ export function buildHomeCockpitModel(input: {
   const canPrepareConfirmation = input.canPrepareConfirmation ?? true;
   const todayYmd = operationsTodayYmd(now);
   const todayOrders = input.orders.filter(
-    (order) => order.pickupDate === todayYmd,
+    (order) =>
+      order.pickupDate === todayYmd && order.status !== "cancelled",
   );
 
   type TodayAttentionOrder = ReturnType<typeof ownerAttentionInputFromOrder> & {
@@ -218,6 +219,15 @@ export function buildHomeCockpitModel(input: {
     isCollectionDineInMethod(order.fulfilmentMethod),
   ).length;
 
+  const completedOrderIds = new Set([
+    ...buckets.completed
+      .filter((order) => order.status !== "cancelled")
+      .map((order) => order.id),
+    ...input.completedCollection
+      .filter((order) => isCollectionActiveStatus(order.status))
+      .map((order) => order.id),
+  ]);
+
   const ready = todayOrders.filter(
     (order) =>
       !isCollectionDineInMethod(order.fulfilmentMethod) &&
@@ -242,7 +252,7 @@ export function buildHomeCockpitModel(input: {
     deliveriesToday,
     dineInsToday,
     ready,
-    completed: buckets.completed.length,
+    completed: completedOrderIds.size,
     needAttention: visibleNeedsAttention.length,
     pendingApprovals: input.pendingApprovals.length,
   };

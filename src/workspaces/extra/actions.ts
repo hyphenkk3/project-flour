@@ -528,6 +528,7 @@ export type ExtraWalkInSalePreview = {
   sizeId: string;
   pickupDate: string;
   unitPrice: number;
+  canOverridePhysicalRm10: boolean;
 };
 
 export async function previewExtraWalkInSaleAction(
@@ -539,7 +540,10 @@ export async function previewExtraWalkInSaleAction(
     staffId: staff.id,
   });
   if (!caps.canCompleteWalkInSale) {
-    return { preview: null, error: "Not authorized to complete a walk-in sale." };
+    return {
+      preview: null,
+      error: "Not authorized to complete a walk-in sale.",
+    };
   }
 
   const unit = await getExtraStockUnitById(extraStockId);
@@ -583,6 +587,8 @@ export async function previewExtraWalkInSaleAction(
       sizeId: unit.libraryCakeSizeId,
       pickupDate,
       unitPrice,
+      canOverridePhysicalRm10:
+        staff.role.code === "owner" || staff.role.code === "manager",
     },
     error: null,
   };
@@ -593,6 +599,10 @@ export async function completeExtraStockWalkInSaleAction(input: {
   paymentMethod: PaymentMethod;
   paymentMethodDescription?: string | null;
   catalogueVoucherId?: string | null;
+  physicalRm10VoucherNumber?: string | null;
+  physicalRm10ExpiryDate?: string | null;
+  rm10OwnerOverride?: boolean;
+  rm10OverrideReason?: string | null;
 }): Promise<{ error: string | null; orderId?: string }> {
   const staff = await requireWalkInHoldStaff();
   const caps = buildExtraWorkspaceCapabilities({
@@ -610,9 +620,43 @@ export async function completeExtraStockWalkInSaleAction(input: {
     return { error: "Choose a payment method." };
   }
   const methodDescription = input.paymentMethodDescription?.trim() || null;
+  const physicalRm10VoucherNumber =
+    input.physicalRm10VoucherNumber?.trim() || null;
+  const physicalRm10ExpiryDate = input.physicalRm10ExpiryDate?.trim() || null;
+  const rm10OwnerOverride = input.rm10OwnerOverride === true;
+  const rm10OverrideReason = input.rm10OverrideReason?.trim() || null;
   if (input.paymentMethod === "others" && !methodDescription) {
     return {
       error: "Description is required when payment method is Others.",
+    };
+  }
+  if (
+    physicalRm10VoucherNumber &&
+    !/^\d{4}-\d{2}-\d{2}$/.test(physicalRm10ExpiryDate ?? "")
+  ) {
+    return { error: "Enter a valid physical voucher expiry date." };
+  }
+  if (
+    !physicalRm10VoucherNumber &&
+    (physicalRm10ExpiryDate || rm10OwnerOverride || rm10OverrideReason)
+  ) {
+    return { error: "Enter a physical voucher number first." };
+  }
+  if (rm10OwnerOverride) {
+    if (staff.role.code !== "owner" && staff.role.code !== "manager") {
+      return {
+        error: "Only Owner or Manager can apply an RM10 eligibility override.",
+      };
+    }
+    if (!rm10OverrideReason) {
+      return { error: "Owner override requires a reason." };
+    }
+  } else if (rm10OverrideReason) {
+    return { error: "An override reason requires an Owner/Manager override." };
+  }
+  if (physicalRm10VoucherNumber && input.catalogueVoucherId?.trim()) {
+    return {
+      error: "Cannot stack with an RM10 Discount Card on the same order.",
     };
   }
 
@@ -626,6 +670,10 @@ export async function completeExtraStockWalkInSaleAction(input: {
       p_payment_method_description:
         input.paymentMethod === "others" ? methodDescription : null,
       p_catalogue_voucher_id: input.catalogueVoucherId?.trim() || null,
+      p_physical_rm10_voucher_number: physicalRm10VoucherNumber,
+      p_physical_rm10_expiry_date: physicalRm10ExpiryDate,
+      p_rm10_owner_override: rm10OwnerOverride,
+      p_rm10_override_reason: rm10OverrideReason,
     },
   );
   if (error) {

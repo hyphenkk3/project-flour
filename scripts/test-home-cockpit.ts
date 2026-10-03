@@ -91,6 +91,14 @@ const orders = [
     orderNumber: "WB-4",
   }),
   listItem({
+    id: "cancelled-fresh-pick",
+    pickupDate: "2026-08-15",
+    status: "cancelled",
+    fulfilmentMethod: "pickup",
+    orderNumber: "WB-CANCELLED-FRESH-PICK",
+    extraStockId: "fresh-pick-stock",
+  }),
+  listItem({
     id: "e",
     pickupDate: "2026-08-16",
     status: "submitted",
@@ -177,11 +185,19 @@ const model = buildHomeCockpitModel({
   now,
 });
 
-assert.equal(model.summary.ordersToday, 4);
+assert.equal(
+  model.summary.ordersToday,
+  4,
+  "cancelled Fresh Pick is excluded from active Today Orders",
+);
 assert.equal(model.summary.pickupsToday, 3);
 assert.equal(model.summary.deliveriesToday, 1);
 assert.equal(model.summary.ready, 1);
-assert.equal(model.summary.completed, 1);
+assert.equal(
+  model.summary.completed,
+  2,
+  "completed Pickup and Delivery count once each; cancelled Fresh Pick does not count",
+);
 assert.ok(model.summary.needAttention >= 2);
 assert.equal(model.summary.pendingApprovals, 1);
 assert.ok(model.attentionGroups.length > 0);
@@ -375,6 +391,11 @@ const dineInModel = buildHomeCockpitModel({
 });
 
 assert.equal(dineInModel.summary.dineInsToday, 2);
+assert.equal(
+  dineInModel.summary.completed,
+  model.summary.completed + 1,
+  "completed Dine-in remains in Completed",
+);
 assert.equal(dineInModel.summary.pickupsToday, 3);
 assert.equal(dineInModel.summary.deliveriesToday, 1);
 assert.equal(
@@ -411,6 +432,16 @@ assert.equal(
   "OFD is Out for Delivery, not Delivery Ready",
 );
 assert.equal(
+  deliveryOutModel.summary.deliveriesToday,
+  model.summary.deliveriesToday + 1,
+  "active Out for Delivery remains in the Deliveries count",
+);
+assert.equal(
+  deliveryOutModel.summary.completed,
+  model.summary.completed,
+  "active Out for Delivery is not Completed",
+);
+assert.equal(
   deliveryOutModel.summary.ready,
   1,
   "OFD must not inflate Today Ready (base fixture still has one pickup Ready)",
@@ -441,6 +472,11 @@ assert.equal(
     deliveredModel.summary.ready,
     1,
     "Delivered delivery must not count as Today Ready",
+  );
+  assert.equal(
+    deliveredModel.summary.completed,
+    model.summary.completed + 1,
+    "delivered Delivery is included in Completed",
   );
 }
 
