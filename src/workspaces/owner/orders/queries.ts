@@ -825,49 +825,55 @@ export async function listOrderTimeline(
       event_type,
       actor_staff_id,
       metadata,
-      created_at,
-      staff_profiles!actor_staff_id ( display_name )
+      created_at
     `,
     )
     .eq("order_id", orderId)
     .order("created_at", { ascending: true });
 
   if (error) {
-    // Fallback without embed if relationship hint fails in some environments
-    const fallback = await supabase
-      .from("order_timeline_events")
-      .select("id, order_id, event_type, actor_staff_id, metadata, created_at")
-      .eq("order_id", orderId)
-      .order("created_at", { ascending: true });
-    if (fallback.error) {
-      throw new Error(fallback.error.message);
-    }
-    return (fallback.data ?? []).map((row) => ({
-      id: row.id as string,
-      orderId: row.order_id as string,
-      eventType: row.event_type as string,
-      actorStaffId: (row.actor_staff_id as string | null) ?? null,
-      actorName: null,
-      metadata: (row.metadata as Record<string, unknown>) ?? {},
-      createdAt: row.created_at as string,
-    }));
+    throw new Error(error.message);
   }
 
-  return (data ?? []).map((row) => {
-    const staff = relationOne(
-      (
-        row as {
-          staff_profiles?:
-            { display_name: string } | { display_name: string }[] | null;
+  const events = data ?? [];
+  const actorStaffIds = [
+    ...new Set(
+      events
+        .map((row) => row.actor_staff_id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
+    ),
+  ];
+  const actorNames = new Map<string, string>();
+
+  if (actorStaffIds.length > 0) {
+    try {
+      // This is a staff-only timeline. Resolve only actor IDs on events already
+      // visible to the authenticated order-detail query; do not widen profile RLS.
+      const admin = createServiceClient();
+      const { data: staffRows, error: staffError } = await admin
+        .from("staff_profiles")
+        .select("id, display_name")
+        .in("id", actorStaffIds);
+
+      if (!staffError) {
+        for (const staff of staffRows ?? []) {
+          const name = String(staff.display_name ?? "").trim();
+          if (name) actorNames.set(String(staff.id), name);
         }
-      ).staff_profiles,
-    );
+      }
+    } catch {
+      // Attribution is presentation-only; retain the UI's safe "Staff" fallback.
+    }
+  }
+
+  return events.map((row) => {
+    const actorStaffId = (row.actor_staff_id as string | null) ?? null;
     return {
       id: row.id as string,
       orderId: row.order_id as string,
       eventType: row.event_type as string,
-      actorStaffId: (row.actor_staff_id as string | null) ?? null,
-      actorName: staff?.display_name ?? null,
+      actorStaffId,
+      actorName: actorStaffId ? (actorNames.get(actorStaffId) ?? null) : null,
       metadata: (row.metadata as Record<string, unknown>) ?? {},
       createdAt: row.created_at as string,
     };

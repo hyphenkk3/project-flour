@@ -30,7 +30,10 @@ import {
   decidePostPaymentCancel,
   decidePostPaymentSave,
 } from "@/engines/orders/post-payment-customer-change";
-import { timelineEventLabel } from "@/engines/orders/timeline";
+import {
+  describeTimelineActor,
+  timelineEventLabel,
+} from "@/engines/orders/timeline";
 import {
   matchesOperationsLifecycleFilter,
   matchesOperationsSearch,
@@ -312,6 +315,25 @@ assert.match(cancelSql, /actor_staff_id/);
 assert.match(cancelSql, /for update/i);
 assert.match(actionsSrc, /order_duplicated/);
 assert.match(actionsSrc, /actorStaffId: staff.id/);
+const orderQueriesSrc = read("src/workspaces/owner/orders/queries.ts");
+const timelineQueryStart = orderQueriesSrc.indexOf(
+  "export async function listOrderTimeline",
+);
+const timelineQueryEnd = orderQueriesSrc.indexOf(
+  "export async function listConfirmationSnapshots",
+  timelineQueryStart,
+);
+const timelineQuery = orderQueriesSrc.slice(
+  timelineQueryStart,
+  timelineQueryEnd,
+);
+assert.match(timelineQuery, /createServiceClient\(\)/);
+assert.match(timelineQuery, /select\("id, display_name"\)/);
+assert.match(timelineQuery, /\.in\("id", actorStaffIds\)/);
+assert.doesNotMatch(timelineQuery, /staff_profiles!actor_staff_id/);
+assert.match(timelineQuery, /actorNames\.get\(actorStaffId\)/);
+assert.equal(describeTimelineActor("order_production_started", "wee"), "wee");
+assert.equal(describeTimelineActor("order_production_started", null), "Staff");
 
 // 23 date changes still validate availability
 assert.match(actionsSrc, /pickupDate !== before.pickupDate/);
