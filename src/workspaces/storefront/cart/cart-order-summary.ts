@@ -123,20 +123,26 @@ export function continueOrderingHref(pathname: string | null | undefined): strin
 export function draftItemSizeChoices(
   item: PreorderDraftItem,
   cake: StorefrontCake | null | undefined,
+  effectivePricesBySizeId?: ReadonlyMap<string, number>,
 ): PreorderDraftSizeChoice[] {
-  if (cake && cake.sizes.length > 0) {
-    return cake.sizes.map((size) => ({
-      id: size.id,
-      size: size.size,
-      price: size.price,
-      preorderDays: size.preorderDays,
-      imageUrl:
-        storefrontPhotoForSize(cake.photos, size.id)?.url ??
-        cake.image ??
-        undefined,
-    }));
-  }
-  return item.sizeChoices ?? [];
+  const choices =
+    cake && cake.sizes.length > 0
+      ? cake.sizes.map((size) => ({
+          id: size.id,
+          size: size.size,
+          price: size.price,
+          preorderDays: size.preorderDays,
+          imageUrl:
+            storefrontPhotoForSize(cake.photos, size.id)?.url ??
+            cake.image ??
+            undefined,
+        }))
+      : (item.sizeChoices ?? []);
+  if (!effectivePricesBySizeId?.size) return choices;
+  return choices.map((choice) => ({
+    ...choice,
+    price: effectivePricesBySizeId.get(choice.id) ?? choice.price,
+  }));
 }
 
 export function draftItemShowsSizeEditor(

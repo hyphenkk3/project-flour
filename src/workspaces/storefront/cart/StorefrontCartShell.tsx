@@ -56,7 +56,7 @@ function OrderLines({
       {items.map((item) => {
         const cake = cakesById.get(item.cakeId) ?? null;
         const preorder = draftLinePreorderLabel(item);
-        const sizeChoices = draftItemSizeChoices(item, cake);
+        const sizeChoices = draftItemSizeChoices(item, cake, pricesBySizeId);
         const showSizeEditor = draftItemShowsSizeEditor(item, cake);
         const sizeSelectId = `cart-size-${item.cakeId}-${item.sizeId}`;
         return (
