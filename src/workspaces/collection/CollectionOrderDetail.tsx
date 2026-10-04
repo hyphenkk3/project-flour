@@ -33,6 +33,7 @@ import {
 import { recipientNotifyPreferenceLabel } from "@/engines/orders/fulfilment";
 import { deriveCollectionPackingReminders } from "@/workspaces/collection/packing";
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
+import { CustomerOrderNoteCallout } from "@/components/orders/CustomerOrderNoteCallout";
 
 type CollectionOrderDetailProps = {
   order: CollectionBoardOrder;
@@ -133,6 +134,12 @@ export function CollectionOrderDetail({
           </p>
         </div>
       </header>
+
+      {order.customerNotes?.trim() ? (
+        <div className="mt-4">
+          <CustomerOrderNoteCallout note={order.customerNotes} />
+        </div>
+      ) : null}
 
       {paymentAttention ? (
         <p className="border-status-danger/20 bg-status-danger-soft text-status-danger mt-4 rounded-2xl border px-4 py-2.5 text-sm leading-relaxed">
@@ -314,17 +321,6 @@ export function CollectionOrderDetail({
             </h2>
             <p className="text-ink mt-1.5 text-sm leading-relaxed whitespace-pre-wrap">
               {order.dineIn.reservationNote.trim()}
-            </p>
-          </section>
-        ) : null}
-
-        {order.customerNotes?.trim() ? (
-          <section className="border-fog rounded-2xl border bg-white px-4 py-3.5">
-            <h2 className="text-ink text-xs font-semibold tracking-wide uppercase">
-              Order Notes
-            </h2>
-            <p className="text-ink mt-1.5 text-sm leading-relaxed whitespace-pre-wrap">
-              {order.customerNotes.trim()}
             </p>
           </section>
         ) : null}

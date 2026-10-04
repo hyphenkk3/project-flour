@@ -80,6 +80,12 @@ const cakeItem = {
 
 // Early Pickup names use the same authoritative schedule rule as Bakery.
 {
+  const calendarQuerySource = readFileSync(
+    resolve("src/workspaces/owner/calendar/queries.ts"),
+    "utf8",
+  );
+  assert.doesNotMatch(calendarQuerySource, /customer_notes|customerNotes/);
+
   const cases: Array<[string, string, boolean]> = [
     ["2026-10-01", "12:00", true], // Thursday
     ["2026-10-01", "12:30", true],
@@ -115,6 +121,41 @@ const cakeItem = {
     }),
     true,
     "manual attention remains true outside Early Pickup",
+  );
+  assert.equal(
+    calendarNeedsBakeryAttention({
+      needsBakeryAttention: false,
+      pickupDate: "2026-10-01",
+      pickupTime: "15:00",
+    }),
+    false,
+    "normal pickup with Bakery Attention off is not bold",
+  );
+  assert.equal(
+    calendarCustomerSignalClass(
+      entry({
+        pickupDate: "2026-10-01",
+        pickupTime: "15:00",
+        needsBakeryAttention: true,
+      }),
+    ).includes("font-bold"),
+    true,
+    "normal pickup with explicit Bakery Attention remains bold",
+  );
+  assert.equal(
+    calendarCustomerSignalClass(
+      entry({
+        pickupDate: "2026-10-01",
+        pickupTime: "12:30",
+        needsBakeryAttention: calendarNeedsBakeryAttention({
+          needsBakeryAttention: false,
+          pickupDate: "2026-10-01",
+          pickupTime: "12:30",
+        }),
+      }),
+    ).includes("font-bold"),
+    true,
+    "Early Pickup remains bold without explicit Bakery Attention",
   );
 }
 

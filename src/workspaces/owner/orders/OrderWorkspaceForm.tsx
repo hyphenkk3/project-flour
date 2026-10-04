@@ -131,6 +131,7 @@ import { OrderOperationalControls } from "@/workspaces/owner/orders/OrderOperati
 import { OrderPaidAddonsEditor } from "@/workspaces/owner/orders/OrderPaidAddonsEditor";
 import { PaymentSection } from "@/workspaces/owner/orders/PaymentSection";
 import { OrderTotalAdjustmentsSection } from "@/workspaces/owner/orders/OrderTotalAdjustmentsSection";
+import { CustomerOrderNoteCallout } from "@/components/orders/CustomerOrderNoteCallout";
 import {
   formatPickupTime,
   formatTimelineDateTime,
@@ -820,6 +821,7 @@ export function OrderWorkspaceForm({
           />
           <p className="text-skyline text-sm">{order.orderNumber}</p>
         </div>
+        <CustomerOrderNoteCallout note={order.notes} />
         {order.status === "paid" &&
         (order.postPaymentCustomerChangeCount ?? 0) >= 1 ? (
           <p className="border-fog text-ink rounded-lg border bg-white px-4 py-3 text-sm">
@@ -1137,12 +1139,6 @@ export function OrderWorkspaceForm({
           </ViewBlock>
         ) : null}
 
-        <ViewBlock title="Order Notes">
-          <p className="text-skyline text-sm leading-relaxed whitespace-pre-wrap">
-            {order.notes?.trim() ? order.notes : "No order notes."}
-          </p>
-        </ViewBlock>
-
         <ViewBlock title="Internal notes">
           <p className="text-skyline text-sm leading-relaxed whitespace-pre-wrap">
             {order.internalNotes?.trim()
@@ -1312,6 +1308,8 @@ export function OrderWorkspaceForm({
         />
         <p className="text-skyline text-sm">{order.orderNumber}</p>
       </div>
+
+      <CustomerOrderNoteCallout note={order.notes} />
 
       {renderApprovalPanels()}
 

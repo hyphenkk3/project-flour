@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { OPTIONAL_NOTES_CUSTOMER_WARNING } from "@/engines/orders/order-guide";
+import { hasCustomerOrderNote } from "@/components/orders/CustomerOrderNoteCallout";
 import { mapCollectionBoardOrder } from "@/workspaces/collection/map-order";
 import { COLLECTION_ORDER_SELECT } from "@/workspaces/collection/select";
 
@@ -34,6 +35,10 @@ const receiptSource = readFileSync(
   "src/workspaces/storefront/checkout/receipt.ts",
   "utf8",
 );
+const noteCallout = readFileSync(
+  "src/components/orders/CustomerOrderNoteCallout.tsx",
+  "utf8",
+);
 
 assert.match(checkoutForm, /name="notes"/);
 assert.match(checkoutForm, /value=\{fields\.notes\}/);
@@ -46,9 +51,42 @@ assert.match(ownerQueries, /customer_notes/);
 assert.match(ownerQueries, /internal_notes/);
 assert.match(ownerQueries, /notes: row\.customer_notes/);
 assert.match(ownerQueries, /internalNotes: row\.internal_notes/);
-assert.match(ownerDetail, /<ViewBlock title="Order Notes">/);
-assert.match(ownerDetail, /order\.notes\?\.trim\(\) \? order\.notes : "No order notes\."/);
-assert.match(ownerDetail, /whitespace-pre-wrap/);
+assert.equal(
+  hasCustomerOrderNote("Please call on arrival.\nLeave by side door; thank you!"),
+  true,
+);
+assert.equal(hasCustomerOrderNote(" \n  "), false);
+assert.equal(hasCustomerOrderNote(null), false);
+assert.match(noteCallout, /CUSTOMER ORDER NOTE/);
+assert.match(noteCallout, /if \(!hasCustomerOrderNote\(note\)\) return null/);
+assert.match(noteCallout, /whitespace-pre-wrap/);
+assert.match(noteCallout, /\{note\}/);
+assert.equal(
+  (ownerDetail.match(/<CustomerOrderNoteCallout note=\{order\.notes\} \/>/g) ?? []).length,
+  2,
+  "the note callout appears once in each mutually exclusive Order Workspace mode",
+);
+const ownerViewStart = ownerDetail.indexOf('if (mode === "view")');
+const ownerViewNote = ownerDetail.indexOf(
+  "<CustomerOrderNoteCallout note={order.notes} />",
+  ownerViewStart,
+);
+assert.ok(
+  ownerViewNote > ownerViewStart &&
+    ownerViewNote < ownerDetail.indexOf("<OrderLifecycleActions", ownerViewNote),
+  "Order Workspace detail shows the callout near the top",
+);
+const ownerEditStart = ownerDetail.indexOf("<form action={formAction}");
+const ownerEditNote = ownerDetail.indexOf(
+  "<CustomerOrderNoteCallout note={order.notes} />",
+  ownerEditStart,
+);
+assert.ok(
+  ownerEditNote > ownerEditStart &&
+    ownerEditNote < ownerDetail.indexOf("{renderApprovalPanels()}", ownerEditStart),
+  "Edit Order shows the same read-only callout near the top",
+);
+assert.doesNotMatch(ownerDetail, /<ViewBlock title="Order Notes">/);
 assert.match(ownerDetail, /<ViewBlock title="Internal notes">/);
 assert.match(ownerDetail, /order\.internalNotes/);
 
@@ -73,7 +111,16 @@ const mapped = mapCollectionBoardOrder({
   include_receipt: false,
 });
 assert.equal(mapped.customerNotes, multilineNote, "newlines and punctuation survive mapping");
-assert.match(collectionDetail, /order\.customerNotes\.trim\(\)/);
+assert.match(collectionDetail, /<CustomerOrderNoteCallout note=\{order\.customerNotes\} \/>/);
+const collectionNotePosition = collectionDetail.indexOf(
+  "<CustomerOrderNoteCallout note={order.customerNotes} />",
+);
+assert.ok(
+  collectionNotePosition > collectionDetail.indexOf("</header>") &&
+    collectionNotePosition <
+      collectionDetail.indexOf('{!secured && order.status === "awaiting_payment"'),
+  "Customer Operations detail shows the note immediately below the order header",
+);
 assert.match(collectionDetail, /whitespace-pre-wrap/);
 assert.match(collectionCard, /Order note:/);
 assert.equal(
