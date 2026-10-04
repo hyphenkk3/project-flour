@@ -584,13 +584,32 @@ export function deliveryCustomerReadyVariant(
   if (!delivery || order.fulfilmentMethod !== "delivery") {
     return "schedule";
   }
-  const samePerson = isDeliveryRecipientSameAsOrderingCustomer({
+  return deliveryCustomerReadyVariantForRecipient({
     customerName: order.customerName,
     customerPhone: order.phone,
-    delivery,
+    recipientName: delivery.recipientName,
+    recipientPhone: delivery.recipientPhone,
+    recipientNotifyPreference: delivery.recipientNotifyPreference,
+  });
+}
+
+export function deliveryCustomerReadyVariantForRecipient(input: {
+  customerName: string;
+  customerPhone: string | null;
+  recipientName: string;
+  recipientPhone: string;
+  recipientNotifyPreference: StorefrontOrderDelivery["recipientNotifyPreference"];
+}): DeliveryCustomerReadyVariant {
+  const samePerson = isDeliveryRecipientSameAsOrderingCustomer({
+    customerName: input.customerName,
+    customerPhone: input.customerPhone,
+    delivery: {
+      recipientName: input.recipientName,
+      recipientPhone: input.recipientPhone,
+    },
   });
   if (samePerson) return "schedule";
-  if (delivery.recipientNotifyPreference === "inform_recipient") {
+  if (input.recipientNotifyPreference === "inform_recipient") {
     return "contact_recipient";
   }
   return "schedule";

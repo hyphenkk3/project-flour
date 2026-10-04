@@ -4,6 +4,7 @@
  * Completed / History: Picked Up + Delivered (+ dine-in completed).
  */
 
+import { createServiceClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   COLLECTION_ACTIVE_PREORDER_STATUSES,
@@ -27,6 +28,10 @@ import {
 import { COLLECTION_ORDER_SELECT } from "@/workspaces/collection/select";
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
 import { addCalendarDaysYmd } from "@/workspaces/collection/date";
+import {
+  COLLECTION_READY_MESSAGE_SENT_EVENT,
+  collectionReadyMessageSentFromEvent,
+} from "@/workspaces/collection/ready-message";
 
 function rowPassesPickupBoard(
   row: CollectionOrderRow,
@@ -392,5 +397,39 @@ export async function getCollectionOrderDetail(
   if (!rowPassesDetail(row, selectedPickupDate)) {
     return null;
   }
-  return mapCollectionBoardOrder(row);
+  const order = mapCollectionBoardOrder(row);
+  const { data: event, error: eventError } = await supabase
+    .from("order_timeline_events")
+    .select("created_at, actor_staff_id")
+    .eq("order_id", orderId)
+    .eq("event_type", COLLECTION_READY_MESSAGE_SENT_EVENT)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (eventError) throw new Error(eventError.message);
+
+  if (!event) return order;
+  const actorStaffId = (event.actor_staff_id as string | null) ?? null;
+  let actorName: string | null = null;
+  if (actorStaffId) {
+    try {
+      const admin = createServiceClient();
+      const { data: staffRow } = await admin
+        .from("staff_profiles")
+        .select("display_name")
+        .eq("id", actorStaffId)
+        .maybeSingle();
+      actorName = String(staffRow?.display_name ?? "").trim() || null;
+    } catch {
+      // Attribution is presentation-only; preserve the event if lookup fails.
+    }
+  }
+  order.readyMessageSent = collectionReadyMessageSentFromEvent(
+    {
+      createdAt: String(event.created_at),
+      actorStaffId,
+    },
+    actorName,
+  );
+  return order;
 }

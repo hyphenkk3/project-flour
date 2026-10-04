@@ -36,15 +36,20 @@ import {
 import { STOREFRONT_OPEN_ORDER_EVENT } from "@/workspaces/storefront/cart/open-order";
 import { CatalogueVoucherCartPanel } from "@/workspaces/storefront/offers/CatalogueVoucherCartPanel";
 import { CatalogueVoucherCartTotals } from "@/workspaces/storefront/offers/CatalogueVoucherCartTotals";
+import { usePickupDatePricedCakes } from "@/workspaces/storefront/catalog/usePickupDatePricedCakes";
 
 const DESKTOP_ORDER_RAIL_WIDTH = "20.5rem";
 
 function OrderLines({
   cakesById,
   items,
+  pricesBySizeId,
+  pricesPending,
 }: {
   cakesById: Map<string, StorefrontCake>;
   items: readonly PreorderDraftItem[];
+  pricesBySizeId: ReadonlyMap<string, number>;
+  pricesPending: boolean;
 }) {
   return (
     <ul className="divide-fog divide-y">
@@ -70,7 +75,7 @@ function OrderLines({
                     <p className="font-display text-ink text-[1.05rem] leading-snug tracking-tight">
                       {item.cakeName}
                     </p>
-                    {showSizeEditor ? (
+                    {showSizeEditor && !pricesPending ? (
                       <>
                         <label className="sr-only" htmlFor={sizeSelectId}>
                           {item.cakeName} size
@@ -94,6 +99,10 @@ function OrderLines({
                           ))}
                         </select>
                       </>
+                    ) : pricesPending ? (
+                      <p className="text-skyline mt-1.5 text-sm" role="status">
+                        Checking price for collection date…
+                      </p>
                     ) : (
                       <p className="text-skyline mt-0.5 text-sm">
                         {item.sizeLabel}
@@ -153,7 +162,12 @@ function OrderLines({
                     </button>
                   </div>
                   <p className="text-ink text-sm font-medium tabular-nums">
-                    {formatRm(item.unitPrice * item.quantity)}
+                    {pricesPending
+                      ? "Checking price…"
+                      : formatRm(
+                          (pricesBySizeId.get(item.sizeId) ?? item.unitPrice) *
+                            item.quantity,
+                        )}
                   </p>
                 </div>
               </div>
@@ -173,6 +187,7 @@ function OrderSummary({
   onContinue,
   onKeepEditing,
   showDatePrompt,
+  pricesPending,
 }: {
   checkoutBlocked: boolean;
   continueHref: string;
@@ -185,6 +200,7 @@ function OrderSummary({
   onContinue?: () => void;
   onKeepEditing: () => void;
   showDatePrompt: boolean;
+  pricesPending: boolean;
 }) {
   const selectedDate = formatCartCollectionDate(draft.pickupDate);
   const earliestDate = formatCartCollectionDate(
@@ -227,8 +243,16 @@ function OrderSummary({
           </div>
         ) : null}
       </dl>
-      <CatalogueVoucherCartPanel draft={draft} />
-      <CatalogueVoucherCartTotals commercialTotal={total} draft={draft} />
+      {pricesPending ? (
+        <p className="text-skyline text-sm" role="status">
+          Checking prices for your collection date…
+        </p>
+      ) : (
+        <>
+          <CatalogueVoucherCartPanel draft={draft} />
+          <CatalogueVoucherCartTotals commercialTotal={total} draft={draft} />
+        </>
+      )}
       {invalidCopy && showDatePrompt ? (
         <div className="space-y-3">
           <p className="font-display text-ink text-xl tracking-tight">
@@ -302,17 +326,50 @@ export function StorefrontCartShell({
   const [open, setOpen] = useState(false);
   const [datePromptDismissed, setDatePromptDismissed] = useState(false);
   const [editCakes, setEditCakes] = useState<StorefrontCake[]>([]);
+  const [editCakesLoaded, setEditCakesLoaded] = useState(false);
   const wasDateValidRef = useRef(true);
   const titleId = useId();
   const hasItems = draftHasItems(draft);
   const count = draftCakeCount(draft);
-  const total = draftTotal(draft);
   const itemLabel = count === 1 ? "1 item" : `${count} items`;
   const continueHref = continueOrderingHref(pathname);
   const cakeIdsKey = (draft?.items ?? []).map((item) => item.cakeId).join(",");
+  const hasSelectedPickupDate = Boolean(
+    draft?.pickupDate && /^\d{4}-\d{2}-\d{2}$/.test(draft.pickupDate),
+  );
+  const { cakes: datePricedEditCakes, ready: pickupPricesReady } =
+    usePickupDatePricedCakes(editCakes, draft?.pickupDate);
+  const pricesPending = Boolean(
+    hasSelectedPickupDate && (!editCakesLoaded || !pickupPricesReady),
+  );
+  const pricesBySizeId = useMemo(
+    () =>
+      new Map(
+        (pricesPending || !hasSelectedPickupDate ? [] : datePricedEditCakes).flatMap((cake) =>
+          cake.sizes.map((size) => [size.id, size.price] as const),
+        ),
+      ),
+    [datePricedEditCakes, hasSelectedPickupDate, pricesPending],
+  );
+  const displayDraft = draft
+    ? {
+        ...draft,
+        items: draft.items.map((item) => ({
+          ...item,
+          unitPrice: pricesBySizeId.get(item.sizeId) ?? item.unitPrice,
+        })),
+      }
+    : null;
+  const total = displayDraft ? draftTotal(displayDraft) : 0;
   const cakesById = useMemo(
-    () => new Map(editCakes.map((cake) => [cake.id, cake])),
-    [editCakes],
+    () =>
+      new Map(
+        (pricesPending ? [] : datePricedEditCakes).map((cake) => [
+          cake.id,
+          cake,
+        ]),
+      ),
+    [datePricedEditCakes, pricesPending],
   );
   const dateEvaluation = draft
     ? evaluateDraftSelectedCollectionDate(draft)
@@ -329,12 +386,17 @@ export function StorefrontCartShell({
   useEffect(() => {
     if (!cakeIdsKey) {
       setEditCakes([]);
+      setEditCakesLoaded(true);
       return;
     }
+    setEditCakesLoaded(false);
     const ids = cakeIdsKey.split(",").filter(Boolean);
     let cancelled = false;
     void loadCartEditCakes(ids).then((cakes) => {
-      if (!cancelled) setEditCakes(cakes);
+      if (!cancelled) {
+        setEditCakes(cakes);
+        setEditCakesLoaded(true);
+      }
     });
     return () => {
       cancelled = true;
@@ -423,7 +485,7 @@ export function StorefrontCartShell({
             Your Order
           </span>
           <span aria-live="polite" className="text-sm font-medium tabular-nums">
-            {itemLabel} · {formatRm(total)}
+          {itemLabel} · {pricesPending ? "Checking price…" : formatRm(total)}
           </span>
         </span>
         <span className="block w-full py-1 text-center text-sm font-semibold tracking-tight">
@@ -511,17 +573,23 @@ export function StorefrontCartShell({
                     </button>
                   </div>
                   <div className="min-h-0 flex-1 overflow-y-auto px-5">
-                    <OrderLines cakesById={cakesById} items={draft.items} />
+                    <OrderLines
+                      cakesById={cakesById}
+                      items={draft.items}
+                      pricesBySizeId={pricesBySizeId}
+                      pricesPending={pricesPending}
+                    />
                   </div>
                   <div className="border-fog border-t px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
                     <OrderSummary
                       checkoutBlocked={checkoutBlocked}
                       continueHref={continueHref}
-                      draft={draft}
+                      draft={displayDraft ?? draft}
                       invalidCopy={invalidCopy}
                       onContinue={() => setOpen(false)}
                       onKeepEditing={() => setDatePromptDismissed(true)}
                       showDatePrompt={showDatePrompt}
+                      pricesPending={pricesPending}
                     />
                   </div>
                 </div>
@@ -547,16 +615,22 @@ export function StorefrontCartShell({
                 <p className="text-skyline mt-1 text-sm">{itemLabel}</p>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto px-6">
-                <OrderLines cakesById={cakesById} items={draft.items} />
+                <OrderLines
+                  cakesById={cakesById}
+                  items={draft.items}
+                  pricesBySizeId={pricesBySizeId}
+                  pricesPending={pricesPending}
+                />
               </div>
               <div className="px-6 pt-4 pb-8">
                 <OrderSummary
                   checkoutBlocked={checkoutBlocked}
                   continueHref={continueHref}
-                  draft={draft}
+                  draft={displayDraft ?? draft}
                   invalidCopy={invalidCopy}
                   onKeepEditing={() => setDatePromptDismissed(true)}
                   showDatePrompt={showDatePrompt}
+                  pricesPending={pricesPending}
                 />
               </div>
             </aside>

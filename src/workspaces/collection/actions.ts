@@ -13,6 +13,8 @@ import {
   isCollectionMarkCollectedEligible,
   isCollectionUndoCollectedEligible,
   isCollectionUndoDineInEligible,
+  COLLECTION_ACTIVE_PREORDER_STATUSES,
+  type CollectionBoardTab,
 } from "@/workspaces/collection/eligibility";
 import { canCompleteGuestOrder } from "@/engines/orders/lifecycle";
 import {
@@ -22,7 +24,7 @@ import {
   listCollectionOrdersForTab,
 } from "@/workspaces/collection/queries";
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
-import type { CollectionBoardTab } from "@/workspaces/collection/eligibility";
+import { COLLECTION_READY_MESSAGE_SENT_EVENT } from "@/workspaces/collection/ready-message";
 
 async function requireCollectionStaff() {
   const staff = await requireStaff();
@@ -200,4 +202,74 @@ export async function getCollectionOrderDetailAction(
 ): Promise<CollectionBoardOrder | null> {
   await requireCollectionStaff();
   return getCollectionOrderDetail(orderId, selectedPickupDate);
+}
+
+export async function markCollectionReadyMessageSentAction(
+  orderId: string,
+): Promise<{
+  error: string | null;
+  sentAt?: string;
+  sentByName?: string | null;
+}> {
+  const staff = await requireCollectionStaff();
+  const supabase = await createClient();
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .select(
+      "id, customer_id, status, fulfilment_method, ready_at, picked_up_at, delivered_at",
+    )
+    .eq("id", orderId)
+    .is("customer_id", null)
+    .maybeSingle();
+  if (orderError) return { error: orderError.message };
+  if (!order) return { error: "Order not found." };
+  if (
+    !COLLECTION_ACTIVE_PREORDER_STATUSES.includes(order.status) ||
+    !order.ready_at ||
+    order.picked_up_at ||
+    order.delivered_at
+  ) {
+    return { error: "Only an active, ready Collection order can be marked sent." };
+  }
+
+  const { data: existing, error: existingError } = await supabase
+    .from("order_timeline_events")
+    .select("created_at, actor_staff_id")
+    .eq("order_id", orderId)
+    .eq("event_type", COLLECTION_READY_MESSAGE_SENT_EVENT)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (existingError) return { error: existingError.message };
+  if (existing) {
+    return {
+      error: null,
+      sentAt: String(existing.created_at),
+      sentByName:
+        existing.actor_staff_id === staff.id ? staff.displayName : "Staff",
+    };
+  }
+
+  const { data: inserted, error: insertError } = await supabase
+    .from("order_timeline_events")
+    .insert({
+      order_id: orderId,
+      event_type: COLLECTION_READY_MESSAGE_SENT_EVENT,
+      actor_staff_id: staff.id,
+      metadata: {
+        channel: "whatsapp",
+        fulfilment_method: order.fulfilment_method,
+      },
+    })
+    .select("created_at")
+    .single();
+  if (insertError) return { error: insertError.message };
+
+  revalidatePath("/collection");
+  revalidatePath(`/collection/orders/${orderId}`);
+  return {
+    error: null,
+    sentAt: String(inserted.created_at),
+    sentByName: staff.displayName,
+  };
 }

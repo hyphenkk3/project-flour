@@ -37,6 +37,7 @@ export default async function CollectionOrderPage({
       boardDate={boardDate}
       capabilities={capabilities}
       order={order}
+      staffDisplayName={staff.displayName}
       tab={tab}
     />
   );

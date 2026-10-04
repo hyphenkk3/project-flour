@@ -8,6 +8,11 @@ import type {
   StorefrontOrderFulfilmentMethod,
 } from "@/types/storefront";
 
+export type CollectionReadyMessageSent = {
+  sentAt: string;
+  sentByName: string | null;
+};
+
 export type CollectionCakeLine = {
   id: string;
   cakeName: string;
@@ -64,6 +69,7 @@ export type CollectionBoardOrder = {
   fulfilmentMethod: StorefrontOrderFulfilmentMethod;
   status: GuestOrderStatus;
   customerNotes: string | null;
+  readyMessageSent?: CollectionReadyMessageSent | null;
   productionStartedAt: string | null;
   readyAt: string | null;
   pickedUpAt: string | null;
