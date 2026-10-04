@@ -34,12 +34,14 @@ import { recipientNotifyPreferenceLabel } from "@/engines/orders/fulfilment";
 import { deriveCollectionPackingReminders } from "@/workspaces/collection/packing";
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
 import { CustomerOrderNoteCallout } from "@/components/orders/CustomerOrderNoteCallout";
+import { CollectionReadyMessage } from "@/workspaces/collection/CollectionReadyMessage";
 
 type CollectionOrderDetailProps = {
   order: CollectionBoardOrder;
   boardDate: string;
   tab?: CollectionBoardTab;
   capabilities: CollectionWorkspaceCapabilities;
+  staffDisplayName: string;
 };
 
 export function CollectionOrderDetail({
@@ -47,6 +49,7 @@ export function CollectionOrderDetail({
   boardDate,
   tab = "ready",
   capabilities,
+  staffDisplayName,
 }: CollectionOrderDetailProps) {
   const presentation = collectionDeskPresentation({
     readyAt: order.readyAt,
@@ -313,6 +316,11 @@ export function CollectionOrderDetail({
             ))}
           </ul>
         </section>
+
+        <CollectionReadyMessage
+          order={order}
+          staffDisplayName={staffDisplayName}
+        />
 
         {order.dineIn?.reservationNote?.trim() ? (
           <section className="border-fog rounded-2xl border bg-white px-4 py-3.5">

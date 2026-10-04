@@ -95,7 +95,10 @@ function normalizeIdentityPhone(value: string | null | undefined): string {
 export function isDeliveryRecipientSameAsOrderingCustomer(input: {
   customerName: string | null | undefined;
   customerPhone: string | null | undefined;
-  delivery: StorefrontOrderDelivery | null | undefined;
+  delivery:
+    | Pick<StorefrontOrderDelivery, "recipientName" | "recipientPhone">
+    | null
+    | undefined;
 }): boolean {
   const delivery = input.delivery;
   if (!delivery) return false;

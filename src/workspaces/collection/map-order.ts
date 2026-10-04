@@ -210,6 +210,7 @@ export function mapCollectionBoardOrder(
     fulfilmentMethod: normalizeFulfilmentMethod(row.fulfilment_method),
     status: row.status,
     customerNotes: row.customer_notes,
+    readyMessageSent: null,
     productionStartedAt: row.production_started_at,
     readyAt: row.ready_at,
     pickedUpAt: row.picked_up_at,
