@@ -10,7 +10,10 @@ import { resolve } from "node:path";
 import { BROWSE_CURRENTLY_UNAVAILABLE_NOTE } from "@/engines/menu/homepage-collection-preview";
 import type { StorefrontCake } from "@/types/storefront";
 import { startingPrice } from "@/workspaces/storefront/catalog/pricing";
-import { applyResolvedPickupDatePrices } from "@/workspaces/storefront/catalog/pickup-date-pricing";
+import {
+  applyResolvedPickupDatePrices,
+  cakeDetailPriceDate,
+} from "@/workspaces/storefront/catalog/pickup-date-pricing";
 import {
   applyEffectiveStorefrontPrices,
   browseCakePreviewFromDisplay,
@@ -137,6 +140,35 @@ const pickupDateDubai = applyResolvedPickupDatePrices([dubaiFourInch], {
 })[0]!;
 assert.equal(pickupDateDubai.sizes[0]?.price, 80);
 assert.equal(dubaiFourInch.sizes[0]?.price, 78, "base snapshot stays unchanged");
+const savedOrderPickupDate = "2026-10-06";
+assert.equal(
+  cakeDetailPriceDate(savedOrderPickupDate, savedOrderPickupDate),
+  savedOrderPickupDate,
+);
+assert.equal(
+  cakeDetailPriceDate("2026-10-05", savedOrderPickupDate),
+  "2026-10-05",
+  "an explicit page-entry pickup date remains authoritative",
+);
+assert.equal(
+  cakeDetailPriceDate(null, savedOrderPickupDate),
+  savedOrderPickupDate,
+  "when transient page-entry scope disappears, Cake Detail keeps using the saved pickup date",
+);
+const afterScopeLoss = applyResolvedPickupDatePrices(
+  [dubaiFourInch],
+  { "dubai-four-inch-size": 80 },
+)[0]!;
+assert.equal(
+  afterScopeLoss.sizes.find((size) => size.id === "dubai-four-inch-size")?.price,
+  80,
+  "the selected size remains RM80 rather than reverting to its RM78 base snapshot",
+);
+assert.equal(
+  cakeDetailPriceDate(null, "2026-10-07"),
+  "2026-10-07",
+  "changing the saved pickup date changes the date passed to scheduled price resolution",
+);
 const fallbackDubai = applyResolvedPickupDatePrices([dubaiFourInch], {})[0]!;
 assert.equal(fallbackDubai.sizes[0]?.price, 78, "base price remains the fallback");
 const currentPricedAvocado = applyEffectiveStorefrontPrices(
@@ -405,7 +437,13 @@ assert.match(
 );
 assert.match(
   readSrc("src/workspaces/storefront/catalog/CakeDetailPickupScope.tsx"),
-  /usePickupDatePricedCakes\(\s*\[cake\],\s*scope\?\.pickup\s*,?\s*\)/,
+  /cakeDetailPriceDate\(scope\?\.pickup,\s*draft\?\.pickupDate\)/,
+  "Cake Detail falls back to the saved order pickup date when its transient entry scope is absent",
+);
+assert.match(
+  readSrc("src/workspaces/storefront/catalog/CakeDetailPickupScope.tsx"),
+  /usePickupDatePricedCakes\(\s*\[cake\],\s*priceDate\s*,?\s*\)/,
+  "Cake Detail resolves its displayed size prices for the effective pickup date",
 );
 assert.match(
   readSrc("src/workspaces/storefront/catalog/usePickupDatePricedCakes.ts"),
