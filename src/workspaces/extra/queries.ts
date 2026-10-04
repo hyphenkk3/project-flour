@@ -3,12 +3,17 @@ import {
   isExtraConfirmedOnOffer,
   type ExtraLifecycle,
 } from "@/engines/extra/availability";
+import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
+import { extraCustomerVisibleFulfilmentDates } from "@/engines/extra/fresh-picks-fulfilment";
 import { compareHomeFreshPickUnits } from "@/engines/extra/home-fresh-picks";
+import type { FreshPicksPreparationConfig } from "@/engines/extra/fresh-picks-preparation";
 import { isExtraWalkInHeld } from "@/engines/extra/walk-in-hold";
 import { resolveCakePhoto, type ResolvableCakePhoto } from "@/engines/menu/cake-photos";
 import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
 import { createClient } from "@/lib/supabase/server";
 import { isMissingCakePhotoSchema } from "@/workspaces/library/cakes/photo-storage";
+import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
+import { loadFreshPicksPreparationConfig } from "@/workspaces/storefront/extra/config";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
 
 type ExtraStockRow = {
@@ -190,26 +195,13 @@ async function extraPhotosByCake(
   return photosByCake;
 }
 
-async function extraPricesBySize(sizeIds: string[]): Promise<Map<string, number>> {
-  const prices = new Map<string, number>();
-  if (sizeIds.length === 0) return prices;
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("library_cake_sizes")
-    .select("id, price")
-    .in("id", sizeIds);
-  if (error) return prices;
-  for (const row of (data ?? []) as Array<{ id: string; price: number | string | null }>) {
-    if (row.price == null) continue;
-    const price = Number(row.price);
-    if (!Number.isFinite(price)) continue;
-    prices.set(row.id, price);
-  }
-  return prices;
-}
-
 async function attachHomeFreshPickPresentation(
   units: ExtraStockUnit[],
+  input: {
+    now: Date;
+    snapshot: OperatingHoursSnapshot;
+    config: FreshPicksPreparationConfig;
+  },
 ): Promise<ExtraStockUnit[]> {
   const cakeIds = [
     ...new Set(
@@ -218,17 +210,53 @@ async function attachHomeFreshPickPresentation(
         .filter((id): id is string => Boolean(id)),
     ),
   ];
-  const sizeIds = [
-    ...new Set(
-      units
-        .map((unit) => unit.libraryCakeSizeId)
-        .filter((id): id is string => Boolean(id)),
-    ),
-  ];
-  const [photosByCake, priceBySize] = await Promise.all([
+  const [photosByCake, supabase] = await Promise.all([
     extraPhotosByCake(cakeIds),
-    extraPricesBySize(sizeIds),
+    createClient(),
   ]);
+  const pricesBySizeAndDate = new Map<string, Promise<number | null>>();
+  const priceByUnitId = new Map<string, number | null>();
+  await Promise.all(
+    units.map(async (unit) => {
+      const sizeId = unit.libraryCakeSizeId;
+      if (!sizeId || !unit.pickupAvailableFromAt || !unit.pickupThroughAt) {
+        priceByUnitId.set(unit.id, null);
+        return;
+      }
+      const pickupDate = extraCustomerVisibleFulfilmentDates({
+        window: {
+          pickupAvailableFromAt: unit.pickupAvailableFromAt,
+          orderCutoffAt: unit.pickupThroughAt,
+        },
+        now: input.now,
+        snapshot: input.snapshot,
+        config: input.config,
+      })[0];
+      if (!pickupDate) {
+        priceByUnitId.set(unit.id, null);
+        return;
+      }
+
+      const priceKey = `${sizeId}|${pickupDate}`;
+      let pricePromise = pricesBySizeAndDate.get(priceKey);
+      if (!pricePromise) {
+        pricePromise = Promise.resolve(
+          supabase
+            .rpc("library_cake_size_price_on", {
+              p_cake_size_id: sizeId,
+              p_pickup_date: pickupDate,
+            })
+            .then(({ data, error }) => {
+              if (error || data == null) return null;
+              const price = Number(data);
+              return Number.isFinite(price) ? price : null;
+            }),
+        ).catch(() => null);
+        pricesBySizeAndDate.set(priceKey, pricePromise);
+      }
+      priceByUnitId.set(unit.id, await pricePromise);
+    }),
+  );
 
   return units.map((unit) => {
     const photos = unit.libraryCakeId
@@ -239,9 +267,7 @@ async function attachHomeFreshPickPresentation(
       ...unit,
       imageUrl: image?.url ?? null,
       imageAlt: image?.altText ?? null,
-      unitPrice: unit.libraryCakeSizeId
-        ? (priceBySize.get(unit.libraryCakeSizeId) ?? null)
-        : null,
+      unitPrice: priceByUnitId.get(unit.id) ?? null,
     };
   });
 }
@@ -365,7 +391,11 @@ export async function listHomeFreshPickUnits(): Promise<ExtraStockUnit[]> {
     );
 
   units.sort(compareHomeFreshPickUnits);
-  return attachHomeFreshPickPresentation(units);
+  const [snapshot, config] = await Promise.all([
+    loadOperatingHoursSnapshot(),
+    loadFreshPicksPreparationConfig(),
+  ]);
+  return attachHomeFreshPickPresentation(units, { now, snapshot, config });
 }
 
 export type ExtraAssignableOrder = {

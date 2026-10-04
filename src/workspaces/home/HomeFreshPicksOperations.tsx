@@ -299,9 +299,8 @@ function HomeFreshPickCard({
     unitPrice: unit.unitPrice,
   });
   const summary = freshPickHomeSummaryLine({
-    preparedOn: unit.preparedOn,
+    pickupAvailableFromAt: unit.pickupAvailableFromAt,
     pickupThroughAt: unit.pickupThroughAt,
-    todayYmd,
   });
   const heldMore =
     unit.walkInHeld &&

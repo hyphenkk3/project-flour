@@ -5,11 +5,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import {
   buildExtraWorkspaceCapabilities,
   canSeeHomeFreshPicks,
   extraOperationalActionFlags,
 } from "@/engines/extra/capabilities";
+import { extraCustomerVisibleFulfilmentDates } from "@/engines/extra/fresh-picks-fulfilment";
+import { DEFAULT_FRESH_PICKS_PREPARATION_CONFIG } from "@/engines/extra/fresh-picks-preparation";
 import {
   HOME_FRESH_PICKS_PREVIEW_LIMIT,
   compareHomeFreshPickUnits,
@@ -142,6 +145,33 @@ assert.equal(
   '6" · RM135',
 );
 
+const freshPickPricingNow = new Date("2026-10-04T02:00:00.000Z");
+const freshPickPricingDates = extraCustomerVisibleFulfilmentDates({
+  window: {
+    pickupAvailableFromAt: "2026-10-04T02:00:00.000Z",
+    orderCutoffAt: "2026-10-06T08:00:00.000Z",
+  },
+  now: freshPickPricingNow,
+  snapshot: OPERATING_HOURS_SEED,
+  config: DEFAULT_FRESH_PICKS_PREPARATION_CONFIG,
+});
+assert.equal(
+  freshPickPricingDates[0],
+  "2026-10-04",
+  "Owner Home prices a Fresh Pick on its first currently valid customer pickup date",
+);
+const baseFreshPickPrice = 78;
+const scheduledFreshPickPrice = 80;
+assert.notEqual(baseFreshPickPrice, scheduledFreshPickPrice);
+assert.equal(
+  formatHomeFreshPickSizePrice({
+    sizeLabel: '4"',
+    unitPrice: scheduledFreshPickPrice,
+  }),
+  '4" · RM80',
+  "a RM80 date-resolved price is the Owner Home Fresh Pick card price even when base price is RM78",
+);
+
 const newerAvailable = {
   walkInHeld: false,
   walkInHeldUntil: null,
@@ -268,7 +298,17 @@ assert.match(querySrc, /resolveCakePhoto\(photos, unit\.libraryCakeSizeId\)/);
 assert.doesNotMatch(querySrc, /resolveCatalogueListingPhoto/);
 assert.doesNotMatch(querySrc, /storefrontCatalogueListingPhoto/);
 assert.match(querySrc, /library_cake_photos/);
-assert.match(querySrc, /library_cake_sizes/);
+const homePriceQuerySrc = querySrc.slice(
+  querySrc.indexOf("async function attachHomeFreshPickPresentation"),
+  querySrc.indexOf("export async function listExtraStockUnits"),
+);
+assert.match(homePriceQuerySrc, /extraCustomerVisibleFulfilmentDates/);
+assert.match(homePriceQuerySrc, /pickupAvailableFromAt: unit\.pickupAvailableFromAt/);
+assert.match(homePriceQuerySrc, /orderCutoffAt: unit\.pickupThroughAt/);
+assert.match(homePriceQuerySrc, /library_cake_size_price_on/);
+assert.match(homePriceQuerySrc, /p_pickup_date: pickupDate/);
+assert.doesNotMatch(homePriceQuerySrc, /\.from\("library_cake_sizes"\)/);
+assert.match(homePriceQuerySrc, /unitPrice: priceByUnitId\.get\(unit\.id\)/);
 assert.match(querySrc, /\.eq\("lifecycle", "confirmed"\)/);
 assert.match(querySrc, /\.is\("sold_at", null\)/);
 assert.match(querySrc, /\.is\("cut_into_slices_at", null\)/);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { buildWhatsAppDeepLink } from "@/engines/orders/whatsapp";
 import { formatTimelineDateTime } from "@/workspaces/owner/orders/labels";
 import { OrderMessagePreview } from "@/workspaces/owner/orders/OrderMessagePreview";
 import type { MessageType } from "@/engines/orders/messages";
@@ -33,6 +34,10 @@ export function CollectionReadyMessage({
     () => generateCollectionReadyMessage(order, senderName),
     [order, senderName],
   );
+  const whatsappUrl = useMemo(
+    () => buildWhatsAppDeepLink(order.guestPhone ?? "", message),
+    [order.guestPhone, message],
+  );
   const activeReady = Boolean(
     order.readyAt && !order.pickedUpAt && !order.deliveredAt,
   );
@@ -54,6 +59,11 @@ export function CollectionReadyMessage({
         });
       }
     });
+  }
+
+  function openWhatsApp() {
+    if (!whatsappUrl) return;
+    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
   }
 
   return (
@@ -86,15 +96,28 @@ export function CollectionReadyMessage({
             {` · Sent by ${sent.sentByName ?? "Staff"} · ${formatTimelineDateTime(sent.sentAt)}`}
           </span>
         </p>
-      ) : activeReady ? (
-        <button
-          className="bg-ink text-mist hover:bg-skyline inline-flex min-h-11 w-full items-center justify-center rounded-lg px-4 text-sm font-medium disabled:opacity-60"
-          disabled={pending}
-          onClick={markSent}
-          type="button"
-        >
-          {pending ? "Saving…" : "Mark Ready Message Sent"}
-        </button>
+      ) : null}
+      {activeReady ? (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            className="border-fog text-ink hover:bg-mist inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!whatsappUrl}
+            onClick={openWhatsApp}
+            type="button"
+          >
+            Open WhatsApp
+          </button>
+          {!sent ? (
+            <button
+              className="bg-ink text-mist hover:bg-skyline inline-flex min-h-11 flex-1 items-center justify-center rounded-lg px-4 text-sm font-medium disabled:opacity-60"
+              disabled={pending}
+              onClick={markSent}
+              type="button"
+            >
+              {pending ? "Saving…" : "Mark Ready Message Sent"}
+            </button>
+          ) : null}
+        </div>
       ) : null}
       {error ? (
         <p className="text-status-danger text-sm" role="alert">

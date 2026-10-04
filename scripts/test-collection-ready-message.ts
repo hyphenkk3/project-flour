@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { buildWhatsAppDeepLink, normalizeMalaysiaWhatsAppPhone } from "@/engines/orders/whatsapp";
 import { mapCollectionBoardOrder } from "@/workspaces/collection/map-order";
 import {
   COLLECTION_READY_MESSAGE_SENT_EVENT,
@@ -36,6 +37,23 @@ assert.match(
   generateCollectionReadyMessage(pickup, "Lily"),
   /ready for pick up/,
 );
+const pickupReadyMessage = generateCollectionReadyMessage(pickup, "Lily");
+assert.equal(normalizeMalaysiaWhatsAppPhone(pickup.guestPhone ?? ""), "60123456789");
+const readyWhatsAppUrl = buildWhatsAppDeepLink(
+  pickup.guestPhone ?? "",
+  pickupReadyMessage,
+);
+assert.equal(
+  readyWhatsAppUrl,
+  `https://wa.me/60123456789?text=${encodeURIComponent(pickupReadyMessage)}`,
+);
+assert.equal(
+  new URL(readyWhatsAppUrl!).searchParams.get("text"),
+  pickupReadyMessage,
+  "WhatsApp receives the existing ready-message text, URL-encoded and pre-filled",
+);
+assert.equal(buildWhatsAppDeepLink("", pickupReadyMessage), null);
+assert.equal(buildWhatsAppDeepLink("not a phone", pickupReadyMessage), null);
 
 const delivery = mapCollectionBoardOrder({
   id: "order-delivery",
@@ -88,7 +106,26 @@ assert.match(detailSource, /<CollectionReadyMessage/);
 const componentSource = readSrc("src/workspaces/collection/CollectionReadyMessage.tsx");
 assert.match(componentSource, /Customer Ready Message/);
 assert.match(componentSource, /Mark Ready Message Sent/);
+assert.match(componentSource, /Open WhatsApp/);
 assert.match(componentSource, /Copy for WhatsApp\. Nothing is sent automatically\./);
+assert.match(
+  componentSource,
+  /buildWhatsAppDeepLink\(order\.guestPhone \?\? "", message\)/,
+  "the deep link uses the order's customer phone and the existing generated message",
+);
+assert.match(componentSource, /disabled={!whatsappUrl}/);
+assert.match(componentSource, /generateCollectionReadyMessage\(order, senderName\)/);
+assert.doesNotMatch(componentSource, /generateCustomerReadyMessage|generateCustomerDeliveryReadyMessage/);
+const openWhatsAppHandler = componentSource.slice(
+  componentSource.indexOf("function openWhatsApp()"),
+  componentSource.indexOf("\n  return (", componentSource.indexOf("function openWhatsApp()")),
+);
+assert.match(openWhatsAppHandler, /window\.open\(whatsappUrl/);
+assert.doesNotMatch(
+  openWhatsAppHandler,
+  /markCollectionReadyMessageSentAction|customer_ready_message_sent/,
+  "opening WhatsApp never records the sent event",
+);
 const markHandler = componentSource.slice(
   componentSource.indexOf("function markSent"),
   componentSource.indexOf("\n  return (", componentSource.indexOf("function markSent")),

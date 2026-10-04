@@ -84,21 +84,28 @@ export function walkInHoldExtendConfirmDescription(
 export const WALK_IN_HOLD_RELEASE_CONFIRM_DESCRIPTION =
   "Release this Walk-in Hold? The Fresh Pick will be available for online sale and other staff actions immediately.";
 
-/**
- * Compact Home / counter line from the order-availability deadline
- * (`pickup_through_at` / orders available through). Display only.
- */
+/** Display the persisted Fresh Pick order window in Malaysia business time. */
 export function freshPickHomeSummaryLine(input: {
-  preparedOn: string | null;
+  pickupAvailableFromAt: string | null;
   pickupThroughAt: string | null;
-  todayYmd: string;
 }): string {
+  const from = input.pickupAvailableFromAt?.trim() ?? "";
   const through = input.pickupThroughAt?.trim() ?? "";
+  const fromMs = from ? Date.parse(from) : Number.NaN;
   const throughMs = through ? Date.parse(through) : Number.NaN;
-  if (!Number.isFinite(throughMs)) {
-    return "Orders available through — · — cutoff";
+  if (!Number.isFinite(fromMs) || !Number.isFinite(throughMs)) {
+    return "Orders available from — through —";
   }
-  const dateLabel = formatBusinessCalendarDate(toBusinessDateKey(through));
-  const cutoff = formatExtraPickupThroughClock(through);
-  return `Orders available through ${dateLabel} · ${cutoff} cutoff`;
+  const fromDateKey = toBusinessDateKey(from);
+  const throughDateKey = toBusinessDateKey(through);
+  const fromDateLabel = formatBusinessCalendarDate(fromDateKey);
+  const throughDateLabel = formatBusinessCalendarDate(throughDateKey);
+  const fromClock = formatExtraPickupThroughClock(from);
+  const throughClock = formatExtraPickupThroughClock(through);
+  if (fromDateKey === throughDateKey) {
+    return `Orders available on ${fromDateLabel}, ${fromClock}–${throughClock}`;
+  }
+  const fromLabel = `${fromDateLabel}, ${fromClock}`;
+  const throughLabel = `${throughDateLabel}, ${throughClock}`;
+  return `Orders available from ${fromLabel} through ${throughLabel}`;
 }
