@@ -1,13 +1,18 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { buildWhatsAppDeepLink, normalizeMalaysiaWhatsAppPhone } from "@/engines/orders/whatsapp";
+import {
+  buildWhatsAppDeepLink,
+  normalizeMalaysiaWhatsAppPhone,
+} from "@/engines/orders/whatsapp";
+import { generateCustomerThankYouMessage } from "@/engines/orders/messages";
 import { mapCollectionBoardOrder } from "@/workspaces/collection/map-order";
 import {
   COLLECTION_READY_MESSAGE_SENT_EVENT,
   collectionReadyMessageSentFromEvent,
   collectionReadyMessageVariant,
   generateCollectionReadyMessage,
+  selectCollectionWhatsAppMessage,
 } from "@/workspaces/collection/ready-message";
 
 function readSrc(path: string): string {
@@ -32,13 +37,19 @@ const pickup = mapCollectionBoardOrder({
   delivered_at: null,
   include_receipt: false,
 });
-assert.match(generateCollectionReadyMessage(pickup, "Lily"), /Good morning, Lily here/);
+assert.match(
+  generateCollectionReadyMessage(pickup, "Lily"),
+  /Good morning, Lily here/,
+);
 assert.match(
   generateCollectionReadyMessage(pickup, "Lily"),
   /ready for pick up/,
 );
 const pickupReadyMessage = generateCollectionReadyMessage(pickup, "Lily");
-assert.equal(normalizeMalaysiaWhatsAppPhone(pickup.guestPhone ?? ""), "60123456789");
+assert.equal(
+  normalizeMalaysiaWhatsAppPhone(pickup.guestPhone ?? ""),
+  "60123456789",
+);
 const readyWhatsAppUrl = buildWhatsAppDeepLink(
   pickup.guestPhone ?? "",
   pickupReadyMessage,
@@ -54,6 +65,35 @@ assert.equal(
 );
 assert.equal(buildWhatsAppDeepLink("", pickupReadyMessage), null);
 assert.equal(buildWhatsAppDeepLink("not a phone", pickupReadyMessage), null);
+
+const thankYouMessage = generateCustomerThankYouMessage();
+const readySelection = selectCollectionWhatsAppMessage(
+  pickupReadyMessage,
+  thankYouMessage,
+  false,
+);
+assert.deepEqual(readySelection, { kind: "ready", text: pickupReadyMessage });
+const thankYouSelection = selectCollectionWhatsAppMessage(
+  pickupReadyMessage,
+  thankYouMessage,
+  true,
+);
+assert.deepEqual(thankYouSelection, {
+  kind: "thank_you",
+  text: thankYouMessage,
+});
+assert.equal(
+  new URL(
+    buildWhatsAppDeepLink(pickup.guestPhone ?? "", thankYouSelection.text)!,
+  ).searchParams.get("text"),
+  thankYouMessage,
+  "after the persisted Ready Message state, WhatsApp pre-fills existing Thank You text",
+);
+assert.equal(buildWhatsAppDeepLink("", thankYouSelection.text), null);
+assert.equal(
+  buildWhatsAppDeepLink("not a phone", thankYouSelection.text),
+  null,
+);
 
 const delivery = mapCollectionBoardOrder({
   id: "order-delivery",
@@ -98,27 +138,62 @@ assert.deepEqual(sent, {
   sentByName: "Lily",
 });
 assert.equal(collectionReadyMessageSentFromEvent(null, null), null);
-assert.equal(COLLECTION_READY_MESSAGE_SENT_EVENT, "customer_ready_message_sent");
+assert.equal(
+  COLLECTION_READY_MESSAGE_SENT_EVENT,
+  "customer_ready_message_sent",
+);
 
-const detailSource = readSrc("src/workspaces/collection/CollectionOrderDetail.tsx");
+const detailSource = readSrc(
+  "src/workspaces/collection/CollectionOrderDetail.tsx",
+);
 assert.match(detailSource, /<CollectionReadyMessage/);
 
-const componentSource = readSrc("src/workspaces/collection/CollectionReadyMessage.tsx");
+const componentSource = readSrc(
+  "src/workspaces/collection/CollectionReadyMessage.tsx",
+);
 assert.match(componentSource, /Customer Ready Message/);
+assert.match(componentSource, /Customer Thank You Message/);
 assert.match(componentSource, /Mark Ready Message Sent/);
-assert.match(componentSource, /Open WhatsApp/);
-assert.match(componentSource, /Copy for WhatsApp\. Nothing is sent automatically\./);
+assert.equal(componentSource.match(/Open WhatsApp —/g)?.length, 1);
 assert.match(
   componentSource,
-  /buildWhatsAppDeepLink\(order\.guestPhone \?\? "", message\)/,
-  "the deep link uses the order's customer phone and the existing generated message",
+  /Copy for WhatsApp\. Nothing is sent automatically\./,
+);
+assert.match(
+  componentSource,
+  /buildWhatsAppDeepLink\(\s*order\.guestPhone \?\? "",\s*selectedWhatsAppMessage\.text,?\s*\)/,
+  "the single deep link uses the customer phone and selected existing message",
 );
 assert.match(componentSource, /disabled={!whatsappUrl}/);
-assert.match(componentSource, /generateCollectionReadyMessage\(order, senderName\)/);
-assert.doesNotMatch(componentSource, /generateCustomerReadyMessage|generateCustomerDeliveryReadyMessage/);
+assert.match(
+  componentSource,
+  /generateCollectionReadyMessage\(order, senderName\)/,
+);
+assert.match(componentSource, /generateCustomerThankYouMessage\(\)/);
+assert.match(componentSource, /Boolean\(sent\)/);
+assert.match(
+  componentSource,
+  /selectedWhatsAppMessage\.kind === "ready"\s*\?\s*"Ready Message"\s*:\s*"Thank You Message"/,
+);
+assert.match(
+  componentSource,
+  /type=\{previewKind === "ready" \? messageType : "customer_thank_you"\}/,
+);
+assert.doesNotMatch(
+  componentSource,
+  /Thank you for the order and hope you enjoy ya/,
+  "Thank You wording is supplied by the existing message generator",
+);
+assert.doesNotMatch(
+  componentSource,
+  /generateCustomerReadyMessage|generateCustomerDeliveryReadyMessage/,
+);
 const openWhatsAppHandler = componentSource.slice(
   componentSource.indexOf("function openWhatsApp()"),
-  componentSource.indexOf("\n  return (", componentSource.indexOf("function openWhatsApp()")),
+  componentSource.indexOf(
+    "\n  return (",
+    componentSource.indexOf("function openWhatsApp()"),
+  ),
 );
 assert.match(openWhatsAppHandler, /window\.open\(whatsappUrl/);
 assert.doesNotMatch(
@@ -128,13 +203,29 @@ assert.doesNotMatch(
 );
 const markHandler = componentSource.slice(
   componentSource.indexOf("function markSent"),
-  componentSource.indexOf("\n  return (", componentSource.indexOf("function markSent")),
+  componentSource.indexOf(
+    "\n  return (",
+    componentSource.indexOf("function markSent"),
+  ),
 );
 assert.match(markHandler, /markCollectionReadyMessageSentAction\(order\.id\)/);
+assert.match(markHandler, /if \(result\.sentAt\)[\s\S]*setSent\(/);
 assert.equal(
   componentSource.match(/markCollectionReadyMessageSentAction/g)?.length,
   2,
   "the action is imported and invoked only from the explicit mark-sent handler",
+);
+const thankYouHandler = componentSource.slice(
+  componentSource.indexOf('onClick={() => setPreviewKind("thank_you")}'),
+  componentSource.indexOf(
+    'type="button"',
+    componentSource.indexOf('onClick={() => setPreviewKind("thank_you")}'),
+  ),
+);
+assert.doesNotMatch(
+  thankYouHandler,
+  /markCollectionReadyMessageSentAction|customer_ready_message_sent/,
+  "preparing the Thank You Message does not alter sent state",
 );
 
 const actionSource = readSrc("src/workspaces/collection/actions.ts");
@@ -142,8 +233,15 @@ assert.match(actionSource, /COLLECTION_READY_MESSAGE_SENT_EVENT/);
 assert.match(actionSource, /actor_staff_id:\s*staff\.id/);
 assert.match(actionSource, /sentAt:\s*String\(inserted\.created_at\)/);
 assert.match(actionSource, /order_timeline_events/);
-assert.match(actionSource, /if \(existing\)/, "repeat confirmation reuses the saved event");
-assert.match(actionSource, /Only an active, ready Collection order can be marked sent/);
+assert.match(
+  actionSource,
+  /if \(existing\)/,
+  "repeat confirmation reuses the saved event",
+);
+assert.match(
+  actionSource,
+  /Only an active, ready Collection order can be marked sent/,
+);
 
 const querySource = readSrc("src/workspaces/collection/queries.ts");
 assert.match(querySource, /order_timeline_events/);
@@ -156,8 +254,10 @@ assert.match(
   "reopened details display persistent actor and time",
 );
 
-const previewSource = readSrc("src/workspaces/owner/orders/OrderMessagePreview.tsx");
+const previewSource = readSrc(
+  "src/workspaces/owner/orders/OrderMessagePreview.tsx",
+);
 assert.match(previewSource, /nothing is sent\s+automatically/);
 assert.match(previewSource, /navigator\.clipboard\.writeText/);
 
-console.log("PASS Collection Ready Message display, copy and sent-state contract");
+console.log("PASS Collection Ready Message and state-aware WhatsApp contract");
