@@ -65,6 +65,7 @@ type CakeDetailPurchasePanelProps = {
   pickupScopeFrom?: string | null;
   pickupScopeTo?: string | null;
   pickupScopePickup?: string | null;
+  pickupPricesReady?: boolean;
   selectedSizeId: string;
   onSelectedSizeIdChange: (sizeId: string) => void;
   offerToday?: string | null;
@@ -80,6 +81,7 @@ export function CakeDetailPurchasePanel({
   pickupScopeFrom = null,
   pickupScopeTo = null,
   pickupScopePickup = null,
+  pickupPricesReady = true,
   selectedSizeId,
   onSelectedSizeIdChange,
   offerToday = null,
@@ -172,7 +174,7 @@ export function CakeDetailPurchasePanel({
           </h2>
           {selectedSize ? (
             <p className="text-ink text-lg font-semibold tabular-nums">
-              {formatRm(selectedSize.price)}
+              {pickupPricesReady ? formatRm(selectedSize.price) : "Checking price…"}
             </p>
           ) : null}
         </div>
@@ -200,7 +202,7 @@ export function CakeDetailPurchasePanel({
                     </span>
                   </span>
                   <span className="text-sm font-semibold tabular-nums">
-                    {formatRm(size.price)}
+                    {pickupPricesReady ? formatRm(size.price) : "Checking…"}
                   </span>
                 </button>
               </li>

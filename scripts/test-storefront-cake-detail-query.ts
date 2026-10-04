@@ -11,6 +11,10 @@ import { BROWSE_CURRENTLY_UNAVAILABLE_NOTE } from "@/engines/menu/homepage-colle
 import type { StorefrontCake } from "@/types/storefront";
 import { startingPrice } from "@/workspaces/storefront/catalog/pricing";
 import {
+  applyResolvedPickupDatePrices,
+  cakeDetailPriceDate,
+} from "@/workspaces/storefront/catalog/pickup-date-pricing";
+import {
   applyEffectiveStorefrontPrices,
   browseCakePreviewFromDisplay,
   mergeBrowseCakeDisplay,
@@ -118,6 +122,55 @@ const staffOnlySpecial: BrowsePublicationCatalogue = {
 };
 
 const avocado = cake("avocado");
+const dubaiFourInch = cake("dubai-four-inch", {
+  name: "Dubai Chocolate Kunafa (Slightly Sweeter)",
+  sizes: [
+    {
+      id: "dubai-four-inch-size",
+      cakeId: "dubai-four-inch",
+      size: '4"',
+      price: 78,
+      sortOrder: 0,
+      preorderDays: 2,
+    },
+  ],
+});
+const pickupDateDubai = applyResolvedPickupDatePrices([dubaiFourInch], {
+  "dubai-four-inch-size": 80,
+})[0]!;
+assert.equal(pickupDateDubai.sizes[0]?.price, 80);
+assert.equal(dubaiFourInch.sizes[0]?.price, 78, "base snapshot stays unchanged");
+const savedOrderPickupDate = "2026-10-06";
+assert.equal(
+  cakeDetailPriceDate(savedOrderPickupDate, savedOrderPickupDate),
+  savedOrderPickupDate,
+);
+assert.equal(
+  cakeDetailPriceDate("2026-10-05", savedOrderPickupDate),
+  "2026-10-05",
+  "an explicit page-entry pickup date remains authoritative",
+);
+assert.equal(
+  cakeDetailPriceDate(null, savedOrderPickupDate),
+  savedOrderPickupDate,
+  "when transient page-entry scope disappears, Cake Detail keeps using the saved pickup date",
+);
+const afterScopeLoss = applyResolvedPickupDatePrices(
+  [dubaiFourInch],
+  { "dubai-four-inch-size": 80 },
+)[0]!;
+assert.equal(
+  afterScopeLoss.sizes.find((size) => size.id === "dubai-four-inch-size")?.price,
+  80,
+  "the selected size remains RM80 rather than reverting to its RM78 base snapshot",
+);
+assert.equal(
+  cakeDetailPriceDate(null, "2026-10-07"),
+  "2026-10-07",
+  "changing the saved pickup date changes the date passed to scheduled price resolution",
+);
+const fallbackDubai = applyResolvedPickupDatePrices([dubaiFourInch], {})[0]!;
+assert.equal(fallbackDubai.sizes[0]?.price, 78, "base price remains the fallback");
 const currentPricedAvocado = applyEffectiveStorefrontPrices(
   [avocado],
   new Map([
@@ -368,7 +421,11 @@ const queriesSrc = readSrc("src/workspaces/storefront/catalog/queries.ts");
 assert.match(queriesSrc, /library_cake_size_price_on/);
 assert.match(queriesSrc, /p_pickup_date: priceDate/);
 assert.match(queriesSrc, /currentEffectivePrice/);
-assert.match(queriesSrc, /withEffectiveStorefrontPrices\(cakes, todayYmd\)/);
+assert.match(
+  queriesSrc,
+  /withEffectiveStorefrontPrices\(cakes,\s*toBusinessDateKey\(\)\)/,
+  "customer-facing collection browse uses today's effective scheduled prices",
+);
 assert.match(
   readSrc("src/workspaces/storefront/home/StorefrontCollectionCakesPage.tsx"),
   /listAvailableCakes\(collectionId, \{ currentEffectivePrice: true \}\)/,
@@ -377,6 +434,61 @@ assert.match(
   readSrc("src/workspaces/storefront/checkout/actions.ts"),
   /p_pickup_date: key/,
   "checkout still resolves price for its selected pickup date",
+);
+assert.match(
+  readSrc("src/workspaces/storefront/catalog/CakeDetailPickupScope.tsx"),
+  /cakeDetailPriceDate\(scope\?\.pickup,\s*draft\?\.pickupDate\)/,
+  "Cake Detail falls back to the saved order pickup date when its transient entry scope is absent",
+);
+assert.match(
+  readSrc("src/workspaces/storefront/catalog/CakeDetailPickupScope.tsx"),
+  /usePickupDatePricedCakes\(\s*\[cake\],\s*priceDate\s*,?\s*\)/,
+  "Cake Detail resolves its displayed size prices for the effective pickup date",
+);
+assert.match(
+  readSrc("src/workspaces/storefront/catalog/usePickupDatePricedCakes.ts"),
+  /resolveCheckoutCakeSizePrices\(date, sizeIds\)/,
+  "cake detail and size selection reuse Checkout's pickup-date resolver",
+);
+assert.match(
+  readSrc("src/workspaces/storefront/cart/AddToOrderSheet.tsx"),
+  /usePickupDatePricedCakes\(\[cake\], pickupScope\?\.pickup\)/,
+  "Add to Order uses the scoped pickup date before saving its price snapshot",
+);
+assert.match(
+  readSrc("src/workspaces/storefront/cart/StorefrontCartShell.tsx"),
+  /usePickupDatePricedCakes\(editCakes, draft\?\.pickupDate\)/,
+  "Cart/sidebar uses the selected date for its displayed prices",
+);
+assert.match(
+  readSrc("src/workspaces/storefront/checkout/GuestCheckoutForm.tsx"),
+  /resolveCheckoutCakeSizePrices\(pickupDate, sizeIds\)/,
+  "existing Checkout resolution remains in place",
+);
+assert.match(
+  readSrc("src/workspaces/storefront/extra/queries.ts"),
+  /extraPriceOn\(supabase, row\.library_cake_size_id, pickupDate \?\? null\)/,
+  "Fresh Pick/Home card price uses the first currently valid pickup date",
+);
+assert.match(
+  readSrc("src/workspaces/storefront/extra/queries.ts"),
+  /p_pickup_date: pickupDate/,
+  "Fresh Pick listing uses the authoritative scheduled-price RPC",
+);
+assert.match(
+  readSrc("src/workspaces/storefront/home/HomeFreshPicksSection.tsx"),
+  /formatRm\(pick\.unitPrice\)/,
+  "Home Fresh Picks displays the date-resolved offering price",
+);
+assert.match(
+  readSrc("src/workspaces/storefront/extra/GuestExtraOrderForm.tsx"),
+  /loadFreshPickPrices\(\[extra\.id\], pickupDate\)/,
+  "Fresh Pick customer page resolves the chosen valid pickup date",
+);
+assert.match(
+  readSrc("src/workspaces/storefront/extra/GuestExtraCheckoutForm.tsx"),
+  /loadFreshPickPrices\(extraStockIds, selectedDate\)/,
+  "Fresh Pick checkout and payment total use the chosen date price",
 );
 const membershipFn = queriesSrc.slice(
   queriesSrc.indexOf("async function listCakePublicationCatalogues"),

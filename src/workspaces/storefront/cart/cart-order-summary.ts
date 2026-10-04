@@ -123,20 +123,37 @@ export function continueOrderingHref(pathname: string | null | undefined): strin
 export function draftItemSizeChoices(
   item: PreorderDraftItem,
   cake: StorefrontCake | null | undefined,
+  effectivePricesBySizeId?: ReadonlyMap<string, number>,
 ): PreorderDraftSizeChoice[] {
-  if (cake && cake.sizes.length > 0) {
-    return cake.sizes.map((size) => ({
-      id: size.id,
-      size: size.size,
-      price: size.price,
-      preorderDays: size.preorderDays,
-      imageUrl:
-        storefrontPhotoForSize(cake.photos, size.id)?.url ??
-        cake.image ??
-        undefined,
-    }));
-  }
-  return item.sizeChoices ?? [];
+  const choices =
+    cake && cake.sizes.length > 0
+      ? cake.sizes.map((size) => ({
+          id: size.id,
+          size: size.size,
+          price: size.price,
+          preorderDays: size.preorderDays,
+          imageUrl:
+            storefrontPhotoForSize(cake.photos, size.id)?.url ??
+            cake.image ??
+            undefined,
+        }))
+      : (item.sizeChoices ?? []);
+  return choices.map((choice) => ({
+    ...choice,
+    price:
+      effectivePricesBySizeId?.get(choice.id) ??
+      (effectivePricesBySizeId && choice.id === item.sizeId
+        ? item.unitPrice
+        : choice.price),
+  }));
+}
+
+/** Unit price used by both the selected cart option and its line amount. */
+export function draftLineDisplayUnitPrice(
+  item: PreorderDraftItem,
+  effectivePricesBySizeId: ReadonlyMap<string, number>,
+): number {
+  return effectivePricesBySizeId.get(item.sizeId) ?? item.unitPrice;
 }
 
 export function draftItemShowsSizeEditor(

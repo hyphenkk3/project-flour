@@ -21,6 +21,7 @@ type StorefrontCakeDetailViewProps = {
   pickupScopeFrom?: string | null;
   pickupScopeTo?: string | null;
   pickupScopePickup?: string | null;
+  pickupPricesReady?: boolean;
   offerToday?: string | null;
   offerVoucher?: CatalogueVoucherRecord | null;
   offerPromise?: Promise<CakeOfferVoucher | null>;
@@ -34,6 +35,7 @@ export function StorefrontCakeDetailView({
   pickupScopeFrom,
   pickupScopeTo,
   pickupScopePickup,
+  pickupPricesReady = true,
   offerToday = null,
   offerVoucher = null,
   offerPromise,
@@ -99,6 +101,7 @@ export function StorefrontCakeDetailView({
         pickupScopeFrom={pickupScopeFrom}
         pickupScopePickup={pickupScopePickup}
         pickupScopeTo={pickupScopeTo}
+        pickupPricesReady={pickupPricesReady}
         selectedSizeId={selectedSizeId}
       />
     </div>

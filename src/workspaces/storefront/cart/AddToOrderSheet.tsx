@@ -10,6 +10,7 @@ import {
   formatPreorderRequirement,
   formatRm,
 } from "@/workspaces/storefront/catalog/pricing";
+import { usePickupDatePricedCakes } from "@/workspaces/storefront/catalog/usePickupDatePricedCakes";
 import { openStorefrontOrder } from "@/workspaces/storefront/cart/open-order";
 import {
   draftLineQuantity,
@@ -49,6 +50,9 @@ export function AddToOrderSheet({
 }: AddToOrderSheetProps) {
   const titleId = useId();
   const addingRef = useRef(false);
+  const { cakes: pricedCakes, ready: pickupPricesReady } =
+    usePickupDatePricedCakes([cake], pickupScope?.pickup);
+  const pricedCake = pricedCakes[0] ?? cake;
   const initialSelectedId = initialSizeId || cake.sizes[0]?.id || "";
   const [sizeId, setSizeId] = useState(initialSelectedId);
   const [quantity, setQuantity] = useState(() => {
@@ -61,10 +65,10 @@ export function AddToOrderSheet({
   });
   const [adding, setAdding] = useState(false);
 
-  const selected = cake.sizes.find((size) => size.id === sizeId);
-  const photo = storefrontPhotoForSize(cake.photos, sizeId);
+  const selected = pricedCake.sizes.find((size) => size.id === sizeId);
+  const photo = storefrontPhotoForSize(pricedCake.photos, sizeId);
   const existingQuantity = selected
-    ? draftLineQuantity(readPreorderDraft(), cake.id, selected.id)
+    ? draftLineQuantity(readPreorderDraft(), pricedCake.id, selected.id)
     : 0;
   const editingExisting = existingQuantity > 0;
 
@@ -72,40 +76,40 @@ export function AddToOrderSheet({
     setSizeId(nextSizeId);
     const existing = draftLineQuantity(
       readPreorderDraft(),
-      cake.id,
+      pricedCake.id,
       nextSizeId,
     );
     setQuantity(existing > 0 ? existing : 1);
   }
 
   function addToOrder() {
-    if (!selected || addingRef.current) return;
+    if (!selected || !pickupPricesReady || addingRef.current) return;
     addingRef.current = true;
     setAdding(true);
     const draft = readPreorderDraft() ?? emptyPreorderDraft();
-    const existing = draftLineQuantity(draft, cake.id, selected.id);
+    const existing = draftLineQuantity(draft, pricedCake.id, selected.id);
     if (existing > 0) {
-      setDraftLineQuantity(cake.id, selected.id, quantity);
+      setDraftLineQuantity(pricedCake.id, selected.id, quantity);
       onAdded("updated");
       return;
     }
     const next = mergeDraftItem(draft, {
-      cakeId: cake.id,
+      cakeId: pricedCake.id,
       sizeId: selected.id,
       quantity,
-      cakeName: cake.name,
+      cakeName: pricedCake.name,
       sizeLabel: selected.size,
       unitPrice: selected.price,
       preorderDays: selected.preorderDays,
-      imageUrl: photo?.url ?? cake.image ?? undefined,
-      sizeChoices: cake.sizes.map((size) => ({
+      imageUrl: photo?.url ?? pricedCake.image ?? undefined,
+      sizeChoices: pricedCake.sizes.map((size) => ({
         id: size.id,
         size: size.size,
         price: size.price,
         preorderDays: size.preorderDays,
         imageUrl:
-          storefrontPhotoForSize(cake.photos, size.id)?.url ??
-          cake.image ??
+          storefrontPhotoForSize(pricedCake.photos, size.id)?.url ??
+          pricedCake.image ??
           undefined,
       })),
     });
@@ -170,13 +174,13 @@ export function AddToOrderSheet({
           )}
         </div>
 
-        {cake.sizes.length === 0 ? (
+        {pricedCake.sizes.length === 0 ? (
           <p className="text-skyline text-sm">This cake has no sizes yet.</p>
         ) : (
           <fieldset className="space-y-2">
             <legend className="text-ink text-sm font-medium">Size</legend>
             <ul className="grid gap-2">
-              {cake.sizes.map((size) => {
+              {pricedCake.sizes.map((size) => {
                 const selectedSize = size.id === sizeId;
                 return (
                   <li key={size.id}>
@@ -204,7 +208,7 @@ export function AddToOrderSheet({
                         </span>
                       </span>
                       <span className="text-ink shrink-0 text-sm font-semibold tabular-nums">
-                        {formatRm(size.price)}
+                        {pickupPricesReady ? formatRm(size.price) : "Checking…"}
                       </span>
                     </label>
                   </li>
@@ -217,6 +221,11 @@ export function AddToOrderSheet({
         {editingExisting ? (
           <p className="text-ink text-sm" role="status">
             {existingQuantity} × {selected?.size} already in your order
+          </p>
+        ) : null}
+        {!pickupPricesReady ? (
+          <p className="text-skyline text-sm" role="status">
+            Checking price for your pickup date…
           </p>
         ) : null}
 
@@ -258,7 +267,7 @@ export function AddToOrderSheet({
         <button
           aria-busy={adding}
           className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200 disabled:opacity-50"
-          disabled={!selected || adding}
+          disabled={!selected || !pickupPricesReady || adding}
           type="submit"
         >
           {adding

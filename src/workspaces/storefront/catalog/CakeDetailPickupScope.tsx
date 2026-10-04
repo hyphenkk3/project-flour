@@ -9,7 +9,10 @@ import {
   resolveCakeDetailPickupScope,
   subscribeCakeEntryScope,
 } from "@/workspaces/storefront/catalog/cake-entry-scope";
+import { usePreorderDraft } from "@/workspaces/storefront/cart/usePreorderDraft";
+import { cakeDetailPriceDate } from "@/workspaces/storefront/catalog/pickup-date-pricing";
 import { StorefrontCakeDetailView } from "@/workspaces/storefront/catalog/StorefrontCakeDetailView";
+import { usePickupDatePricedCakes } from "@/workspaces/storefront/catalog/usePickupDatePricedCakes";
 
 type CakeDetailPickupScopeProps = {
   availabilityNote?: string | null;
@@ -37,6 +40,7 @@ export function CakeDetailPickupScope({
   urlTo = null,
 }: CakeDetailPickupScopeProps) {
   const cakeId = cake.id;
+  const draft = usePreorderDraft();
   const stored = useSyncExternalStore(
     subscribeCakeEntryScope,
     () => getStoredCakeEntryScopeSnapshot(cakeId),
@@ -54,11 +58,16 @@ export function CakeDetailPickupScope({
     },
     stored,
   });
+  const priceDate = cakeDetailPriceDate(scope?.pickup, draft?.pickupDate);
+  const { cakes: pricedCakes, ready: pricesReady } = usePickupDatePricedCakes(
+    [cake],
+    priceDate,
+  );
 
   return (
     <StorefrontCakeDetailView
       availabilityNote={availabilityNote}
-      cake={cake}
+      cake={pricedCakes[0] ?? cake}
       hideAddToOrder={hideAddToOrder}
       offerToday={offerToday}
       offerVoucher={offerVoucher}
@@ -67,6 +76,7 @@ export function CakeDetailPickupScope({
       pickupScopeFrom={scope?.from ?? null}
       pickupScopePickup={scope?.pickup ?? null}
       pickupScopeTo={scope?.to ?? null}
+      pickupPricesReady={pricesReady}
     />
   );
 }
