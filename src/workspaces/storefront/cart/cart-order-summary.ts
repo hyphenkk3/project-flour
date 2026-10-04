@@ -138,11 +138,22 @@ export function draftItemSizeChoices(
             undefined,
         }))
       : (item.sizeChoices ?? []);
-  if (!effectivePricesBySizeId?.size) return choices;
   return choices.map((choice) => ({
     ...choice,
-    price: effectivePricesBySizeId.get(choice.id) ?? choice.price,
+    price:
+      effectivePricesBySizeId?.get(choice.id) ??
+      (effectivePricesBySizeId && choice.id === item.sizeId
+        ? item.unitPrice
+        : choice.price),
   }));
+}
+
+/** Unit price used by both the selected cart option and its line amount. */
+export function draftLineDisplayUnitPrice(
+  item: PreorderDraftItem,
+  effectivePricesBySizeId: ReadonlyMap<string, number>,
+): number {
+  return effectivePricesBySizeId.get(item.sizeId) ?? item.unitPrice;
 }
 
 export function draftItemShowsSizeEditor(

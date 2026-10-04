@@ -7,7 +7,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { draftItemSizeChoices } from "@/workspaces/storefront/cart/cart-order-summary";
+import {
+  draftItemSizeChoices,
+  draftLineDisplayUnitPrice,
+} from "@/workspaces/storefront/cart/cart-order-summary";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import {
   draftTotal,
@@ -38,14 +41,27 @@ const item: PreorderDraftItem = {
   quantity: 1,
   cakeName: "Dubai Chocolate Kunafa (Slightly Sweeter)",
   sizeLabel: savedSizeChoice.size,
-  unitPrice: 78,
+  unitPrice: 80,
   preorderDays: 2,
   sizeChoices: [savedSizeChoice, otherSizeChoice],
 };
 const pickupDatePrices = new Map([[savedSizeChoice.id, 80]]);
 
-// The line option can fall back to its saved RM78 choice; the cart's current
-// pickup-date resolver must override that with RM80 for the same size ID.
+// Reproduce the actual browser split: the saved sizeChoices snapshot is RM78,
+// while the selected cart line amount is RM80. The active price map can be
+// absent when the current cake/size could not be loaded for the sidebar.
+const displayedChoicesWithoutMap = draftItemSizeChoices(item, null, new Map());
+const selectedChoiceWithoutMap = displayedChoicesWithoutMap.find(
+  (choice) => choice.id === item.sizeId,
+);
+assert.ok(selectedChoiceWithoutMap);
+assert.equal(
+  `${selectedChoiceWithoutMap.size} · ${formatRm(selectedChoiceWithoutMap.price)}`,
+  '4" · RM80',
+  "the selected cart option follows the same RM80 fallback as its line amount, not its RM78 size snapshot",
+);
+assert.equal(draftLineDisplayUnitPrice(item, new Map()), 80);
+
 const displayedChoices = draftItemSizeChoices(item, null, pickupDatePrices);
 const displayedLine = displayedChoices.find(
   (choice) => choice.id === item.sizeId,
@@ -56,6 +72,19 @@ assert.equal(
   `${displayedLine.size} · ${formatRm(displayedLine.price)}`,
   '4" · RM80',
 );
+const changedPickupDatePrices = new Map([[savedSizeChoice.id, 82]]);
+const displayedLineAfterDateChange = draftItemSizeChoices(
+  item,
+  null,
+  changedPickupDatePrices,
+).find((choice) => choice.id === item.sizeId);
+assert.ok(displayedLineAfterDateChange);
+assert.equal(displayedLineAfterDateChange.price, 82);
+assert.equal(
+  draftLineDisplayUnitPrice(item, changedPickupDatePrices),
+  82,
+  "a changed pickup date updates both the selected size label and its line amount",
+);
 
 const displayDraft = {
   ...emptyPreorderDraft(),
@@ -63,12 +92,12 @@ const displayDraft = {
   items: [
     {
       ...item,
-      unitPrice: pickupDatePrices.get(item.sizeId) ?? item.unitPrice,
+      unitPrice: draftLineDisplayUnitPrice(item, pickupDatePrices),
     },
   ],
 };
 assert.equal(draftTotal(displayDraft), 80);
-assert.equal(item.unitPrice, 78, "the saved quote remains unchanged");
+assert.equal(item.unitPrice, 80, "the saved selected-line amount remains unchanged");
 assert.equal(
   savedSizeChoice.price,
   78,
@@ -83,8 +112,18 @@ assert.match(
 );
 assert.match(
   cartShell,
-  /pricesBySizeId\.get\(item\.sizeId\)\s*\?\?\s*item\.unitPrice/,
-  "the cart total uses the resolved pickup-date price",
+  /draftLineDisplayUnitPrice\(item,\s*pricesBySizeId\)\s*\*\s*item\.quantity/,
+  "the cart line amount uses the shared selected-line price",
+);
+assert.match(
+  cartShell,
+  /draftLineDisplayUnitPrice\(item,\s*pricesBySizeId\)/,
+  "the cart total and line amount use the shared selected-line price",
+);
+assert.match(
+  cartShell,
+  /\{choice\.size\} · \{formatRm\(choice\.price\)\}/,
+  "the rendered size selector displays the helper-resolved choice price",
 );
 
 console.log("PASS storefront cart line pricing");

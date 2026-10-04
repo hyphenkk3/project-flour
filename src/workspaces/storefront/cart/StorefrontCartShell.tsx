@@ -14,6 +14,7 @@ import {
   draftEarliestCollectionYmd,
   draftItemShowsSizeEditor,
   draftItemSizeChoices,
+  draftLineDisplayUnitPrice,
   draftLinePreorderLabel,
   draftStrongestPreorder,
   evaluateDraftSelectedCollectionDate,
@@ -165,7 +166,7 @@ function OrderLines({
                     {pricesPending
                       ? "Checking price…"
                       : formatRm(
-                          (pricesBySizeId.get(item.sizeId) ?? item.unitPrice) *
+                          draftLineDisplayUnitPrice(item, pricesBySizeId) *
                             item.quantity,
                         )}
                   </p>
@@ -356,7 +357,7 @@ export function StorefrontCartShell({
         ...draft,
         items: draft.items.map((item) => ({
           ...item,
-          unitPrice: pricesBySizeId.get(item.sizeId) ?? item.unitPrice,
+          unitPrice: draftLineDisplayUnitPrice(item, pricesBySizeId),
         })),
       }
     : null;
