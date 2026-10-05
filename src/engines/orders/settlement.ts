@@ -17,7 +17,10 @@ export type SettlementInput = {
   /** Commercial lines: cakes and/or paid add-ons (unit price snapshots × qty). */
   items: Array<{ unitPrice: number; quantity: number }>;
   adjustments: Array<Pick<OrderAdjustment, "amount">>;
-  allocations: Array<Pick<OrderPaymentAllocationView, "amount" | "paymentStatus">>;
+  allocations: Array<
+    Pick<OrderPaymentAllocationView, "amount" | "paymentStatus"> &
+      Partial<Pick<OrderPaymentAllocationView, "effectiveAmount">>
+  >;
   refunds: Array<Pick<OrderRefundView, "amount" | "status">>;
 };
 
@@ -26,7 +29,9 @@ export type SettlementInput = {
  * subtotal = commercial (cakes + paid add-ons); amountDue = subtotal + adjustments.
  * Do not re-implement these rules in UI components.
  */
-export function calculateOrderSettlement(input: SettlementInput): OrderSettlement {
+export function calculateOrderSettlement(
+  input: SettlementInput,
+): OrderSettlement {
   const subtotal = calculateOrderTotal(input.items);
   const totalAdjustments = fromCents(
     input.adjustments.reduce((sum, row) => sum + toCents(row.amount), 0),
@@ -36,7 +41,10 @@ export function calculateOrderSettlement(input: SettlementInput): OrderSettlemen
   const verifiedPaymentsAllocated = fromCents(
     input.allocations
       .filter((row) => row.paymentStatus === "verified")
-      .reduce((sum, row) => sum + toCents(row.amount), 0),
+      .reduce(
+        (sum, row) => sum + toCents(row.effectiveAmount ?? row.amount),
+        0,
+      ),
   );
 
   const refundsTotal = fromCents(

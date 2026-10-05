@@ -30,6 +30,7 @@ import { OrderDiscountsPanel } from "@/workspaces/owner/orders/OrderDiscountsPan
 import { DeliveryFinanceBreakdown } from "@/workspaces/owner/orders/DeliveryFinanceBreakdown";
 import { RecordPaymentForm } from "@/workspaces/owner/orders/RecordPaymentForm";
 import { RecordRefundForm } from "@/workspaces/owner/orders/RecordRefundForm";
+import { RecordPaymentCorrectionForm } from "@/workspaces/owner/orders/RecordPaymentCorrectionForm";
 import {
   PAYMENT_CORRECTION_STATUS_LABEL,
   paymentCorrectionStatus,
@@ -66,6 +67,8 @@ export function PaymentSection({
   const [showRecord, setShowRecord] = useState(false);
   const [showRefund, setShowRefund] = useState(false);
   const [showExtend, setShowExtend] = useState(false);
+  const [correctingPaymentAllocationId, setCorrectingPaymentAllocationId] =
+    useState<string | null>(null);
   const settlement = order.settlement;
   const correctionStatus = paymentCorrectionStatus(settlement);
   const canCorrect =
@@ -73,10 +76,7 @@ export function PaymentSection({
     order.status !== "cancelled" &&
     settlement.overpayment > 0;
   const isPaid = order.status === "paid";
-  const overdue = isPaymentOverdue(
-    order.status,
-    order.paymentDeadlineAt,
-  );
+  const overdue = isPaymentOverdue(order.status, order.paymentDeadlineAt);
   const canRecord =
     canRecordPayment &&
     order.status === "awaiting_payment" &&
@@ -125,7 +125,8 @@ export function PaymentSection({
       className="border-fog scroll-mt-24 space-y-4 rounded-xl border bg-white p-5"
       id={OWNER_ORDER_PAYMENT_SECTION_ID}
       tabIndex={-1}
-    >      <div className="flex flex-wrap items-start justify-between gap-3">
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
           Payment
         </h2>
@@ -139,7 +140,6 @@ export function PaymentSection({
           </p>
         ) : null}
       </div>
-
       <div className="space-y-2">
         <ul className="space-y-2">
           {cakeBreakdown.lines.map((line, index) => (
@@ -159,8 +159,7 @@ export function PaymentSection({
           {[...(order.paidAddons ?? [])]
             .sort(
               (a, b) =>
-                a.sortOrder - b.sortOrder ||
-                a.code.localeCompare(b.code, "en"),
+                a.sortOrder - b.sortOrder || a.code.localeCompare(b.code, "en"),
             )
             .map((addon) => {
               const lineTotal = addon.unitPrice * addon.quantity;
@@ -189,9 +188,7 @@ export function PaymentSection({
           <p className="text-skyline text-sm">{cakeBreakdown.sumExpression}</p>
         ) : null}
       </div>
-
       <DeliveryFinanceBreakdown order={order} />
-
       {canManageDiscounts ? (
         <OrderDiscountsPanel
           canOverrideDiscountEligibility={canOverrideDiscountEligibility}
@@ -200,7 +197,6 @@ export function PaymentSection({
           pendingDiscountApproval={pendingDiscountApproval}
         />
       ) : null}
-
       <dl
         className={`grid gap-2 text-sm ${
           settlement.overpayment > 0 || settlement.refundsTotal > 0
@@ -251,7 +247,6 @@ export function PaymentSection({
             : null}
         </p>
       ) : null}
-
       {!isPaid && order.paymentDeadlineAt ? (
         <div className="space-y-1">
           <p className="text-skyline text-xs tracking-wide uppercase">
@@ -269,11 +264,9 @@ export function PaymentSection({
           </p>
         </div>
       ) : null}
-
       {!isPaid && !order.paymentDeadlineAt && order.paymentRequestSentAt ? (
         <p className="text-skyline text-sm">Payment request sent</p>
       ) : null}
-
       {order.refunds.length > 0 ? (
         <div className="space-y-3">
           <h3 className="text-ink text-xs font-semibold tracking-[0.12em] uppercase">
@@ -291,7 +284,7 @@ export function PaymentSection({
                   {row.createdByName ?? "Staff"}
                 </p>
                 {row.reason ? (
-                  <p className="text-skyline whitespace-pre-line text-sm">
+                  <p className="text-skyline text-sm whitespace-pre-line">
                     {row.reason}
                   </p>
                 ) : null}
@@ -300,7 +293,6 @@ export function PaymentSection({
           </ul>
         </div>
       ) : null}
-
       {order.paymentAllocations.length > 0 ? (
         <div className="space-y-3">
           <h3 className="text-ink text-xs font-semibold tracking-[0.12em] uppercase">
@@ -309,23 +301,97 @@ export function PaymentSection({
           <ul className="space-y-3">
             {order.paymentAllocations.map((row) => (
               <li key={row.id}>
-                <p className="text-ink text-sm font-medium">
-                  {formatRm(row.amount)}
-                </p>
-                <p className="text-skyline text-sm">
-                  {paymentMethodLabel(row.method, row.methodDescription)}
-                  {" · "}
-                  {formatPaymentHistoryDate(row.paidAt)}
-                </p>
+                {row.correction ? (
+                  <>
+                    <p className="text-ink text-sm font-medium">
+                      Original payment · {formatRm(row.amount)}
+                    </p>
+                    <p className="text-skyline text-sm">
+                      {paymentMethodLabel(row.method, row.methodDescription)}
+                      {" · "}
+                      {formatPaymentHistoryDate(row.paidAt)}
+                    </p>
+                    <div className="border-fog bg-mist/30 mt-2 space-y-1 rounded-lg border p-3 text-sm">
+                      <p className="text-ink font-medium">
+                        Correction · {formatRm(row.correction.originalAmount)}
+                        {" → "}
+                        {formatRm(row.correction.correctedAmount)}
+                      </p>
+                      <p className="text-skyline">
+                        {paymentMethodLabel(
+                          row.correction.originalMethod,
+                          row.correction.originalMethodDescription,
+                        )}
+                        {" → "}
+                        {paymentMethodLabel(
+                          row.correction.correctedMethod,
+                          row.correction.correctedMethodDescription,
+                        )}
+                      </p>
+                      <p className="text-skyline whitespace-pre-line">
+                        Reason: {row.correction.reason}
+                      </p>
+                      <p className="text-skyline text-xs">
+                        Corrected by {row.correction.correctedByName ?? "Staff"}
+                        {" · "}
+                        {formatPaymentHistoryDate(row.correction.correctedAt)}
+                      </p>
+                    </div>
+                    <p className="text-ink mt-2 text-sm font-semibold">
+                      Effective payment ·{" "}
+                      {formatRm(row.effectiveAmount ?? row.amount)}
+                      {" · "}
+                      {paymentMethodLabel(
+                        row.effectiveMethod ?? row.method,
+                        row.effectiveMethodDescription ?? row.methodDescription,
+                      )}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-ink text-sm font-medium">
+                      {formatRm(row.amount)}
+                    </p>
+                    <p className="text-skyline text-sm">
+                      {paymentMethodLabel(row.method, row.methodDescription)}
+                      {" · "}
+                      {formatPaymentHistoryDate(row.paidAt)}
+                    </p>
+                  </>
+                )}
                 <p className="text-skyline text-xs">
                   Verified by {row.verifiedByName ?? "Staff"}
                 </p>
+                {canRecordPaymentCorrection &&
+                order.status !== "cancelled" &&
+                order.refunds.length === 0 &&
+                !row.correction &&
+                (row.allocationCount ?? 1) === 1 ? (
+                  <button
+                    className="text-skyline hover:text-ink mt-2 text-sm font-medium"
+                    onClick={() => {
+                      setCorrectingPaymentAllocationId(row.id);
+                      setShowRecord(false);
+                      setShowRefund(false);
+                      setShowExtend(false);
+                    }}
+                    type="button"
+                  >
+                    Correct Payment
+                  </button>
+                ) : null}
+                {correctingPaymentAllocationId === row.id ? (
+                  <RecordPaymentCorrectionForm
+                    allocation={row}
+                    onCancel={() => setCorrectingPaymentAllocationId(null)}
+                    order={order}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>
         </div>
       ) : null}
-
       {paymentThankYouAvailable ? (
         <div className="border-fog bg-mist/40 flex flex-col gap-2 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
@@ -358,7 +424,6 @@ export function PaymentSection({
           )}
         </div>
       ) : null}
-
       {canRequest || canRecord || canCorrect ? (
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           {canRequest ? (
@@ -413,7 +478,6 @@ export function PaymentSection({
           ) : null}
         </div>
       ) : null}
-
       {showRecord && canRecord ? (
         <RecordPaymentForm
           onCancel={() => setShowRecord(false)}
@@ -421,16 +485,14 @@ export function PaymentSection({
           remainingBalance={settlement.remainingBalance}
         />
       ) : null}
-
       {showRefund && canCorrect ? (
-        <RecordRefundForm
-          onCancel={() => setShowRefund(false)}
-          order={order}
-        />
+        <RecordRefundForm onCancel={() => setShowRefund(false)} order={order} />
       ) : null}
-
       {showExtend && canExtendFollowUp ? (
-        <form action={extendAction} className="border-fog space-y-3 rounded-xl border bg-mist/30 p-4">
+        <form
+          action={extendAction}
+          className="border-fog bg-mist/30 space-y-3 rounded-xl border p-4"
+        >
           <FormField htmlFor="deadline_at" label="Follow-up deadline">
             <FormInput
               defaultValue={toDatetimeLocalValue(

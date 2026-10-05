@@ -79,6 +79,7 @@ import {
   type OwnerCreateFulfilmentMethod,
 } from "@/engines/orders/fulfilment";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
+import { paymentMethodLabel } from "@/engines/orders/payment-details";
 import type {
   ConfirmationSnapshot,
   OrderTimelineEvent,
@@ -305,10 +306,7 @@ export function OrderWorkspaceForm({
     mode === "edit" ? editPickupDate : order.pickupDate;
   const isFreshPickCustomerOrder =
     order.orderSource === "customer_website" && Boolean(order.extraStockId);
-  const offerableSizeIds = useMemo(
-    () => offerableCakeSizeIds(cakes),
-    [cakes],
-  );
+  const offerableSizeIds = useMemo(() => offerableCakeSizeIds(cakes), [cakes]);
   const pickupDatePrices = usePickupDateCakeSizePrices(
     selectedPickupDate,
     offerableSizeIds,
@@ -1231,6 +1229,37 @@ export function OrderWorkspaceForm({
                     {" · "}
                     {describeTimelineActor(event.eventType, event.actorName)}
                   </p>
+                  {event.eventType === "payment_corrected" ? (
+                    <div className="text-skyline mt-1 space-y-1 text-xs">
+                      <p>
+                        Amount:{" "}
+                        {formatRm(Number(event.metadata.original_amount))}
+                        {" → "}
+                        {formatRm(Number(event.metadata.corrected_amount))}
+                      </p>
+                      <p>
+                        Method:{" "}
+                        {paymentMethodLabel(
+                          String(event.metadata.original_method) as
+                            "wb_qr" | "online_transfer" | "others",
+                          typeof event.metadata.original_method_description ===
+                            "string"
+                            ? event.metadata.original_method_description
+                            : null,
+                        )}
+                        {" → "}
+                        {paymentMethodLabel(
+                          String(event.metadata.corrected_method) as
+                            "wb_qr" | "online_transfer" | "others",
+                          typeof event.metadata.corrected_method_description ===
+                            "string"
+                            ? event.metadata.corrected_method_description
+                            : null,
+                        )}
+                      </p>
+                      <p>Reason: {String(event.metadata.reason ?? "")}</p>
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ol>

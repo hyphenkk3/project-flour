@@ -14,6 +14,7 @@ export const TIMELINE_EVENT_LABELS: Record<string, string> = {
   payment_deadline_extended: "Payment follow-up deadline extended",
   payment_recorded: "Payment recorded",
   payment_correction_recorded: "Overpayment refund recorded",
+  payment_corrected: "Payment corrected",
   payment_secured: "Paid · Preorder secured",
   august_promo_applied: "August Promo applied",
   rm10_voucher_redeemed: "RM10 Discount Card redeemed",
@@ -39,9 +40,9 @@ export const TIMELINE_EVENT_LABELS: Record<string, string> = {
   operations_approval_rejected: "Approval rejected",
   operations_approval_cancelled: "Approval cancelled",
   operations_approval_withdrawn: "Preorder exception withdrawn",
-  preorder_exception_customer_informed: "Customer informed of preorder exception",
-  preorder_exception_customer_informed_corrected:
-    "Customer Informed corrected",
+  preorder_exception_customer_informed:
+    "Customer informed of preorder exception",
+  preorder_exception_customer_informed_corrected: "Customer Informed corrected",
   post_payment_customer_change: "Post-payment customer change",
   post_payment_customer_change_override: "Post-payment change override",
   delivery_finance_initialized: "Delivery charges enabled",
@@ -51,15 +52,15 @@ export const TIMELINE_EVENT_LABELS: Record<string, string> = {
   delivery_fee_waiver_requested: "Delivery fee waiver requested",
   delivery_fee_waiver_approved: "Delivery fee waiver approved",
   delivery_fee_waiver_rejected: "Delivery fee waiver rejected",
-  delivery_fee_waiver_request_cancelled: "Delivery fee waiver request cancelled",
+  delivery_fee_waiver_request_cancelled:
+    "Delivery fee waiver request cancelled",
   delivery_processing_fee_overridden: "Processing fee overridden",
   delivery_processing_fee_waived: "Processing fee waived",
   delivery_processing_fee_restored: "Processing fee restored",
   delivery_processing_fee_change_requested: "Processing fee change requested",
   delivery_processing_fee_request_approved: "Processing fee request approved",
   delivery_processing_fee_request_rejected: "Processing fee request rejected",
-  delivery_processing_fee_request_cancelled:
-    "Processing fee request cancelled",
+  delivery_processing_fee_request_cancelled: "Processing fee request cancelled",
 };
 
 export function timelineEventLabel(eventType: string): string {
