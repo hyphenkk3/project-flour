@@ -12,6 +12,9 @@ import {
 } from "@/components/ui/form";
 import { buildCakePriceBreakdown } from "@/engines/orders/cake-price-breakdown";
 import { paymentMethodLabel } from "@/engines/orders/payment-details";
+import { buildWhatsAppDeepLink } from "@/engines/orders/whatsapp";
+import { generateOrderMessage } from "@/engines/orders/messages";
+import { hasVerifiedPaymentForPaymentThankYou } from "@/engines/orders/payment-thank-you";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type { StorefrontOrder } from "@/types/storefront";
 import { OWNER_ORDER_PAYMENT_SECTION_ID } from "@/engines/operations/owner-attention";
@@ -95,6 +98,15 @@ export function PaymentSection({
       unitPrice: item.unitPrice,
     })),
   );
+  const paymentThankYouAvailable = hasVerifiedPaymentForPaymentThankYou(
+    order.paymentAllocations,
+  );
+  const paymentThankYouUrl = paymentThankYouAvailable
+    ? buildWhatsAppDeepLink(
+        order.phone,
+        generateOrderMessage("customer_payment_thank_you", { order }),
+      )
+    : null;
 
   const boundExtend = extendPaymentDeadlineAction.bind(null, order.id);
   const [extendState, extendAction, extendPending] = useActionState(
@@ -311,6 +323,39 @@ export function PaymentSection({
               </li>
             ))}
           </ul>
+        </div>
+      ) : null}
+
+      {paymentThankYouAvailable ? (
+        <div className="border-fog bg-mist/40 flex flex-col gap-2 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <h3 className="text-ink text-sm font-semibold">
+              Payment Thank You Message
+            </h3>
+            <p className="text-skyline text-xs">
+              Opens WhatsApp with the message pre-filled. Nothing is sent
+              automatically.
+            </p>
+          </div>
+          {paymentThankYouUrl ? (
+            <a
+              className="bg-ink text-mist hover:bg-skyline inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg px-5 text-sm font-medium"
+              href={paymentThankYouUrl}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              Open WhatsApp
+            </a>
+          ) : (
+            <button
+              className="border-fog text-skyline inline-flex min-h-11 shrink-0 cursor-not-allowed items-center justify-center rounded-lg border px-5 text-sm font-medium"
+              disabled
+              title="A valid customer phone number is required to open WhatsApp."
+              type="button"
+            >
+              Open WhatsApp
+            </button>
+          )}
         </div>
       ) : null}
 
