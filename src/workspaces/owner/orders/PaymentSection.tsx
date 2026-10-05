@@ -12,6 +12,9 @@ import {
 } from "@/components/ui/form";
 import { buildCakePriceBreakdown } from "@/engines/orders/cake-price-breakdown";
 import { paymentMethodLabel } from "@/engines/orders/payment-details";
+import { buildWhatsAppDeepLink } from "@/engines/orders/whatsapp";
+import { generateOrderMessage } from "@/engines/orders/messages";
+import { hasVerifiedPaymentForPaymentThankYou } from "@/engines/orders/payment-thank-you";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type { StorefrontOrder } from "@/types/storefront";
 import { OWNER_ORDER_PAYMENT_SECTION_ID } from "@/engines/operations/owner-attention";
@@ -27,6 +30,7 @@ import { OrderDiscountsPanel } from "@/workspaces/owner/orders/OrderDiscountsPan
 import { DeliveryFinanceBreakdown } from "@/workspaces/owner/orders/DeliveryFinanceBreakdown";
 import { RecordPaymentForm } from "@/workspaces/owner/orders/RecordPaymentForm";
 import { RecordRefundForm } from "@/workspaces/owner/orders/RecordRefundForm";
+import { RecordPaymentCorrectionForm } from "@/workspaces/owner/orders/RecordPaymentCorrectionForm";
 import {
   PAYMENT_CORRECTION_STATUS_LABEL,
   paymentCorrectionStatus,
@@ -63,6 +67,8 @@ export function PaymentSection({
   const [showRecord, setShowRecord] = useState(false);
   const [showRefund, setShowRefund] = useState(false);
   const [showExtend, setShowExtend] = useState(false);
+  const [correctingPaymentAllocationId, setCorrectingPaymentAllocationId] =
+    useState<string | null>(null);
   const settlement = order.settlement;
   const correctionStatus = paymentCorrectionStatus(settlement);
   const canCorrect =
@@ -95,6 +101,15 @@ export function PaymentSection({
       unitPrice: item.unitPrice,
     })),
   );
+  const paymentThankYouAvailable = hasVerifiedPaymentForPaymentThankYou(
+    order.paymentAllocations,
+  );
+  const paymentThankYouUrl = paymentThankYouAvailable
+    ? buildWhatsAppDeepLink(
+        order.phone,
+        generateOrderMessage("customer_payment_thank_you", { order }),
+      )
+    : null;
 
   const boundExtend = extendPaymentDeadlineAction.bind(null, order.id);
   const [extendState, extendAction, extendPending] = useActionState(
@@ -297,20 +312,128 @@ export function PaymentSection({
           <ul className="space-y-3">
             {order.paymentAllocations.map((row) => (
               <li key={row.id}>
-                <p className="text-ink text-sm font-medium">
-                  {formatRm(row.amount)}
-                </p>
-                <p className="text-skyline text-sm">
-                  {paymentMethodLabel(row.method, row.methodDescription)}
-                  {" · "}
-                  {formatPaymentHistoryDate(row.paidAt)}
-                </p>
+                {row.correction ? (
+                  <>
+                    <p className="text-ink text-sm font-medium">
+                      Original payment · {formatRm(row.amount)}
+                    </p>
+                    <p className="text-skyline text-sm">
+                      {paymentMethodLabel(row.method, row.methodDescription)}
+                      {" · "}
+                      {formatPaymentHistoryDate(row.paidAt)}
+                    </p>
+                    <div className="border-fog bg-mist/30 mt-2 space-y-1 rounded-lg border p-3 text-sm">
+                      <p className="text-ink font-medium">
+                        Correction · {formatRm(row.correction.originalAmount)}
+                        {" → "}
+                        {formatRm(row.correction.correctedAmount)}
+                      </p>
+                      <p className="text-skyline">
+                        {paymentMethodLabel(
+                          row.correction.originalMethod,
+                          row.correction.originalMethodDescription,
+                        )}
+                        {" → "}
+                        {paymentMethodLabel(
+                          row.correction.correctedMethod,
+                          row.correction.correctedMethodDescription,
+                        )}
+                      </p>
+                      <p className="text-skyline whitespace-pre-line">
+                        Reason: {row.correction.reason}
+                      </p>
+                      <p className="text-skyline text-xs">
+                        Corrected by {row.correction.correctedByName ?? "Staff"}
+                        {" · "}
+                        {formatPaymentHistoryDate(row.correction.correctedAt)}
+                      </p>
+                    </div>
+                    <p className="text-ink mt-2 text-sm font-semibold">
+                      Effective payment ·{" "}
+                      {formatRm(row.effectiveAmount ?? row.amount)}
+                      {" · "}
+                      {paymentMethodLabel(
+                        row.effectiveMethod ?? row.method,
+                        row.effectiveMethodDescription ?? row.methodDescription,
+                      )}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-ink text-sm font-medium">
+                      {formatRm(row.amount)}
+                    </p>
+                    <p className="text-skyline text-sm">
+                      {paymentMethodLabel(row.method, row.methodDescription)}
+                      {" · "}
+                      {formatPaymentHistoryDate(row.paidAt)}
+                    </p>
+                  </>
+                )}
                 <p className="text-skyline text-xs">
                   Verified by {row.verifiedByName ?? "Staff"}
                 </p>
+                {canRecordPaymentCorrection &&
+                order.status !== "cancelled" &&
+                order.refunds.length === 0 &&
+                !row.correction &&
+                (row.allocationCount ?? 1) === 1 ? (
+                  <button
+                    className="text-skyline hover:text-ink mt-2 text-sm font-medium"
+                    onClick={() => {
+                      setCorrectingPaymentAllocationId(row.id);
+                      setShowRecord(false);
+                      setShowRefund(false);
+                      setShowExtend(false);
+                    }}
+                    type="button"
+                  >
+                    Correct Payment
+                  </button>
+                ) : null}
+                {correctingPaymentAllocationId === row.id ? (
+                  <RecordPaymentCorrectionForm
+                    allocation={row}
+                    onCancel={() => setCorrectingPaymentAllocationId(null)}
+                    order={order}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>
+        </div>
+      ) : null}
+
+      {paymentThankYouAvailable ? (
+        <div className="border-fog bg-mist/40 flex flex-col gap-2 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <h3 className="text-ink text-sm font-semibold">
+              Payment Thank You Message
+            </h3>
+            <p className="text-skyline text-xs">
+              Opens WhatsApp with the message pre-filled. Nothing is sent
+              automatically.
+            </p>
+          </div>
+          {paymentThankYouUrl ? (
+            <a
+              className="bg-ink text-mist hover:bg-skyline inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg px-5 text-sm font-medium"
+              href={paymentThankYouUrl}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              Open WhatsApp
+            </a>
+          ) : (
+            <button
+              className="border-fog text-skyline inline-flex min-h-11 shrink-0 cursor-not-allowed items-center justify-center rounded-lg border px-5 text-sm font-medium"
+              disabled
+              title="A valid customer phone number is required to open WhatsApp."
+              type="button"
+            >
+              Open WhatsApp
+            </button>
+          )}
         </div>
       ) : null}
 

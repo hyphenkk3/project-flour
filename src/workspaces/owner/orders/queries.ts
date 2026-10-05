@@ -18,6 +18,7 @@ import type {
   OrderAdjustment,
   OrderPaymentAllocationView,
   OrderRefundView,
+  PaymentRecordCorrectionView,
   OrderSource,
   OrderTimelineEvent,
   PaymentMethodCode,
@@ -645,6 +646,110 @@ async function loadOrderFinancials(orderId: string): Promise<{
     allocationRows = fallback.data ?? [];
   }
 
+  const allocationIds = allocationRows.flatMap((raw) => {
+    const row = raw as { id?: string };
+    return row.id ? [row.id] : [];
+  });
+  const paymentIds = allocationRows.flatMap((raw) => {
+    const row = raw as { payment_id?: string };
+    return row.payment_id ? [row.payment_id] : [];
+  });
+
+  let correctionRows: unknown[] = [];
+  if (allocationIds.length > 0) {
+    const result = await supabase
+      .from("payment_corrections")
+      .select(
+        "id, payment_id, payment_allocation_id, order_id, correction_type, original_amount, corrected_amount, original_method, corrected_method, original_method_description, corrected_method_description, reason, corrected_by, corrected_at",
+      )
+      .in("payment_allocation_id", allocationIds);
+    if (result.error) throw new Error(result.error.message);
+    correctionRows = result.data ?? [];
+  }
+
+  let transactionAllocationRows: unknown[] = [];
+  if (paymentIds.length > 0) {
+    const result = await supabase
+      .from("payment_allocations")
+      .select("payment_id")
+      .in("payment_id", paymentIds);
+    if (result.error) throw new Error(result.error.message);
+    transactionAllocationRows = result.data ?? [];
+  }
+
+  const correctionActorIds = Array.from(
+    new Set(
+      correctionRows.flatMap((raw) => {
+        const actorId = (raw as { corrected_by?: string | null }).corrected_by;
+        return actorId ? [actorId] : [];
+      }),
+    ),
+  );
+  const correctionActorNames = new Map<string, string>();
+  if (correctionActorIds.length > 0) {
+    try {
+      const admin = createServiceClient();
+      const { data: staffRows, error: staffError } = await admin
+        .from("staff_profiles")
+        .select("id, display_name")
+        .in("id", correctionActorIds);
+      if (!staffError) {
+        for (const staff of staffRows ?? []) {
+          const name = String(staff.display_name ?? "").trim();
+          if (name) correctionActorNames.set(String(staff.id), name);
+        }
+      }
+    } catch {
+      // Attribution is presentation-only; keep the safe Staff fallback.
+    }
+  }
+
+  const correctionByAllocation = new Map<string, PaymentRecordCorrectionView>();
+  for (const raw of correctionRows) {
+    const row = raw as {
+      id: string;
+      payment_id: string;
+      payment_allocation_id: string;
+      order_id: string;
+      correction_type: "amount" | "method" | "combined";
+      original_amount: number | string;
+      corrected_amount: number | string;
+      original_method: PaymentMethodCode;
+      corrected_method: PaymentMethodCode;
+      original_method_description: string | null;
+      corrected_method_description: string | null;
+      reason: string;
+      corrected_by: string;
+      corrected_at: string;
+    };
+    correctionByAllocation.set(row.payment_allocation_id, {
+      id: row.id,
+      paymentId: row.payment_id,
+      paymentAllocationId: row.payment_allocation_id,
+      orderId: row.order_id,
+      correctionType: row.correction_type,
+      originalAmount: Number(row.original_amount),
+      correctedAmount: Number(row.corrected_amount),
+      originalMethod: row.original_method,
+      correctedMethod: row.corrected_method,
+      originalMethodDescription: row.original_method_description,
+      correctedMethodDescription: row.corrected_method_description,
+      reason: row.reason,
+      correctedBy: row.corrected_by,
+      correctedByName: correctionActorNames.get(row.corrected_by) ?? null,
+      correctedAt: row.corrected_at,
+    });
+  }
+
+  const transactionAllocationCounts = new Map<string, number>();
+  for (const raw of transactionAllocationRows) {
+    const paymentId = (raw as { payment_id: string }).payment_id;
+    transactionAllocationCounts.set(
+      paymentId,
+      (transactionAllocationCounts.get(paymentId) ?? 0) + 1,
+    );
+  }
+
   const adjustments: OrderAdjustment[] = (adjustmentsRes.data ?? []).map(
     (row) => ({
       id: row.id as string,
@@ -701,14 +806,25 @@ async function loadOrderFinancials(orderId: string): Promise<{
       const payment = relationOne(row.payments);
       if (!payment || payment.status !== "verified") return [];
       const staff = relationOne(payment.staff_profiles);
+      const correction = correctionByAllocation.get(row.id) ?? null;
+      const amount = Number(row.amount);
       return [
         {
           id: row.id,
           paymentId: row.payment_id,
           orderId: row.order_id,
-          amount: Number(row.amount),
+          amount,
+          effectiveAmount: correction?.correctedAmount ?? amount,
+          allocationCount: transactionAllocationCounts.get(row.payment_id) ?? 1,
+          correction,
           paymentStatus: "verified" as const,
           method: payment.method as PaymentMethodCode,
+          effectiveMethod:
+            correction?.correctedMethod ??
+            (payment.method as PaymentMethodCode),
+          effectiveMethodDescription:
+            correction?.correctedMethodDescription ??
+            payment.method_description,
           methodDescription: payment.method_description,
           paidAt: payment.paid_at,
           referenceNote: payment.reference_note,

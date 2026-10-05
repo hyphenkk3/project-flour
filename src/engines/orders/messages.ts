@@ -11,6 +11,7 @@ import {
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import { formatDeliveryFinanceWaiverLines } from "@/engines/orders/delivery-finance";
 import { isDeliveryRecipientSameAsOrderingCustomer } from "@/engines/orders/fulfilment";
+import { generateCustomerPaymentThankYouMessage } from "@/engines/orders/payment-thank-you";
 import {
   formatItemPriceComponent,
   formatOrderFinancialEquation,
@@ -45,7 +46,8 @@ export type MessageType =
   | "customer_ready"
   | "customer_delivery_ready"
   | "customer_out_for_delivery"
-  | "customer_thank_you";
+  | "customer_thank_you"
+  | "customer_payment_thank_you";
 
 export type OutForDeliveryAudience = "orderer" | "recipient";
 
@@ -709,5 +711,7 @@ export function generateOrderMessage(
       return generateCustomerOutForDeliveryMessage();
     case "customer_thank_you":
       return generateCustomerThankYouMessage();
+    case "customer_payment_thank_you":
+      return generateCustomerPaymentThankYouMessage(input.order);
   }
 }

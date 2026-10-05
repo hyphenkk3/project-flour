@@ -116,13 +116,39 @@ export type OrderSource =
 export type Rm10IssuanceSuppressionCode =
   "august_promo_applied" | "rm10_voucher_redeemed";
 
+export type PaymentRecordCorrectionView = {
+  id: string;
+  paymentId: string;
+  paymentAllocationId: string;
+  orderId: string;
+  correctionType: "amount" | "method" | "combined";
+  originalAmount: number;
+  correctedAmount: number;
+  originalMethod: PaymentMethodCode;
+  correctedMethod: PaymentMethodCode;
+  originalMethodDescription: string | null;
+  correctedMethodDescription: string | null;
+  reason: string;
+  correctedBy: string;
+  correctedByName: string | null;
+  correctedAt: string;
+};
+
 export type OrderPaymentAllocationView = {
   id: string;
   paymentId: string;
   orderId: string;
+  /** Immutable amount originally allocated to this order. */
   amount: number;
+  /** Amount applied to settlement after any append-only correction. */
+  effectiveAmount?: number;
+  /** Transaction-level count used to disable correction for shared payments. */
+  allocationCount?: number;
+  correction?: PaymentRecordCorrectionView | null;
   paymentStatus: "verified";
   method: PaymentMethodCode;
+  effectiveMethod?: PaymentMethodCode;
+  effectiveMethodDescription?: string | null;
   methodDescription: string | null;
   paidAt: string;
   referenceNote: string | null;
@@ -390,6 +416,7 @@ export type OrderTimelineEventType =
   | "payment_deadline_extended"
   | "payment_recorded"
   | "payment_correction_recorded"
+  | "payment_corrected"
   | "payment_secured"
   | "august_promo_applied"
   | "rm10_voucher_redeemed"

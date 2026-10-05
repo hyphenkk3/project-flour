@@ -50,6 +50,10 @@ import {
   validatePaymentCorrection,
 } from "@/engines/orders/payment-correction";
 import {
+  parseCorrectedPaymentAmount,
+  validatePaymentCorrection as validatePaymentRecordCorrection,
+} from "@/engines/orders/payment-record-correction";
+import {
   classifyPaidOrderSave,
   decidePostPaymentCancel,
   decidePostPaymentSave,
@@ -78,6 +82,7 @@ import {
 } from "@/engines/vouchers/physical-rm10";
 import { createClient } from "@/lib/supabase/server";
 import type {
+  PaymentMethodCode,
   StorefrontOrder,
   StorefrontOrderListItem,
 } from "@/types/storefront";
@@ -1478,6 +1483,103 @@ export type RecordPaymentCorrectionState = {
   error: string | null;
   success: boolean;
 };
+
+export async function correctPaymentRecordAction(
+  orderId: string,
+  paymentAllocationId: string,
+  _prev: RecordPaymentCorrectionState,
+  formData: FormData,
+): Promise<RecordPaymentCorrectionState> {
+  const auth = await requireOwnerOrManager();
+  if (auth.error || !auth.staff) {
+    return {
+      error: "Only Owner or Manager may correct a payment.",
+      success: false,
+    };
+  }
+
+  const order = await getGuestOrderById(orderId);
+  if (!order) return { error: "Order not found.", success: false };
+  if (order.status === "cancelled") {
+    return {
+      error: "Cannot correct a payment on a cancelled order.",
+      success: false,
+    };
+  }
+  if (order.refunds.some((refund) => refund.status === "recorded")) {
+    return {
+      error: "Payments on orders with recorded refunds cannot be corrected.",
+      success: false,
+    };
+  }
+
+  const allocation = order.paymentAllocations.find(
+    (row) => row.id === paymentAllocationId,
+  );
+  if (!allocation) {
+    return {
+      error: "Payment allocation not found. Reload and try again.",
+      success: false,
+    };
+  }
+  if ((allocation.allocationCount ?? 1) !== 1) {
+    return {
+      error: "Shared payments cannot be corrected in this workflow.",
+      success: false,
+    };
+  }
+  if (allocation.correction) {
+    return {
+      error: "This payment has already been corrected.",
+      success: false,
+    };
+  }
+
+  const correctedAmount = parseCorrectedPaymentAmount(
+    String(formData.get("amount") ?? ""),
+  );
+  if (correctedAmount == null) {
+    return {
+      error: "Enter a valid corrected amount (zero or greater).",
+      success: false,
+    };
+  }
+  const correctedMethod = String(
+    formData.get("method") ?? "",
+  ) as PaymentMethodCode;
+  const correctedMethodDescription = String(
+    formData.get("method_description") ?? "",
+  );
+  const reason = String(formData.get("reason") ?? "");
+  const checked = validatePaymentRecordCorrection({
+    originalAmount: allocation.amount,
+    correctedAmount,
+    originalMethod: allocation.method,
+    originalMethodDescription: allocation.methodDescription,
+    correctedMethod,
+    correctedMethodDescription,
+    reason,
+  });
+  if (checked.error) return { error: checked.error, success: false };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("record_payment_correction", {
+    p_order_id: orderId,
+    p_payment_allocation_id: paymentAllocationId,
+    p_corrected_amount: correctedAmount,
+    p_corrected_method: correctedMethod,
+    p_corrected_method_description:
+      correctedMethod === "others" ? correctedMethodDescription.trim() : null,
+    p_reason: reason.trim(),
+    p_actor_staff_id: auth.staff.id,
+  });
+  if (error) return { error: error.message, success: false };
+
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/payment`);
+  return { error: null, success: true };
+}
 
 export async function recordOverpaymentRefundAction(
   orderId: string,
