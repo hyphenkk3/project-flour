@@ -6,6 +6,16 @@
 export const FRESH_PICK_NEW_WINDOW_MS = 60 * 60 * 1000;
 export const HOME_FRESH_PICKS_PREVIEW_LIMIT = 4;
 
+export function freshPickTodayStatusLabel(input: {
+  readyForCollection: boolean;
+  availableToday: boolean;
+}): string {
+  if (input.readyForCollection) {
+    return input.availableToday ? "AVAILABLE TODAY" : "NOT ORDERABLE TODAY";
+  }
+  return input.availableToday ? "AVAILABLE TODAY" : "TODAY CLOSED";
+}
+
 export function isFreshPickNew(input: {
   confirmedAt: string | null;
   now?: Date;

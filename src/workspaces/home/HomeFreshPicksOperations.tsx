@@ -13,6 +13,7 @@ import {
   homeFreshPickStatusLabel,
   previewHomeFreshPicks,
 } from "@/engines/extra/home-fresh-picks";
+import { formatExtraBoardWindowInstant } from "@/engines/extra/fresh-picks-time";
 import {
   EXTRA_WALK_IN_HOLD_ACTIVE_ERROR,
   freshPickHomeSummaryLine,
@@ -27,6 +28,7 @@ import { CutExtraIntoSlicesDialog } from "@/workspaces/extra/CutExtraIntoSlicesD
 import { MoveExtraWindowDialog } from "@/workspaces/extra/MoveExtraWindowDialog";
 import { WalkInHoldCompleteSaleDialog } from "@/workspaces/extra/WalkInHoldCompleteSaleDialog";
 import { WalkInHoldPanel } from "@/workspaces/extra/WalkInHoldPanel";
+import { FreshPickTodayOrderabilityStatus } from "@/workspaces/extra/FreshPickTodayOrderabilityStatus";
 import type { ExtraStockUnit } from "@/workspaces/extra/types";
 
 type HomeFreshPicksOperationsProps = {
@@ -341,6 +343,16 @@ function HomeFreshPickCard({
           <p className="text-skyline mt-0.5 text-sm tabular-nums">{sizePrice}</p>
         ) : null}
         <p className="text-skyline mt-1 text-[11px] font-medium">{statusLabel}</p>
+        {unit.readyForCollection ? (
+          <p className="text-status-success mt-1 text-xs font-semibold">
+            Ready for Collection
+          </p>
+        ) : null}
+        <FreshPickTodayOrderabilityStatus
+          availability={unit.todayOrderability}
+          readyForCollection={unit.readyForCollection}
+          walkInHeld={unit.walkInHeld}
+        />
         {unit.walkInHeld ? (
           <>
             <p className="text-skyline mt-0.5 text-sm">
@@ -351,7 +363,15 @@ function HomeFreshPickCard({
             </p>
           </>
         ) : (
-          <p className="text-skyline mt-0.5 text-sm">{summary}</p>
+          <>
+            {unit.pickupAvailableFromAt ? (
+              <p className="text-skyline mt-0.5 text-sm">
+                Pickup available from{" "}
+                {formatExtraBoardWindowInstant(unit.pickupAvailableFromAt)}
+              </p>
+            ) : null}
+            <p className="text-skyline mt-0.5 text-sm">{summary}</p>
+          </>
         )}
 
         <div
