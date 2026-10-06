@@ -101,7 +101,6 @@ export function ConfirmationPreview({
       setError("Could not build a WhatsApp link from this phone number.");
       return;
     }
-    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
   }
 
   function handleMarkSent() {
@@ -178,13 +177,22 @@ export function ConfirmationPreview({
         >
           {pending ? "Saving…" : "Mark as Sent"}
         </button>
-        <button
-          className="border-fog text-ink hover:bg-mist inline-flex min-h-12 items-center justify-center rounded-lg border px-5 text-sm font-medium"
-          onClick={handleOpenWhatsApp}
-          type="button"
-        >
-          Open WhatsApp
-        </button>
+        {whatsappUrl ? (
+          <a
+            className="border-fog text-ink hover:bg-mist inline-flex min-h-12 items-center justify-center rounded-lg border px-5 text-sm font-medium"
+            href={whatsappUrl}
+          >
+            Open WhatsApp
+          </a>
+        ) : (
+          <button
+            className="border-fog text-ink hover:bg-mist inline-flex min-h-12 items-center justify-center rounded-lg border px-5 text-sm font-medium"
+            onClick={handleOpenWhatsApp}
+            type="button"
+          >
+            Open WhatsApp
+          </button>
+        )}
         <button
           className="border-fog text-ink hover:bg-mist inline-flex min-h-12 items-center justify-center rounded-lg border px-5 text-sm font-medium"
           onClick={handleCopy}
