@@ -101,7 +101,7 @@ export function ConfirmationPreview({
       setError("Could not build a WhatsApp link from this phone number.");
       return;
     }
-    window.location.assign(whatsappUrl);
+    window.open(whatsappUrl, "_blank", "noopener,noreferrer");
   }
 
   function handleMarkSent() {
