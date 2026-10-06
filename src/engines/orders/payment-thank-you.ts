@@ -32,6 +32,11 @@ const CUSTOMER_PAYMENT_THANK_YOU_MESSAGES: Record<
     "Thank you and see you soon! ❤️",
 };
 
+const DELIVERY_SAME_RECIPIENT_NO_NOTIFY_MESSAGE =
+  "Thank you for your payment!\n\n" +
+  "Your delivery is arranged as confirmed.\n\n" +
+  "Thank you and see you soon! ❤️";
+
 type PaymentThankYouOrder = Pick<
   StorefrontOrder,
   "fulfilmentMethod" | "customerName" | "phone" | "delivery"
@@ -55,9 +60,23 @@ export function customerPaymentThankYouVariant(
 export function generateCustomerPaymentThankYouMessage(
   order: PaymentThankYouOrder,
 ): string {
-  return CUSTOMER_PAYMENT_THANK_YOU_MESSAGES[
-    customerPaymentThankYouVariant(order)
-  ];
+  const variant = customerPaymentThankYouVariant(order);
+  const mayInformRecipient =
+    order.delivery?.recipientNotifyPreference === "inform_recipient";
+
+  if (!mayInformRecipient && variant === "delivery_same_recipient") {
+    return DELIVERY_SAME_RECIPIENT_NO_NOTIFY_MESSAGE;
+  }
+
+  const message = CUSTOMER_PAYMENT_THANK_YOU_MESSAGES[variant];
+  if (!mayInformRecipient && variant === "delivery_different_recipient") {
+    return message.replace(
+      "We will inform you and also message recipient before delivery on that day ya!",
+      "We will inform you before delivery on that day ya!",
+    );
+  }
+
+  return message;
 }
 
 export function hasVerifiedPaymentForPaymentThankYou(

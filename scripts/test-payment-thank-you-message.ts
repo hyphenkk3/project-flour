@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { generateOrderMessage } from "@/engines/orders/messages";
 import {
+  customerPaymentThankYouVariant,
   generateCustomerPaymentThankYouMessage,
   hasVerifiedPaymentForPaymentThankYou,
 } from "@/engines/orders/payment-thank-you";
@@ -22,6 +23,14 @@ const deliverySameMessage =
   "Thank you for your payment!\n\n" +
   "We will inform you before delivery on that day ya!\n\n" +
   "Once we’ve arrange grab we will send you the grab link as well as photo for your reference ;)";
+const deliveryDifferentNoNotifyMessage =
+  "Thank you for your payment!\n\n" +
+  "We will inform you before delivery on that day ya!\n\n" +
+  "Once we’ve arrange grab we will send you the grab link as well as photo for your reference ;)";
+const deliverySameNoNotifyMessage =
+  "Thank you for your payment!\n\n" +
+  "Your delivery is arranged as confirmed.\n\n" +
+  "Thank you and see you soon! ❤️";
 const dineInMessage =
   "Thank you for your payment!\n\n" +
   "Kindly inform our crew on the day when you want the cake being served and we will take care of the rest ya. ☺️\n\n" +
@@ -46,6 +55,7 @@ const deliveryDifferent = order({
   delivery: {
     recipientName: "Lee Tan",
     recipientPhone: "0198765432",
+    recipientNotifyPreference: "inform_recipient",
   } as StorefrontOrder["delivery"],
 });
 const deliverySame = order({
@@ -53,6 +63,23 @@ const deliverySame = order({
   delivery: {
     recipientName: " amy   tan ",
     recipientPhone: "0123 456-789",
+    recipientNotifyPreference: "inform_recipient",
+  } as StorefrontOrder["delivery"],
+});
+const deliveryDifferentNoNotify = order({
+  fulfilmentMethod: "delivery",
+  delivery: {
+    recipientName: "Lee Tan",
+    recipientPhone: "0198765432",
+    recipientNotifyPreference: "do_not_inform_recipient",
+  } as StorefrontOrder["delivery"],
+});
+const deliverySameNoNotify = order({
+  fulfilmentMethod: "delivery",
+  delivery: {
+    recipientName: " amy   tan ",
+    recipientPhone: "0123 456-789",
+    recipientNotifyPreference: "do_not_inform_recipient",
   } as StorefrontOrder["delivery"],
 });
 const dineIn = order({ fulfilmentMethod: "dine_in" });
@@ -66,6 +93,34 @@ assert.equal(
   generateCustomerPaymentThankYouMessage(deliverySame),
   deliverySameMessage,
 );
+assert.equal(
+  generateCustomerPaymentThankYouMessage(deliveryDifferentNoNotify),
+  deliveryDifferentNoNotifyMessage,
+);
+assert.equal(
+  generateCustomerPaymentThankYouMessage(deliverySameNoNotify),
+  deliverySameNoNotifyMessage,
+);
+assert.equal(
+  customerPaymentThankYouVariant(deliveryDifferentNoNotify),
+  "delivery_different_recipient",
+);
+assert.equal(
+  customerPaymentThankYouVariant(deliverySameNoNotify),
+  "delivery_same_recipient",
+);
+assert.doesNotMatch(
+  generateCustomerPaymentThankYouMessage(deliveryDifferentNoNotify),
+  /message recipient|inform recipient|contact recipient/i,
+);
+assert.match(
+  generateCustomerPaymentThankYouMessage(deliveryDifferent),
+  /also message recipient before delivery/i,
+);
+assert.doesNotMatch(
+  generateCustomerPaymentThankYouMessage(deliverySameNoNotify),
+  /inform you|message|contact|send you/i,
+);
 assert.equal(generateCustomerPaymentThankYouMessage(dineIn), dineInMessage);
 
 assert.equal(
@@ -77,6 +132,12 @@ assert.equal(
     order: deliveryDifferent,
   }),
   deliveryDifferentMessage,
+);
+assert.equal(
+  generateOrderMessage("customer_payment_thank_you", {
+    order: deliveryDifferentNoNotify,
+  }),
+  deliveryDifferentNoNotifyMessage,
 );
 
 const verifiedAllocation = { paymentStatus: "verified" } as const;
