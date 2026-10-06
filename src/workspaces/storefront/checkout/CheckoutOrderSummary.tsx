@@ -26,6 +26,8 @@ import type { CatalogueVoucherPreview } from "@/workspaces/storefront/offers/use
 type CheckoutOrderSummaryProps = {
   items: PreorderDraftItem[];
   cakes: StorefrontCake[];
+  checkoutPricesBySizeId: Record<string, number>;
+  checkoutChoicePricesReady: boolean;
   total: number;
   catalogueVoucher?: CatalogueVoucherPreview | null;
   deliveryCharges?: CheckoutDeliveryChargesBreakdown | null;
@@ -47,9 +49,27 @@ type CheckoutOrderSummaryProps = {
   onRemove: (index: number) => void;
 };
 
+function checkoutStartingPriceLabel(
+  cake: StorefrontCake,
+  pricesBySizeId: Record<string, number>,
+  pricesReady: boolean,
+): string {
+  if (!pricesReady) return "";
+  const price = startingPrice({
+    ...cake,
+    sizes: cake.sizes.map((size) => ({
+      ...size,
+      price: pricesBySizeId[size.id] ?? size.price,
+    })),
+  });
+  return price == null ? "" : ` · from ${formatRm(price)}`;
+}
+
 function CheckoutOrderSummaryView({
   items,
   cakes,
+  checkoutPricesBySizeId,
+  checkoutChoicePricesReady,
   total,
   catalogueVoucher = null,
   deliveryCharges = null,
@@ -70,6 +90,9 @@ function CheckoutOrderSummaryView({
   onChangeQuantity,
   onRemove,
 }: CheckoutOrderSummaryProps) {
+  const effectivePricesBySizeId = new Map(
+    Object.entries(checkoutPricesBySizeId),
+  );
   return (
     <aside className="lg:sticky lg:top-8">
       <p className="text-signal text-[11px] font-medium tracking-[0.22em] uppercase">
@@ -107,7 +130,11 @@ function CheckoutOrderSummaryView({
             {items.map((item, index) => {
               const cake = cakes.find((entry) => entry.id === item.cakeId);
               const preorder = draftLinePreorderLabel(item);
-              const sizeChoices = draftItemSizeChoices(item, cake);
+              const sizeChoices = draftItemSizeChoices(
+                item,
+                cake,
+                effectivePricesBySizeId,
+              );
               const sizeOptions = sizeChoices.some(
                 (choice) => choice.id === item.sizeId,
               )
@@ -161,7 +188,10 @@ function CheckoutOrderSummaryView({
                             >
                               {sizeOptions.map((size) => (
                                 <option key={size.id} value={size.id}>
-                                  {size.size} — {formatRm(size.price)}
+                                  {size.size} —{" "}
+                                  {checkoutChoicePricesReady
+                                    ? formatRm(size.price)
+                                    : "Checking price…"}
                                 </option>
                               ))}
                             </FormSelect>
@@ -233,9 +263,11 @@ function CheckoutOrderSummaryView({
                   >
                     <span className="text-ink min-w-0 flex-1 text-sm">
                       {cake.name}
-                      {startingPrice(cake) != null
-                        ? ` · from ${formatRm(startingPrice(cake) ?? 0)}`
-                        : ""}
+                      {checkoutStartingPriceLabel(
+                        cake,
+                        checkoutPricesBySizeId,
+                        checkoutChoicePricesReady,
+                      )}
                     </span>
                     <div className="w-36 shrink-0">
                     <FormSelect
