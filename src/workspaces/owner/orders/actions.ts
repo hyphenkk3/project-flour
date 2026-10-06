@@ -2724,6 +2724,12 @@ export async function cancelGuestOrderAction(
   if (!order) {
     return { error: "Order not found." };
   }
+  if (order.status === "paid" && order.extraStockId) {
+    return {
+      error:
+        "Paid Fresh Picks must use the Owner-only Cancel & Record Refund operation.",
+    };
+  }
   const gate = canCancelGuestOrder({
     snapshot: {
       status: order.status,
@@ -2763,6 +2769,56 @@ export async function cancelGuestOrderAction(
   revalidatePath(`/owner/orders/${orderId}`);
   revalidatePath("/bakery");
   revalidatePath("/collection");
+  return { error: null };
+}
+
+export async function cancelAndRefundFreshPickAction(
+  orderId: string,
+  reason: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireStaff();
+  if (staff.role.code !== "owner") {
+    return {
+      error: "Only Owner may cancel and record a paid Fresh Pick refund.",
+    };
+  }
+
+  const cleanReason = reason.trim();
+  if (!cleanReason) {
+    return { error: "A reason is required for this exceptional cancellation." };
+  }
+
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found." };
+  }
+  if (order.status !== "paid" || !order.extraStockId) {
+    return { error: "Only a paid Fresh Pick can use this operation." };
+  }
+  if (order.settlement.netReceived <= 0) {
+    return {
+      error: "There is no remaining cash amount to record as a refund.",
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("cancel_and_refund_paid_fresh_pick", {
+    p_order_id: order.id,
+    p_actor_staff_id: staff.id,
+    p_reason: cleanReason,
+  });
+  if (error) {
+    return { error: error.message };
+  }
+
+  scheduleStaffNotificationDispatch();
+  revalidatePath("/owner");
+  revalidatePath("/owner/calendar");
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/payment`);
+  revalidatePath("/bakery");
+  revalidatePath("/collection");
+  revalidatePath("/extra");
   return { error: null };
 }
 

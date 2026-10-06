@@ -416,6 +416,7 @@ export type OrderTimelineEventType =
   | "payment_deadline_extended"
   | "payment_recorded"
   | "payment_correction_recorded"
+  | "fresh_pick_cancelled_refunded"
   | "payment_corrected"
   | "payment_secured"
   | "august_promo_applied"

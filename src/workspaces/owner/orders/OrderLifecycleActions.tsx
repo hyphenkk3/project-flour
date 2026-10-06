@@ -3,11 +3,18 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { FormField, FormInput } from "@/components/ui/form";
+import {
+  FormError,
+  FormField,
+  FormInput,
+  FormTextarea,
+} from "@/components/ui/form";
 import type { GuestOrderWorkspaceCapabilities } from "@/engines/orders/delivery-finance-capabilities";
 import { isGuestOrderCancelled } from "@/engines/orders/lifecycle";
 import type { StorefrontOrder } from "@/types/storefront";
+import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import {
+  cancelAndRefundFreshPickAction,
   cancelGuestOrderAction,
   duplicateGuestOrderAction,
 } from "@/workspaces/owner/orders/actions";
@@ -23,14 +30,30 @@ export function OrderLifecycleActions({
 }: OrderLifecycleActionsProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState<"cancel" | "duplicate" | null>(null);
+  const [pending, setPending] = useState<
+    "cancel" | "duplicate" | "fresh_pick_refund" | null
+  >(null);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelOverride, setCancelOverride] = useState(false);
+  const [freshPickRefundOpen, setFreshPickRefundOpen] = useState(false);
+  const [freshPickRefundReason, setFreshPickRefundReason] = useState("");
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [pickupDate, setPickupDate] = useState(order.pickupDate);
 
+  const isPaidFreshPick =
+    Boolean(order.extraStockId) && order.status === "paid";
+  const handoffStarted = Boolean(
+    order.outForDeliveryAt || order.pickedUpAt || order.deliveredAt,
+  );
   const canCancel =
-    capabilities.canCancelGuestOrder && !isGuestOrderCancelled(order.status);
+    capabilities.canCancelGuestOrder &&
+    !isGuestOrderCancelled(order.status) &&
+    !isPaidFreshPick;
+  const canCancelAndRefundFreshPick =
+    capabilities.role === "owner" &&
+    isPaidFreshPick &&
+    order.settlement.netReceived > 0 &&
+    !handoffStarted;
   const canDuplicate = capabilities.canDuplicateGuestOrder;
   const postPaymentChangeUsed =
     order.status === "paid" &&
@@ -38,8 +61,32 @@ export function OrderLifecycleActions({
   const canOverridePostPayment =
     capabilities.canOverridePostPaymentCustomerChange;
 
-  if (!canCancel && !canDuplicate) {
+  if (!canCancel && !canCancelAndRefundFreshPick && !canDuplicate) {
     return null;
+  }
+
+  async function runCancelAndRefundFreshPick() {
+    if (pending) return;
+    if (!freshPickRefundReason.trim()) {
+      setError("A reason is required for this exceptional cancellation.");
+      return;
+    }
+    setError(null);
+    setPending("fresh_pick_refund");
+    try {
+      const result = await cancelAndRefundFreshPickAction(
+        order.id,
+        freshPickRefundReason,
+      );
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setFreshPickRefundOpen(false);
+      router.refresh();
+    } finally {
+      setPending(null);
+    }
   }
 
   async function runCancel() {
@@ -108,6 +155,19 @@ export function OrderLifecycleActions({
             Cancel order
           </button>
         ) : null}
+        {canCancelAndRefundFreshPick ? (
+          <button
+            className="border-status-danger/40 text-status-danger hover:bg-status-danger-soft inline-flex min-h-11 items-center justify-center rounded-xl border bg-white px-4 text-sm font-medium"
+            onClick={() => {
+              setError(null);
+              setFreshPickRefundReason("");
+              setFreshPickRefundOpen(true);
+            }}
+            type="button"
+          >
+            Cancel &amp; Record Refund
+          </button>
+        ) : null}
       </div>
       {error ? (
         <p className="text-status-danger text-sm">{error}</p>
@@ -142,6 +202,32 @@ export function OrderLifecycleActions({
             </span>
           </label>
         ) : null}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        cancelLabel="Keep Fresh Pick order"
+        confirmLabel="Cancel & Record Refund"
+        description={`This records a manual refund; Project Flour does not transfer money. Continue only after ${formatRm(order.settlement.netReceived)} has already been returned to the customer. The order will be cancelled and its exact physical Fresh Pick item(s) returned to inventory.`}
+        onCancel={() => setFreshPickRefundOpen(false)}
+        onConfirm={() => void runCancelAndRefundFreshPick()}
+        open={freshPickRefundOpen}
+        pending={pending === "fresh_pick_refund"}
+        title="Cancel order and record manual refund?"
+        tone="danger"
+      >
+        <FormError message={error} />
+        <FormField htmlFor="fresh-pick-refund-reason" label="Reason">
+          <FormTextarea
+            id="fresh-pick-refund-reason"
+            onChange={(event) => setFreshPickRefundReason(event.target.value)}
+            placeholder="Required for the audit trail"
+            rows={3}
+            value={freshPickRefundReason}
+          />
+        </FormField>
+        <p className="text-status-danger text-sm font-medium">
+          Owner only. Confirm the money has already been returned manually.
+        </p>
       </ConfirmDialog>
 
       <ConfirmDialog

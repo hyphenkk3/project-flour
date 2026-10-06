@@ -137,6 +137,7 @@ export function PaymentRequestPreview({
   const whatsappUrl = buildWhatsAppDeepLink(order.phone, message);
 
   useEffect(() => {
+    if (order.status !== "awaiting_payment") return;
     const key = `wb-pay-prepared:${order.id}:${settlement.remainingBalance}`;
     try {
       if (window.sessionStorage.getItem(key) === "1") {
@@ -150,7 +151,7 @@ export function PaymentRequestPreview({
     if (preparedLogged) return;
     setPreparedLogged(true);
     void recordPaymentRequestPreparedAction(order.id);
-  }, [order.id, preparedLogged, settlement.remainingBalance]);
+  }, [order.id, order.status, preparedLogged, settlement.remainingBalance]);
 
   function handleCopy() {
     void navigator.clipboard.writeText(message).then(() => {
@@ -159,7 +160,8 @@ export function PaymentRequestPreview({
     });
   }
 
-  const canCopyMessageAndQr = method === "wb_qr" && wholecakePreorderQr;
+  const canCopyMessageAndQr =
+    order.status !== "cancelled" && method === "wb_qr" && wholecakePreorderQr;
   const canSharePayment = canCopyMessageAndQr;
 
   useEffect(() => {
@@ -266,6 +268,23 @@ export function PaymentRequestPreview({
       router.push(workspaceHref);
       router.refresh();
     });
+  }
+
+  if (order.status === "cancelled") {
+    return (
+      <div className="space-y-4">
+        <Link
+          className="text-skyline hover:text-ink text-sm font-medium"
+          href={workspaceHref}
+        >
+          ← Order Workspace
+        </Link>
+        <p className="text-ink text-sm">
+          Cancelled orders cannot receive payment requests. Historical payments
+          and refunds remain in the order record.
+        </p>
+      </div>
+    );
   }
 
   if (settlement.remainingBalance <= 0) {
