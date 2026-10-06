@@ -19,6 +19,7 @@ export type ExtraStockUnit = {
   pickupThroughAt: string | null;
   soldAt: string | null;
   cutIntoSlicesAt: string | null;
+  readyForCollection: boolean;
   walkInHeldAt: string | null;
   walkInHeldUntil: string | null;
   walkInHeldBy: string | null;

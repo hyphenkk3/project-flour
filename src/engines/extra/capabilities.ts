@@ -35,6 +35,10 @@ export type ExtraWorkspaceCapabilities = {
   canCutExtraIntoSlices: boolean;
   /** Bakery direct-create confirmed Available stock. */
   canCreateConfirmedExtra: boolean;
+  /** Mark one confirmed physical Fresh Pick ready for collection. */
+  canMarkReadyForCollection: boolean;
+  /** Undo readiness with a separate audit event. */
+  canUndoReadyForCollection: boolean;
   /** See Walk-in Hold state on a Fresh Pick. */
   canViewWalkInHold: boolean;
   /** Place a Walk-in Hold on a Fresh Pick. */
@@ -83,6 +87,8 @@ export function buildExtraWorkspaceCapabilities(input: {
     canMoveExtraWindow: canMutate,
     canCutExtraIntoSlices: canMutate,
     canCreateConfirmedExtra: canMutate,
+    canMarkReadyForCollection: canMutate,
+    canUndoReadyForCollection: canMutate,
     canViewWalkInHold: canViewExtraWalkInHold(input.role),
     canCreateWalkInHold: canHold,
     canExtendWalkInHold: canHold,

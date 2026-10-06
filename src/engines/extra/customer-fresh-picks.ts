@@ -197,6 +197,7 @@ export function extraActionableFreshPickDays(input: {
   now?: Date;
   snapshot?: OperatingHoursSnapshot;
   config?: FreshPicksPreparationConfig;
+  readyForCollection?: boolean;
 }): FreshPickDay[] {
   return extraActionableFulfilmentDays(input);
 }

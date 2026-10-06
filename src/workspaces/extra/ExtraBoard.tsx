@@ -23,9 +23,11 @@ import {
 import {
   confirmExtraStockAction,
   createConfirmedExtraStockAction,
+  markExtraStockReadyForCollectionAction,
   proposeExtraStockAction,
   rejectExtraStockAction,
   unconfirmExtraStockAction,
+  undoExtraStockReadyForCollectionAction,
   undoRejectExtraStockAction,
 } from "@/workspaces/extra/actions";
 import { AssignExtraToOrderDialog } from "@/workspaces/extra/AssignExtraToOrderDialog";
@@ -77,6 +79,12 @@ export function ExtraBoard({
   const [movingUnit, setMovingUnit] = useState<ExtraStockUnit | null>(null);
   const [slicingUnit, setSlicingUnit] = useState<ExtraStockUnit | null>(null);
   const [sellingUnit, setSellingUnit] = useState<ExtraStockUnit | null>(null);
+  const [readyUnit, setReadyUnit] = useState<ExtraStockUnit | null>(null);
+  const [undoReadyUnit, setUndoReadyUnit] = useState<ExtraStockUnit | null>(
+    null,
+  );
+  const [readyReason, setReadyReason] = useState("");
+  const [undoReadyReason, setUndoReadyReason] = useState("");
   const [drafts, setDrafts] = useState<Record<string, ExtraWindowDraft>>({});
 
   const proposed = useMemo(
@@ -274,6 +282,38 @@ export function ExtraBoard({
     startTransition(async () => {
       const result = await undoRejectExtraStockAction(unit.id);
       if (result.error) setError(result.error);
+    });
+  }
+
+  function runMarkReady() {
+    if (!readyUnit) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await markExtraStockReadyForCollectionAction(
+        readyUnit.id,
+        readyReason,
+      );
+      if (result.error) setError(result.error);
+      else {
+        setReadyUnit(null);
+        setReadyReason("");
+      }
+    });
+  }
+
+  function runUndoReady() {
+    if (!undoReadyUnit) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await undoExtraStockReadyForCollectionAction(
+        undoReadyUnit.id,
+        undoReadyReason,
+      );
+      if (result.error) setError(result.error);
+      else {
+        setUndoReadyUnit(null);
+        setUndoReadyReason("");
+      }
     });
   }
 
@@ -612,6 +652,14 @@ export function ExtraBoard({
                   </span>
                 </p>
                 <p className="text-ink mt-1 text-sm font-medium">Fresh Pick</p>
+                <p className="text-skyline mt-1 text-xs break-all">
+                  Physical item · {unit.id}
+                </p>
+                {unit.readyForCollection ? (
+                  <p className="text-status-success mt-2 text-sm font-semibold">
+                    Ready for Collection · this physical cake
+                  </p>
+                ) : null}
                 <p className="text-skyline mt-1 text-sm">
                   Pickup available from{" "}
                   {formatExtraBoardWindowInstant(
@@ -627,6 +675,44 @@ export function ExtraBoard({
                 ) : null}
                 {surface === "full" && !unit.walkInHeld ? (
                   <>
+                    {!unit.readyForCollection &&
+                    capabilities.canMarkReadyForCollection ? (
+                      <div className="mt-3">
+                        <button
+                          className={btnPrimary}
+                          disabled={pending}
+                          onClick={() => {
+                            setError(null);
+                            setReadyReason("");
+                            setReadyUnit(unit);
+                          }}
+                          type="button"
+                        >
+                          Mark Ready for Collection
+                        </button>
+                        <p className="text-skyline mt-1 text-xs">
+                          Applies only to this physical cake, not matching Fresh
+                          Picks.
+                        </p>
+                      </div>
+                    ) : null}
+                    {unit.readyForCollection &&
+                    capabilities.canUndoReadyForCollection ? (
+                      <div className="mt-3">
+                        <button
+                          className={btnSecondary}
+                          disabled={pending}
+                          onClick={() => {
+                            setError(null);
+                            setUndoReadyReason("");
+                            setUndoReadyUnit(unit);
+                          }}
+                          type="button"
+                        >
+                          Undo Ready status
+                        </button>
+                      </div>
+                    ) : null}
                 <p className="text-skyline mt-3 text-sm">
                   Stop Fresh Pick availability
                 </p>
@@ -855,6 +941,62 @@ export function ExtraBoard({
             required
             rows={3}
             value={rejectReason}
+          />
+        </FormField>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        allowDismiss={!pending}
+        confirmLabel="Mark this cake Ready"
+        description={
+          readyUnit
+            ? `Mark this physical ${readyUnit.cakeName} ${readyUnit.sizeLabel} Fresh Pick as Ready for Collection? This bypasses only the preparation cutoff for pickup and dine-in; normal hours and the item order window still apply.`
+            : undefined
+        }
+        onCancel={() => {
+          if (pending) return;
+          setReadyUnit(null);
+          setReadyReason("");
+        }}
+        onConfirm={runMarkReady}
+        open={readyUnit != null}
+        pending={pending}
+        title="Mark Ready for Collection?"
+      >
+        <FormField htmlFor="extra-ready-reason" label="Reason (optional)">
+          <FormTextarea
+            id="extra-ready-reason"
+            onChange={(event) => setReadyReason(event.target.value)}
+            rows={2}
+            value={readyReason}
+          />
+        </FormField>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        allowDismiss={!pending}
+        confirmLabel="Undo Ready status"
+        description={
+          undoReadyUnit
+            ? `Remove Ready status from this physical ${undoReadyUnit.cakeName} ${undoReadyUnit.sizeLabel} Fresh Pick? A separate audit event will be recorded.`
+            : undefined
+        }
+        onCancel={() => {
+          if (pending) return;
+          setUndoReadyUnit(null);
+          setUndoReadyReason("");
+        }}
+        onConfirm={runUndoReady}
+        open={undoReadyUnit != null}
+        pending={pending}
+        title="Undo Ready status?"
+      >
+        <FormField htmlFor="extra-undo-ready-reason" label="Reason (optional)">
+          <FormTextarea
+            id="extra-undo-ready-reason"
+            onChange={(event) => setUndoReadyReason(event.target.value)}
+            rows={2}
+            value={undoReadyReason}
           />
         </FormField>
       </ConfirmDialog>

@@ -41,9 +41,9 @@ import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operati
 import {
   extraCustomerSameDayUnavailableNotice,
   extraCustomerVisibleFulfilmentDates,
-  firstAvailableFreshPicksFulfilment,
-  freshPicksChooserStates,
-  freshPicksMethodAvailability,
+  firstAvailableFreshPicksFulfilmentForItems,
+  freshPicksChooserStatesForItems,
+  freshPicksMethodAvailabilityForItems,
 } from "@/engines/extra/fresh-picks-fulfilment";
 import {
   DEFAULT_FRESH_PICKS_PREPARATION_CONFIG,
@@ -335,34 +335,65 @@ export function GuestExtraCheckoutForm({
     { enabled: pricingReady },
   );
 
-  const fulfilmentContext = {
+  const physicalItemContexts = (cart?.items ?? []).map((item) => ({
     window: {
-      pickupAvailableFromAt: cart?.pickupAvailableFromAt ?? "",
-      orderCutoffAt: cart?.orderCutoffAt ?? "",
+      pickupAvailableFromAt:
+        item.pickupAvailableFromAt || cart?.pickupAvailableFromAt || "",
+      orderCutoffAt: item.orderCutoffAt || cart?.orderCutoffAt || "",
     },
+    readyForCollection: item.readyForCollection,
+  }));
+  const fulfilmentContext = {
     snapshot: hoursSnapshot,
     config: preparationConfig,
   };
-  const dates = cart
-    ? extraCustomerVisibleFulfilmentDates(fulfilmentContext)
+  const candidateDates = physicalItemContexts.map((item) =>
+    extraCustomerVisibleFulfilmentDates({
+      ...item,
+      ...fulfilmentContext,
+    }),
+  );
+  const dates = physicalItemContexts.length
+    ? candidateDates[0]!.filter(
+        (date) =>
+          candidateDates.every((itemDates) => itemDates.includes(date)) &&
+          (["pickup", "dine_in", "delivery"] as const).some(
+            (method) =>
+              freshPicksMethodAvailabilityForItems(
+                method,
+                date,
+                physicalItemContexts,
+                fulfilmentContext,
+              ).available,
+          ),
+      )
     : [];
-  const sameDayNotice = cart
-    ? extraCustomerSameDayUnavailableNotice(fulfilmentContext)
+  const sameDayNotice = cart && physicalItemContexts.length > 0
+    ? extraCustomerSameDayUnavailableNotice({
+        ...physicalItemContexts[0]!,
+        ...fulfilmentContext,
+      })
     : null;
   const methodStates = selectedDate
-    ? freshPicksChooserStates(selectedDate, fulfilmentContext)
+    ? freshPicksChooserStatesForItems(
+        selectedDate,
+        physicalItemContexts,
+        fulfilmentContext,
+      )
     : undefined;
   const resolvedMethod = selectedDate
-    ? firstAvailableFreshPicksFulfilment(
+    ? firstAvailableFreshPicksFulfilmentForItems(
         selectedDate,
         fulfilmentMethod,
+        physicalItemContexts,
         fulfilmentContext,
       )
     : fulfilmentMethod;
   const methodAvailability = selectedDate
-    ? freshPicksMethodAvailability(
+    ? freshPicksMethodAvailabilityForItems(
         resolvedMethod,
         selectedDate,
+        physicalItemContexts,
         fulfilmentContext,
       )
     : null;
@@ -761,15 +792,17 @@ export function GuestExtraCheckoutForm({
               onChange={(event) => {
                 const next = event.target.value;
                 setSelectedDate(next);
-                const nextMethod = firstAvailableFreshPicksFulfilment(
+                const nextMethod = firstAvailableFreshPicksFulfilmentForItems(
                   next,
                   fulfilmentMethod,
+                  physicalItemContexts,
                   fulfilmentContext,
                 );
                 applyFulfilment(nextMethod);
-                const nextSlots = freshPicksMethodAvailability(
+                const nextSlots = freshPicksMethodAvailabilityForItems(
                   nextMethod,
                   next,
+                  physicalItemContexts,
                   fulfilmentContext,
                 ).slots;
                 setSelectedTime(nextSlots[0]?.value ?? "");
@@ -804,9 +837,10 @@ export function GuestExtraCheckoutForm({
               onChange={(value) => {
                 const next = parseCustomerWebsiteFulfilmentMethod(value);
                 applyFulfilment(next);
-                const nextSlots = freshPicksMethodAvailability(
+                const nextSlots = freshPicksMethodAvailabilityForItems(
                   next,
                   selectedDate,
+                  physicalItemContexts,
                   fulfilmentContext,
                 ).slots;
                 setSelectedTime(nextSlots[0]?.value ?? "");

@@ -36,6 +36,7 @@ export type StorefrontExtraPick = {
   pickupThroughAt: string | null;
   confirmedAt: string | null;
   soldAt: string | null;
+  readyForCollection: boolean;
   day: FreshPickDay;
   days: FreshPickDay[];
   extraStockIds: string[];
@@ -61,6 +62,7 @@ type ExtraRow = {
   sold_at: string | null;
   order_id?: string | null;
   cut_into_slices_at?: string | null;
+  ready_for_collection?: boolean | null;
   walk_in_held_until?: string | null;
 };
 
@@ -88,6 +90,7 @@ function publishedNow(row: ExtraRow, now: Date): boolean {
 function daysFromRemainingPickup(
   pickupAvailableFromAt: string | null,
   pickupThroughAt: string | null,
+  readyForCollection: boolean,
   todayYmd: string,
   now: Date,
   snapshot: OperatingHoursSnapshot,
@@ -100,6 +103,7 @@ function daysFromRemainingPickup(
     now,
     snapshot,
     config,
+    readyForCollection,
   });
 }
 
@@ -201,6 +205,7 @@ function mapPick(
   const days = daysFromRemainingPickup(
     row.pickup_available_from_at,
     row.pickup_through_at,
+    row.ready_for_collection === true,
     todayYmd,
     now,
     snapshot,
@@ -227,6 +232,7 @@ function mapPick(
     pickupThroughAt: row.pickup_through_at,
     confirmedAt: row.confirmed_at,
     soldAt: row.sold_at,
+    readyForCollection: row.ready_for_collection === true,
     day,
     days,
     extraStockIds: [row.id],
@@ -254,7 +260,7 @@ export async function listStorefrontAvailableExtra(): Promise<
     const { data, error } = await supabase
       .from("extra_stock")
       .select(
-        "id, lifecycle, cake_name, size_label, library_cake_id, library_cake_size_id, prepared_on, pickup_available_from_at, pickup_through_at, confirmed_at, sold_at, order_id, cut_into_slices_at, walk_in_held_until",
+        "id, lifecycle, cake_name, size_label, library_cake_id, library_cake_size_id, prepared_on, pickup_available_from_at, pickup_through_at, confirmed_at, sold_at, order_id, cut_into_slices_at, walk_in_held_until, ready_for_collection",
       )
       .eq("lifecycle", "confirmed")
       .is("sold_at", null)
@@ -281,6 +287,7 @@ export async function listStorefrontAvailableExtra(): Promise<
             pickupAvailableFromAt: row.pickup_available_from_at ?? "",
             orderCutoffAt: row.pickup_through_at ?? "",
           },
+          readyForCollection: row.ready_for_collection === true,
           now,
           snapshot: hoursSnapshot,
           config,
@@ -333,7 +340,7 @@ export async function getStorefrontExtraById(
     const { data, error } = await supabase
       .from("extra_stock")
       .select(
-        "id, lifecycle, cake_name, size_label, library_cake_id, library_cake_size_id, prepared_on, pickup_available_from_at, pickup_through_at, confirmed_at, sold_at, order_id, cut_into_slices_at, walk_in_held_until",
+        "id, lifecycle, cake_name, size_label, library_cake_id, library_cake_size_id, prepared_on, pickup_available_from_at, pickup_through_at, confirmed_at, sold_at, order_id, cut_into_slices_at, walk_in_held_until, ready_for_collection",
       )
       .eq("id", id)
       .maybeSingle();
@@ -352,6 +359,7 @@ export async function getStorefrontExtraById(
           pickupAvailableFromAt: row.pickup_available_from_at,
           orderCutoffAt: row.pickup_through_at,
         },
+        readyForCollection: row.ready_for_collection === true,
         now,
         snapshot: hoursSnapshot,
         config,

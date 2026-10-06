@@ -59,9 +59,16 @@ const METHODS: CustomerWebsiteFulfilmentMethod[] = [
 
 export type FreshPicksFulfilmentContext = {
   window: ExtraPickupWindow;
+  /** Per-physical-extra state. Never applies to delivery. */
+  readyForCollection?: boolean;
   now?: Date;
   snapshot?: OperatingHoursSnapshot;
   config?: FreshPicksPreparationConfig;
+};
+
+export type FreshPicksPhysicalItemContext = {
+  window: ExtraPickupWindow;
+  readyForCollection: boolean;
 };
 
 function contextDefaults(input: FreshPicksFulfilmentContext): {
@@ -218,7 +225,17 @@ export function freshPicksMethodAvailability(
   input: FreshPicksFulfilmentContext,
 ): FreshPicksMethodAvailability {
   const { window, now, snapshot, config } = contextDefaults(input);
+  const readyForCollection =
+    input.readyForCollection === true && method !== "delivery";
   const key = dateYmd.trim().slice(0, 10);
+  const orderWindowEndMs = Date.parse(window.orderCutoffAt);
+  if (Number.isFinite(orderWindowEndMs) && now.getTime() > orderWindowEndMs) {
+    return unavailable(
+      method,
+      "fulfilment_window_passed",
+      "This Fresh Pick is no longer available to order.",
+    );
+  }
   if (!extraPickupDates(window).includes(key)) {
     return unavailable(
       method,
@@ -255,7 +272,11 @@ export function freshPicksMethodAvailability(
     );
   }
 
-  if (isToday && isFreshPicksSameDayCutoffPassed(now, config)) {
+  if (
+    isToday &&
+    !readyForCollection &&
+    isFreshPicksSameDayCutoffPassed(now, config)
+  ) {
     return unavailable(
       method,
       "same_day_preparation_cutoff",
@@ -265,8 +286,22 @@ export function freshPicksMethodAvailability(
 
   const slots =
     method === "pickup"
-      ? extraCustomerPickupSlotsForDate(key, window, now, snapshot, config)
-      : filterSlotsByLead(method, key, fromFiltered, now, config);
+      ? (() => {
+          const pickupSlots = extraCustomerPickupSlotsForDate(
+            key,
+            window,
+            now,
+            snapshot,
+            config,
+            { readyForCollection },
+          );
+          return readyForCollection && isToday
+            ? futureOperatingSlots(key, pickupSlots, now)
+            : pickupSlots;
+        })()
+      : readyForCollection
+        ? futureOperatingSlots(key, fromFiltered, now)
+        : filterSlotsByLead(method, key, fromFiltered, now, config);
 
   if (slots.length > 0) return available(method, slots);
 
@@ -351,6 +386,7 @@ export function extraActionableFulfilmentDays(input: {
   now?: Date;
   snapshot?: OperatingHoursSnapshot;
   config?: FreshPicksPreparationConfig;
+  readyForCollection?: boolean;
 }): Array<"today" | "tomorrow"> {
   if (!input.pickupAvailableFromAt || !input.orderCutoffAt) return [];
   const ctx: FreshPicksFulfilmentContext = {
@@ -358,6 +394,7 @@ export function extraActionableFulfilmentDays(input: {
       pickupAvailableFromAt: input.pickupAvailableFromAt,
       orderCutoffAt: input.orderCutoffAt,
     },
+    readyForCollection: input.readyForCollection === true,
     now: input.now,
     snapshot: input.snapshot,
     config: input.config,
@@ -391,6 +428,7 @@ export function isValidExtraCustomerFulfilment(input: {
   fulfilmentTime: string;
   pickupAvailableFromAt: string;
   orderCutoffAt: string;
+  readyForCollection?: boolean;
   now?: Date;
   snapshot?: OperatingHoursSnapshot;
   config?: FreshPicksPreparationConfig;
@@ -400,6 +438,7 @@ export function isValidExtraCustomerFulfilment(input: {
       pickupAvailableFromAt: input.pickupAvailableFromAt,
       orderCutoffAt: input.orderCutoffAt,
     },
+    readyForCollection: input.readyForCollection === true,
     now: input.now,
     snapshot: input.snapshot,
     config: input.config,
@@ -439,6 +478,100 @@ export function freshPicksChooserStates(
     };
   }
   return map;
+}
+
+/** Availability shared by every exact physical item in a Fresh Pick cart. */
+export function freshPicksMethodAvailabilityForItems(
+  method: CustomerWebsiteFulfilmentMethod,
+  dateYmd: string,
+  items: readonly FreshPicksPhysicalItemContext[],
+  input: Omit<FreshPicksFulfilmentContext, "window" | "readyForCollection">,
+): FreshPicksMethodAvailability {
+  if (items.length === 0) {
+    return unavailable(method, "no_available_slots", "Add a Fresh Pick first.");
+  }
+  const states = items.map((item) =>
+    freshPicksMethodAvailability(method, dateYmd, {
+      ...input,
+      window: item.window,
+      readyForCollection: item.readyForCollection,
+    }),
+  );
+  const availableStates = states.filter((state) => state.available);
+  if (availableStates.length !== states.length) {
+    return states.find((state) => !state.available)!;
+  }
+  const allowedByAll = new Set(
+    availableStates[0]!.slots.map((slot) => slot.value),
+  );
+  for (const state of availableStates.slice(1)) {
+    const allowed = new Set(state.slots.map((slot) => slot.value));
+    for (const value of allowedByAll) {
+      if (!allowed.has(value)) allowedByAll.delete(value);
+    }
+  }
+  const slots = availableStates[0]!.slots.filter((slot) =>
+    allowedByAll.has(slot.value),
+  );
+  if (slots.length === 0) {
+    return unavailable(
+      method,
+      "no_available_slots",
+      "No fulfilment time is available for every Fresh Pick in your order.",
+    );
+  }
+  return available(method, slots);
+}
+
+export function freshPicksDateAvailabilityForItems(
+  dateYmd: string,
+  items: readonly FreshPicksPhysicalItemContext[],
+  input: Omit<FreshPicksFulfilmentContext, "window" | "readyForCollection">,
+): FreshPicksDateAvailability {
+  return {
+    pickup: freshPicksMethodAvailabilityForItems("pickup", dateYmd, items, input),
+    dine_in: freshPicksMethodAvailabilityForItems("dine_in", dateYmd, items, input),
+    delivery: freshPicksMethodAvailabilityForItems("delivery", dateYmd, items, input),
+  };
+}
+
+export function freshPicksChooserStatesForItems(
+  dateYmd: string,
+  items: readonly FreshPicksPhysicalItemContext[],
+  input: Omit<FreshPicksFulfilmentContext, "window" | "readyForCollection">,
+): Record<CustomerWebsiteFulfilmentMethod, { available: boolean; reason: string | null; detail: string | null }> {
+  const availability = freshPicksDateAvailabilityForItems(dateYmd, items, input);
+  return {
+    pickup: {
+      available: availability.pickup.available,
+      reason: availability.pickup.message,
+      detail: availability.pickup.availableFromLabel,
+    },
+    dine_in: {
+      available: availability.dine_in.available,
+      reason: availability.dine_in.message,
+      detail: availability.dine_in.availableFromLabel,
+    },
+    delivery: {
+      available: availability.delivery.available,
+      reason: availability.delivery.message,
+      detail: availability.delivery.availableFromLabel,
+    },
+  };
+}
+
+export function firstAvailableFreshPicksFulfilmentForItems(
+  dateYmd: string,
+  preferred: CustomerWebsiteFulfilmentMethod,
+  items: readonly FreshPicksPhysicalItemContext[],
+  input: Omit<FreshPicksFulfilmentContext, "window" | "readyForCollection">,
+): CustomerWebsiteFulfilmentMethod {
+  const availability = freshPicksDateAvailabilityForItems(dateYmd, items, input);
+  if (availability[preferred].available) return preferred;
+  if (availability.pickup.available) return "pickup";
+  if (availability.dine_in.available) return "dine_in";
+  if (availability.delivery.available) return "delivery";
+  return preferred;
 }
 
 export { formatPickupClockLabel };

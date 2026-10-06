@@ -273,6 +273,54 @@ export async function unconfirmExtraStockAction(
   return { error: null };
 }
 
+export async function markExtraStockReadyForCollectionAction(
+  extraStockId: string,
+  reason?: string | null,
+): Promise<{ error: string | null }> {
+  const staff = await requireExtraStaff();
+  const caps = buildExtraWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canMarkReadyForCollection) {
+    return { error: "Not authorized to mark a Fresh Pick ready." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("mark_extra_stock_ready_for_collection", {
+    p_extra_stock_id: extraStockId,
+    p_actor_staff_id: staff.id,
+    p_reason: reason?.trim() || null,
+  });
+  if (error) return { error: error.message };
+  revalidateExtraPaths();
+  return { error: null };
+}
+
+export async function undoExtraStockReadyForCollectionAction(
+  extraStockId: string,
+  reason?: string | null,
+): Promise<{ error: string | null }> {
+  const staff = await requireExtraStaff();
+  const caps = buildExtraWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canUndoReadyForCollection) {
+    return { error: "Not authorized to undo Fresh Pick readiness." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("undo_extra_stock_ready_for_collection", {
+    p_extra_stock_id: extraStockId,
+    p_actor_staff_id: staff.id,
+    p_reason: reason?.trim() || null,
+  });
+  if (error) return { error: error.message };
+  revalidateExtraPaths();
+  return { error: null };
+}
+
 export async function rejectExtraStockAction(
   extraStockId: string,
   rejectReason?: string | null,

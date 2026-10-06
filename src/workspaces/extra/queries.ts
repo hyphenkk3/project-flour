@@ -28,6 +28,7 @@ type ExtraStockRow = {
   pickup_through_at: string | null;
   sold_at: string | null;
   cut_into_slices_at: string | null;
+  ready_for_collection?: boolean | null;
   walk_in_held_at: string | null;
   walk_in_held_until: string | null;
   walk_in_held_by: string | null;
@@ -59,6 +60,7 @@ const EXTRA_SELECT = `
   pickup_through_at,
   sold_at,
   cut_into_slices_at,
+  ready_for_collection,
   walk_in_held_at,
   walk_in_held_until,
   walk_in_held_by,
@@ -102,6 +104,7 @@ export function mapExtraStockRow(
     pickupThroughAt: row.pickup_through_at,
     soldAt: row.sold_at,
     cutIntoSlicesAt: row.cut_into_slices_at,
+    readyForCollection: row.ready_for_collection === true,
     walkInHeldAt: row.walk_in_held_at,
     walkInHeldUntil: row.walk_in_held_until,
     walkInHeldBy: row.walk_in_held_by,
