@@ -111,6 +111,7 @@ export function PaymentRequestPreview({
   const wholecakePreorderQr = isWholecakePreorderPaymentContext({
     extraStockId: order.extraStockId,
     fulfilmentMethod: order.fulfilmentMethod,
+    orderSource: order.orderSource,
   });
 
   const payload = buildPaymentRequestPayload({
