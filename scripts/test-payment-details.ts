@@ -17,6 +17,7 @@ import {
   generatePaymentRequestMessage,
   type PaymentRequestPayload,
 } from "@/engines/orders/payment-message";
+import type { OrderSource } from "@/types/storefront";
 
 const root = process.cwd();
 
@@ -75,6 +76,25 @@ assert.equal(
   }),
   false,
 );
+for (const fulfilmentMethod of ["pickup", "delivery", "dine_in"]) {
+  assert.equal(
+    isWholecakePreorderPaymentContext({
+      extraStockId: "fresh-pick-1",
+      fulfilmentMethod,
+      orderSource: "customer_website",
+    }),
+    true,
+    `customer Fresh Pick ${fulfilmentMethod} uses preorder QR context`,
+  );
+}
+assert.equal(
+  isWholecakePreorderPaymentContext({
+    extraStockId: "other-extra-1",
+    fulfilmentMethod: "pickup",
+    orderSource: "walk_in",
+  }),
+  false,
+);
 
 function payload(
   overrides: Partial<PaymentRequestPayload> = {},
@@ -89,6 +109,72 @@ function payload(
     ...overrides,
   };
 }
+
+function canSharePaymentForOrder(input: {
+  status: string;
+  remainingBalance: number;
+  method: string;
+  extraStockId?: string | null;
+  fulfilmentMethod?: string | null;
+  orderSource?: OrderSource | null;
+}): boolean {
+  return (
+    input.status === "awaiting_payment" &&
+    input.remainingBalance > 0 &&
+    input.method === "wb_qr" &&
+    isWholecakePreorderPaymentContext(input)
+  );
+}
+
+for (const fulfilmentMethod of ["pickup", "delivery", "dine_in"]) {
+  assert.equal(
+    canSharePaymentForOrder({
+      status: "awaiting_payment",
+      remainingBalance: 85,
+      method: "wb_qr",
+      extraStockId: "fresh-pick-1",
+      fulfilmentMethod,
+      orderSource: "customer_website",
+    }),
+    true,
+    `Fresh Pick ${fulfilmentMethod} with balance can share payment`,
+  );
+}
+assert.equal(
+  canSharePaymentForOrder({
+    status: "paid",
+    remainingBalance: 0,
+    method: "wb_qr",
+    extraStockId: "fresh-pick-1",
+    fulfilmentMethod: "pickup",
+    orderSource: "customer_website",
+  }),
+  false,
+  "paid Fresh Pick with zero balance cannot share payment",
+);
+assert.equal(
+  canSharePaymentForOrder({
+    status: "awaiting_payment",
+    remainingBalance: 85,
+    method: "wb_qr",
+    extraStockId: "other-extra-1",
+    fulfilmentMethod: "pickup",
+    orderSource: "walk_in",
+  }),
+  false,
+  "non-Fresh-Pick EXTRA remains ineligible",
+);
+assert.equal(
+  canSharePaymentForOrder({
+    status: "awaiting_payment",
+    remainingBalance: 85,
+    method: "wb_qr",
+    fulfilmentMethod: "pickup",
+    orderSource: "customer_website",
+  }),
+  true,
+  "whole-cake preorder remains eligible",
+);
 
 const wholecakeQr = generatePaymentRequestMessage(
   payload({ wholecakePreorderQr: true }),
@@ -126,6 +212,28 @@ assert.match(
   /Please make payment using the attached Whitebird Wholecake Preorder Payment QR\./,
 );
 
+for (const fulfilmentMethod of ["pickup", "delivery", "dine_in"]) {
+  const freshPickContext = isWholecakePreorderPaymentContext({
+    extraStockId: "fresh-pick-1",
+    fulfilmentMethod,
+    orderSource: "customer_website",
+  });
+  assert.equal(freshPickContext, true);
+  const freshPickPaymentRequest = generatePaymentRequestMessage(
+    payload({
+      wholecakePreorderQr: freshPickContext,
+      netReceived: 50,
+      remainingBalance: 85,
+    }),
+  );
+  assert.equal(freshPickPaymentRequest, wholecakePartial);
+  assert.match(freshPickPaymentRequest, /Balance to Pay: RM85/);
+  assert.match(
+    freshPickPaymentRequest,
+    /Whitebird Wholecake Preorder Payment QR/,
+  );
+}
+
 const extraQr = generatePaymentRequestMessage(
   payload({ wholecakePreorderQr: false }),
 );
@@ -150,7 +258,22 @@ const previewSrc = readSrc(
 assert.match(previewSrc, /WHOLECAKE_PREORDER_PAYMENT_QR_SRC/);
 assert.match(previewSrc, /isWholecakePreorderPaymentContext/);
 assert.match(previewSrc, /wholecakePreorderQr/);
+assert.match(previewSrc, /orderSource: order\.orderSource/);
+assert.match(previewSrc, /canSharePayment = canCopyMessageAndQr/);
+assert.match(previewSrc, /qrSrc: WHOLECAKE_PREORDER_PAYMENT_QR_SRC/);
 assert.match(previewSrc, /contrast-\[1000%\]/);
+
+const paymentSectionSrc = readSrc(
+  "src/workspaces/owner/orders/PaymentSection.tsx",
+);
+assert.match(paymentSectionSrc, /settlement\.remainingBalance > 0/);
+assert.match(paymentSectionSrc, /order\.status === "awaiting_payment"/);
+assert.match(previewSrc, /method === "wb_qr" && wholecakePreorderQr/);
+
+const paymentRouteSrc = readSrc(
+  "src/app/(app)/owner/orders/[id]/payment/page.tsx",
+);
+assert.match(paymentRouteSrc, /order\.settlement\.remainingBalance <= 0/);
 
 const detailsSrc = readSrc("src/engines/orders/payment-details.ts");
 assert.doesNotMatch(detailsSrc, /Maybank/);

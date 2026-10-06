@@ -1,3 +1,5 @@
+import type { OrderSource } from "@/types/storefront";
+
 /**
  * Whitebird wholecake preorder payment instruction details.
  * Do not hardcode these values elsewhere.
@@ -79,16 +81,18 @@ export function getPaymentRequestDetails(
 }
 
 /**
- * The supplied QR is wholecake preorder payment only.
- * Do not show it for Fresh Pick / EXTRA sales or dine-in reservations.
+ * The supplied QR is used for wholecake preorders and customer Fresh Picks.
+ * Do not show it for other EXTRA sales or dine-in reservations.
  */
 export function isWholecakePreorderPaymentContext(input: {
   extraStockId?: string | null;
   fulfilmentMethod?: string | null;
+  orderSource?: OrderSource | null;
 }): boolean {
-  if (input.extraStockId) return false;
-  if (input.fulfilmentMethod === "dine_in") return false;
-  return true;
+  if (input.extraStockId) {
+    return input.orderSource === "customer_website";
+  }
+  return input.fulfilmentMethod !== "dine_in";
 }
 
 /** Default payment hold: 24 hours after request marked sent. */
