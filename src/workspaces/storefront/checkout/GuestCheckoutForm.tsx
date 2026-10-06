@@ -329,7 +329,7 @@ function persistDraft(
 }
 
 const checkoutPickupOfferCache = new Map<string, CheckoutPickupOffer>();
-const checkoutCakeSizePriceCache = new Map<string, Record<string, number>>();
+const checkoutCakeSizePriceCache = new Map<string, Promise<number | null>>();
 
 export function GuestCheckoutForm({
   suggestedPickupDate = null,
@@ -359,6 +359,10 @@ export function GuestCheckoutForm({
   const formRef = useRef<HTMLFormElement>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [resolvedPriceKey, setResolvedPriceKey] = useState<string | null>(null);
+  const [resolvedCheckoutSizePrices, setResolvedCheckoutSizePrices] = useState<{
+    key: string;
+    prices: Record<string, number>;
+  } | null>(null);
   const [priceRefreshKey, setPriceRefreshKey] = useState(0);
   const [acknowledgedSnapshot, setAcknowledgedSnapshot] = useState("");
   const [deliveryProcessingAckSnapshot, setDeliveryProcessingAckSnapshot] =
@@ -904,47 +908,117 @@ export function GuestCheckoutForm({
   const sizeIdsKey = [...new Set(items.map((item) => item.sizeId).filter(Boolean))]
     .sort()
     .join(",");
+  const checkoutChoiceSizeIdsKey = [
+    ...new Set(
+      [
+        ...items.flatMap((item) =>
+          (item.sizeChoices ?? []).map((choice) => choice.id),
+        ),
+        ...cakes
+          .filter(
+            (cake) =>
+              items.some((item) => item.cakeId === cake.id) || addingCake,
+          )
+          .flatMap((cake) => cake.sizes.map((size) => size.id)),
+        ...items.map((item) => item.sizeId),
+      ].filter(Boolean),
+    ),
+  ]
+    .sort()
+    .join(",");
   const priceResolutionKey = fields.pickupDate
     ? `${fields.pickupDate}|${sizeIdsKey}`
+    : "";
+  const checkoutChoicePriceKey = fields.pickupDate
+    ? `${fields.pickupDate}|${checkoutChoiceSizeIdsKey}`
     : "";
 
   useEffect(() => {
     if (!hydrated || !calendarReady) return;
     const pickupDate = fields.pickupDate.trim().slice(0, 10);
-    const sizeIds = sizeIdsKey.split(",").filter(Boolean);
+    const sizeIds = checkoutChoiceSizeIdsKey.split(",").filter(Boolean);
+    const selectedSizeIds = sizeIdsKey.split(",").filter(Boolean);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(pickupDate) || sizeIds.length === 0) {
       return;
     }
     markCheckoutLoadOnce("size_prices_start", checkoutLoadSeen.current);
     let cancelled = false;
-    const applyPrices = (prices: Record<string, number>) => {
-      if (cancelled) return;
-      const missing = sizeIds.some((id) => prices[id] == null);
-      setItems((current) => applyApplicableUnitPrices(current, prices));
-      if (!missing) {
-        setResolvedPriceKey(`${pickupDate}|${sizeIds.slice().sort().join(",")}`);
+    const resolveAndCache = (ids: string[]) => {
+      const sizeIds = ids.filter(
+        (id) => !checkoutCakeSizePriceCache.has(`${pickupDate}|${id}`),
+      );
+      if (sizeIds.length > 0) {
+        const batch = resolveCheckoutCakeSizePrices(pickupDate, sizeIds);
+        for (const id of sizeIds) {
+          const key = `${pickupDate}|${id}`;
+          const entry = batch
+            .then((resolved) => resolved[id] ?? null)
+            .catch(() => null)
+            .then((price) => {
+              if (
+                price == null &&
+                checkoutCakeSizePriceCache.get(key) === entry
+              ) {
+                checkoutCakeSizePriceCache.delete(key);
+              }
+              return price;
+            });
+          checkoutCakeSizePriceCache.set(key, entry);
+        }
       }
-    };
-    const cached = checkoutCakeSizePriceCache.get(
-      `${pickupDate}|${sizeIdsKey}`,
-    );
-    if (cached) {
-      applyPrices(cached);
-    } else {
-      void resolveCheckoutCakeSizePrices(pickupDate, sizeIds).then((prices) => {
-        checkoutCakeSizePriceCache.set(`${pickupDate}|${sizeIdsKey}`, prices);
-        applyPrices(prices);
+      return Promise.all(
+        ids.map((id) => checkoutCakeSizePriceCache.get(`${pickupDate}|${id}`)),
+      ).then((resolved) => {
+        const prices: Record<string, number> = {};
+        for (const [index, price] of resolved.entries()) {
+          if (price != null) prices[ids[index]] = price;
+        }
+        return prices;
       });
-    }
+    };
+    void resolveAndCache(selectedSizeIds).then((prices) => {
+      if (cancelled) return;
+      setItems((current) => applyApplicableUnitPrices(current, prices));
+      if (selectedSizeIds.every((id) => prices[id] != null)) {
+        setResolvedPriceKey(
+          `${pickupDate}|${selectedSizeIds.slice().sort().join(",")}`,
+        );
+      }
+    });
+    void resolveAndCache(sizeIds).then((prices) => {
+      if (cancelled) return;
+      setResolvedCheckoutSizePrices({
+        key: `${pickupDate}|${sizeIds.slice().sort().join(",")}`,
+        prices,
+      });
+    });
     return () => {
       cancelled = true;
     };
-  }, [calendarReady, fields.pickupDate, hydrated, priceRefreshKey, sizeIdsKey]);
+  }, [
+    calendarReady,
+    checkoutChoiceSizeIdsKey,
+    fields.pickupDate,
+    hydrated,
+    priceRefreshKey,
+    sizeIdsKey,
+  ]);
 
   const pricesReady =
     items.length === 0 ||
     !fields.pickupDate ||
     resolvedPriceKey === priceResolutionKey;
+  const checkoutChoicePricesReady =
+    !fields.pickupDate ||
+    (resolvedCheckoutSizePrices?.key === checkoutChoicePriceKey &&
+      checkoutChoiceSizeIdsKey
+        .split(",")
+        .filter(Boolean)
+        .every((id) => resolvedCheckoutSizePrices.prices[id] != null));
+  const checkoutPricesBySizeId =
+    checkoutChoicePricesReady && fields.pickupDate
+      ? (resolvedCheckoutSizePrices?.prices ?? {})
+      : {};
   const pricedItems = pricesReady
     ? items
     : items.map((item) => ({ ...item, applicableUnitPrice: undefined }));
@@ -2425,6 +2499,8 @@ export function GuestCheckoutForm({
             addingCake={addingCake}
             cakePickupAvailabilityNotes={cakePickupAvailabilityNotes}
             cakes={cakes}
+            checkoutChoicePricesReady={checkoutChoicePricesReady}
+            checkoutPricesBySizeId={checkoutPricesBySizeId}
             catalogueReady={catalogueReady}
             earliestLabel={earliestLabel}
             items={pricedItems}

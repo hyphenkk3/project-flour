@@ -11,7 +11,9 @@ import {
   draftItemSizeChoices,
   draftLineDisplayUnitPrice,
 } from "@/workspaces/storefront/cart/cart-order-summary";
+import { chargedDraftItemUnitPrice } from "@/engines/orders/cake-size-price-ack";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
+import { customerPreorderCommercialTotal } from "@/engines/orders/customer-preorder-options";
 import {
   draftTotal,
   emptyPreorderDraft,
@@ -32,7 +34,7 @@ const savedSizeChoice: PreorderDraftSizeChoice = {
 const otherSizeChoice: PreorderDraftSizeChoice = {
   id: "dubai-kunafa-6",
   size: '6"',
-  price: 145,
+  price: 135,
   preorderDays: 2,
 };
 const item: PreorderDraftItem = {
@@ -104,6 +106,81 @@ assert.equal(
   "the saved size snapshot remains unchanged",
 );
 
+const checkoutSizePricesByDate = new Map([
+  [
+    "2026-09-30",
+    new Map([
+      [savedSizeChoice.id, 78],
+      [otherSizeChoice.id, 135],
+    ]),
+  ],
+  [
+    "2026-10-01",
+    new Map([
+      [savedSizeChoice.id, 80],
+      [otherSizeChoice.id, 140],
+    ]),
+  ],
+]);
+const checkoutItem6: PreorderDraftItem = {
+  ...item,
+  sizeId: otherSizeChoice.id,
+  sizeLabel: otherSizeChoice.size,
+  unitPrice: otherSizeChoice.price,
+  applicableUnitPrice: 140,
+};
+for (const [date, expectedPrices] of checkoutSizePricesByDate) {
+  const checkoutItem4 = {
+    ...item,
+    applicableUnitPrice: expectedPrices.get(savedSizeChoice.id),
+  };
+  const checkoutItems = [
+    checkoutItem4,
+    {
+      ...checkoutItem6,
+      applicableUnitPrice: expectedPrices.get(otherSizeChoice.id),
+    },
+  ];
+  const selector4 = draftItemSizeChoices(
+    checkoutItem4,
+    null,
+    expectedPrices,
+  ).find((choice) => choice.id === savedSizeChoice.id);
+  const selector6 = draftItemSizeChoices(
+    checkoutItems[1],
+    null,
+    expectedPrices,
+  ).find((choice) => choice.id === otherSizeChoice.id);
+  assert.equal(
+    `${selector4?.size} — ${formatRm(selector4?.price ?? 0)}`,
+    date === "2026-10-01" ? '4" — RM80' : '4" — RM78',
+  );
+  assert.equal(
+    `${selector6?.size} — ${formatRm(selector6?.price ?? 0)}`,
+    date === "2026-10-01" ? '6" — RM140' : '6" — RM135',
+  );
+  assert.equal(
+    chargedDraftItemUnitPrice(checkoutItems[0]),
+    expectedPrices.get(savedSizeChoice.id),
+  );
+  assert.equal(
+    chargedDraftItemUnitPrice(checkoutItems[1]),
+    expectedPrices.get(otherSizeChoice.id),
+  );
+  assert.equal(
+    customerPreorderCommercialTotal({
+      items: checkoutItems.map((checkoutItem) => ({
+        unitPrice: chargedDraftItemUnitPrice(checkoutItem),
+        quantity: checkoutItem.quantity,
+      })),
+      options: [],
+      selectedCodes: [],
+    }),
+    expectedPrices.get(savedSizeChoice.id)! +
+      expectedPrices.get(otherSizeChoice.id)!,
+  );
+}
+
 const cartShell = readSrc("src/workspaces/storefront/cart/StorefrontCartShell.tsx");
 assert.match(
   cartShell,
@@ -126,4 +203,40 @@ assert.match(
   "the rendered size selector displays the helper-resolved choice price",
 );
 
-console.log("PASS storefront cart line pricing");
+const checkoutSummary = readSrc(
+  "src/workspaces/storefront/checkout/CheckoutOrderSummary.tsx",
+);
+assert.match(
+  checkoutSummary,
+  /draftItemSizeChoices\(\s*item,\s*cake,\s*effectivePricesBySizeId,?\s*\)/,
+);
+assert.match(
+  checkoutSummary,
+  /checkoutChoicePricesReady\s*\?\s*formatRm\(size\.price\)\s*:\s*"Checking price…"/,
+);
+assert.match(
+  checkoutSummary,
+  /pricesBySizeId\[size\.id\]\s*\?\?\s*size\.price/,
+);
+assert.match(
+  checkoutSummary,
+  /checkoutStartingPriceLabel\(\s*cake,\s*checkoutPricesBySizeId,\s*checkoutChoicePricesReady,?\s*\)/,
+);
+assert.match(
+  checkoutSummary,
+  /chargedDraftItemUnitPrice\(item\)\s*\*\s*item\.quantity/,
+);
+const checkoutForm = readSrc(
+  "src/workspaces/storefront/checkout/GuestCheckoutForm.tsx",
+);
+assert.match(
+  checkoutForm,
+  /resolveCheckoutCakeSizePrices\(pickupDate, sizeIds\)/,
+);
+assert.match(checkoutForm, /checkoutPricesBySizeId=\{checkoutPricesBySizeId\}/);
+assert.match(
+  checkoutForm,
+  /checkoutChoicePricesReady\s*&&\s*fields\.pickupDate[\s\S]*resolvedCheckoutSizePrices\?\.prices/,
+);
+
+console.log("PASS storefront checkout and cart line pricing");
