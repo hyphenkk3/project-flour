@@ -13,6 +13,11 @@ export type CollectionReadyMessageSent = {
   sentByName: string | null;
 };
 
+export type CollectionReadyMessageOperatingHours = {
+  whitebirdStatus: "open" | "closed" | "unknown";
+  pickupLatestBookable: string | null;
+};
+
 export type CollectionCakeLine = {
   id: string;
   cakeName: string;
@@ -70,6 +75,7 @@ export type CollectionBoardOrder = {
   status: GuestOrderStatus;
   customerNotes: string | null;
   readyMessageSent?: CollectionReadyMessageSent | null;
+  readyMessageOperatingHours?: CollectionReadyMessageOperatingHours;
   productionStartedAt: string | null;
   readyAt: string | null;
   pickedUpAt: string | null;
