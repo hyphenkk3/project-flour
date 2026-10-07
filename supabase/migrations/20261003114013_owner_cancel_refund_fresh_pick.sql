@@ -115,7 +115,7 @@ $$;
 revoke all on function public.cancel_guest_order(uuid, uuid, boolean)
   from public, anon;
 grant execute on function public.cancel_guest_order(uuid, uuid, boolean)
-  to authenticated;
+  to authenticated, service_role;
 
 create or replace function public.cancel_and_refund_paid_fresh_pick(
   p_order_id uuid,
