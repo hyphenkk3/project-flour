@@ -195,14 +195,17 @@ assert.match(cartSrc, /Continue Ordering/);
 assert.match(cartSrc, /href=\{continueHref\}/);
 assert.match(cartSrc, /continueOrderingHref/);
 assert.match(cartSrc, /preorderCheckoutHref/);
-assert.match(cartSrc, /View Order →/);
+assert.match(
+  cartSrc,
+  /View Order\s*<span aria-hidden="true" className="text-lg leading-none">\s*→\s*<\/span>/,
+);
 assert.match(
   cartSrc,
   /h-\[calc\(4\.25rem\+env\(safe-area-inset-bottom,0px\)\)\] md:hidden/,
 );
 assert.match(
   cartSrc,
-  /bg-ink text-mist fixed right-0 bottom-0 left-0 z-40 flex min-h-12 flex-col/,
+  /bg-ink text-mist fixed right-0 bottom-0 left-0 z-40 flex min-h-\[4\.25rem\] items-center justify-between/,
 );
 assert.match(cartSrc, /Your Order/);
 assert.match(cartSrc, /Collection date/);

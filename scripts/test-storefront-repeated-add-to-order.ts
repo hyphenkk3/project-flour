@@ -155,7 +155,10 @@ assert.doesNotMatch(panelSrc, /existingQuantityForSize/);
 assert.match(cardSrc, /<AddToOrderButton/);
 assert.doesNotMatch(cardSrc, /existingQuantity=/);
 
-assert.match(cartSrc, /View Order →/);
+assert.match(
+  cartSrc,
+  /View Order\s*<span aria-hidden="true" className="text-lg leading-none">\s*→\s*<\/span>/,
+);
 assert.match(cartSrc, /setDraftLineQuantity/);
 assert.match(cartSrc, /removeDraftLine/);
 assert.doesNotMatch(sheetSrc, /dine_in|DineInVenuePartyFields/);

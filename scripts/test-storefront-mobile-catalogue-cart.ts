@@ -95,7 +95,10 @@ assert.doesNotMatch(cardSrc, /sm:rounded-2xl sm:border/);
 assert.match(cardSrc, /sm:block/);
 assert.match(cardSrc, /sm:inline-flex/);
 
-assert.match(cartSrc, /View Order →/);
+assert.match(
+  cartSrc,
+  /View Order\s*<span aria-hidden="true" className="text-lg leading-none">\s*→\s*<\/span>/,
+);
 assert.match(cartSrc, /fixed right-0 bottom-0 left-0 z-40/);
 assert.match(cartSrc, /md:hidden/);
 assert.match(cartSrc, /h-dvh/);

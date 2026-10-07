@@ -476,21 +476,29 @@ export function StorefrontCartShell({
 
       <button
         aria-label={`${itemLabel}, ${formatRm(total)}. View order.`}
-        className="bg-ink text-mist fixed right-0 bottom-0 left-0 z-40 flex min-h-12 flex-col justify-center gap-0.5 px-5 pt-2 text-left shadow-[0_-8px_24px_rgba(28,25,22,0.18)] md:hidden"
+        className="bg-ink text-mist fixed right-0 bottom-0 left-0 z-40 flex min-h-[4.25rem] items-center justify-between gap-4 px-5 pt-2 text-left shadow-[0_-8px_24px_rgba(28,25,22,0.18)] md:hidden"
         onClick={() => setOpen(true)}
         style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
         type="button"
       >
-        <span className="flex items-baseline justify-between gap-3">
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="text-[11px] font-medium tracking-[0.22em] uppercase">
             Your Order
           </span>
-          <span aria-live="polite" className="text-sm font-medium tabular-nums">
-          {itemLabel} · {pricesPending ? "Checking price…" : formatRm(total)}
+          <span
+            aria-live="polite"
+            className="flex flex-wrap items-baseline gap-x-1.5 text-[13px] leading-tight font-medium tabular-nums"
+          >
+            <span>{itemLabel}</span>
+            <span aria-hidden="true">·</span>
+            <span>{pricesPending ? "Checking price…" : formatRm(total)}</span>
           </span>
         </span>
-        <span className="block w-full py-1 text-center text-sm font-semibold tracking-tight">
-          View Order →
+        <span className="border-mist/25 inline-flex shrink-0 items-center gap-2 border-l pl-4 text-[15px] font-semibold tracking-tight whitespace-nowrap">
+          View Order
+          <span aria-hidden="true" className="text-lg leading-none">
+            →
+          </span>
         </span>
       </button>
 

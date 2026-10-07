@@ -34,14 +34,13 @@ assert.doesNotMatch(sheetSrc, /quantity:\s*1,/);
 
 assert.match(
   cartSrc,
-  /bg-ink text-mist fixed right-0 bottom-0 left-0 z-40 flex min-h-12 flex-col/,
+  /bg-ink text-mist fixed right-0 bottom-0 left-0 z-40 flex min-h-\[4\.25rem\] items-center justify-between gap-4 px-5 pt-2 text-left/,
 );
-assert.match(cartSrc, /View Order →/);
-assert.match(cartSrc, /Your Order/);
 assert.match(
   cartSrc,
-  /block w-full py-1 text-center text-sm font-semibold tracking-tight/,
+  /View Order\s*<span aria-hidden="true" className="text-lg leading-none">\s*→\s*<\/span>/,
 );
+assert.match(cartSrc, /Your Order/);
 assert.match(
   cartSrc,
   /paddingBottom: "max\(0\.5rem, env\(safe-area-inset-bottom\)\)"/,
