@@ -30,6 +30,7 @@ export type StaffNotificationDeliveryResult = {
   sent: number;
   skipped: number;
   failed: number;
+  suppressed: number;
   errors: string[];
 };
 
@@ -59,6 +60,17 @@ export type StaffNotificationEmailCompleter = (input: {
   status: "sent" | "failed";
   error?: string;
   resendId?: string | null;
+  claimedUntil: string;
+}) => Promise<void>;
+
+export type FreshPickHoldReminderValidator = (input: {
+  payload: Record<string, unknown> | null;
+}) => Promise<boolean>;
+
+export type StaffNotificationEmailSuppressor = (input: {
+  eventId: string;
+  staffId: string;
+  reason: string;
   claimedUntil: string;
 }) => Promise<void>;
 
@@ -144,6 +156,11 @@ export async function deliverStaffNotificationEmailsToRecipients(input: {
   recipients: Array<{ staffId: string; email: string }>;
   alreadyDeliveredStaffIds?: Set<string>;
   mailer: StaffNotificationMailer;
+  beforeSend?: (recipient: { staffId: string; email: string }) => Promise<
+    | { send: true }
+    | { send: false; reason: string }
+  >;
+  recordSuppressed?: (staffId: string, reason: string) => Promise<void>;
   recordDelivery?: (
     staffId: string,
     status: "sent" | "failed",
@@ -159,6 +176,7 @@ export async function deliverStaffNotificationEmailsToRecipients(input: {
     sent: 0,
     skipped: 0,
     failed: 0,
+    suppressed: 0,
     errors: [] as string[],
   };
 
@@ -169,6 +187,13 @@ export async function deliverStaffNotificationEmailsToRecipients(input: {
     }
 
     try {
+      const sendCheck = await input.beforeSend?.(recipient);
+      if (sendCheck?.send === false) {
+        await input.recordSuppressed?.(recipient.staffId, sendCheck.reason);
+        result.suppressed += 1;
+        continue;
+      }
+
       const sent = await input.mailer.send({
         to: recipient.email,
         subject: email.subject,
@@ -272,6 +297,39 @@ export async function completeStaffNotificationEmailDelivery(input: {
   }
 }
 
+export async function isCurrentFreshPickHoldReminder(input: {
+  payload: Record<string, unknown> | null;
+}): Promise<boolean> {
+  const admin = createServiceClient();
+  const { data, error } = await admin.rpc(
+    "staff_notification_fresh_pick_hold_reminder_is_current",
+    { p_payload: input.payload },
+  );
+
+  if (error) throw new Error(error.message);
+  return data === true;
+}
+
+export async function suppressStaffNotificationEmailDelivery(input: {
+  eventId: string;
+  staffId: string;
+  reason: string;
+  claimedUntil: string;
+}): Promise<void> {
+  const admin = createServiceClient();
+  const { error } = await admin.rpc(
+    "suppress_staff_notification_email_delivery",
+    {
+      p_event_id: input.eventId,
+      p_staff_id: input.staffId,
+      p_reason: input.reason,
+      p_claimed_until: input.claimedUntil,
+    },
+  );
+
+  if (error) throw new Error(error.message);
+}
+
 async function loadOrderContent(
   orderId: string | null,
 ): Promise<OrderContentRow | null> {
@@ -295,6 +353,8 @@ async function deliverClaimedStaffNotificationEmails(input: {
   claimed: ClaimedStaffNotificationEmail[];
   mailer: StaffNotificationMailer;
   completeDelivery: StaffNotificationEmailCompleter;
+  validateFreshPickHoldReminder: FreshPickHoldReminderValidator;
+  suppressDelivery: StaffNotificationEmailSuppressor;
 }): Promise<StaffNotificationDeliveryResult[]> {
   const byEvent = new Map<string, ClaimedStaffNotificationEmail[]>();
   for (const row of input.claimed) {
@@ -318,6 +378,7 @@ async function deliverClaimedStaffNotificationEmails(input: {
       sent: 0,
       skipped: 0,
       failed: 0,
+      suppressed: 0,
       errors: [],
     };
 
@@ -355,6 +416,27 @@ async function deliverClaimedStaffNotificationEmails(input: {
           email: row.staffEmail,
         })),
         mailer: input.mailer,
+        beforeSend:
+          first.code === "fresh_pick_walk_in_hold_reminder"
+            ? async () =>
+                (await input.validateFreshPickHoldReminder({
+                  payload,
+                }))
+                  ? { send: true as const }
+                  : {
+                      send: false as const,
+                      reason:
+                        "Fresh Pick Walk-in Hold is no longer active or no longer matches this reminder.",
+                    }
+            : undefined,
+        recordSuppressed: async (staffId, reason) =>
+          input.suppressDelivery({
+            eventId,
+            staffId,
+            reason,
+            claimedUntil:
+              claimedUntilByStaffId.get(staffId) ?? first.claimedUntil,
+          }),
         recordDelivery: (staffId, status, detail) =>
           input.completeDelivery({
             eventId,
@@ -413,6 +495,8 @@ export async function deliverPendingStaffNotificationEmails(input?: {
   eventId?: string;
   claimer?: StaffNotificationEmailClaimer;
   completeDelivery?: StaffNotificationEmailCompleter;
+  validateFreshPickHoldReminder?: FreshPickHoldReminderValidator;
+  suppressDelivery?: StaffNotificationEmailSuppressor;
 }): Promise<StaffNotificationDeliveryResult[]> {
   try {
     const claimed = await (
@@ -429,6 +513,11 @@ export async function deliverPendingStaffNotificationEmails(input?: {
       mailer: input?.mailer ?? createResendStaffNotificationMailer(),
       completeDelivery:
         input?.completeDelivery ?? completeStaffNotificationEmailDelivery,
+      validateFreshPickHoldReminder:
+        input?.validateFreshPickHoldReminder ??
+        isCurrentFreshPickHoldReminder,
+      suppressDelivery:
+        input?.suppressDelivery ?? suppressStaffNotificationEmailDelivery,
     });
   } catch (error) {
     const message =

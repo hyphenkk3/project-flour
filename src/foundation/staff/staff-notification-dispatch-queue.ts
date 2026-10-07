@@ -8,7 +8,10 @@ export const STAFF_NOTIFICATION_EMAIL_LEASE_SECONDS = 120;
 export const STAFF_NOTIFICATION_EMAIL_MAX_ATTEMPTS = 5;
 
 export type StaffNotificationEmailDeliveryStatus =
-  "sent" | "failed" | "claimed";
+  | "sent"
+  | "failed"
+  | "claimed"
+  | "suppressed";
 
 export type StaffNotificationEmailDeliveryState = {
   staffId: string;
@@ -54,7 +57,7 @@ export function isStaffNotificationEmailDeliveryClaimable(
   now: Date,
 ): boolean {
   if (!delivery) return true;
-  if (delivery.status === "sent") return false;
+  if (delivery.status !== "claimed" && delivery.status !== "failed") return false;
   if (delivery.attemptCount >= STAFF_NOTIFICATION_EMAIL_MAX_ATTEMPTS) {
     return false;
   }
