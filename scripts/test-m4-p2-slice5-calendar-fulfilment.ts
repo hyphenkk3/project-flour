@@ -78,85 +78,154 @@ const cakeItem = {
   quantity: 1,
 };
 
-// Early Pickup names use the same authoritative schedule rule as Bakery.
+// Calendar bold follows only the persisted Needs Bakery Attention flag.
 {
   const calendarQuerySource = readFileSync(
     resolve("src/workspaces/owner/calendar/queries.ts"),
     "utf8",
   );
   assert.doesNotMatch(calendarQuerySource, /customer_notes|customerNotes/);
+  assert.doesNotMatch(calendarQuerySource, /isEarlyPickupAttention/);
 
-  const cases: Array<[string, string, boolean]> = [
-    ["2026-10-01", "12:00", true], // Thursday
-    ["2026-10-01", "12:30", true],
-    ["2026-10-06", "14:30", true], // Tuesday
-    ["2026-10-01", "15:00", false],
-    ["2026-10-07", "12:00", true], // Wednesday
-    ["2026-10-07", "12:30", true],
-    ["2026-10-07", "13:00", false],
-    ["2026-10-01", "17:30", false],
+  const cases: Array<{
+    flag: boolean | null;
+    pickupDate: string;
+    pickupTime: string;
+    fulfilmentMethod: StorefrontOrderFulfilmentMethod;
+  }> = [
+    {
+      flag: true,
+      pickupDate: "2026-10-07",
+      pickupTime: "12:00",
+      fulfilmentMethod: "pickup",
+    },
+    {
+      flag: true,
+      pickupDate: "2026-10-01",
+      pickupTime: "17:30",
+      fulfilmentMethod: "pickup",
+    },
+    {
+      flag: false,
+      pickupDate: "2026-10-07",
+      pickupTime: "12:30",
+      fulfilmentMethod: "pickup",
+    },
+    {
+      flag: false,
+      pickupDate: "2026-10-07",
+      pickupTime: "13:00",
+      fulfilmentMethod: "pickup",
+    },
+    {
+      flag: false,
+      pickupDate: "2026-10-01",
+      pickupTime: "15:00",
+      fulfilmentMethod: "pickup",
+    },
+    {
+      flag: false,
+      pickupDate: "2026-10-01",
+      pickupTime: "17:30",
+      fulfilmentMethod: "pickup",
+    },
+    {
+      flag: false,
+      pickupDate: "2026-10-01",
+      pickupTime: "12:30",
+      fulfilmentMethod: "dine_in",
+    },
+    {
+      flag: false,
+      pickupDate: "2026-10-01",
+      pickupTime: "12:30",
+      fulfilmentMethod: "delivery",
+    },
+    {
+      flag: true,
+      pickupDate: "2026-10-01",
+      pickupTime: "12:30",
+      fulfilmentMethod: "dine_in",
+    },
+    {
+      flag: true,
+      pickupDate: "2026-10-01",
+      pickupTime: "12:30",
+      fulfilmentMethod: "delivery",
+    },
+    {
+      flag: null,
+      pickupDate: "2026-10-01",
+      pickupTime: "12:30",
+      fulfilmentMethod: "pickup",
+    },
   ];
 
-  for (const [pickupDate, pickupTime, expected] of cases) {
+  for (const [index, testCase] of cases.entries()) {
+    const expected = testCase.flag === true;
     const needsBakeryAttention = calendarNeedsBakeryAttention({
-      needsBakeryAttention: false,
-      pickupDate,
-      pickupTime,
+      needsBakeryAttention: testCase.flag,
     });
-    assert.equal(needsBakeryAttention, expected, `${pickupDate} ${pickupTime}`);
+    const calendarEntry = entry({
+      id: `attention-${index}`,
+      pickupDate: testCase.pickupDate,
+      pickupTime: testCase.pickupTime,
+      fulfilmentMethod: testCase.fulfilmentMethod,
+      needsBakeryAttention,
+    });
+    assert.equal(needsBakeryAttention, expected, `mapped flag ${index}`);
     assert.equal(
-      calendarCustomerSignalClass(
-        entry({ pickupDate, pickupTime, needsBakeryAttention }),
-      ).includes("font-bold"),
+      calendarCustomerSignalClass(calendarEntry).includes("font-bold"),
       expected,
-      `bold signal ${pickupDate} ${pickupTime}`,
+      `month-grid customer signal ${index}`,
+    );
+    const matrix = buildCalendarMatrix([calendarEntry], [testCase.pickupDate]);
+    assert.equal(
+      matrix[0]!.cellsByDate[testCase.pickupDate]!.customers[0]!
+        .needsBakeryAttention,
+      expected,
+      `matrix customer signal ${index}`,
     );
   }
 
-  assert.equal(
-    calendarNeedsBakeryAttention({
-      needsBakeryAttention: true,
-      pickupDate: "2026-10-01",
-      pickupTime: "15:00",
-    }),
-    true,
-    "manual attention remains true outside Early Pickup",
+  const monthGridSource = readFileSync(
+    resolve("src/workspaces/owner/calendar/CalendarMonthGrid.tsx"),
+    "utf8",
   );
   assert.equal(
-    calendarNeedsBakeryAttention({
-      needsBakeryAttention: false,
-      pickupDate: "2026-10-01",
-      pickupTime: "15:00",
-    }),
-    false,
-    "normal pickup with Bakery Attention off is not bold",
+    monthGridSource.match(/calendarCustomerSignalClass\((?:line\.)?entry\)/g)
+      ?.length,
+    2,
+    "Orders and Cakes views share the same bold signal at every viewport",
   );
-  assert.equal(
-    calendarCustomerSignalClass(
-      entry({
-        pickupDate: "2026-10-01",
-        pickupTime: "15:00",
-        needsBakeryAttention: true,
-      }),
-    ).includes("font-bold"),
-    true,
-    "normal pickup with explicit Bakery Attention remains bold",
+  const matrixSource = readFileSync(
+    resolve("src/workspaces/owner/calendar/CalendarMatrixView.tsx"),
+    "utf8",
   );
-  assert.equal(
-    calendarCustomerSignalClass(
-      entry({
-        pickupDate: "2026-10-01",
-        pickupTime: "12:30",
+  assert.match(matrixSource, /customer\.needsBakeryAttention\s*\? "font-bold"/);
+
+  for (const status of [
+    "submitted",
+    "pending_confirmation",
+    "awaiting_payment",
+    "paid",
+  ] as GuestOrderStatus[]) {
+    for (const flag of [false, true]) {
+      const operationalEntry = entry({
+        status,
         needsBakeryAttention: calendarNeedsBakeryAttention({
-          needsBakeryAttention: false,
-          pickupDate: "2026-10-01",
-          pickupTime: "12:30",
+          needsBakeryAttention: flag,
         }),
-      }),
-    ).includes("font-bold"),
-    true,
-    "Early Pickup remains bold without explicit Bakery Attention",
-  );
+        readyAt: "2026-10-01T04:00:00Z",
+        pickedUpAt: "2026-10-01T07:00:00Z",
+      });
+      assert.equal(
+        calendarCustomerSignalClass(operationalEntry).includes("font-bold"),
+        flag,
+        `${status} ready/collected flag ${flag}`,
+      );
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
