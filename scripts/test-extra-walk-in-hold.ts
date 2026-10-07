@@ -238,80 +238,72 @@ assert.equal(
 
 assert.equal(
   freshPickHomeSummaryLine({
-    preparedOn: "2026-09-17",
+    pickupAvailableFromAt: "2026-09-17T02:00:00.000Z",
     pickupThroughAt: "2026-09-17T09:30:00.000Z",
-    todayYmd: "2026-09-17",
   }),
-  "Orders available through 17 Sep 2026 · 5:30 PM cutoff",
+  "Orders available on 17 Sep 2026, 10:00 AM–5:30 PM",
 );
 
+const fromYesterday = extraPickupThroughIso("2026-09-22", "09:00");
 const throughTomorrow = extraPickupThroughIso("2026-09-23", "15:00");
 assert.equal(
   freshPickHomeSummaryLine({
-    preparedOn: "2026-09-22",
+    pickupAvailableFromAt: fromYesterday,
     pickupThroughAt: throughTomorrow,
-    todayYmd: "2026-09-22",
   }),
-  "Orders available through 23 Sep 2026 · 3:00 PM cutoff",
+  "Orders available from 22 Sep 2026, 9:00 AM through 23 Sep 2026, 3:00 PM",
 );
 assert.notEqual(
   freshPickHomeSummaryLine({
-    preparedOn: "2026-09-22",
+    pickupAvailableFromAt: fromYesterday,
     pickupThroughAt: throughTomorrow,
-    todayYmd: "2026-09-22",
   }),
-  "Pickup today · 3:00 PM cutoff",
+  "Pickup available from 22 Sep 2026, 9:00 AM",
 );
 
 const throughToday = extraPickupThroughIso("2026-09-22", "15:00");
 assert.equal(
   freshPickHomeSummaryLine({
-    preparedOn: "2026-09-22",
+    pickupAvailableFromAt: fromYesterday,
     pickupThroughAt: throughToday,
-    todayYmd: "2026-09-22",
   }),
-  "Orders available through 22 Sep 2026 · 3:00 PM cutoff",
+  "Orders available on 22 Sep 2026, 9:00 AM–3:00 PM",
 );
 
 const throughFuture = extraPickupThroughIso("2026-09-24", "15:00");
 assert.equal(
   freshPickHomeSummaryLine({
-    preparedOn: "2026-09-23",
+    pickupAvailableFromAt: extraPickupThroughIso("2026-09-23", "12:00"),
     pickupThroughAt: throughFuture,
-    todayYmd: "2026-09-22",
   }),
-  "Orders available through 24 Sep 2026 · 3:00 PM cutoff",
+  "Orders available from 23 Sep 2026, 12:00 PM through 24 Sep 2026, 3:00 PM",
 );
 
 assert.equal(
   freshPickHomeSummaryLine({
-    preparedOn: "2026-09-22",
+    pickupAvailableFromAt: fromYesterday,
     pickupThroughAt: throughTomorrow,
-    todayYmd: "2026-09-22",
   }),
   freshPickHomeSummaryLine({
-    preparedOn: "2026-09-23",
+    pickupAvailableFromAt: fromYesterday,
     pickupThroughAt: throughTomorrow,
-    todayYmd: "2026-09-24",
   }),
-  "displayed date comes from pickupThroughAt, not pickup/today",
+  "Home range uses persisted start/end values, not today's date",
 );
 
 assert.doesNotMatch(
   freshPickHomeSummaryLine({
-    preparedOn: "2026-09-22",
+    pickupAvailableFromAt: fromYesterday,
     pickupThroughAt: throughTomorrow,
-    todayYmd: "2026-09-22",
   }),
   /Malaysia time/i,
 );
 assert.equal(
   freshPickHomeSummaryLine({
-    preparedOn: "2026-09-22",
+    pickupAvailableFromAt: null,
     pickupThroughAt: null,
-    todayYmd: "2026-09-22",
   }),
-  "Orders available through — · — cutoff",
+  "Orders available from — through —",
 );
 
 const homeOpsSrc = readFileSync(

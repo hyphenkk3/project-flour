@@ -13,7 +13,6 @@ import {
   homeFreshPickStatusLabel,
   previewHomeFreshPicks,
 } from "@/engines/extra/home-fresh-picks";
-import { formatExtraBoardWindowInstant } from "@/engines/extra/fresh-picks-time";
 import {
   EXTRA_WALK_IN_HOLD_ACTIVE_ERROR,
   freshPickHomeSummaryLine,
@@ -194,7 +193,6 @@ export function HomeFreshPicksOperations({
               key={unit.id}
               now={now}
               pending={pending}
-              todayYmd={todayYmd}
               unit={unit}
               onAssign={() => {
                 setError(null);
@@ -267,7 +265,6 @@ export function HomeFreshPicksOperations({
 function HomeFreshPickCard({
   unit,
   capabilities,
-  todayYmd,
   pending,
   now,
   onAssign,
@@ -278,7 +275,6 @@ function HomeFreshPickCard({
 }: {
   unit: ExtraStockUnit;
   capabilities: ExtraWorkspaceCapabilities;
-  todayYmd: string;
   pending: boolean;
   now: Date;
   onAssign: () => void;
@@ -301,9 +297,8 @@ function HomeFreshPickCard({
     unitPrice: unit.unitPrice,
   });
   const summary = freshPickHomeSummaryLine({
-    preparedOn: unit.preparedOn,
+    pickupAvailableFromAt: unit.pickupAvailableFromAt,
     pickupThroughAt: unit.pickupThroughAt,
-    todayYmd,
   });
   const heldMore =
     unit.walkInHeld &&
@@ -363,15 +358,7 @@ function HomeFreshPickCard({
             </p>
           </>
         ) : (
-          <>
-            {unit.pickupAvailableFromAt ? (
-              <p className="text-skyline mt-0.5 text-sm">
-                Pickup available from{" "}
-                {formatExtraBoardWindowInstant(unit.pickupAvailableFromAt)}
-              </p>
-            ) : null}
-            <p className="text-skyline mt-0.5 text-sm">{summary}</p>
-          </>
+          <p className="text-skyline mt-0.5 text-sm">{summary}</p>
         )}
 
         <div

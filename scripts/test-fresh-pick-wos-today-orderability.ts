@@ -8,6 +8,7 @@ import {
   type FreshPicksFulfilmentContext,
 } from "@/engines/extra/fresh-picks-fulfilment";
 import { freshPickTodayStatusLabel } from "@/engines/extra/home-fresh-picks";
+import { freshPickHomeSummaryLine } from "@/engines/extra/walk-in-hold";
 import { toBusinessDateKey } from "@/lib/dates";
 
 const TODAY = "2026-10-06";
@@ -168,12 +169,28 @@ const windowHelperSource = readFileSync(
   "utf8",
 );
 assert.match(homeSource, /FreshPickTodayOrderabilityStatus/);
-assert.match(homeSource, /Pickup available from/);
+assert.doesNotMatch(homeSource, /Pickup available from/);
 assert.match(homeSource, /freshPickHomeSummaryLine/);
-assert.match(windowHelperSource, /Orders available through/);
+assert.match(windowHelperSource, /Orders available from/);
 assert.match(extraBoardSource, /FreshPickTodayOrderabilityStatus/);
 assert.match(extraBoardSource, /Pickup available from/);
 assert.match(extraBoardSource, /Orders available through/);
+const homeRange = freshPickHomeSummaryLine({
+  pickupAvailableFromAt: "2026-10-06T04:00:00.000Z",
+  pickupThroughAt: "2026-10-07T07:00:00.000Z",
+});
+assert.match(homeRange, /^Orders available from /);
+assert.match(homeRange, /through /);
+assert.match(homeRange, /6 Oct/);
+assert.match(homeRange, /7 Oct/);
+assert.doesNotMatch(homeRange, /Pickup available from/);
+assert.equal(
+  freshPickHomeSummaryLine({
+    pickupAvailableFromAt: "2026-10-06T04:00:00.000Z",
+    pickupThroughAt: "2026-10-06T07:00:00.000Z",
+  }),
+  "Orders available on 6 Oct 2026, 12:00 PM–3:00 PM",
+);
 assert.equal(toBusinessDateKey(new Date("2026-10-06T08:30:00.000Z")), TODAY);
 
 const querySource = readFileSync(
