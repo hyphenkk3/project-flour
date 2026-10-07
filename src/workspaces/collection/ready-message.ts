@@ -126,3 +126,13 @@ export function resolveCollectionReadyMessageOperatingHours(
 
   return { whitebirdStatus, pickupLatestBookable };
 }
+
+export function selectCollectionWhatsAppMessage(
+  readyMessage: string,
+  thankYouMessage: string,
+  readyMessageSent: boolean,
+): { kind: "ready" | "thank_you"; text: string } {
+  return readyMessageSent
+    ? { kind: "thank_you", text: thankYouMessage }
+    : { kind: "ready", text: readyMessage };
+}

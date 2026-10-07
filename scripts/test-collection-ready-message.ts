@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
+import { buildWhatsAppDeepLink } from "@/engines/orders/whatsapp";
 import {
   closeCapabilitiesOnDate,
   copyWeeklyDayToDate,
@@ -9,6 +10,7 @@ import {
 import {
   generateCustomerDeliveryReadyMessage,
   generateCustomerReadyMessage,
+  generateCustomerThankYouMessage,
 } from "@/engines/orders/messages";
 import { WHITEBIRD_CUSTOMER_PHONE } from "@/engines/orders/whitebird-customer-contact";
 import { STOREFRONT_WHATSAPP_PHONE } from "@/workspaces/storefront/home/storefront-contact";
@@ -19,6 +21,7 @@ import {
   collectionReadyMessageVariant,
   generateCollectionReadyMessage,
   resolveCollectionReadyMessageOperatingHours,
+  selectCollectionWhatsAppMessage,
 } from "@/workspaces/collection/ready-message";
 
 function readSrc(path: string): string {
@@ -52,6 +55,14 @@ assert.equal(
   generateCollectionReadyMessage(pickup, "Lily"),
   generateCustomerReadyMessage("Lily"),
   "open pickup keeps the exact existing Ready Message",
+);
+const thankYouMessage = generateCustomerThankYouMessage();
+assert.equal(
+  thankYouMessage,
+  "Thank you for the order and hope you enjoy ya ;)\n\n" +
+    "If there’s anything please do not hesitate to let us know so we can improve and serve you better !\n\n" +
+    "Thank you once again and have a nice day ahead!",
+  "Collection uses the exact approved Production Thank You content",
 );
 
 const WEDNESDAY = "2026-10-07";
@@ -282,6 +293,36 @@ assert.deepEqual(sent, {
   sentAt: "2026-10-06T04:05:00.000Z",
   sentByName: "Lily",
 });
+const readySelection = selectCollectionWhatsAppMessage(
+  generateCollectionReadyMessage(pickup, "Lily"),
+  thankYouMessage,
+  Boolean(null),
+);
+assert.deepEqual(readySelection, {
+  kind: "ready",
+  text: generateCustomerReadyMessage("Lily"),
+});
+const thankYouSelection = selectCollectionWhatsAppMessage(
+  generateCollectionReadyMessage(pickup, "Lily"),
+  thankYouMessage,
+  Boolean(sent),
+);
+assert.deepEqual(thankYouSelection, {
+  kind: "thank_you",
+  text: thankYouMessage,
+});
+assert.equal(
+  new URL(
+    buildWhatsAppDeepLink(pickup.guestPhone ?? "", thankYouSelection.text)!,
+  ).searchParams.get("text"),
+  thankYouMessage,
+  "after persisted Ready Message Sent, WhatsApp uses the existing Thank You text",
+);
+assert.equal(buildWhatsAppDeepLink("", thankYouSelection.text), null);
+assert.equal(
+  buildWhatsAppDeepLink("not a phone", thankYouSelection.text),
+  null,
+);
 assert.equal(collectionReadyMessageSentFromEvent(null, null), null);
 assert.equal(COLLECTION_READY_MESSAGE_SENT_EVENT, "customer_ready_message_sent");
 
@@ -290,8 +331,53 @@ assert.match(detailSource, /<CollectionReadyMessage/);
 
 const componentSource = readSrc("src/workspaces/collection/CollectionReadyMessage.tsx");
 assert.match(componentSource, /Customer Ready Message/);
+assert.match(componentSource, /Customer Thank You Message/);
+assert.ok(
+  componentSource.indexOf("Customer Ready Message") <
+    componentSource.indexOf("Customer Thank You Message"),
+  "Thank You action appears below the Ready Message action",
+);
 assert.match(componentSource, /Mark Ready Message Sent/);
+assert.equal(componentSource.match(/Open WhatsApp —/g)?.length, 1);
 assert.match(componentSource, /Copy for WhatsApp\. Nothing is sent automatically\./);
+assert.match(
+  componentSource,
+  /buildWhatsAppDeepLink\([\s\S]*order\.guestPhone \?\? ""[\s\S]*selectedWhatsAppMessage\.text/,
+);
+assert.match(componentSource, /generateCustomerThankYouMessage\(\)/);
+assert.match(componentSource, /Boolean\(sent\)/);
+assert.match(
+  componentSource,
+  /generatedText=\{previewKind === "ready" \? message : thankYouMessage\}/,
+);
+assert.match(
+  componentSource,
+  /type=\{previewKind === "ready" \? messageType : "customer_thank_you"\}/,
+);
+assert.match(
+  componentSource,
+  /onSenderNameChange=\{\s*previewKind === "ready" \? setSenderName : undefined/,
+);
+const thankYouPreviewHandler = componentSource.slice(
+  componentSource.indexOf('onClick={() => setPreviewKind("thank_you")}'),
+  componentSource.indexOf(
+    'type="button"',
+    componentSource.indexOf('onClick={() => setPreviewKind("thank_you")}'),
+  ),
+);
+assert.doesNotMatch(
+  thankYouPreviewHandler,
+  /markCollectionReadyMessageSentAction|customer_ready_message_sent/,
+  "opening the Thank You preview does not change Ready Message Sent state",
+);
+const openWhatsAppHandler = componentSource.slice(
+  componentSource.indexOf("function openWhatsApp()"),
+  componentSource.indexOf(
+    "\n  return (",
+    componentSource.indexOf("function openWhatsApp()"),
+  ),
+);
+assert.match(openWhatsAppHandler, /window\.open\(whatsappUrl/);
 const markHandler = componentSource.slice(
   componentSource.indexOf("function markSent"),
   componentSource.indexOf("\n  return (", componentSource.indexOf("function markSent")),
