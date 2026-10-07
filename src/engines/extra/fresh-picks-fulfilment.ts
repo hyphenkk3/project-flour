@@ -51,6 +51,13 @@ export type FreshPicksDateAvailability = Record<
   FreshPicksMethodAvailability
 >;
 
+export type FreshPickTodayOrderability = {
+  /** Fulfilment methods with at least one currently valid slot today. */
+  availableMethods: CustomerWebsiteFulfilmentMethod[];
+  /** First future customer-visible date, if one remains in the item window. */
+  nextAvailableDate: string | null;
+};
+
 const METHODS: CustomerWebsiteFulfilmentMethod[] = [
   "pickup",
   "dine_in",
@@ -352,6 +359,25 @@ export function extraCustomerVisibleFulfilmentDates(
   const first = upcoming[0]!;
   if (first > todayYmd) return [first];
   return upcoming.slice(0, 2);
+}
+
+/**
+ * WOS display summary for one exact physical Fresh Pick. It deliberately
+ * delegates to the same method/date resolver used by the storefront.
+ */
+export function freshPickTodayOrderability(
+  input: FreshPicksFulfilmentContext,
+): FreshPickTodayOrderability {
+  const { now } = contextDefaults(input);
+  const todayYmd = toBusinessDateKey(now);
+  const today = freshPicksDateAvailability(todayYmd, { ...input, now });
+  const visibleDates = extraCustomerVisibleFulfilmentDates({ ...input, now });
+
+  return {
+    availableMethods: METHODS.filter((method) => today[method].available),
+    nextAvailableDate:
+      visibleDates.find((date) => date > todayYmd) ?? null,
+  };
 }
 
 /**

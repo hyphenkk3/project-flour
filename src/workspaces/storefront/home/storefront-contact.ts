@@ -1,9 +1,10 @@
 import { normalizeMalaysiaWhatsAppPhone } from "@/engines/orders/whatsapp";
+import { WHITEBIRD_CUSTOMER_PHONE } from "@/engines/orders/whitebird-customer-contact";
 
 /**
  * Official customer WhatsApp for the storefront.
  */
-export const STOREFRONT_WHATSAPP_PHONE = "+60128730060";
+export const STOREFRONT_WHATSAPP_PHONE = WHITEBIRD_CUSTOMER_PHONE;
 
 /** Display name for the Find Us block. */
 export const STOREFRONT_LOCATION_NAME = "Whitebird";

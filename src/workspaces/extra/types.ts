@@ -1,4 +1,5 @@
 import type { ExtraLifecycle } from "@/engines/extra/availability";
+import type { FreshPickTodayOrderability } from "@/engines/extra/fresh-picks-fulfilment";
 
 export type { ExtraLifecycle };
 
@@ -49,6 +50,8 @@ export type ExtraStockUnit = {
   imageAlt?: string | null;
   /** Library cake size price for this Extra unit. */
   unitPrice?: number | null;
+  /** Customer orderability for today, computed per physical item. */
+  todayOrderability?: FreshPickTodayOrderability | null;
 };
 
 export type ExtraCakeOption = {

@@ -6,6 +6,7 @@
 
 import { createServiceClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import {
   COLLECTION_ACTIVE_PREORDER_STATUSES,
   COLLECTION_HISTORY_LOOKBACK_DAYS,
@@ -31,6 +32,7 @@ import { addCalendarDaysYmd } from "@/workspaces/collection/date";
 import {
   COLLECTION_READY_MESSAGE_SENT_EVENT,
   collectionReadyMessageSentFromEvent,
+  resolveCollectionReadyMessageOperatingHours,
 } from "@/workspaces/collection/ready-message";
 
 function rowPassesPickupBoard(
@@ -408,28 +410,46 @@ export async function getCollectionOrderDetail(
     .maybeSingle();
   if (eventError) throw new Error(eventError.message);
 
-  if (!event) return order;
-  const actorStaffId = (event.actor_staff_id as string | null) ?? null;
-  let actorName: string | null = null;
-  if (actorStaffId) {
+  if (event) {
+    const actorStaffId = (event.actor_staff_id as string | null) ?? null;
+    let actorName: string | null = null;
+    if (actorStaffId) {
+      try {
+        const admin = createServiceClient();
+        const { data: staffRow } = await admin
+          .from("staff_profiles")
+          .select("display_name")
+          .eq("id", actorStaffId)
+          .maybeSingle();
+        actorName = String(staffRow?.display_name ?? "").trim() || null;
+      } catch {
+        // Attribution is presentation-only; preserve the event if lookup fails.
+      }
+    }
+    order.readyMessageSent = collectionReadyMessageSentFromEvent(
+      {
+        createdAt: String(event.created_at),
+        actorStaffId,
+      },
+      actorName,
+    );
+  }
+
+  if (
+    order.fulfilmentMethod === "pickup" &&
+    (order.readyAt || order.readyMessageSent)
+  ) {
     try {
-      const admin = createServiceClient();
-      const { data: staffRow } = await admin
-        .from("staff_profiles")
-        .select("display_name")
-        .eq("id", actorStaffId)
-        .maybeSingle();
-      actorName = String(staffRow?.display_name ?? "").trim() || null;
+      const hours = await loadOperatingHoursSnapshot();
+      order.readyMessageOperatingHours =
+        resolveCollectionReadyMessageOperatingHours(order.pickupDate, hours);
     } catch {
-      // Attribution is presentation-only; preserve the event if lookup fails.
+      order.readyMessageOperatingHours =
+        resolveCollectionReadyMessageOperatingHours(order.pickupDate, {
+          weekly: [],
+          overrides: [],
+        });
     }
   }
-  order.readyMessageSent = collectionReadyMessageSentFromEvent(
-    {
-      createdAt: String(event.created_at),
-      actorStaffId,
-    },
-    actorName,
-  );
   return order;
 }

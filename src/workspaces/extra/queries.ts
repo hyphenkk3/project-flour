@@ -4,7 +4,10 @@ import {
   type ExtraLifecycle,
 } from "@/engines/extra/availability";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
-import { extraCustomerVisibleFulfilmentDates } from "@/engines/extra/fresh-picks-fulfilment";
+import {
+  extraCustomerVisibleFulfilmentDates,
+  freshPickTodayOrderability,
+} from "@/engines/extra/fresh-picks-fulfilment";
 import { compareHomeFreshPickUnits } from "@/engines/extra/home-fresh-picks";
 import type { FreshPicksPreparationConfig } from "@/engines/extra/fresh-picks-preparation";
 import { isExtraWalkInHeld } from "@/engines/extra/walk-in-hold";
@@ -138,6 +141,41 @@ export function mapExtraStockRow(
       now,
     }),
   };
+}
+
+function attachTodayOrderability(
+  units: ExtraStockUnit[],
+  input: {
+    now: Date;
+    snapshot: OperatingHoursSnapshot;
+    config: FreshPicksPreparationConfig;
+  },
+): ExtraStockUnit[] {
+  return units.map((unit) => {
+    if (
+      unit.lifecycle !== "confirmed" ||
+      unit.soldAt ||
+      unit.cutIntoSlicesAt ||
+      !unit.pickupAvailableFromAt ||
+      !unit.pickupThroughAt
+    ) {
+      return { ...unit, todayOrderability: null };
+    }
+
+    return {
+      ...unit,
+      todayOrderability: freshPickTodayOrderability({
+        window: {
+          pickupAvailableFromAt: unit.pickupAvailableFromAt,
+          orderCutoffAt: unit.pickupThroughAt,
+        },
+        readyForCollection: unit.readyForCollection,
+        now: input.now,
+        snapshot: input.snapshot,
+        config: input.config,
+      }),
+    };
+  });
 }
 
 type ExtraPhotoRow = {
@@ -291,40 +329,56 @@ export async function listExtraStockUnits(): Promise<ExtraStockUnit[]> {
     mapExtraStockRow(row, now),
   );
   const soldIds = units.filter((unit) => unit.soldAt).map((unit) => unit.id);
-  if (soldIds.length === 0) return units;
+  let assignedUnits = units;
+  if (soldIds.length > 0) {
+    const { data: orders, error: orderError } = await supabase
+      .from("orders")
+      .select("id, order_number, guest_name, extra_stock_id")
+      .in("extra_stock_id", soldIds);
+    if (orderError) {
+      throw new Error(orderError.message);
+    }
 
-  const { data: orders, error: orderError } = await supabase
-    .from("orders")
-    .select("id, order_number, guest_name, extra_stock_id")
-    .in("extra_stock_id", soldIds);
-  if (orderError) {
-    throw new Error(orderError.message);
-  }
+    const byExtra = new Map<
+      string,
+      { id: string; order_number: string; guest_name: string | null }
+    >();
+    for (const order of orders ?? []) {
+      const extraId = (order as { extra_stock_id?: string | null }).extra_stock_id;
+      if (!extraId) continue;
+      byExtra.set(extraId, {
+        id: (order as { id: string }).id,
+        order_number: String((order as { order_number?: string }).order_number ?? ""),
+        guest_name: (order as { guest_name?: string | null }).guest_name ?? null,
+      });
+    }
 
-  const byExtra = new Map<
-    string,
-    { id: string; order_number: string; guest_name: string | null }
-  >();
-  for (const order of orders ?? []) {
-    const extraId = (order as { extra_stock_id?: string | null }).extra_stock_id;
-    if (!extraId) continue;
-    byExtra.set(extraId, {
-      id: (order as { id: string }).id,
-      order_number: String((order as { order_number?: string }).order_number ?? ""),
-      guest_name: (order as { guest_name?: string | null }).guest_name ?? null,
+    assignedUnits = units.map((unit) => {
+      const linked = byExtra.get(unit.id);
+      if (!linked) return unit;
+      return {
+        ...unit,
+        assignedOrderId: linked.id,
+        assignedOrderNumber: linked.order_number || null,
+        assignedGuestName: linked.guest_name,
+      };
     });
   }
 
-  return units.map((unit) => {
-    const linked = byExtra.get(unit.id);
-    if (!linked) return unit;
-    return {
-      ...unit,
-      assignedOrderId: linked.id,
-      assignedOrderNumber: linked.order_number || null,
-      assignedGuestName: linked.guest_name,
-    };
-  });
+  const hasOrderabilityCandidates = assignedUnits.some(
+    (unit) =>
+      unit.lifecycle === "confirmed" &&
+      !unit.soldAt &&
+      !unit.cutIntoSlicesAt &&
+      Boolean(unit.pickupAvailableFromAt && unit.pickupThroughAt),
+  );
+  if (!hasOrderabilityCandidates) return assignedUnits;
+
+  const [snapshot, config] = await Promise.all([
+    loadOperatingHoursSnapshot(),
+    loadFreshPicksPreparationConfig(),
+  ]);
+  return attachTodayOrderability(assignedUnits, { now, snapshot, config });
 }
 
 /**
@@ -398,7 +452,12 @@ export async function listHomeFreshPickUnits(): Promise<ExtraStockUnit[]> {
     loadOperatingHoursSnapshot(),
     loadFreshPicksPreparationConfig(),
   ]);
-  return attachHomeFreshPickPresentation(units, { now, snapshot, config });
+  const presented = await attachHomeFreshPickPresentation(units, {
+    now,
+    snapshot,
+    config,
+  });
+  return attachTodayOrderability(presented, { now, snapshot, config });
 }
 
 export type ExtraAssignableOrder = {

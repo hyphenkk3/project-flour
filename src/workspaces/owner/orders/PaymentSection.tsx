@@ -101,9 +101,9 @@ export function PaymentSection({
       unitPrice: item.unitPrice,
     })),
   );
-  const paymentThankYouAvailable = hasVerifiedPaymentForPaymentThankYou(
-    order.paymentAllocations,
-  );
+  const paymentThankYouAvailable =
+    order.status !== "cancelled" &&
+    hasVerifiedPaymentForPaymentThankYou(order.paymentAllocations);
   const paymentThankYouUrl = paymentThankYouAvailable
     ? buildWhatsAppDeepLink(
         order.phone,

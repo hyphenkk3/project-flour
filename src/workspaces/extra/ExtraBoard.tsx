@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { FormField, FormTextarea } from "@/components/ui/form";
@@ -36,6 +37,7 @@ import { ExtraWindowFields } from "@/workspaces/extra/ExtraWindowFields";
 import { MoveExtraWindowDialog } from "@/workspaces/extra/MoveExtraWindowDialog";
 import { WalkInHoldCompleteSaleDialog } from "@/workspaces/extra/WalkInHoldCompleteSaleDialog";
 import { WalkInHoldPanel } from "@/workspaces/extra/WalkInHoldPanel";
+import { FreshPickTodayOrderabilityStatus } from "@/workspaces/extra/FreshPickTodayOrderabilityStatus";
 import {
   initialExtraWindow,
   nextExtraWindow,
@@ -60,6 +62,7 @@ export function ExtraBoard({
   todayYmd,
   surface = "full",
 }: ExtraBoardProps) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"propose" | "create">(
@@ -86,6 +89,11 @@ export function ExtraBoard({
   const [readyReason, setReadyReason] = useState("");
   const [undoReadyReason, setUndoReadyReason] = useState("");
   const [drafts, setDrafts] = useState<Record<string, ExtraWindowDraft>>({});
+
+  useEffect(() => {
+    const refreshId = window.setInterval(() => router.refresh(), 30_000);
+    return () => window.clearInterval(refreshId);
+  }, [router]);
 
   const proposed = useMemo(
     () => units.filter((u) => isBakeryExtraProposalActionable(u)),
@@ -660,6 +668,11 @@ export function ExtraBoard({
                     Ready for Collection · this physical cake
                   </p>
                 ) : null}
+                <FreshPickTodayOrderabilityStatus
+                  availability={unit.todayOrderability}
+                  readyForCollection={unit.readyForCollection}
+                  walkInHeld={unit.walkInHeld}
+                />
                 <p className="text-skyline mt-1 text-sm">
                   Pickup available from{" "}
                   {formatExtraBoardWindowInstant(

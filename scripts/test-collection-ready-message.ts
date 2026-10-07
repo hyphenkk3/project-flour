@@ -1,17 +1,28 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
+import {
+  closeCapabilitiesOnDate,
+  copyWeeklyDayToDate,
+} from "@/engines/business-calendar/operating-hours";
 import {
   buildWhatsAppDeepLink,
   normalizeMalaysiaWhatsAppPhone,
 } from "@/engines/orders/whatsapp";
-import { generateCustomerThankYouMessage } from "@/engines/orders/messages";
+import {
+  generateCustomerReadyMessage,
+  generateCustomerThankYouMessage,
+} from "@/engines/orders/messages";
+import { WHITEBIRD_CUSTOMER_PHONE } from "@/engines/orders/whitebird-customer-contact";
+import { STOREFRONT_WHATSAPP_PHONE } from "@/workspaces/storefront/home/storefront-contact";
 import { mapCollectionBoardOrder } from "@/workspaces/collection/map-order";
 import {
   COLLECTION_READY_MESSAGE_SENT_EVENT,
   collectionReadyMessageSentFromEvent,
   collectionReadyMessageVariant,
   generateCollectionReadyMessage,
+  resolveCollectionReadyMessageOperatingHours,
   selectCollectionWhatsAppMessage,
 } from "@/workspaces/collection/ready-message";
 
@@ -46,6 +57,7 @@ assert.match(
   /ready for pick up/,
 );
 const pickupReadyMessage = generateCollectionReadyMessage(pickup, "Lily");
+assert.equal(pickupReadyMessage, generateCustomerReadyMessage("Lily"));
 assert.equal(
   normalizeMalaysiaWhatsAppPhone(pickup.guestPhone ?? ""),
   "60123456789",
@@ -67,6 +79,187 @@ assert.equal(buildWhatsAppDeepLink("", pickupReadyMessage), null);
 assert.equal(buildWhatsAppDeepLink("not a phone", pickupReadyMessage), null);
 
 const thankYouMessage = generateCustomerThankYouMessage();
+assert.equal(
+  thankYouMessage,
+  "Thank you for the order and hope you enjoy ya ;)\n\n" +
+    "If there’s anything please do not hesitate to let us know so we can improve and serve you better !\n\n" +
+    "Thank you once again and have a nice day ahead!",
+);
+
+const WEDNESDAY = "2026-10-07";
+const MONDAY = "2026-10-05";
+const pickupFor = (pickupDate: string) => ({ ...pickup, pickupDate });
+const readyMessageHoursFor = (
+  pickupDate: string,
+  snapshot: typeof OPERATING_HOURS_SEED,
+) => resolveCollectionReadyMessageOperatingHours(pickupDate, snapshot);
+
+const weeklyWednesdayHours = readyMessageHoursFor(
+  WEDNESDAY,
+  OPERATING_HOURS_SEED,
+);
+assert.deepEqual(weeklyWednesdayHours, {
+  whitebirdStatus: "closed",
+  pickupLatestBookable: "15:00",
+});
+const closedWednesdayMessage = generateCollectionReadyMessage(
+  {
+    ...pickupFor(WEDNESDAY),
+    readyMessageOperatingHours: weeklyWednesdayHours,
+  },
+  "wee",
+);
+assert.equal(
+  closedWednesdayMessage,
+  "Good morning, wee here ☀️\n" +
+    "Just to let you know that your order above is ready for pickup ya from now until latest 3pm ya.\n\n" +
+    "Do give us a CALL at 0128730060 when you arrive as we are closed today so we will open the door for you ya.\n" +
+    "(we might miss the message so please call, thank you)",
+);
+
+const openedWednesday = copyWeeklyDayToDate(
+  OPERATING_HOURS_SEED,
+  WEDNESDAY,
+  1,
+  ["whitebird"],
+);
+const openedWednesdayMessage = generateCollectionReadyMessage(
+  {
+    ...pickupFor(WEDNESDAY),
+    readyMessageOperatingHours: readyMessageHoursFor(
+      WEDNESDAY,
+      openedWednesday,
+    ),
+  },
+  "Lily",
+);
+assert.equal(openedWednesdayMessage, generateCustomerReadyMessage("Lily"));
+
+const closedMonday = closeCapabilitiesOnDate(OPERATING_HOURS_SEED, MONDAY, [
+  "whitebird",
+]);
+const closedMondayHours = readyMessageHoursFor(MONDAY, closedMonday);
+assert.equal(closedMondayHours.whitebirdStatus, "closed");
+assert.equal(closedMondayHours.pickupLatestBookable, "17:30");
+assert.match(
+  generateCollectionReadyMessage(
+    { ...pickupFor(MONDAY), readyMessageOperatingHours: closedMondayHours },
+    "Lily",
+  ),
+  /latest 5:30pm/,
+);
+
+const closedWednesdayAtFour = {
+  ...OPERATING_HOURS_SEED,
+  overrides: [
+    ...OPERATING_HOURS_SEED.overrides,
+    {
+      ...OPERATING_HOURS_SEED.weekly.find(
+        (row) => row.capability === "pickup" && row.weekday === 3,
+      )!,
+      overrideDate: WEDNESDAY,
+      latestBookable: "16:00",
+      closesAt: "16:00",
+      note: null,
+    },
+  ],
+};
+assert.match(
+  generateCollectionReadyMessage(
+    {
+      ...pickupFor(WEDNESDAY),
+      readyMessageOperatingHours: readyMessageHoursFor(
+        WEDNESDAY,
+        closedWednesdayAtFour,
+      ),
+    },
+    "Lily",
+  ),
+  /latest 4pm/,
+);
+
+const missingLatestPickupTime = {
+  ...OPERATING_HOURS_SEED,
+  overrides: [
+    ...OPERATING_HOURS_SEED.overrides,
+    {
+      ...OPERATING_HOURS_SEED.weekly.find(
+        (row) => row.capability === "pickup" && row.weekday === 3,
+      )!,
+      overrideDate: WEDNESDAY,
+      latestBookable: null,
+      note: null,
+    },
+  ],
+};
+const noDeadlineMessage = generateCollectionReadyMessage(
+  {
+    ...pickupFor(WEDNESDAY),
+    readyMessageOperatingHours: readyMessageHoursFor(
+      WEDNESDAY,
+      missingLatestPickupTime,
+    ),
+  },
+  "Lily",
+);
+assert.match(noDeadlineMessage, /ready for pickup ya\.\n\nDo give us a CALL/);
+assert.doesNotMatch(noDeadlineMessage, /latest \d/);
+const malformedLatestPickupTime = {
+  ...missingLatestPickupTime,
+  overrides: missingLatestPickupTime.overrides.map((row) =>
+    row.capability === "pickup" ? { ...row, latestBookable: "25:00" } : row,
+  ),
+};
+const malformedDeadlineMessage = generateCollectionReadyMessage(
+  {
+    ...pickupFor(WEDNESDAY),
+    readyMessageOperatingHours: readyMessageHoursFor(
+      WEDNESDAY,
+      malformedLatestPickupTime,
+    ),
+  },
+  "Lily",
+);
+assert.doesNotMatch(malformedDeadlineMessage, /latest \d/);
+
+const unknownHours = readyMessageHoursFor(MONDAY, {
+  weekly: [],
+  overrides: [],
+});
+assert.equal(unknownHours.whitebirdStatus, "unknown");
+assert.equal(
+  generateCollectionReadyMessage(
+    { ...pickupFor(MONDAY), readyMessageOperatingHours: unknownHours },
+    "Lily",
+  ),
+  generateCustomerReadyMessage("Lily"),
+);
+const malformedHours = {
+  ...OPERATING_HOURS_SEED,
+  weekly: OPERATING_HOURS_SEED.weekly.map((row) =>
+    row.capability === "whitebird" && row.weekday === 1
+      ? { ...row, opensAt: null, closesAt: null, latestBookable: null }
+      : row,
+  ),
+};
+assert.equal(
+  readyMessageHoursFor(MONDAY, malformedHours).whitebirdStatus,
+  "unknown",
+);
+
+assert.equal(WHITEBIRD_CUSTOMER_PHONE, "+60128730060");
+assert.equal(STOREFRONT_WHATSAPP_PHONE, WHITEBIRD_CUSTOMER_PHONE);
+assert.match(closedWednesdayMessage, /CALL at 0128730060/);
+
+const dineInWhileClosed = {
+  ...pickupFor(WEDNESDAY),
+  fulfilmentMethod: "dine_in" as const,
+  readyMessageOperatingHours: weeklyWednesdayHours,
+};
+assert.equal(
+  generateCollectionReadyMessage(dineInWhileClosed, "Lily"),
+  generateCustomerReadyMessage("Lily"),
+);
 const readySelection = selectCollectionWhatsAppMessage(
   pickupReadyMessage,
   thankYouMessage,

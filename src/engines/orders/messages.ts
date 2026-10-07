@@ -19,6 +19,7 @@ import {
   type FinancialEquationItem,
 } from "@/engines/orders/financial-equation";
 import { paymentMethodLabel } from "@/engines/orders/payment-details";
+import { whitebirdCustomerPhoneLocal } from "@/engines/orders/whitebird-customer-contact";
 import {
   messagesForQuantity,
   normalizeWrittenMessage,
@@ -573,6 +574,27 @@ export function generateCustomerReadyMessage(senderName: string): string {
     `Wed :3:00pm\n` +
     `Fri-Sun :9:30pm\n\n` +
     `Thank you, and hope to see you soon! 🤭`
+  );
+}
+
+export function generateCustomerClosedPickupReadyMessage(
+  senderName: string,
+  latestPickupTime: string | null,
+): string {
+  const sender = senderName.trim() || "Whitebird";
+  const validLatestPickupTime =
+    latestPickupTime && /^([01]\d|2[0-3]):[0-5]\d$/.test(latestPickupTime)
+      ? formatCrewPickupTime({ pickupTime: latestPickupTime })
+      : null;
+  const readyLine = validLatestPickupTime
+    ? `Just to let you know that your order above is ready for pickup ya from now until latest ${validLatestPickupTime} ya.`
+    : "Just to let you know that your order above is ready for pickup ya.";
+
+  return (
+    `Good morning, ${sender} here ☀️\n` +
+    `${readyLine}\n\n` +
+    `Do give us a CALL at ${whitebirdCustomerPhoneLocal()} when you arrive as we are closed today so we will open the door for you ya.\n` +
+    `(we might miss the message so please call, thank you)`
   );
 }
 

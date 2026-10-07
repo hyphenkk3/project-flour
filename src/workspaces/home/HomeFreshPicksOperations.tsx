@@ -27,6 +27,7 @@ import { CutExtraIntoSlicesDialog } from "@/workspaces/extra/CutExtraIntoSlicesD
 import { MoveExtraWindowDialog } from "@/workspaces/extra/MoveExtraWindowDialog";
 import { WalkInHoldCompleteSaleDialog } from "@/workspaces/extra/WalkInHoldCompleteSaleDialog";
 import { WalkInHoldPanel } from "@/workspaces/extra/WalkInHoldPanel";
+import { FreshPickTodayOrderabilityStatus } from "@/workspaces/extra/FreshPickTodayOrderabilityStatus";
 import type { ExtraStockUnit } from "@/workspaces/extra/types";
 
 type HomeFreshPicksOperationsProps = {
@@ -192,7 +193,6 @@ export function HomeFreshPicksOperations({
               key={unit.id}
               now={now}
               pending={pending}
-              todayYmd={todayYmd}
               unit={unit}
               onAssign={() => {
                 setError(null);
@@ -265,7 +265,6 @@ export function HomeFreshPicksOperations({
 function HomeFreshPickCard({
   unit,
   capabilities,
-  todayYmd,
   pending,
   now,
   onAssign,
@@ -276,7 +275,6 @@ function HomeFreshPickCard({
 }: {
   unit: ExtraStockUnit;
   capabilities: ExtraWorkspaceCapabilities;
-  todayYmd: string;
   pending: boolean;
   now: Date;
   onAssign: () => void;
@@ -340,6 +338,16 @@ function HomeFreshPickCard({
           <p className="text-skyline mt-0.5 text-sm tabular-nums">{sizePrice}</p>
         ) : null}
         <p className="text-skyline mt-1 text-[11px] font-medium">{statusLabel}</p>
+        {unit.readyForCollection ? (
+          <p className="text-status-success mt-1 text-xs font-semibold">
+            Ready for Collection
+          </p>
+        ) : null}
+        <FreshPickTodayOrderabilityStatus
+          availability={unit.todayOrderability}
+          readyForCollection={unit.readyForCollection}
+          walkInHeld={unit.walkInHeld}
+        />
         {unit.walkInHeld ? (
           <>
             <p className="text-skyline mt-0.5 text-sm">
