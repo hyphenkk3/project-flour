@@ -51,6 +51,7 @@ export type ClaimedStaffNotificationEmail = {
 
 export type StaffNotificationEmailClaimer = (input: {
   eventId?: string;
+  staffId?: string;
   limit: number;
 }) => Promise<ClaimedStaffNotificationEmail[]>;
 
@@ -243,6 +244,7 @@ function mapClaimedRow(row: ClaimRpcRow): ClaimedStaffNotificationEmail {
 
 export async function claimStaffNotificationEmailDeliveries(input: {
   eventId?: string;
+  staffId?: string;
   limit?: number;
 }): Promise<ClaimedStaffNotificationEmail[]> {
   const admin = createServiceClient();
@@ -252,6 +254,7 @@ export async function claimStaffNotificationEmailDeliveries(input: {
       p_limit: input.limit ?? STAFF_NOTIFICATION_EMAIL_SWEEP_LIMIT,
       p_event_id: input.eventId ?? null,
       p_lease_seconds: STAFF_NOTIFICATION_EMAIL_LEASE_SECONDS,
+      p_staff_id: input.staffId ?? null,
     },
   );
 
@@ -493,6 +496,7 @@ export async function deliverStaffNotificationEvent(input: {
 export async function deliverPendingStaffNotificationEmails(input?: {
   mailer?: StaffNotificationMailer;
   eventId?: string;
+  staffId?: string;
   claimer?: StaffNotificationEmailClaimer;
   completeDelivery?: StaffNotificationEmailCompleter;
   validateFreshPickHoldReminder?: FreshPickHoldReminderValidator;
@@ -503,6 +507,7 @@ export async function deliverPendingStaffNotificationEmails(input?: {
       input?.claimer ?? claimStaffNotificationEmailDeliveries
     )({
       eventId: input?.eventId,
+      staffId: input?.staffId,
       limit: STAFF_NOTIFICATION_EMAIL_SWEEP_LIMIT,
     });
 
