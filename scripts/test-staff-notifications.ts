@@ -144,7 +144,10 @@ const waitingListNotifySql = read(
   "supabase/migrations/20260920120000_staff_notification_waiting_list_new_request.sql",
 );
 assert.match(waitingListNotifySql, /waiting_list_new_request/);
-assert.match(waitingListNotifySql, /waiting_list_new_request:' \|\| v_request.id/);
+assert.match(
+  waitingListNotifySql,
+  /waiting_list_new_request:' \|\| v_request.id/,
+);
 assert.match(waitingListNotifySql, /created_by_staff_id is not null/);
 assert.match(waitingListNotifySql, /constraint trigger/i);
 assert.match(waitingListNotifySql, /initially deferred/i);
@@ -161,7 +164,9 @@ assert.match(newOrderContentSql, /constraint trigger/i);
 assert.match(newOrderContentSql, /initially deferred/i);
 assert.match(newOrderContentSql, /staff_notification_emit_new_order/);
 assert.doesNotMatch(
-  newOrderContentSql.split("if tg_op = 'INSERT'")[1]?.split("if tg_op = 'UPDATE'")[0] ?? "",
+  newOrderContentSql
+    .split("if tg_op = 'INSERT'")[1]
+    ?.split("if tg_op = 'UPDATE'")[0] ?? "",
   /'new_order:'/,
 );
 assert.doesNotMatch(newOrderContentSql, /from public\.waiting_list/);
@@ -661,6 +666,7 @@ async function testEmailDelivery() {
     },
     recipients: emailRecipients,
     mailer: fakeMailer,
+    dispatchEnabled: async () => true,
   });
   assert.equal(bothOn.sent, 2);
   assert.equal(bothOn.failed, 0);
@@ -679,6 +685,7 @@ async function testEmailDelivery() {
       emailRecipients.map((item) => item.staffId),
     ),
     mailer: fakeMailer,
+    dispatchEnabled: async () => true,
   });
   assert.equal(duplicateSend.sent, 0);
   assert.equal(duplicateSend.skipped, 2);
@@ -700,6 +707,7 @@ async function testEmailDelivery() {
     },
     recipients: [{ staffId: "a", email: "a@whitebird.test" }],
     mailer: failingMailer,
+    dispatchEnabled: async () => true,
   });
   assert.equal(paymentSucceeded, true);
   assert.equal(failedEmail.failed, 1);
@@ -797,6 +805,7 @@ async function testEmailDelivery() {
   };
 
   const firstDispatch = await deliverPendingStaffNotificationEmails({
+    dispatchEnabled: async () => true,
     mailer: concurrentMailer,
     claimer: memoryClaimer,
     completeDelivery: async (input) => {
@@ -804,6 +813,7 @@ async function testEmailDelivery() {
     },
   });
   const secondDispatch = await deliverPendingStaffNotificationEmails({
+    dispatchEnabled: async () => true,
     mailer: concurrentMailer,
     claimer: memoryClaimer,
     completeDelivery: async (input) => {
@@ -912,7 +922,8 @@ async function testEmailDelivery() {
     /pathname === "\/api\/staff\/notifications\/dispatch"/,
   );
   assert.doesNotMatch(
-    middlewareSrc.split("function isPublicPath")[1]?.split("function ")[0] ?? "",
+    middlewareSrc.split("function isPublicPath")[1]?.split("function ")[0] ??
+      "",
     /\/api\/staff\/notifications\/dispatch/,
   );
 

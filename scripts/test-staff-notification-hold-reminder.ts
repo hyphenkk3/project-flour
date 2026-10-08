@@ -20,21 +20,35 @@ const migration = readFileSync(
   "utf8",
 );
 const reliabilityMigration = readFileSync(
-  resolve("supabase/migrations/20260903160000_staff_notification_reliability.sql"),
+  resolve(
+    "supabase/migrations/20260903160000_staff_notification_reliability.sql",
+  ),
   "utf8",
 );
 
-const holdValidator = migration.split(
-  "create or replace function public.staff_notification_fresh_pick_hold_reminder_is_current",
-)[1]?.split("$$;")[0] ?? "";
-const claimFunction = migration.split(
-  "create or replace function public.claim_staff_notification_email_deliveries",
-)[1]?.split("$$;")[0] ?? "";
-const reminderSweep = migration.split(
-  "create or replace function public.sweep_extra_walk_in_hold_reminders",
-)[1]?.split("$$;")[0] ?? "";
+const holdValidator =
+  migration
+    .split(
+      "create or replace function public.staff_notification_fresh_pick_hold_reminder_is_current",
+    )[1]
+    ?.split("$$;")[0] ?? "";
+const claimFunction =
+  migration
+    .split(
+      "create or replace function public.claim_staff_notification_email_deliveries",
+    )[1]
+    ?.split("$$;")[0] ?? "";
+const reminderSweep =
+  migration
+    .split(
+      "create or replace function public.sweep_extra_walk_in_hold_reminders",
+    )[1]
+    ?.split("$$;")[0] ?? "";
 
-assert.match(migration, /status in \('sent', 'failed', 'claimed', 'suppressed'\)/);
+assert.match(
+  migration,
+  /status in \('sent', 'failed', 'claimed', 'suppressed'\)/,
+);
 assert.match(migration, /p_status in \('claimed', 'failed'\)/);
 assert.match(reliabilityMigration, /unique \(event_id, staff_id\)/i);
 assert.match(migration, /on conflict \(event_id, staff_id\)/i);
@@ -49,7 +63,10 @@ assert.match(holdValidator, /cut_into_slices_at is null/i);
 assert.match(holdValidator, /walk_in_held_until = v_held_until/i);
 assert.match(holdValidator, /walk_in_held_at = v_held_at/i);
 assert.match(holdValidator, /walk_in_held_by = v_held_by/i);
-assert.match(holdValidator, /extra_walk_in_hold_is_active\([\s\S]*clock_timestamp\(\)/i);
+assert.match(
+  holdValidator,
+  /extra_walk_in_hold_is_active\([\s\S]*clock_timestamp\(\)/i,
+);
 assert.match(reminderSweep, /'walk_in_held_at', stock_row\.walk_in_held_at/i);
 assert.match(
   claimFunction,
@@ -58,7 +75,10 @@ assert.match(
 assert.match(claimFunction, /coalesce\(pref\.email_enabled, true\)/i);
 assert.match(claimFunction, /sp\.is_active = true/i);
 assert.match(claimFunction, /on conflict \(event_id, staff_id\)/i);
-assert.match(migration, /status = 'suppressed'[\s\S]*next_attempt_at = null[\s\S]*claimed_until = null/i);
+assert.match(
+  migration,
+  /status = 'suppressed'[\s\S]*next_attempt_at = null[\s\S]*claimed_until = null/i,
+);
 
 const now = new Date("2026-10-07T10:00:00.000Z");
 const terminalSuppressed: StaffNotificationEmailDeliveryState = {
@@ -68,7 +88,10 @@ const terminalSuppressed: StaffNotificationEmailDeliveryState = {
   nextAttemptAt: null,
   claimedUntil: new Date("2026-10-07T09:00:00.000Z"),
 };
-assert.equal(isStaffNotificationEmailDeliveryClaimable(terminalSuppressed, now), false);
+assert.equal(
+  isStaffNotificationEmailDeliveryClaimable(terminalSuppressed, now),
+  false,
+);
 
 const retryableFailure: StaffNotificationEmailDeliveryState = {
   staffId: "owner-1",
@@ -77,7 +100,10 @@ const retryableFailure: StaffNotificationEmailDeliveryState = {
   nextAttemptAt: new Date("2026-10-07T09:59:00.000Z"),
   claimedUntil: null,
 };
-assert.equal(isStaffNotificationEmailDeliveryClaimable(retryableFailure, now), true);
+assert.equal(
+  isStaffNotificationEmailDeliveryClaimable(retryableFailure, now),
+  true,
+);
 
 const baseClaim: Omit<ClaimedStaffNotificationEmail, "code" | "payload"> = {
   deliveryId: "delivery-1",
@@ -99,7 +125,9 @@ async function testPreSendSuppression() {
     walk_in_held_until: "2026-10-07T10:00:00.000Z",
     walk_in_held_by: "owner-1",
   };
-  const reminder = (payload: Record<string, unknown>): ClaimedStaffNotificationEmail => ({
+  const reminder = (
+    payload: Record<string, unknown>,
+  ): ClaimedStaffNotificationEmail => ({
     ...baseClaim,
     code: "fresh_pick_walk_in_hold_reminder",
     payload,
@@ -108,6 +136,7 @@ async function testPreSendSuppression() {
   let sendCount = 0;
   let validationCount = 0;
   const activeResult = await deliverPendingStaffNotificationEmails({
+    dispatchEnabled: async () => true,
     claimer: async () => [reminder(exactActivePayload)],
     mailer: {
       async send() {
@@ -143,6 +172,7 @@ async function testPreSendSuppression() {
     let suppressed = 0;
     const payload = { ...exactActivePayload, testCase: staleCase };
     const staleResult = await deliverPendingStaffNotificationEmails({
+      dispatchEnabled: async () => true,
       claimer: async () => [reminder(payload)],
       mailer: {
         async send() {
@@ -161,7 +191,9 @@ async function testPreSendSuppression() {
         assert.match(input.reason, /no longer active|no longer matches/i);
       },
       completeDelivery: async () => {
-        assert.fail("suppressed deliveries must not use sent/failed completion");
+        assert.fail(
+          "suppressed deliveries must not use sent/failed completion",
+        );
       },
     });
     assert.equal(staleResult[0]?.sent, 0, staleCase);
@@ -174,6 +206,7 @@ async function testPreSendSuppression() {
   let otherEventValidationCount = 0;
   let otherEventSendCount = 0;
   const otherResult = await deliverPendingStaffNotificationEmails({
+    dispatchEnabled: async () => true,
     claimer: async () => [
       {
         ...baseClaim,
@@ -192,7 +225,9 @@ async function testPreSendSuppression() {
       return false;
     },
     suppressDelivery: async () => {
-      assert.fail("other event types must not be suppressed by hold validation");
+      assert.fail(
+        "other event types must not be suppressed by hold validation",
+      );
     },
     completeDelivery: async ({ status }) => {
       assert.equal(status, "sent");

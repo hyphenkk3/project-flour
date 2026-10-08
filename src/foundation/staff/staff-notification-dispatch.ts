@@ -8,6 +8,7 @@ import {
 import type { StaffNotificationEventKey } from "@/foundation/staff/notification-event-identity";
 import { buildStaffNotificationEmail } from "@/foundation/staff/staff-notification-email";
 import { parseNewOrderNotificationPayload } from "@/foundation/staff/staff-notification-new-order";
+import { isStaffNotificationEmailDispatchEnabled } from "@/foundation/staff/staff-notification-email-dispatch-gate";
 import {
   STAFF_NOTIFICATION_EMAIL_LEASE_SECONDS,
   STAFF_NOTIFICATION_EMAIL_SWEEP_LIMIT,
@@ -19,7 +20,7 @@ export type StaffNotificationMailer = {
     subject: string;
     html: string;
     idempotencyKey: string;
-  }): Promise<{ id?: string | null }>;
+  }): Promise<{ id?: string | null; skipped?: boolean }>;
 };
 
 export type StaffNotificationDeliveryResult = {
@@ -75,6 +76,18 @@ export type StaffNotificationEmailSuppressor = (input: {
   claimedUntil: string;
 }) => Promise<void>;
 
+export type StaffNotificationEmailDispatchGate = () => Promise<boolean>;
+
+async function isDispatchEnabled(
+  gate: StaffNotificationEmailDispatchGate,
+): Promise<boolean> {
+  try {
+    return (await gate()) === true;
+  } catch {
+    return false;
+  }
+}
+
 type OrderContentRow = {
   id: string;
   order_number: string | null;
@@ -122,9 +135,13 @@ function staffNotificationResendFrom(): string {
   return process.env.RESEND_FROM?.trim() || DEVELOPMENT_RESEND_FROM;
 }
 
-export function createResendStaffNotificationMailer(): StaffNotificationMailer {
+export function createResendStaffNotificationMailer(
+  dispatchEnabled: StaffNotificationEmailDispatchGate = isStaffNotificationEmailDispatchEnabled,
+): StaffNotificationMailer {
   return {
     async send(input) {
+      if (!(await isDispatchEnabled(dispatchEnabled))) return { skipped: true };
+
       const apiKey = process.env.RESEND_API_KEY?.trim();
       if (!apiKey) {
         throw new Error("RESEND_API_KEY is not configured.");
@@ -157,16 +174,17 @@ export async function deliverStaffNotificationEmailsToRecipients(input: {
   recipients: Array<{ staffId: string; email: string }>;
   alreadyDeliveredStaffIds?: Set<string>;
   mailer: StaffNotificationMailer;
-  beforeSend?: (recipient: { staffId: string; email: string }) => Promise<
-    | { send: true }
-    | { send: false; reason: string }
-  >;
+  beforeSend?: (recipient: {
+    staffId: string;
+    email: string;
+  }) => Promise<{ send: true } | { send: false; reason: string }>;
   recordSuppressed?: (staffId: string, reason: string) => Promise<void>;
   recordDelivery?: (
     staffId: string,
     status: "sent" | "failed",
     detail: { error?: string; resendId?: string | null },
   ) => Promise<void>;
+  dispatchEnabled?: StaffNotificationEmailDispatchGate;
 }): Promise<
   Omit<StaffNotificationDeliveryResult, "eventId" | "eventKey" | "code">
 > {
@@ -188,6 +206,15 @@ export async function deliverStaffNotificationEmailsToRecipients(input: {
     }
 
     try {
+      if (
+        !(await isDispatchEnabled(
+          input.dispatchEnabled ?? isStaffNotificationEmailDispatchEnabled,
+        ))
+      ) {
+        result.skipped += 1;
+        continue;
+      }
+
       const sendCheck = await input.beforeSend?.(recipient);
       if (sendCheck?.send === false) {
         await input.recordSuppressed?.(recipient.staffId, sendCheck.reason);
@@ -201,6 +228,10 @@ export async function deliverStaffNotificationEmailsToRecipients(input: {
         html: email.html,
         idempotencyKey: `${input.eventKey}:${recipient.staffId}`,
       });
+      if (sent.skipped) {
+        result.skipped += 1;
+        continue;
+      }
       result.sent += 1;
       await input.recordDelivery?.(recipient.staffId, "sent", {
         resendId: sent.id ?? null,
@@ -247,6 +278,8 @@ export async function claimStaffNotificationEmailDeliveries(input: {
   staffId?: string;
   limit?: number;
 }): Promise<ClaimedStaffNotificationEmail[]> {
+  if (!(await isStaffNotificationEmailDispatchEnabled())) return [];
+
   const admin = createServiceClient();
   const claimArguments = {
     p_limit: input.limit ?? STAFF_NOTIFICATION_EMAIL_SWEEP_LIMIT,
@@ -369,6 +402,7 @@ async function deliverClaimedStaffNotificationEmails(input: {
   completeDelivery: StaffNotificationEmailCompleter;
   validateFreshPickHoldReminder: FreshPickHoldReminderValidator;
   suppressDelivery: StaffNotificationEmailSuppressor;
+  dispatchEnabled: StaffNotificationEmailDispatchGate;
 }): Promise<StaffNotificationDeliveryResult[]> {
   const byEvent = new Map<string, ClaimedStaffNotificationEmail[]>();
   for (const row of input.claimed) {
@@ -430,6 +464,7 @@ async function deliverClaimedStaffNotificationEmails(input: {
           email: row.staffEmail,
         })),
         mailer: input.mailer,
+        dispatchEnabled: input.dispatchEnabled,
         beforeSend:
           first.code === "fresh_pick_walk_in_hold_reminder"
             ? async () =>
@@ -512,8 +547,13 @@ export async function deliverPendingStaffNotificationEmails(input?: {
   completeDelivery?: StaffNotificationEmailCompleter;
   validateFreshPickHoldReminder?: FreshPickHoldReminderValidator;
   suppressDelivery?: StaffNotificationEmailSuppressor;
+  dispatchEnabled?: StaffNotificationEmailDispatchGate;
 }): Promise<StaffNotificationDeliveryResult[]> {
   try {
+    const dispatchEnabled =
+      input?.dispatchEnabled ?? isStaffNotificationEmailDispatchEnabled;
+    if (!(await isDispatchEnabled(dispatchEnabled))) return [];
+
     const claimed = await (
       input?.claimer ?? claimStaffNotificationEmailDeliveries
     )({
@@ -526,12 +566,13 @@ export async function deliverPendingStaffNotificationEmails(input?: {
 
     return deliverClaimedStaffNotificationEmails({
       claimed,
-      mailer: input?.mailer ?? createResendStaffNotificationMailer(),
+      mailer:
+        input?.mailer ?? createResendStaffNotificationMailer(dispatchEnabled),
+      dispatchEnabled,
       completeDelivery:
         input?.completeDelivery ?? completeStaffNotificationEmailDelivery,
       validateFreshPickHoldReminder:
-        input?.validateFreshPickHoldReminder ??
-        isCurrentFreshPickHoldReminder,
+        input?.validateFreshPickHoldReminder ?? isCurrentFreshPickHoldReminder,
       suppressDelivery:
         input?.suppressDelivery ?? suppressStaffNotificationEmailDelivery,
     });

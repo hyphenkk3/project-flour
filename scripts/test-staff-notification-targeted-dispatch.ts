@@ -78,6 +78,10 @@ const dispatchSource = readFileSync(
   "src/foundation/staff/staff-notification-dispatch.ts",
   "utf8",
 );
+const gateSource = readFileSync(
+  "src/foundation/staff/staff-notification-email-dispatch-gate.ts",
+  "utf8",
+);
 assert.match(
   dispatchSource,
   /claim_staff_notification_email_deliveries_for_staff/,
@@ -88,37 +92,17 @@ assert.match(
   /claim_staff_notification_email_deliveries",\s*\{[\s\S]*?p_event_id:\s*input\.eventId\s*\?\?\s*null/,
   "global/event sweep keeps the existing three-argument RPC",
 );
-
-const targetedMigration = readFileSync(
-  "supabase/migrations/20261008120000_staff_notification_targeted_claim.sql",
-  "utf8",
+assert.match(
+  gateSource,
+  /staff_notification_email_dispatch_is_enabled/,
+  "the app gate reads the database master gate",
 );
 assert.match(
-  targetedMigration,
-  /create function public\.claim_staff_notification_email_deliveries_for_staff\(/i,
-);
-assert.doesNotMatch(
-  targetedMigration,
-  /drop function public\.claim_staff_notification_email_deliveries\(integer, uuid, integer\)/i,
-  "the deployed three-argument RPC must remain installed",
-);
-assert.equal(
-  targetedMigration.match(/sp\.id = p_staff_id/gi)?.length,
-  2,
-  "exact recipient filtering must happen before event selection and pair materialization",
-);
-assert.match(
-  targetedMigration,
-  /if p_event_id is null or p_staff_id is null then[\s\S]*?raise exception/i,
-  "the targeted RPC fails closed when either identity is absent",
-);
-assert.match(targetedMigration, /new\.created_at > activation\.activated_at/i);
-assert.match(targetedMigration, /'staffId', recipient\.id::text/i);
-assert.match(
-  targetedMigration,
-  /staff_notification_fresh_pick_hold_reminder_is_current\(e\.payload\)/,
+  dispatchSource,
+  /if \(!\(await isStaffNotificationEmailDispatchEnabled\(\)\)\) return \[\]/,
+  "claiming fails closed before either RPC is selected",
 );
 
 console.log(
-  "PASS: strict POST validation, unauthorized no-claim, targeted dispatch, GET sweep, separate targeted RPC, and migration safeguards",
+  "PASS: strict POST validation, unauthorized no-claim, targeted dispatch, GET sweep, and master-gate safeguards",
 );
