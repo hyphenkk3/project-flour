@@ -20,8 +20,18 @@ export type StaffNotificationMailer = {
     subject: string;
     html: string;
     idempotencyKey: string;
+    oneShot?: {
+      scopeId: string;
+      eventId: string;
+      staffId: string;
+      deliveryId: string;
+    };
   }): Promise<{ id?: string | null; skipped?: boolean }>;
 };
+
+export type OneShotStaffNotificationAttempt = NonNullable<
+  Parameters<StaffNotificationMailer["send"]>[0]["oneShot"]
+>;
 
 export type StaffNotificationDeliveryResult = {
   eventId: string;
@@ -147,22 +157,105 @@ export function createResendStaffNotificationMailer(
         throw new Error("RESEND_API_KEY is not configured.");
       }
 
-      const resend = new Resend(apiKey);
-      const { data, error } = await resend.emails.send(
-        {
-          from: staffNotificationResendFrom(),
-          to: [input.to],
-          subject: input.subject,
-          html: input.html,
-        },
-        { idempotencyKey: input.idempotencyKey },
-      );
+      return sendResendStaffNotificationEmail(apiKey, input);
+    },
+  };
+}
 
-      if (error) {
-        throw new Error(error.message);
+async function sendResendStaffNotificationEmail(
+  apiKey: string,
+  input: {
+    to: string;
+    subject: string;
+    html: string;
+    idempotencyKey: string;
+  },
+): Promise<{ id: string | null }> {
+  const resend = new Resend(apiKey);
+  const { data, error } = await resend.emails.send(
+    {
+      from: staffNotificationResendFrom(),
+      to: [input.to],
+      subject: input.subject,
+      html: input.html,
+    },
+    { idempotencyKey: input.idempotencyKey },
+  );
+
+  if (error) throw new Error(error.message);
+  return { id: data?.id ?? null };
+}
+
+/**
+ * Provider adapter reserved for the one-shot route. The database CAS is the
+ * durable one-attempt authorization; an ambiguous provider result is recorded
+ * as unknown and never returns the scope to a retryable state.
+ */
+export function createOneShotTestResendMailer(input: {
+  authorize: (attempt: OneShotStaffNotificationAttempt) => Promise<boolean>;
+  record: (
+    attempt: OneShotStaffNotificationAttempt,
+    result: "accepted" | "unknown" | "blocked",
+    detail?: { providerRequestId?: string | null; error?: string },
+  ) => Promise<void>;
+  environmentIsDev: () => boolean;
+  sendProvider?: (message: {
+    to: string;
+    subject: string;
+    html: string;
+    idempotencyKey: string;
+  }) => Promise<{ id: string | null }>;
+}): StaffNotificationMailer {
+  return {
+    async send(message) {
+      const attempt = message.oneShot;
+      if (!attempt || !input.environmentIsDev()) return { skipped: true };
+      const apiKey = process.env.RESEND_API_KEY?.trim();
+      if (!input.sendProvider && !apiKey) {
+        throw new Error("RESEND_API_KEY is not configured.");
       }
 
-      return { id: data?.id ?? null };
+      let authorized = false;
+      try {
+        authorized = await input.authorize(attempt);
+      } catch {
+        authorized = false;
+      }
+      if (!authorized) {
+        await input.record(attempt, "blocked", {
+          error: "One-shot provider authorization was denied.",
+        });
+        return { skipped: true };
+      }
+
+      try {
+        const sent = input.sendProvider
+          ? await input.sendProvider(message)
+          : await sendResendStaffNotificationEmail(apiKey!, message);
+        try {
+          await input.record(attempt, "accepted", {
+            providerRequestId: sent.id,
+          });
+        } catch (error) {
+          console.error(
+            "[staff-notifications] One-shot provider result could not be recorded.",
+            error,
+          );
+        }
+        return { id: sent.id };
+      } catch (error) {
+        const messageText =
+          error instanceof Error ? error.message : "Unknown provider result.";
+        try {
+          await input.record(attempt, "unknown", { error: messageText });
+        } catch (recordError) {
+          console.error(
+            "[staff-notifications] Ambiguous one-shot result could not be recorded.",
+            recordError,
+          );
+        }
+        throw error;
+      }
     },
   };
 }
