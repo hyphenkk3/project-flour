@@ -248,15 +248,26 @@ export async function claimStaffNotificationEmailDeliveries(input: {
   limit?: number;
 }): Promise<ClaimedStaffNotificationEmail[]> {
   const admin = createServiceClient();
-  const { data, error } = await admin.rpc(
-    "claim_staff_notification_email_deliveries",
-    {
-      p_limit: input.limit ?? STAFF_NOTIFICATION_EMAIL_SWEEP_LIMIT,
-      p_event_id: input.eventId ?? null,
-      p_lease_seconds: STAFF_NOTIFICATION_EMAIL_LEASE_SECONDS,
-      p_staff_id: input.staffId ?? null,
-    },
-  );
+  const claimArguments = {
+    p_limit: input.limit ?? STAFF_NOTIFICATION_EMAIL_SWEEP_LIMIT,
+    p_lease_seconds: STAFF_NOTIFICATION_EMAIL_LEASE_SECONDS,
+  };
+  if (input.staffId !== undefined && (!input.eventId || !input.staffId)) {
+    throw new Error("Targeted claims require event and staff IDs.");
+  }
+
+  const claim =
+    input.staffId !== undefined
+      ? await admin.rpc("claim_staff_notification_email_deliveries_for_staff", {
+          ...claimArguments,
+          p_event_id: input.eventId!,
+          p_staff_id: input.staffId,
+        })
+      : await admin.rpc("claim_staff_notification_email_deliveries", {
+          ...claimArguments,
+          p_event_id: input.eventId ?? null,
+        });
+  const { data, error } = claim;
 
   if (error) {
     if (error.code === "42P01" || isMissingRelation(error.message)) {

@@ -78,7 +78,16 @@ const dispatchSource = readFileSync(
   "src/foundation/staff/staff-notification-dispatch.ts",
   "utf8",
 );
-assert.match(dispatchSource, /p_staff_id:\s*input\.staffId\s*\?\?\s*null/);
+assert.match(
+  dispatchSource,
+  /claim_staff_notification_email_deliveries_for_staff/,
+  "targeted requests use a distinct RPC name",
+);
+assert.match(
+  dispatchSource,
+  /claim_staff_notification_email_deliveries",\s*\{[\s\S]*?p_event_id:\s*input\.eventId\s*\?\?\s*null/,
+  "global/event sweep keeps the existing three-argument RPC",
+);
 
 const targetedMigration = readFileSync(
   "supabase/migrations/20261008120000_staff_notification_targeted_claim.sql",
@@ -86,13 +95,22 @@ const targetedMigration = readFileSync(
 );
 assert.match(
   targetedMigration,
+  /create function public\.claim_staff_notification_email_deliveries_for_staff\(/i,
+);
+assert.doesNotMatch(
+  targetedMigration,
   /drop function public\.claim_staff_notification_email_deliveries\(integer, uuid, integer\)/i,
+  "the deployed three-argument RPC must remain installed",
 );
 assert.equal(
-  targetedMigration.match(/p_staff_id is null or sp\.id = p_staff_id/gi)
-    ?.length,
+  targetedMigration.match(/sp\.id = p_staff_id/gi)?.length,
   2,
-  "recipient filtering must happen before event selection and pair materialization",
+  "exact recipient filtering must happen before event selection and pair materialization",
+);
+assert.match(
+  targetedMigration,
+  /if p_event_id is null or p_staff_id is null then[\s\S]*?raise exception/i,
+  "the targeted RPC fails closed when either identity is absent",
 );
 assert.match(targetedMigration, /new\.created_at > activation\.activated_at/i);
 assert.match(targetedMigration, /'staffId', recipient\.id::text/i);
@@ -102,5 +120,5 @@ assert.match(
 );
 
 console.log(
-  "PASS: strict POST validation, unauthorized no-claim, targeted dispatch, GET sweep, RPC recipient argument, and migration safeguards",
+  "PASS: strict POST validation, unauthorized no-claim, targeted dispatch, GET sweep, separate targeted RPC, and migration safeguards",
 );
