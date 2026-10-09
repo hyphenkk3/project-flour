@@ -29,17 +29,54 @@ function escapeHtml(value: unknown): string {
     .replaceAll("'", "&#039;");
 }
 
-function fulfilmentIndependentDateLabel(pickupDate?: string | null): string | null {
+function fulfilmentIndependentDateLabel(
+  pickupDate?: string | null,
+): string | null {
   if (!pickupDate) return null;
   return formatShortBusinessDate(pickupDate);
 }
 
-function absoluteHref(href?: string | null): string | null {
-  if (!href) return null;
-  if (/^https?:\/\//i.test(href)) return href;
-  const base = (process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/$/, "");
-  if (!base) return href;
-  return `${base}${href.startsWith("/") ? href : `/${href}`}`;
+function staffEmailHref(href?: string | null): string | null {
+  if (
+    !href?.startsWith("/") ||
+    href.startsWith("//") ||
+    /[\\\u0000-\u0020\u007f]/.test(href) ||
+    /%(?![0-9a-fA-F]{2})/.test(href)
+  ) {
+    return null;
+  }
+
+  const expectedOrigin =
+    process.env.VERCEL_ENV === "production"
+      ? "https://whitebird.asia"
+      : process.env.VERCEL_ENV === "preview" &&
+          process.env.VERCEL_GIT_COMMIT_REF ===
+            "debug/mobile-add-to-order-safari"
+        ? "https://dev.whitebird.asia"
+        : null;
+  const configuredOrigin = process.env.NEXT_PUBLIC_SITE_URL;
+  if (!expectedOrigin || configuredOrigin !== expectedOrigin) return null;
+
+  try {
+    const origin = new URL(configuredOrigin);
+    if (
+      origin.protocol !== "https:" ||
+      origin.origin !== expectedOrigin ||
+      origin.username ||
+      origin.password ||
+      origin.port ||
+      origin.pathname !== "/" ||
+      origin.search ||
+      origin.hash
+    ) {
+      return null;
+    }
+
+    const destination = new URL(href, origin);
+    return destination.origin === expectedOrigin ? destination.href : null;
+  } catch {
+    return null;
+  }
 }
 
 function fulfilmentFromPreviewLine(description?: string | null): string | null {
@@ -76,7 +113,7 @@ function buildNewOrderEmailHtml(
   const notes = summary.notes
     ? `<p><strong>Notes:</strong><br />${escapeHtml(summary.notes)}</p>`
     : "";
-  const viewHref = absoluteHref(href);
+  const viewHref = staffEmailHref(href);
 
   return `
           <div
@@ -100,13 +137,14 @@ function buildNewOrderEmailHtml(
         `;
 }
 
-export function buildStaffNotificationEmail(input: StaffNotificationEmailContent): {
+export function buildStaffNotificationEmail(
+  input: StaffNotificationEmailContent,
+): {
   subject: string;
   html: string;
 } {
   if (input.code === "new_order" && input.newOrder) {
-    const orderNumber =
-      input.newOrder.orderNumber ?? input.orderNumber ?? null;
+    const orderNumber = input.newOrder.orderNumber ?? input.orderNumber ?? null;
     return {
       subject: orderNumber
         ? `New order received — ${orderNumber}`
@@ -129,6 +167,7 @@ export function buildStaffNotificationEmail(input: StaffNotificationEmailContent
     input.code === "new_order"
       ? fulfilmentFromPreviewLine(input.description)
       : null;
+  const viewHref = staffEmailHref(input.href);
 
   const details = [
     input.orderNumber
@@ -164,8 +203,8 @@ export function buildStaffNotificationEmail(input: StaffNotificationEmailContent
             <p>${escapeHtml(input.description)}</p>
             ${details}
             ${
-              input.href
-                ? `<p><a href="${escapeHtml(input.href)}">View in Whitebird</a></p>`
+              viewHref
+                ? `<p><a href="${escapeHtml(viewHref)}">View in Whitebird</a></p>`
                 : ""
             }
           </div>
