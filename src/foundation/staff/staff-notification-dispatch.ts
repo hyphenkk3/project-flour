@@ -157,13 +157,18 @@ export function createResendStaffNotificationMailer(
         throw new Error("RESEND_API_KEY is not configured.");
       }
 
-      return sendResendStaffNotificationEmail(apiKey, input);
+      return sendResendStaffNotificationEmail(
+        apiKey,
+        staffNotificationResendFrom(),
+        input,
+      );
     },
   };
 }
 
 async function sendResendStaffNotificationEmail(
   apiKey: string,
+  from: string,
   input: {
     to: string;
     subject: string;
@@ -174,7 +179,7 @@ async function sendResendStaffNotificationEmail(
   const resend = new Resend(apiKey);
   const { data, error } = await resend.emails.send(
     {
-      from: staffNotificationResendFrom(),
+      from,
       to: [input.to],
       subject: input.subject,
       html: input.html,
@@ -191,70 +196,127 @@ async function sendResendStaffNotificationEmail(
  * durable one-attempt authorization; an ambiguous provider result is recorded
  * as unknown and never returns the scope to a retryable state.
  */
+type OneShotAuthorizationResult =
+  | { authorized: true }
+  | {
+      authorized: false;
+      reason: "provider_authorization_error" | "provider_authorization_denied";
+    };
+
+type OneShotMailerResult = {
+  id?: string | null;
+  skipped?: boolean;
+  blockedReason?:
+    | "environment_not_allowed"
+    | "provider_api_key_missing"
+    | "provider_sender_missing"
+    | "one_shot_audit_error"
+    | "provider_authorization_error"
+    | "provider_authorization_denied";
+};
+
 export function createOneShotTestResendMailer(input: {
-  authorize: (attempt: OneShotStaffNotificationAttempt) => Promise<boolean>;
+  authorize: (
+    attempt: OneShotStaffNotificationAttempt,
+  ) => Promise<boolean | OneShotAuthorizationResult>;
   record: (
     attempt: OneShotStaffNotificationAttempt,
     result: "accepted" | "unknown" | "blocked",
     detail?: { providerRequestId?: string | null; error?: string },
   ) => Promise<void>;
   environmentIsDev: () => boolean;
+  apiKey?: string;
+  from?: string;
   sendProvider?: (message: {
     to: string;
     subject: string;
     html: string;
     idempotencyKey: string;
   }) => Promise<{ id: string | null }>;
-}): StaffNotificationMailer {
+}): {
+  send(
+    input: Parameters<StaffNotificationMailer["send"]>[0],
+  ): Promise<OneShotMailerResult>;
+} {
   return {
     async send(message) {
       const attempt = message.oneShot;
-      if (!attempt || !input.environmentIsDev()) return { skipped: true };
-      const apiKey = process.env.RESEND_API_KEY?.trim();
+      if (!attempt || !input.environmentIsDev()) {
+        return { skipped: true, blockedReason: "environment_not_allowed" };
+      }
+      const apiKey = input.apiKey?.trim() ?? process.env.RESEND_API_KEY?.trim();
+      const from = input.from?.trim() ?? process.env.RESEND_FROM?.trim();
       if (!input.sendProvider && !apiKey) {
-        throw new Error("RESEND_API_KEY is not configured.");
+        return { skipped: true, blockedReason: "provider_api_key_missing" };
+      }
+      if (!input.sendProvider && !from) {
+        return { skipped: true, blockedReason: "provider_sender_missing" };
       }
 
-      let authorized = false;
+      let authorization:
+        | { authorized: true }
+        | {
+            authorized: false;
+            reason:
+              "provider_authorization_error" | "provider_authorization_denied";
+          };
       try {
-        authorized = await input.authorize(attempt);
+        const result = await input.authorize(attempt);
+        authorization =
+          typeof result === "boolean"
+            ? result
+              ? { authorized: true }
+              : {
+                  authorized: false,
+                  reason: "provider_authorization_denied",
+                }
+            : result;
       } catch {
-        authorized = false;
+        authorization = {
+          authorized: false,
+          reason: "provider_authorization_error",
+        };
       }
-      if (!authorized) {
-        await input.record(attempt, "blocked", {
-          error: "One-shot provider authorization was denied.",
-        });
-        return { skipped: true };
+      if (!authorization.authorized) {
+        try {
+          await input.record(attempt, "blocked", {
+            error:
+              authorization.reason === "provider_authorization_error"
+                ? "One-shot provider authorization check failed."
+                : "One-shot provider authorization was denied.",
+          });
+        } catch {
+          return { skipped: true, blockedReason: "one_shot_audit_error" };
+        }
+        return { skipped: true, blockedReason: authorization.reason };
       }
 
       try {
         const sent = input.sendProvider
           ? await input.sendProvider(message)
-          : await sendResendStaffNotificationEmail(apiKey!, message);
+          : await sendResendStaffNotificationEmail(apiKey!, from!, message);
         try {
           await input.record(attempt, "accepted", {
             providerRequestId: sent.id,
           });
-        } catch (error) {
+        } catch {
           console.error(
             "[staff-notifications] One-shot provider result could not be recorded.",
-            error,
           );
         }
         return { id: sent.id };
-      } catch (error) {
-        const messageText =
-          error instanceof Error ? error.message : "Unknown provider result.";
+      } catch {
         try {
-          await input.record(attempt, "unknown", { error: messageText });
-        } catch (recordError) {
+          await input.record(attempt, "unknown", {
+            error:
+              "One-shot provider result is unknown; automatic retry is disabled.",
+          });
+        } catch {
           console.error(
             "[staff-notifications] Ambiguous one-shot result could not be recorded.",
-            recordError,
           );
         }
-        throw error;
+        throw new Error("One-shot provider result is unknown.");
       }
     },
   };

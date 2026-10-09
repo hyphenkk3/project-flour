@@ -36,6 +36,8 @@ async function main() {
   assert.match(route, /staff\.isMasterOwner/);
   assert.match(route, /staff\.role\.code !== "owner"/);
   assert.match(route, /Only scopeId, eventId, and staffId are accepted/);
+  assert.match(route, /reason: result\.reason/);
+  assert.match(route, /status: 409/);
   assert.doesNotMatch(route, /arm_staff_notification_email_test_scope/);
   const oneShot = read(
     "src/foundation/staff/staff-notification-one-shot-test.ts",
@@ -251,7 +253,10 @@ async function main() {
       throw new Error("mock timeout after request may have started");
     },
   });
-  await assert.rejects(timeoutMailer.send(message), /mock timeout/);
+  await assert.rejects(
+    timeoutMailer.send(message),
+    /One-shot provider result is unknown/,
+  );
   const restartedMailer = createOneShotTestResendMailer({
     environmentIsDev: () => true,
     authorize: async () => attemptState === "not_started",

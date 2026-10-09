@@ -73,6 +73,12 @@ export async function POST(request: Request) {
   if (result.outcome === "accepted") {
     return NextResponse.json({ ok: true, outcome: result.outcome });
   }
+  if (result.outcome === "blocked") {
+    return NextResponse.json(
+      { ok: false, outcome: result.outcome, reason: result.reason },
+      { status: 409 },
+    );
+  }
   return NextResponse.json(
     { ok: false, outcome: result.outcome },
     { status: 409 },
