@@ -6,7 +6,14 @@ import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import type { StorefrontCake } from "@/types/storefront";
-import { loadCartEditCakes } from "@/workspaces/storefront/cart/actions";
+import {
+  cakeSizeAvailability,
+  validCakeSizeSelection,
+} from "@/engines/menu/cake-size-availability";
+import {
+  loadCartEditCakes,
+  validateCartSizeAvailability,
+} from "@/workspaces/storefront/cart/actions";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import {
   cartInvalidCollectionDateCopy,
@@ -23,6 +30,7 @@ import {
 } from "@/workspaces/storefront/cart/cart-order-summary";
 import { usePreorderDraft } from "@/workspaces/storefront/cart/usePreorderDraft";
 import {
+  readPreorderDraft,
   draftCakeCount,
   draftHasItems,
   draftTotal,
@@ -46,137 +54,229 @@ function OrderLines({
   items,
   pricesBySizeId,
   pricesPending,
+  pickupDate,
 }: {
+  pickupDate: string | null;
   cakesById: Map<string, StorefrontCake>;
   items: readonly PreorderDraftItem[];
   pricesBySizeId: ReadonlyMap<string, number>;
   pricesPending: boolean;
 }) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const pendingRef = useRef(false);
+  async function changeLine(
+    item: PreorderDraftItem,
+    change: () => void,
+    nextSizeId = item.sizeId,
+  ) {
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    setPending(true);
+    setError(null);
+    const before = readPreorderDraft();
+    const snapshot = JSON.stringify(before);
+    const result = await validateCartSizeAvailability(
+      [{ cakeId: item.cakeId, sizeId: nextSizeId }],
+      before?.pickupDate || null,
+    ).catch(() => ({
+      error: "Unable to check cake size availability. Please try again.",
+    }));
+    if (result.error || JSON.stringify(readPreorderDraft()) !== snapshot)
+      setError(result.error ?? "Your order changed. Please try again.");
+    else change();
+    pendingRef.current = false;
+    setPending(false);
+  }
   return (
-    <ul className="divide-fog divide-y">
-      {items.map((item) => {
-        const cake = cakesById.get(item.cakeId) ?? null;
-        const preorder = draftLinePreorderLabel(item);
-        const sizeChoices = draftItemSizeChoices(item, cake, pricesBySizeId);
-        const showSizeEditor = draftItemShowsSizeEditor(item, cake);
-        const sizeSelectId = `cart-size-${item.cakeId}-${item.sizeId}`;
-        return (
-          <li className="py-5" key={`${item.cakeId}::${item.sizeId}`}>
-            <div className="flex items-start gap-3">
-              {item.imageUrl ? (
-                <div className="bg-fog relative h-14 w-14 shrink-0 overflow-hidden rounded-[10px]">
-                  <CakePhotoImage alt="" sizes="56px" src={item.imageUrl} />
-                </div>
-              ) : (
-                <div aria-hidden className="bg-fog h-14 w-14 shrink-0" />
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-display text-ink text-[1.05rem] leading-snug tracking-tight">
-                      {item.cakeName}
-                    </p>
-                    {showSizeEditor && !pricesPending ? (
-                      <>
-                        <label className="sr-only" htmlFor={sizeSelectId}>
-                          {item.cakeName} size
-                        </label>
-                        <select
-                          className="border-fog text-ink mt-1 w-full max-w-[11rem] border-0 border-b bg-transparent py-1.5 text-sm outline-none"
-                          id={sizeSelectId}
-                          onChange={(event) => {
-                            const next = sizeChoices.find(
+    <div>
+      {error ? (
+        <p role="alert" className="text-status-danger text-sm">
+          {error}
+        </p>
+      ) : null}
+      <ul className="divide-fog divide-y">
+        {items.map((item) => {
+          const cake = cakesById.get(item.cakeId) ?? null;
+          const preorder = draftLinePreorderLabel(item);
+          const sizeChoices = draftItemSizeChoices(item, cake, pricesBySizeId);
+          const showSizeEditor = draftItemShowsSizeEditor(item, cake);
+          const sizeSelectId = `cart-size-${item.cakeId}-${item.sizeId}`;
+          return (
+            <li className="py-5" key={`${item.cakeId}::${item.sizeId}`}>
+              <div className="flex items-start gap-3">
+                {item.imageUrl ? (
+                  <div className="bg-fog relative h-14 w-14 shrink-0 overflow-hidden rounded-[10px]">
+                    <CakePhotoImage alt="" sizes="56px" src={item.imageUrl} />
+                  </div>
+                ) : (
+                  <div aria-hidden className="bg-fog h-14 w-14 shrink-0" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-display text-ink text-[1.05rem] leading-snug tracking-tight">
+                        {item.cakeName}
+                      </p>
+                      {showSizeEditor && !pricesPending ? (
+                        <>
+                          <label className="sr-only" htmlFor={sizeSelectId}>
+                            {item.cakeName} size
+                          </label>
+                          <select
+                            className="border-fog text-ink mt-1 w-full max-w-[11rem] border-0 border-b bg-transparent py-1.5 text-sm outline-none"
+                            id={sizeSelectId}
+                            disabled={pending}
+                            onChange={(event) => {
+                              const next = sizeChoices.find(
                               (choice) => choice.id === event.target.value,
                             );
-                            if (!next) return;
-                            setDraftLineSize(item.cakeId, item.sizeId, next);
-                          }}
-                          value={item.sizeId}
-                        >
-                          {sizeChoices.map((choice) => (
-                            <option key={choice.id} value={choice.id}>
-                              {choice.size} · {formatRm(choice.price)}
+                              if (!next) return;
+                              void changeLine(
+                                item,
+                                () =>
+                                  setDraftLineSize(
+                                    item.cakeId,
+                                    item.sizeId,
+                                    next,
+                                  ),
+                                next.id,
+                              );
+                            }}
+                            value={validCakeSizeSelection(
+                              sizeChoices,
+                              item.sizeId,
+                              pickupDate,
+                            )}
+                          >
+                            <option value="" disabled>
+                              Select a valid size
                             </option>
-                          ))}
-                        </select>
-                      </>
-                    ) : pricesPending ? (
-                      <p className="text-skyline mt-1.5 text-sm" role="status">
-                        Checking price for collection date…
-                      </p>
-                    ) : (
-                      <p className="text-skyline mt-0.5 text-sm">
-                        {item.sizeLabel}
-                      </p>
-                    )}
-                    {preorder ? (
-                      <p className="text-skyline mt-1.5 text-[11px] font-medium tracking-[0.16em] uppercase">
-                        {preorder}
-                      </p>
-                    ) : null}
-                  </div>
-                  <button
-                    className="text-skyline hover:text-ink shrink-0 text-sm font-medium"
-                    onClick={() => removeDraftLine(item.cakeId, item.sizeId)}
-                    type="button"
-                  >
-                    Remove
-                  </button>
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <div
-                    aria-label={`${item.cakeName} quantity`}
-                    className="flex items-center gap-2"
-                    role="group"
-                  >
+                            {sizeChoices.map((choice) => (
+                              <option
+                                key={choice.id}
+                                value={choice.id}
+                                disabled={
+                                  !cakeSizeAvailability(choice, pickupDate)
+                                    .available
+                                }
+                              >
+                                {choice.size} · {formatRm(choice.price)}
+                                {cakeSizeAvailability(choice, pickupDate)
+                                  .message
+                                  ? ` — ${cakeSizeAvailability(choice, pickupDate).message}`
+                                  : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </>
+                      ) : pricesPending ? (
+                        <p
+                          className="text-skyline mt-1.5 text-sm"
+                          role="status"
+                        >
+                          Checking price for collection date…
+                        </p>
+                      ) : (
+                        <p className="text-skyline mt-0.5 text-sm">
+                          {item.sizeLabel}
+                        </p>
+                      )}
+                      {cake &&
+                      !cakeSizeAvailability(
+                        cake.sizes.find((size) => size.id === item.sizeId) ??
+                          {},
+                        pickupDate,
+                      ).available ? (
+                        <p
+                          className="text-status-danger mt-2 text-sm"
+                          role="status"
+                        >
+                          {
+                            cakeSizeAvailability(
+                              cake.sizes.find(
+                                (size) => size.id === item.sizeId,
+                              ) ?? {},
+                              pickupDate,
+                            ).message
+                          }{" "}
+                          Please select a valid size.
+                        </p>
+                      ) : null}
+                      {preorder ? (
+                        <p className="text-skyline mt-1.5 text-[11px] font-medium tracking-[0.16em] uppercase">
+                          {preorder}
+                        </p>
+                      ) : null}
+                    </div>
                     <button
-                      aria-label={`Decrease ${item.cakeName} quantity`}
-                      className="text-ink inline-flex min-h-10 min-w-10 items-center justify-center text-lg disabled:opacity-40"
-                      disabled={item.quantity <= 1}
-                      onClick={() =>
-                        setDraftLineQuantity(
-                          item.cakeId,
-                          item.sizeId,
-                          item.quantity - 1,
-                        )
-                      }
+                      className="text-skyline hover:text-ink shrink-0 text-sm font-medium"
+                      onClick={() => removeDraftLine(item.cakeId, item.sizeId)}
                       type="button"
                     >
-                      −
-                    </button>
-                    <span className="text-ink min-w-6 text-center text-sm tabular-nums">
-                      {item.quantity}
-                    </span>
-                    <button
-                      aria-label={`Increase ${item.cakeName} quantity`}
-                      className="text-ink inline-flex min-h-10 min-w-10 items-center justify-center text-lg"
-                      onClick={() =>
-                        setDraftLineQuantity(
-                          item.cakeId,
-                          item.sizeId,
-                          item.quantity + 1,
-                        )
-                      }
-                      type="button"
-                    >
-                      +
+                      Remove
                     </button>
                   </div>
-                  <p className="text-ink text-sm font-medium tabular-nums">
-                    {pricesPending
-                      ? "Checking price…"
-                      : formatRm(
-                          draftLineDisplayUnitPrice(item, pricesBySizeId) *
-                            item.quantity,
-                        )}
-                  </p>
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div
+                      aria-label={`${item.cakeName} quantity`}
+                      className="flex items-center gap-2"
+                      role="group"
+                    >
+                      <button
+                        aria-label={`Decrease ${item.cakeName} quantity`}
+                        className="text-ink inline-flex min-h-10 min-w-10 items-center justify-center text-lg disabled:opacity-40"
+                        disabled={pending || item.quantity <= 1}
+                        onClick={() =>
+                          void changeLine(item, () =>
+                            setDraftLineQuantity(
+                              item.cakeId,
+                              item.sizeId,
+                              item.quantity - 1,
+                            ),
+                          )
+                        }
+                        type="button"
+                      >
+                        −
+                      </button>
+                      <span className="text-ink min-w-6 text-center text-sm tabular-nums">
+                        {item.quantity}
+                      </span>
+                      <button
+                        aria-label={`Increase ${item.cakeName} quantity`}
+                        disabled={pending}
+                        className="text-ink inline-flex min-h-10 min-w-10 items-center justify-center text-lg"
+                        onClick={() =>
+                          void changeLine(item, () =>
+                            setDraftLineQuantity(
+                              item.cakeId,
+                              item.sizeId,
+                              item.quantity + 1,
+                            ),
+                          )
+                        }
+                        type="button"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <p className="text-ink text-sm font-medium tabular-nums">
+                      {pricesPending
+                        ? "Checking price…"
+                        : formatRm(
+                            draftLineDisplayUnitPrice(item, pricesBySizeId) *
+                              item.quantity,
+                          )}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          </li>
-        );
-      })}
-    </ul>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -587,6 +687,7 @@ export function StorefrontCartShell({
                       items={draft.items}
                       pricesBySizeId={pricesBySizeId}
                       pricesPending={pricesPending}
+                      pickupDate={draft.pickupDate || null}
                     />
                   </div>
                   <div className="border-fog border-t px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
@@ -629,6 +730,7 @@ export function StorefrontCartShell({
                   items={draft.items}
                   pricesBySizeId={pricesBySizeId}
                   pricesPending={pricesPending}
+                  pickupDate={draft.pickupDate || null}
                 />
               </div>
               <div className="px-6 pt-4 pb-8">

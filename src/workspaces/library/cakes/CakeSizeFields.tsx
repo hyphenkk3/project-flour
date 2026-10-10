@@ -1,5 +1,6 @@
 "use client";
 
+import { cakeSizeAvailabilityPeriod } from "@/engines/menu/cake-size-availability";
 import { useState } from "react";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form";
 import type { LibraryCakeSizePrice } from "@/types/library-cake";
@@ -14,6 +15,8 @@ type SizeDraft = {
   label: string;
   price: string;
   preorderDays: string;
+  availableFrom: string;
+  availableUntil: string;
 };
 
 function preorderOptionLabel(days: number): string {
@@ -39,6 +42,8 @@ type CakeSizeFieldsProps = {
     label: string;
     price: number;
     preorderDays?: number;
+    availableFrom?: string | null;
+    availableUntil?: string | null;
   }>;
   schedules?: LibraryCakeSizePrice[];
 };
@@ -50,6 +55,8 @@ function createEmptySize(): SizeDraft {
     label: "",
     price: "",
     preorderDays: "2",
+    availableFrom: "",
+    availableUntil: "",
   };
 }
 
@@ -66,6 +73,8 @@ export function CakeSizeFields({
         label: size.label,
         price: String(size.price),
         preorderDays: String(size.preorderDays ?? 2),
+        availableFrom: size.availableFrom ?? "",
+        availableUntil: size.availableUntil ?? "",
       }));
     }
     return [createEmptySize()];
@@ -182,6 +191,56 @@ export function CakeSizeFields({
                 </button>
               </div>
             </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FormField
+                htmlFor={`size_available_from_${size.key}`}
+                label="Available From"
+              >
+                <FormInput
+                  id={`size_available_from_${size.key}`}
+                  name="size_available_from"
+                  type="date"
+                  value={size.availableFrom}
+                  onChange={(event) =>
+                    setSizes((current) =>
+                      current.map((row) =>
+                        row.key === size.key
+                          ? { ...row, availableFrom: event.target.value }
+                          : row,
+                      ),
+                    )
+                  }
+                />
+              </FormField>
+              <FormField
+                htmlFor={`size_available_until_${size.key}`}
+                label="Available Until"
+              >
+                <FormInput
+                  id={`size_available_until_${size.key}`}
+                  name="size_available_until"
+                  type="date"
+                  min={size.availableFrom || undefined}
+                  value={size.availableUntil}
+                  onChange={(event) =>
+                    setSizes((current) =>
+                      current.map((row) =>
+                        row.key === size.key
+                          ? { ...row, availableUntil: event.target.value }
+                          : row,
+                      ),
+                    )
+                  }
+                />
+              </FormField>
+            </div>
+            <p className="text-skyline text-xs">
+              {cakeSizeAvailabilityPeriod({
+                availableFrom: size.availableFrom || null,
+                availableUntil: size.availableUntil || null,
+              }) ?? "Available for all pickup dates"}
+              . Both dates are inclusive. Leave either field empty for no limit.
+            </p>
             {cakeId && size.id ? (
               <CakeSizePriceSchedule
                 cakeId={cakeId}

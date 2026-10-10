@@ -22,10 +22,10 @@ const panelSrc = readSrc(
 );
 
 assert.match(sheetSrc, /addingRef\.current/);
-assert.match(sheetSrc, /if \(!selected \|\| addingRef\.current\) return;/);
+assert.match(sheetSrc, /if \(!selected \|\| !pickupPricesReady \|\| addingRef\.current\) return;/);
 assert.match(sheetSrc, /addingRef\.current = true;/);
 assert.match(sheetSrc, /setAdding\(true\)/);
-assert.match(sheetSrc, /disabled=\{\!selected \|\| adding\}/);
+assert.match(sheetSrc, /disabled=\{\!selected \|\| !pickupPricesReady \|\| adding\}/);
 assert.match(sheetSrc, /Added ✓/);
 assert.match(sheetSrc, /Added to your order/);
 assert.match(sheetSrc, /mergeDraftItem/);

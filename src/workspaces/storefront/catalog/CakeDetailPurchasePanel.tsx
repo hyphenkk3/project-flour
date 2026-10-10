@@ -1,5 +1,6 @@
 "use client";
 
+import { cakeSizeAvailability } from "@/engines/menu/cake-size-availability";
 import { Suspense, use, useMemo } from "react";
 import type { CatalogueVoucherRecord } from "@/types/catalogue-voucher";
 import type { StorefrontCake } from "@/types/storefront";
@@ -97,7 +98,13 @@ export function CakeDetailPurchasePanel({
   const pickupScope =
     /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to)
       ? { from, to, pickup: pickupScopePickup }
-      : null;
+      : pickupScopePickup
+        ? {
+            from: pickupScopePickup,
+            to: pickupScopePickup,
+            pickup: pickupScopePickup,
+          }
+        : null;
   const scopedOfferVoucher = useMemo(() => {
     if (!offerVoucher || !offerToday) return null;
     if (
@@ -181,14 +188,18 @@ export function CakeDetailPurchasePanel({
         <ul className="mt-3 grid gap-2">
           {cake.sizes.map((size) => {
             const selected = size.id === selectedSizeId;
+            const availability = cakeSizeAvailability(size, pickupScopePickup);
             return (
               <li key={size.id}>
                 <button
                   aria-pressed={selected}
+                  disabled={!availability.available}
                   className={
-                    selected
-                      ? "border-ink bg-mist text-ink flex min-h-12 w-full items-center justify-between border px-4 py-2 text-left active:opacity-80"
-                      : "border-fog text-ink hover:border-ink flex min-h-12 w-full items-center justify-between border bg-transparent px-4 py-2 text-left active:opacity-80"
+                    !availability.available
+                      ? "border-fog text-skyline flex min-h-12 w-full cursor-not-allowed items-center justify-between border px-4 py-2 text-left opacity-60"
+                      : selected
+                        ? "border-ink bg-mist text-ink flex min-h-12 w-full items-center justify-between border px-4 py-2 text-left active:opacity-80"
+                        : "border-fog text-ink hover:border-ink flex min-h-12 w-full items-center justify-between border bg-transparent px-4 py-2 text-left active:opacity-80"
                   }
                   onClick={() => onSelectedSizeIdChange(size.id)}
                   type="button"
@@ -199,6 +210,11 @@ export function CakeDetailPurchasePanel({
                     </span>
                     <span className="text-skyline mt-0.5 block text-sm">
                       {formatPreorderRequirement(size.preorderDays)}
+                      {availability.message ? (
+                        <span className="mt-1 block">
+                          {availability.message}
+                        </span>
+                      ) : null}
                     </span>
                   </span>
                   <span className="text-sm font-semibold tabular-nums">

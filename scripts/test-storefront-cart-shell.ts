@@ -230,7 +230,9 @@ assert.doesNotMatch(cartSrc, /Submit Preorder/);
 assert.doesNotMatch(cartSrc, /Proceed to Payment/);
 assert.doesNotMatch(cartSrc, /Review Order/);
 assert.doesNotMatch(cartSrc, /submitGuestPreorderAction/);
-assert.doesNotMatch(cartSrc, /pickupDate:/);
+// Date-aware validation receives the selected date; cart edits still do not write it.
+assert.match(cartSrc, /validateCartSizeAvailability/);
+assert.doesNotMatch(cartSrc, /pickupDate:\s*(?:event|value|date)/);
 assert.doesNotMatch(cartSrc, /writePreorderDraft/);
 
 const draftSrc = readSrc(

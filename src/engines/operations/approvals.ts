@@ -79,6 +79,7 @@ export type CrossMonthPickupPayload = {
 };
 
 export type LateOrderEditProposedItem = {
+  itemId?: string;
   cakeId: string;
   cakeSizeId: string;
   quantity: number;
@@ -314,7 +315,12 @@ export function lateOrderEditRestrictionReason(input: {
   status?: GuestOrderStatus;
   now?: Date;
 }): string | null {
-  if (!isWithinTwoDayChangeCutoff({ pickupDate: input.pickupDate, now: input.now })) {
+  if (
+    !isWithinTwoDayChangeCutoff({
+      pickupDate: input.pickupDate,
+      now: input.now,
+    })
+  ) {
     return null;
   }
   return "This order is within the 2-day change cutoff.";
@@ -324,10 +330,7 @@ export function itemsSignatureFromLines(
   items: Array<{ cakeId: string; cakeSizeId: string; quantity: number }>,
 ): string {
   return [...items]
-    .map(
-      (item) =>
-        `${item.cakeId}:${item.cakeSizeId}:${item.quantity}`,
-    )
+    .map((item) => `${item.cakeId}:${item.cakeSizeId}:${item.quantity}`)
     .sort()
     .join("|");
 }
@@ -384,7 +387,10 @@ export function fingerprintsMatch(
   if (stored.pickupDate !== current.pickupDate) return false;
   if (stored.pickupTime !== current.pickupTime) return false;
   if (requestType === "discount_exception") {
-    return stored.hasRm10 === current.hasRm10 && stored.hasAugust === current.hasAugust;
+    return (
+      stored.hasRm10 === current.hasRm10 &&
+      stored.hasAugust === current.hasAugust
+    );
   }
   if (requestType === "late_order_edit") {
     return (
@@ -485,7 +491,9 @@ export function parseOperationsApprovalPayload(
       voucherNumber,
       expiryDate,
       eligibilityReason: eligibilityReason ?? "",
-      currentAmountDue: Number(row.current_amount_due ?? row.currentAmountDue ?? 0),
+      currentAmountDue: Number(
+        row.current_amount_due ?? row.currentAmountDue ?? 0,
+      ),
       requestedAmountDue: Number(
         row.requested_amount_due ?? row.requestedAmountDue ?? 0,
       ),
@@ -513,7 +521,8 @@ export function parseOperationsApprovalPayload(
       currentPickupTime: currentPickupTime ?? "",
       proposedPickupDate,
       proposedPickupTime,
-      fulfilmentMethod: stringField(row.fulfilment_method ?? row.fulfilmentMethod) ?? "pickup",
+      fulfilmentMethod:
+        stringField(row.fulfilment_method ?? row.fulfilmentMethod) ?? "pickup",
     };
   }
   const proposedRaw =
@@ -524,8 +533,12 @@ export function parseOperationsApprovalPayload(
     row.current && typeof row.current === "object"
       ? (row.current as Record<string, unknown>)
       : null;
-  const pickupDate = stringField(proposedRaw.pickup_date ?? proposedRaw.pickupDate);
-  const pickupTime = stringField(proposedRaw.pickup_time ?? proposedRaw.pickupTime);
+  const pickupDate = stringField(
+    proposedRaw.pickup_date ?? proposedRaw.pickupDate,
+  );
+  const pickupTime = stringField(
+    proposedRaw.pickup_time ?? proposedRaw.pickupTime,
+  );
   const items = parseLateEditItems(proposedRaw.items);
   const paidAddons = parseLateEditPaidAddons(
     proposedRaw.paid_addons ?? proposedRaw.paidAddons,
@@ -544,7 +557,9 @@ export function parseOperationsApprovalPayload(
   const currentPickupTime = currentRaw
     ? stringField(currentRaw.pickup_time ?? currentRaw.pickupTime)
     : null;
-  const currentItems = currentRaw ? parseLateEditItems(currentRaw.items) : undefined;
+  const currentItems = currentRaw
+    ? parseLateEditItems(currentRaw.items)
+    : undefined;
   const currentPaidAddons = currentRaw
     ? parseLateEditPaidAddons(currentRaw.paid_addons ?? currentRaw.paidAddons)
     : undefined;
@@ -583,7 +598,8 @@ export function parseOperationsApprovalFingerprint(
     status,
     hasRm10: Boolean(row.has_rm10 ?? row.hasRm10),
     hasAugust: Boolean(row.has_august ?? row.hasAugust),
-    itemsSignature: stringField(row.items_signature ?? row.itemsSignature) ?? "",
+    itemsSignature:
+      stringField(row.items_signature ?? row.itemsSignature) ?? "",
     paidAddonsSignature:
       stringField(row.paid_addons_signature ?? row.paidAddonsSignature) ?? "",
   };
@@ -653,7 +669,9 @@ export function lateOrderEditPayloadToRpc(
       items: (payload.proposed.items ?? []).map(lateEditItemToRpc),
       ...(payload.proposed.paidAddons !== undefined
         ? {
-            paid_addons: payload.proposed.paidAddons.map(lateEditPaidAddonToRpc),
+            paid_addons: payload.proposed.paidAddons.map(
+              lateEditPaidAddonToRpc,
+            ),
           }
         : {}),
     },
@@ -673,8 +691,11 @@ export function formatApprovalAge(createdAt: string, now = new Date()): string {
   return `${days}d ago`;
 }
 
-function lateEditItemToRpc(item: LateOrderEditProposedItem): Record<string, unknown> {
+function lateEditItemToRpc(
+  item: LateOrderEditProposedItem,
+): Record<string, unknown> {
   return {
+    ...(item.itemId ? { item_id: item.itemId } : {}),
     cake_id: item.cakeId,
     cake_size_id: item.cakeSizeId,
     quantity: item.quantity,
@@ -695,7 +716,9 @@ function lateEditPaidAddonToRpc(
   };
 }
 
-function parseLateEditItems(itemsRaw: unknown): LateOrderEditProposedItem[] | undefined {
+function parseLateEditItems(
+  itemsRaw: unknown,
+): LateOrderEditProposedItem[] | undefined {
   if (!Array.isArray(itemsRaw)) return undefined;
   return itemsRaw
     .map((item) => {
@@ -709,7 +732,9 @@ function parseLateEditItems(itemsRaw: unknown): LateOrderEditProposedItem[] | un
       const unitPrice = Number(entry.unit_price ?? entry.unitPrice ?? 0);
       if (!cakeId || !cakeSizeId || !cakeName || !sizeLabel) return null;
       if (!Number.isInteger(quantity) || quantity < 1) return null;
+      const itemId = stringField(entry.item_id ?? entry.itemId);
       return {
+        ...(itemId ? { itemId } : {}),
         cakeId,
         cakeSizeId,
         quantity,
@@ -817,7 +842,9 @@ function ymdField(value: unknown): string | null {
     const day = String(value.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   }
-  const text = String(value ?? "").trim().slice(0, 10);
+  const text = String(value ?? "")
+    .trim()
+    .slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
 }
 

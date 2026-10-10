@@ -22,6 +22,7 @@ import {
   LIBRARY_CAKE_STATUSES,
   parseNonNegativeNumber,
 } from "@/workspaces/library/labels";
+import { cakeSizeAvailabilityRangeError } from "@/engines/menu/cake-size-availability";
 import { parsePreorderDays } from "@/engines/preorder/lead";
 import {
   parseCakeCategoryAssignmentIds,
@@ -59,6 +60,8 @@ function parseSizes(formData: FormData): LibraryCakeSizeInput[] | string {
     .map((value) => String(value).trim());
   const prices = formData.getAll("size_price");
   const preorderDaysRaw = formData.getAll("size_preorder_days");
+  const fromDates = formData.getAll("size_available_from");
+  const untilDates = formData.getAll("size_available_until");
 
   const sizes: LibraryCakeSizeInput[] = [];
 
@@ -83,6 +86,13 @@ function parseSizes(formData: FormData): LibraryCakeSizeInput[] | string {
       return `Preorder days for size “${label}” must be a whole number of at least 1.`;
     }
 
+    const availableFrom = String(fromDates[index] ?? "").trim() || null;
+    const availableUntil = String(untilDates[index] ?? "").trim() || null;
+    const dateError = cakeSizeAvailabilityRangeError(
+      availableFrom,
+      availableUntil,
+    );
+    if (dateError) return `Size “${label}”: ${dateError}`;
     const price = parseNonNegativeNumber(priceRaw);
     sizes.push({
       id,
@@ -90,6 +100,8 @@ function parseSizes(formData: FormData): LibraryCakeSizeInput[] | string {
       price,
       sortOrder: sizes.length,
       preorderDays,
+      availableFrom,
+      availableUntil,
     });
   }
 
@@ -361,6 +373,8 @@ async function reconcileCakeSizes(
           price: size.price,
           sort_order: size.sortOrder,
           preorder_days: size.preorderDays,
+          available_from: size.availableFrom ?? null,
+          available_until: size.availableUntil ?? null,
         })
         .eq("id", sizeId)
         .eq("cake_id", cakeId);
@@ -378,6 +392,8 @@ async function reconcileCakeSizes(
       price: size.price,
       sort_order: size.sortOrder,
       preorder_days: size.preorderDays,
+      available_from: size.availableFrom ?? null,
+      available_until: size.availableUntil ?? null,
     });
     if (error) {
       throw new Error(error.message);

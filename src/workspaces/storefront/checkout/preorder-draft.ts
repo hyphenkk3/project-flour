@@ -14,6 +14,8 @@ export type PreorderDraftSizeChoice = {
   price: number;
   preorderDays: number;
   imageUrl?: string;
+  availableFrom?: string | null;
+  availableUntil?: string | null;
 };
 
 export type PreorderDraftItem = {
@@ -32,6 +34,8 @@ export type PreorderDraftItem = {
   preorderDays?: number;
   /** Display-only thumbnail captured at add-to-order. */
   imageUrl?: string;
+  availableFrom?: string | null;
+  availableUntil?: string | null;
   /** Display/edit snapshot of offered sizes. Live catalogue still wins when loaded. */
   sizeChoices?: PreorderDraftSizeChoice[];
 };
@@ -236,6 +240,8 @@ export function readPreorderDraft(): PreorderDraft | null {
           typeof item.imageUrl === "string" && item.imageUrl.trim()
             ? item.imageUrl.trim()
             : undefined,
+        availableFrom: item.availableFrom ?? null,
+        availableUntil: item.availableUntil ?? null,
         sizeChoices: parseDraftSizeChoices(item.sizeChoices),
       })),
     };
@@ -314,6 +320,8 @@ function parseDraftSizeChoices(
       price,
       preorderDays,
       imageUrl,
+      availableFrom: row.availableFrom ?? null,
+      availableUntil: row.availableUntil ?? null,
     });
   }
   return choices.length > 0 ? choices : undefined;
@@ -337,6 +345,8 @@ export function setDraftLineSize(
     sizeLabel: nextSize.size,
     unitPrice: nextSize.price,
     preorderDays: nextSize.preorderDays,
+    availableFrom: nextSize.availableFrom ?? null,
+    availableUntil: nextSize.availableUntil ?? null,
     imageUrl: nextSize.imageUrl ?? source.imageUrl,
   };
   const withoutSource = current.items.filter(

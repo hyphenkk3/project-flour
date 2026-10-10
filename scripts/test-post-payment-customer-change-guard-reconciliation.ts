@@ -117,11 +117,25 @@ assert.match(
 assert.match(implementation, /'post_payment_customer_change_override'/);
 assert.match(implementation, /'post_payment_customer_change'/);
 
-// The approved app-side decision still reaches the guard before writing.
-const guardCall = actions.indexOf('"guard_post_payment_customer_change"');
-assert.ok(guardCall > 0);
-assert.ok(
-  actions.indexOf('.from("orders")\n    .update(', guardCall) > guardCall,
+// Guard consumption and all staff mutations now share one transaction.
+const save = actions.slice(
+  actions.indexOf("export async function saveOrderWorkspaceAction"),
+  actions.indexOf("export async function markConfirmationSentAction"),
+);
+assert.match(save, /"save_guest_order_workspace_atomic"/);
+assert.doesNotMatch(save, /\.from\("orders"\)\s*\.update/);
+const amendment = readFileSync(
+  "supabase/migrations/20261010104124_cake_size_order_amendment_safety.sql",
+  "utf8",
+);
+assert.match(
+  amendment,
+  /public\.guard_post_payment_customer_change\(o\.id,actor,override_requested\)/,
+);
+assert.match(amendment, /public\._bind_rpc_actor\(p_actor_staff_id\)/);
+assert.match(
+  amendment,
+  /set constraints public\.orders_size_availability_final/,
 );
 
 const customerChange: PostPaymentSaveClassification = {

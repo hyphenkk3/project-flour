@@ -285,7 +285,14 @@ export async function updateOrderAction(
     .eq("id", orderId);
 
   if (error) {
-    return { error: "Unable to update order." };
+    return {
+      error:
+        /Available (from|until)|Cake size is not available|Fresh Pick/.test(
+          error.message,
+        )
+          ? error.message
+          : "Unable to update order.",
+    };
   }
 
   revalidateOrderPaths(orderId);

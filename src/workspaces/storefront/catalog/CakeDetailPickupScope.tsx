@@ -74,7 +74,7 @@ export function CakeDetailPickupScope({
       offerPromise={offerPromise}
       pickupDateNotice={pickupDateNotice}
       pickupScopeFrom={scope?.from ?? null}
-      pickupScopePickup={scope?.pickup ?? null}
+      pickupScopePickup={priceDate}
       pickupScopeTo={scope?.to ?? null}
       pickupPricesReady={pricesReady}
     />

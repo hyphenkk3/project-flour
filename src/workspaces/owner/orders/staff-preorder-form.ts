@@ -8,6 +8,7 @@ import {
 } from "@/engines/orders/fulfilment";
 
 export type StaffPreorderFormItem = {
+  itemId?: string;
   cakeId: string;
   cakeSizeId: string;
   quantity: number;
@@ -20,6 +21,7 @@ export function parseStaffPreorderItemsFromForm(
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw) as Array<{
+      itemId?: string;
       cakeId?: string;
       cakeSizeId?: string;
       quantity?: number;
@@ -27,6 +29,7 @@ export function parseStaffPreorderItemsFromForm(
     if (!Array.isArray(parsed)) return [];
     return parsed
       .map((item) => ({
+        ...(item.itemId ? { itemId: String(item.itemId).trim() } : {}),
         cakeId: String(item.cakeId ?? "").trim(),
         cakeSizeId: String(item.cakeSizeId ?? "").trim(),
         quantity: Number(item.quantity ?? 0),

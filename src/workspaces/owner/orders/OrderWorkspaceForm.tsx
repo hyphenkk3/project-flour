@@ -157,6 +157,7 @@ const initialSaveState: OrderWorkspaceSaveState = {
 };
 
 type EditableItem = {
+  itemId?: string;
   key: string;
   cakeId: string;
   cakeSizeId: string;
@@ -306,10 +307,7 @@ export function OrderWorkspaceForm({
     mode === "edit" ? editPickupDate : order.pickupDate;
   const isFreshPickCustomerOrder =
     order.orderSource === "customer_website" && Boolean(order.extraStockId);
-  const offerableSizeIds = useMemo(
-    () => offerableCakeSizeIds(cakes),
-    [cakes],
-  );
+  const offerableSizeIds = useMemo(() => offerableCakeSizeIds(cakes), [cakes]);
   const pickupDatePrices = usePickupDateCakeSizePrices(
     selectedPickupDate,
     offerableSizeIds,
@@ -394,14 +392,21 @@ export function OrderWorkspaceForm({
       const cake = cakes.find((entry) => entry.id === item.cakeId);
       const size = cake?.sizes.find((entry) => entry.id === item.cakeSizeId);
       if (!cake || !size) return [];
+      const prior = order.items.find(
+        (row) =>
+          row.id === item.itemId &&
+          row.cakeId === item.cakeId &&
+          row.cakeSizeId === item.cakeSizeId,
+      );
       return [
         {
+          itemId: item.itemId,
           cakeId: cake.id,
           cakeSizeId: size.id,
           quantity: item.quantity,
-          unitPrice: size.price,
-          cakeName: cake.name,
-          sizeLabel: size.size,
+          unitPrice: prior?.unitPrice ?? size.price,
+          cakeName: prior?.cakeName ?? cake.name,
+          sizeLabel: prior?.sizeLabel ?? size.size,
         },
       ];
     });
@@ -409,6 +414,7 @@ export function OrderWorkspaceForm({
 
   const currentItemSnapshot: LateOrderEditProposedItem[] = order.items.map(
     (item) => ({
+      itemId: item.id,
       cakeId: item.cakeId,
       cakeSizeId: item.cakeSizeId,
       quantity: item.quantity,
@@ -678,6 +684,7 @@ export function OrderWorkspaceForm({
     setEditItems(
       order.items.map((item, index) => ({
         key: item.id || `item-${index}`,
+        itemId: item.id,
         cakeId: item.cakeId,
         cakeSizeId: item.cakeSizeId,
         quantity: item.quantity,
@@ -770,6 +777,7 @@ export function OrderWorkspaceForm({
     () =>
       JSON.stringify(
         editItems.map((item) => ({
+          itemId: item.itemId,
           cakeId: item.cakeId,
           cakeSizeId: item.cakeSizeId,
           quantity: item.quantity,
@@ -1636,6 +1644,21 @@ export function OrderWorkspaceForm({
                 className="border-fog space-y-3 rounded-lg border p-3"
                 key={item.key}
               >
+                {item.itemId &&
+                order.items.filter(
+                  (row) =>
+                    row.cakeId === item.cakeId &&
+                    row.cakeSizeId === item.cakeSizeId,
+                ).length > 1 ? (
+                  <p className="text-skyline text-xs">
+                    Historical line —{" "}
+                    {formatRm(
+                      order.items.find((row) => row.id === item.itemId)
+                        ?.unitPrice ?? 0,
+                    )}{" "}
+                    each. Edit this row’s quantity separately.
+                  </p>
+                ) : null}
                 <FormField label="Cake">
                   <FormSelect
                     onChange={(event) => {

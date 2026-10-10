@@ -10,22 +10,14 @@ import {
   canAccessCustomerConfirmation,
   financialMateriallyAffectsConfirmation,
   nextStatusAfterConfirmationMarkedSent,
-  orderMateriallyAffectsConfirmation,
   orderStatusAllowsConfirmationInvalidation,
   shouldOfferUpdatedConfirmationAction,
-  shouldOutdateSentConfirmation,
 } from "@/engines/orders/confirmation-validity";
-import {
-  paidAddonsMateriallyDiffer,
-  paidAddonsTimelineSummary,
-  type PaidAddonMutationPayload,
-} from "@/engines/orders/paid-addons";
+import { type PaidAddonMutationPayload } from "@/engines/orders/paid-addons";
 import {
   buildCreateStaffFulfilmentRpcParams,
   defaultDeliveryCreateDraft,
   deliveryDraftFromPersistedOrder,
-  fulfilmentMateriallyDiffer,
-  fulfilmentTimelineSummary,
   normalizeOwnerCreateFulfilmentMethod,
   validateOwnerCreateFulfilment,
 } from "@/engines/orders/fulfilment";
@@ -656,6 +648,7 @@ export async function saveOrderWorkspaceAction(
   const cakes = await listOfferableLibraryCakes();
 
   const resolvedItems: Array<{
+    itemId?: string;
     cakeId: string;
     cakeSizeId: string;
     quantity: number;
@@ -665,6 +658,16 @@ export async function saveOrderWorkspaceAction(
   }> = [];
 
   for (const draft of draftItems) {
+    if (
+      draft.itemId &&
+      !before.items.some((item) => item.id === draft.itemId)
+    ) {
+      return {
+        error:
+          "The historical item no longer belongs to this order. Reload before saving.",
+        success: false,
+      };
+    }
     let cake = cakes.find((entry) => entry.id === draft.cakeId) ?? null;
     if (!cake) {
       cake = await getAvailableCakeById(draft.cakeId);
@@ -684,9 +687,12 @@ export async function saveOrderWorkspaceAction(
     }
     const prior = before.items.find(
       (item) =>
-        item.cakeId === draft.cakeId && item.cakeSizeId === draft.cakeSizeId,
+        item.cakeId === draft.cakeId &&
+        item.cakeSizeId === draft.cakeSizeId &&
+        (!draft.itemId || item.id === draft.itemId),
     );
     resolvedItems.push({
+      itemId: draft.itemId,
       cakeId: cake.id,
       cakeSizeId: size.id,
       quantity: draft.quantity,
@@ -705,7 +711,7 @@ export async function saveOrderWorkspaceAction(
   // Consolidate identical cake+size
   const consolidated = new Map<string, (typeof resolvedItems)[number]>();
   for (const item of resolvedItems) {
-    const key = `${item.cakeId}::${item.cakeSizeId}`;
+    const key = item.itemId ?? `${item.cakeId}::${item.cakeSizeId}`;
     const existing = consolidated.get(key);
     if (existing) {
       existing.quantity += item.quantity;
@@ -784,302 +790,73 @@ export async function saveOrderWorkspaceAction(
 
   const supabase = await createClient();
 
-  if (
-    postPaymentDecision.action === "consume" ||
-    postPaymentDecision.action === "override"
-  ) {
-    const { error: guardError } = await supabase.rpc(
-      "guard_post_payment_customer_change",
-      {
-        p_order_id: orderId,
-        p_actor_staff_id: staff.id,
-        p_override: postPaymentDecision.action === "override",
-      },
-    );
-    if (guardError) {
-      return { error: guardError.message, success: false };
-    }
-  }
-
-  const { error: updateError } = await supabase
-    .from("orders")
-    .update({
-      guest_name: guestName,
-      guest_phone: guestPhone || null,
-      guest_email: guestEmail || null,
-      order_source: nextSource,
-      crew_order: crewOrder,
-      include_receipt: includeReceipt,
-      needs_bakery_attention: needsAttention,
-      bakery_attention_note: needsAttention ? attentionNote || null : null,
-      pickup_date: pickupDate,
-      pickup_time: pickupTime,
-      /** Preserve historical free-text; Owner UI no longer edits this field. */
-      pickup_instruction: before.pickupInstruction,
-      customer_notes: customerNotes || null,
-      internal_notes: internalNotes || null,
-      updated_by: staff.id,
-    })
-    .eq("id", orderId)
-    .is("customer_id", null);
-
-  if (updateError) {
-    return { error: updateError.message, success: false };
-  }
-
-  // Transactional replace of the full item set (delete + insert in one RPC).
-  const { error: syncItemsError } = await supabase.rpc(
-    "sync_guest_order_items",
-    {
-      p_order_id: orderId,
-      p_items: finalItems.map((item) => ({
-        cake_id: item.cakeId,
-        cake_size_id: item.cakeSizeId,
-        quantity: item.quantity,
-        unit_price: item.unitPrice,
-        cake_name: item.cakeName,
-        size_label: item.sizeLabel,
-      })),
-    },
-  );
-
-  if (syncItemsError) {
-    return { error: syncItemsError.message, success: false };
-  }
-
-  const { error: deleteCompError } = await supabase
-    .from("order_complimentary_items")
-    .delete()
-    .eq("order_id", orderId);
-
-  if (deleteCompError) {
-    return { error: deleteCompError.message, success: false };
-  }
-
   const complimentaryToSave = draftComplimentary.filter(
     (item) => item.quantity > 0,
   );
-  if (complimentaryToSave.length > 0) {
-    const { error: insertCompError } = await supabase
-      .from("order_complimentary_items")
-      .insert(
-        complimentaryToSave.map((item) => ({
-          order_id: orderId,
-          complimentary_item_type_id: item.typeId,
+  const { error: saveError } = await supabase.rpc(
+    "save_guest_order_workspace_atomic",
+    {
+      p_order_id: orderId,
+      p_actor_staff_id: staff.id,
+      p_plan: {
+        expected_pickup_date: before.pickupDate,
+        post_payment_override: postPaymentOverride,
+        pickup_month_override: pickupMonthOverride,
+        order: {
+          guest_name: guestName,
+          guest_phone: guestPhone || null,
+          guest_email: guestEmail || null,
+          order_source: nextSource,
+          crew_order: crewOrder,
+          include_receipt: includeReceipt,
+          needs_bakery_attention: needsAttention,
+          bakery_attention_note: needsAttention ? attentionNote || null : null,
+          pickup_date: pickupDate,
+          pickup_time: pickupTime,
+          customer_notes: customerNotes || null,
+          internal_notes: internalNotes || null,
+        },
+        items: finalItems.map((item) => ({
+          cake_id: item.cakeId,
+          cake_size_id: item.cakeSizeId,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          cake_name: item.cakeName,
+          size_label: item.sizeLabel,
+        })),
+        complimentary: complimentaryToSave.map((item) => ({
+          type_id: item.typeId,
           name: item.name,
           quantity: item.quantity,
           sort_order: item.sortOrder,
         })),
-      );
-    if (insertCompError) {
-      return { error: insertCompError.message, success: false };
-    }
-  }
-
-  // Full-membership sync — server retains snapshots for kept codes.
-  const { error: syncPaidAddonsError } = await supabase.rpc(
-    "sync_guest_order_paid_addons",
-    {
-      p_order_id: orderId,
-      p_paid_addons: draftPaidAddons,
-    },
-  );
-
-  if (syncPaidAddonsError) {
-    return { error: syncPaidAddonsError.message, success: false };
-  }
-
-  if (preserveDineIn && before.dineInReservation && dineInParty) {
-    const { error: reservationError } = await supabase
-      .from("order_dine_in_reservations")
-      .update({
-        reservation_date: pickupDate,
-        reservation_time: dineInReservationTime,
-        venue: dineInParty.venue,
-        guest_count: dineInParty.totalGuestCount,
-        adult_count: dineInParty.adultCount,
-        kid_count: dineInParty.kidCount,
-        toddler_count: dineInParty.toddlerCount,
-        whitebird_split_seating_acknowledged:
-          dineInParty.whitebirdSplitSeatingAcknowledged,
-        reservation_note:
-          String(formData.get("reservation_note") ?? "").trim() || null,
-      })
-      .eq("order_id", orderId);
-    if (reservationError) {
-      return { error: reservationError.message, success: false };
-    }
-  } else if (fulfilmentRpc) {
-    // Atomic method + delivery-details sync (Pickup clears sibling row).
-    const { error: syncFulfilmentError } = await supabase.rpc(
-      "sync_guest_order_fulfilment",
-      {
-        p_order_id: orderId,
-        p_fulfilment_method: fulfilmentRpc.p_fulfilment_method,
-        p_delivery: fulfilmentRpc.p_delivery,
+        paid_addons: draftPaidAddons,
+        dine_in:
+          preserveDineIn && before.dineInReservation && dineInParty
+            ? {
+                reservation_time: dineInReservationTime,
+                venue: dineInParty.venue,
+                guest_count: dineInParty.totalGuestCount,
+                adult_count: dineInParty.adultCount,
+                kid_count: dineInParty.kidCount,
+                toddler_count: dineInParty.toddlerCount,
+                whitebird_split_seating_acknowledged:
+                  dineInParty.whitebirdSplitSeatingAcknowledged,
+                reservation_note:
+                  String(formData.get("reservation_note") ?? "").trim() || null,
+              }
+            : null,
+        fulfilment: fulfilmentRpc
+          ? {
+              method: fulfilmentRpc.p_fulfilment_method,
+              delivery: fulfilmentRpc.p_delivery,
+            }
+          : null,
       },
-    );
-
-    if (syncFulfilmentError) {
-      return { error: syncFulfilmentError.message, success: false };
-    }
-  }
-
-  const afterPaidAddons = await getGuestOrderById(orderId);
-  if (!afterPaidAddons) {
-    return { error: "Order not found after fulfilment sync.", success: false };
-  }
-
-  const materialChange = orderMateriallyAffectsConfirmation(before, {
-    customerName: guestName,
-    phone: guestPhone,
-    pickupDate,
-    pickupTime,
-    items: finalItems,
-    complimentaryItems: complimentaryToSave.map((item) => ({
-      name: item.name,
-      quantity: item.quantity,
-    })),
-    paidAddons: afterPaidAddons.paidAddons,
-    fulfilmentMethod: afterPaidAddons.fulfilmentMethod,
-    delivery: afterPaidAddons.delivery,
-  });
-
-  const paidAddonsChanged = paidAddonsMateriallyDiffer(
-    before.paidAddons ?? [],
-    afterPaidAddons.paidAddons ?? [],
-  );
-
-  const fulfilmentChanged = fulfilmentMateriallyDiffer(
-    {
-      method: before.fulfilmentMethod,
-      pickupDate: before.pickupDate,
-      pickupTime: before.pickupTime,
-      delivery: before.delivery,
-    },
-    {
-      method: afterPaidAddons.fulfilmentMethod,
-      pickupDate: afterPaidAddons.pickupDate,
-      pickupTime: afterPaidAddons.pickupTime,
-      delivery: afterPaidAddons.delivery,
     },
   );
-
-  const shouldInvalidateConfirmation = shouldOutdateSentConfirmation({
-    materialChange,
-    orderStatus: before.status,
-  });
-  const previousAmountDue = before.settlement.amountDue;
-  const previousStatus = before.status;
-
-  const reconcile = await reconcileOrderStatusAfterFinancialChange({
-    orderId,
-    before,
-    staffId: staff.id,
-  });
-  if (reconcile.error) {
-    return { error: reconcile.error, success: false };
-  }
-
-  const after = await getGuestOrderById(orderId);
-  if (!after) {
-    return { error: "Order not found after save.", success: false };
-  }
-
-  const newAmountDue = after.settlement.amountDue;
-  const netReceived = after.settlement.netReceived;
-  const newStatus = after.status;
-
-  const shouldAuditUpdate =
-    materialChange ||
-    paidAddonsChanged ||
-    fulfilmentChanged ||
-    previousStatus === "awaiting_payment" ||
-    previousStatus === "paid" ||
-    newStatus !== previousStatus ||
-    previousAmountDue !== newAmountDue;
-
-  if (shouldAuditUpdate) {
-    const metadata: Record<string, unknown> = {
-      previous_amount_due: previousAmountDue,
-      new_amount_due: newAmountDue,
-      net_received: netReceived,
-      previous_status: previousStatus,
-      new_status: newStatus,
-      remaining_balance: after.settlement.remainingBalance,
-      overpayment: after.settlement.overpayment,
-    };
-    if (
-      previousStatus === "awaiting_payment" ||
-      previousStatus === "paid" ||
-      newStatus !== previousStatus
-    ) {
-      metadata.amended_during_payment_lifecycle = true;
-    }
-    if (paidAddonsChanged) {
-      metadata.paid_addons_before = paidAddonsTimelineSummary(
-        before.paidAddons ?? [],
-      );
-      metadata.paid_addons_after = paidAddonsTimelineSummary(
-        after.paidAddons ?? [],
-      );
-    }
-    if (fulfilmentChanged) {
-      metadata.fulfilment_before = fulfilmentTimelineSummary({
-        method: before.fulfilmentMethod,
-        pickupDate: before.pickupDate,
-        pickupTime: before.pickupTime,
-        delivery: before.delivery,
-      });
-      metadata.fulfilment_after = fulfilmentTimelineSummary({
-        method: after.fulfilmentMethod,
-        pickupDate: after.pickupDate,
-        pickupTime: after.pickupTime,
-        delivery: after.delivery,
-      });
-    }
-
-    await insertTimelineEvent({
-      orderId,
-      eventType: "order_updated",
-      actorStaffId: staff.id,
-      metadata,
-    });
-  }
-
-  if (shouldInvalidateConfirmation) {
-    const { data: latestSent } = await supabase
-      .from("order_confirmation_snapshots")
-      .select("id")
-      .eq("order_id", orderId)
-      .eq("lifecycle_status", "sent")
-      .order("version", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (latestSent?.id) {
-      await supabase
-        .from("order_confirmation_snapshots")
-        .update({
-          lifecycle_status: "outdated",
-          outdated_at: new Date().toISOString(),
-        })
-        .eq("id", latestSent.id)
-        .eq("lifecycle_status", "sent");
-
-      await insertTimelineEvent({
-        orderId,
-        eventType: "confirmation_outdated",
-        actorStaffId: staff.id,
-        metadata: { snapshot_id: latestSent.id },
-      });
-    }
-
-    await supabase
-      .from("orders")
-      .update({ confirmation_needs_resend: true })
-      .eq("id", orderId);
-  }
+  if (saveError) return { error: saveError.message, success: false };
+  scheduleStaffNotificationDispatch();
 
   revalidatePath("/owner");
   revalidatePath(`/owner/orders/${orderId}`);
@@ -1597,7 +1374,10 @@ export async function recordOverpaymentRefundAction(
     return { error: "Order not found.", success: false };
   }
   if (order.status === "cancelled") {
-    return { error: "Cannot correct payment on a cancelled order.", success: false };
+    return {
+      error: "Cannot correct payment on a cancelled order.",
+      success: false,
+    };
   }
 
   const amount = parseRefundAmount(String(formData.get("amount") ?? ""));
@@ -1605,7 +1385,10 @@ export async function recordOverpaymentRefundAction(
     return { error: PAYMENT_CORRECTION_INVALID_AMOUNT, success: false };
   }
 
-  const reasonRaw = String(formData.get("reason") ?? "").replace(/^\s+|\s+$/g, "");
+  const reasonRaw = String(formData.get("reason") ?? "").replace(
+    /^\s+|\s+$/g,
+    "",
+  );
   const reason = reasonRaw ? reasonRaw : null;
 
   const checked = validatePaymentCorrection({
@@ -1613,7 +1396,10 @@ export async function recordOverpaymentRefundAction(
     amount,
   });
   if (checked.error || !checked.preview) {
-    return { error: checked.error ?? PAYMENT_CORRECTION_INVALID_AMOUNT, success: false };
+    return {
+      error: checked.error ?? PAYMENT_CORRECTION_INVALID_AMOUNT,
+      success: false,
+    };
   }
   const preview = checked.preview;
 
@@ -1693,9 +1479,8 @@ export async function applyCatalogueVoucherAction(
     return { error: "Order not found." };
   }
 
-  const { applyCatalogueVoucherAuthoritative } = await import(
-    "@/workspaces/vouchers/catalogue-actions"
-  );
+  const { applyCatalogueVoucherAuthoritative } =
+    await import("@/workspaces/vouchers/catalogue-actions");
   const result = await applyCatalogueVoucherAuthoritative({
     orderId,
     voucherId,

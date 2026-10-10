@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import {
+  cakeSizeAvailability,
+  validCakeSizeSelection,
+} from "@/engines/menu/cake-size-availability";
+import { validateCartSizeAvailability } from "@/workspaces/storefront/cart/actions";
+import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
+import { usePreorderDraft } from "@/workspaces/storefront/cart/usePreorderDraft";
+import { useEffect, useLayoutEffect, useId, useRef, useState } from "react";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import { StorefrontOverlay } from "@/workspaces/storefront/StorefrontOverlay";
 import type { StorefrontCake } from "@/types/storefront";
@@ -49,12 +56,30 @@ export function AddToOrderSheet({
   initialSizeId,
 }: AddToOrderSheetProps) {
   const titleId = useId();
+  const draftState = usePreorderDraft();
+  const [chosenPickupDate, setChosenPickupDate] = useState<string | null>(null);
+  const pickupDate =
+    chosenPickupDate ?? pickupScope?.pickup ?? draftState?.pickupDate ?? null;
+  const pickupDateRef = useRef(pickupDate);
+  useLayoutEffect(() => {
+    pickupDateRef.current = pickupDate;
+  }, [pickupDate]);
   const addingRef = useRef(false);
   const { cakes: pricedCakes, ready: pickupPricesReady } =
-    usePickupDatePricedCakes([cake], pickupScope?.pickup);
+    usePickupDatePricedCakes([cake], pickupDate);
   const pricedCake = pricedCakes[0] ?? cake;
   const initialSelectedId = initialSizeId || cake.sizes[0]?.id || "";
-  const [sizeId, setSizeId] = useState(initialSelectedId);
+  const [requestedSizeId, setSizeId] = useState(initialSelectedId);
+  const sizeId = validCakeSizeSelection(
+    pricedCake.sizes,
+    requestedSizeId,
+    pickupDate,
+  );
+  const [availabilityError, setAvailabilityError] = useState<string | null>(
+    null,
+  );
+  // Clear invalid selection before rendering the changed date, without picking a replacement.
+  if (requestedSizeId && !sizeId) setSizeId("");
   const [quantity, setQuantity] = useState(() => {
     const existing = draftLineQuantity(
       readPreorderDraft(),
@@ -82,14 +107,41 @@ export function AddToOrderSheet({
     setQuantity(existing > 0 ? existing : 1);
   }
 
-  function addToOrder() {
+  async function addToOrder() {
     if (!selected || !pickupPricesReady || addingRef.current) return;
     addingRef.current = true;
     setAdding(true);
+    setAvailabilityError(null);
+    const checkedDate = pickupDate || null;
+    const draftSnapshot = JSON.stringify(readPreorderDraft());
+    const result = await validateCartSizeAvailability(
+      [{ cakeId: pricedCake.id, sizeId: selected.id }],
+      checkedDate,
+    ).catch(() => ({
+      error: "Unable to check cake size availability. Please try again.",
+    }));
+    const currentDate = pickupDateRef.current || null;
+    if (
+      result.error ||
+      checkedDate !== currentDate ||
+      draftSnapshot !== JSON.stringify(readPreorderDraft())
+    ) {
+      setAvailabilityError(
+        result.error ?? "Pickup date changed. Please check the size again.",
+      );
+      addingRef.current = false;
+      setAdding(false);
+      return;
+    }
     const draft = readPreorderDraft() ?? emptyPreorderDraft();
     const existing = draftLineQuantity(draft, pricedCake.id, selected.id);
     if (existing > 0) {
-      setDraftLineQuantity(pricedCake.id, selected.id, quantity);
+      const updated = setDraftLineQuantity(
+        pricedCake.id,
+        selected.id,
+        quantity,
+      );
+      if (pickupDate) writePreorderDraft({ ...updated, pickupDate });
       onAdded("updated");
       return;
     }
@@ -101,12 +153,16 @@ export function AddToOrderSheet({
       sizeLabel: selected.size,
       unitPrice: selected.price,
       preorderDays: selected.preorderDays,
+      availableFrom: selected.availableFrom ?? null,
+      availableUntil: selected.availableUntil ?? null,
       imageUrl: photo?.url ?? pricedCake.image ?? undefined,
       sizeChoices: pricedCake.sizes.map((size) => ({
         id: size.id,
         size: size.size,
         price: size.price,
         preorderDays: size.preorderDays,
+        availableFrom: size.availableFrom ?? null,
+        availableUntil: size.availableUntil ?? null,
         imageUrl:
           storefrontPhotoForSize(pricedCake.photos, size.id)?.url ??
           pricedCake.image ??
@@ -120,6 +176,7 @@ export function AddToOrderSheet({
       next.pickupScopeTo = to;
       next.pickupScopeConstrainsBounds = !isFullMonthPickupScope(from, to);
     }
+    if (pickupDate) next.pickupDate = pickupDate;
     writePreorderDraft(next);
     onAdded("added");
   }
@@ -174,6 +231,23 @@ export function AddToOrderSheet({
           )}
         </div>
 
+        {cake.sizes.some(
+          (size) => size.availableFrom || size.availableUntil,
+        ) ? (
+          <PickupSlotFields
+            dateId={`${titleId}-pickup-date`}
+            defaultDate={pickupDate ?? ""}
+            includeFieldNames={false}
+            showTime={false}
+            required={false}
+            minDate={pickupScope?.from}
+            maxDate={pickupScope?.to}
+            onDateChange={(date) => {
+              setChosenPickupDate(date);
+              setAvailabilityError(null);
+            }}
+          />
+        ) : null}
         {pricedCake.sizes.length === 0 ? (
           <p className="text-skyline text-sm">This cake has no sizes yet.</p>
         ) : (
@@ -182,18 +256,22 @@ export function AddToOrderSheet({
             <ul className="grid gap-2">
               {pricedCake.sizes.map((size) => {
                 const selectedSize = size.id === sizeId;
+                const availability = cakeSizeAvailability(size, pickupDate);
                 return (
                   <li key={size.id}>
                     <label
                       className={
-                        selectedSize
-                          ? "border-ink bg-mist flex cursor-pointer items-center justify-between gap-3 border px-4 py-3"
-                          : "border-fog hover:border-ink flex cursor-pointer items-center justify-between gap-3 border bg-transparent px-4 py-3"
+                        !availability.available
+                          ? "border-fog flex cursor-not-allowed items-center justify-between gap-3 border px-4 py-3 opacity-60"
+                          : selectedSize
+                            ? "border-ink bg-mist flex cursor-pointer items-center justify-between gap-3 border px-4 py-3"
+                            : "border-fog hover:border-ink flex cursor-pointer items-center justify-between gap-3 border bg-transparent px-4 py-3"
                       }
                     >
                       <span className="min-w-0">
                         <input
                           checked={selectedSize}
+                          disabled={!availability.available || adding}
                           className="sr-only"
                           name="add-to-order-size"
                           onChange={() => selectSize(size.id)}
@@ -205,6 +283,11 @@ export function AddToOrderSheet({
                         </span>
                         <span className="text-skyline mt-0.5 block text-sm">
                           {formatPreorderRequirement(size.preorderDays)}
+                          {availability.message ? (
+                            <span className="mt-1 block">
+                              {availability.message}
+                            </span>
+                          ) : null}
                         </span>
                       </span>
                       <span className="text-ink shrink-0 text-sm font-semibold tabular-nums">
@@ -229,6 +312,11 @@ export function AddToOrderSheet({
           </p>
         ) : null}
 
+        {availabilityError ? (
+          <p className="text-status-danger text-sm" role="alert">
+            {availabilityError}
+          </p>
+        ) : null}
         <div className="flex items-center justify-between gap-3">
           <p className="text-ink text-sm font-medium" id={`${titleId}-qty`}>
             Quantity

@@ -40,6 +40,8 @@ export type LibraryCakeSize = {
   price: number;
   sortOrder: number;
   preorderDays: number;
+  availableFrom?: string | null;
+  availableUntil?: string | null;
 };
 
 export type LibraryCakeSizePrice = {
@@ -98,6 +100,8 @@ export type LibraryCakeSizeInput = {
   price: number;
   sortOrder: number;
   preorderDays: number;
+  availableFrom?: string | null;
+  availableUntil?: string | null;
 };
 
 export type LibraryCakePhotoInput = {

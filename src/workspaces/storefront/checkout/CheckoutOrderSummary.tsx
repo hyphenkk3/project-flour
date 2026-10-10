@@ -1,8 +1,15 @@
+import {
+  cakeSizeAvailability,
+  validCakeSizeSelection,
+} from "@/engines/menu/cake-size-availability";
 import { memo } from "react";
 import type { StorefrontCake } from "@/types/storefront";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import { FormSelect } from "@/components/ui/form";
-import { startingPrice, formatRm } from "@/workspaces/storefront/catalog/pricing";
+import {
+  startingPrice,
+  formatRm,
+} from "@/workspaces/storefront/catalog/pricing";
 import { chargedDraftItemUnitPrice } from "@/engines/orders/cake-size-price-ack";
 import {
   DELIVERY_FEE_LINE_LABEL,
@@ -32,6 +39,8 @@ type CheckoutOrderSummaryProps = {
   catalogueVoucher?: CatalogueVoucherPreview | null;
   deliveryCharges?: CheckoutDeliveryChargesBreakdown | null;
   pickupDateLabel: string | null;
+  pickupDate?: string | null;
+  cartValidationPending?: boolean;
   earliestLabel: string | null;
   preorderLabel: string | null;
   offerLabel: string | null;
@@ -74,6 +83,8 @@ function CheckoutOrderSummaryView({
   catalogueVoucher = null,
   deliveryCharges = null,
   pickupDateLabel,
+  pickupDate = null,
+  cartValidationPending = false,
   earliestLabel,
   preorderLabel,
   offerLabel,
@@ -102,13 +113,17 @@ function CheckoutOrderSummaryView({
         Your Order
       </h2>
       {pickupDateLabel ? (
-        <p className="text-skyline mt-2 text-sm">Collection · {pickupDateLabel}</p>
+        <p className="text-skyline mt-2 text-sm">
+          Collection · {pickupDateLabel}
+        </p>
       ) : null}
 
       <div className="mt-6">
         {unavailableMessage && !loadingOffer ? (
           <div className="mb-4" role="status">
-            <p className="text-ink text-sm leading-relaxed">{unavailableMessage}</p>
+            <p className="text-ink text-sm leading-relaxed">
+              {unavailableMessage}
+            </p>
             <p className="text-skyline mt-2 text-sm leading-relaxed">
               Please choose a date in a published catalogue.
             </p>
@@ -151,7 +166,10 @@ function CheckoutOrderSummaryView({
               const sizeSelectId = `size-${index}`;
               const qtyId = `qty-${index}`;
               return (
-                <li className="py-4" key={`${item.cakeId}-${item.sizeId}-${index}`}>
+                <li
+                  className="py-4"
+                  key={`${item.cakeId}-${item.sizeId}-${index}`}
+                >
                   <div className="flex items-start gap-3">
                     {item.imageUrl ? (
                       <div className="bg-fog relative h-14 w-14 shrink-0 overflow-hidden rounded-[10px]">
@@ -181,30 +199,52 @@ function CheckoutOrderSummaryView({
                           <div className="w-[9.75rem] shrink-0">
                             <FormSelect
                               id={sizeSelectId}
+                              disabled={cartValidationPending || loadingOffer}
                               onChange={(event) =>
                                 onChangeSize(index, event.target.value)
                               }
-                              value={item.sizeId}
+                              value={validCakeSizeSelection(
+                                cake?.sizes ?? [],
+                                item.sizeId,
+                                pickupDate,
+                              )}
                             >
+                              <option value="" disabled>
+                                Select a valid size
+                              </option>
                               {sizeOptions.map((size) => (
-                                <option key={size.id} value={size.id}>
+                                <option
+                                  key={size.id}
+                                  value={size.id}
+                                  disabled={
+                                    !cakeSizeAvailability(size, pickupDate)
+                                      .available
+                                  }
+                                >
                                   {size.size} —{" "}
                                   {checkoutChoicePricesReady
                                     ? formatRm(size.price)
                                     : "Checking price…"}
+                                  {cakeSizeAvailability(size, pickupDate)
+                                    .message
+                                    ? ` — ${cakeSizeAvailability(size, pickupDate).message}`
+                                    : ""}
                                 </option>
                               ))}
                             </FormSelect>
                           </div>
                         ) : (
-                          <p className="text-skyline text-sm">{item.sizeLabel}</p>
+                          <p className="text-skyline text-sm">
+                            {item.sizeLabel}
+                          </p>
                         )}
                         <label className="sr-only" htmlFor={qtyId}>
                           Quantity
                         </label>
                         <input
-                          className="border-fog text-ink h-12 w-16 rounded-lg border bg-white px-2 text-center text-sm tabular-nums outline-none focus:border-signal"
+                          className="border-fog text-ink focus:border-signal h-12 w-16 rounded-lg border bg-white px-2 text-center text-sm tabular-nums outline-none"
                           id={qtyId}
+                          disabled={cartValidationPending || loadingOffer}
                           min={1}
                           onChange={(event) =>
                             onChangeQuantity(
@@ -222,13 +262,34 @@ function CheckoutOrderSummaryView({
                           )}
                         </p>
                       </div>
+                      {cake &&
+                      !cakeSizeAvailability(
+                        cake.sizes.find((size) => size.id === item.sizeId) ??
+                          {},
+                        pickupDate,
+                      ).available ? (
+                        <p
+                          role="status"
+                          className="text-status-danger mt-2 text-sm"
+                        >
+                          {
+                            cakeSizeAvailability(
+                              cake.sizes.find(
+                                (size) => size.id === item.sizeId,
+                              ) ?? {},
+                              pickupDate,
+                            ).message
+                          }{" "}
+                          Please select a valid size.
+                        </p>
+                      ) : null}
                       {preorder ? (
                         <p className="text-skyline mt-2 text-[11px] font-semibold tracking-[0.14em] uppercase">
                           {preorder}
                         </p>
                       ) : null}
                       {cakePickupAvailabilityNotes[item.cakeId] ? (
-                        <p className="text-status-danger mt-2 text-sm font-semibold leading-snug">
+                        <p className="text-status-danger mt-2 text-sm leading-snug font-semibold">
                           {cakePickupAvailabilityNotes[item.cakeId]}
                         </p>
                       ) : null}
@@ -270,22 +331,43 @@ function CheckoutOrderSummaryView({
                       )}
                     </span>
                     <div className="w-36 shrink-0">
-                    <FormSelect
-                      aria-label={`Size for ${cake.name}`}
-                      onChange={(event) =>
-                        onAddSize(cake.id, event.target.value)
-                      }
-                      value={addSizeByCake[cake.id] ?? cake.sizes[0]?.id ?? ""}
-                    >
-                      {cake.sizes.map((size) => (
-                        <option key={size.id} value={size.id}>
-                          {size.size}
+                      <FormSelect
+                        aria-label={`Size for ${cake.name}`}
+                        onChange={(event) =>
+                          onAddSize(cake.id, event.target.value)
+                        }
+                        value={addSizeByCake[cake.id] ?? ""}
+                        disabled={cartValidationPending || loadingOffer}
+                      >
+                        <option value="" disabled>
+                          Select a size
                         </option>
-                      ))}
-                    </FormSelect>
+                        {cake.sizes.map((size) => (
+                          <option
+                            key={size.id}
+                            value={size.id}
+                            disabled={
+                              !cakeSizeAvailability(size, pickupDate).available
+                            }
+                          >
+                            {size.size}
+                            {cakeSizeAvailability(size, pickupDate).message
+                              ? ` — ${cakeSizeAvailability(size, pickupDate).message}`
+                              : ""}
+                          </option>
+                        ))}
+                      </FormSelect>
                     </div>
                     <button
                       className="text-signal text-sm font-medium"
+                      disabled={
+                        cartValidationPending ||
+                        !cake.sizes.some(
+                          (size) =>
+                            size.id === addSizeByCake[cake.id] &&
+                            cakeSizeAvailability(size, pickupDate).available,
+                        )
+                      }
                       onClick={() => onAddCake(cake)}
                       type="button"
                     >
@@ -363,7 +445,9 @@ function CheckoutOrderSummaryView({
               </div>
               <div className="flex items-baseline justify-between gap-3">
                 <dt className="text-ink text-sm">{DELIVERY_FEE_LINE_LABEL}</dt>
-                <dd className="text-skyline text-sm">{DELIVERY_FEE_PENDING_LABEL}</dd>
+                <dd className="text-skyline text-sm">
+                  {DELIVERY_FEE_PENDING_LABEL}
+                </dd>
               </div>
               <div className="flex items-baseline justify-between gap-3 pt-1">
                 <dt className="text-ink text-sm">

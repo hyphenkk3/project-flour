@@ -198,6 +198,8 @@ export type StorefrontCakeSize = {
   sortOrder: number;
   /** UX estimate. Server reloads live `library_cake_sizes.preorder_days`. */
   preorderDays: number;
+  availableFrom?: string | null;
+  availableUntil?: string | null;
 };
 
 export type StorefrontCakePhoto = {
