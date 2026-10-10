@@ -7,6 +7,7 @@ import {
 } from "@/foundation/staff/notification-preferences";
 import type { StaffNotificationEventKey } from "@/foundation/staff/notification-event-identity";
 import { buildStaffNotificationEmail } from "@/foundation/staff/staff-notification-email";
+import { LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED } from "@/foundation/staff/legacy-staff-notification-email-pause";
 import { parseNewOrderNotificationPayload } from "@/foundation/staff/staff-notification-new-order";
 import {
   STAFF_NOTIFICATION_EMAIL_LEASE_SECONDS,
@@ -124,6 +125,10 @@ function staffNotificationResendFrom(): string {
 export function createResendStaffNotificationMailer(): StaffNotificationMailer {
   return {
     async send(input) {
+      if (LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED) {
+        throw new Error("Staff email dispatch is paused.");
+      }
+
       const apiKey = process.env.RESEND_API_KEY?.trim();
       if (!apiKey) {
         throw new Error("RESEND_API_KEY is not configured.");
@@ -156,10 +161,10 @@ export async function deliverStaffNotificationEmailsToRecipients(input: {
   recipients: Array<{ staffId: string; email: string }>;
   alreadyDeliveredStaffIds?: Set<string>;
   mailer: StaffNotificationMailer;
-  beforeSend?: (recipient: { staffId: string; email: string }) => Promise<
-    | { send: true }
-    | { send: false; reason: string }
-  >;
+  beforeSend?: (recipient: {
+    staffId: string;
+    email: string;
+  }) => Promise<{ send: true } | { send: false; reason: string }>;
   recordSuppressed?: (staffId: string, reason: string) => Promise<void>;
   recordDelivery?: (
     staffId: string,
@@ -170,15 +175,20 @@ export async function deliverStaffNotificationEmailsToRecipients(input: {
   Omit<StaffNotificationDeliveryResult, "eventId" | "eventKey" | "code">
 > {
   const already = input.alreadyDeliveredStaffIds ?? new Set<string>();
-  const email = buildStaffNotificationEmail(input.content);
   const result = {
     attempted: input.recipients.length,
     sent: 0,
     skipped: 0,
     failed: 0,
-    suppressed: 0,
+    suppressed: LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED
+      ? input.recipients.length
+      : 0,
     errors: [] as string[],
   };
+
+  if (LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED) return result;
+
+  const email = buildStaffNotificationEmail(input.content);
 
   for (const recipient of input.recipients) {
     if (already.has(recipient.staffId)) {
@@ -498,6 +508,8 @@ export async function deliverPendingStaffNotificationEmails(input?: {
   validateFreshPickHoldReminder?: FreshPickHoldReminderValidator;
   suppressDelivery?: StaffNotificationEmailSuppressor;
 }): Promise<StaffNotificationDeliveryResult[]> {
+  if (LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED) return [];
+
   try {
     const claimed = await (
       input?.claimer ?? claimStaffNotificationEmailDeliveries
@@ -514,8 +526,7 @@ export async function deliverPendingStaffNotificationEmails(input?: {
       completeDelivery:
         input?.completeDelivery ?? completeStaffNotificationEmailDelivery,
       validateFreshPickHoldReminder:
-        input?.validateFreshPickHoldReminder ??
-        isCurrentFreshPickHoldReminder,
+        input?.validateFreshPickHoldReminder ?? isCurrentFreshPickHoldReminder,
       suppressDelivery:
         input?.suppressDelivery ?? suppressStaffNotificationEmailDelivery,
     });

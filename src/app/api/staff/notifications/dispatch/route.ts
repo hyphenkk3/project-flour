@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { authorizeStaffNotificationDispatch } from "@/foundation/staff/staff-notification-dispatch-auth";
 import { deliverPendingStaffNotificationEmails } from "@/foundation/staff/staff-notification-dispatch";
+import { LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED } from "@/foundation/staff/legacy-staff-notification-email-pause";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,13 @@ async function handleDispatch(request: Request): Promise<NextResponse> {
   const auth = authorizeStaffNotificationDispatch(request);
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  if (LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED) {
+    return NextResponse.json(
+      { error: "Staff email dispatch is paused." },
+      { status: 503 },
+    );
   }
 
   let eventId: string | undefined;
