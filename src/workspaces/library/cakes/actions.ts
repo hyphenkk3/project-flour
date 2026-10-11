@@ -53,7 +53,10 @@ function parseLines(value: FormDataEntryValue | null): string[] {
     .filter(Boolean);
 }
 
-function parseSizes(formData: FormData): LibraryCakeSizeInput[] | string {
+function parseSizes(
+  formData: FormData,
+  currentSizes: readonly LibraryCakeSizeInput[] = [],
+): LibraryCakeSizeInput[] | string {
   const ids = formData.getAll("size_id").map((value) => String(value).trim());
   const labels = formData
     .getAll("size_label")
@@ -62,6 +65,16 @@ function parseSizes(formData: FormData): LibraryCakeSizeInput[] | string {
   const preorderDaysRaw = formData.getAll("size_preorder_days");
   const fromDates = formData.getAll("size_available_from");
   const untilDates = formData.getAll("size_available_until");
+
+  // Missing date fields preserve saved values. Empty fields explicitly clear them.
+  // Partial arrays cannot be associated safely with size IDs; reject them.
+  if (
+    (fromDates.length !== 0 && fromDates.length !== labels.length) ||
+    (untilDates.length !== 0 && untilDates.length !== labels.length)
+  ) {
+    return "Reload the cake editor before saving availability dates.";
+  }
+  const currentById = new Map(currentSizes.map((size) => [size.id, size]));
 
   const sizes: LibraryCakeSizeInput[] = [];
 
@@ -86,8 +99,15 @@ function parseSizes(formData: FormData): LibraryCakeSizeInput[] | string {
       return `Preorder days for size “${label}” must be a whole number of at least 1.`;
     }
 
-    const availableFrom = String(fromDates[index] ?? "").trim() || null;
-    const availableUntil = String(untilDates[index] ?? "").trim() || null;
+    const current = id ? currentById.get(id) : undefined;
+    const availableFrom =
+      fromDates.length === 0
+        ? (current?.availableFrom ?? null)
+        : String(fromDates[index]).trim() || null;
+    const availableUntil =
+      untilDates.length === 0
+        ? (current?.availableUntil ?? null)
+        : String(untilDates[index]).trim() || null;
     const dateError = cakeSizeAvailabilityRangeError(
       availableFrom,
       availableUntil,
@@ -115,6 +135,7 @@ function parseSizes(formData: FormData): LibraryCakeSizeInput[] | string {
 async function parseCakeInput(
   formData: FormData,
   options: {
+    currentSizes?: readonly LibraryCakeSizeInput[];
     currentCategoryIds?: readonly string[];
     currentTagIds?: readonly string[];
   } = {},
@@ -127,7 +148,7 @@ async function parseCakeInput(
     formData.get("status") ?? "",
   ).trim() as LibraryCakeStatus;
   const allergens = parseLines(formData.get("allergens"));
-  const sizes = parseSizes(formData);
+  const sizes = parseSizes(formData, options.currentSizes);
   if (typeof sizes === "string") {
     return sizes;
   }
@@ -538,6 +559,7 @@ export async function updateCakeAction(
   const staff = await requireLibraryStaff();
   const current = await getCakeById(id);
   const parsed = await parseCakeInput(formData, {
+    currentSizes: current?.sizes,
     currentCategoryIds: current?.categories.map((row) => row.id) ?? [],
     currentTagIds: current?.tags?.map((row) => row.id) ?? [],
   });

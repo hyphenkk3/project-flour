@@ -216,6 +216,8 @@ export function CakeForm({
           label: size.label,
           price: size.price,
           preorderDays: size.preorderDays,
+          availableFrom: size.availableFrom,
+          availableUntil: size.availableUntil,
         }))}
         schedules={schedules}
       />
