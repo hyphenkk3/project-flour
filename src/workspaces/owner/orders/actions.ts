@@ -817,6 +817,7 @@ export async function saveOrderWorkspaceAction(
           internal_notes: internalNotes || null,
         },
         items: finalItems.map((item) => ({
+          item_id: item.itemId,
           cake_id: item.cakeId,
           cake_size_id: item.cakeSizeId,
           quantity: item.quantity,
