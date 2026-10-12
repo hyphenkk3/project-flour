@@ -29,6 +29,9 @@ run(fn('20260817140000_extra_pickup_from_order_cutoff.sql','create_confirmed_ext
 run("""
 create table waiting_list_requests(id uuid primary key,guest_name text,guest_phone text,created_by_staff_id uuid,converted_order_id uuid,pickup_date date,status text);
 create table waiting_list_items(id uuid primary key,request_id uuid,library_cake_id uuid,library_cake_size_id uuid,pickup_date date,status text,remaining_quantity int,accepted_quantity int,converted_order_id uuid);
+alter table waiting_list_items add column quantity int not null default 1;
+create function fixture_sync_waiting_list_remaining() returns trigger language plpgsql as $$begin new.remaining_quantity := new.quantity-new.accepted_quantity; return new; end$$;
+create trigger fixture_waiting_list_remaining before insert or update of quantity,accepted_quantity on waiting_list_items for each row execute function fixture_sync_waiting_list_remaining();
 create table production_capacity_holds(id uuid primary key,waiting_list_item_id uuid,status text,held_at timestamptz,held_until timestamptz,quantity int,converted_order_id uuid,released_at timestamptz);
 create table waiting_list_confirmation_links(id uuid primary key,request_id uuid,status text,expires_at timestamptz,issued_at timestamptz,converted_order_id uuid,submitted_payload jsonb,item_snapshot jsonb);
 create table waiting_list_events(request_id uuid,item_id uuid,event_type text,actor uuid,payload jsonb);
@@ -110,11 +113,12 @@ print(f'{count} authorization cases PASS; owner/ACL/search_path/stock attributio
 
 # Actual conversion wrapper bodies, with minimal ancillary schema/helper fixtures.
 import uuid,json
-def waiting_fixture(d='2026-11-01',quantity=1):
+def waiting_fixture(d='2026-11-01',quantity=1,hold_quantity=None):
     req,item,hold,link=[str(uuid.uuid4()) for _ in range(4)]
+    held=hold_quantity if hold_quantity is not None else 1
     payload=json.dumps({'customer_name':'Synthetic','phone':'0123456789','pickup_date':d,'pickup_time':'12:00','fulfilment_method':'pickup','unit_price':999})
     snap=json.dumps([{'waiting_list_item_id':item,'cake_id':CAKE,'cake_size_id':SIZE,'offered_quantity':quantity}])
-    run(f"insert into waiting_list_requests values('{req}','Synthetic','0123456789','{actor(1)}',null,'{d}','accepted'); insert into waiting_list_items values('{item}','{req}','{CAKE}','{SIZE}','{d}','accepted',1,0,null); insert into production_capacity_holds values('{hold}','{item}','active',now(),now()+interval '1 day',1,null,null); insert into waiting_list_confirmation_links values('{link}','{req}','submitted',now()+interval '1 day',now(),null,'{payload}','{snap}');",DB)
+    run(f"insert into waiting_list_requests values('{req}','Synthetic','0123456789','{actor(1)}',null,'{d}','accepted'); insert into waiting_list_items(id,request_id,library_cake_id,library_cake_size_id,pickup_date,status,remaining_quantity,accepted_quantity,converted_order_id,quantity) values('{item}','{req}','{CAKE}','{SIZE}','{d}','accepted',{quantity},0,null,{quantity}); insert into production_capacity_holds values('{hold}','{item}','active',now(),now()+interval '1 day',{held},null,null); insert into waiting_list_confirmation_links values('{link}','{req}','submitted',now()+interval '1 day',now(),null,'{payload}','{snap}');",DB)
     return req,item,hold,link
 for name in ['waiting_list_convert_item','waiting_list_convert_confirmation']:
     req,item,hold,link=waiting_fixture()
@@ -133,8 +137,56 @@ for name in ['waiting_list_convert_item','waiting_list_convert_confirmation']:
     req,item,hold,link=waiting_fixture('2026-10-31')
     check('authenticated',uid(3),call(actor(3)),False,name+' bakery October unavailable rollback','Available from')
     req,item,hold,link=waiting_fixture(quantity=2)
+    run(f"update waiting_list_items set accepted_quantity=1,status='partially_accepted' where id='{item}';",DB)
     query=call(actor(3)) if name.endswith('_confirmation') else call(actor(3)).replace(",1,'12:00')",",2,'12:00')")
     check('authenticated',uid(3),query,False,name+' excess quantity rejected')
+
+# Reproduce the hosted sequence against the installed baseline before applying
+# the focused follow-up migration. Recording acceptance consumes the remainder,
+# so the old conversion guard rejects the already-accepted held quantity.
+req,item,hold,link=waiting_fixture()
+run(f"update waiting_list_items set accepted_quantity=1,remaining_quantity=0,status='accepted' where id='{item}';",DB)
+query=f"select public.waiting_list_convert_item('{actor(1)}','{item}',1,'12:00')"
+check('authenticated',uid(1),query,False,'baseline accepted quantity repro','Convert quantity is not valid')
+
+# Install only the local follow-up migration under test; hosted databases are
+# never contacted by this disposable Unix-socket test harness.
+run((ROOT/'supabase/migrations/20261012001012_waiting_list_accepted_quantity_conversion.sql').read_text(),DB)
+
+req,item,hold,link=waiting_fixture()
+run(f"update waiting_list_items set accepted_quantity=1,remaining_quantity=0,status='accepted' where id='{item}';",DB)
+query=f"select public.waiting_list_convert_item('{actor(1)}','{item}',1,'12:00')"
+check('authenticated',uid(1),query,True,'accepted quantity converts after response')
+assert scalar(f"select status='converted' and accepted_quantity=1 and remaining_quantity=0 and converted_order_id is not null from waiting_list_items where id='{item}'")=='t'
+assert scalar(f"select status='converted' and converted_order_id=(select converted_order_id from waiting_list_items where id='{item}') from production_capacity_holds where id='{hold}'")=='t'
+
+# A direct conversion from Contacted still records acceptance once.
+req,item,hold,link=waiting_fixture()
+run(f"update waiting_list_items set status='contacted' where id='{item}';",DB)
+query=f"select public.waiting_list_convert_item('{actor(2)}','{item}',1,'12:00')"
+check('authenticated',uid(2),query,True,'contacted offer converts and records acceptance')
+assert scalar(f"select accepted_quantity=1 and remaining_quantity=0 and status='converted' from waiting_list_items where id='{item}'")=='t'
+
+# Partial recorded acceptance converts only accepted, unconverted units.
+req,item,hold,link=waiting_fixture(quantity=2,hold_quantity=2)
+run(f"update waiting_list_items set accepted_quantity=1,remaining_quantity=1,status='partially_accepted' where id='{item}';",DB)
+query=f"select public.waiting_list_convert_item('{actor(2)}','{item}',1,'12:00')"
+check('authenticated',uid(2),query,True,'partial accepted quantity converts without double-counting')
+assert scalar(f"select accepted_quantity=1 and remaining_quantity=1 and status='partially_accepted' from waiting_list_items where id='{item}'")=='t'
+
+# Attempting to convert the unaccepted remainder is rejected atomically.
+req,item,hold,link=waiting_fixture(quantity=2,hold_quantity=2)
+run(f"update waiting_list_items set accepted_quantity=1,remaining_quantity=1,status='partially_accepted' where id='{item}';",DB)
+query=f"select public.waiting_list_convert_item('{actor(2)}','{item}',2,'12:00')"
+check('authenticated',uid(2),query,False,'unaccepted remainder cannot convert','accepted offer')
+
+# Identity binding and the migration's narrow call surface survive replacement.
+req,item,hold,link=waiting_fixture()
+run(f"update waiting_list_items set accepted_quantity=1,remaining_quantity=0,status='accepted' where id='{item}';",DB)
+query=f"select public.waiting_list_convert_item('{actor(1)}','{item}',1,'12:00')"
+check('authenticated',uid(99),query,False,'post-fix customer cannot convert')
+check('authenticated',uid(2),query,False,'post-fix forged staff actor rejected')
+assert scalar("select has_function_privilege('authenticated','public.waiting_list_convert_item(uuid,uuid,integer,time without time zone,boolean)','EXECUTE') and not has_function_privilege('anon','public.waiting_list_convert_item(uuid,uuid,integer,time without time zone,boolean)','EXECUTE') and not has_function_privilege('service_role','public.waiting_list_convert_item(uuid,uuid,integer,time without time zone,boolean)','EXECUTE')")=='t'
 for role in ['anon','authenticated','service_role']:
     q=preorder(actor(3)).replace('public.create_staff_guest_preorder','staff_preorder_private.create_waiting_list_preorder')
     check(role,uid(3),q,False,role+' cannot directly enter private path')

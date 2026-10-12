@@ -150,6 +150,7 @@ import {
   offerableCakeSizeIds,
 } from "@/workspaces/owner/orders/pickup-date-cake-size-prices";
 import { usePickupDateCakeSizePrices } from "@/workspaces/owner/orders/use-pickup-date-cake-size-prices";
+import { preserveOrderEditorStateOnReset } from "@/workspaces/owner/orders/preserve-action-form-state.mjs";
 
 const initialSaveState: OrderWorkspaceSaveState = {
   error: null,
@@ -1303,7 +1304,12 @@ export function OrderWorkspaceForm({
   }
 
   return (
-    <form action={formAction} className="space-y-6" key={formKey}>
+    <form
+      action={formAction}
+      className="space-y-6"
+      key={formKey}
+      onReset={preserveOrderEditorStateOnReset}
+    >
       <input name="items_json" type="hidden" value={itemsJson} />
       <input
         name="complimentary_json"

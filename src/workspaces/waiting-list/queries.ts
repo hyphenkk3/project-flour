@@ -7,6 +7,7 @@ import {
   type WaitingListConfirmationStaffLink,
 } from "@/engines/waiting-list/confirmation-review";
 import type { WaitingListItemStatus } from "@/engines/waiting-list/types";
+import { waitingListConvertibleQuantity } from "@/engines/waiting-list/conversion-quantity.mjs";
 import {
   parseWaitingListNotificationPayload,
   waitingListHomePreviewLine,
@@ -100,7 +101,7 @@ export async function listWaitingListBoard(input: {
     let query = supabase
       .from("waiting_list_items")
       .select(
-        "id, request_id, pickup_date, library_cake_id, library_cake_size_id, quantity, remaining_quantity, queue_position, status, contacted_at, response_deadline_at, converted_order_id, created_at",
+        "id, request_id, pickup_date, library_cake_id, library_cake_size_id, quantity, accepted_quantity, remaining_quantity, queue_position, status, contacted_at, response_deadline_at, converted_order_id, created_at",
       )
       .order("pickup_date", { ascending: true })
       .order("queue_position", { ascending: true });
@@ -201,9 +202,9 @@ export async function listWaitingListBoard(input: {
         .eq("status", "active"),
       supabase
         .from("waiting_list_events")
-        .select("item_id, event_type")
+        .select("item_id, event_type, payload")
         .in("item_id", itemIds)
-        .eq("event_type", "capacity_action_required"),
+        .in("event_type", ["capacity_action_required", "converted_to_order"]),
       orderIds.length > 0
         ? supabase.from("orders").select("id, order_number").in("id", orderIds)
         : Promise.resolve({ data: [] as unknown[] }),
@@ -245,8 +246,22 @@ export async function listWaitingListBoard(input: {
       );
     }
     const actionRequired = new Set(
-      (events ?? []).map((row) => asId((row as { item_id?: string }).item_id)),
+      (events ?? [])
+        .filter((row) => row.event_type === "capacity_action_required")
+        .map((row) => asId((row as { item_id?: string }).item_id)),
     );
+    const convertedQuantityByItem = new Map<string, number>();
+    for (const event of events ?? []) {
+      if (event.event_type !== "converted_to_order") continue;
+      const itemId = asId((event as { item_id?: string }).item_id);
+      const payload = (event as { payload?: { quantity?: number } }).payload;
+      const quantity = Number(payload?.quantity ?? 0);
+      if (!itemId || !Number.isFinite(quantity) || quantity < 1) continue;
+      convertedQuantityByItem.set(
+        itemId,
+        (convertedQuantityByItem.get(itemId) ?? 0) + quantity,
+      );
+    }
     const orderNumberById = new Map(
       (orders ?? []).map((row) => [
         asId((row as { id?: string }).id),
@@ -347,6 +362,13 @@ export async function listWaitingListBoard(input: {
         quantity: Number((row as { quantity?: number }).quantity ?? 0),
         remainingQuantity: Number(
           (row as { remaining_quantity?: number }).remaining_quantity ?? 0,
+        ),
+        acceptedQuantity: Number(
+          (row as { accepted_quantity?: number }).accepted_quantity ?? 0,
+        ),
+        convertibleQuantity: waitingListConvertibleQuantity(
+          Number((row as { accepted_quantity?: number }).accepted_quantity ?? 0),
+          convertedQuantityByItem.get(itemId) ?? 0,
         ),
         pickupDate: String(
           (row as { pickup_date?: string }).pickup_date ?? "",

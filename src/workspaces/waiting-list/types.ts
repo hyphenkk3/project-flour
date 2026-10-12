@@ -15,6 +15,8 @@ export type WaitingListBoardRow = {
   sizeLabel: string;
   quantity: number;
   remainingQuantity: number;
+  acceptedQuantity?: number;
+  convertibleQuantity?: number;
   pickupDate: string;
   queuePosition: number;
   joinedAt: string;

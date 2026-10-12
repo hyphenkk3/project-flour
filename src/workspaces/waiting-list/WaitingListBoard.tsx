@@ -412,7 +412,11 @@ function WaitingListItemControls({
             Convert qty
             <input
               className="border-fog text-ink ml-2 h-11 w-20 rounded-lg border bg-white px-3 text-sm tabular-nums"
-              defaultValue={row.offeredQuantity ?? row.remainingQuantity}
+              defaultValue={
+                row.status === "accepted" || row.status === "partially_accepted"
+                  ? (row.convertibleQuantity ?? row.remainingQuantity)
+                  : (row.offeredQuantity ?? row.remainingQuantity)
+              }
               min={1}
               name="quantity"
               type="number"
