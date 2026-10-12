@@ -34,7 +34,7 @@ create function fixture_sync_waiting_list_remaining() returns trigger language p
 create trigger fixture_waiting_list_remaining before insert or update of quantity,accepted_quantity on waiting_list_items for each row execute function fixture_sync_waiting_list_remaining();
 create table production_capacity_holds(id uuid primary key,waiting_list_item_id uuid,status text,held_at timestamptz,held_until timestamptz,quantity int,converted_order_id uuid,released_at timestamptz);
 create table waiting_list_confirmation_links(id uuid primary key,request_id uuid,status text,expires_at timestamptz,issued_at timestamptz,converted_order_id uuid,submitted_payload jsonb,item_snapshot jsonb);
-create table waiting_list_events(request_id uuid,item_id uuid,event_type text,actor uuid,payload jsonb);
+create table waiting_list_events(request_id uuid,item_id uuid,event_type text,actor uuid,metadata jsonb);
 create function _waiting_list_item_has_submitted_confirmation(uuid) returns boolean language sql as $$select false$$;
 create function _waiting_list_append_event(uuid,uuid,text,uuid,jsonb) returns void language sql set search_path=public as $$insert into waiting_list_events values($1,$2,$3,$4,$5)$$;
 create function _waiting_list_sync_request_status(uuid) returns void language sql as $$select null::void$$;
@@ -141,17 +141,18 @@ for name in ['waiting_list_convert_item','waiting_list_convert_confirmation']:
     query=call(actor(3)) if name.endswith('_confirmation') else call(actor(3)).replace(",1,'12:00')",",2,'12:00')")
     check('authenticated',uid(3),query,False,name+' excess quantity rejected')
 
-# Reproduce the hosted sequence against the installed baseline before applying
-# the focused follow-up migration. Recording acceptance consumes the remainder,
-# so the old conversion guard rejects the already-accepted held quantity.
+# Install the reviewed accepted-quantity migration, then reproduce the hosted
+# event-column mismatch using DEV's actual metadata-based schema.
+run((ROOT/'supabase/migrations/20261012001012_waiting_list_accepted_quantity_conversion.sql').read_text(),DB)
 req,item,hold,link=waiting_fixture()
 run(f"update waiting_list_items set accepted_quantity=1,remaining_quantity=0,status='accepted' where id='{item}';",DB)
 query=f"select public.waiting_list_convert_item('{actor(1)}','{item}',1,'12:00')"
-check('authenticated',uid(1),query,False,'baseline accepted quantity repro','Convert quantity is not valid')
+check('authenticated',uid(1),query,False,'baseline event-column mismatch repro','column e.payload does not exist')
 
 # Install only the local follow-up migration under test; hosted databases are
 # never contacted by this disposable Unix-socket test harness.
-run((ROOT/'supabase/migrations/20261012001012_waiting_list_accepted_quantity_conversion.sql').read_text(),DB)
+run((ROOT/'supabase/migrations/20261012015854_waiting_list_conversion_events_metadata.sql').read_text(),DB)
+assert scalar("select position('e.metadata' in prosrc)>0 and position('e.payload' in prosrc)=0 from pg_proc where proname='waiting_list_convert_item'")=='t'
 
 req,item,hold,link=waiting_fixture()
 run(f"update waiting_list_items set accepted_quantity=1,remaining_quantity=0,status='accepted' where id='{item}';",DB)
