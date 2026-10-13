@@ -45,6 +45,7 @@ const {
   buildMonthlyReport,
   classifyAdjustment,
   isReportOwner,
+  nextMonth,
   orderFinancials,
   percentChange,
   previousMonth,
@@ -230,6 +231,7 @@ assert.equal(
   5,
 );
 assert.equal(previousMonth("2026-01"), "2025-12");
+assert.equal(nextMonth("2025-12"), "2026-01");
 assert.equal(percentChange(10, 0), null);
 assert.equal(percentChange(11, 10), 10);
 assert.equal(isReportOwner("owner"), true);
@@ -242,6 +244,10 @@ for (const role of [
 ])
   assert.equal(isReportOwner(role), false);
 const nav = readFileSync("src/foundation/navigation/workspaces.ts", "utf8");
+const dashboard = readFileSync(
+  "src/workspaces/owner/reports/ManagementReportDashboard.tsx",
+  "utf8",
+);
 const page = readFileSync(
   "src/app/(app)/owner/management/reports/page.tsx",
   "utf8",
@@ -268,6 +274,50 @@ const managerNav = getNavigationForRole("manager").find(
 );
 assert.ok(ownerNav);
 assert.ok(managerNav);
+const expectedNavigation = {
+  owner: [
+    "Home",
+    "Operations",
+    "Whole Cake Calendar",
+    "Bakery",
+    "Collection",
+    "Library",
+    "Customer Operations",
+    "Management",
+  ],
+  manager: [
+    "Home",
+    "Operations",
+    "Whole Cake Calendar",
+    "Bakery",
+    "Collection",
+    "Library",
+    "Customer Operations",
+    "Management",
+  ],
+  customer_operations: [
+    "Home",
+    "Operations",
+    "Whole Cake Calendar",
+    "Collection",
+    "Customer Operations",
+  ],
+  bakery: ["Home", "Whole Cake Calendar", "Bakery", "Collection", "Library"],
+  collection: ["Home", "Collection"],
+};
+for (const [role, labels] of Object.entries(expectedNavigation)) {
+  const items = getNavigationForRole(role);
+  assert.deepEqual(
+    Array.from(items, (item) => item.label),
+    labels,
+    `${role} navigation order and visibility`,
+  );
+  assert.equal(
+    new Set(items.map((item) => item.id)).size,
+    items.length,
+    `${role} navigation has no duplicate entries`,
+  );
+}
 assert.equal(
   ownerNav.children?.map((child) => child.label).join(","),
   "Financial,Staff",
@@ -293,6 +343,27 @@ assert.match(settingsPage, /StaffProfileForm/);
 assert.match(page, /isReportOwner\(staff\.role\.code\)/);
 assert.match(loader, /await requireReportOwner\(\)/);
 assert.match(loader, /method === "drive_through" \? "pickup"/);
+assert.match(dashboard, /Fulfilled net sales/);
+assert.match(dashboard, /Gross product sales/);
+assert.match(dashboard, /Net product sales/);
+assert.match(dashboard, /Delivery charges/);
+assert.match(dashboard, /Processing fees/);
+assert.match(dashboard, /Other adjustments · reconcile/);
+assert.match(dashboard, /Scheduled, not fulfilled/);
+assert.match(dashboard, /Cancelled orders/);
+assert.match(dashboard, /Outstanding now/);
+assert.match(dashboard, /Payments collected/);
+assert.match(dashboard, /Recorded refunds/);
+assert.match(dashboard, /action="\/owner\/management\/reports"/);
+assert.match(dashboard, /method="get"/);
+assert.match(dashboard, /previousMonth\(current\.month\)/);
+assert.match(dashboard, /nextMonth\(current\.month\)/);
+assert.match(dashboard, /current\.month < latestMonth/);
+assert.match(dashboard, /grid-cols-2 gap-x-4/);
+assert.match(dashboard, /min-w-0/);
+assert.match(dashboard, /break-words/);
+assert.match(dashboard, /min-h-10 min-w-10/);
+assert.match(dashboard, /focus-visible:ring-2/);
 console.log(
   "Management reports calculations, role-specific navigation, report guards, personal settings, and fulfilment reconciliation passed.",
 );

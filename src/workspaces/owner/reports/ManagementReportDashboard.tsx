@@ -1,8 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
+  nextMonth,
   percentChange,
+  previousMonth,
+  reportMonth,
   type buildMonthlyReport,
 } from "@/engines/reports/monthly";
 
@@ -62,6 +66,13 @@ function Metric({
 
 export function ManagementReportDashboard({ report }: { report: Report }) {
   const { current, previous } = report;
+  const latestMonth = reportMonth(new Date());
+  const canAdvanceMonth = current.month < latestMonth;
+  const monthLabel = new Intl.DateTimeFormat("en-MY", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${current.month}-01T00:00:00Z`));
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"quantity" | "revenue" | "name">("quantity");
   const cakes = useMemo(
@@ -94,7 +105,7 @@ export function ManagementReportDashboard({ report }: { report: Report }) {
         <p className="text-xs font-semibold tracking-[.2em] text-teal-700 uppercase">
           Owner Workspace · Management
         </p>
-        <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div>
             <h1 className="text-3xl font-semibold text-slate-900">Reports</h1>
             <p className="mt-1 text-sm text-slate-600">
@@ -102,100 +113,275 @@ export function ManagementReportDashboard({ report }: { report: Report }) {
               collection are separate.
             </p>
           </div>
-          <form
-            action="/owner/management/reports"
-            className="flex items-end gap-2"
-          >
-            <label className="text-sm font-medium" htmlFor="report-month">
-              Month
-              <input
-                id="report-month"
-                name="month"
-                type="month"
-                defaultValue={current.month}
-                className="mt-1 block min-h-11 rounded-lg border border-slate-300 bg-white px-3"
-              />
-            </label>
-            <button className="min-h-11 rounded-lg bg-slate-900 px-4 text-white">
-              View
-            </button>
-          </form>
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
+            <nav
+              aria-label="Report month navigation"
+              className="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 bg-white px-2 py-1"
+            >
+              <Link
+                aria-label={`Previous month: ${new Intl.DateTimeFormat(
+                  "en-MY",
+                  {
+                    month: "long",
+                    year: "numeric",
+                    timeZone: "UTC",
+                  },
+                ).format(
+                  new Date(`${previousMonth(current.month)}-01T00:00:00Z`),
+                )}`}
+                className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-xl text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none"
+                href={`/owner/management/reports?month=${previousMonth(current.month)}`}
+              >
+                <span aria-hidden="true">‹</span>
+              </Link>
+              <div aria-live="polite" className="min-w-32 text-center">
+                <p className="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
+                  Reporting month
+                </p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {monthLabel}
+                </p>
+              </div>
+              {canAdvanceMonth ? (
+                <Link
+                  aria-label={`Next month: ${new Intl.DateTimeFormat("en-MY", {
+                    month: "long",
+                    year: "numeric",
+                    timeZone: "UTC",
+                  }).format(
+                    new Date(`${nextMonth(current.month)}-01T00:00:00Z`),
+                  )}`}
+                  className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-xl text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none"
+                  href={`/owner/management/reports?month=${nextMonth(current.month)}`}
+                >
+                  <span aria-hidden="true">›</span>
+                </Link>
+              ) : (
+                <span
+                  aria-disabled="true"
+                  aria-label="Next month unavailable"
+                  className="inline-flex min-h-10 min-w-10 cursor-not-allowed items-center justify-center rounded-lg text-xl text-slate-300"
+                >
+                  <span aria-hidden="true">›</span>
+                </span>
+              )}
+            </nav>
+            <form
+              action="/owner/management/reports"
+              className="flex items-end gap-2"
+              method="get"
+            >
+              <label
+                className="min-w-0 text-xs font-medium text-slate-600"
+                htmlFor="report-month"
+              >
+                Choose month
+                <input
+                  id="report-month"
+                  name="month"
+                  type="month"
+                  defaultValue={current.month}
+                  className="mt-1 block min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900"
+                />
+              </label>
+              <button
+                className="min-h-11 shrink-0 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none"
+                type="submit"
+              >
+                Go
+              </button>
+            </form>
+          </div>
         </div>
       </header>
       <section aria-labelledby="financial" className="space-y-3">
-        <h2 id="financial" className="text-xl font-semibold">
+        <h2 id="financial" className="text-lg font-semibold text-slate-900">
           Financial overview
         </h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <Metric
-            title="Fulfilled net sales"
-            value={currency(current.netSales)}
-            detail={change(current.netSales, previous.netSales)}
-          />
-          <Metric
-            title="Fulfilled gross sales"
-            value={currency(current.gross)}
-            detail="Before discounts; includes net fees and other adjustments"
-          />
-          <Metric
-            title="Gross product sales"
-            value={currency(current.grossProducts)}
-            detail="Cakes and paid add-ons"
-          />
-          <Metric
-            title="Discounts"
-            value={currency(current.discounts)}
-            detail={change(current.discounts, previous.discounts)}
-          />
-          <Metric
-            title="Net product sales"
-            value={currency(current.netProducts)}
-          />
-          <Metric title="Delivery charges" value={currency(current.delivery)} />
-          <Metric
-            title="Processing fees"
-            value={currency(current.processing)}
-          />
-          <Metric
-            title="Other adjustments · reconcile"
-            value={currency(current.other)}
-            detail="Unclassified commercial adjustments; review before treating as fees or discounts."
-          />
-          <Metric
-            title="Total fulfilled orders"
-            value={integer(current.fulfilled)}
-            detail={change(current.fulfilled, previous.fulfilled)}
-          />
-          <Metric
-            title="Average order value"
-            value={currency(current.aov)}
-            detail={change(current.aov, previous.aov)}
-          />
-          <Metric
-            title="Scheduled, not fulfilled"
-            value={currency(current.unfulfilledValue)}
-            detail={`${current.unfulfilled} orders; excluded from sales`}
-          />
-          <Metric
-            title="Cancelled orders"
-            value={integer(current.cancelled)}
-            detail={`${currency(current.cancelledValue)} current order value; excluded from sales`}
-          />
-          <Metric
-            title="Outstanding now"
-            value={currency(current.outstandingNow)}
-            detail={`As of ${new Date(report.asOf).toLocaleString("en-MY")}; not historical month-end balance`}
-          />
-          <Metric
-            title="Payments collected"
-            value={currency(report.payments.collected)}
-            detail="By payment date, including corrected allocations"
-          />
-          <Metric
-            title="Recorded refunds"
-            value={currency(report.payments.refunds)}
-            detail="By recorded refund date"
-          />
+        <div className="space-y-3">
+          <section
+            aria-labelledby="primary-financial-summary"
+            className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5"
+          >
+            <h3 id="primary-financial-summary" className="sr-only">
+              Primary financial summary
+            </h3>
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1.95fr)] lg:gap-6">
+              <div className="border-b border-slate-200 pb-4 lg:border-r lg:border-b-0 lg:pr-6 lg:pb-0">
+                <p className="text-xs font-semibold tracking-wide text-teal-800 uppercase">
+                  Fulfilled net sales
+                </p>
+                <p className="mt-1 text-3xl font-semibold tracking-tight break-words text-slate-950 tabular-nums sm:text-4xl">
+                  {currency(current.netSales)}
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {change(current.netSales, previous.netSales)}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3 sm:gap-x-6">
+                <div className="min-w-0">
+                  <p className="text-xs text-slate-500">Gross sales</p>
+                  <p className="mt-1 text-lg font-semibold break-words text-slate-900 tabular-nums">
+                    {currency(current.gross)}
+                  </p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-slate-500">Discounts</p>
+                  <p className="mt-1 text-lg font-semibold break-words text-slate-900 tabular-nums">
+                    {currency(current.discounts)}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    {change(current.discounts, previous.discounts)}
+                  </p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-slate-500">Net product sales</p>
+                  <p className="mt-1 text-lg font-semibold break-words text-slate-900 tabular-nums">
+                    {currency(current.netProducts)}
+                  </p>
+                </div>
+                <div className="min-w-0 border-t border-slate-100 pt-3 sm:col-span-1">
+                  <p className="text-xs text-slate-500">Fulfilled orders</p>
+                  <p className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">
+                    {integer(current.fulfilled)}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    {change(current.fulfilled, previous.fulfilled)}
+                  </p>
+                </div>
+                <div className="min-w-0 border-t border-slate-100 pt-3 sm:col-span-2">
+                  <p className="text-xs text-slate-500">Average order value</p>
+                  <p className="mt-1 text-lg font-semibold break-words text-slate-900 tabular-nums">
+                    {currency(current.aov)}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    {change(current.aov, previous.aov)}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-3 border-t border-slate-200 pt-3 sm:grid-cols-3 sm:gap-5">
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500">Outstanding now</p>
+                <p className="mt-1 text-sm font-semibold break-words text-slate-900 tabular-nums">
+                  {currency(current.outstandingNow)}
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  As of {new Date(report.asOf).toLocaleString("en-MY")}; not
+                  historical month-end
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500">Payments collected</p>
+                <p className="mt-1 text-sm font-semibold break-words text-slate-900 tabular-nums">
+                  {currency(report.payments.collected)}
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  By payment date, including corrected allocations
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500">Recorded refunds</p>
+                <p className="mt-1 text-sm font-semibold break-words text-slate-900 tabular-nums">
+                  {currency(report.payments.refunds)}
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  By recorded refund date
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section
+            aria-labelledby="revenue-breakdown"
+            className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5"
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <div>
+                <h3
+                  id="revenue-breakdown"
+                  className="text-sm font-semibold text-slate-900"
+                >
+                  Revenue breakdown
+                </h3>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Product sales, fees, and reconciliation components
+                </p>
+              </div>
+            </div>
+            <dl className="mt-3 grid grid-cols-1 gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                ["Gross product sales", currency(current.grossProducts)],
+                ["Discounts", currency(current.discounts)],
+                ["Net product sales", currency(current.netProducts)],
+                ["Delivery charges", currency(current.delivery)],
+                ["Processing fees", currency(current.processing)],
+                ["Other adjustments · reconcile", currency(current.other)],
+              ].map(([title, value]) => (
+                <div
+                  className="flex min-w-0 items-baseline justify-between gap-3 border-b border-slate-100 py-2.5 text-sm"
+                  key={title}
+                >
+                  <dt className="text-slate-600">{title}</dt>
+                  <dd className="shrink-0 font-medium text-slate-900 tabular-nums">
+                    {value}
+                  </dd>
+                </div>
+              ))}
+              <div className="flex min-w-0 items-baseline justify-between gap-3 border-t border-slate-300 py-3 text-sm font-semibold sm:col-span-2 lg:col-span-3">
+                <dt className="text-slate-900">Fulfilled net sales</dt>
+                <dd className="shrink-0 text-slate-950 tabular-nums">
+                  {currency(current.netSales)}
+                </dd>
+              </div>
+            </dl>
+            <p className="mt-1 text-xs text-slate-500">
+              Gross sales before discounts includes net fees and other
+              adjustments. Unclassified adjustments remain visible above for
+              reconciliation.
+            </p>
+          </section>
+
+          <section
+            aria-labelledby="order-summary"
+            className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5"
+          >
+            <h3
+              id="order-summary"
+              className="text-sm font-semibold text-slate-900"
+            >
+              Order status summary
+            </h3>
+            <dl className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <div>
+                <dt className="text-xs text-slate-500">Fulfilled orders</dt>
+                <dd className="mt-1 text-xl font-semibold text-slate-900 tabular-nums">
+                  {integer(current.fulfilled)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">
+                  Scheduled, not fulfilled
+                </dt>
+                <dd className="mt-1 text-xl font-semibold text-slate-900 tabular-nums">
+                  {integer(current.unfulfilled)}
+                </dd>
+                <p className="mt-0.5 text-xs break-words text-slate-600 tabular-nums">
+                  {currency(current.unfulfilledValue)}; excluded from sales
+                </p>
+              </div>
+              <div>
+                <dt className="text-xs text-slate-500">Cancelled orders</dt>
+                <dd className="mt-1 text-xl font-semibold text-slate-900 tabular-nums">
+                  {integer(current.cancelled)}
+                </dd>
+                <p className="mt-0.5 text-xs break-words text-slate-600 tabular-nums">
+                  {currency(current.cancelledValue)} current order value;
+                  excluded from sales
+                </p>
+              </div>
+            </dl>
+          </section>
         </div>
         {current.reconciliation !== 0 && (
           <p
