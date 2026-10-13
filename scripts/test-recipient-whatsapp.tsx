@@ -91,18 +91,35 @@ const collection = readFileSync(
   "src/workspaces/collection/CollectionOrderDetail.tsx",
   "utf8",
 );
+const collectionMessages = readFileSync(
+  "src/workspaces/collection/CollectionReadyMessage.tsx",
+  "utf8",
+);
 assert.match(
   owner,
   /<RecipientWhatsAppButton[\s\S]*?recipientPhone=\{order\.delivery\.recipientPhone\}/,
 );
 assert.match(
-  collection,
+  collectionMessages,
   /<RecipientWhatsAppButton[\s\S]*?recipientPhone=\{order\.delivery\.recipientPhone\}/,
 );
 assert.ok(
-  collection.indexOf("<RecipientWhatsAppButton") <
-    collection.indexOf("<CollectionReadyMessage"),
+  owner.indexOf("<RecipientWhatsAppButton") > owner.indexOf("customerActions.map"),
 );
+assert.ok(owner.indexOf("<RecipientWhatsAppButton") < owner.indexOf("</section>"));
+assert.ok(!collection.includes("<RecipientWhatsAppButton"));
+assert.ok(collection.includes("<CollectionReadyMessage"));
+assert.ok(
+  collectionMessages.indexOf("<RecipientWhatsAppButton") >
+    collectionMessages.indexOf('aria-label="Order messages"'),
+);
+assert.ok(
+  collectionMessages.indexOf("<RecipientWhatsAppButton") <
+    collectionMessages.indexOf("</section>"),
+);
+assert.match(collectionMessages, /if \(!showCustomer && !showRecipient\) return null/);
+assert.match(collectionMessages, /RECIPIENT/);
+assert.match(owner, /Recipient/);
 console.log(
-  "PASS recipient WhatsApp eligibility, formatting, missing data, destinations, and both locations",
+  "PASS recipient WhatsApp behavior and grouped messaging layout in both locations",
 );

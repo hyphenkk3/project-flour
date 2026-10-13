@@ -370,7 +370,7 @@ assert.match(
 );
 assert.match(
   componentSource,
-  /type=\{previewKind === "ready" \? messageType : "customer_thank_you"\}/,
+  /type=\{\s*previewKind === "ready" \? messageType : "customer_thank_you"\s*\}/,
 );
 assert.doesNotMatch(
   componentSource,

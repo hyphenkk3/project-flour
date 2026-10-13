@@ -141,19 +141,6 @@ export function OrderMessagesSection({
         </div>
 
         <div className="space-y-3">
-          {order.delivery ? (
-            <RecipientWhatsAppButton
-              addressLine1={order.delivery.addressLine1}
-              addressLines={formatDeliveryAddressLines(order.delivery)}
-              fulfilmentMethod={order.fulfilmentMethod}
-              recipientNotifyPreference={
-                order.delivery.recipientNotifyPreference
-              }
-              recipientPhone={order.delivery.recipientPhone}
-              scheduledTime={order.pickupTime}
-              staffDisplayName={staffDisplayName}
-            />
-          ) : null}
           {crewActions.length > 0 ? (
             <div className="space-y-1.5">
               <p className="text-ink text-[10px] font-semibold tracking-[0.14em] uppercase">
@@ -191,6 +178,27 @@ export function OrderMessagesSection({
                   />
                 ))}
               </div>
+            </div>
+          ) : null}
+
+          {order.fulfilmentMethod === "delivery" &&
+          order.delivery?.recipientNotifyPreference === "inform_recipient" ? (
+            <div className="border-fog space-y-1.5 border-t pt-3">
+              <p className="text-skyline text-[10px] font-semibold tracking-[0.14em] uppercase">
+                Recipient
+              </p>
+              <RecipientWhatsAppButton
+                addressLine1={order.delivery.addressLine1}
+                addressLines={formatDeliveryAddressLines(order.delivery)}
+                className={customerSecondaryButtonClass}
+                fulfilmentMethod={order.fulfilmentMethod}
+                recipientNotifyPreference={
+                  order.delivery.recipientNotifyPreference
+                }
+                recipientPhone={order.delivery.recipientPhone}
+                scheduledTime={order.pickupTime}
+                staffDisplayName={staffDisplayName}
+              />
             </div>
           ) : null}
         </div>

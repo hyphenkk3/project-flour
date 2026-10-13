@@ -3,12 +3,12 @@ import {
   type RecipientWhatsAppInput,
 } from "@/engines/orders/recipient-whatsapp";
 
-export function RecipientWhatsAppButton(props: RecipientWhatsAppInput) {
-  const link = recipientWhatsAppLink(props);
+export function RecipientWhatsAppButton({
+  className = "border-fog text-ink hover:bg-mist inline-flex min-h-11 w-full items-center justify-center rounded-lg border px-4 text-sm font-medium",
+  ...input
+}: RecipientWhatsAppInput & { className?: string }) {
+  const link = recipientWhatsAppLink(input);
   if (!link.visible) return null;
-
-  const className =
-    "border-fog text-ink hover:bg-mist inline-flex min-h-11 w-full items-center justify-center rounded-lg border px-4 text-sm font-medium";
 
   return (
     <div className="space-y-1.5">
