@@ -48,6 +48,7 @@ export type ReportOrder = {
 
 const cents = (value: number) => Math.round(value * 100);
 const money = (value: number) => Math.round(value) / 100;
+const roundedCurrency = (value: number) => cents(value) / 100;
 const sum = (values: number[]) =>
   money(values.reduce((a, b) => a + cents(b), 0));
 
@@ -169,7 +170,7 @@ export function orderFinancials(order: ReportOrder) {
     processing,
     other,
     netSales,
-    reconciliation: money(netSales - settlement.amountDue),
+    reconciliation: roundedCurrency(netSales - settlement.amountDue),
     outstandingNow: settlement.remainingBalance,
     settlement,
   };
@@ -238,7 +239,7 @@ export function buildMonthlyReport(orders: ReportOrder[], month: string) {
       gross: sum(values.map((row) => row.grossSales)),
       discounts: sum(values.map((row) => row.discounts)),
       netSales,
-      aov: done.length ? money(netSales / done.length) : 0,
+      aov: done.length ? roundedCurrency(netSales / done.length) : 0,
       cakeQuantity: done.reduce(
         (n, row) => n + row.items.reduce((m, item) => m + item.quantity, 0),
         0,
@@ -324,7 +325,7 @@ export function buildMonthlyReport(orders: ReportOrder[], month: string) {
     processing: total("processing"),
     other: total("other"),
     netSales,
-    aov: fulfilled.length ? money(netSales / fulfilled.length) : 0,
+    aov: fulfilled.length ? roundedCurrency(netSales / fulfilled.length) : 0,
     unfulfilledValue: sum(
       unfulfilled.map((row) => orderFinancials(row).netSales),
     ),

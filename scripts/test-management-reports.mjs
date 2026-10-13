@@ -162,7 +162,13 @@ assert.equal(report.gross, 286);
 assert.equal(report.discounts, 10);
 assert.equal(report.other, -4);
 assert.equal(report.netSales, 276);
+assert.equal(report.aov, 92);
+assert.equal(
+  report.methods.find((row) => row.method === "pickup")?.aov,
+  176,
+);
 assert.equal(report.reconciliation, 0);
+assert.equal(buildMonthlyReport([prior], "2026-09").aov, 50);
 assert.equal(
   report.cakes.find((row) => row.cakeName === "Old Mango")?.quantity,
   2,
