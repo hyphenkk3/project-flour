@@ -60,6 +60,7 @@ export type CollectionDineInReservation = {
 export type CollectionDeliveryDetails = {
   recipientName: string;
   recipientPhone: string;
+  addressLine1: string;
   addressLines: string[];
   recipientNotifyPreference: RecipientNotifyPreference;
 };

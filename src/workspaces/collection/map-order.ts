@@ -191,6 +191,7 @@ function mapDelivery(
   return {
     recipientName: mapped.recipientName,
     recipientPhone: mapped.recipientPhone,
+    addressLine1: mapped.addressLine1,
     addressLines: formatDeliveryAddressLines(mapped),
     recipientNotifyPreference: mapped.recipientNotifyPreference,
   };

@@ -12,6 +12,8 @@ import {
   type OutForDeliveryAudience,
 } from "@/engines/orders/messages";
 import type { StorefrontOrder } from "@/types/storefront";
+import { formatDeliveryAddressLines } from "@/engines/orders/fulfilment";
+import { RecipientWhatsAppButton } from "@/components/orders/RecipientWhatsAppButton";
 import { OrderMessagePreview } from "@/workspaces/owner/orders/OrderMessagePreview";
 
 type OrderMessagesSectionProps = {
@@ -51,11 +53,7 @@ function MessageActionButton({
   onOpen: (action: MessageAction) => void;
 }) {
   return (
-    <button
-      className={className}
-      onClick={() => onOpen(action)}
-      type="button"
-    >
+    <button className={className} onClick={() => onOpen(action)} type="button">
       {action.title}
     </button>
   );
@@ -130,7 +128,7 @@ export function OrderMessagesSection({
         className={
           compact
             ? "space-y-3"
-            : "border-line space-y-3 rounded-lg border bg-mist/40 px-3 py-3"
+            : "border-line bg-mist/40 space-y-3 rounded-lg border px-3 py-3"
         }
       >
         <div className="space-y-1">
@@ -143,6 +141,19 @@ export function OrderMessagesSection({
         </div>
 
         <div className="space-y-3">
+          {order.delivery ? (
+            <RecipientWhatsAppButton
+              addressLine1={order.delivery.addressLine1}
+              addressLines={formatDeliveryAddressLines(order.delivery)}
+              fulfilmentMethod={order.fulfilmentMethod}
+              recipientNotifyPreference={
+                order.delivery.recipientNotifyPreference
+              }
+              recipientPhone={order.delivery.recipientPhone}
+              scheduledTime={order.pickupTime}
+              staffDisplayName={staffDisplayName}
+            />
+          ) : null}
           {crewActions.length > 0 ? (
             <div className="space-y-1.5">
               <p className="text-ink text-[10px] font-semibold tracking-[0.14em] uppercase">

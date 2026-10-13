@@ -35,6 +35,7 @@ import { deriveCollectionPackingReminders } from "@/workspaces/collection/packin
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
 import { CustomerOrderNoteCallout } from "@/components/orders/CustomerOrderNoteCallout";
 import { CollectionReadyMessage } from "@/workspaces/collection/CollectionReadyMessage";
+import { RecipientWhatsAppButton } from "@/components/orders/RecipientWhatsAppButton";
 
 type CollectionOrderDetailProps = {
   order: CollectionBoardOrder;
@@ -298,6 +299,18 @@ export function CollectionOrderDetail({
               </div>
             </dl>
           </section>
+        ) : null}
+
+        {order.delivery ? (
+          <RecipientWhatsAppButton
+            addressLine1={order.delivery.addressLine1}
+            addressLines={order.delivery.addressLines}
+            fulfilmentMethod={order.fulfilmentMethod}
+            recipientNotifyPreference={order.delivery.recipientNotifyPreference}
+            recipientPhone={order.delivery.recipientPhone}
+            scheduledTime={order.pickupTime}
+            staffDisplayName={staffDisplayName}
+          />
         ) : null}
 
         <section className="border-fog rounded-2xl border bg-white px-4 py-3.5">

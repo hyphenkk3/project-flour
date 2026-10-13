@@ -68,6 +68,7 @@ const order = mapCollectionBoardOrder({
 assert.deepEqual(order.delivery, {
   recipientName: "Recipient Example",
   recipientPhone: "0198765432",
+  addressLine1: "12 Jalan Example",
   addressLines: [
     "12 Jalan Example",
     "Taman Example",
