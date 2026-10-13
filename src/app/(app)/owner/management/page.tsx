@@ -33,7 +33,7 @@ export default async function ManagementPage() {
     <main className="space-y-6">
       <header>
         <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
-          Owner Workspace · Management
+          Management
         </p>
         <h2 className="text-ink mt-1 text-2xl font-semibold">Management</h2>
         <p className="text-skyline mt-1 text-sm">
