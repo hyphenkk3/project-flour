@@ -5,16 +5,23 @@ type WorkspaceLinkProps = {
   item: WorkspaceNavItem;
   active?: boolean;
   compact?: boolean;
+  mobileNavigation?: boolean;
+  mobileLabel?: string;
 };
 
 export function WorkspaceLink({
   item,
   active = false,
   compact = false,
+  mobileNavigation = false,
+  mobileLabel,
 }: WorkspaceLinkProps) {
   const baseClass = compact
-    ? "flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-center text-[11px] leading-tight"
+    ? mobileNavigation
+      ? "flex min-h-14 w-max min-w-[6.25rem] shrink-0 flex-col items-center justify-center gap-0.5 px-3 py-2 text-center text-[11px] leading-tight"
+      : "flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 text-center text-[11px] leading-tight"
     : "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition";
+  const label = mobileNavigation ? (mobileLabel ?? item.label) : item.label;
 
   if (!item.available || !item.href) {
     return (
@@ -27,8 +34,16 @@ export function WorkspaceLink({
         }
         title="Coming later"
       >
-        <span className={compact ? "line-clamp-2 font-medium" : "font-medium"}>
-          {item.label}
+        <span
+          className={
+            mobileNavigation
+              ? "font-medium whitespace-nowrap"
+              : compact
+                ? "line-clamp-2 font-medium"
+                : "font-medium"
+          }
+        >
+          {label}
         </span>
       </span>
     );
@@ -53,7 +68,17 @@ export function WorkspaceLink({
       href={item.href}
       scroll={item.href.startsWith("/owner/calendar") ? false : undefined}
     >
-      <span className={compact ? "line-clamp-2" : undefined}>{item.label}</span>
+      <span
+        className={
+          mobileNavigation
+            ? "whitespace-nowrap"
+            : compact
+              ? "line-clamp-2"
+              : undefined
+        }
+      >
+        {label}
+      </span>
     </Link>
   );
 }

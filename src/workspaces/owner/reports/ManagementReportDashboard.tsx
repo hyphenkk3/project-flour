@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
   nextMonth,
@@ -65,6 +66,7 @@ function Metric({
 }
 
 export function ManagementReportDashboard({ report }: { report: Report }) {
+  const router = useRouter();
   const { current, previous } = report;
   const latestMonth = reportMonth(new Date());
   const canAdvanceMonth = current.month < latestMonth;
@@ -73,6 +75,16 @@ export function ManagementReportDashboard({ report }: { report: Report }) {
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(`${current.month}-01T00:00:00Z`));
+  const selectMonth = (month: string) => {
+    if (
+      !/^\d{4}-(0[1-9]|1[0-2])$/.test(month) ||
+      month < "2020-01" ||
+      month > latestMonth
+    ) {
+      return;
+    }
+    router.push(`/owner/management/reports?month=${month}`, { scroll: false });
+  };
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"quantity" | "revenue" | "name">("quantity");
   const cakes = useMemo(
@@ -116,7 +128,7 @@ export function ManagementReportDashboard({ report }: { report: Report }) {
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
             <nav
               aria-label="Report month navigation"
-              className="flex min-h-12 items-center gap-3 rounded-xl border border-slate-200 bg-white px-2 py-1"
+              className="flex min-h-12 w-full max-w-sm min-w-0 items-center justify-between gap-1 rounded-xl border border-slate-200 bg-white px-1 py-1 sm:w-auto sm:justify-start sm:gap-2 sm:px-2"
             >
               <Link
                 aria-label={`Previous month: ${new Intl.DateTimeFormat(
@@ -129,19 +141,29 @@ export function ManagementReportDashboard({ report }: { report: Report }) {
                 ).format(
                   new Date(`${previousMonth(current.month)}-01T00:00:00Z`),
                 )}`}
-                className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-xl text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none"
+                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-xl text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none"
                 href={`/owner/management/reports?month=${previousMonth(current.month)}`}
+                scroll={false}
               >
                 <span aria-hidden="true">‹</span>
               </Link>
-              <div aria-live="polite" className="min-w-32 text-center">
-                <p className="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
-                  Reporting month
-                </p>
-                <p className="text-sm font-semibold text-slate-900">
-                  {monthLabel}
-                </p>
-              </div>
+              <label className="relative flex min-h-11 min-w-0 flex-1 cursor-pointer items-center justify-center rounded-lg px-1 text-center focus-within:ring-2 focus-within:ring-teal-700 hover:bg-slate-50 sm:min-w-[10.5rem]">
+                <span aria-live="polite" className="pointer-events-none">
+                  <span className="text-sm font-semibold text-slate-900">
+                    {monthLabel}
+                  </span>
+                </span>
+                <input
+                  aria-label="Choose report month and year"
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  max={latestMonth}
+                  min="2020-01"
+                  onChange={(event) => selectMonth(event.currentTarget.value)}
+                  title="Choose report month and year"
+                  type="month"
+                  value={current.month}
+                />
+              </label>
               {canAdvanceMonth ? (
                 <Link
                   aria-label={`Next month: ${new Intl.DateTimeFormat("en-MY", {
@@ -151,8 +173,9 @@ export function ManagementReportDashboard({ report }: { report: Report }) {
                   }).format(
                     new Date(`${nextMonth(current.month)}-01T00:00:00Z`),
                   )}`}
-                  className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-xl text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none"
+                  className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-xl text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none"
                   href={`/owner/management/reports?month=${nextMonth(current.month)}`}
+                  scroll={false}
                 >
                   <span aria-hidden="true">›</span>
                 </Link>
@@ -160,37 +183,12 @@ export function ManagementReportDashboard({ report }: { report: Report }) {
                 <span
                   aria-disabled="true"
                   aria-label="Next month unavailable"
-                  className="inline-flex min-h-10 min-w-10 cursor-not-allowed items-center justify-center rounded-lg text-xl text-slate-300"
+                  className="inline-flex min-h-11 min-w-11 shrink-0 cursor-not-allowed items-center justify-center rounded-lg text-xl text-slate-300"
                 >
                   <span aria-hidden="true">›</span>
                 </span>
               )}
             </nav>
-            <form
-              action="/owner/management/reports"
-              className="flex items-end gap-2"
-              method="get"
-            >
-              <label
-                className="min-w-0 text-xs font-medium text-slate-600"
-                htmlFor="report-month"
-              >
-                Choose month
-                <input
-                  id="report-month"
-                  name="month"
-                  type="month"
-                  defaultValue={current.month}
-                  className="mt-1 block min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900"
-                />
-              </label>
-              <button
-                className="min-h-11 shrink-0 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none"
-                type="submit"
-              >
-                Go
-              </button>
-            </form>
           </div>
         </div>
       </header>

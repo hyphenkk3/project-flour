@@ -54,6 +54,9 @@ const {
 } = pure("@/engines/reports/monthly");
 const { getNavigationForRole } = pure("@/foundation/navigation/workspaces");
 const { isWorkspaceNavActive } = pure("@/foundation/navigation/is-active");
+const { activeItemScrollTarget } = pure(
+  "@/foundation/navigation/mobile-scroll",
+);
 const item = (cakeName, sizeLabel, quantity, unitPrice) => ({
   cakeName,
   sizeLabel,
@@ -232,6 +235,18 @@ assert.equal(
 );
 assert.equal(previousMonth("2026-01"), "2025-12");
 assert.equal(nextMonth("2025-12"), "2026-01");
+assert.equal(
+  activeItemScrollTarget({ left: 0, right: 100 }, { left: 20, right: 80 }, 0),
+  null,
+);
+assert.equal(
+  activeItemScrollTarget({ left: 0, right: 100 }, { left: -5, right: 50 }, 100),
+  95,
+);
+assert.equal(
+  activeItemScrollTarget({ left: 0, right: 100 }, { left: 70, right: 120 }, 0),
+  20,
+);
 assert.equal(percentChange(10, 0), null);
 assert.equal(percentChange(11, 10), 10);
 assert.equal(isReportOwner("owner"), true);
@@ -246,6 +261,10 @@ for (const role of [
 const nav = readFileSync("src/foundation/navigation/workspaces.ts", "utf8");
 const dashboard = readFileSync(
   "src/workspaces/owner/reports/ManagementReportDashboard.tsx",
+  "utf8",
+);
+const workspaceLink = readFileSync(
+  "src/components/shell/WorkspaceLink.tsx",
   "utf8",
 );
 const page = readFileSync(
@@ -354,16 +373,41 @@ assert.match(dashboard, /Cancelled orders/);
 assert.match(dashboard, /Outstanding now/);
 assert.match(dashboard, /Payments collected/);
 assert.match(dashboard, /Recorded refunds/);
-assert.match(dashboard, /action="\/owner\/management\/reports"/);
-assert.match(dashboard, /method="get"/);
 assert.match(dashboard, /previousMonth\(current\.month\)/);
 assert.match(dashboard, /nextMonth\(current\.month\)/);
 assert.match(dashboard, /current\.month < latestMonth/);
+assert.match(dashboard, /aria-label="Choose report month and year"/);
+assert.match(dashboard, /type="month"/);
+assert.match(dashboard, /max=\{latestMonth\}/);
+assert.match(dashboard, /month < "2020-01"/);
+assert.match(dashboard, /router\.push\([^\n]+\{ scroll: false \}\)/);
+assert.doesNotMatch(dashboard, /Choose month|>\s*Go\s*</);
+assert.match(dashboard, /new Intl\.DateTimeFormat\(\s*"en-MY"/);
 assert.match(dashboard, /grid-cols-2 gap-x-4/);
 assert.match(dashboard, /min-w-0/);
 assert.match(dashboard, /break-words/);
-assert.match(dashboard, /min-h-10 min-w-10/);
 assert.match(dashboard, /focus-visible:ring-2/);
+assert.match(mobileNavigation, /overflow-x-auto/);
+assert.match(mobileNavigation, /overscroll-x-contain/);
+assert.match(mobileNavigation, /scrollbar-width:none/);
+assert.match(mobileNavigation, /env\(safe-area-inset-bottom\)/);
+assert.match(mobileNavigation, /\[aria-current="page"\]/);
+assert.match(mobileNavigation, /prefers-reduced-motion: reduce/);
+assert.match(mobileNavigation, /activeItemScrollTarget/);
+assert.match(mobileNavigation, /MOBILE_LABELS/);
+for (const label of [
+  'home: "Home"',
+  'owner: "Operations"',
+  'owner_calendar: "Calendar"',
+  'bakery: "Bakery"',
+  'collection: "Collection"',
+  'library: "Library"',
+  'customer_operations: "Customers"',
+  'management: "Management"',
+])
+  assert.ok(mobileNavigation.includes(label), `mobile-only label ${label}`);
+assert.match(workspaceLink, /min-w-\[6\.25rem\]/);
+assert.match(workspaceLink, /whitespace-nowrap/);
 console.log(
   "Management reports calculations, role-specific navigation, report guards, personal settings, and fulfilment reconciliation passed.",
 );

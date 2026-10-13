@@ -26,7 +26,7 @@ assert.match(
 );
 assert.match(mobileNav, /fixed inset-x-0 bottom-0/);
 assert.match(mobileNav, /md:hidden/);
-assert.match(mobileNav, /pb-\[env\(safe-area-inset-bottom\)\]/);
+assert.match(mobileNav, /pb-\[max\(0\.25rem,env\(safe-area-inset-bottom\)\)\]/);
 assert.doesNotMatch(rootLayout, /storefrontViewport/);
 
 console.log("Library mobile card sizing and shared staff shell checks passed.");
