@@ -252,7 +252,7 @@ try {
       document.querySelector("[role=dialog] button[type=submit]")?.disabled ===
       false,
   );
-  await dialog.getByRole("button", { name: "Add", exact: true }).click();
+  await dialog.getByRole("button", { name: "Add to Order", exact: true }).click();
   await page.waitForFunction(() => !document.querySelector("[role=dialog]"));
   assert.equal(
     await page.evaluate(

@@ -91,6 +91,10 @@ export function AddToOrderSheet({
   const [adding, setAdding] = useState(false);
 
   const selected = pricedCake.sizes.find((size) => size.id === sizeId);
+  const singleSize = pricedCake.sizes.length === 1 ? pricedCake.sizes[0] : null;
+  const singleAvailability = singleSize
+    ? cakeSizeAvailability(singleSize, pickupDate)
+    : null;
   const photo = storefrontPhotoForSize(pricedCake.photos, sizeId);
   const existingQuantity = selected
     ? draftLineQuantity(readPreorderDraft(), pricedCake.id, selected.id)
@@ -186,198 +190,254 @@ export function AddToOrderSheet({
   return (
     <StorefrontOverlay
       labelledBy={titleId}
-      panelClassName="border-fog bg-mist text-ink flex max-h-[100dvh] min-h-0 w-full flex-col overflow-hidden rounded-t-lg border md:max-h-[calc(100dvh-5rem)] md:max-w-md md:rounded-lg"
+      panelClassName="border-fog bg-mist text-ink flex max-h-[100dvh] min-h-0 w-full flex-col overflow-hidden rounded-t-2xl border shadow-xl md:max-h-[calc(100dvh-3rem)] md:max-w-lg md:rounded-2xl"
     >
       <form
-        className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:px-6 md:pt-5 md:pb-6"
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
         onSubmit={(event) => {
           event.preventDefault();
           addToOrder();
         }}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-signal text-[11px] font-medium tracking-[0.22em] uppercase">
-              {editingExisting ? "Already in your order" : "Add to Order"}
-            </p>
-            <h2
-              className="font-display text-ink mt-1 text-2xl tracking-tight"
-              id={titleId}
-            >
-              {cake.name}
-            </h2>
-          </div>
-          <button
-            aria-label="Close"
-            className="text-skyline hover:text-ink inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center text-sm font-medium"
-            onClick={onClose}
-            type="button"
-          >
-            Close
-          </button>
-        </div>
-
-        <div className="bg-fog aspect-[4/3] overflow-hidden rounded-[10px]">
-          {photo ? (
-            <CakePhotoImage
-              alt={photo.altText || cake.name}
-              sizes="(min-width: 768px) 28rem, 100vw"
-              src={photo.url}
-            />
-          ) : (
-            <div className="text-skyline flex h-full items-center justify-center px-4 text-center text-sm">
-              Photo coming soon
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-4 pt-3 pb-4 sm:px-5 md:px-6 md:pt-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
+                {editingExisting ? "Already in your order" : "Add to Order"}
+              </p>
+              <h2
+                className="font-display text-ink mt-0.5 text-xl leading-tight tracking-tight sm:text-2xl"
+                id={titleId}
+              >
+                {cake.name}
+              </h2>
             </div>
-          )}
-        </div>
+            <button
+              aria-label="Close"
+              className="text-skyline hover:text-ink inline-flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-transparent text-sm font-medium focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none"
+              onClick={onClose}
+              type="button"
+            >
+              Close
+            </button>
+          </div>
 
-        {cake.sizes.some(
-          (size) => size.availableFrom || size.availableUntil,
-        ) ? (
-          <PickupSlotFields
-            dateId={`${titleId}-pickup-date`}
-            defaultDate={pickupDate ?? ""}
-            includeFieldNames={false}
-            showTime={false}
-            required={false}
-            minDate={pickupScope?.from}
-            maxDate={pickupScope?.to}
-            onDateChange={(date) => {
-              setChosenPickupDate(date);
-              setAvailabilityError(null);
-            }}
-          />
-        ) : null}
-        {pricedCake.sizes.length === 0 ? (
-          <p className="text-skyline text-sm">This cake has no sizes yet.</p>
-        ) : (
-          <fieldset className="space-y-2">
-            <legend className="text-ink text-sm font-medium">Size</legend>
-            <ul className="grid gap-2">
-              {pricedCake.sizes.map((size) => {
-                const selectedSize = size.id === sizeId;
-                const availability = cakeSizeAvailability(size, pickupDate);
-                return (
-                  <li key={size.id}>
-                    <label
-                      className={
-                        !availability.available
-                          ? "border-fog flex cursor-not-allowed items-center justify-between gap-3 border px-4 py-3 opacity-60"
-                          : selectedSize
-                            ? "border-ink bg-mist flex cursor-pointer items-center justify-between gap-3 border px-4 py-3"
-                            : "border-fog hover:border-ink flex cursor-pointer items-center justify-between gap-3 border bg-transparent px-4 py-3"
-                      }
-                    >
-                      <span className="min-w-0">
+          <div className="border-fog bg-paper flex min-w-0 items-center gap-3 rounded-xl border p-2.5 sm:gap-4 sm:p-3">
+            <div className="bg-fog relative h-20 w-20 shrink-0 overflow-hidden rounded-lg">
+              {photo ? (
+                <CakePhotoImage
+                  alt={photo.altText || `${cake.name} cake`}
+                  className="h-full w-full"
+                  objectFit="contain"
+                  sizes="80px"
+                  src={photo.url}
+                />
+              ) : (
+                <div className="text-skyline flex h-full items-center justify-center px-2 text-center text-xs">
+                  Photo coming soon
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-skyline text-xs font-medium">
+                {pricedCake.sizes.length === 1
+                  ? "Single size"
+                  : "Selected size"}
+              </p>
+              {selected ? (
+                <div className="mt-1 flex min-w-0 items-baseline justify-between gap-3">
+                  <span className="text-ink truncate text-base font-semibold">
+                    {selected.size}
+                  </span>
+                  <span className="text-ink shrink-0 text-base font-semibold tabular-nums">
+                    {pickupPricesReady
+                      ? formatRm(selected.price)
+                      : "Checking price…"}
+                  </span>
+                </div>
+              ) : singleSize ? (
+                <div className="mt-1 flex min-w-0 items-baseline justify-between gap-3">
+                  <span className="text-ink truncate text-base font-semibold">
+                    {singleSize.size}
+                  </span>
+                  <span className="text-ink shrink-0 text-base font-semibold tabular-nums">
+                    {pickupPricesReady
+                      ? formatRm(singleSize.price)
+                      : "Checking price…"}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-ink mt-1 text-sm">Choose a size below.</p>
+              )}
+              {singleAvailability?.message ? (
+                <p className="text-skyline mt-1 text-xs leading-snug">
+                  {singleAvailability.message}
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          {cake.sizes.some(
+            (size) => size.availableFrom || size.availableUntil,
+          ) ? (
+            <PickupSlotFields
+              dateId={`${titleId}-pickup-date`}
+              defaultDate={pickupDate ?? ""}
+              includeFieldNames={false}
+              showTime={false}
+              required={false}
+              minDate={pickupScope?.from}
+              maxDate={pickupScope?.to}
+              onDateChange={(date) => {
+                setChosenPickupDate(date);
+                setAvailabilityError(null);
+              }}
+            />
+          ) : null}
+          {pricedCake.sizes.length === 0 ? (
+            <p className="text-skyline text-sm">This cake has no sizes yet.</p>
+          ) : pricedCake.sizes.length > 1 ? (
+            <fieldset className="space-y-2">
+              <legend className="text-ink text-sm font-medium">
+                Choose a size
+              </legend>
+              <ul className="grid gap-2">
+                {pricedCake.sizes.map((size) => {
+                  const selectedSize = size.id === sizeId;
+                  const availability = cakeSizeAvailability(size, pickupDate);
+                  const availabilityId = `${titleId}-size-${size.id}-availability`;
+                  return (
+                    <li key={size.id}>
+                      <label
+                        className={[
+                          "flex min-h-14 items-center justify-between gap-3 rounded-lg border px-3 py-2.5 transition-colors focus-within:ring-2 focus-within:ring-teal-700 focus-within:ring-offset-2 sm:px-4",
+                          !availability.available
+                            ? "border-fog bg-fog/50 cursor-not-allowed opacity-65"
+                            : selectedSize
+                              ? "text-ink cursor-pointer border-teal-700 bg-teal-50/70"
+                              : "border-fog bg-paper hover:border-skyline text-ink cursor-pointer",
+                        ].join(" ")}
+                      >
                         <input
                           checked={selectedSize}
                           disabled={!availability.available || adding}
                           className="sr-only"
-                          name="add-to-order-size"
+                          name={`${titleId}-size`}
                           onChange={() => selectSize(size.id)}
                           type="radio"
                           value={size.id}
+                          aria-describedby={
+                            availability.message ? availabilityId : undefined
+                          }
                         />
-                        <span className="text-ink block text-sm font-medium">
-                          {size.size}
-                        </span>
-                        <span className="text-skyline mt-0.5 block text-sm">
-                          {formatPreorderRequirement(size.preorderDays)}
+                        <span className="min-w-0">
+                          <span className="text-ink block text-sm font-semibold">
+                            {size.size}
+                          </span>
+                          <span className="text-skyline mt-0.5 block text-xs leading-snug">
+                            {formatPreorderRequirement(size.preorderDays)}
+                          </span>
                           {availability.message ? (
-                            <span className="mt-1 block">
+                            <span
+                              className="text-skyline mt-0.5 block text-xs leading-snug"
+                              id={availabilityId}
+                            >
                               {availability.message}
                             </span>
                           ) : null}
                         </span>
-                      </span>
-                      <span className="text-ink shrink-0 text-sm font-semibold tabular-nums">
-                        {pickupPricesReady ? formatRm(size.price) : "Checking…"}
-                      </span>
-                    </label>
-                  </li>
-                );
-              })}
-            </ul>
-          </fieldset>
-        )}
-
-        {editingExisting ? (
-          <p className="text-ink text-sm" role="status">
-            {existingQuantity} × {selected?.size} already in your order
-          </p>
-        ) : null}
-        {!pickupPricesReady ? (
-          <p className="text-skyline text-sm" role="status">
-            Checking price for your pickup date…
-          </p>
-        ) : null}
-
-        {availabilityError ? (
-          <p className="text-status-danger text-sm" role="alert">
-            {availabilityError}
-          </p>
-        ) : null}
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-ink text-sm font-medium" id={`${titleId}-qty`}>
-            Quantity
-          </p>
-          <div
-            aria-labelledby={`${titleId}-qty`}
-            className="flex items-center gap-2"
-            role="group"
-          >
-            <button
-              aria-label="Decrease quantity"
-              className="text-ink inline-flex min-h-11 min-w-11 items-center justify-center text-lg disabled:opacity-40"
-              disabled={quantity <= 1}
-              onClick={() => setQuantity((value) => Math.max(1, value - 1))}
-              type="button"
-            >
-              −
-            </button>
-            <span
-              aria-live="polite"
-              className="text-ink min-w-8 text-center text-sm font-medium tabular-nums"
-            >
-              {quantity}
-            </span>
-            <button
-              aria-label="Increase quantity"
-              className="text-ink inline-flex min-h-11 min-w-11 items-center justify-center text-lg"
-              onClick={() => setQuantity((value) => Math.min(99, value + 1))}
-              type="button"
-            >
-              +
-            </button>
-          </div>
+                        <span className="text-ink shrink-0 text-sm font-semibold tabular-nums">
+                          {pickupPricesReady
+                            ? formatRm(size.price)
+                            : "Checking price…"}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            </fieldset>
+          ) : null}
         </div>
 
-        <button
-          aria-busy={adding}
-          className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200 disabled:opacity-50"
-          disabled={!selected || !pickupPricesReady || adding}
-          type="submit"
-        >
-          {adding
-            ? editingExisting
-              ? "Updated ✓"
-              : "Added ✓"
-            : editingExisting
-              ? "Update Order"
-              : "Add"}
-        </button>
-        {editingExisting ? (
+        <div className="border-fog bg-mist shrink-0 space-y-2 border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5 md:px-6 md:pb-4">
+          {editingExisting ? (
+            <p className="text-ink text-xs" role="status">
+              {existingQuantity} × {selected?.size} already in your order
+            </p>
+          ) : null}
+          {!pickupPricesReady ? (
+            <p className="text-skyline text-xs" role="status">
+              Checking price for your pickup date…
+            </p>
+          ) : null}
+          {availabilityError ? (
+            <p className="text-status-danger text-sm" role="alert">
+              {availabilityError}
+            </p>
+          ) : null}
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-ink text-sm font-medium" id={`${titleId}-qty`}>
+              Quantity
+            </p>
+            <div
+              aria-labelledby={`${titleId}-qty`}
+              className="flex items-center gap-2"
+              role="group"
+            >
+              <button
+                aria-label="Decrease quantity"
+                className="text-ink inline-flex min-h-11 min-w-11 items-center justify-center text-lg disabled:opacity-40"
+                disabled={quantity <= 1}
+                onClick={() => setQuantity((value) => Math.max(1, value - 1))}
+                type="button"
+              >
+                −
+              </button>
+              <span
+                aria-live="polite"
+                className="text-ink min-w-8 text-center text-sm font-medium tabular-nums"
+              >
+                {quantity}
+              </span>
+              <button
+                aria-label="Increase quantity"
+                className="text-ink inline-flex min-h-11 min-w-11 items-center justify-center text-lg disabled:opacity-40"
+                onClick={() => setQuantity((value) => Math.min(99, value + 1))}
+                type="button"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
           <button
-            className="text-ink hover:text-skyline inline-flex min-h-11 w-full cursor-pointer items-center justify-center text-sm font-medium"
-            onClick={() => {
-              onClose();
-              openStorefrontOrder();
-            }}
-            type="button"
+            aria-busy={adding}
+            className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-lg px-5 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!selected || !pickupPricesReady || adding}
+            type="submit"
           >
-            View Order
+            {adding
+              ? editingExisting
+                ? "Updated ✓"
+                : "Added ✓"
+              : editingExisting
+                ? "Update Order"
+                : "Add to Order"}
           </button>
-        ) : null}
+          {editingExisting ? (
+            <button
+              className="text-ink hover:text-skyline inline-flex min-h-10 w-full cursor-pointer items-center justify-center text-sm font-medium"
+              onClick={() => {
+                onClose();
+                openStorefrontOrder();
+              }}
+              type="button"
+            >
+              View Order
+            </button>
+          ) : null}
+        </div>
       </form>
     </StorefrontOverlay>
   );

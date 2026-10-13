@@ -8,6 +8,7 @@ type CakePhotoImageProps = {
   className?: string;
   sizes: string;
   priority?: boolean;
+  objectFit?: "cover" | "contain";
   /** Desktop-only, reduced-motion-safe photo lift. */
   zoomOnHover?: boolean;
 };
@@ -32,10 +33,12 @@ export function CakePhotoImage({
   className,
   sizes,
   priority = false,
+  objectFit = "cover",
   zoomOnHover = false,
 }: CakePhotoImageProps) {
   const imageClass = [
-    "rounded-[10px] object-cover",
+    "rounded-[10px]",
+    objectFit === "contain" ? "object-contain" : "object-cover",
     zoomOnHover
       ? "transition duration-700 ease-out motion-reduce:transition-none md:group-hover:scale-[1.035]"
       : "",

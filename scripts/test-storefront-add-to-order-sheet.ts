@@ -63,8 +63,9 @@ assert.match(
   sheetSrc,
   /flex max-h-\[100dvh\] min-h-0 w-full flex-col overflow-hidden/,
 );
-assert.match(sheetSrc, /md:max-h-\[calc\(100dvh-5rem\)\]/);
-assert.match(sheetSrc, /flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto/);
+assert.match(sheetSrc, /md:max-h-\[calc\(100dvh-3rem\)\]/);
+assert.match(sheetSrc, /md:max-w-lg/);
+assert.match(sheetSrc, /flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto/);
 assert.doesNotMatch(sheetSrc, /from "react-dom"/);
 assert.doesNotMatch(sheetSrc, /fixed inset-x-0 bottom-0 z-\[60\]/);
 assert.doesNotMatch(sheetSrc, /pointer-events-none fixed inset-0 z-50/);
@@ -105,20 +106,26 @@ assert.match(
 );
 assert.match(
   sheetSrc,
-  /cursor-pointer items-center justify-center rounded-md px-5[\s\S]*type="submit"/,
+  /cursor-pointer items-center justify-center rounded-lg px-5[\s\S]*type="submit"/,
 );
 assert.match(sheetSrc, /mergeDraftItem/);
 assert.match(sheetSrc, /setDraftLineQuantity/);
 assert.match(sheetSrc, /draftLineQuantity/);
 assert.match(sheetSrc, /addingRef\.current/);
-assert.match(sheetSrc, /disabled=\{\!selected \|\| adding\}/);
+assert.match(sheetSrc, /disabled=\{\!selected \|\| !pickupPricesReady \|\| adding\}/);
 assert.match(sheetSrc, /Added ✓/);
 assert.match(sheetSrc, /Update Order/);
 assert.match(sheetSrc, /setSizeId/);
 assert.match(sheetSrc, /setQuantity/);
 assert.match(sheetSrc, /\{cake\.name\}/);
-assert.match(sheetSrc, /name="add-to-order-size"/);
+assert.match(sheetSrc, /name=\{`\$\{titleId\}-size`\}/);
 assert.match(sheetSrc, /type="radio"/);
+assert.match(sheetSrc, /pricedCake\.sizes\.length === 1/);
+assert.match(sheetSrc, /pricedCake\.sizes\.length > 1 \?/);
+assert.match(sheetSrc, /objectFit="contain"/);
+assert.match(sheetSrc, /focus-within:ring-2/);
+assert.match(sheetSrc, /min-h-14 items-center justify-between/);
+assert.match(sheetSrc, /pb-\[max\(0\.75rem,env\(safe-area-inset-bottom\)\)\]/);
 assert.doesNotMatch(sheetSrc, /aria-pressed=\{selectedSize\}/);
 assert.match(sheetSrc, /Decrease quantity/);
 assert.match(sheetSrc, /Increase quantity/);

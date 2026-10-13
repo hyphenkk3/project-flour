@@ -75,11 +75,14 @@ assert.match(addButtonSrc, /from "@\/workspaces\/storefront\/StorefrontOverlay"/
 assert.match(addButtonSrc, /<StorefrontOverlay/);
 assert.match(addButtonSrc, /labelledBy=\{titleId\}/);
 assert.match(addButtonSrc, /max-h-\[100dvh\]/);
-assert.match(addButtonSrc, /md:max-h-\[calc\(100dvh-5rem\)\]/);
+assert.match(addButtonSrc, /md:max-h-\[calc\(100dvh-3rem\)\]/);
 assert.match(
   addButtonSrc,
-  /flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto/,
+  /flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto/,
 );
+assert.match(addButtonSrc, /md:max-w-lg/);
+assert.match(addButtonSrc, /objectFit="contain"/);
+assert.match(addButtonSrc, /Add to Order/);
 assert.doesNotMatch(addButtonSrc, /from "react-dom"/);
 assert.doesNotMatch(addButtonSrc, /createPortal/);
 assert.doesNotMatch(addButtonSrc, /role="dialog"/);
