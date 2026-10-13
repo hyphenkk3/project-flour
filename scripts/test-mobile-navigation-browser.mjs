@@ -1,4 +1,4 @@
-/** Browser regression test for the fixed mobile workspace navigation. */
+/** Browser regression test for the fixed, compact mobile workspace navigation. */
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { createServer } from "node:http";
@@ -18,8 +18,10 @@ import {MobileNavigation} from "@/components/shell/MobileNavigation";
 import {getNavigationForRole} from "@/foundation/navigation/workspaces";
 function Harness() {
   const [path, setPath] = useState("/home");
+  const [role, setRole] = useState("owner");
   window.navigateWorkspace = (nextPath) => setPath(nextPath);
-  return <><MobileNavigation items={getNavigationForRole("owner")} currentPath={path}/><main style={{minHeight:"140vh",padding:"24px"}}>Workspace content</main></>;
+  window.setNavigationRole = (nextRole) => setRole(nextRole);
+  return <><MobileNavigation items={getNavigationForRole(role)} currentPath={path}/><main style={{minHeight:"140vh",padding:"24px"}}>Workspace content</main></>;
 }
 createRoot(document.getElementById("root")).render(<Harness/>);
 `;
@@ -93,112 +95,170 @@ try {
     hasTouch: true,
   });
   await page.goto(`http://127.0.0.1:${address.port}`);
-  const scrollArea = page.locator(
-    'nav[aria-label="Workspaces"] [role="group"]',
-  );
-  const links = scrollArea.locator("a");
+  const nav = page.locator('nav[aria-label="Workspaces"]');
+  const links = nav.locator("a");
   const expectedLabels = [
     "Home",
-    "Operations",
+    "Ops",
     "Calendar",
     "Bakery",
-    "Collection",
+    "Collect",
     "Library",
-    "Customers",
-    "Management",
+    "Customer",
+    "Manage",
   ];
 
-  for (const width of [320, 390]) {
+  for (const width of [320, 375, 390, 393, 430]) {
     await page.setViewportSize({ width, height: 844 });
     await page.evaluate(() => window.scrollTo(0, 0));
+    await page.evaluate(() => window.setNavigationRole("owner"));
     await page.evaluate(() => window.navigateWorkspace("/home"));
-    await scrollArea.evaluate((element) => {
-      element.scrollLeft = 0;
-    });
     await page.waitForFunction(
       () =>
         document
-          .querySelector('[role="group"] [aria-current="page"]')
+          .querySelector('nav [aria-current="page"]')
           ?.getAttribute("href") === "/home",
     );
     assert.equal(await links.count(), expectedLabels.length);
     assert.deepEqual(await links.allTextContents(), expectedLabels);
-    const initial = await scrollArea.evaluate((element) => ({
+    const layout = await nav.evaluate((element) => ({
       width: element.clientWidth,
       content: element.scrollWidth,
-      left: element.scrollLeft,
-      paddingBottom: Number.parseFloat(
-        getComputedStyle(element.parentElement.parentElement).paddingBottom,
-      ),
+      paddingBottom: Number.parseFloat(getComputedStyle(element).paddingBottom),
       pageWidth: document.documentElement.scrollWidth,
       viewportWidth: window.innerWidth,
+      position: getComputedStyle(element).position,
     }));
-    assert.ok(initial.content > initial.width, `${width}px nav is scrollable`);
-    assert.equal(initial.pageWidth, initial.viewportWidth, "no page overflow");
-    assert.ok(
-      initial.paddingBottom >= 4,
-      "bottom safe-area spacing is present",
-    );
     assert.equal(
-      initial.left,
-      0,
-      "first item starts at the initial scroll position",
+      layout.content,
+      layout.width,
+      `${width}px nav does not scroll`,
     );
+    assert.equal(layout.pageWidth, layout.viewportWidth, "no page overflow");
+    assert.ok(layout.paddingBottom >= 4, "bottom safe-area spacing is present");
+    assert.equal(layout.position, "fixed", "navigation stays fixed");
 
-    const first = await links.nth(0).evaluate((element) => {
-      const bounds = element.getBoundingClientRect();
-      const viewport =
-        element.parentElement.parentElement.getBoundingClientRect();
-      return bounds.left >= viewport.left && bounds.right <= viewport.right;
-    });
-    assert.equal(first, true, "first navigation item is fully reachable");
-
-    const whiteSpace = await links
-      .locator("span")
-      .evaluateAll((elements) =>
-        elements.map((element) => getComputedStyle(element).whiteSpace),
+    const geometry = await links.evaluateAll((elements) =>
+      elements.map((element) => {
+        const bounds = element.getBoundingClientRect();
+        const navBounds = element.closest("nav").getBoundingClientRect();
+        const label = element.querySelector("span");
+        const labelBounds = label.getBoundingClientRect();
+        const style = getComputedStyle(label);
+        return {
+          left: bounds.left,
+          right: bounds.right,
+          navLeft: navBounds.left,
+          navRight: navBounds.right,
+          width: bounds.width,
+          height: bounds.height,
+          labelLeft: labelBounds.left,
+          labelRight: labelBounds.right,
+          labelWidth: labelBounds.width,
+          labelScrollWidth: label.scrollWidth,
+          whiteSpace: style.whiteSpace,
+          fontSize: style.fontSize,
+        };
+      }),
+    );
+    for (const [index, item] of geometry.entries()) {
+      assert.ok(
+        item.left >= item.navLeft,
+        `${width}px item ${index} left visible`,
       );
-    assert.ok(
-      whiteSpace.every((value) => value === "nowrap"),
-      "labels do not wrap",
+      assert.ok(
+        item.right <= item.navRight,
+        `${width}px item ${index} right visible`,
+      );
+      assert.ok(item.width >= 36, `${width}px item ${index} has usable width`);
+      assert.ok(
+        item.height >= 48,
+        `${width}px item ${index} has usable height`,
+      );
+      assert.ok(
+        item.labelLeft >= item.left,
+        `${width}px label ${index} starts inside its tap target`,
+      );
+      assert.ok(
+        item.labelRight <= item.right,
+        `${width}px label ${index} ends inside its tap target`,
+      );
+      assert.ok(
+        item.labelScrollWidth <= item.labelWidth + 1,
+        `${width}px label ${index} is not clipped`,
+      );
+      assert.equal(
+        item.whiteSpace,
+        "nowrap",
+        `${width}px label ${index} stays on one line`,
+      );
+      assert.equal(
+        item.fontSize,
+        "10px",
+        "compact labels remain readable at 10px",
+      );
+    }
+    const first = geometry[0];
+    const last = geometry.at(-1);
+    assert.ok(first.left >= first.navLeft, "first item is visible");
+    assert.ok(last.right <= last.navRight, "last item is visible");
+
+    const active = links.nth(0);
+    assert.equal(await active.getAttribute("aria-current"), "page");
+    assert.match(
+      await active.getAttribute("class"),
+      /text-signal/,
+      "active item remains visually distinguished",
     );
 
-    await scrollArea.evaluate((element) => {
-      element.scrollLeft = element.scrollWidth;
-    });
-    const last = await links.nth(7).evaluate((element) => {
-      const bounds = element.getBoundingClientRect();
-      const viewport =
-        element.parentElement.parentElement.getBoundingClientRect();
-      return bounds.left >= viewport.left && bounds.right <= viewport.right;
-    });
-    assert.equal(last, true, "last navigation item is fully reachable");
+    for (const [role, labels] of [
+      ["manager", expectedLabels],
+      [
+        "customer_operations",
+        ["Home", "Ops", "Calendar", "Collect", "Customer"],
+      ],
+      ["bakery", ["Home", "Calendar", "Bakery", "Collect", "Library"]],
+      ["collection", ["Home", "Collect"]],
+    ]) {
+      await page.evaluate(
+        (nextRole) => window.setNavigationRole(nextRole),
+        role,
+      );
+      assert.deepEqual(
+        await links.allTextContents(),
+        labels,
+        `${role} role order and visibility`,
+      );
+      assert.equal(
+        await nav.evaluate(
+          (element) => element.scrollWidth === element.clientWidth,
+        ),
+        true,
+        `${width}px ${role} navigation has no horizontal scrolling`,
+      );
+    }
+    await page.evaluate(() => window.setNavigationRole("owner"));
+    await page.waitForFunction(
+      () => document.querySelectorAll("nav a").length === 8,
+    );
 
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await scrollArea.evaluate((element) => {
-      element.scrollLeft = 0;
-    });
     await page.evaluate(() => window.navigateWorkspace("/owner/management"));
-    await page.waitForFunction(() => {
-      const container = document.querySelector('[role="group"]');
-      const active = container?.querySelector('[aria-current="page"]');
-      if (!container || !active) return false;
-      const outer = container.getBoundingClientRect();
-      const item = active.getBoundingClientRect();
-      return item.left >= outer.left && item.right <= outer.right;
-    });
-    assert.equal(await links.nth(7).getAttribute("aria-current"), "page");
-    const activeScroll = await scrollArea.evaluate(
-      (element) => element.scrollLeft,
+    await page.waitForFunction(
+      () =>
+        document.querySelector('nav a[aria-current="page"]')?.textContent ===
+        "Manage",
     );
-    await page.evaluate(() =>
-      window.navigateWorkspace("/owner/management/reports"),
+    assert.match(
+      await links.nth(7).getAttribute("class"),
+      /text-signal/,
+      "Management active indicator remains visible at the final item",
     );
-    await page.waitForTimeout(50);
     assert.equal(
-      await scrollArea.evaluate((element) => element.scrollLeft),
-      activeScroll,
-      "already-visible active item does not trigger another scroll",
+      await nav.evaluate(
+        (element) => element.scrollWidth === element.clientWidth,
+      ),
+      true,
+      "active state does not introduce horizontal overflow",
     );
   }
 
@@ -216,5 +276,5 @@ try {
 }
 
 console.log(
-  "Mobile workspace navigation browser checks passed at 320px and 390px, including overflow, labels, reachability, active reveal, reduced motion, and desktop hiding.",
+  "Fixed mobile workspace navigation passed at 320, 375, 390, 393, and 430px for all role layouts, labels, clipping, touch geometry, active state, overflow, and desktop hiding.",
 );
