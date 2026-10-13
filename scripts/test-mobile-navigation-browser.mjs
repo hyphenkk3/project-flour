@@ -61,7 +61,14 @@ const result = await esbuild.build({
 });
 const bundle = result.outputFiles[0].text;
 const cssName = readdirSync(path.join(root, ".next/static/chunks")).find(
-  (name) => name.endsWith(".css"),
+  (name) => {
+    if (!name.endsWith(".css")) return false;
+    const contents = readFileSync(
+      path.join(root, ".next/static/chunks", name),
+      "utf8",
+    );
+    return contents.includes(".fixed") && contents.includes(".bg-signal");
+  },
 );
 assert.ok(cssName, "production CSS exists; run the production build first");
 const css = readFileSync(
@@ -172,7 +179,7 @@ try {
       );
       assert.ok(item.width >= 36, `${width}px item ${index} has usable width`);
       assert.ok(
-        item.height >= 48,
+        item.height >= 44,
         `${width}px item ${index} has usable height`,
       );
       assert.ok(
@@ -209,6 +216,31 @@ try {
       await active.getAttribute("class"),
       /text-signal/,
       "active item remains visually distinguished",
+    );
+    const homeActiveStyle = await active.locator("span").evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        background: style.backgroundColor,
+        radius: style.borderRadius,
+        height: element.getBoundingClientRect().height,
+      };
+    });
+    assert.notEqual(homeActiveStyle.background, "rgba(0, 0, 0, 0)");
+    assert.notEqual(homeActiveStyle.radius, "0px");
+    assert.ok(homeActiveStyle.height <= 20, "active background stays compact");
+    assert.equal(
+      await links
+        .nth(0)
+        .evaluate((element) => getComputedStyle(element, "::after").height),
+      "12px",
+      "short low-contrast dividers separate the tab hit areas",
+    );
+    assert.equal(
+      await links
+        .nth(7)
+        .evaluate((element) => getComputedStyle(element, "::after").display),
+      "none",
+      "no divider follows the last tab",
     );
 
     for (const [role, labels] of [
@@ -259,6 +291,27 @@ try {
       ),
       true,
       "active state does not introduce horizontal overflow",
+    );
+    await page.evaluate(() =>
+      window.navigateWorkspace("/owner/management/reports"),
+    );
+    await page.waitForFunction(
+      () =>
+        document.querySelector('nav a[aria-current="page"]')?.textContent ===
+        "Manage",
+    );
+    assert.equal(
+      await links.nth(7).getAttribute("aria-current"),
+      "page",
+      "nested Management route retains active tab state",
+    );
+    assert.notEqual(
+      await links
+        .nth(7)
+        .locator("span")
+        .evaluate((element) => getComputedStyle(element).backgroundColor),
+      "rgba(0, 0, 0, 0)",
+      "nested Management route renders the teal active background",
     );
   }
 

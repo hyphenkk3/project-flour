@@ -20,14 +20,14 @@ const MOBILE_LABELS: Record<string, string> = {
 };
 
 const MOBILE_ITEM_WIDTHS: Record<string, number> = {
-  home: 40,
+  home: 39,
   owner: 39,
-  owner_calendar: 49,
+  owner_calendar: 50,
   bakery: 39,
-  collection: 40,
+  collection: 39,
   library: 39,
   customer_operations: 54,
-  management: 43,
+  management: 44,
 };
 
 export function MobileNavigation({
