@@ -22,6 +22,9 @@ type AppShellFrameProps = {
 };
 
 function titleForPath(pathname: string): string {
+  if (pathname.startsWith("/owner/management")) {
+    return "Management";
+  }
   if (pathname.startsWith("/owner")) {
     return "Operations";
   }

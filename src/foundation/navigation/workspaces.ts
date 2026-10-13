@@ -69,8 +69,8 @@ export const WORKSPACE_CATALOG: Record<WorkspaceId, WorkspaceNavItem> = {
   management: {
     id: "management",
     label: "Management",
-    href: null,
-    available: false,
+    href: "/owner/management/reports",
+    available: true,
   },
 };
 
@@ -83,6 +83,7 @@ export const ROLE_NAVIGATION: Record<RoleCode, readonly WorkspaceId[]> = {
     "home",
     "owner",
     "owner_calendar",
+    "management",
     "bakery",
     "collection",
     "customer_operations",
@@ -96,7 +97,6 @@ export const ROLE_NAVIGATION: Record<RoleCode, readonly WorkspaceId[]> = {
     "bakery",
     "collection",
     "library",
-    "management",
   ],
   customer_operations: [
     "home",
