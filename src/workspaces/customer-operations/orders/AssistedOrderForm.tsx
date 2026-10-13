@@ -30,7 +30,8 @@ import {
 import { AssistedOrderFulfilmentFields } from "@/workspaces/customer-operations/orders/AssistedOrderFulfilmentFields";
 import { STAFF_GUEST_ORDER_SOURCES } from "@/workspaces/owner/orders/labels";
 import {
-  displayCakeSizeUnitPrice,
+  verifiedSelectedCakeSizePrices,
+  verifiedStaffCakeSizeSubmission,
   offerableCakeSizeIds,
 } from "@/workspaces/owner/orders/pickup-date-cake-size-prices";
 import { usePickupDateCakeSizePrices } from "@/workspaces/owner/orders/use-pickup-date-cake-size-prices";
@@ -91,14 +92,18 @@ export function AssistedOrderForm({
   ]);
   const [pickupDate, setPickupDate] = useState("");
 
-  const offerableSizeIds = useMemo(
-    () => offerableCakeSizeIds(cakes),
-    [cakes],
-  );
+  const offerableSizeIds = useMemo(() => offerableCakeSizeIds(cakes), [cakes]);
   const pickupDatePrices = usePickupDateCakeSizePrices(
     pickupDate,
     offerableSizeIds,
   );
+  const requiredPriceSizeIds = items.map((item) => item.cakeSizeId);
+  const cakePriceVerified = verifiedSelectedCakeSizePrices({
+    pickupDate: pickupDate,
+    sizeIds: requiredPriceSizeIds,
+    prices: pickupDatePrices.prices,
+    status: pickupDatePrices.status,
+  });
 
   const selectedCustomer =
     customers.find((customer) => customer.id === customerId) ?? null;
@@ -124,7 +129,9 @@ export function AssistedOrderForm({
 
   function removeCakeLine(key: string) {
     setItems((current) =>
-      current.length <= 1 ? current : current.filter((item) => item.key !== key),
+      current.length <= 1
+        ? current
+        : current.filter((item) => item.key !== key),
     );
   }
 
@@ -138,7 +145,23 @@ export function AssistedOrderForm({
   }
 
   return (
-    <form action={formAction} className="flex max-w-xl flex-col gap-6">
+    <form
+      action={(formData) => {
+        if (
+          verifiedStaffCakeSizeSubmission({
+            verified: cakePriceVerified,
+            formData,
+            pickupDate: pickupDate,
+            itemsJson,
+          })
+        )
+          formAction(formData);
+      }}
+      className="flex max-w-xl flex-col gap-6"
+      onSubmit={(event) => {
+        if (!cakePriceVerified) event.preventDefault();
+      }}
+    >
       <input name="items_json" type="hidden" value={itemsJson} />
       <input name="fulfilment_method" type="hidden" value={fulfilmentMethod} />
       <input name="delivery_json" type="hidden" value={deliveryJson} />
@@ -262,13 +285,11 @@ export function AssistedOrderForm({
                       {(cake?.sizes ?? []).map((size) => (
                         <option key={size.id} value={size.id}>
                           {size.size} —{" "}
-                          {formatRm(
-                            displayCakeSizeUnitPrice(
-                              size.price,
-                              size.id,
-                              pickupDatePrices,
-                            ),
-                          )}
+                          {Number.isFinite(pickupDatePrices.prices[size.id])
+                            ? formatRm(pickupDatePrices.prices[size.id])
+                            : pickupDatePrices.status === "error"
+                              ? "Price unavailable"
+                              : "Checking price…"}
                         </option>
                       ))}
                     </FormSelect>
@@ -321,10 +342,34 @@ export function AssistedOrderForm({
         <FormTextarea id="internal_notes" name="internal_notes" rows={3} />
       </FormField>
 
+      {requiredPriceSizeIds.length > 0 && !cakePriceVerified ? (
+        <div className="text-sm" role="status">
+          {pickupDatePrices.status === "error" ? (
+            <>
+              <p className="text-status-danger">
+                Cake prices could not be verified. Retry before saving.
+              </p>
+              <button
+                className="text-signal font-medium underline"
+                onClick={pickupDatePrices.retry}
+                type="button"
+              >
+                Retry prices
+              </button>
+            </>
+          ) : (
+            <p className="text-skyline">
+              Checking price… Saving is available when prices are verified.
+            </p>
+          )}
+        </div>
+      ) : null}
       <FormError message={state.error} />
 
       <FormActions>
-        <FormSubmitButton pending={pending}>Create order</FormSubmitButton>
+        <FormSubmitButton disabled={!cakePriceVerified} pending={pending}>
+          Create order
+        </FormSubmitButton>
         <Link
           className="border-fog text-ink inline-flex min-h-12 items-center justify-center rounded-lg border bg-white px-5 text-sm font-medium"
           href="/customer-operations/orders"

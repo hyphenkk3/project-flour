@@ -161,7 +161,11 @@ assert.doesNotMatch(opsPriceHookSrc, /Earl Grey/);
 
 for (const src of [staffGuestFormSrc, assistedFormSrc, workspaceFormSrc]) {
   assert.match(src, /usePickupDateCakeSizePrices/);
-  assert.match(src, /displayCakeSizeUnitPrice/);
+  assert.match(src, /verifiedSelectedCakeSizePrices/);
+  assert.match(src, /Checking price…/);
+  assert.match(src, /Retry prices/);
+  assert.match(src, /disabled=\{!cakePriceVerified\}/);
+  assert.match(src, /verifiedStaffCakeSizeSubmission/);
   assert.doesNotMatch(src, /formatRm\(size\.price\)/);
 }
 

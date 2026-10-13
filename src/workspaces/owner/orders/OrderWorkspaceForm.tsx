@@ -146,7 +146,9 @@ import {
 } from "@/workspaces/owner/orders/labels";
 import { withOwnerReturnTo } from "@/workspaces/owner/navigation/return-to";
 import {
-  displayCakeSizeUnitPrice,
+  verifiedSelectedCakeSizePrices,
+  verifiedStaffCakeSizeSubmission,
+  newlyPricedCakeSizeIds,
   offerableCakeSizeIds,
 } from "@/workspaces/owner/orders/pickup-date-cake-size-prices";
 import { usePickupDateCakeSizePrices } from "@/workspaces/owner/orders/use-pickup-date-cake-size-prices";
@@ -313,6 +315,14 @@ export function OrderWorkspaceForm({
     selectedPickupDate,
     offerableSizeIds,
   );
+  const requiredPriceSizeIds = newlyPricedCakeSizeIds(editItems, order.items);
+  const cakePriceVerified = verifiedSelectedCakeSizePrices({
+    pickupDate: selectedPickupDate,
+    sizeIds: requiredPriceSizeIds,
+    prices: pickupDatePrices.prices,
+    status: pickupDatePrices.status,
+  });
+
   const preorderLines = preorderLinesFromWorkspaceItems({
     items:
       mode === "edit"
@@ -1305,10 +1315,23 @@ export function OrderWorkspaceForm({
 
   return (
     <form
-      action={formAction}
+      action={(formData) => {
+        if (
+          verifiedStaffCakeSizeSubmission({
+            verified: cakePriceVerified,
+            formData,
+            pickupDate: selectedPickupDate,
+            itemsJson,
+          })
+        )
+          formAction(formData);
+      }}
       className="space-y-6"
       key={formKey}
       onReset={preserveOrderEditorStateOnReset}
+      onSubmit={(event) => {
+        if (!cakePriceVerified) event.preventDefault();
+      }}
     >
       <input name="items_json" type="hidden" value={itemsJson} />
       <input
@@ -1698,13 +1721,11 @@ export function OrderWorkspaceForm({
                       {(cake?.sizes ?? []).map((size) => (
                         <option key={size.id} value={size.id}>
                           {size.size} —{" "}
-                          {formatRm(
-                            displayCakeSizeUnitPrice(
-                              size.price,
-                              size.id,
-                              pickupDatePrices,
-                            ),
-                          )}
+                          {Number.isFinite(pickupDatePrices.prices[size.id])
+                            ? formatRm(pickupDatePrices.prices[size.id])
+                            : pickupDatePrices.status === "error"
+                              ? "Price unavailable"
+                              : "Checking price…"}
                         </option>
                       ))}
                     </FormSelect>
@@ -1995,9 +2016,33 @@ export function OrderWorkspaceForm({
         </div>
       ) : null}
 
+      {requiredPriceSizeIds.length > 0 && !cakePriceVerified ? (
+        <div className="text-sm" role="status">
+          {pickupDatePrices.status === "error" ? (
+            <>
+              <p className="text-status-danger">
+                Cake prices could not be verified. Retry before saving.
+              </p>
+              <button
+                className="text-signal font-medium underline"
+                onClick={pickupDatePrices.retry}
+                type="button"
+              >
+                Retry prices
+              </button>
+            </>
+          ) : (
+            <p className="text-skyline">
+              Checking price… Saving is available when prices are verified.
+            </p>
+          )}
+        </div>
+      ) : null}
       <FormActions>
         {blockDirectSave ? null : (
-          <FormSubmitButton pending={pending}>Save Changes</FormSubmitButton>
+          <FormSubmitButton disabled={!cakePriceVerified} pending={pending}>
+            Save Changes
+          </FormSubmitButton>
         )}
         <button
           className="border-fog text-ink hover:bg-mist inline-flex min-h-12 items-center justify-center rounded-lg border px-5 text-sm font-medium"

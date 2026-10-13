@@ -1,56 +1,90 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { resolveCheckoutCakeSizePrices } from "@/workspaces/storefront/checkout/actions";
+import {
+  cakeSizePriceRequestKey,
+  isCurrentCakeSizePriceResponse,
+} from "@/workspaces/owner/orders/pickup-date-cake-size-prices";
 
-const pickupDatePriceCache = new Map<string, Record<string, number>>();
+type Resolution = {
+  key: string;
+  attempt: number;
+  prices: Record<string, number>;
+  failed: boolean;
+};
 
-function pickupDateYmd(value: string): string | null {
-  const key = value.trim().slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : null;
-}
-
-function sizeIdsKey(ids: readonly string[]): string {
-  return [
-    ...new Set(ids.map((id) => id.trim()).filter((id) => id.length > 0)),
-  ]
-    .sort()
-    .join(",");
-}
-
-/**
- * Display-only pickup-date cake-size prices via library_cake_size_price_on.
- * Does not change order create/submit payloads.
- */
+/** Display state is scoped to the current date and size set. SQL remains authoritative. */
 export function usePickupDateCakeSizePrices(
   pickupDate: string,
   sizeIds: readonly string[],
-): Record<string, number> {
-  const date = pickupDateYmd(pickupDate);
-  const idsKey = sizeIdsKey(sizeIds);
-  const cacheKey = date && idsKey ? `${date}|${idsKey}` : "";
-  const [, setCacheRevision] = useState(0);
+) {
+  const key = cakeSizePriceRequestKey(pickupDate, sizeIds);
+  const [resolution, setResolution] = useState<Resolution | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const currentKey = useRef(key);
+  const currentAttempt = useRef(attempt);
 
   useEffect(() => {
-    if (!date || !idsKey) {
-      return;
-    }
-    if (pickupDatePriceCache.has(cacheKey)) {
-      return;
-    }
+    currentKey.current = key;
+    currentAttempt.current = attempt;
+    if (!key) return;
     let cancelled = false;
-    void resolveCheckoutCakeSizePrices(date, idsKey.split(",")).then(
-      (prices) => {
-        pickupDatePriceCache.set(cacheKey, prices);
-        if (cancelled) return;
-        setCacheRevision((current) => current + 1);
-      },
-    );
+    const [date, ids] = key.split("|");
+    void resolveCheckoutCakeSizePrices(date, ids.split(","))
+      .then((prices) => {
+        if (
+          cancelled ||
+          !isCurrentCakeSizePriceResponse({
+            responseKey: key,
+            responseAttempt: attempt,
+            currentKey: currentKey.current,
+            currentAttempt: currentAttempt.current,
+          })
+        )
+          return;
+        setResolution({
+          key,
+          attempt,
+          prices,
+          failed: ids.split(",").some((id) => !Number.isFinite(prices[id])),
+        });
+      })
+      .catch(() => {
+        if (
+          !cancelled &&
+          isCurrentCakeSizePriceResponse({
+            responseKey: key,
+            responseAttempt: attempt,
+            currentKey: currentKey.current,
+            currentAttempt: currentAttempt.current,
+          })
+        ) {
+          setResolution({ key, attempt, prices: {}, failed: true });
+        }
+      });
     return () => {
       cancelled = true;
     };
-  }, [cacheKey, date, idsKey]);
+  }, [key, attempt]);
 
-  if (!date) return {};
-  return pickupDatePriceCache.get(cacheKey) ?? {};
+  const current =
+    resolution?.key === key && resolution.attempt === attempt
+      ? resolution
+      : null;
+  return {
+    prices: current?.prices ?? {},
+    status: !key
+      ? "idle"
+      : !current
+        ? "loading"
+        : current.failed
+          ? "error"
+          : "ready",
+    retry: () => {
+      currentAttempt.current += 1;
+      setResolution(null);
+      setAttempt((value) => value + 1);
+    },
+  } as const;
 }
