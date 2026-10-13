@@ -8,25 +8,10 @@ import {
   percentChange,
   previousMonth,
   reportMonth,
-  type buildMonthlyReport,
 } from "@/engines/reports/monthly";
+import type { ManagementReportData } from "@/engines/reports/export-data";
+import { ReportExportControls } from "@/workspaces/owner/reports/ReportExportControls";
 
-type Monthly = ReturnType<typeof buildMonthlyReport>;
-type Report = {
-  current: Monthly;
-  previous: Monthly;
-  bookings: {
-    count: number;
-    value: number;
-    sources: Array<{ source: string; count: number }>;
-  };
-  payments: {
-    collected: number;
-    refunds: number;
-    methods: Array<{ method: string; value: number }>;
-  };
-  asOf: string;
-};
 const currency = (value: number) =>
   new Intl.NumberFormat("en-MY", { style: "currency", currency: "MYR" }).format(
     value,
@@ -65,7 +50,7 @@ function Metric({
   );
 }
 
-export function ManagementReportDashboard({ report }: { report: Report }) {
+export function ManagementReportDashboard({ report }: { report: ManagementReportData }) {
   const router = useRouter();
   const { current, previous } = report;
   const latestMonth = reportMonth(new Date());
@@ -189,6 +174,7 @@ export function ManagementReportDashboard({ report }: { report: Report }) {
                 </span>
               )}
             </nav>
+            <ReportExportControls month={current.month} />
           </div>
         </div>
       </header>

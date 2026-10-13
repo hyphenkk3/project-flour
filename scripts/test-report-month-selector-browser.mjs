@@ -110,10 +110,28 @@ try {
     hasTouch: true,
     locale: "ja-JP",
   });
+  await page.addInitScript(() => {
+    window.fetch = (input) => {
+      window.lastExportUrl = String(input);
+      return new Promise((resolve) => {
+        window.finishReportExport = () =>
+          resolve(new Response(new Blob(["verified report"]), { status: 200 }));
+      });
+    };
+    URL.createObjectURL = () => "blob:http://localhost/report";
+    URL.revokeObjectURL = () => {};
+    HTMLAnchorElement.prototype.click = function () {
+      window.lastDownload = { href: this.href, filename: this.download };
+    };
+  });
   await page.goto(`http://127.0.0.1:${address.port}/?month=2026-09`);
   const monthLabel = page.locator('nav[aria-label="Report month navigation"]');
   const picker = page.getByLabel("Choose report month and year");
   await page.getByText("September 2026", { exact: true }).waitFor();
+  const exportPdf = page.locator("button").filter({ hasText: /PDF/ });
+  const exportExcel = page.locator("button").filter({ hasText: /Excel/ });
+  assert.equal(await exportPdf.count(), 1);
+  assert.equal(await exportExcel.count(), 1);
   assert.equal(await picker.getAttribute("type"), "month");
   assert.equal(await picker.getAttribute("min"), "2020-01");
   assert.equal(await picker.getAttribute("max"), "2026-10");
@@ -124,6 +142,25 @@ try {
   );
   assert.equal(await page.getByRole("button", { name: "Go" }).count(), 0);
   assert.equal(await page.locator("form").count(), 0);
+
+  await exportPdf.click();
+  await page.getByRole("button", { name: "Preparing PDF…" }).waitFor();
+  assert.equal(await exportPdf.isDisabled(), true);
+  assert.equal(await exportExcel.isDisabled(), true, "duplicate export requests are blocked");
+  assert.equal(
+    await page.evaluate(() => window.lastExportUrl),
+    "/api/owner/management/reports/export/pdf?month=2026-09",
+  );
+  await page.evaluate(() => window.finishReportExport());
+  await page.waitForFunction(() => window.lastDownload?.filename === "Whitebird_Report_2026-09.pdf");
+  await exportExcel.click();
+  await page.getByRole("button", { name: "Preparing Excel…" }).waitFor();
+  assert.equal(
+    await page.evaluate(() => window.lastExportUrl),
+    "/api/owner/management/reports/export/excel?month=2026-09",
+  );
+  await page.evaluate(() => window.finishReportExport());
+  await page.waitForFunction(() => window.lastDownload?.filename === "Whitebird_Report_2026-09.xlsx");
 
   await monthLabel
     .getByRole("link", { name: "Next month: October 2026" })
@@ -171,21 +208,18 @@ try {
     .click();
   await page.getByText("January 2026", { exact: true }).waitFor();
 
-  await page.setViewportSize({ width: 320, height: 844 });
-  assert.equal(
-    await monthLabel.evaluate(
-      (element) => element.scrollWidth <= element.clientWidth,
-    ),
-    true,
-    "month selector fits a 320px phone viewport",
-  );
-  assert.equal(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-    true,
-    "report month selector does not cause horizontal page overflow",
-  );
+  for (const width of [320, 375, 390, 393, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    assert.equal(await page.getByRole("button", { name: "Export PDF" }).isVisible(), true);
+    assert.equal(await page.getByRole("button", { name: "Export Excel" }).isVisible(), true);
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+      true,
+      `report month selector and export controls fit a ${width}px phone viewport`,
+    );
+  }
   await page.setViewportSize({ width: 1280, height: 900 });
   assert.equal(
     await monthLabel.isVisible(),
