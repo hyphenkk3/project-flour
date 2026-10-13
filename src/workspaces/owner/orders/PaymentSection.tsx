@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -19,6 +19,7 @@ import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type { StorefrontOrder } from "@/types/storefront";
 import { OWNER_ORDER_PAYMENT_SECTION_ID } from "@/engines/operations/owner-attention";
 import { extendPaymentDeadlineAction } from "@/workspaces/owner/orders/actions";
+import { scrollWorkspaceElementIntoView } from "@/workspaces/owner/orders/scroll-workspace-section";
 import {
   formatPaymentDueRelative,
   formatPaymentHistoryDate,
@@ -65,6 +66,7 @@ export function PaymentSection({
 }: PaymentSectionProps) {
   const router = useRouter();
   const [showRecord, setShowRecord] = useState(false);
+  const recordFormContainerRef = useRef<HTMLDivElement>(null);
   const [showRefund, setShowRefund] = useState(false);
   const [showExtend, setShowExtend] = useState(false);
   const [correctingPaymentAllocationId, setCorrectingPaymentAllocationId] =
@@ -116,6 +118,23 @@ export function PaymentSection({
     boundExtend,
     { error: null, success: false },
   );
+
+  useEffect(() => {
+    if (!showRecord) return;
+
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        const form = recordFormContainerRef.current;
+        if (form) scrollWorkspaceElementIntoView(form);
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    };
+  }, [showRecord]);
 
   useEffect(() => {
     if (!extendState.success) return;
@@ -493,11 +512,13 @@ export function PaymentSection({
       ) : null}
 
       {showRecord && canRecord ? (
-        <RecordPaymentForm
-          onCancel={() => setShowRecord(false)}
-          orderId={order.id}
-          remainingBalance={settlement.remainingBalance}
-        />
+        <div ref={recordFormContainerRef}>
+          <RecordPaymentForm
+            onCancel={() => setShowRecord(false)}
+            orderId={order.id}
+            remainingBalance={settlement.remainingBalance}
+          />
+        </div>
       ) : null}
 
       {showRefund && canCorrect ? (

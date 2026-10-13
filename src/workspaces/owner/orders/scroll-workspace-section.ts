@@ -40,3 +40,26 @@ export function scrollWorkspaceSectionIntoView(
     el.focus({ preventScroll: true });
   }
 }
+
+/** Scroll an expanded workspace form into view without moving keyboard focus. */
+export function scrollWorkspaceElementIntoView(element: HTMLElement): void {
+  if (typeof document === "undefined" || typeof window === "undefined") return;
+
+  const rect = element.getBoundingClientRect();
+  const headerOffset = stickyHeaderOffsetPx() + EXTRA_GAP_PX;
+  const viewportBottom = window.innerHeight - EXTRA_GAP_PX;
+  if (rect.top >= headerOffset && rect.bottom <= viewportBottom) return;
+
+  const requestedTop = rect.top + window.scrollY - headerOffset;
+  const maxTop = Math.max(
+    0,
+    document.documentElement.scrollHeight - window.innerHeight,
+  );
+  const top = Math.max(0, Math.min(requestedTop, maxTop));
+  if (Math.abs(top - window.scrollY) < 2) return;
+
+  const reduceMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+  window.scrollTo({ top, behavior: reduceMotion ? "auto" : "smooth" });
+}

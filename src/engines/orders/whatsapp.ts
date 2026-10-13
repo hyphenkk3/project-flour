@@ -1,32 +1,34 @@
 /**
- * Normalize a customer-facing Malaysian phone for WhatsApp deep links.
- * Does not mutate the stored display value — returns digits for wa.me only.
+ * Normalize customer phone numbers for WhatsApp deep links.
+ * Malaysian national numbers receive the MY country code; international
+ * numbers keep their country code. The stored display value is never changed.
  */
 export function normalizeMalaysiaWhatsAppPhone(raw: string): string | null {
-  let digits = raw.replace(/[^\d+]/g, "");
-
-  if (digits.startsWith("+")) {
-    digits = digits.slice(1);
+  const normalized = raw.trim().replace(/[^\d+]/g, "");
+  if (
+    (normalized.includes("+") && !normalized.startsWith("+")) ||
+    normalized.indexOf("+", 1) !== -1
+  ) {
+    return null;
   }
-
-  digits = digits.replace(/\D/g, "");
+  let digits = normalized.replace(/\D/g, "");
 
   if (!digits) return null;
 
   if (digits.startsWith("0")) {
     digits = `60${digits.slice(1)}`;
-  } else if (digits.startsWith("8") && digits.length >= 9 && digits.length <= 11) {
-    // Local mobile without leading 0 (uncommon) — treat as MY if short
-    digits = `60${digits}`;
-  } else if (!digits.startsWith("60") && digits.length <= 10) {
-    digits = `60${digits}`;
+  } else if (digits.startsWith("60")) {
+    // Already in Malaysian international format.
   }
 
-  if (!/^60\d{8,11}$/.test(digits)) {
-    return null;
+  if (digits.startsWith("60")) {
+    return /^60\d{8,11}$/.test(digits) ? digits : null;
   }
 
-  return digits;
+  // wa.me accepts E.164 digits without the plus. A leading plus explicitly
+  // marks an international number; bare country-prefixed numbers such as 65…
+  // are also preserved instead of being mistaken for Malaysian local numbers.
+  return /^[1-9]\d{7,14}$/.test(digits) ? digits : null;
 }
 
 export function buildWhatsAppDeepLink(

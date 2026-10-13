@@ -262,7 +262,7 @@ export function CakeDirectory({
             );
             return (
               <li
-                className="border-fog rounded-xl border bg-white p-4"
+                className="border-fog min-w-0 rounded-xl border bg-white p-4 sm:min-w-[auto]"
                 key={cake.id}
               >
                 <div className="flex items-start gap-3">
