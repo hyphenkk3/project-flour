@@ -22,6 +22,13 @@ export function isWorkspaceNavActive(
     );
   }
 
+  if (item.id === "management") {
+    return (
+      currentPath.startsWith("/owner/management") ||
+      currentPath.startsWith("/settings/staff")
+    );
+  }
+
   if (currentPath === item.href || currentPath.startsWith(`${item.href}/`)) {
     return true;
   }

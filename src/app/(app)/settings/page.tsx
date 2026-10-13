@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { requireStaff } from "@/foundation/auth/session";
-import { canManageStaff } from "@/foundation/navigation/access";
 import { getNotificationDefinitionsForRole } from "@/foundation/staff/notification-preferences";
 import { loadStaffNotificationPreferences } from "@/foundation/staff/notification-preferences-queries";
 import { NotificationPreferences } from "@/components/settings/NotificationPreferences";
@@ -73,22 +71,6 @@ export default async function SettingsPage() {
           initialPreferences={preferences}
         />
       </section>
-
-      {canManageStaff(staff.role.code) && (
-        <section className="border-fog rounded-xl border bg-white p-5">
-          <h3 className="text-ink text-sm font-semibold">Staff Management</h3>
-          <p className="text-skyline mt-1 text-sm">
-            Manage Whitebird staff accounts and access.
-          </p>
-
-          <Link
-            className="bg-signal mt-4 inline-flex rounded-lg px-4 py-2.5 text-sm font-medium text-white transition hover:opacity-90"
-            href="/settings/staff"
-          >
-            Open staff accounts
-          </Link>
-        </section>
-      )}
     </main>
   );
 }

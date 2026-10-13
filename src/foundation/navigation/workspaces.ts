@@ -16,6 +16,8 @@ export type WorkspaceNavItem = {
   href: string | null;
   /** Fully implemented and navigable in the current version. */
   available: boolean;
+  /** Desktop-only shortcut links shown beneath a workspace in the sidebar. */
+  children?: Array<{ label: string; href: string }>;
 };
 
 /**
@@ -69,7 +71,7 @@ export const WORKSPACE_CATALOG: Record<WorkspaceId, WorkspaceNavItem> = {
   management: {
     id: "management",
     label: "Management",
-    href: "/owner/management/reports",
+    href: "/owner/management",
     available: true,
   },
 };
@@ -93,6 +95,7 @@ export const ROLE_NAVIGATION: Record<RoleCode, readonly WorkspaceId[]> = {
     "home",
     "owner",
     "owner_calendar",
+    "management",
     "customer_operations",
     "bakery",
     "collection",
@@ -112,5 +115,20 @@ export const ROLE_NAVIGATION: Record<RoleCode, readonly WorkspaceId[]> = {
 export function getNavigationForRole(role: RoleCode): WorkspaceNavItem[] {
   return ROLE_NAVIGATION[role]
     .map((id) => WORKSPACE_CATALOG[id])
+    .map((item) =>
+      item.id !== "management"
+        ? item
+        : {
+            ...item,
+            children: [
+              ...(role === "owner"
+                ? [{ label: "Financial", href: "/owner/management/reports" }]
+                : []),
+              ...(role === "owner" || role === "manager"
+                ? [{ label: "Staff", href: "/settings/staff" }]
+                : []),
+            ],
+          },
+    )
     .filter((item) => item.available && Boolean(item.href));
 }

@@ -32,9 +32,9 @@ export default async function StaffAdminPage() {
       <div>
         <Link
           className="text-skyline hover:text-ink text-xs font-medium"
-          href="/settings"
+          href="/owner/management"
         >
-          Back to Settings
+          Back to Management
         </Link>
         <p className="text-signal mt-3 text-[11px] font-medium tracking-[0.18em] uppercase">
           Account

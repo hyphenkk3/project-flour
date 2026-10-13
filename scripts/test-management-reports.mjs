@@ -51,6 +51,8 @@ const {
   reportFulfilled,
   summarizeCash,
 } = pure("@/engines/reports/monthly");
+const { getNavigationForRole } = pure("@/foundation/navigation/workspaces");
+const { isWorkspaceNavActive } = pure("@/foundation/navigation/is-active");
 const item = (cakeName, sizeLabel, quantity, unitPrice) => ({
   cakeName,
   sizeLabel,
@@ -163,10 +165,7 @@ assert.equal(report.discounts, 10);
 assert.equal(report.other, -4);
 assert.equal(report.netSales, 276);
 assert.equal(report.aov, 92);
-assert.equal(
-  report.methods.find((row) => row.method === "pickup")?.aov,
-  176,
-);
+assert.equal(report.methods.find((row) => row.method === "pickup")?.aov, 176);
 assert.equal(report.reconciliation, 0);
 assert.equal(buildMonthlyReport([prior], "2026-09").aov, 50);
 assert.equal(
@@ -248,15 +247,52 @@ const page = readFileSync(
   "utf8",
 );
 const loader = readFileSync("src/workspaces/owner/reports/queries.ts", "utf8");
-assert.match(nav, /href: "\/owner\/management\/reports"/);
-assert.match(nav, /owner: \[[\s\S]*?"management"/);
-assert.doesNotMatch(
-  nav.match(/manager: \[[\s\S]*?\]/)?.[0] ?? "",
-  /"management"/,
+const managementPage = readFileSync(
+  "src/app/(app)/owner/management/page.tsx",
+  "utf8",
 );
+const settingsPage = readFileSync("src/app/(app)/settings/page.tsx", "utf8");
+const sidebar = readFileSync(
+  "src/components/shell/SidebarNavigation.tsx",
+  "utf8",
+);
+const mobileNavigation = readFileSync(
+  "src/components/shell/MobileNavigation.tsx",
+  "utf8",
+);
+const ownerNav = getNavigationForRole("owner").find(
+  (item) => item.id === "management",
+);
+const managerNav = getNavigationForRole("manager").find(
+  (item) => item.id === "management",
+);
+assert.ok(ownerNav);
+assert.ok(managerNav);
+assert.equal(
+  ownerNav.children?.map((child) => child.label).join(","),
+  "Financial,Staff",
+);
+assert.equal(
+  managerNav.children?.map((child) => child.label).join(","),
+  "Staff",
+);
+assert.equal(isWorkspaceNavActive(ownerNav, "/owner/management/reports"), true);
+assert.equal(isWorkspaceNavActive(managerNav, "/settings/staff"), true);
+assert.match(nav, /owner: \[[\s\S]*?"management"/);
+assert.match(nav, /manager: \[[\s\S]*?"management"/);
+assert.match(managementPage, /canManageStaff\(staff\.role\.code\)/);
+assert.match(managementPage, /staff\.role\.code === "owner"/);
+assert.match(managementPage, /href: "\/settings\/staff"/);
+assert.match(sidebar, /item\.children\?\.length/);
+assert.doesNotMatch(mobileNavigation, /item\.children/);
+assert.doesNotMatch(settingsPage, /href="\/settings\/staff"/);
+assert.match(settingsPage, /StaffPasskeySettings/);
+assert.match(settingsPage, /StaffPasswordSettings/);
+assert.match(settingsPage, /StaffUsernameForm/);
+assert.match(settingsPage, /StaffProfileForm/);
 assert.match(page, /isReportOwner\(staff\.role\.code\)/);
 assert.match(loader, /await requireReportOwner\(\)/);
 assert.match(loader, /method === "drive_through" \? "pickup"/);
 console.log(
-  "Management report calculations, reconciliation, month assignment, fulfilment, and Owner guards passed.",
+  "Management reports calculations, role-specific navigation, report guards, personal settings, and fulfilment reconciliation passed.",
 );

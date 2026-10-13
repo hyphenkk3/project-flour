@@ -297,8 +297,8 @@ const settingsPage = readFileSync(
   resolve("src/app/(app)/settings/page.tsx"),
   "utf8",
 );
-assert.match(settingsPage, /canManageStaff/);
-assert.match(settingsPage, /href="\/settings\/staff"/);
+assert.doesNotMatch(settingsPage, /href="\/settings\/staff"/);
+assert.doesNotMatch(settingsPage, /Staff Management/);
 assert.match(settingsPage, /StaffPasskeySettings/);
 assert.match(settingsPage, /StaffPasswordSettings/);
 assert.match(settingsPage, /StaffUsernameForm/);
@@ -311,6 +311,7 @@ const staffPage = readFileSync(
 assert.match(staffPage, /requireStaff/);
 assert.match(staffPage, /canManageStaff/);
 assert.match(staffPage, /redirect\("\/settings"\)/);
+assert.match(staffPage, /href="\/owner\/management"/);
 assert.match(staffPage, /listStaffProfilesForAdmin/);
 assert.match(staffPage, /listArchivedStaffProfilesForAdmin/);
 assert.match(staffPage, /archivedStaff=\{archivedStaff\}/);
@@ -405,7 +406,8 @@ const workspaces = readFileSync(
   resolve("src/foundation/navigation/workspaces.ts"),
   "utf8",
 );
-assert.match(workspaces, /management:[\s\S]*available: false/);
+assert.match(workspaces, /management:[\s\S]*href: "\/owner\/management"/);
+assert.match(workspaces, /manager: \[[\s\S]*?"management"/);
 
 const types = readFileSync(resolve("src/types/staff.ts"), "utf8");
 assert.match(types, /isMasterOwner: boolean/);
