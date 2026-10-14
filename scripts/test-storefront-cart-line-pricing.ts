@@ -117,6 +117,8 @@ assert.equal(
 // verified unit price is visible, checkout must not call it a new change.
 const pistachioDraft = {
   ...emptyPreorderDraft(),
+  customerName: "Example Customer",
+  notes: "Keep existing checkout details",
   pickupDate: "2026-10-19",
   items: [
     {
@@ -140,6 +142,26 @@ const acceptedCartDraft = draftWithDisplayedPricesAsQuote(
 );
 assert.ok(acceptedCartDraft);
 assert.equal(acceptedCartDraft.items[0]?.unitPrice, 140);
+assert.deepEqual(
+  { ...acceptedCartDraft, items: pistachioDraft.items },
+  pistachioDraft,
+  "accepting a displayed quote must not rewrite customer or cart fields",
+);
+assert.deepEqual(
+  Object.fromEntries(
+    Object.entries(acceptedCartDraft.items[0]).filter(
+      ([key]) =>
+        !["unitPrice", "quotedUnitPrice", "applicableUnitPrice"].includes(key),
+    ),
+  ),
+  Object.fromEntries(
+    Object.entries(pistachioDraft.items[0]).filter(
+      ([key]) =>
+        !["unitPrice", "quotedUnitPrice", "applicableUnitPrice"].includes(key),
+    ),
+  ),
+  "accepting the quote must preserve every non-pricing cart-line field",
+);
 assert.equal(
   pistachioDraft.items[0]?.unitPrice,
   135,

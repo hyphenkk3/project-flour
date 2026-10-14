@@ -117,7 +117,19 @@ assert.match(cartSrc, /md:fixed md:inset-y-0 md:right-0/);
 assert.doesNotMatch(cartSrc, /showModal/);
 assert.doesNotMatch(cartSrc, /<dialog/);
 assert.doesNotMatch(cartSrc, /85dvh/);
-assert.doesNotMatch(cartSrc, /writePreorderDraft/);
+// The cart may carry a fully resolved, visible price into checkout, but it
+// must not introduce a second draft writer for unrelated cart changes.
+assert.equal((cartSrc.match(/\bwritePreorderDraft\s*\(/g) ?? []).length, 1);
+assert.match(cartSrc, /if \(pricesPending \|\| !draft\) return;/);
+assert.match(
+  cartSrc,
+  /if \(!current \|\| current\.pickupDate !== draft\.pickupDate\) return;/,
+);
+assert.match(
+  cartSrc,
+  /const accepted = draftWithDisplayedPricesAsQuote\(current, pricesBySizeId\);\s*if \(accepted && accepted !== current\) writePreorderDraft\(accepted\);/,
+);
+assert.doesNotMatch(cartSrc, /writePreorderDraft\((?!accepted\))/);
 assert.match(draftSrc, /whitebird-preorder-draft-v1/);
 
 const collectionSrc = readSrc(

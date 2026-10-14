@@ -181,6 +181,8 @@ assert.doesNotMatch(cartSrc, /paddingRight/);
 assert.match(cartSrc, /md:hidden/);
 assert.match(cartSrc, /h-dvh/);
 assert.doesNotMatch(cartSrc, /85dvh/);
+assert.match(cartSrc, /relative h-14 w-14 shrink-0 overflow-hidden/);
+assert.match(cartSrc, /sizes="56px" src=\{item\.imageUrl\}/);
 assert.match(cartSrc, /View My Order/);
 const viewMyOrderLink = cartSrc.slice(
   cartSrc.lastIndexOf(
