@@ -32,6 +32,8 @@ type SizeRow = {
   price: number | string;
   sort_order: number;
   preorder_days?: number | string | null;
+  available_from?: string | null;
+  available_until?: string | null;
 };
 
 type PhotoRow = {
@@ -105,6 +107,8 @@ export function mapSize(row: SizeRow): LibraryCakeSize {
     price: Number(row.price),
     sortOrder: row.sort_order,
     preorderDays: readPreorderDays(row.preorder_days),
+    availableFrom: row.available_from ?? null,
+    availableUntil: row.available_until ?? null,
   };
 }
 
@@ -259,7 +263,9 @@ const cakeListSelect = `
     label,
     price,
     sort_order,
-    preorder_days
+    preorder_days,
+    available_from,
+    available_until
   ),
   library_cake_photos (
     id,

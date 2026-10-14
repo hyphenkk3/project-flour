@@ -1,5 +1,6 @@
 "use client";
 
+import { cakeSizeAvailabilityPeriod } from "@/engines/menu/cake-size-availability";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import { StorefrontCakeDetailLink } from "@/workspaces/storefront/catalog/StorefrontCakeDetailLink";
 import { BROWSE_CURRENTLY_UNAVAILABLE_NOTE } from "@/engines/menu/homepage-collection-preview";
@@ -142,6 +143,14 @@ export function StorefrontCakeCard({
             <p className="text-skyline mt-0.5 text-xs sm:mt-1 sm:text-sm">
               {sizes}
             </p>
+          ) : null}
+          {cake.sizes.some((size) => size.availableFrom || size.availableUntil) ? (
+            <ul className="text-skyline mt-1 space-y-1 text-xs sm:text-sm">
+              {cake.sizes.map((size) => {
+                const period = cakeSizeAvailabilityPeriod(size);
+                return period ? <li key={size.id}>{size.size} — {period}</li> : null;
+              })}
+            </ul>
           ) : null}
           {tags ? (
             <p className="text-skyline mt-1.5 text-[11px] leading-snug tracking-[0.02em]">

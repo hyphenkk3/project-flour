@@ -1,5 +1,12 @@
 "use client";
 
+import { storefrontPhotoForSize } from "@/workspaces/storefront/catalog/cake-photo-map";
+import {
+  cartSizeAvailabilityError,
+  validCakeSizeSelection,
+} from "@/engines/menu/cake-size-availability";
+import { validateCartSizeAvailability } from "@/workspaces/storefront/cart/actions";
+
 import {
   useActionState,
   useCallback,
@@ -632,10 +639,7 @@ export function GuestCheckoutForm({
       markCheckoutLoadOnce("calendar_context_ready", checkoutLoadSeen.current);
     };
 
-    const applyOffer = (
-      offer: CheckoutPickupOffer,
-      offerDate: string,
-    ) => {
+    const applyOffer = (offer: CheckoutPickupOffer, offerDate: string) => {
       setCakes(offer.cakes);
       setUnavailableMessage(offer.unavailableMessage);
       setCollectionId(offer.collection?.id ?? null);
@@ -649,9 +653,18 @@ export function GuestCheckoutForm({
           ? formatCollectionAvailabilityLabel(offer.collection)
           : null,
       );
-      setAddSizeByCake(
+      setAddSizeByCake((current) =>
         Object.fromEntries(
-          offer.cakes.map((cake) => [cake.id, cake.sizes[0]?.id ?? ""]),
+          offer.cakes.map((cake) => [
+            cake.id,
+            validCakeSizeSelection(
+              cake.sizes,
+              Object.prototype.hasOwnProperty.call(current, cake.id)
+                ? current[cake.id]
+                : (cake.sizes[0]?.id ?? ""),
+              offerDate,
+            ),
+          ]),
         ),
       );
       setItems((current) => {
@@ -922,7 +935,9 @@ export function GuestCheckoutForm({
       const missing = sizeIds.some((id) => prices[id] == null);
       setItems((current) => applyApplicableUnitPrices(current, prices));
       if (!missing) {
-        setResolvedPriceKey(`${pickupDate}|${sizeIds.slice().sort().join(",")}`);
+        setResolvedPriceKey(
+          `${pickupDate}|${sizeIds.slice().sort().join(",")}`,
+        );
       }
     };
     const cached = checkoutCakeSizePriceCache.get(
@@ -1232,6 +1247,44 @@ export function GuestCheckoutForm({
     });
   }
 
+  const [cartValidationPending, setCartValidationPending] = useState(false);
+  const cartValidationRef = useRef(false);
+  const cartSnapshotRef = useRef("");
+  useLayoutEffect(() => {
+    cartSnapshotRef.current = JSON.stringify({
+      items,
+      pickupDate: fields.pickupDate,
+    });
+  }, [items, fields.pickupDate]);
+  const sizeAvailabilityError = liveOfferPending
+    ? null
+    : cartSizeAvailabilityError(items, cakes, fields.pickupDate || null);
+  const validateCartChange = useCallback(
+    async (cakeId: string, sizeId: string): Promise<boolean> => {
+      if (cartValidationRef.current) return false;
+      cartValidationRef.current = true;
+      setCartValidationPending(true);
+      const snapshot = cartSnapshotRef.current;
+      const result = await validateCartSizeAvailability(
+        [{ cakeId, sizeId }],
+        fields.pickupDate || null,
+      ).catch(() => ({
+        error: "Unable to check cake size availability. Please try again.",
+      }));
+      cartValidationRef.current = false;
+      setCartValidationPending(false);
+      if (result.error || snapshot !== cartSnapshotRef.current) {
+        setItemError(
+          result.error ??
+            "Your order or pickup date changed. Please try again.",
+        );
+        return false;
+      }
+      return true;
+    },
+    [fields.pickupDate],
+  );
+
   const updateItem = useCallback(
     (index: number, patch: Partial<PreorderDraftItem>) => {
       setItemError(null);
@@ -1259,14 +1312,18 @@ export function GuestCheckoutForm({
   );
 
   const handleChangeQuantity = useCallback(
-    (index: number, quantity: number) => {
-      updateItem(index, { quantity });
+    async (index: number, quantity: number) => {
+      const item = items[index];
+      if (item && (await validateCartChange(item.cakeId, item.sizeId)))
+        updateItem(index, { quantity });
     },
-    [updateItem],
+    [items, updateItem, validateCartChange],
   );
 
   const changeSize = useCallback(
-    (index: number, sizeId: string) => {
+    async (index: number, sizeId: string) => {
+      const target = items[index];
+      if (!target || !(await validateCartChange(target.cakeId, sizeId))) return;
       setItems((current) => {
         const item = current[index];
         if (!item) return current;
@@ -1278,6 +1335,14 @@ export function GuestCheckoutForm({
               sizeLabel: liveSize.size,
               unitPrice: liveSize.price,
               preorderDays: liveSize.preorderDays,
+              availableFrom: liveSize.availableFrom ?? null,
+              availableUntil: liveSize.availableUntil ?? null,
+              imageUrl:
+                storefrontPhotoForSize(cake?.photos ?? [], liveSize.id)?.url ??
+                item.sizeChoices?.find((choice) => choice.id === liveSize.id)
+                  ?.imageUrl ??
+                cake?.image ??
+                undefined,
               applicableUnitPrice: undefined,
             }
           : draftItemSizeChoices(item, cake).find(
@@ -1291,6 +1356,9 @@ export function GuestCheckoutForm({
                 sizeLabel: nextSize.size,
                 unitPrice: nextSize.price,
                 preorderDays: nextSize.preorderDays,
+                availableFrom: nextSize.availableFrom ?? null,
+                availableUntil: nextSize.availableUntil ?? null,
+                imageUrl: nextSize.imageUrl,
                 applicableUnitPrice: undefined,
               }
             : nextSize;
@@ -1314,7 +1382,7 @@ export function GuestCheckoutForm({
       });
       setItemError(null);
     },
-    [cakes],
+    [items, cakes, validateCartChange],
   );
 
   const removeItem = useCallback((index: number) => {
@@ -1323,10 +1391,10 @@ export function GuestCheckoutForm({
   }, []);
 
   const addOfferedCake = useCallback(
-    (cake: StorefrontCake) => {
-      const sizeId = addSizeByCake[cake.id] || cake.sizes[0]?.id;
+    async (cake: StorefrontCake) => {
+      const sizeId = addSizeByCake[cake.id];
       const size = cake.sizes.find((entry) => entry.id === sizeId);
-      if (!size) return;
+      if (!size || !(await validateCartChange(cake.id, size.id))) return false;
       setItemError(null);
       setItems((current) => {
         const filtered = filterDraftItemsToOfferedCakes(
@@ -1340,6 +1408,8 @@ export function GuestCheckoutForm({
               sizeLabel: size.size,
               unitPrice: size.price,
               preorderDays: size.preorderDays,
+              availableFrom: size.availableFrom ?? null,
+              availableUntil: size.availableUntil ?? null,
             },
           ],
           cakes,
@@ -1351,14 +1421,14 @@ export function GuestCheckoutForm({
         }
         return filtered.items;
       });
+      return true;
     },
-    [addSizeByCake, cakes],
+    [addSizeByCake, cakes, validateCartChange],
   );
 
   const addOfferedCakeAndClosePicker = useCallback(
-    (cake: StorefrontCake) => {
-      addOfferedCake(cake);
-      setAddingCake(false);
+    async (cake: StorefrontCake) => {
+      if (await addOfferedCake(cake)) setAddingCake(false);
     },
     [addOfferedCake],
   );
@@ -1386,6 +1456,11 @@ export function GuestCheckoutForm({
 
   function handleSubmit(formData: FormData) {
     if (calendarPending || liveOfferPending || sizePricesPending) {
+      return;
+    }
+    if (cartValidationPending) return;
+    if (sizeAvailabilityError) {
+      setItemError(sizeAvailabilityError);
       return;
     }
     if (unavailableMessage) {
@@ -1566,6 +1641,8 @@ export function GuestCheckoutForm({
     pickupCompatibility?.dateLevelMessage,
   );
   const submitBlocked =
+    cartValidationPending ||
+    Boolean(sizeAvailabilityError) ||
     calendarPending ||
     pickupMembershipsPending ||
     Boolean(calendarError) ||
@@ -2131,9 +2208,7 @@ export function GuestCheckoutForm({
                       </p>
                       <FormCheckbox
                         checked={deliveryProcessingFeeAcknowledged}
-                        error={
-                          fieldErrors.delivery_processing_fee_ack_accepted
-                        }
+                        error={fieldErrors.delivery_processing_fee_ack_accepted}
                         id="delivery_processing_fee_ack_accepted"
                         label={DELIVERY_PROCESSING_FEE_ACK_LABEL}
                         markRequired
@@ -2437,11 +2512,13 @@ export function GuestCheckoutForm({
             onRemove={removeItem}
             onToggleAdding={setAddingCake}
             pickupDateLabel={pickupDateLabel}
+            pickupDate={fields.pickupDate || null}
+            cartValidationPending={cartValidationPending}
             preorderLabel={preorderLabel}
             total={total}
             catalogueVoucher={catalogueVoucher}
             deliveryCharges={deliveryCharges}
-            unavailableMessage={unavailableMessage}
+            unavailableMessage={sizeAvailabilityError ?? unavailableMessage}
           />
         </div>
       </form>

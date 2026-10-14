@@ -1,3 +1,7 @@
+import {
+  cakeSizeAvailability,
+  validCakeSizeSelection,
+} from "@/engines/menu/cake-size-availability";
 import { memo } from "react";
 import type { StorefrontCake } from "@/types/storefront";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
@@ -30,6 +34,8 @@ type CheckoutOrderSummaryProps = {
   catalogueVoucher?: CatalogueVoucherPreview | null;
   deliveryCharges?: CheckoutDeliveryChargesBreakdown | null;
   pickupDateLabel: string | null;
+  pickupDate?: string | null;
+  cartValidationPending?: boolean;
   earliestLabel: string | null;
   preorderLabel: string | null;
   offerLabel: string | null;
@@ -54,6 +60,8 @@ function CheckoutOrderSummaryView({
   catalogueVoucher = null,
   deliveryCharges = null,
   pickupDateLabel,
+  pickupDate = null,
+  cartValidationPending = false,
   earliestLabel,
   preorderLabel,
   offerLabel,
@@ -154,14 +162,33 @@ function CheckoutOrderSummaryView({
                           <div className="w-[9.75rem] shrink-0">
                             <FormSelect
                               id={sizeSelectId}
+                              disabled={cartValidationPending || loadingOffer}
                               onChange={(event) =>
                                 onChangeSize(index, event.target.value)
                               }
-                              value={item.sizeId}
+                              value={validCakeSizeSelection(
+                                cake?.sizes ?? [],
+                                item.sizeId,
+                                pickupDate,
+                              )}
                             >
+                              <option value="" disabled>
+                                Select a valid size
+                              </option>
                               {sizeOptions.map((size) => (
-                                <option key={size.id} value={size.id}>
+                                <option
+                                  key={size.id}
+                                  value={size.id}
+                                  disabled={
+                                    !cakeSizeAvailability(size, pickupDate)
+                                      .available
+                                  }
+                                >
                                   {size.size} — {formatRm(size.price)}
+                                  {cakeSizeAvailability(size, pickupDate)
+                                    .message
+                                    ? ` — ${cakeSizeAvailability(size, pickupDate).message}`
+                                    : ""}
                                 </option>
                               ))}
                             </FormSelect>
@@ -175,6 +202,7 @@ function CheckoutOrderSummaryView({
                         <input
                           className="border-fog text-ink h-12 w-16 rounded-lg border bg-white px-2 text-center text-sm tabular-nums outline-none focus:border-signal"
                           id={qtyId}
+                          disabled={cartValidationPending || loadingOffer}
                           min={1}
                           onChange={(event) =>
                             onChangeQuantity(
@@ -192,6 +220,27 @@ function CheckoutOrderSummaryView({
                           )}
                         </p>
                       </div>
+                      {cake &&
+                      !cakeSizeAvailability(
+                        cake.sizes.find((size) => size.id === item.sizeId) ??
+                          {},
+                        pickupDate,
+                      ).available ? (
+                        <p
+                          role="status"
+                          className="text-status-danger mt-2 text-sm"
+                        >
+                          {
+                            cakeSizeAvailability(
+                              cake.sizes.find(
+                                (size) => size.id === item.sizeId,
+                              ) ?? {},
+                              pickupDate,
+                            ).message
+                          }{" "}
+                          Please select a valid size.
+                        </p>
+                      ) : null}
                       {preorder ? (
                         <p className="text-skyline mt-2 text-[11px] font-semibold tracking-[0.14em] uppercase">
                           {preorder}
@@ -238,22 +287,43 @@ function CheckoutOrderSummaryView({
                         : ""}
                     </span>
                     <div className="w-36 shrink-0">
-                    <FormSelect
-                      aria-label={`Size for ${cake.name}`}
-                      onChange={(event) =>
-                        onAddSize(cake.id, event.target.value)
-                      }
-                      value={addSizeByCake[cake.id] ?? cake.sizes[0]?.id ?? ""}
-                    >
-                      {cake.sizes.map((size) => (
-                        <option key={size.id} value={size.id}>
-                          {size.size}
+                      <FormSelect
+                        aria-label={`Size for ${cake.name}`}
+                        onChange={(event) =>
+                          onAddSize(cake.id, event.target.value)
+                        }
+                        value={addSizeByCake[cake.id] ?? ""}
+                        disabled={cartValidationPending || loadingOffer}
+                      >
+                        <option value="" disabled>
+                          Select a size
                         </option>
-                      ))}
-                    </FormSelect>
+                        {cake.sizes.map((size) => (
+                          <option
+                            key={size.id}
+                            value={size.id}
+                            disabled={
+                              !cakeSizeAvailability(size, pickupDate).available
+                            }
+                          >
+                            {size.size}
+                            {cakeSizeAvailability(size, pickupDate).message
+                              ? ` — ${cakeSizeAvailability(size, pickupDate).message}`
+                              : ""}
+                          </option>
+                        ))}
+                      </FormSelect>
                     </div>
                     <button
                       className="text-signal text-sm font-medium"
+                      disabled={
+                        cartValidationPending ||
+                        !cake.sizes.some(
+                          (size) =>
+                            size.id === addSizeByCake[cake.id] &&
+                            cakeSizeAvailability(size, pickupDate).available,
+                        )
+                      }
                       onClick={() => onAddCake(cake)}
                       type="button"
                     >

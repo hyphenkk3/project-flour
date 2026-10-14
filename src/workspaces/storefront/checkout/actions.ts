@@ -1,5 +1,6 @@
 "use server";
 
+import { validateCartSizeAvailability } from "@/workspaces/storefront/cart/actions";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import { loadDineInVenuePhotos } from "@/workspaces/storefront/dine-in/queries";
 import {
@@ -420,6 +421,12 @@ async function submitGuestPreorderActionBody(
   if (items.length === 0) {
     return { error: "Please add at least one cake to your preorder." };
   }
+
+  const availability = await validateCartSizeAvailability(
+    items.map((item) => ({ cakeId: item.cake_id, sizeId: item.cake_size_id })),
+    pickupDate,
+  );
+  if (availability.error) return { error: availability.error };
 
   const rpcArgs: Record<string, unknown> = {
     p_customer_name: customerName,

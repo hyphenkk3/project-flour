@@ -1,5 +1,6 @@
 "use client";
 
+import { validCakeSizeSelection } from "@/engines/menu/cake-size-availability";
 import { useEffect, useState } from "react";
 import type { CatalogueVoucherRecord } from "@/types/catalogue-voucher";
 import type { StorefrontCake } from "@/types/storefront";
@@ -40,7 +41,16 @@ export function StorefrontCakeDetailView({
   offerVoucher = null,
   offerPromise,
 }: StorefrontCakeDetailViewProps) {
-  const [selectedSizeId, setSelectedSizeId] = useState(cake.sizes[0]?.id ?? "");
+  const [requestedSizeId, setSelectedSizeId] = useState(
+    cake.sizes[0]?.id ?? "",
+  );
+  const selectedSizeId = validCakeSizeSelection(
+    cake.sizes,
+    requestedSizeId,
+    pickupScopePickup,
+  );
+  // Adjust the selection before rendering a changed pickup date; never restore it automatically.
+  if (requestedSizeId && !selectedSizeId) setSelectedSizeId("");
   const hero = storefrontPhotoForSize(cake.photos, selectedSizeId);
   const gallery = storefrontPhotoGallery(cake.photos, hero);
 

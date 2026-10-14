@@ -99,6 +99,8 @@ type LibraryCakeEmbed = {
     price: number | string;
     sort_order: number;
     preorder_days?: number | string | null;
+    available_from?: string | null;
+    available_until?: string | null;
   }> | null;
   library_cake_photos?: StorefrontCakePhotoRow[] | null;
 };
@@ -276,6 +278,8 @@ function mapSize(row: {
   price: number | string;
   sort_order: number;
   preorder_days?: number | string | null;
+  available_from?: string | null;
+  available_until?: string | null;
 }): StorefrontCakeSize {
   return {
     id: row.id,
@@ -284,6 +288,8 @@ function mapSize(row: {
     price: Number(row.price),
     sortOrder: row.sort_order,
     preorderDays: readPreorderDays(row.preorder_days),
+    availableFrom: row.available_from ?? null,
+    availableUntil: row.available_until ?? null,
   };
 }
 
@@ -327,7 +333,9 @@ function libraryCakeEmbedSelect(
         label,
         price,
         sort_order,
-        preorder_days
+        preorder_days,
+        available_from,
+        available_until
       ),`
     : "";
   return `
@@ -838,7 +846,9 @@ export async function listAvailableCheckoutCakes(
           label,
           price,
           sort_order,
-          preorder_days
+          preorder_days,
+          available_from,
+          available_until
         )
       )
     `,
@@ -879,7 +889,9 @@ export async function listCheckoutCakesForCakeIds(
           label,
           price,
           sort_order,
-          preorder_days
+          preorder_days,
+          available_from,
+          available_until
         )
       )
     `,
@@ -1583,7 +1595,9 @@ const LIVE_CAKE_COMMERCIAL_SELECT = `
         label,
         price,
         sort_order,
-        preorder_days
+        preorder_days,
+        available_from,
+        available_until
       )
     `;
 
@@ -1600,7 +1614,9 @@ const LIVE_CAKE_COMMERCIAL_SELECT_LEGACY = `
         label,
         price,
         sort_order,
-        preorder_days
+        preorder_days,
+        available_from,
+        available_until
       )
     `;
 

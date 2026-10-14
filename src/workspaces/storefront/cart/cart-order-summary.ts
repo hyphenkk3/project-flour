@@ -132,6 +132,8 @@ export function draftItemSizeChoices(
           size: size.size,
           price: size.price,
           preorderDays: size.preorderDays,
+          availableFrom: size.availableFrom ?? null,
+          availableUntil: size.availableUntil ?? null,
           imageUrl:
             storefrontPhotoForSize(cake.photos, size.id)?.url ??
             cake.image ??
