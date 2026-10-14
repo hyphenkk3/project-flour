@@ -17,8 +17,12 @@ preserveOrderEditorStateOnReset({
 assert.equal(prevented, true, "failed Server Action reset must be canceled");
 assert.match(
   source,
-  /<form[\s\S]*?action=\{formAction\}[\s\S]*?onReset=\{preserveOrderEditorStateOnReset\}/,
-  "the order editor must wire the reset guard to its Server Action form",
+  /<form[\s\S]*?action=\{\(formData\) => \{[\s\S]*?verifiedStaffCakeSizeSubmission\([\s\S]*?formAction\(formData\)[\s\S]*?onReset=\{preserveOrderEditorStateOnReset\}/,
+  "the order editor must verify current prices before calling its guarded Server Action and preserve state on reset",
+);
+assert.match(
+  source,
+  /onSubmit=\{\(event\) => \{[\s\S]*?if \(!cakePriceVerified\) event\.preventDefault\(\)/,
 );
 assert.match(
   source,

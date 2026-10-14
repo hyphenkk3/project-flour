@@ -31,12 +31,21 @@ assert.match(migration, /undo_guest_order_picked_up/);
 assert.doesNotMatch(migration, /'bakery'/);
 assert.doesNotMatch(migration, /create table/i);
 assert.doesNotMatch(migration, /alter table/i);
+const bakeryMigration = readFileSync(
+  resolve("supabase/migrations/20260821130000_collection_bakery_picked_up.sql"),
+  "utf8",
+);
+assert.match(bakeryMigration, /mark_guest_order_picked_up/);
+assert.match(bakeryMigration, /undo_guest_order_picked_up/);
+assert.match(bakeryMigration, /'customer_operations',\s*'bakery'/);
+assert.match(bakeryMigration, /fulfilment_method.*pickup/s);
 
 for (const role of [
   "owner",
   "manager",
   "collection",
   "customer_operations",
+  "bakery",
 ] as const) {
   assert.equal(canAccessCollectionWorkspace(role), true, role);
   const caps = buildCollectionWorkspaceCapabilities({
@@ -47,12 +56,13 @@ for (const role of [
   assert.equal(caps.canUndoCollected, true, `${role} undo`);
 }
 
-assert.equal(canAccessCollectionWorkspace("bakery"), false);
 const bakery = buildCollectionWorkspaceCapabilities({
   role: "bakery",
   staffId: "bakery-1",
 });
-assert.equal(bakery.canMarkCollected, false);
-assert.equal(bakery.canUndoCollected, false);
+assert.equal(bakery.canMarkCollected, true);
+assert.equal(bakery.canUndoCollected, true);
+assert.equal(bakery.canManageDelivery, false);
+assert.equal(canAccessCollectionWorkspace("unknown" as never), false);
 
 console.log("PASS Collection Picked Up RPC roles (source)");

@@ -62,10 +62,9 @@ assert.deepEqual(extraPickupDates(window89), [SEP8, SEP9]);
     ["tomorrow"],
     "7. homepage listing horizon stays tomorrow-only on 7 Sep",
   );
-  assert.deepEqual(
-    homepageFreshPicksAvailabilityLines(["tomorrow"], SEP7),
-    ["1 cake available tomorrow · 8 SEP"],
-  );
+  assert.deepEqual(homepageFreshPicksAvailabilityLines(["tomorrow"], SEP7), [
+    "1 cake available tomorrow · 8 SEP",
+  ]);
   assert.equal(
     isValidExtraCustomerPickup({
       pickupDate: SEP8,
@@ -216,19 +215,18 @@ assert.deepEqual(extraPickupDates(window89), [SEP8, SEP9]);
     orderCutoffAt: extraPickupThroughIso(SEP10, "14:00")!,
   };
   assert.deepEqual(extraPickupDates(threeDay), [SEP8, SEP9, SEP10]);
-  assert.deepEqual(
-    extraCustomerVisiblePickupDates(threeDay, morningOn(SEP7)),
-    [SEP8],
-  );
+  assert.deepEqual(extraCustomerVisiblePickupDates(threeDay, morningOn(SEP7)), [
+    SEP8,
+  ]);
   assert.deepEqual(
     extraCustomerVisiblePickupDates(threeDay, morningOn(SEP8)),
     [SEP8, SEP9],
     "later window dates stay hidden until the current offering date arrives",
   );
-  assert.deepEqual(
-    extraCustomerVisiblePickupDates(threeDay, morningOn(SEP9)),
-    [SEP9, SEP10],
-  );
+  assert.deepEqual(extraCustomerVisiblePickupDates(threeDay, morningOn(SEP9)), [
+    SEP9,
+    SEP10,
+  ]);
   assert.deepEqual(
     extraCustomerVisiblePickupDates(threeDay, morningOn(SEP10)),
     [SEP10],
@@ -261,7 +259,11 @@ assert.doesNotMatch(extraFormSrc, /extraOrderablePickupDates/);
 assert.match(extraQueriesSrc, /extraActionableFreshPickDays/);
 assert.match(extraQueriesSrc, /extraCustomerVisibleFulfilmentDates/);
 assert.match(extraPageSrc, /freshPickAvailabilityDateLabel/);
-assert.match(extraPageSrc, /freshPickAvailabilityLabel\(pick\.days\)/);
+assert.match(
+  extraPageSrc,
+  /freshPickAvailabilityDateLabel\(pick\.days, todayYmd\)/,
+);
+assert.doesNotMatch(extraPageSrc, /freshPickAvailabilityLabel\(pick\.days\)/);
 assert.match(extraCardSrc, /homepageFreshPicksAvailabilityLines/);
 assert.doesNotMatch(extraCardSrc, /extraCustomerVisiblePickupDates/);
 assert.doesNotMatch(extraPageSrc, /extraCustomerVisiblePickupDates/);

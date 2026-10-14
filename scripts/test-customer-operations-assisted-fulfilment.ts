@@ -379,9 +379,25 @@ assert.match(ownerPickupFields, /__custom__/);
 assert.match(ownerPickupFields, /Custom time for special arrangements/);
 assert.doesNotMatch(form, /OwnerPickupFields/);
 assert.doesNotMatch(assistedForm, /OwnerPickupFields/);
-assert.match(checkoutActions, /isValidPickupSlot/);
-assert.match(checkoutActions, /isValidDeliverySlot/);
-assert.match(checkoutActions, /isValidDineInReservationPair/);
+assert.match(checkoutActions, /submit_guest_preorder/);
+assert.match(checkoutActions, /validateOwnerCreateFulfilment/);
+const checkoutRpc = read(
+  "supabase/migrations/20260922180000_guest_preorder_delivery_processing_ack.sql",
+);
+assert.match(
+  checkoutRpc,
+  /is_valid_public_pickup_slot\(p_pickup_date, p_pickup_time\)/,
+);
+assert.match(checkoutRpc, /is_valid_delivery_slot/);
+assert.match(checkoutActions, /validateDineInPartyFromForm/);
+assert.match(
+  read("src/engines/orders/assisted-fulfilment.ts"),
+  /isValidPickupSlot/,
+);
+assert.match(
+  read("src/engines/orders/assisted-fulfilment.ts"),
+  /isValidDineInReservationPair/,
+);
 assert.doesNotMatch(checkoutActions, /create_staff_guest_preorder/);
 assert.doesNotMatch(extraActions, /create_staff_guest_preorder/);
 assert.match(migration, /p_dine_in jsonb default null/);

@@ -28,6 +28,7 @@ import {
   deliverStaffNotificationEmailsToRecipients,
   deliverPendingStaffNotificationEmails,
 } from "../src/foundation/staff/staff-notification-dispatch";
+import { LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED } from "../src/foundation/staff/legacy-staff-notification-email-pause";
 import { authorizeStaffNotificationDispatch } from "../src/foundation/staff/staff-notification-dispatch-auth";
 import {
   STAFF_NOTIFICATION_EMAIL_MAX_ATTEMPTS,
@@ -144,7 +145,10 @@ const waitingListNotifySql = read(
   "supabase/migrations/20260920120000_staff_notification_waiting_list_new_request.sql",
 );
 assert.match(waitingListNotifySql, /waiting_list_new_request/);
-assert.match(waitingListNotifySql, /waiting_list_new_request:' \|\| v_request.id/);
+assert.match(
+  waitingListNotifySql,
+  /waiting_list_new_request:' \|\| v_request.id/,
+);
 assert.match(waitingListNotifySql, /created_by_staff_id is not null/);
 assert.match(waitingListNotifySql, /constraint trigger/i);
 assert.match(waitingListNotifySql, /initially deferred/i);
@@ -161,7 +165,9 @@ assert.match(newOrderContentSql, /constraint trigger/i);
 assert.match(newOrderContentSql, /initially deferred/i);
 assert.match(newOrderContentSql, /staff_notification_emit_new_order/);
 assert.doesNotMatch(
-  newOrderContentSql.split("if tg_op = 'INSERT'")[1]?.split("if tg_op = 'UPDATE'")[0] ?? "",
+  newOrderContentSql
+    .split("if tg_op = 'INSERT'")[1]
+    ?.split("if tg_op = 'UPDATE'")[0] ?? "",
   /'new_order:'/,
 );
 assert.doesNotMatch(newOrderContentSql, /from public\.waiting_list/);
@@ -643,6 +649,7 @@ const expiredClaim = tryClaimStaffNotificationEmailDelivery({
 assert.equal(expiredClaim.ok, true);
 
 async function testEmailDelivery() {
+  assert.equal(LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED, true);
   const sent: string[] = [];
   const fakeMailer = {
     async send(input: { to: string; idempotencyKey: string }) {
@@ -662,9 +669,10 @@ async function testEmailDelivery() {
     recipients: emailRecipients,
     mailer: fakeMailer,
   });
-  assert.equal(bothOn.sent, 2);
+  assert.equal(bothOn.sent, 0);
   assert.equal(bothOn.failed, 0);
-  assert.equal(sent.length, 2);
+  assert.equal(bothOn.suppressed, 2);
+  assert.equal(sent.length, 0);
 
   const duplicateSend = await deliverStaffNotificationEmailsToRecipients({
     eventId: "evt-1",
@@ -681,8 +689,8 @@ async function testEmailDelivery() {
     mailer: fakeMailer,
   });
   assert.equal(duplicateSend.sent, 0);
-  assert.equal(duplicateSend.skipped, 2);
-  assert.equal(sent.length, 2);
+  assert.equal(duplicateSend.suppressed, 2);
+  assert.equal(sent.length, 0);
 
   const failingMailer = {
     async send() {
@@ -702,8 +710,9 @@ async function testEmailDelivery() {
     mailer: failingMailer,
   });
   assert.equal(paymentSucceeded, true);
-  assert.equal(failedEmail.failed, 1);
+  assert.equal(failedEmail.failed, 0);
   assert.equal(failedEmail.sent, 0);
+  assert.equal(failedEmail.suppressed, 1);
 
   const memoryDeliveries = new Map<
     string,
@@ -811,20 +820,17 @@ async function testEmailDelivery() {
     },
   });
 
-  assert.equal(firstDispatch[0]?.sent, 2);
+  assert.deepEqual(firstDispatch, []);
   assert.equal(secondDispatch.length, 0);
-  assert.equal(concurrentSent.length, 2);
-  assert.equal(
-    [...memoryDeliveries.values()].every((row) => row.status === "sent"),
-    true,
-  );
+  assert.equal(concurrentSent.length, 0);
+  assert.equal(memoryDeliveries.size, 0);
   assert.equal(
     eventHasPendingStaffNotificationEmail({
       recipients: concurrentRecipients,
       deliveries: [...memoryDeliveries.values()],
       now: new Date(),
     }),
-    false,
+    true,
   );
 
   const unauthorized = authorizeStaffNotificationDispatch(
@@ -912,7 +918,8 @@ async function testEmailDelivery() {
     /pathname === "\/api\/staff\/notifications\/dispatch"/,
   );
   assert.doesNotMatch(
-    middlewareSrc.split("function isPublicPath")[1]?.split("function ")[0] ?? "",
+    middlewareSrc.split("function isPublicPath")[1]?.split("function ")[0] ??
+      "",
     /\/api\/staff\/notifications\/dispatch/,
   );
 

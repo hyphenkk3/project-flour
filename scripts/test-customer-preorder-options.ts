@@ -135,10 +135,7 @@ const nonePayload = customerPaidAddonMutationPayload({
   }),
 });
 assert.deepEqual(nonePayload, []);
-assert.equal(
-  customerPaidAddonMessageRequired("birthday_card", []),
-  false,
-);
+assert.equal(customerPaidAddonMessageRequired("birthday_card", []), false);
 assert.equal(
   customerPaidAddonMessageVisible("birthday_card", []),
   false,
@@ -209,10 +206,10 @@ const bothPayload = customerPaidAddonMutationPayload({
   }),
 });
 assert.equal(bothPayload.length, 2);
-assert.deepEqual(
-  bothPayload.map((row) => row.code).sort(),
-  ["birthday_card", "wishing_card"],
-);
+assert.deepEqual(bothPayload.map((row) => row.code).sort(), [
+  "birthday_card",
+  "wishing_card",
+]);
 
 function confirmFromSelections(
   next: CustomerPreorderSelections,
@@ -271,10 +268,7 @@ assert.match(birthdayConfirm, /~ Pistachio Chocolate \(Less Sweet\) 6" x1/);
 assert.match(birthdayConfirm, /~ Birthday Card x1/);
 assert.match(birthdayConfirm, /⭐️Special Request:⭐️/);
 assert.match(birthdayConfirm, /~Written message on Birthday Card:/);
-assert.match(
-  birthdayConfirm,
-  /Happy birthday Mummy! Love Eby, Tun, Papa/,
-);
+assert.match(birthdayConfirm, /Happy birthday Mummy! Love Eby, Tun, Papa/);
 assert.match(
   birthdayConfirm,
   /\*Complimentary Birthday Topper x1, Candle x1, Knife x1/,
@@ -419,11 +413,11 @@ assert.doesNotMatch(
 const receiptMigrationSrc = readSrc(
   "supabase/migrations/20260818140000_guest_preorder_include_receipt.sql",
 );
+assert.match(receiptMigrationSrc, /p_include_receipt boolean default false/);
 assert.match(
   receiptMigrationSrc,
-  /p_include_receipt boolean default false/,
+  /v_include_receipt := coalesce\(p_include_receipt, false\)/,
 );
-assert.match(receiptMigrationSrc, /v_include_receipt := coalesce\(p_include_receipt, false\)/);
 assert.match(receiptMigrationSrc, /include_receipt/);
 assert.match(receiptMigrationSrc, /email_submission_receipt_requested/);
 assert.match(receiptMigrationSrc, /as addon_row/);
@@ -436,13 +430,16 @@ assert.doesNotMatch(
 const extraFormSrc = readSrc(
   "src/workspaces/storefront/extra/GuestExtraOrderForm.tsx",
 );
-assert.match(extraFormSrc, /name="include_receipt"/);
+const extraCheckoutSrc = readSrc(
+  "src/workspaces/storefront/extra/GuestExtraCheckoutForm.tsx",
+);
+assert.match(extraCheckoutSrc, /name="include_receipt"/);
 assert.match(
-  extraFormSrc,
+  extraCheckoutSrc,
   /Would you like a copy of the receipt\? \(will be attached during pickup\)/,
 );
 assert.doesNotMatch(extraFormSrc, /email_submission_receipt_requested/);
-assert.match(extraFormSrc, /name="complimentary_code"/);
+assert.match(extraCheckoutSrc, /name="complimentary_code"/);
 assert.doesNotMatch(extraFormSrc, /submit_guest_preorder/);
 assert.doesNotMatch(extraFormSrc, /GuestCheckoutForm/);
 assert.doesNotMatch(extraFormSrc, /birthday_card/);
@@ -456,6 +453,12 @@ assert.match(extraActionsSrc, /p_email: null/);
 assert.match(extraActionsSrc, /p_email_submission_receipt_requested: false/);
 assert.doesNotMatch(extraActionsSrc, /formData\.get\("email"\)/);
 assert.doesNotMatch(extraActionsSrc, /submit_guest_preorder/);
-assert.doesNotMatch(extraActionsSrc, /p_paid_addons/);
+assert.match(extraCheckoutSrc, /name="paid_addon_code"/);
+assert.match(
+  extraActionsSrc,
+  /const allowedPaid = new Set\(paidAddonOptions\.map/,
+);
+assert.match(extraActionsSrc, /customerPaidAddonMutationPayload\(/);
+assert.match(extraActionsSrc, /p_paid_addons: paidAddons/);
 
 console.log("PASS customer preorder options / confirmation mapping");

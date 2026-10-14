@@ -64,11 +64,15 @@ const successSrc = readSrc(
   "src/workspaces/storefront/checkout/StorefrontSuccessPage.tsx",
 );
 const receiptSrc = readSrc("src/workspaces/storefront/checkout/receipt.ts");
-const cartSrc = readSrc("src/workspaces/storefront/cart/StorefrontCartShell.tsx");
+const cartSrc = readSrc(
+  "src/workspaces/storefront/cart/StorefrontCartShell.tsx",
+);
 const addToOrderSrc = readSrc(
   "src/workspaces/storefront/cart/AddToOrderSheet.tsx",
 );
-const draftSrc = readSrc("src/workspaces/storefront/checkout/preorder-draft.ts");
+const draftSrc = readSrc(
+  "src/workspaces/storefront/checkout/preorder-draft.ts",
+);
 const extraBoardSrc = readSrc("src/workspaces/extra/ExtraBoard.tsx");
 const ownerCardSrc = readSrc("src/workspaces/owner/orders/OwnerOrderCard.tsx");
 const extraRpcSrc = readSrc(
@@ -197,7 +201,9 @@ assert.match(extraActionsSrc, /getStorefrontExtraById/);
 
 // Pickup-window errors stay pickup-window errors
 assert.equal(
-  extraSubmitCustomerError("Please choose a valid fulfilment time for that date."),
+  extraSubmitCustomerError(
+    "Please choose a valid fulfilment time for that date.",
+  ),
   "Please choose a valid fulfilment time for that date.",
 );
 
@@ -310,7 +316,15 @@ assert.equal(FRESH_PICKS_SUCCESS_TITLE, "Order Received");
 assert.equal(FRESH_PICKS_SUCCESS_PAYMENT, "Payment Pending");
 assert.equal(
   FRESH_PICKS_SUCCESS_CONTACT,
-  "Whitebird will contact you via WhatsApp to proceed with payment and confirm your order.",
+  "Whitebird will contact you via WhatsApp to confirm your order. Once your order is confirmed, we will provide the payment details.",
+);
+assert.match(
+  FRESH_PICKS_SUCCESS_CONTACT,
+  /confirm your order.*payment details/,
+);
+assert.doesNotMatch(
+  FRESH_PICKS_SUCCESS_CONTACT,
+  /payment (?:received|confirmed)/i,
 );
 assert.equal(
   FRESH_PICKS_SUCCESS_NOTICE,
@@ -322,7 +336,7 @@ assert.equal(FRESH_PICKS_SUCCESS_FLOW, "fresh-picks");
 assert.match(extraCheckoutSrc, /FRESH_PICKS_SUCCESS_FLOW/);
 assert.match(
   extraCheckoutSrc,
-  /router\.replace\(\s*`\/order\/success\?order=\$\{state\.orderId\}&flow=\$\{FRESH_PICKS_SUCCESS_FLOW\}`/,
+  /router\.replace\(\s*`\/order\/success\?order=\$\{viewState\.orderId\}&flow=\$\{FRESH_PICKS_SUCCESS_FLOW\}`/,
 );
 assert.match(extraActionsSrc, /return \{ error: null, orderId \}/);
 assert.doesNotMatch(extraActionsSrc, /from "next\/navigation"/);

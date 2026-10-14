@@ -104,20 +104,48 @@ assert.equal(deriveOrderLifecycleStage(collected), "completed");
 assert.equal(orderLifecycleLabel(collected), "Completed / Collected");
 assert.equal(LIFECYCLE_STAGE_LABELS.cancelled, "Cancelled");
 
-assert.equal(canStartGuestProduction(paid, "bakery").ok, true, "4 bakery start paid");
-assert.equal(canMarkGuestOrderReady({ snapshot: preparing, role: "bakery", surface: "bakery" }).ok, true, "5 bakery ready");
-assert.equal(canCompleteGuestOrder({ snapshot: ready, role: "collection", surface: "collection" }).ok, true, "6 collection complete");
+assert.equal(
+  canStartGuestProduction(paid, "bakery").ok,
+  true,
+  "4 bakery start paid",
+);
+assert.equal(
+  canMarkGuestOrderReady({
+    snapshot: preparing,
+    role: "bakery",
+    surface: "bakery",
+  }).ok,
+  true,
+  "5 bakery ready",
+);
+assert.equal(
+  canCompleteGuestOrder({
+    snapshot: ready,
+    role: "collection",
+    surface: "collection",
+  }).ok,
+  true,
+  "6 collection complete",
+);
 
 // 7 invalid transitions
 assert.equal(canStartGuestProduction(cancelled, "bakery").ok, false);
 assert.equal(canStartGuestProduction(collected, "bakery").ok, false);
 assert.equal(canStartGuestProduction(ready, "bakery").ok, false);
 assert.equal(
-  canMarkGuestOrderReady({ snapshot: cancelled, role: "bakery", surface: "bakery" }).ok,
+  canMarkGuestOrderReady({
+    snapshot: cancelled,
+    role: "bakery",
+    surface: "bakery",
+  }).ok,
   false,
 );
 assert.equal(
-  canMarkGuestOrderReady({ snapshot: collected, role: "bakery", surface: "bakery" }).ok,
+  canMarkGuestOrderReady({
+    snapshot: collected,
+    role: "bakery",
+    surface: "bakery",
+  }).ok,
   false,
 );
 
@@ -127,12 +155,12 @@ assert.equal(isGuestOrderEditable("cancelled"), false);
 assert.equal(canStartGuestProduction(cancelled, "bakery").ok, false);
 assert.equal(canStartGuestProduction(collected, "bakery").ok, false);
 assert.equal(canStartGuestProduction(ready, "bakery").ok, false);
-assert.equal(canConfirmGuestPayment(cancelled, "customer_operations").ok, false);
+assert.equal(
+  canConfirmGuestPayment(cancelled, "customer_operations").ok,
+  false,
+);
 {
-  const payCancel = canConfirmGuestPayment(
-    cancelled,
-    "customer_operations",
-  );
+  const payCancel = canConfirmGuestPayment(cancelled, "customer_operations");
   assert.equal(payCancel.ok, false);
   if (!payCancel.ok) {
     assert.equal(payCancel.error, LIFECYCLE_ERRORS.cancelledPayment);
@@ -370,26 +398,45 @@ assert.match(
 assert.match(actionsSrc, /rpc\("cancel_guest_order"/);
 assert.match(actionsSrc, /p_order_id: orderId/);
 assert.match(actionsSrc, /p_actor_staff_id: staff\.id/);
-assert.match(actionsSrc, /guard_post_payment_customer_change/);
+const actorBoundGuard = read(
+  "supabase/migrations/20261007120100_restore_actor_bound_post_payment_customer_change.sql",
+);
+const atomicSave = read(
+  "supabase/migrations/20261010104124_cake_size_order_amendment_safety.sql",
+);
+assert.match(actorBoundGuard, /_bind_rpc_actor\(p_actor_staff_id\)/);
+assert.match(actorBoundGuard, /_guard_post_payment_customer_change_impl\(/);
+assert.match(
+  actorBoundGuard,
+  /revoke all on function public\._guard_post_payment_customer_change_impl[\s\S]*?from public, anon, authenticated/,
+);
+assert.match(atomicSave, /actor:=public\._bind_rpc_actor\(p_actor_staff_id\)/);
+assert.match(
+  atomicSave,
+  /if override_requested and role_code not in \('owner','manager'\)/,
+);
+assert.match(
+  atomicSave,
+  /perform public\.guard_post_payment_customer_change\(o\.id,actor,override_requested\)/,
+);
 assert.match(actionsSrc, /post_payment_change_override/);
 assert.match(actionsSrc, /decidePostPaymentSave/);
 assert.match(actionsSrc, /decidePostPaymentCancel/);
 assert.match(actionsSrc, /p_override: override/);
-assert.match(actionsSrc, /unitPrice: prior \? prior.unitPrice : size.price/);
 assert.match(
   actionsSrc,
-  /classification.newCakeLineAdded/,
+  /unitPrice: prior\s*\? prior\.unitPrice\s*: await resolveNewOrderItemUnitPrice\(/,
 );
+assert.match(actionsSrc, /pickupDate,\s*fallbackPrice: size\.price/);
+assert.match(actionsSrc, /classification.newCakeLineAdded/);
 
-const workspaceSrc = read(
-  "src/workspaces/owner/orders/OrderWorkspaceForm.tsx",
-);
-assert.match(workspaceSrc, /one-time post-payment customer change has been used/);
-assert.match(workspaceSrc, /post_payment_change_override/);
+const workspaceSrc = read("src/workspaces/owner/orders/OrderWorkspaceForm.tsx");
 assert.match(
   workspaceSrc,
-  /canOverridePostPaymentCustomerChange/,
+  /one-time post-payment customer change has been used/,
 );
+assert.match(workspaceSrc, /post_payment_change_override/);
+assert.match(workspaceSrc, /canOverridePostPaymentCustomerChange/);
 
 const lifecycleActionsSrc = read(
   "src/workspaces/owner/orders/OrderLifecycleActions.tsx",
@@ -623,12 +670,18 @@ assert.match(
   read("src/workspaces/owner/orders/collection-date-guard.ts"),
   /before_preorder/,
 );
-const dateGuardIdx = actionsSrc.indexOf("export async function saveOrderWorkspaceAction");
+const dateGuardIdx = actionsSrc.indexOf(
+  "export async function saveOrderWorkspaceAction",
+);
 const saveBody = actionsSrc.slice(dateGuardIdx);
 const firstDateGuard = saveBody.indexOf("assertStaffCollectionDateAllowed");
 const postPay = saveBody.indexOf("decidePostPaymentSave");
 assert.ok(firstDateGuard > -1 && postPay > firstDateGuard);
-assert.ok(saveBody.indexOf("guard_post_payment_customer_change") > postPay);
+assert.match(saveBody.slice(postPay), /save_guest_order_workspace_atomic/);
+assert.match(
+  saveBody.slice(postPay),
+  /post_payment_override: postPaymentOverride/,
+);
 
 // 27 search by reference / customer / date / status / lifecycle
 const searchOrder: OperationsBoardOrder = {
@@ -649,10 +702,7 @@ assert.equal(matchesOperationsSearch(searchOrder, "ORD-20260903-0001"), true);
 assert.equal(matchesOperationsSearch(searchOrder, "Amy"), true);
 assert.equal(matchesOperationsSearch(searchOrder, "5678"), true);
 assert.equal(matchesOperationsStatusFilter(searchOrder, "paid"), true);
-assert.equal(
-  matchesOperationsLifecycleFilter(searchOrder, "preparing"),
-  true,
-);
+assert.equal(matchesOperationsLifecycleFilter(searchOrder, "preparing"), true);
 assert.equal(
   parseOperationsBoardSearchParams({ lifecycle: "ready_for_collection" })
     .lifecycleFilter,
@@ -665,10 +715,7 @@ const cancelledRow: OperationsBoardOrder = {
   productionStartedAt: null,
 };
 assert.equal(matchesOperationsStatusFilter(cancelledRow, "cancelled"), true);
-assert.equal(
-  matchesOperationsLifecycleFilter(cancelledRow, "cancelled"),
-  true,
-);
+assert.equal(matchesOperationsLifecycleFilter(cancelledRow, "cancelled"), true);
 
 // 28 Bakery queue filtering
 assert.equal(
