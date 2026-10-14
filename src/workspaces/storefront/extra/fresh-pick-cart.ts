@@ -30,6 +30,9 @@ export type FreshPickCartItem = {
   imageUrl: string | null;
   pickupDate: string;
   pickupTime: string;
+  pickupAvailableFromAt: string;
+  orderCutoffAt: string;
+  readyForCollection: boolean;
 };
 
 export type FreshPickCart = {
@@ -78,6 +81,7 @@ export type FreshPickCartAddInput = {
   fulfilmentMethod?: CustomerWebsiteFulfilmentMethod;
   pickupAvailableFromAt: string;
   orderCutoffAt: string;
+  readyForCollection?: boolean;
 };
 
 export type FreshPickCartValidationContext = {
@@ -178,6 +182,13 @@ function parseItem(value: unknown): FreshPickCartItem | null {
         : null,
     pickupDate,
     pickupTime,
+    pickupAvailableFromAt:
+      typeof row.pickupAvailableFromAt === "string"
+        ? row.pickupAvailableFromAt
+        : "",
+    orderCutoffAt:
+      typeof row.orderCutoffAt === "string" ? row.orderCutoffAt : "",
+    readyForCollection: row.readyForCollection === true,
   };
 }
 
@@ -320,6 +331,7 @@ export function extraIsValidForCartPickup(
     pickupTime: string;
     pickupAvailableFromAt: string;
     orderCutoffAt: string;
+    readyForCollection?: boolean;
     fulfilmentMethod?: CustomerWebsiteFulfilmentMethod;
     now?: Date;
   },
@@ -331,6 +343,7 @@ export function extraIsValidForCartPickup(
     fulfilmentTime: input.pickupTime,
     pickupAvailableFromAt: input.pickupAvailableFromAt,
     orderCutoffAt: input.orderCutoffAt,
+    readyForCollection: input.readyForCollection,
     now: input.now ?? context.now,
     snapshot: context.snapshot,
     config: context.config,
@@ -357,6 +370,7 @@ export function addFreshPickToCart(
         pickupTime: input.pickupTime,
         pickupAvailableFromAt: input.pickupAvailableFromAt,
         orderCutoffAt: input.orderCutoffAt,
+        readyForCollection: input.readyForCollection,
         fulfilmentMethod,
         now,
       },
@@ -383,16 +397,21 @@ export function addFreshPickToCart(
       return { ok: false, error: FRESH_PICKS_CART_PICKUP_MISMATCH };
     }
     if (
-      !extraIsValidForCartPickup(
-        {
-          pickupDate: current.pickupDate,
-          pickupTime: current.pickupTime,
-          pickupAvailableFromAt: input.pickupAvailableFromAt,
-          orderCutoffAt: input.orderCutoffAt,
-          fulfilmentMethod: current.fulfilmentMethod,
-          now,
-        },
-        context,
+      current.items.some(
+        (item) =>
+          !extraIsValidForCartPickup(
+            {
+              pickupDate: current.pickupDate,
+              pickupTime: current.pickupTime,
+              pickupAvailableFromAt:
+                item.pickupAvailableFromAt || current.pickupAvailableFromAt,
+              orderCutoffAt: item.orderCutoffAt || current.orderCutoffAt,
+              readyForCollection: item.readyForCollection,
+              fulfilmentMethod: current.fulfilmentMethod,
+              now,
+            },
+            context,
+          ),
       )
     ) {
       return { ok: false, error: FRESH_PICKS_CART_UNAVAILABLE_FOR_PICKUP };
@@ -409,6 +428,9 @@ export function addFreshPickToCart(
     imageUrl: input.imageUrl,
     pickupDate: input.pickupDate,
     pickupTime: input.pickupTime,
+    pickupAvailableFromAt: input.pickupAvailableFromAt,
+    orderCutoffAt: input.orderCutoffAt,
+    readyForCollection: input.readyForCollection === true,
   };
   const next: FreshPickCart = {
     ...current,

@@ -290,6 +290,7 @@ async function submitGuestExtraOrderActionBody(
         fulfilmentTime: pickupTime,
         pickupAvailableFromAt: extra.pickupAvailableFromAt,
         orderCutoffAt: extra.pickupThroughAt,
+        readyForCollection: extra.readyForCollection,
         snapshot: hoursSnapshot,
         config: preparationConfig,
       })

@@ -34,6 +34,8 @@ export const EXTRA_SAME_DAY_PICKUP_LEAD_MS =
 export type ExtraPickupSlotOptions = {
   /** When false, skip cutoff + lead so callers can explain why a method is gone. */
   applySameDayPreparation?: boolean;
+  /** A physically ready cake bypasses preparation only for pickup. */
+  readyForCollection?: boolean;
 };
 
 export function extraPickupDates(input: ExtraPickupWindow): string[] {
@@ -133,7 +135,9 @@ export function extraCustomerPickupSlotsForDate(
   config: FreshPicksPreparationConfig = DEFAULT_FRESH_PICKS_PREPARATION_CONFIG,
   options: ExtraPickupSlotOptions = {},
 ): PickupSlot[] {
-  const applySameDayPreparation = options.applySameDayPreparation !== false;
+  const applySameDayPreparation =
+    options.applySameDayPreparation !== false &&
+    options.readyForCollection !== true;
   const slots = extraOperatingPickupSlotsForDate(dateYmd, input, snapshot);
   if (!applySameDayPreparation) return slots;
   const when = now ?? new Date();

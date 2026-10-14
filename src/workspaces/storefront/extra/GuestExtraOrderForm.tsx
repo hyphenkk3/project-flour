@@ -70,6 +70,7 @@ export function GuestExtraOrderForm({
   };
   const fulfilmentContext = {
     window: pickupWindow,
+    readyForCollection: extra.readyForCollection,
     snapshot: hoursSnapshot,
     config: preparationConfig,
   };
@@ -149,6 +150,7 @@ export function GuestExtraOrderForm({
           pickupTime: existing.pickupTime,
           pickupAvailableFromAt: extra.pickupAvailableFromAt,
           orderCutoffAt: extra.pickupThroughAt,
+          readyForCollection: extra.readyForCollection,
           fulfilmentMethod: existing.fulfilmentMethod,
         },
         { snapshot: hoursSnapshot, config: preparationConfig },
@@ -159,6 +161,7 @@ export function GuestExtraOrderForm({
       setFulfilmentMethod(existing.fulfilmentMethod);
     }
   }, [
+    extra.readyForCollection,
     extra.pickupAvailableFromAt,
     extra.pickupThroughAt,
     hoursSnapshot,
@@ -192,6 +195,7 @@ export function GuestExtraOrderForm({
         fulfilmentMethod: resolvedMethod,
         pickupAvailableFromAt: extra.pickupAvailableFromAt ?? "",
         orderCutoffAt: extra.pickupThroughAt ?? "",
+        readyForCollection: extra.readyForCollection,
       },
       undefined,
       { snapshot: hoursSnapshot, config: preparationConfig },
