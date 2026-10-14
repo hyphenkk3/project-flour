@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -24,6 +31,7 @@ import {
   draftLineDisplayUnitPrice,
   draftLinePreorderLabel,
   draftStrongestPreorder,
+  draftWithDisplayedPricesAsQuote,
   evaluateDraftSelectedCollectionDate,
   formatCartCollectionDate,
   isDraftCheckoutBlockedByCollectionDate,
@@ -31,6 +39,7 @@ import {
 import { usePreorderDraft } from "@/workspaces/storefront/cart/usePreorderDraft";
 import {
   readPreorderDraft,
+  writePreorderDraft,
   draftCakeCount,
   draftHasItems,
   draftTotal,
@@ -286,6 +295,7 @@ function OrderSummary({
   draft,
   invalidCopy,
   onContinue,
+  onCheckout,
   onKeepEditing,
   showDatePrompt,
   pricesPending,
@@ -299,6 +309,7 @@ function OrderSummary({
     earliestLabel: string | null;
   } | null;
   onContinue?: () => void;
+  onCheckout: () => void;
   onKeepEditing: () => void;
   showDatePrompt: boolean;
   pricesPending: boolean;
@@ -400,6 +411,7 @@ function OrderSummary({
             <Link
               className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200"
               href={checkoutHref}
+              onClick={onCheckout}
             >
               View My Order
             </Link>
@@ -462,6 +474,23 @@ export function StorefrontCartShell({
       }
     : null;
   const total = displayDraft ? draftTotal(displayDraft) : 0;
+  const carryDisplayedPricesToCheckout = useCallback(() => {
+    if (pricesPending || !draft) return;
+    const current = readPreorderDraft();
+    if (!current || current.pickupDate !== draft.pickupDate) return;
+    const accepted = draftWithDisplayedPricesAsQuote(current, pricesBySizeId);
+    if (accepted && accepted !== current) writePreorderDraft(accepted);
+  }, [draft, pricesBySizeId, pricesPending]);
+  useEffect(() => {
+    // The desktop rail or opened mobile cart shows each verified unit price.
+    // Capture that visible quote even when another page link opens checkout.
+    if (
+      open ||
+      (desktopRail && window.matchMedia("(min-width: 768px)").matches)
+    ) {
+      carryDisplayedPricesToCheckout();
+    }
+  }, [carryDisplayedPricesToCheckout, desktopRail, open]);
   const cakesById = useMemo(
     () =>
       new Map(
@@ -697,6 +726,7 @@ export function StorefrontCartShell({
                       draft={displayDraft ?? draft}
                       invalidCopy={invalidCopy}
                       onContinue={() => setOpen(false)}
+                      onCheckout={carryDisplayedPricesToCheckout}
                       onKeepEditing={() => setDatePromptDismissed(true)}
                       showDatePrompt={showDatePrompt}
                       pricesPending={pricesPending}
@@ -739,6 +769,7 @@ export function StorefrontCartShell({
                   continueHref={continueHref}
                   draft={displayDraft ?? draft}
                   invalidCopy={invalidCopy}
+                  onCheckout={carryDisplayedPricesToCheckout}
                   onKeepEditing={() => setDatePromptDismissed(true)}
                   showDatePrompt={showDatePrompt}
                   pricesPending={pricesPending}

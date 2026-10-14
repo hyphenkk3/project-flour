@@ -10,8 +10,15 @@ import { resolve } from "node:path";
 import {
   draftItemSizeChoices,
   draftLineDisplayUnitPrice,
+  draftWithDisplayedPricesAsQuote,
 } from "@/workspaces/storefront/cart/cart-order-summary";
-import { chargedDraftItemUnitPrice } from "@/engines/orders/cake-size-price-ack";
+import {
+  applyApplicableUnitPrices,
+  buildCakePriceAckPayload,
+  cakePriceAckRequired,
+  cakePriceChangeLines,
+  chargedDraftItemUnitPrice,
+} from "@/engines/orders/cake-size-price-ack";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import { customerPreorderCommercialTotal } from "@/engines/orders/customer-preorder-options";
 import {
@@ -106,6 +113,96 @@ assert.equal(
   "the saved size snapshot remains unchanged",
 );
 
+// A base-price draft can show RM140 for 19 October in the cart. Once that
+// verified unit price is visible, checkout must not call it a new change.
+const pistachioDraft = {
+  ...emptyPreorderDraft(),
+  pickupDate: "2026-10-19",
+  items: [
+    {
+      cakeId: "pistachio-chocolate",
+      sizeId: "pistachio-chocolate-6",
+      cakeName: "Pistachio Chocolate (Less Sweet)",
+      sizeLabel: '6"',
+      quantity: 1,
+      unitPrice: 135,
+    },
+  ],
+};
+const visibleOctoberPrice = new Map([["pistachio-chocolate-6", 140]]);
+assert.equal(
+  draftLineDisplayUnitPrice(pistachioDraft.items[0], visibleOctoberPrice),
+  140,
+);
+const acceptedCartDraft = draftWithDisplayedPricesAsQuote(
+  pistachioDraft,
+  visibleOctoberPrice,
+);
+assert.ok(acceptedCartDraft);
+assert.equal(acceptedCartDraft.items[0]?.unitPrice, 140);
+assert.equal(
+  pistachioDraft.items[0]?.unitPrice,
+  135,
+  "the original draft is not mutated",
+);
+const sameCheckoutPrice = applyApplicableUnitPrices(acceptedCartDraft.items, {
+  "pistachio-chocolate-6": 140,
+});
+assert.equal(cakePriceAckRequired(sameCheckoutPrice), false);
+assert.deepEqual(cakePriceChangeLines(sameCheckoutPrice), []);
+assert.deepEqual(
+  buildCakePriceAckPayload({
+    pickupDate: "2026-10-19",
+    items: sameCheckoutPrice,
+  }).lines,
+  [
+    {
+      cake_size_id: "pistachio-chocolate-6",
+      quoted_unit_price: 140,
+      acknowledged_unit_price: 140,
+    },
+  ],
+);
+
+// A real change after the cart displayed RM140 must still need acknowledgement.
+const changedAfterCart = applyApplicableUnitPrices(acceptedCartDraft.items, {
+  "pistachio-chocolate-6": 145,
+});
+assert.equal(cakePriceAckRequired(changedAfterCart), true);
+assert.equal(cakePriceChangeLines(changedAfterCart)[0]?.quotedUnitPrice, 140);
+assert.equal(
+  cakePriceChangeLines(changedAfterCart)[0]?.applicableUnitPrice,
+  145,
+);
+const changedPickupDate = applyApplicableUnitPrices(acceptedCartDraft.items, {
+  "pistachio-chocolate-6": 135,
+});
+assert.equal(cakePriceAckRequired(changedPickupDate), true);
+assert.equal(cakePriceChangeLines(changedPickupDate)[0]?.quotedUnitPrice, 140);
+
+// Do not treat a base price or incomplete date-price response as accepted.
+assert.equal(draftWithDisplayedPricesAsQuote(pistachioDraft, new Map()), null);
+assert.equal(
+  draftWithDisplayedPricesAsQuote(acceptedCartDraft, visibleOctoberPrice),
+  acceptedCartDraft,
+  "an unchanged verified quote should not rewrite the draft",
+);
+assert.equal(
+  draftWithDisplayedPricesAsQuote(
+    { ...pistachioDraft, pickupDate: "" },
+    visibleOctoberPrice,
+  ),
+  null,
+);
+assert.equal(
+  draftWithDisplayedPricesAsQuote(
+    { ...pistachioDraft, items: [...pistachioDraft.items, item] },
+    visibleOctoberPrice,
+  ),
+  null,
+  "an incomplete price map must not partially accept a multi-cake cart",
+);
+
 const checkoutSizePricesByDate = new Map([
   [
     "2026-09-30",
@@ -182,6 +279,13 @@ for (const [date, expectedPrices] of checkoutSizePricesByDate) {
 }
 
 const cartShell = readSrc("src/workspaces/storefront/cart/StorefrontCartShell.tsx");
+assert.match(cartShell, /onClick=\{onCheckout\}/);
+assert.match(cartShell, /carryDisplayedPricesToCheckout\(\)/);
+assert.match(cartShell, /writePreorderDraft\(accepted\)/);
+assert.match(
+  cartShell,
+  /open\s*\|\|\s*\(desktopRail\s*&&\s*window\.matchMedia/,
+);
 assert.match(
   cartShell,
   /draftItemSizeChoices\(item,\s*cake,\s*pricesBySizeId\)/,

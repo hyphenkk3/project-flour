@@ -158,6 +158,46 @@ export function draftLineDisplayUnitPrice(
   return effectivePricesBySizeId.get(item.sizeId) ?? item.unitPrice;
 }
 
+/** Carry verified prices shown in the cart into checkout as the customer's quote. */
+export function draftWithDisplayedPricesAsQuote(
+  draft: PreorderDraft,
+  effectivePricesBySizeId: ReadonlyMap<string, number>,
+): PreorderDraft | null {
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(draft.pickupDate) ||
+    draft.items.length === 0
+  ) {
+    return null;
+  }
+  if (
+    draft.items.some((item) => {
+      const price = effectivePricesBySizeId.get(item.sizeId);
+      return price == null || !Number.isFinite(price) || price < 0;
+    })
+  ) {
+    return null;
+  }
+  if (
+    draft.items.every(
+      (item) =>
+        (item.quotedUnitPrice ?? item.unitPrice) ===
+          effectivePricesBySizeId.get(item.sizeId) &&
+        item.applicableUnitPrice === undefined,
+    )
+  ) {
+    return draft;
+  }
+  return {
+    ...draft,
+    items: draft.items.map((item) => ({
+      ...item,
+      unitPrice: effectivePricesBySizeId.get(item.sizeId)!,
+      quotedUnitPrice: undefined,
+      applicableUnitPrice: undefined,
+    })),
+  };
+}
+
 export function draftItemShowsSizeEditor(
   item: PreorderDraftItem,
   cake: StorefrontCake | null | undefined,

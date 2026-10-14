@@ -233,7 +233,22 @@ assert.doesNotMatch(cartSrc, /submitGuestPreorderAction/);
 // Date-aware validation receives the selected date; cart edits still do not write it.
 assert.match(cartSrc, /validateCartSizeAvailability/);
 assert.doesNotMatch(cartSrc, /pickupDate:\s*(?:event|value|date)/);
-assert.doesNotMatch(cartSrc, /writePreorderDraft/);
+const cartEditsSrc = cartSrc.slice(
+  cartSrc.indexOf("function OrderLines("),
+  cartSrc.indexOf("function OrderSummary("),
+);
+assert.doesNotMatch(cartEditsSrc, /writePreorderDraft/);
+const quoteBridgeSrc = cartSrc.slice(
+  cartSrc.indexOf("const carryDisplayedPricesToCheckout ="),
+  cartSrc.indexOf(
+    "const cakesById =",
+    cartSrc.indexOf("const carryDisplayedPricesToCheckout ="),
+  ),
+);
+assert.match(quoteBridgeSrc, /if \(pricesPending \|\| !draft\) return/);
+assert.match(quoteBridgeSrc, /current\.pickupDate !== draft\.pickupDate/);
+assert.match(quoteBridgeSrc, /writePreorderDraft\(accepted\)/);
+assert.doesNotMatch(quoteBridgeSrc, /pickupDate:\s*(?:event|value|date)/);
 
 const draftSrc = readSrc(
   "src/workspaces/storefront/checkout/preorder-draft.ts",
