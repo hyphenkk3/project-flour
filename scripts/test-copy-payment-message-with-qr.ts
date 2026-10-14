@@ -144,7 +144,7 @@ void (async () => {
   assert.match(previewSrc, /Message \+ QR copied/);
   assert.match(
     previewSrc,
-    /canCopyMessageAndQr = method === "wb_qr" && wholecakePreorderQr/,
+    /canCopyMessageAndQr\s*=\s*order\.status !== "cancelled" && method === "wb_qr" && wholecakePreorderQr/,
   );
   assert.match(previewSrc, /copyPaymentMessageWithQr/);
   assert.match(previewSrc, /qrSrc: WHOLECAKE_PREORDER_PAYMENT_QR_SRC/);

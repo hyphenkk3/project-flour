@@ -90,7 +90,11 @@ for (const example of examples) {
     window,
     lateAfternoon,
   ).map((slot) => slot.value);
-  assert.equal(todaySlots.length, 0, "16:00:00 is too late for same-day Fresh Picks");
+  assert.equal(
+    todaySlots.length,
+    0,
+    "16:00:00 is too late for same-day Fresh Picks",
+  );
 }
 
 {
@@ -174,7 +178,19 @@ assert.doesNotMatch(checkoutFormSrc, /EXTRA_SAME_DAY_PICKUP_LEAD_MS/);
 const checkoutActionsSrc = readSrc(
   "src/workspaces/storefront/checkout/actions.ts",
 );
-assert.match(checkoutActionsSrc, /isValidPickupSlot/);
+// The checkout action now delegates final slot validation to the atomic RPC.
+assert.match(
+  checkoutActionsSrc,
+  /slots, collection, cakes, lead time, capacity/,
+);
+assert.match(checkoutActionsSrc, /submit_guest_preorder/);
+const preorderRpcSrc = readSrc(
+  "supabase/migrations/20260922180000_guest_preorder_delivery_processing_ack.sql",
+);
+assert.match(
+  preorderRpcSrc,
+  /is_valid_public_pickup_slot\(p_pickup_date, p_pickup_time\)/,
+);
 assert.doesNotMatch(checkoutActionsSrc, /isValidExtraCustomerPickup/);
 assert.doesNotMatch(checkoutActionsSrc, /EXTRA_SAME_DAY_PICKUP_LEAD_MS/);
 
