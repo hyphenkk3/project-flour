@@ -165,7 +165,127 @@ async function testPreSendSuppression() {
   }
 }
 
-testPreSendSuppression()
+async function testUnpausedPreSendSuppression() {
+  const exactActivePayload = {
+    extra_stock_id: "stock-a",
+    walk_in_held_at: "2026-10-07T09:45:00.000Z",
+    walk_in_held_until: "2026-10-07T10:00:00.000Z",
+    walk_in_held_by: "owner-1",
+  };
+  const reminder = (
+    payload: Record<string, unknown>,
+  ): ClaimedStaffNotificationEmail => ({
+    ...baseClaim,
+    code: "fresh_pick_walk_in_hold_reminder",
+    payload,
+  });
+
+  let sendCount = 0;
+  let validationCount = 0;
+  const activeResult = await deliverPendingStaffNotificationEmails({
+    claimer: async () => [reminder(exactActivePayload)],
+    mailer: {
+      async send() {
+        sendCount += 1;
+        return { id: "resend-active" };
+      },
+    },
+    validateFreshPickHoldReminder: async ({ payload }) => {
+      validationCount += 1;
+      assert.deepEqual(payload, exactActivePayload);
+      return true;
+    },
+    suppressDelivery: async () => {
+      assert.fail("active exact hold must not be suppressed");
+    },
+    completeDelivery: async ({ status }) => {
+      assert.equal(status, "sent");
+    },
+  });
+  assert.equal(activeResult[0]?.sent, 1);
+  assert.equal(activeResult[0]?.suppressed, 0);
+  assert.equal(validationCount, 1);
+  assert.equal(sendCount, 1);
+
+  const staleCases = [
+    "expired",
+    "released",
+    "extended-expiry-mismatch",
+    "replacement-hold-mismatch",
+  ];
+  for (const staleCase of staleCases) {
+    let staleSendCount = 0;
+    let suppressed = 0;
+    const payload = { ...exactActivePayload, testCase: staleCase };
+    const staleResult = await deliverPendingStaffNotificationEmails({
+      claimer: async () => [reminder(payload)],
+      mailer: {
+        async send() {
+          staleSendCount += 1;
+          return { id: "must-not-send" };
+        },
+      },
+      validateFreshPickHoldReminder: async ({ payload: checked }) => {
+        assert.deepEqual(checked, payload);
+        return false;
+      },
+      suppressDelivery: async (input) => {
+        suppressed += 1;
+        assert.equal(input.eventId, "event-1");
+        assert.equal(input.staffId, "owner-1");
+        assert.match(input.reason, /no longer active|no longer matches/i);
+      },
+      completeDelivery: async () => {
+        assert.fail(
+          "suppressed deliveries must not use sent/failed completion",
+        );
+      },
+    });
+    assert.equal(staleResult[0]?.sent, 0, staleCase);
+    assert.equal(staleResult[0]?.suppressed, 1, staleCase);
+    assert.equal(staleResult[0]?.failed, 0, staleCase);
+    assert.equal(staleSendCount, 0, staleCase);
+    assert.equal(suppressed, 1, staleCase);
+  }
+
+  let otherEventValidationCount = 0;
+  let otherEventSendCount = 0;
+  const otherResult = await deliverPendingStaffNotificationEmails({
+    claimer: async () => [
+      {
+        ...baseClaim,
+        code: "order_paid",
+        payload: exactActivePayload,
+      },
+    ],
+    mailer: {
+      async send() {
+        otherEventSendCount += 1;
+        return { id: "resend-order-paid" };
+      },
+    },
+    validateFreshPickHoldReminder: async () => {
+      otherEventValidationCount += 1;
+      return false;
+    },
+    suppressDelivery: async () => {
+      assert.fail(
+        "other event types must not be suppressed by hold validation",
+      );
+    },
+    completeDelivery: async ({ status }) => {
+      assert.equal(status, "sent");
+    },
+  });
+  assert.equal(otherResult[0]?.sent, 1);
+  assert.equal(otherEventSendCount, 1);
+  assert.equal(otherEventValidationCount, 0);
+}
+
+(LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED
+  ? testPreSendSuppression()
+  : testUnpausedPreSendSuppression()
+)
   .then(() => console.log("Staff notification hold reminder tests passed."))
   .catch((error: unknown) => {
     console.error(error);
