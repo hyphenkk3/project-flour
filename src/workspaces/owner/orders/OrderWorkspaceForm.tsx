@@ -131,6 +131,7 @@ import { OrderLifecycleActions } from "@/workspaces/owner/orders/OrderLifecycleA
 import { OrderOperationalControls } from "@/workspaces/owner/orders/OrderOperationalControls";
 import { OrderPaidAddonsEditor } from "@/workspaces/owner/orders/OrderPaidAddonsEditor";
 import { PaymentSection } from "@/workspaces/owner/orders/PaymentSection";
+import { shouldShowPaymentSection } from "@/engines/orders/payment-section-visibility";
 import { OrderTotalAdjustmentsSection } from "@/workspaces/owner/orders/OrderTotalAdjustmentsSection";
 import { CustomerOrderNoteCallout } from "@/components/orders/CustomerOrderNoteCallout";
 import {
@@ -1111,8 +1112,12 @@ export function OrderWorkspaceForm({
           />
         ) : null}
 
-        {capabilities.canManagePayments &&
-        (order.status === "awaiting_payment" || order.status === "paid") ? (
+        {shouldShowPaymentSection({
+          status: order.status,
+          canManagePayments: capabilities.canManagePayments,
+          paymentHistoryCount: order.paymentAllocations.length,
+          refundHistoryCount: order.refunds.length,
+        }) ? (
           <PaymentSection
             canExtendPaymentDeadline={capabilities.canExtendPaymentDeadline}
             canManageDiscounts={capabilities.canManageDiscounts}

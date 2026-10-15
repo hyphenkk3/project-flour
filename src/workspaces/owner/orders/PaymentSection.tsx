@@ -38,6 +38,10 @@ import {
 } from "@/engines/orders/payment-correction";
 import { withOwnerReturnTo } from "@/workspaces/owner/navigation/return-to";
 import type { OperationsApprovalRecord } from "@/engines/operations/approvals";
+import {
+  canMutatePaymentForOrderStatus,
+  shouldShowCancelledNoRefundNotice,
+} from "@/engines/orders/payment-section-visibility";
 
 type PaymentSectionProps = {
   order: StorefrontOrder;
@@ -73,9 +77,10 @@ export function PaymentSection({
     useState<string | null>(null);
   const settlement = order.settlement;
   const correctionStatus = paymentCorrectionStatus(settlement);
+  const canMutatePayments = canMutatePaymentForOrderStatus(order.status);
   const canCorrect =
+    canMutatePayments &&
     canRecordPaymentCorrection &&
-    order.status !== "cancelled" &&
     settlement.overpayment > 0;
   const isPaid = order.status === "paid";
   const overdue = isPaymentOverdue(
@@ -83,14 +88,17 @@ export function PaymentSection({
     order.paymentDeadlineAt,
   );
   const canRecord =
+    canMutatePayments &&
     canRecordPayment &&
     order.status === "awaiting_payment" &&
     settlement.remainingBalance > 0;
   const canRequest =
+    canMutatePayments &&
     canPreparePaymentRequest &&
     order.status === "awaiting_payment" &&
     settlement.remainingBalance > 0;
   const canExtendFollowUp =
+    canMutatePayments &&
     canExtendPaymentDeadline &&
     order.status === "awaiting_payment" &&
     Boolean(order.paymentDeadlineAt);
@@ -104,7 +112,7 @@ export function PaymentSection({
     })),
   );
   const paymentThankYouAvailable =
-    order.status !== "cancelled" &&
+    canMutatePayments &&
     hasVerifiedPaymentForPaymentThankYou(order.paymentAllocations);
   const paymentThankYouUrl = paymentThankYouAvailable
     ? buildWhatsAppDeepLink(
@@ -162,6 +170,16 @@ export function PaymentSection({
         ) : null}
       </div>
 
+      {shouldShowCancelledNoRefundNotice({
+        status: order.status,
+        paymentHistoryCount: order.paymentAllocations.length,
+        refundHistoryCount: order.refunds.length,
+      }) ? (
+        <p className="border-fog bg-mist/40 text-ink rounded-lg border p-3 text-sm">
+          Order cancelled. No refund recorded.
+        </p>
+      ) : null}
+
       <div className="space-y-2">
         <ul className="space-y-2">
           {cakeBreakdown.lines.map((line, index) => (
@@ -214,7 +232,7 @@ export function PaymentSection({
 
       <DeliveryFinanceBreakdown order={order} />
 
-      {canManageDiscounts ? (
+      {canManageDiscounts && canMutatePayments ? (
         <OrderDiscountsPanel
           canOverrideDiscountEligibility={canOverrideDiscountEligibility}
           canRequestOperationsApproval={canRequestOperationsApproval}
@@ -392,8 +410,8 @@ export function PaymentSection({
                 <p className="text-skyline text-xs">
                   Verified by {row.verifiedByName ?? "Staff"}
                 </p>
-                {canRecordPaymentCorrection &&
-                order.status !== "cancelled" &&
+                {canMutatePayments &&
+                canRecordPaymentCorrection &&
                 order.refunds.length === 0 &&
                 !row.correction &&
                 (row.allocationCount ?? 1) === 1 ? (
@@ -410,7 +428,7 @@ export function PaymentSection({
                     Correct Payment
                   </button>
                 ) : null}
-                {correctingPaymentAllocationId === row.id ? (
+                {canCorrect && correctingPaymentAllocationId === row.id ? (
                   <RecordPaymentCorrectionForm
                     allocation={row}
                     onCancel={() => setCorrectingPaymentAllocationId(null)}
