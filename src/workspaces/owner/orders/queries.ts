@@ -570,8 +570,7 @@ async function loadOrderFinancials(orderId: string): Promise<{
           reference_note,
           verified_by,
           verified_at,
-          created_at,
-          staff_profiles!verified_by ( display_name )
+          created_at
         )
       `,
       )
@@ -592,8 +591,7 @@ async function loadOrderFinancials(orderId: string): Promise<{
         refunded_at,
         status,
         created_at,
-        created_by,
-        staff_profiles!created_by ( display_name )
+        created_by
       `,
       )
       .eq("order_id", orderId)
@@ -681,32 +679,62 @@ async function loadOrderFinancials(orderId: string): Promise<{
     transactionAllocationRows = result.data ?? [];
   }
 
-  const correctionActorIds = Array.from(
-    new Set(
-      correctionRows.flatMap((raw) => {
+  // The financial rows above are visible through the viewer's order access.
+  // Resolve only their actor IDs on the server: staff_profiles RLS allows a
+  // staff member to read their own profile, not a colleague's profile.
+  const financialActorIds = Array.from(
+    new Set([
+      ...allocationRows.flatMap((raw) => {
+        const payment = relationOne(
+          (
+            raw as {
+              payments?:
+                | { verified_by?: string | null; status?: string }
+                | { verified_by?: string | null; status?: string }[]
+                | null;
+            }
+          ).payments,
+        );
+        return payment?.status === "verified" && payment.verified_by
+          ? [payment.verified_by]
+          : [];
+      }),
+      ...refundRows.flatMap((raw) => {
+        const actorId = (raw as { created_by?: string | null }).created_by;
+        return actorId ? [actorId] : [];
+      }),
+      ...correctionRows.flatMap((raw) => {
         const actorId = (raw as { corrected_by?: string | null }).corrected_by;
         return actorId ? [actorId] : [];
       }),
-    ),
+    ]),
   );
-  const correctionActorNames = new Map<string, string>();
-  if (correctionActorIds.length > 0) {
+  const financialActorNames = new Map<string, string>();
+  let financialActorLookupFailed = false;
+  if (financialActorIds.length > 0) {
     try {
       const admin = createServiceClient();
       const { data: staffRows, error: staffError } = await admin
         .from("staff_profiles")
         .select("id, display_name")
-        .in("id", correctionActorIds);
+        .in("id", financialActorIds);
       if (!staffError) {
         for (const staff of staffRows ?? []) {
           const name = String(staff.display_name ?? "").trim();
-          if (name) correctionActorNames.set(String(staff.id), name);
+          if (name) financialActorNames.set(String(staff.id), name);
         }
+      } else {
+        financialActorLookupFailed = true;
       }
     } catch {
-      // Attribution is presentation-only; keep the safe Staff fallback.
+      financialActorLookupFailed = true;
     }
   }
+  const financialActorName = (id: string | null | undefined): string | null =>
+    id
+      ? (financialActorNames.get(id) ??
+        (financialActorLookupFailed ? "Name unavailable" : null))
+      : null;
 
   const correctionByAllocation = new Map<string, PaymentRecordCorrectionView>();
   for (const raw of correctionRows) {
@@ -740,7 +768,7 @@ async function loadOrderFinancials(orderId: string): Promise<{
       correctedMethodDescription: row.corrected_method_description,
       reason: row.reason,
       correctedBy: row.corrected_by,
-      correctedByName: correctionActorNames.get(row.corrected_by) ?? null,
+      correctedByName: financialActorName(row.corrected_by),
       correctedAt: row.corrected_at,
     });
   }
@@ -790,8 +818,6 @@ async function loadOrderFinancials(orderId: string): Promise<{
               verified_by: string;
               verified_at: string;
               created_at: string;
-              staff_profiles?:
-                { display_name: string } | { display_name: string }[] | null;
             }
           | {
               status: string;
@@ -802,14 +828,11 @@ async function loadOrderFinancials(orderId: string): Promise<{
               verified_by: string;
               verified_at: string;
               created_at: string;
-              staff_profiles?:
-                { display_name: string } | { display_name: string }[] | null;
             }[]
           | null;
       };
       const payment = relationOne(row.payments);
       if (!payment || payment.status !== "verified") return [];
-      const staff = relationOne(payment.staff_profiles);
       const correction = correctionByAllocation.get(row.id) ?? null;
       const amount = Number(row.amount);
       return [
@@ -833,7 +856,7 @@ async function loadOrderFinancials(orderId: string): Promise<{
           paidAt: payment.paid_at,
           referenceNote: payment.reference_note,
           verifiedBy: payment.verified_by,
-          verifiedByName: staff?.display_name ?? null,
+          verifiedByName: financialActorName(payment.verified_by),
           verifiedAt: payment.verified_at,
           createdAt: row.created_at ?? payment.created_at,
         },
@@ -853,12 +876,7 @@ async function loadOrderFinancials(orderId: string): Promise<{
       refunded_at: string;
       created_at: string;
       created_by: string | null;
-      staff_profiles?:
-        | { display_name: string }
-        | { display_name: string }[]
-        | null;
     };
-    const staff = relationOne(row.staff_profiles);
     return {
       id: row.id,
       orderId: row.order_id,
@@ -871,7 +889,7 @@ async function loadOrderFinancials(orderId: string): Promise<{
       refundedAt: row.refunded_at,
       status: "recorded" as const,
       createdBy: row.created_by ?? null,
-      createdByName: staff?.display_name ?? null,
+      createdByName: financialActorName(row.created_by),
       createdAt: row.created_at,
     };
   });
