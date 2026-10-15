@@ -95,7 +95,7 @@ export function OrderDirectory({ orders }: OrderDirectoryProps) {
       ) : (
         <ul className="grid gap-3">
           {visible.map((order) => (
-            <li key={order.id}>
+            <li className="min-w-0" key={order.id}>
               <OrderCard order={order} />
             </li>
           ))}

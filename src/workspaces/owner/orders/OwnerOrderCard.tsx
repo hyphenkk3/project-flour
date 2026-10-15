@@ -96,7 +96,7 @@ export function OwnerOrderCard({
             {orderSourceLabel(order.orderSource)}
             {order.extraStockId ? " · Fresh Picks" : ""}
           </p>
-          <p className={completed ? "text-skyline text-sm" : "text-ink text-sm"}>
+          <p className={completed ? "text-skyline break-words text-sm" : "text-ink break-words text-sm"}>
             {cakeLine}
           </p>
           <p className="text-skyline text-sm">

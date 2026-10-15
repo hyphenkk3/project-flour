@@ -22,7 +22,7 @@ function SettingsLink() {
 export function UserMenu({ staff, compact = false }: UserMenuProps) {
   if (compact) {
     return (
-      <div className="flex items-center justify-end gap-2 md:gap-3">
+      <div className="flex flex-wrap items-center justify-end gap-2 md:gap-3">
         <div className="min-w-0 text-right">
           <p className="text-ink truncate text-sm font-medium">
             {staff.displayName}
