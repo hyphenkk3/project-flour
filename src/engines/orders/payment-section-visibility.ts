@@ -15,13 +15,13 @@ export function shouldShowPaymentSection({
   if (status === "awaiting_payment" || status === "paid") return true;
 
   return (
-    status === "cancelled" &&
+    (status === "cancelled" || status === "completed") &&
     (paymentHistoryCount > 0 || refundHistoryCount > 0)
   );
 }
 
 export function canMutatePaymentForOrderStatus(status: string): boolean {
-  return status !== "cancelled";
+  return status !== "cancelled" && status !== "completed";
 }
 
 export function shouldShowCancelledNoRefundNotice(input: {

@@ -164,7 +164,7 @@ assert.doesNotMatch(migration, /drop trigger[^;]*catalogue_voucher/i);
 
 assert.match(
   paymentSection,
-  /order\.status !== "cancelled"[\s\S]*?hasVerifiedPaymentForPaymentThankYou/,
+  /canMutatePayments = canMutatePaymentForOrderStatus\(order\.status\)[\s\S]*?paymentThankYouAvailable =\s+canMutatePayments &&\s+hasVerifiedPaymentForPaymentThankYou/,
 );
 assert.match(
   paymentRequestPreview,

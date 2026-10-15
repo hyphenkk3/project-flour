@@ -7,11 +7,13 @@ import {
   FormError,
   FormField,
   FormInput,
+  FormSelect,
   FormTextarea,
 } from "@/components/ui/form";
+import { REFUND_METHOD_OPTIONS, todayMalaysiaDate } from "@/engines/orders/refund-recording";
 import type { GuestOrderWorkspaceCapabilities } from "@/engines/orders/delivery-finance-capabilities";
 import { isGuestOrderCancelled } from "@/engines/orders/lifecycle";
-import type { StorefrontOrder } from "@/types/storefront";
+import type { RefundMethodCode, StorefrontOrder } from "@/types/storefront";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import {
   cancelAndRefundFreshPickAction,
@@ -37,6 +39,9 @@ export function OrderLifecycleActions({
   const [cancelOverride, setCancelOverride] = useState(false);
   const [freshPickRefundOpen, setFreshPickRefundOpen] = useState(false);
   const [freshPickRefundReason, setFreshPickRefundReason] = useState("");
+  const [freshPickRefundMethod, setFreshPickRefundMethod] = useState<RefundMethodCode>("online_transfer");
+  const [freshPickRefundMethodDescription, setFreshPickRefundMethodDescription] = useState("");
+  const [freshPickRefundDate, setFreshPickRefundDate] = useState(todayMalaysiaDate());
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [pickupDate, setPickupDate] = useState(order.pickupDate);
 
@@ -77,6 +82,9 @@ export function OrderLifecycleActions({
       const result = await cancelAndRefundFreshPickAction(
         order.id,
         freshPickRefundReason,
+        freshPickRefundMethod,
+        freshPickRefundMethodDescription,
+        freshPickRefundDate,
       );
       if (result.error) {
         setError(result.error);
@@ -161,6 +169,9 @@ export function OrderLifecycleActions({
             onClick={() => {
               setError(null);
               setFreshPickRefundReason("");
+              setFreshPickRefundMethod("online_transfer");
+              setFreshPickRefundMethodDescription("");
+              setFreshPickRefundDate(todayMalaysiaDate());
               setFreshPickRefundOpen(true);
             }}
             type="button"
@@ -223,6 +234,38 @@ export function OrderLifecycleActions({
             placeholder="Required for the audit trail"
             rows={3}
             value={freshPickRefundReason}
+          />
+        </FormField>
+        <FormField htmlFor="fresh-pick-refund-method" label="Refund method">
+          <FormSelect
+            id="fresh-pick-refund-method"
+            onChange={(event) => setFreshPickRefundMethod(event.target.value as RefundMethodCode)}
+            value={freshPickRefundMethod}
+          >
+            {REFUND_METHOD_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </FormSelect>
+        </FormField>
+        {freshPickRefundMethod === "others" ? (
+          <FormField htmlFor="fresh-pick-refund-method-description" label="Other method description">
+            <FormInput
+              id="fresh-pick-refund-method-description"
+              maxLength={200}
+              onChange={(event) => setFreshPickRefundMethodDescription(event.target.value)}
+              required
+              value={freshPickRefundMethodDescription}
+            />
+          </FormField>
+        ) : null}
+        <FormField htmlFor="fresh-pick-refund-date" label="Refund date">
+          <FormInput
+            id="fresh-pick-refund-date"
+            max={todayMalaysiaDate()}
+            onChange={(event) => setFreshPickRefundDate(event.target.value)}
+            required
+            type="date"
+            value={freshPickRefundDate}
           />
         </FormField>
         <p className="text-status-danger text-sm font-medium">

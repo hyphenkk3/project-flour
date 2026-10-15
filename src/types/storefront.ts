@@ -164,6 +164,9 @@ export type OrderRefundView = {
   paymentId: string | null;
   amount: number;
   reason: string | null;
+  refundType?: string | null;
+  refundMethod?: RefundMethodCode | null;
+  refundMethodDescription?: string | null;
   refundedAt: string;
   status: "recorded";
   createdBy: string | null;
@@ -171,13 +174,22 @@ export type OrderRefundView = {
   createdAt: string;
 };
 
+export type RefundMethodCode =
+  | "online_transfer"
+  | "wb_qr"
+  | "cash"
+  | "others";
+
 export type OrderSettlement = {
   subtotal: number;
   totalAdjustments: number;
   amountDue: number;
   verifiedPaymentsAllocated: number;
   refundsTotal: number;
+  overpaymentRefundsTotal?: number;
   netReceived: number;
+  remainingRefundable?: number;
+  genuineOutstanding?: number;
   remainingBalance: number;
   overpayment: number;
   isFullyPaid: boolean;
@@ -418,6 +430,7 @@ export type OrderTimelineEventType =
   | "payment_deadline_extended"
   | "payment_recorded"
   | "payment_correction_recorded"
+  | "refund_recorded"
   | "fresh_pick_cancelled_refunded"
   | "payment_corrected"
   | "payment_secured"

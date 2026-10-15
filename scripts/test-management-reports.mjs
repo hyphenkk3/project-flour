@@ -191,7 +191,7 @@ assert.equal(
   1,
 );
 assert.equal(report.discountedOrders, 1);
-assert.equal(report.outstandingNow, 374);
+assert.equal(report.outstandingNow, 369);
 assert.equal(buildMonthlyReport([prior], "2026-09").netSales, 50);
 assert.equal(buildMonthlyReport([], "2026-10").netSales, 0);
 assert.equal(classifyAdjustment(adjustment(-2, "manual")), "other");
@@ -201,6 +201,8 @@ assert.equal(
 );
 assert.equal(orderFinancials(pickup).settlement.verifiedPaymentsAllocated, 90);
 assert.equal(orderFinancials(pickup).settlement.refundsTotal, 5);
+assert.equal(orderFinancials(pickup).settlement.netReceived, 85);
+assert.equal(orderFinancials(pickup).settlement.remainingBalance, 86);
 assert.equal(
   summarizeCash(
     [
@@ -222,6 +224,13 @@ assert.equal(
     [{ amount: 5, status: "recorded", refundedAt: "2026-10-10" }],
   ).collected,
   110,
+);
+assert.equal(
+  summarizeCash(
+    [{ amount: 100, effectiveAmount: 100, status: "verified", method: "wb_qr", paidAt: "2026-10-05" }],
+    [{ amount: 20, status: "recorded", refundedAt: "2026-11-02" }],
+  ).netReceipts,
+  80,
 );
 assert.equal(
   summarizeCash(
@@ -355,7 +364,7 @@ assert.match(dashboard, /Processing fees/);
 assert.match(dashboard, /Other adjustments · reconcile/);
 assert.match(dashboard, /Scheduled, not fulfilled/);
 assert.match(dashboard, /Cancelled orders/);
-assert.match(dashboard, /Outstanding now/);
+assert.match(dashboard, /Outstanding for Selected Month/);
 assert.match(dashboard, /Payments collected/);
 assert.match(dashboard, /Recorded refunds/);
 assert.match(dashboard, /previousMonth\(current\.month\)/);

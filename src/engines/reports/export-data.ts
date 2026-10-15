@@ -16,6 +16,7 @@ export type ManagementReportData = {
   payments: {
     collected: number;
     refunds: number;
+    netReceipts: number;
     methods: Array<{ method: string; value: number }>;
   };
   asOf: string;
@@ -88,7 +89,8 @@ export function buildManagementReportExportSheets(
         ["Orders", "Cancelled Orders", { value: current.cancelled, kind: "integer" }, `Current order value ${current.cancelledValue.toFixed(2)}; excluded from sales`],
         ["Payments", "Payments Collected", { value: report.payments.collected, kind: "currency" }, "By payment date; includes advance payments and corrected allocations"],
         ["Payments", "Recorded Refunds", { value: report.payments.refunds, kind: "currency" }, "Recorded refund amount by refund date"],
-        ["Payments", "Outstanding Now", { value: current.outstandingNow, kind: "currency" }, `Calculated as of ${report.asOf}; not a historical month-end balance`],
+        ["Payments", "Net Receipts", { value: report.payments.netReceipts, kind: "currency" }, "Payments collected minus refunds issued in the selected month; by transaction date"],
+        ["Payments", "Outstanding for Selected Month", { value: current.outstandingNow, kind: "currency" }, `Calculated as of ${report.asOf}; not a historical month-end balance`],
         ["Cake Sales", "Cake Quantity", { value: current.cakeQuantity, kind: "integer" }, "Historical order-item quantities"],
         ["Order Sources", "Fresh Pick Orders (subset)", { value: current.freshPicks.orders, kind: "integer" }, `Fresh Pick fulfilled sales ${current.freshPicks.netSales.toFixed(2)}; included in source totals and not additive`],
         ["Discounts", "Discounted Orders", { value: current.discountedOrders, kind: "integer" }, "Fulfilled orders with an effective discount"],
@@ -221,6 +223,7 @@ export function buildManagementReportExportSheets(
         { header: "Payment Method", width: 30 },
         { header: "Collected", kind: "currency" },
         { header: "Recorded Refunds", kind: "currency" },
+        { header: "Net Receipts", kind: "currency" },
         { header: "Basis", width: 46 },
       ],
       rows: [
@@ -228,9 +231,10 @@ export function buildManagementReportExportSheets(
           row.method || "Unspecified",
           { value: row.value, kind: "currency" },
           null,
+          null,
           "Verified, corrected payment allocations by payment date; may include advance payments",
         ]),
-        ["Total", { value: report.payments.collected, kind: "currency" }, { value: report.payments.refunds, kind: "currency" }, "Recorded refunds are reported separately by refund date"] as ExportCell[],
+        ["Total", { value: report.payments.collected, kind: "currency" }, { value: report.payments.refunds, kind: "currency" }, { value: report.payments.netReceipts, kind: "currency" }, "Net receipts = collections minus refunds in this report period"] as ExportCell[],
       ],
     },
     {

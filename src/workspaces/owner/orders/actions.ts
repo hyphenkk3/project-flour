@@ -39,8 +39,11 @@ import {
   PAYMENT_CORRECTION_INVALID_AMOUNT,
   PAYMENT_CORRECTION_UNAUTHORIZED,
   parseRefundAmount,
-  validatePaymentCorrection,
 } from "@/engines/orders/payment-correction";
+import {
+  isRefundMethod,
+  isValidRefundDate,
+} from "@/engines/orders/refund-recording";
 import {
   parseCorrectedPaymentAmount,
   validatePaymentCorrection as validatePaymentRecordCorrection,
@@ -1359,6 +1362,73 @@ export async function correctPaymentRecordAction(
   return { error: null, success: true };
 }
 
+export async function recordRefundAction(
+  orderId: string,
+  _prev: RecordPaymentCorrectionState,
+  formData: FormData,
+): Promise<RecordPaymentCorrectionState> {
+  const auth = await requireOwnerOrManager();
+  if (auth.error || !auth.staff) {
+    return { error: PAYMENT_CORRECTION_UNAUTHORIZED, success: false };
+  }
+  const order = await getGuestOrderById(orderId);
+  if (!order) {
+    return { error: "Order not found.", success: false };
+  }
+  if (order.extraStockId) {
+    return { error: "Fresh Pick refunds must use the Owner cancellation and refund workflow.", success: false };
+  }
+
+  const amountRaw = String(formData.get("amount") ?? "");
+  const amount = parseRefundAmount(amountRaw);
+  if (amount == null) {
+    return { error: PAYMENT_CORRECTION_INVALID_AMOUNT, success: false };
+  }
+  const method = String(formData.get("method") ?? "");
+  const methodDescription = String(formData.get("method_description") ?? "").trim();
+  const refundedOn = String(formData.get("refunded_on") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  const requestKey = String(formData.get("request_key") ?? "");
+  if (!isRefundMethod(method)) {
+    return { error: "Choose a valid refund method.", success: false };
+  }
+  if (method === "others" ? !methodDescription : Boolean(methodDescription)) {
+    return {
+      error: method === "others" ? "Describe the other refund method." : "Remove the method description.",
+      success: false,
+    };
+  }
+  if (!reason || reason.length > 2000) {
+    return { error: "A refund reason is required (maximum 2,000 characters).", success: false };
+  }
+  if (!isValidRefundDate(refundedOn)) {
+    return { error: "Choose a valid refund date no later than today.", success: false };
+  }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestKey)) {
+    return { error: "The refund confirmation expired. Review it again before saving.", success: false };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("record_order_refund", {
+    p_order_id: orderId,
+    p_amount: amount.toFixed(2),
+    p_method: method,
+    p_method_description: method === "others" ? methodDescription : null,
+    p_refunded_on: refundedOn,
+    p_reason: reason,
+    p_request_key: requestKey,
+  });
+
+  if (error) {
+    return { error: error.message, success: false };
+  }
+
+  revalidatePath("/owner");
+  revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/payment`);
+  return { error: null, success: true };
+}
+
 export async function recordOverpaymentRefundAction(
   orderId: string,
   _prev: RecordPaymentCorrectionState,
@@ -1368,66 +1438,51 @@ export async function recordOverpaymentRefundAction(
   if (auth.error || !auth.staff) {
     return { error: PAYMENT_CORRECTION_UNAUTHORIZED, success: false };
   }
-  const staff = auth.staff;
-
   const order = await getGuestOrderById(orderId);
   if (!order) {
     return { error: "Order not found.", success: false };
   }
-  if (order.status === "cancelled") {
-    return {
-      error: "Cannot correct payment on a cancelled order.",
-      success: false,
-    };
-  }
 
   const amount = parseRefundAmount(String(formData.get("amount") ?? ""));
-  if (amount == null) {
-    return { error: PAYMENT_CORRECTION_INVALID_AMOUNT, success: false };
+  const method = String(formData.get("method") ?? "");
+  const methodDescription = String(formData.get("method_description") ?? "").trim();
+  const refundedOn = String(formData.get("refunded_on") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  const requestKey = String(formData.get("request_key") ?? "");
+  if (amount == null) return { error: PAYMENT_CORRECTION_INVALID_AMOUNT, success: false };
+  if (!isRefundMethod(method)) return { error: "Choose a valid refund method.", success: false };
+  if (method === "others" ? !methodDescription : Boolean(methodDescription)) {
+    return { error: method === "others" ? "Describe the other refund method." : "Remove the method description.", success: false };
   }
-
-  const reasonRaw = String(formData.get("reason") ?? "").replace(
-    /^\s+|\s+$/g,
-    "",
-  );
-  const reason = reasonRaw ? reasonRaw : null;
-
-  const checked = validatePaymentCorrection({
-    settlement: order.settlement,
-    amount,
-  });
-  if (checked.error || !checked.preview) {
-    return {
-      error: checked.error ?? PAYMENT_CORRECTION_INVALID_AMOUNT,
-      success: false,
-    };
+  if (!reason || reason.length > 2000) return { error: "A refund reason is required (maximum 2,000 characters).", success: false };
+  if (!isValidRefundDate(refundedOn)) return { error: "Choose a valid refund date no later than today.", success: false };
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestKey)) {
+    return { error: "The refund confirmation expired. Review it again before saving.", success: false };
   }
-  const preview = checked.preview;
-
-  const paymentSnapshot = order.paymentAllocations.map((row) => ({
-    id: row.id,
-    amount: row.amount,
-    paidAt: row.paidAt,
-    method: row.method,
-    referenceNote: row.referenceNote,
-  }));
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("record_overpayment_refund", {
+  const { error } = await supabase.rpc("record_overpayment_refund_with_details", {
     p_order_id: orderId,
-    p_amount: preview.refundAmount,
+    p_amount: amount.toFixed(2),
     p_reason: reason,
-    p_actor_staff_id: staff.id,
-    p_payment_snapshot: paymentSnapshot,
+    p_actor_staff_id: auth.staff.id,
+    p_payment_snapshot: order.paymentAllocations.map((row) => ({
+      id: row.id,
+      amount: row.amount,
+      paidAt: row.paidAt,
+      method: row.method,
+      referenceNote: row.referenceNote,
+    })),
+    p_method: method,
+    p_method_description: method === "others" ? methodDescription : null,
+    p_refunded_on: refundedOn,
+    p_request_key: requestKey,
   });
+  if (error) return { error: error.message, success: false };
 
-  if (error) {
-    return { error: error.message, success: false };
-  }
-
-  scheduleStaffNotificationDispatch();
   revalidatePath("/owner");
   revalidatePath(`/owner/orders/${orderId}`);
+  revalidatePath(`/owner/orders/${orderId}/payment`);
   return { error: null, success: true };
 }
 
@@ -2553,6 +2608,9 @@ export async function cancelGuestOrderAction(
 export async function cancelAndRefundFreshPickAction(
   orderId: string,
   reason: string,
+  method: string,
+  methodDescription: string,
+  refundedOn: string,
 ): Promise<{ error: string | null }> {
   const staff = await requireStaff();
   if (staff.role.code !== "owner") {
@@ -2564,6 +2622,16 @@ export async function cancelAndRefundFreshPickAction(
   const cleanReason = reason.trim();
   if (!cleanReason) {
     return { error: "A reason is required for this exceptional cancellation." };
+  }
+  const cleanDescription = methodDescription.trim();
+  if (!isRefundMethod(method)) {
+    return { error: "Choose a valid refund method." };
+  }
+  if (method === "others" ? !cleanDescription : Boolean(cleanDescription)) {
+    return { error: method === "others" ? "Describe the other refund method." : "Remove the method description." };
+  }
+  if (!isValidRefundDate(refundedOn)) {
+    return { error: "Choose a valid refund date no later than today." };
   }
 
   const order = await getGuestOrderById(orderId);
@@ -2580,10 +2648,13 @@ export async function cancelAndRefundFreshPickAction(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("cancel_and_refund_paid_fresh_pick", {
+  const { error } = await supabase.rpc("cancel_and_refund_paid_fresh_pick_with_details", {
     p_order_id: order.id,
     p_actor_staff_id: staff.id,
     p_reason: cleanReason,
+    p_method: method,
+    p_method_description: method === "others" ? cleanDescription : null,
+    p_refunded_on: refundedOn,
   });
   if (error) {
     return { error: error.message };

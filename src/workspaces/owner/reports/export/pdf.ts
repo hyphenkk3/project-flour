@@ -278,11 +278,11 @@ export async function generateManagementReportPdf(
     { header: "Note", width: 120 },
   ], [["Fresh Pick", { value: report.current.freshPicks.orders, kind: "integer" }, { value: report.current.freshPicks.netSales, kind: "currency" }, "Subset of order-source totals above; included there and not additive."]], [110, 82, 125, 190]);
   drawTable("F. Bookings", byName.get("Bookings")!.columns, byName.get("Bookings")!.rows, [115, 85, 140, 167]);
-  drawTable("F. Payments", byName.get("Payments")!.columns, byName.get("Payments")!.rows, [110, 110, 120, 167]);
+  drawTable("F. Payments", byName.get("Payments")!.columns, byName.get("Payments")!.rows, [82, 82, 82, 82, 157]);
   drawTable("G. Month-over-Month Comparison", byName.get("Monthly Comparison")!.columns, byName.get("Monthly Comparison")!.rows);
   ensureSpace(40);
   doc.font("Helvetica").fontSize(8).fillColor(muted).text(
-    `Outstanding Now is ${formatCell({ value: report.current.outstandingNow, kind: "currency" }, { header: "" })} as of ${new Intl.DateTimeFormat("en-MY", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kuching" }).format(new Date(report.asOf))}. Historical month-end outstanding is not available. This is an internal management report, not an immutable month-end record.`,
+    `Outstanding for Selected Month is ${formatCell({ value: report.current.outstandingNow, kind: "currency" }, { header: "" })} as of ${new Intl.DateTimeFormat("en-MY", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kuching" }).format(new Date(report.asOf))}. Historical month-end outstanding is not available. This is an internal management report, not an immutable month-end record.`,
     { width: contentWidth, lineGap: 2 },
   );
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -31,6 +31,7 @@ import { OrderDiscountsPanel } from "@/workspaces/owner/orders/OrderDiscountsPan
 import { DeliveryFinanceBreakdown } from "@/workspaces/owner/orders/DeliveryFinanceBreakdown";
 import { RecordPaymentForm } from "@/workspaces/owner/orders/RecordPaymentForm";
 import { RecordRefundForm } from "@/workspaces/owner/orders/RecordRefundForm";
+import { refundMethodLabel } from "@/engines/orders/refund-recording";
 import { RecordPaymentCorrectionForm } from "@/workspaces/owner/orders/RecordPaymentCorrectionForm";
 import {
   PAYMENT_CORRECTION_STATUS_LABEL,
@@ -72,16 +73,43 @@ export function PaymentSection({
   const [showRecord, setShowRecord] = useState(false);
   const recordFormContainerRef = useRef<HTMLDivElement>(null);
   const [showRefund, setShowRefund] = useState(false);
+  const [refundKind, setRefundKind] = useState<"general" | "overpayment">("general");
+  const [refundSuccess, setRefundSuccess] = useState(false);
   const [showExtend, setShowExtend] = useState(false);
   const [correctingPaymentAllocationId, setCorrectingPaymentAllocationId] =
     useState<string | null>(null);
   const settlement = order.settlement;
+  const remainingRefundable =
+    settlement.remainingRefundable ?? Math.max(0, settlement.netReceived);
+  const genuineOutstanding =
+    settlement.genuineOutstanding ??
+    Math.max(0, settlement.amountDue - settlement.verifiedPaymentsAllocated);
   const correctionStatus = paymentCorrectionStatus(settlement);
   const canMutatePayments = canMutatePaymentForOrderStatus(order.status);
-  const canCorrect =
-    canMutatePayments &&
-    canRecordPaymentCorrection &&
-    settlement.overpayment > 0;
+  const canRecordRefund =
+    canRecordPaymentCorrection && remainingRefundable > 0 && !order.extraStockId;
+  const canRecordOverpaymentRefund =
+    canMutatePayments && canRecordPaymentCorrection && settlement.overpayment > 0;
+  const canCorrectPayments =
+    canMutatePayments && canRecordPaymentCorrection && settlement.overpayment > 0;
+  const nonCollectibleOrder =
+    order.status === "cancelled" || String(order.status) === "completed";
+  const collectibleBalance = nonCollectibleOrder
+    ? 0
+    : settlement.remainingBalance;
+  const closeRefundForm = useCallback(() => setShowRefund(false), []);
+  const markRefundSuccess = useCallback(() => setRefundSuccess(true), []);
+  const openFinancialForm = (
+    form: "none" | "record" | "refund" | "extend" | "correction",
+    allocationId?: string,
+  ) => {
+    setShowRecord(form === "record");
+    setShowRefund(form === "refund");
+    setShowExtend(form === "extend");
+    setCorrectingPaymentAllocationId(
+      form === "correction" ? (allocationId ?? null) : null,
+    );
+  };
   const isPaid = order.status === "paid";
   const overdue = isPaymentOverdue(
     order.status,
@@ -243,9 +271,9 @@ export function PaymentSection({
 
       <dl
         className={`grid gap-2 text-sm ${
-          settlement.overpayment > 0 || settlement.refundsTotal > 0
+          settlement.refundsTotal > 0 || remainingRefundable > 0
             ? "sm:grid-cols-2 lg:grid-cols-4"
-            : "sm:grid-cols-3"
+            : "sm:grid-cols-2 lg:grid-cols-3"
         }`}
       >
         <div>
@@ -261,10 +289,14 @@ export function PaymentSection({
           </dd>
         </div>
         <div>
-          <dt className="text-skyline">Balance</dt>
+          <dt className="text-skyline">{nonCollectibleOrder ? "Collectible balance" : "Outstanding"}</dt>
           <dd className="text-ink font-semibold">
-            {formatRm(settlement.remainingBalance)}
+            {formatRm(collectibleBalance)}
           </dd>
+        </div>
+        <div>
+          <dt className="text-skyline">Net receipts</dt>
+          <dd className="text-ink font-semibold">{formatRm(settlement.netReceived)}</dd>
         </div>
         {settlement.refundsTotal > 0 ? (
           <div>
@@ -282,7 +314,23 @@ export function PaymentSection({
             </dd>
           </div>
         ) : null}
+        {remainingRefundable > 0 ? (
+          <div>
+            <dt className="text-skyline">Remaining refundable</dt>
+            <dd className="text-ink font-semibold">{formatRm(remainingRefundable)}</dd>
+          </div>
+        ) : null}
       </dl>
+      {nonCollectibleOrder && genuineOutstanding > 0 ? (
+        <p className="text-skyline text-sm">
+          {formatRm(genuineOutstanding)} remained unpaid against the original order, but no balance is collectible on this {order.status === "cancelled" ? "cancelled" : "completed"} order.
+        </p>
+      ) : null}
+      {refundSuccess ? (
+        <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900" role="status">
+          Refund recorded. Order and payment history are unchanged.
+        </p>
+      ) : null}
       {correctionStatus !== "none" || settlement.overpayment > 0 ? (
         <p className="text-skyline text-sm">
           Correction: {PAYMENT_CORRECTION_STATUS_LABEL[correctionStatus]}.
@@ -328,7 +376,12 @@ export function PaymentSection({
                 <p className="text-skyline text-sm">
                   Recorded {formatPaymentHistoryDate(row.refundedAt)}
                   {" · "}
+                  {refundMethodLabel(row.refundMethod ?? null, row.refundMethodDescription)}
+                  {" · "}
                   {row.createdByName ?? "Staff"}
+                </p>
+                <p className="text-skyline text-xs">
+                  Recorded {formatTimelineDateTime(row.createdAt)}
                 </p>
                 {row.reason ? (
                   <p className="text-skyline whitespace-pre-line text-sm">
@@ -417,18 +470,13 @@ export function PaymentSection({
                 (row.allocationCount ?? 1) === 1 ? (
                   <button
                     className="text-skyline hover:text-ink mt-2 text-sm font-medium"
-                    onClick={() => {
-                      setCorrectingPaymentAllocationId(row.id);
-                      setShowRecord(false);
-                      setShowRefund(false);
-                      setShowExtend(false);
-                    }}
+                    onClick={() => openFinancialForm("correction", row.id)}
                     type="button"
                   >
                     Correct Payment
                   </button>
                 ) : null}
-                {canCorrect && correctingPaymentAllocationId === row.id ? (
+                {canCorrectPayments && correctingPaymentAllocationId === row.id ? (
                   <RecordPaymentCorrectionForm
                     allocation={row}
                     onCancel={() => setCorrectingPaymentAllocationId(null)}
@@ -474,7 +522,7 @@ export function PaymentSection({
         </div>
       ) : null}
 
-      {canRequest || canRecord || canCorrect ? (
+      {canRequest || canRecord || canRecordRefund || canRecordOverpaymentRefund ? (
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           {canRequest ? (
             <Link
@@ -490,36 +538,41 @@ export function PaymentSection({
           {canRecord ? (
             <button
               className="border-fog text-ink hover:bg-mist inline-flex min-h-12 items-center justify-center rounded-lg border px-5 text-sm font-medium"
-              onClick={() => {
-                setShowRecord(true);
-                setShowRefund(false);
-                setShowExtend(false);
-              }}
+              onClick={() => openFinancialForm("record")}
               type="button"
             >
               + Record Payment
             </button>
           ) : null}
-          {canCorrect ? (
+          {canRecordRefund ? (
             <button
               className="border-fog text-ink hover:bg-mist inline-flex min-h-12 items-center justify-center rounded-lg border px-5 text-sm font-medium"
               onClick={() => {
-                setShowRefund(true);
-                setShowRecord(false);
-                setShowExtend(false);
+                setRefundKind("general");
+                openFinancialForm("refund");
               }}
               type="button"
             >
-              Record refund
+              Record General Refund
+            </button>
+          ) : null}
+          {canRecordOverpaymentRefund ? (
+            <button
+              className="border-fog text-ink hover:bg-mist inline-flex min-h-12 items-center justify-center rounded-lg border px-5 text-sm font-medium"
+              onClick={() => {
+                setRefundKind("overpayment");
+                openFinancialForm("refund");
+              }}
+              type="button"
+            >
+              Refund Overpayment
             </button>
           ) : null}
           {canExtendFollowUp ? (
             <button
               className="text-skyline hover:text-ink inline-flex min-h-12 items-center justify-center px-2 text-sm font-medium"
               onClick={() => {
-                setShowExtend((value) => !value);
-                setShowRecord(false);
-                setShowRefund(false);
+                openFinancialForm(showExtend ? "none" : "extend");
               }}
               type="button"
             >
@@ -539,9 +592,13 @@ export function PaymentSection({
         </div>
       ) : null}
 
-      {showRefund && canCorrect ? (
+      {showRefund &&
+      (refundKind === "general" ? canRecordRefund : canRecordOverpaymentRefund) ? (
         <RecordRefundForm
-          onCancel={() => setShowRefund(false)}
+          key={refundKind}
+          onCancel={closeRefundForm}
+          kind={refundKind}
+          onSuccess={markRefundSuccess}
           order={order}
         />
       ) : null}

@@ -244,9 +244,9 @@ export function ManagementReportDashboard({ report }: { report: ManagementReport
                 </div>
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-1 gap-3 border-t border-slate-200 pt-3 sm:grid-cols-3 sm:gap-5">
+            <div className="mt-4 grid grid-cols-1 gap-3 border-t border-slate-200 pt-3 sm:grid-cols-2 xl:grid-cols-4 sm:gap-5">
               <div className="min-w-0">
-                <p className="text-xs text-slate-500">Outstanding now</p>
+                <p className="text-xs text-slate-500">Outstanding for Selected Month</p>
                 <p className="mt-1 text-sm font-semibold break-words text-slate-900 tabular-nums">
                   {currency(current.outstandingNow)}
                 </p>
@@ -271,6 +271,15 @@ export function ManagementReportDashboard({ report }: { report: ManagementReport
                 </p>
                 <p className="mt-0.5 text-[11px] text-slate-500">
                   By recorded refund date
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500">Net receipts</p>
+                <p className="mt-1 text-sm font-semibold break-words text-slate-900 tabular-nums">
+                  {currency(report.payments.netReceipts)}
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  Collections minus refunds by transaction date
                 </p>
               </div>
             </div>

@@ -263,6 +263,7 @@ function mapOrder(
   const paymentAllocations = financial?.paymentAllocations ?? [];
   const refunds = financial?.refunds ?? [];
   const settlement = calculateOrderSettlement({
+    orderStatus: row.status,
     items: commercialLinesForSettlement({ items, paidAddons }),
     adjustments,
     allocations: paymentAllocations,
@@ -585,6 +586,9 @@ async function loadOrderFinancials(orderId: string): Promise<{
         payment_id,
         amount,
         reason,
+        refund_type,
+        refund_method,
+        refund_method_description,
         refunded_at,
         status,
         created_at,
@@ -605,7 +609,7 @@ async function loadOrderFinancials(orderId: string): Promise<{
     const fallback = await supabase
       .from("refunds")
       .select(
-        "id, order_id, payment_id, amount, reason, refunded_at, status, created_at, created_by",
+        "id, order_id, payment_id, amount, reason, refund_type, refunded_at, status, created_at, created_by",
       )
       .eq("order_id", orderId)
       .order("created_at", { ascending: true });
@@ -843,6 +847,9 @@ async function loadOrderFinancials(orderId: string): Promise<{
       payment_id: string | null;
       amount: number | string;
       reason: string | null;
+      refund_type?: string | null;
+      refund_method?: OrderRefundView["refundMethod"];
+      refund_method_description?: string | null;
       refunded_at: string;
       created_at: string;
       created_by: string | null;
@@ -858,6 +865,9 @@ async function loadOrderFinancials(orderId: string): Promise<{
       paymentId: row.payment_id ?? null,
       amount: Number(row.amount),
       reason: row.reason ?? null,
+      refundType: row.refund_type ?? null,
+      refundMethod: row.refund_method ?? null,
+      refundMethodDescription: row.refund_method_description ?? null,
       refundedAt: row.refunded_at,
       status: "recorded" as const,
       createdBy: row.created_by ?? null,

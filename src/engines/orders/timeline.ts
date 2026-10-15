@@ -14,6 +14,7 @@ export const TIMELINE_EVENT_LABELS: Record<string, string> = {
   payment_deadline_extended: "Payment follow-up deadline extended",
   payment_recorded: "Payment recorded",
   payment_correction_recorded: "Overpayment refund recorded",
+  refund_recorded: "Refund recorded",
   fresh_pick_cancelled_refunded:
     "Fresh Pick cancelled · manual refund recorded",
   payment_corrected: "Payment corrected",

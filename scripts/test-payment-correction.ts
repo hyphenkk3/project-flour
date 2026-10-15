@@ -219,7 +219,8 @@ const paymentSection = readFileSync(
   resolve(process.cwd(), "src/workspaces/owner/orders/PaymentSection.tsx"),
   "utf8",
 );
-assert.match(paymentSection, /Record refund/);
+assert.match(paymentSection, /Refund Overpayment/);
+assert.match(paymentSection, /Record General Refund/);
 assert.match(paymentSection, /RecordRefundForm/);
 assert.match(paymentSection, /canRecordPaymentCorrection/);
 assert.match(paymentSection, /verifiedPaymentsAllocated/);
@@ -229,9 +230,10 @@ const refundForm = readFileSync(
   resolve(process.cwd(), "src/workspaces/owner/orders/RecordRefundForm.tsx"),
   "utf8",
 );
-assert.match(refundForm, /Confirm this correction/);
-assert.match(refundForm, /Remaining excess/);
-assert.match(refundForm, /does not send money through a/);
+assert.match(refundForm, /Confirm this refund was already issued/);
+assert.match(refundForm, /Remaining overpayment/);
+assert.match(refundForm, /Refund only the remaining amount received above the order total/);
+assert.match(refundForm, /does not transfer money/);
 
 const migration = readFileSync(
   resolve(

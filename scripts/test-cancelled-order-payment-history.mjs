@@ -74,6 +74,16 @@ assert.equal(
 );
 assert.equal(
   shouldShowPaymentSection({
+    ...base,
+    status: "completed",
+    paymentHistoryCount: 1,
+    refundHistoryCount: 0,
+  }),
+  true,
+  "completed order can show historical payments for refunds",
+);
+assert.equal(
+  shouldShowPaymentSection({
     canManagePayments: false,
     status: "cancelled",
     paymentHistoryCount: 2,
@@ -84,6 +94,7 @@ assert.equal(
 );
 
 assert.equal(canMutatePaymentForOrderStatus("cancelled"), false);
+assert.equal(canMutatePaymentForOrderStatus("completed"), false);
 assert.equal(canMutatePaymentForOrderStatus("paid"), true);
 assert.equal(
   shouldShowCancelledNoRefundNotice({
@@ -116,7 +127,7 @@ assert.match(workspace, /paymentHistoryCount: order\.paymentAllocations\.length/
 assert.match(workspace, /refundHistoryCount: order\.refunds\.length/);
 assert.match(section, /canMutatePaymentForOrderStatus\(order\.status\)/);
 for (const actionGate of [
-  /const canCorrect =\s+canMutatePayments &&/,
+  /const canCorrectPayments =\s+canMutatePayments &&/,
   /const canRecord =\s+canMutatePayments &&/,
   /const canRequest =\s+canMutatePayments &&/,
   /const canExtendFollowUp =\s+canMutatePayments &&/,
@@ -125,7 +136,8 @@ for (const actionGate of [
   assert.match(section, actionGate, "cancelled order actions remain gated");
 }
 assert.match(section, /canManageDiscounts && canMutatePayments/);
-assert.match(section, /canCorrect && correctingPaymentAllocationId === row\.id/);
+assert.match(section, /canCorrectPayments && correctingPaymentAllocationId === row\.id/);
+assert.match(section, /const canRecordRefund =\s+canRecordPaymentCorrection && remainingRefundable > 0/);
 assert.match(section, /Order cancelled\. No refund recorded\./);
 assert.match(section, /formatRm\(settlement\.refundsTotal\)/);
 assert.match(section, /order\.refunds\.map\(\(row\) =>/);

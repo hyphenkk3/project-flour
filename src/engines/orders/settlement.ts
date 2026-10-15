@@ -14,6 +14,7 @@ import type {
 } from "@/types/storefront";
 
 export type SettlementInput = {
+  orderStatus?: string;
   /** Commercial lines: cakes and/or paid add-ons (unit price snapshots × qty). */
   items: Array<{ unitPrice: number; quantity: number }>;
   adjustments: Array<Pick<OrderAdjustment, "amount">>;
@@ -21,7 +22,7 @@ export type SettlementInput = {
     Pick<OrderPaymentAllocationView, "amount" | "paymentStatus"> &
       Partial<Pick<OrderPaymentAllocationView, "effectiveAmount">>
   >;
-  refunds: Array<Pick<OrderRefundView, "amount" | "status">>;
+  refunds: Array<Pick<OrderRefundView, "amount" | "status"> & Partial<Pick<OrderRefundView, "refundType">>>;
 };
 
 /**
@@ -50,11 +51,35 @@ export function calculateOrderSettlement(input: SettlementInput): OrderSettlemen
       .filter((row) => row.status === "recorded")
       .reduce((sum, row) => sum + toCents(row.amount), 0),
   );
+  const hasRefundType = input.refunds.some((row) => row.refundType != null);
+  const overpaymentRefundsTotal = hasRefundType
+    ? fromCents(
+        input.refunds
+          .filter(
+            (row) =>
+              row.status === "recorded" &&
+              row.refundType === "overpayment_correction",
+          )
+          .reduce((sum, row) => sum + toCents(row.amount), 0),
+      )
+    : refundsTotal;
 
   const netReceived = subtractMoney(verifiedPaymentsAllocated, refundsTotal);
-  const remainingBalance = Math.max(0, subtractMoney(amountDue, netReceived));
+  // Refunds are a cash outflow, not new customer debt. Outstanding is measured
+  // against the verified amount originally received, while netReceived remains
+  // available for cash reporting and Fresh Pick cancellation settlement.
+  const genuineOutstanding = Math.max(
+    0,
+    subtractMoney(amountDue, verifiedPaymentsAllocated),
+  );
+  const remainingRefundable = Math.max(0, netReceived);
+  const remainingBalance =
+    input.orderStatus === "cancelled" || input.orderStatus === "completed"
+      ? 0
+      : genuineOutstanding;
   const overpayment = Math.max(0, subtractMoney(netReceived, amountDue));
-  const isFullyPaid = moneyCompare(netReceived, amountDue) >= 0;
+  const isFullyPaid =
+    moneyCompare(verifiedPaymentsAllocated, amountDue) >= 0;
 
   return {
     subtotal,
@@ -62,7 +87,10 @@ export function calculateOrderSettlement(input: SettlementInput): OrderSettlemen
     amountDue,
     verifiedPaymentsAllocated,
     refundsTotal,
+    overpaymentRefundsTotal,
     netReceived,
+    remainingRefundable,
+    genuineOutstanding,
     remainingBalance,
     overpayment,
     isFullyPaid,

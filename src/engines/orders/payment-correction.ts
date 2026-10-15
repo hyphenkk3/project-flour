@@ -53,14 +53,16 @@ export function remainingRefundableExcess(settlement: OrderSettlement): number {
 export function paymentCorrectionStatus(
   settlement: OrderSettlement,
 ): PaymentCorrectionStatus {
-  if (moneyCompare(settlement.refundsTotal, 0) <= 0) return "none";
+  const correctionRefunds =
+    settlement.overpaymentRefundsTotal ?? settlement.refundsTotal;
+  if (moneyCompare(correctionRefunds, 0) <= 0) return "none";
   if (moneyCompare(settlement.overpayment, 0) > 0) return "partial";
   return "full";
 }
 
 export function parseRefundAmount(raw: string): number | null {
   const trimmed = raw.trim();
-  if (!trimmed) return null;
+  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/.test(trimmed)) return null;
   const amount = Number(trimmed);
   if (!Number.isFinite(amount)) return null;
   const cents = toCents(amount);

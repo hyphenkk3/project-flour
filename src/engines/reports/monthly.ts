@@ -140,6 +140,7 @@ export function orderFinancials(order: ReportOrder) {
       .map((row) => row.amount),
   );
   const settlement = calculateOrderSettlement({
+    orderStatus: order.status,
     items: [...order.items, ...order.addons].map((row) => ({
       unitPrice: row.unitPrice,
       quantity: row.quantity,
@@ -171,7 +172,8 @@ export function orderFinancials(order: ReportOrder) {
     other,
     netSales,
     reconciliation: roundedCurrency(netSales - settlement.amountDue),
-    outstandingNow: settlement.remainingBalance,
+    outstandingNow:
+      settlement.remainingBalance,
     settlement,
   };
 }
@@ -200,14 +202,17 @@ export function summarizeCash(
           .map((row) => row.effectiveAmount),
       ),
     }));
+  const collected = sum(verified.map((row) => row.effectiveAmount));
+  const refundsTotal = sum(
+    refunds
+      .filter((row) => row.status === "recorded")
+      .map((row) => row.amount),
+  );
   return {
-    collected: sum(verified.map((row) => row.effectiveAmount)),
+    collected,
     methods,
-    refunds: sum(
-      refunds
-        .filter((row) => row.status === "recorded")
-        .map((row) => row.amount),
-    ),
+    refunds: refundsTotal,
+    netReceipts: sum([collected, -refundsTotal]),
   };
 }
 
@@ -332,7 +337,7 @@ export function buildMonthlyReport(orders: ReportOrder[], month: string) {
     cancelledValue: sum(cancelled.map((row) => orderFinancials(row).netSales)),
     outstandingNow: sum(
       selected
-        .filter((row) => row.status !== "cancelled")
+        .filter((row) => row.status !== "cancelled" && row.status !== "completed")
         .map((row) => orderFinancials(row).outstandingNow),
     ),
     cakeQuantity: cakes.reduce((n, row) => n + row.quantity, 0),
