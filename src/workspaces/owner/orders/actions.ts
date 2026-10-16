@@ -1461,6 +1461,14 @@ export async function recordOverpaymentRefundAction(
   }
 
   const supabase = await createClient();
+  const { data: existingRequest, error: requestLookupError } = await supabase
+    .from("refunds")
+    .select("id")
+    .eq("request_key", requestKey)
+    .maybeSingle();
+  if (requestLookupError) {
+    return { error: requestLookupError.message, success: false };
+  }
   const { error } = await supabase.rpc("record_overpayment_refund_with_details", {
     p_order_id: orderId,
     p_amount: amount.toFixed(2),
@@ -1480,6 +1488,9 @@ export async function recordOverpaymentRefundAction(
   });
   if (error) return { error: error.message, success: false };
 
+  if (!existingRequest) {
+    scheduleStaffNotificationDispatch();
+  }
   revalidatePath("/owner");
   revalidatePath(`/owner/orders/${orderId}`);
   revalidatePath(`/owner/orders/${orderId}/payment`);

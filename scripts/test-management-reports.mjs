@@ -192,6 +192,49 @@ assert.equal(
 );
 assert.equal(report.discountedOrders, 1);
 assert.equal(report.outstandingNow, 369);
+
+const completedWithUnpaidRemainder = {
+  ...base("completed-unpaid"),
+  status: "completed",
+  items: [item("Completed cake", '6"', 1, 100)],
+  addons: [],
+  allocations: [
+    {
+      amount: 60,
+      effectiveAmount: 60,
+      status: "verified",
+      method: "wb_qr",
+      paidAt: "2026-10-05T00:00:00Z",
+    },
+  ],
+  refunds: [{ amount: 10, status: "recorded", refundedAt: "2026-10-10T00:00:00Z" }],
+};
+const activeWithUnpaidRemainder = {
+  ...base("active-unpaid"),
+  status: "awaiting_payment",
+  items: [item("Active cake", '6"', 1, 100)],
+  addons: [],
+  allocations: [
+    {
+      amount: 40,
+      effectiveAmount: 40,
+      status: "verified",
+      method: "wb_qr",
+      paidAt: "2026-10-05T00:00:00Z",
+    },
+  ],
+  refunds: [{ amount: 10, status: "recorded", refundedAt: "2026-10-10T00:00:00Z" }],
+};
+assert.equal(orderFinancials(completedWithUnpaidRemainder).outstandingNow, 40);
+assert.equal(orderFinancials(activeWithUnpaidRemainder).outstandingNow, 60);
+assert.equal(
+  buildMonthlyReport(
+    [completedWithUnpaidRemainder, activeWithUnpaidRemainder],
+    "2026-10",
+  ).outstandingNow,
+  100,
+  "completed and active orders count only genuine unpaid balances",
+);
 assert.equal(buildMonthlyReport([prior], "2026-09").netSales, 50);
 assert.equal(buildMonthlyReport([], "2026-10").netSales, 0);
 assert.equal(classifyAdjustment(adjustment(-2, "manual")), "other");

@@ -130,7 +130,9 @@ assert.match(generalRpc, /order_verified_allocated\(p_order_id\)/);
 assert.match(generalRpc, /order_refunds_total\(p_order_id\)/);
 assert.match(generalRpc, /insert into public\.order_timeline_events/);
 assert.doesNotMatch(generalRpc, /update public\.orders|update public\.payments|delete from public\.(refunds|payments|payment_allocations)/i);
+assert.match(migration, /drop policy if exists refunds_authenticated_insert on public\.refunds/i);
 assert.match(migration, /revoke insert, update, delete, truncate, references, trigger\s+on table public\.refunds from public, anon, authenticated, service_role/i);
+assert.match(migration, /grant select on table public\.refunds to authenticated/i);
 assert.match(migration, /grant execute on function public\.record_order_refund[\s\S]*?to authenticated/i);
 assert.doesNotMatch(migration, /alter function public\.cancel_and_refund_paid_fresh_pick[\s\S]*rename/i);
 assert.doesNotMatch(migration, /revoke all on function public\.cancel_and_refund_paid_fresh_pick\(/i);
@@ -164,6 +166,17 @@ assert.equal((paymentUi.match(/openFinancialForm\("refund"\)/g) ?? []).length, 2
 assert.match(paymentUi, /openFinancialForm\(showExtend \? "none" : "extend"\)/);
 assert.match(actionSource, /record_overpayment_refund_with_details/);
 assert.match(actionSource, /Fresh Pick refunds must use the Owner cancellation and refund workflow/);
+const overpaymentAction = actionSource.slice(
+  actionSource.indexOf("export async function recordOverpaymentRefundAction"),
+  actionSource.indexOf("// ---------------------------------------------------------------------------", actionSource.indexOf("export async function recordOverpaymentRefundAction")),
+);
+const requestPrecheck = overpaymentAction.indexOf('.select("id")');
+const refundRpc = overpaymentAction.indexOf('rpc("record_overpayment_refund_with_details"');
+const notificationSchedule = overpaymentAction.indexOf("scheduleStaffNotificationDispatch()");
+assert.ok(requestPrecheck >= 0 && requestPrecheck < refundRpc, "request-key precheck runs before the refund RPC");
+assert.ok(refundRpc < notificationSchedule, "notification scheduling follows the refund RPC");
+assert.match(overpaymentAction, /if \(requestLookupError\)[\s\S]*?return \{ error: requestLookupError\.message, success: false \}/);
+assert.match(overpaymentAction, /if \(error\) return \{ error: error\.message, success: false \};[\s\S]*?if \(!existingRequest\) \{\s*scheduleStaffNotificationDispatch\(\);\s*\}/);
 assert.match(lifecycleUi, /cancelAndRefundFreshPickAction[\s\S]*freshPickRefundMethod/);
 assert.match(reportSource, /netReceipts: sum\(\[collected, -refundsTotal\]\)/);
 assert.match(exportSource, /\["Payments", "Net Receipts"/);
