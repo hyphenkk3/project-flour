@@ -172,8 +172,9 @@ export function orderFinancials(order: ReportOrder) {
     other,
     netSales,
     reconciliation: roundedCurrency(netSales - settlement.amountDue),
+    // Refunds reduce the amount still owed; they must not create a new balance.
     outstandingNow:
-      settlement.remainingBalance,
+      settlement.genuineOutstanding ?? settlement.remainingBalance,
     settlement,
   };
 }
@@ -337,7 +338,7 @@ export function buildMonthlyReport(orders: ReportOrder[], month: string) {
     cancelledValue: sum(cancelled.map((row) => orderFinancials(row).netSales)),
     outstandingNow: sum(
       selected
-        .filter((row) => row.status !== "cancelled" && row.status !== "completed")
+        .filter((row) => row.status !== "cancelled")
         .map((row) => orderFinancials(row).outstandingNow),
     ),
     cakeQuantity: cakes.reduce((n, row) => n + row.quantity, 0),
