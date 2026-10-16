@@ -90,8 +90,7 @@ export function PaymentSection({
     canRecordPaymentCorrection && remainingRefundable > 0 && !order.extraStockId;
   const canRecordOverpaymentRefund =
     canMutatePayments && canRecordPaymentCorrection && settlement.overpayment > 0;
-  const canCorrectPayments =
-    canMutatePayments && canRecordPaymentCorrection && settlement.overpayment > 0;
+  const canCorrectPayments = canMutatePayments && canRecordPaymentCorrection;
   const nonCollectibleOrder =
     order.status === "cancelled" || String(order.status) === "completed";
   const collectibleBalance = nonCollectibleOrder
