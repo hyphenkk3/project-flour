@@ -2,6 +2,11 @@ import {
   percentChange,
   type buildMonthlyReport,
 } from "@/engines/reports/monthly";
+import {
+  assertRefundBreakdownReconciles,
+  type RefundBreakdownEntry,
+} from "@/engines/reports/refund-breakdown";
+import { paymentMethodDisplayLabel } from "@/engines/orders/payment-details";
 
 type MonthlyReport = ReturnType<typeof buildMonthlyReport>;
 
@@ -19,6 +24,7 @@ export type ManagementReportData = {
     netReceipts: number;
     methods: Array<{ method: string; value: number }>;
   };
+  refundBreakdown: RefundBreakdownEntry[];
   asOf: string;
 };
 
@@ -26,14 +32,14 @@ export type ExportCell =
   | string
   | number
   | null
-  | { value: string | number | null; kind?: "currency" | "percentage" | "integer" };
+  | { value: string | number | null; kind?: "currency" | "percentage" | "integer" | "date" };
 
 export type ExportSheet = {
   name: string;
   columns: Array<{
     header: string;
     width?: number;
-    kind?: "currency" | "percentage" | "integer";
+    kind?: "currency" | "percentage" | "integer" | "date";
   }>;
   rows: ExportCell[][];
 };
@@ -45,6 +51,10 @@ const comparison = (current: number, previous: number) =>
 export function buildManagementReportExportSheets(
   report: ManagementReportData,
 ): ExportSheet[] {
+  assertRefundBreakdownReconciles(
+    report.refundBreakdown,
+    report.payments.refunds,
+  );
   const { current, previous } = report;
   const previousCakeQuantities = new Map(
     previous.cakes.map((cake) => [
@@ -228,7 +238,7 @@ export function buildManagementReportExportSheets(
       ],
       rows: [
         ...report.payments.methods.map((row): ExportCell[] => [
-          row.method || "Unspecified",
+          row.method ? paymentMethodDisplayLabel(row.method) : "Unspecified",
           { value: row.value, kind: "currency" },
           null,
           null,
@@ -236,6 +246,27 @@ export function buildManagementReportExportSheets(
         ]),
         ["Total", { value: report.payments.collected, kind: "currency" }, { value: report.payments.refunds, kind: "currency" }, { value: report.payments.netReceipts, kind: "currency" }, "Net receipts = collections minus refunds in this report period"] as ExportCell[],
       ],
+    },
+    {
+      name: "Refund Breakdown",
+      columns: [
+        { header: "Order Number", width: 24 },
+        { header: "Refund Date", width: 16, kind: "date" },
+        { header: "Refund Amount", width: 16, kind: "currency" },
+        { header: "Refund Method", width: 24 },
+        { header: "Refund Source / Type", width: 34 },
+        { header: "Recorded By", width: 22 },
+        { header: "Refund Reason", width: 56 },
+      ],
+      rows: report.refundBreakdown.map((row) => [
+        row.orderNumber,
+        { value: row.refundDate, kind: "date" },
+        { value: row.amount, kind: "currency" },
+        row.method,
+        row.source,
+        row.recordedBy,
+        row.reason,
+      ]),
     },
     {
       name: "Monthly Comparison",

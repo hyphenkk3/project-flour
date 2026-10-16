@@ -1,5 +1,6 @@
 import "server-only";
 import { requireStaff } from "@/foundation/auth/session";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   buildMonthlyReport,
@@ -11,6 +12,11 @@ import {
   type ReportOrder,
   type ReportMethod,
 } from "@/engines/reports/monthly";
+import {
+  assertRefundBreakdownReconciles,
+  managementRefundMonthBounds,
+  mapRefundBreakdownEntry,
+} from "@/engines/reports/refund-breakdown";
 
 type Client = Awaited<ReturnType<typeof createClient>>;
 type Row = Record<string, unknown>;
@@ -226,13 +232,6 @@ async function loadRelated(
   });
 }
 
-function monthBounds(month: string) {
-  return {
-    start: `${month}-01T00:00:00+08:00`,
-    end: `${nextMonth(month)}-01T00:00:00+08:00`,
-  };
-}
-
 export async function loadManagementReport(month: string) {
   await requireReportOwner();
   const client = await createClient();
@@ -244,7 +243,7 @@ export async function loadManagementReport(month: string) {
   const orders = await loadRelated(client, [...currentRows, ...priorRows]);
   const current = buildMonthlyReport(orders, month);
   const previous = buildMonthlyReport(orders, prior);
-  const bounds = monthBounds(month);
+  const bounds = managementRefundMonthBounds(month);
   const bookings = await allRows(() =>
     client
       .from("orders")
@@ -319,7 +318,9 @@ export async function loadManagementReport(month: string) {
   const refundRows = await allRows(() =>
     client
       .from("refunds")
-      .select("amount,status")
+      .select(
+        "id,order_id,amount,status,refunded_at,refund_method,refund_method_description,refund_type,reason,created_by",
+      )
       .gte("refunded_at", bounds.start)
       .lt("refunded_at", bounds.end)
       .order("id"),
@@ -332,6 +333,83 @@ export async function loadManagementReport(month: string) {
       refundedAt: "",
     })),
   );
+  const recordedRefundRows = refundRows.filter(
+    (row) => text(row.status) === "recorded",
+  );
+  const refundOrderIds = [...
+    new Set(recordedRefundRows.map((row) => text(row.order_id)).filter(Boolean)),
+  ];
+  const refundOrders: Row[] = [];
+  for (let i = 0; i < refundOrderIds.length; i += 100) {
+    refundOrders.push(
+      ...(await allRows(() =>
+        client
+          .from("orders")
+          .select("id,order_number")
+          .in("id", refundOrderIds.slice(i, i + 100))
+          .order("id"),
+      )),
+    );
+  }
+  const orderNumberById = new Map(
+    refundOrders.map((row) => [text(row.id), text(row.order_number)]),
+  );
+  const refundActorIds = [
+    ...new Set(
+      recordedRefundRows
+        .map((row) => nullable(row.created_by))
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const actorNameById = new Map<string, string>();
+  let actorLookupFailed = false;
+  if (refundActorIds.length > 0) {
+    try {
+      // Resolve only actors on refunds already visible to the authorized
+      // report query. Do not widen staff_profiles RLS or fetch private fields.
+      const admin = createServiceClient();
+      for (let i = 0; i < refundActorIds.length; i += 100) {
+        const { data, error } = await admin
+          .from("staff_profiles")
+          .select("id,display_name")
+          .in("id", refundActorIds.slice(i, i + 100));
+        if (error) {
+          actorLookupFailed = true;
+          break;
+        }
+        for (const staff of data ?? []) {
+          const name = String(staff.display_name ?? "").trim();
+          if (name) actorNameById.set(String(staff.id), name);
+        }
+      }
+    } catch {
+      actorLookupFailed = true;
+    }
+  }
+  const refundBreakdown = recordedRefundRows.map((row) => {
+    const orderId = text(row.order_id);
+    const orderNumber = orderNumberById.get(orderId);
+    if (!orderNumber)
+      throw new Error("Recorded refund has no visible order number");
+    const actorId = nullable(row.created_by);
+    const recordedBy = actorId
+      ? actorNameById.get(actorId) ??
+        (actorLookupFailed ? "Name unavailable" : "Staff")
+      : "Staff";
+    return mapRefundBreakdownEntry(
+      {
+        amount: number(row.amount),
+        refundedAt: text(row.refunded_at),
+        refundMethod: nullable(row.refund_method),
+        refundMethodDescription: nullable(row.refund_method_description),
+        refundType: nullable(row.refund_type),
+        reason: nullable(row.reason),
+      },
+      orderNumber,
+      recordedBy,
+    );
+  });
+  assertRefundBreakdownReconciles(refundBreakdown, cash.refunds);
   return {
     current,
     previous,
@@ -346,6 +424,7 @@ export async function loadManagementReport(month: string) {
       ),
     },
     payments: cash,
+    refundBreakdown,
     asOf: new Date().toISOString(),
   };
 }

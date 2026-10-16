@@ -19,11 +19,21 @@ export function paymentMethodLabel(
   method: PaymentMethod,
   methodDescription?: string | null,
 ): string {
+  return paymentMethodDisplayLabel(method, methodDescription);
+}
+
+/** Display a stored payment method without changing its database identifier. */
+export function paymentMethodDisplayLabel(
+  method: string,
+  methodDescription?: string | null,
+): string {
   if (method === "others") {
     const detail = methodDescription?.trim();
     return detail ? `Others — ${detail}` : "Others";
   }
-  return PAYMENT_METHOD_LABELS[method];
+  return Object.prototype.hasOwnProperty.call(PAYMENT_METHOD_LABELS, method)
+    ? PAYMENT_METHOD_LABELS[method as PaymentMethod]
+    : method;
 }
 
 export const WHOLECAKE_PREORDER_PAYMENT_QR_SRC =

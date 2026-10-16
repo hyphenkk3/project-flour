@@ -5,7 +5,7 @@ import { buildManagementReportExportSheets } from "@/engines/reports/export-data
 import PDFDocument from "pdfkit";
 
 type CellValue = string | number | null;
-type CellInfo = { value: CellValue; kind?: "currency" | "percentage" | "integer" };
+type CellInfo = { value: CellValue; kind?: "currency" | "percentage" | "integer" | "date" };
 type Column = ExportSheet["columns"][number];
 
 const margin = 42;
@@ -31,7 +31,27 @@ function formatCell(cell: ExportCell, column: Column): string {
     return `${new Intl.NumberFormat("en-MY", { maximumFractionDigits: 1 }).format(value * 100)}%`;
   if (kind === "integer" && typeof value === "number")
     return new Intl.NumberFormat("en-MY", { maximumFractionDigits: 0 }).format(value);
+  if (kind === "date" && typeof value === "string")
+    return new Intl.DateTimeFormat("en-MY", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(new Date(`${value}T00:00:00Z`));
   return String(value);
+}
+
+function splitLongReason(value: string, maximum = 360): string[] {
+  const chunks: string[] = [];
+  let remaining = value;
+  while (remaining.length > maximum) {
+    const breakAt = remaining.lastIndexOf(" ", maximum);
+    const splitAt = breakAt >= maximum / 2 ? breakAt : maximum;
+    chunks.push(remaining.slice(0, splitAt));
+    remaining = remaining.slice(splitAt);
+  }
+  chunks.push(remaining);
+  return chunks;
 }
 
 function reportMonthLabel(month: string): string {
@@ -279,6 +299,23 @@ export async function generateManagementReportPdf(
   ], [["Fresh Pick", { value: report.current.freshPicks.orders, kind: "integer" }, { value: report.current.freshPicks.netSales, kind: "currency" }, "Subset of order-source totals above; included there and not additive."]], [110, 82, 125, 190]);
   drawTable("F. Bookings", byName.get("Bookings")!.columns, byName.get("Bookings")!.rows, [115, 85, 140, 167]);
   drawTable("F. Payments", byName.get("Payments")!.columns, byName.get("Payments")!.rows, [82, 82, 82, 82, 157]);
+  const refunds = byName.get("Refund Breakdown")!;
+  const refundRows = refunds.rows.length
+    ? refunds.rows.flatMap((row) => {
+        const reason = String(row[6] ?? "");
+        return splitLongReason(reason).map((chunk, index) =>
+          index === 0
+            ? [...row.slice(0, 6), chunk]
+            : [null, null, null, null, null, null, chunk],
+        );
+      })
+    : [["No recorded refunds in the selected month", null, null, null, null, null, null]];
+  drawTable(
+    "Refund Breakdown",
+    refunds.columns,
+    refundRows,
+    [76, 58, 62, 72, 84, 62, 145],
+  );
   drawTable("G. Month-over-Month Comparison", byName.get("Monthly Comparison")!.columns, byName.get("Monthly Comparison")!.rows);
   ensureSpace(40);
   doc.font("Helvetica").fontSize(8).fillColor(muted).text(

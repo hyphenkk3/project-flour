@@ -5,7 +5,7 @@ import os from "node:os";
 import vm from "node:vm";
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
-import { inflateRawSync } from "node:zlib";
+import { inflateRawSync, inflateSync } from "node:zlib";
 
 const nativeRequire = createRequire(import.meta.url);
 const cache = new Map();
@@ -135,8 +135,31 @@ const report = {
   payments: {
     collected: 140,
     refunds: 5,
-    methods: [{ method: "wb_qr", value: 140 }],
+    methods: [
+      { method: "wb_qr", value: 110 },
+      { method: "online_transfer", value: 30 },
+    ],
   },
+  refundBreakdown: [
+    {
+      orderNumber: "ORD-20261006-0002",
+      refundDate: "2026-10-15",
+      amount: 2,
+      method: "Online Transfer",
+      source: "General Refund",
+      recordedBy: "wee",
+      reason: "Long reason " + "detail ".repeat(80),
+    },
+    {
+      orderNumber: "ORD-20261006-0002",
+      refundDate: "2026-10-15",
+      amount: 3,
+      method: "Not recorded",
+      source: "Fresh Pick Cancellation Refund",
+      recordedBy: "Staff",
+      reason: "Legacy record",
+    },
+  ],
   asOf: "2026-10-13T10:00:00.000Z",
 };
 
@@ -149,7 +172,7 @@ assert.equal(percentChange(10, 0), null, "zero comparison has no misleading perc
 
 const sheets = buildManagementReportExportSheets(report);
 assert.deepEqual(Array.from(sheets, (sheet) => sheet.name), [
-  "Summary", "Fulfilment", "Cake Sales", "Discounts", "Order Sources", "Bookings", "Payments", "Monthly Comparison",
+  "Summary", "Fulfilment", "Cake Sales", "Discounts", "Order Sources", "Bookings", "Payments", "Refund Breakdown", "Monthly Comparison",
 ]);
 const summary = sheets.find((sheet) => sheet.name === "Summary");
 const summaryNet = summary.rows.find((row) => row[1] === "Fulfilled Net Sales")[2];
@@ -159,6 +182,15 @@ assert.equal(summary.rows.find((row) => row[1] === "Fresh Pick Orders (subset)")
 const cakeSheet = sheets.find((sheet) => sheet.name === "Cake Sales");
 assert.ok(cakeSheet.rows.some((row) => row[1] === '8"'), "multiple historical sizes are included");
 assert.ok(cakeSheet.rows.some((row) => row[0].startsWith("Mango <Classic> & Friends")), "long historical cake name is preserved");
+const refundSheet = sheets.find((sheet) => sheet.name === "Refund Breakdown");
+assert.equal(refundSheet.rows[0][0], "ORD-20261006-0002");
+assert.equal(refundSheet.rows[0][1].value, "2026-10-15");
+assert.equal(refundSheet.rows[0][2].value, 2);
+assert.equal(refundSheet.rows[1][2].value, 3);
+assert.equal(refundSheet.rows.reduce((total, row) => total + row[2].value, 0), report.payments.refunds, "refund rows reconcile exactly with recorded refunds");
+assert.equal(refundSheet.rows[1][3], "Not recorded", "legacy refund methods are not invented");
+const paymentsSheet = sheets.find((sheet) => sheet.name === "Payments");
+assert.ok(paymentsSheet.rows.some((row) => row[0] === "Online Transfer"), "Excel payment methods use the shared display label");
 
 const xlsx = generateManagementReportXlsx(report);
 assert.equal(xlsx.readUInt32LE(0), 0x04034b50, "XLSX starts with a ZIP local header");
@@ -180,7 +212,7 @@ while (xlsx.readUInt32LE(offset) === 0x04034b50) {
 }
 assert.ok(zipEntries.has("[Content_Types].xml"));
 const workbook = zipEntries.get("xl/workbook.xml");
-for (const name of ["Summary", "Fulfilment", "Cake Sales", "Discounts", "Order Sources", "Bookings", "Payments", "Monthly Comparison"])
+for (const name of ["Summary", "Fulfilment", "Cake Sales", "Discounts", "Order Sources", "Bookings", "Payments", "Refund Breakdown", "Monthly Comparison"])
   assert.ok(workbook.includes(`name=\"${name}\"`), `workbook contains ${name} sheet`);
 const summaryXml = zipEntries.get("xl/worksheets/sheet1.xml");
 assert.match(summaryXml, /t="n"/, "financial values are numeric worksheet cells");
@@ -190,6 +222,9 @@ assert.match(cakeXml, /t="inlineStr"/, "untrusted fields are written as literal 
 assert.doesNotMatch(cakeXml, /<f(?:\s|>)/, "no user text is emitted as a spreadsheet formula");
 assert.ok(cakeXml.includes("=HYPERLINK(&quot;https://example.invalid&quot;)") || cakeXml.includes("=HYPERLINK(&quot;https://example.invalid&quot;") , "formula-like cake text remains XML-escaped literal text");
 assert.match(zipEntries.get("xl/styles.xml"), /RM/);
+const refundXml = zipEntries.get("xl/worksheets/sheet8.xml");
+assert.match(refundXml, /<c r="B2" s="5" t="n"><v>46310<\/v><\/c>/, "refund date is stored as an Excel date serial");
+assert.match(refundXml, /<c r="C2" s="2" t="n"><v>2<\/v><\/c>/, "refund amount is numeric with currency formatting");
 
 const pdf = await generateManagementReportPdf(report);
 assert.match(pdf.subarray(0, 8).toString("ascii"), /^%PDF-1\./, "PDF has a PDF header");
@@ -208,6 +243,27 @@ try {
   assert.equal(checked.status, 0, `PDF parser accepts generated file: ${checked.stderr}`);
   const pageCount = Number(checked.stdout.match(/Pages:\s+(\d+)/)?.[1] ?? 0);
   assert.ok(pageCount >= 2, "long cake tables paginate across A4 pages");
+  const decodedStreams = [];
+  let cursor = 0;
+  while ((cursor = pdf.indexOf(Buffer.from("stream\n"), cursor)) >= 0) {
+    const start = cursor + Buffer.byteLength("stream\n");
+    const end = pdf.indexOf(Buffer.from("endstream"), start);
+    if (end < 0) break;
+    try {
+      decodedStreams.push(inflateSync(pdf.subarray(start, end)).toString("latin1"));
+    } catch {
+      // Non-text or uncompressed streams are irrelevant to text assertions.
+    }
+    cursor = end + Buffer.byteLength("endstream");
+  }
+  const pdfText = decodedStreams.join("\n").replace(
+    /\[([^\]]*)\]\s*TJ/g,
+    (_match, content) => content
+      .replace(/<([0-9a-f]+)>/gi, (_hexMatch, hex) => Buffer.from(hex, "hex").toString("latin1"))
+      .replace(/\s*-?\d+(?:\.\d+)?\s*/g, "") + " ",
+  );
+  assert.match(pdfText, /Refund Breakdown/, "PDF includes the refund breakdown section");
+  assert.match(pdfText, /detail.*detail/, "long refund reason remains in the paginated PDF");
 } finally {
   rmSync(temp, { recursive: true, force: true });
 }
@@ -217,6 +273,7 @@ const empty = {
   previous: buildMonthlyReport([], "2026-01"),
   bookings: { count: 0, value: 0, sources: [] },
   payments: { collected: 0, refunds: 0, methods: [] },
+  refundBreakdown: [],
   asOf: "2026-03-01T00:00:00.000Z",
 };
 const emptySheets = buildManagementReportExportSheets(empty);

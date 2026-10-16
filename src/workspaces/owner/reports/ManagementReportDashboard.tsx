@@ -10,6 +10,7 @@ import {
   reportMonth,
 } from "@/engines/reports/monthly";
 import type { ManagementReportData } from "@/engines/reports/export-data";
+import { paymentMethodDisplayLabel } from "@/engines/orders/payment-details";
 import { ReportExportControls } from "@/workspaces/owner/reports/ReportExportControls";
 
 const currency = (value: number) =>
@@ -17,6 +18,13 @@ const currency = (value: number) =>
     value,
   );
 const integer = (value: number) => new Intl.NumberFormat("en-MY").format(value);
+const refundDate = (value: string) =>
+  new Intl.DateTimeFormat("en-MY", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
 const label = (value: string) =>
   value
     .replaceAll("_", " ")
@@ -647,10 +655,63 @@ export function ManagementReportDashboard({ report }: { report: ManagementReport
           </p>
           {report.payments.methods.map((row) => (
             <p className="mt-2 flex justify-between text-sm" key={row.method}>
-              <span>{label(row.method)}</span>
+              <span>{paymentMethodDisplayLabel(row.method)}</span>
               <strong>{currency(row.value)}</strong>
             </p>
           ))}
+        </div>
+      </section>
+      <section
+        aria-labelledby="refund-breakdown"
+        className="min-w-0 max-w-full space-y-3"
+      >
+        <div>
+          <h2
+            id="refund-breakdown"
+            className="text-xl font-semibold text-slate-900"
+          >
+            Refund Breakdown
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Recorded refunds by refund date for {monthLabel}. Total: {currency(report.payments.refunds)}.
+          </p>
+        </div>
+        <div
+          aria-label="Refund transactions for the selected month"
+          className="max-w-full overflow-x-auto rounded-xl border border-slate-200 bg-white"
+          role="region"
+          tabIndex={0}
+        >
+          <table className="w-full min-w-[960px] border-collapse text-left text-sm">
+            <thead className="bg-slate-50 text-xs font-semibold text-slate-600">
+              <tr>
+                {["Order Number", "Refund Date", "Refund Amount", "Refund Method", "Refund Source / Type", "Recorded By", "Refund Reason"].map((heading) => (
+                  <th className="whitespace-nowrap px-3 py-3" key={heading} scope="col">
+                    {heading}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {report.refundBreakdown.length ? report.refundBreakdown.map((row, index) => (
+                <tr key={`${row.orderNumber}-${row.refundDate}-${index}`}>
+                  <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-900">{row.orderNumber}</td>
+                  <td className="whitespace-nowrap px-3 py-3">{refundDate(row.refundDate)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 tabular-nums">{currency(row.amount)}</td>
+                  <td className="px-3 py-3">{row.method}</td>
+                  <td className="px-3 py-3">{row.source}</td>
+                  <td className="px-3 py-3">{row.recordedBy}</td>
+                  <td className="min-w-64 max-w-lg whitespace-normal break-words px-3 py-3">{row.reason}</td>
+                </tr>
+              )) : (
+                <tr>
+                  <td className="px-3 py-4 text-slate-500" colSpan={7}>
+                    No recorded refunds in this reporting month.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </section>
       <p className="text-xs text-slate-500">

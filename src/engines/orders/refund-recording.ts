@@ -4,7 +4,7 @@ export const REFUND_METHOD_OPTIONS: Array<{
   value: RefundMethodCode;
   label: string;
 }> = [
-  { value: "online_transfer", label: "Online Bank Transfer" },
+  { value: "online_transfer", label: "Online Transfer" },
   { value: "wb_qr", label: "WB QR" },
   { value: "cash", label: "Cash" },
   { value: "others", label: "Other" },
