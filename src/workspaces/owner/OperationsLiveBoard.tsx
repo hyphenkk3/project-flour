@@ -266,7 +266,7 @@ export function OperationsLiveBoard({
     return (
       <ul className="grid gap-3">
         {list.map((order) => (
-          <li key={order.id}>
+          <li className="min-w-0" key={order.id}>
             <OwnerOrderCard
               highlight={highlightedIds.has(order.id)}
               order={order}
