@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 const migration = readFileSync(
   resolve(
     process.cwd(),
-    "supabase/migrations/20261017130000_bind_cut_extra_stock_actor_and_restrict_execute.sql",
+    "supabase/migrations/20261017142007_bind_cut_extra_stock_actor_and_restrict_execute.sql",
   ),
   "utf8",
 );
