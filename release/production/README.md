@@ -11,8 +11,10 @@ Candidates are outside supabase/migrations so ordinary CLI pushes cannot include
 | 1 | 20261017150000_assignment_fix.sql | Future assignment reciprocal link, bound actor and anon revocation | Helper/audit signatures must match |
 | 2 | 20261017151000_cutoff.sql | Independent Bakery ordering cutoff | Verify Prod-shaped schema and existing rows |
 | 3 | 20261017152000_refund_v1.sql | Metadata and audited RPC wrappers | Review every existing app writer |
-| 4 | 20261017152100_refund_v1_write_lock.sql | Revoke direct table DML | Conditional on exact app source and all writers RPC-only |
+| 4 | 20261017154000_refund_total_rpc_acl.sql | Restrict direct API access to the six SECURITY DEFINER order financial aggregates | Confirm caller inventory and role-denial checks |
 | 5 | 20261017153000_email_pause.sql | Gate DB trigger/scheduled dispatch | Does not cover direct app/provider paths; provider stop also required |
+
+20261017152100_refund_v1_write_lock.sql remains a separate, conditional candidate and is excluded from the initial Production rollout.
 
 The assignment and cutoff SQL are based on accepted DEV migrations 20261017012542 and 20261017022803 with fail-closed schema preconditions. The refund migration is based on accepted DEV 20261015010528 with table privilege revocation separated. The email candidate is based on actual Production trigger/sweep definitions inspected read-only.
 
@@ -20,7 +22,7 @@ The candidate names express intended ordering only. Previous Supabase migration 
 
 ## Validation status
 
-SQL reviewed; no Production write/deploy/config change occurred. Full Production-shaped isolated rehearsal is not complete because a sanitized schema snapshot or representative disposable database is unavailable in the authorized workspace. No full compatibility pass is claimed. Current Production app build/bindings, Vercel environment values and Resend setup remain unverified.
+The initial four release migrations passed the previous Production-shaped SQL and permission rehearsal; the refund write-lock was excluded. The added financial-helper ACL migration was separately tested in a disposable PostgreSQL 17 database restored from the local ACL-bearing schema-only archive. Anonymous and authenticated direct calls were denied; service-role access, postgres-owned internal calls, and authenticated refund RPC grants remained available. The application checkout and Production were not changed. This targeted permission result is not a final Production deployment clearance: current Production app build/bindings, Vercel environment values, Resend setup, and recovery readiness remain separate release gates.
 
 Production email queue snapshot: 412 failed, 19 sent, no other status; 76 failures met the prior inspected retryable criteria. Preserve all rows. Never reactivate dispatch until aged backlog is explicitly reviewed.
 
