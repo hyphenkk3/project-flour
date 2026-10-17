@@ -1,5 +1,5 @@
 -- Targeted Production release candidate based on accepted DEV migration 20261017142007.
--- Requires 20261017150000_assignment_fix.sql first, which installs _bind_rpc_actor.
+-- Requires the already-present Production _bind_rpc_actor helper; keep this after the assignment candidate in the documented release sequence.
 -- Data-preserving: replaces one RPC and changes only its EXECUTE ACL.
 DO $preflight$
 DECLARE
