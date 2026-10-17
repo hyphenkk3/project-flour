@@ -52,3 +52,12 @@ This verifies only the local synthetic database backup and transaction rollback.
 - Keep the refund table write-lock excluded from the initial rollout until the actual Production application and every writer are confirmed to use RPCs rather than direct DML.
 - The email database gate blocks only the observed trigger and scheduled HTTP request paths. A provider-side send pause and verification of the current Production application remain necessary to guarantee no application email can escape.
 - Do not apply any candidate to Production based on this rehearsal alone. A sanitized complete Production schema or equivalent reviewed schema-only reconstruction and a full production-shaped test are still required.
+
+
+## Production slicing RPC security follow-up
+
+Read-only inspection of the live Production project `cuowwlduhxxifmpvpltt` found one `public.cut_extra_stock_into_slices(uuid,uuid)` function owned by `postgres`, marked SECURITY DEFINER. It already has the Bakery/Manager/Owner role allowlist, confirmed/unsold/already-cut guards, row locking, and audit call. It does not call `_bind_rpc_actor`; effective EXECUTE is true for anon, authenticated, service_role, and postgres because PUBLIC execution remains granted. The function arguments are named `p_extra_stock_id` and `p_actor_staff_id`.
+
+The required helper signatures and six stock columns referenced by the accepted DEV function are present in Production. The existing assignment-release migration runs first and defines the actor binder. Thus a separate targeted replacement is required; no existing Production data or history is repaired by this change.
+
+Candidate `20261017150500_cut_extra_stock_actor_acl.sql` is prepared from accepted DEV migration `20261017142007`, preserving its locks, eligibility checks, single-row update, audit event, and role policy. It revokes PUBLIC/anon and explicitly grants authenticated/service_role. This candidate has not yet been replayed in a disposable database after preparation. No Production object or record was modified during this inspection.

@@ -4,9 +4,9 @@ Use only a disposable database matching relevant Production schema and constrain
 
 1. Provision from sanitized schema-only snapshot or reconstruct verified Production-only objects; record PostgreSQL version and schema fingerprint.
 2. Confirm candidate versions absent and baseline helpers present.
-3. Apply assignment, cutoff, refund metadata/RPC, then email gate. Apply refund table write lock only after exact app sources prove RPC-only writes.
+3. Apply assignment, slicing actor/ACL, cutoff, Refund V1, Email Pause, and financial-aggregate ACL candidates in the release order documented in README. Exclude the separate refund table write-lock.
 4. Check one history record per applied candidate.
-5. Assignment: authorized synthetic staff succeeds; reciprocal links, sold_at, one audit pair; anon/spoofed actor denied; duplicate/mismatch fails atomically.
+5. Assignment: authorized synthetic staff succeeds; reciprocal links, sold_at, one audit pair; anon/spoofed actor denied; duplicate/mismatch fails atomically. Slicing: Bakery/Manager/Owner authenticated actors pass binding; anon and mismatched staff identity fail; only the selected confirmed unsold stock row changes; one audit event; duplicate cut rejected; authenticated/service_role remain allowed and anon denied.
 6. Cutoff: no existing order/stock row changes; cutoff independent from collection window; guest order before cutoff succeeds and at/after is server-rejected.
 7. Refund: test synthetic only; Owner/Manager general refund and Owner-only Fresh Pick cancellation; idempotency and net/report/timeline reconciliation; no provider money transfer.
 8. Email: paused trigger and cron issue no pg_net request; queue/preferences unchanged; web and WhatsApp remain separate; no provider emails.
