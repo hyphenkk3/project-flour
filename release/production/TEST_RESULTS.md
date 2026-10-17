@@ -54,13 +54,38 @@ This verifies only the local synthetic database backup and transaction rollback.
 - Do not apply any candidate to Production based on this rehearsal alone. A sanitized complete Production schema or equivalent reviewed schema-only reconstruction and a full production-shaped test are still required.
 
 
-## Production slicing RPC security follow-up
+## Production slicing RPC security follow-up — local PostgreSQL 17.11 replay
 
-Read-only inspection of the live Production project `cuowwlduhxxifmpvpltt` found one `public.cut_extra_stock_into_slices(uuid,uuid)` function owned by `postgres`, marked SECURITY DEFINER. It already has the Bakery/Manager/Owner role allowlist, confirmed/unsold/already-cut guards, row locking, and audit call. It does not call `_bind_rpc_actor`; effective EXECUTE is true for anon, authenticated, service_role, and postgres because PUBLIC execution remains granted. The function arguments are named `p_extra_stock_id` and `p_actor_staff_id`.
+Date: 2026-10-17
+Target: disposable local PostgreSQL 17.11 restored from the reviewed ACL-bearing Production schema archive. PostgreSQL was bound only to a private Unix socket with no TCP listener; no scheduler jobs or external integrations were enabled. The archive was not modified, uploaded, or committed.
 
-Production's existing `_bind_rpc_actor(uuid)` is SECURITY DEFINER owned by postgres, uses `auth.uid()`, checks the staff-to-auth user binding and staff state, and retains a service_role path. The required helper signatures and six stock columns referenced by the accepted DEV function are present in Production. The existing assignment-release migration runs first and defines the actor binder. Thus a separate targeted replacement is required; no existing Production data or history is repaired by this change.
+### Restore fidelity and limits
 
-Candidate `20261017150500_cut_extra_stock_actor_acl.sql` is prepared from accepted DEV migration `20261017142007`, preserving its locks, eligibility checks, single-row update, audit event, and role policy. It revokes PUBLIC/anon and explicitly grants authenticated/service_role. This candidate has not yet been replayed in a disposable database after preparation. No Production object or record was modified during this inspection.
+The schema-only restore completed after matching local Supabase dependencies required by the archive: `citext`, `btree_gist`, Supabase role placeholders, a `dashboard_user` ACL placeholder, and an empty `cron` schema. No business rows or scheduled jobs were restored. The restored metadata contained 99 tables, 75 triggers, and 161 RLS policies; all 99 tables were under auth/public/storage. Production function definitions were restored from the archive rather than replaced with stubs. The custom local `cron` schema had no jobs, and no external service was available to the local database.
 
+Because this was a schema-only archive, the database contained no pre-existing Production orders or stock to compare. No Production data was read or changed. The test created eight synthetic stock rows and synthetic staff/auth identities only in the disposable database.
 
-The focused local replay of the new slicing candidate was attempted with PostgreSQL 17 but could not start in the current sandbox: `initdb` failed during bootstrap because System V shared-memory creation was denied (`shmget: Operation not permitted`). A retry with memory-mapped shared memory was also denied. No server or test database was created and no candidate SQL was executed. The new candidate therefore remains NOT REPLAYED; run this migration alone in an approved disposable PostgreSQL 17 environment before Production release.
+### Migration replay
+
+Applied individually, in the requested order, with no SQL changes:
+1. `20261017150000_assignment_fix.sql` — PASS.
+2. `20261017150500_cut_extra_stock_actor_acl.sql` — PASS.
+
+Both completed without SQL errors. The assignment migration was included only as the required local dependency and was not applied to any hosted database.
+
+### Targeted security and integrity results
+
+- Anonymous EXECUTE: denied; effective function privilege check returned false.
+- Authenticated Bakery, Manager, and Owner: each successfully cut one eligible confirmed unsold synthetic stock row.
+- Customer Operations: rejected by the role allowlist.
+- Authenticated Bakery supplying another staff member's ID: rejected by `_bind_rpc_actor`.
+- Authenticated request with no bound user identity but a supplied staff ID: rejected as unauthenticated.
+- Sold, Proposed, and already-cut stock: each rejected and left unchanged.
+- Actor binding: each successful stock update and its sole `cut_into_slices` audit event recorded the matching authenticated staff profile. Exactly one cut event existed for each of the three successful rows; no cut event was emitted for rejected attempts.
+- Atomicity: a successful local cut followed by transaction rollback left both stock fields and its cut audit event unchanged.
+- Lock/update protection: the restored function retains `SELECT ... FOR UPDATE` and a guarded single-row update requiring confirmed lifecycle, unsold state, and no prior cut. No order row was changed; the schema-only restore had zero orders.
+- Existing Production history and business rows were not present in the schema-only database, so historical row preservation cannot be established by this rehearsal. The candidate migration itself changes the RPC definition and grants only; its exercised business effects were limited to explicit synthetic calls.
+
+### Release interpretation
+
+The slicing candidate is **locally validated against the restored Production schema and ACL metadata** for the tested role, stock eligibility, actor binding, audit, and transaction behavior. The restore used local Supabase dependency placeholders and did not emulate a live Supabase Auth/PostgREST gateway, active cron scheduler, or Production business rows. This does not prove full Production runtime compatibility or historical-data preservation. Keep the separate refund write-lock migration excluded from the initial rollout. No Production object, migration history, or record was modified.
