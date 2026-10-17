@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 
 const read = (path) => readFileSync(path, "utf8");
 const migration = read(
-  "supabase/migrations/20261017021516_fresh_pick_bakery_order_cutoff_v1.sql",
+  "supabase/migrations/20261017022803_fresh_pick_bakery_order_cutoff_v1.sql",
 );
 const cutoffFn = migration.slice(
   migration.indexOf("create or replace function public.update_extra_stock_order_cutoff"),
