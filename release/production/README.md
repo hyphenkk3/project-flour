@@ -11,8 +11,8 @@ Candidates are outside supabase/migrations so ordinary CLI pushes cannot include
 | 1 | 20261017150000_assignment_fix.sql | Future assignment reciprocal link, bound actor and anon revocation | Helper/audit signatures must match |
 | 2 | 20261017151000_cutoff.sql | Independent Bakery ordering cutoff | Verify Prod-shaped schema and existing rows |
 | 3 | 20261017152000_refund_v1.sql | Metadata and audited RPC wrappers | Review every existing app writer |
-| 4 | 20261017154000_refund_total_rpc_acl.sql | Restrict direct API access to the six SECURITY DEFINER order financial aggregates | Confirm caller inventory and role-denial checks |
-| 5 | 20261017153000_email_pause.sql | Gate DB trigger/scheduled dispatch | Does not cover direct app/provider paths; provider stop also required |
+| 4 | 20261017153000_email_pause.sql | Gate DB trigger/scheduled dispatch | Does not cover direct app/provider paths; provider stop also required |
+| 5 | 20261017154000_refund_total_rpc_acl.sql | Restrict direct API access to the six SECURITY DEFINER order financial aggregates | Confirm caller inventory and role-denial checks |
 
 20261017152100_refund_v1_write_lock.sql remains a separate, conditional candidate and is excluded from the initial Production rollout.
 
