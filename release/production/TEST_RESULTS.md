@@ -61,3 +61,6 @@ Read-only inspection of the live Production project `cuowwlduhxxifmpvpltt` found
 The required helper signatures and six stock columns referenced by the accepted DEV function are present in Production. The existing assignment-release migration runs first and defines the actor binder. Thus a separate targeted replacement is required; no existing Production data or history is repaired by this change.
 
 Candidate `20261017150500_cut_extra_stock_actor_acl.sql` is prepared from accepted DEV migration `20261017142007`, preserving its locks, eligibility checks, single-row update, audit event, and role policy. It revokes PUBLIC/anon and explicitly grants authenticated/service_role. This candidate has not yet been replayed in a disposable database after preparation. No Production object or record was modified during this inspection.
+
+
+The focused local replay of the new slicing candidate was attempted with PostgreSQL 17 but could not start in the current sandbox: `initdb` failed during bootstrap because System V shared-memory creation was denied (`shmget: Operation not permitted`). A retry with memory-mapped shared memory was also denied. No server or test database was created and no candidate SQL was executed. The new candidate therefore remains NOT REPLAYED; run this migration alone in an approved disposable PostgreSQL 17 environment before Production release.
