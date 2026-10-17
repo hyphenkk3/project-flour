@@ -13,11 +13,13 @@ import type {
 type NotificationPreferencesProps = {
   definitions: readonly StaffNotificationDefinition[];
   initialPreferences: StaffNotificationPreference[];
+  emailNotificationsPaused: boolean;
 };
 
 export function NotificationPreferences({
   definitions,
   initialPreferences,
+  emailNotificationsPaused,
 }: NotificationPreferencesProps) {
   const [preferences, setPreferences] =
     useState<StaffNotificationPreference[]>(initialPreferences);
@@ -54,7 +56,9 @@ export function NotificationPreferences({
     formData.set("notification_code", definition.code);
     formData.set("web_enabled", String(next.webEnabled));
     formData.set("web_mode", next.webMode);
-    formData.set("email_enabled", String(next.emailEnabled));
+    if (!emailNotificationsPaused) {
+      formData.set("email_enabled", String(next.emailEnabled));
+    }
 
     const result = await saveStaffNotificationPreferenceAction(formData);
 
@@ -183,38 +187,40 @@ export function NotificationPreferences({
                 </div>
               ) : null}
 
-              <span className="text-fog mx-1">|</span>
+              {!emailNotificationsPaused ? (
+                <>
+                  <span className="text-fog mx-1">|</span>
 
-              <button
-                aria-checked={emailEnabled}
-                aria-label={`${emailEnabled ? "Disable" : "Enable"} ${definition.label} email notifications`}
-                className={[
-                  "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition",
-                  emailEnabled
-                    ? "border-signal bg-signal"
-                    : "border-fog bg-white",
-                  isSaving
-                    ? "cursor-wait opacity-60"
-                    : "cursor-pointer",
-                ].join(" ")}
-                disabled={isSaving}
-                onClick={() =>
-                  void savePreference(definition, {
-                    emailEnabled: !emailEnabled,
-                  })
-                }
-                role="switch"
-                type="button"
-              >
-                <span
-                  className={[
-                    "inline-block h-4 w-4 rounded-full bg-white shadow-sm transition",
-                    emailEnabled ? "translate-x-6" : "translate-x-1",
-                  ].join(" ")}
-                />
-              </button>
+                  <button
+                    aria-checked={emailEnabled}
+                    aria-label={`${emailEnabled ? "Disable" : "Enable"} ${definition.label} email notifications`}
+                    className={[
+                      "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition",
+                      emailEnabled
+                        ? "border-signal bg-signal"
+                        : "border-fog bg-white",
+                      isSaving ? "cursor-wait opacity-60" : "cursor-pointer",
+                    ].join(" ")}
+                    disabled={isSaving}
+                    onClick={() =>
+                      void savePreference(definition, {
+                        emailEnabled: !emailEnabled,
+                      })
+                    }
+                    role="switch"
+                    type="button"
+                  >
+                    <span
+                      className={[
+                        "inline-block h-4 w-4 rounded-full bg-white shadow-sm transition",
+                        emailEnabled ? "translate-x-6" : "translate-x-1",
+                      ].join(" ")}
+                    />
+                  </button>
 
-              <span className="text-ink text-xs font-medium">Email</span>
+                  <span className="text-ink text-xs font-medium">Email</span>
+                </>
+              ) : null}
             </div>
           </div>
         );

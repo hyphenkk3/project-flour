@@ -1,6 +1,7 @@
 "use server";
 
 import { requireStaff } from "@/foundation/auth/session";
+import { LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED } from "@/foundation/staff/legacy-staff-notification-email-pause";
 import {
   STAFF_NOTIFICATION_DEFINITIONS,
   type StaffNotificationCode,
@@ -57,7 +58,9 @@ export async function saveStaffNotificationPreferenceAction(
         notification_code: code,
         web_enabled: webEnabled,
         web_mode: webModeValue,
-        email_enabled: emailEnabled,
+        ...(!LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED
+          ? { email_enabled: emailEnabled }
+          : {}),
       },
       {
         onConflict: "staff_id,notification_code",

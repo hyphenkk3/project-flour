@@ -2,6 +2,7 @@ import { requireStaff } from "@/foundation/auth/session";
 import { getNotificationDefinitionsForRole } from "@/foundation/staff/notification-preferences";
 import { loadStaffNotificationPreferences } from "@/foundation/staff/notification-preferences-queries";
 import { NotificationPreferences } from "@/components/settings/NotificationPreferences";
+import { LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED } from "@/foundation/staff/legacy-staff-notification-email-pause";
 import { StaffPasskeySettings } from "@/components/settings/StaffPasskeySettings";
 import { StaffPasswordSettings } from "@/components/settings/StaffPasswordSettings";
 import { StaffDisplayNameForm } from "@/components/settings/StaffDisplayNameForm";
@@ -63,11 +64,14 @@ export default async function SettingsPage() {
       <section className="border-fog rounded-xl border bg-white p-5">
         <h3 className="text-ink text-sm font-semibold">Notifications</h3>
         <p className="text-skyline mt-1 text-sm">
-          Choose which operational updates you want to receive by email.
+          {LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED
+            ? "Email delivery is temporarily paused. Your saved email preferences are preserved. Web notifications remain available."
+            : "Choose which operational updates you want to receive by email."}
         </p>
 
         <NotificationPreferences
           definitions={definitions}
+          emailNotificationsPaused={LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED}
           initialPreferences={preferences}
         />
       </section>

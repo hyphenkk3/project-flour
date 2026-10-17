@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED,
@@ -18,6 +19,27 @@ const { GET, POST } =
 
 async function main(): Promise<void> {
   assert.equal(LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED, true);
+
+  const preferenceUi = readFileSync(
+    "src/components/settings/NotificationPreferences.tsx",
+    "utf8",
+  );
+  assert.match(preferenceUi, /emailNotificationsPaused/);
+  assert.match(
+    preferenceUi,
+    /!emailNotificationsPaused\s*\?\s*\(/,
+    "email switches must be hidden while delivery is paused",
+  );
+
+  const preferenceAction = readFileSync(
+    "src/foundation/staff/notification-preferences-actions.ts",
+    "utf8",
+  );
+  assert.match(
+    preferenceAction,
+    /!LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED[\s\S]*email_enabled/,
+    "paused web-preference saves must preserve stored email preferences",
+  );
 
   let callbackCalls = 0;
   assert.equal(
