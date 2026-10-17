@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
   nextMonth,
+  formatReportAsOf,
   percentChange,
   previousMonth,
   reportMonth,
@@ -259,7 +260,7 @@ export function ManagementReportDashboard({ report }: { report: ManagementReport
                   {currency(current.outstandingNow)}
                 </p>
                 <p className="mt-0.5 text-[11px] text-slate-500">
-                  As of {new Date(report.asOf).toLocaleString("en-MY")}; not
+                  As of {formatReportAsOf(report.asOf)}; not
                   historical month-end
                 </p>
               </div>

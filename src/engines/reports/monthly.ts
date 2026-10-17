@@ -66,6 +66,12 @@ export function reportMonth(date: Date): string {
     .slice(0, 7);
 }
 
+export function formatReportAsOf(value: string): string {
+  return new Date(value).toLocaleString("en-MY", {
+    timeZone: "Asia/Kuching",
+  });
+}
+
 export function previousMonth(month: string): string {
   const [year, number] = month.split("-").map(Number);
   if (!year || !number || number < 1 || number > 12)

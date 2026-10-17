@@ -44,6 +44,7 @@ function pure(name) {
 const {
   buildMonthlyReport,
   classifyAdjustment,
+  formatReportAsOf,
   isReportOwner,
   nextMonth,
   orderFinancials,
@@ -287,6 +288,11 @@ assert.equal(nextMonth("2025-12"), "2026-01");
 assert.equal(percentChange(10, 0), null);
 assert.equal(percentChange(11, 10), 10);
 assert.equal(isReportOwner("owner"), true);
+assert.equal(
+  formatReportAsOf("2026-10-17T04:36:37.000Z"),
+  "17/10/2026, 12:36:37 pm",
+  "report as-of timestamps use the same Malaysia time zone on server and client",
+);
 for (const role of [
   "manager",
   "bakery",
@@ -410,6 +416,7 @@ assert.match(dashboard, /Cancelled orders/);
 assert.match(dashboard, /Outstanding for Selected Month/);
 assert.match(dashboard, /Payments collected/);
 assert.match(dashboard, /Recorded refunds/);
+assert.match(dashboard, /formatReportAsOf\(report\.asOf\)/);
 assert.match(dashboard, /previousMonth\(current\.month\)/);
 assert.match(dashboard, /nextMonth\(current\.month\)/);
 assert.match(dashboard, /current\.month < latestMonth/);
