@@ -7,7 +7,9 @@ select to_regprocedure('public._bind_rpc_actor(uuid)') is not null actor_binder,
  to_regprocedure('public._staff_role_code(uuid)') is not null role_helper,
  to_regprocedure('public.assign_extra_stock_to_order(uuid,uuid,uuid)') is not null assignment_rpc,
  to_regprocedure('public._pickup_slot_in_weekly_hours(date,time without time zone)') is not null pickup_helper,
- to_regclass('public.refunds') is not null refunds_table,\n to_regprocedure('public.cut_extra_stock_into_slices(uuid,uuid)') is not null cut_slices_rpc,\n to_regprocedure('public._record_extra_stock_event(uuid,text,uuid,jsonb)') is not null stock_audit_helper;
+ to_regclass('public.refunds') is not null refunds_table,
+ to_regprocedure('public.cut_extra_stock_into_slices(uuid,uuid)') is not null cut_slices_rpc,
+ to_regprocedure('public._record_extra_stock_event(uuid,text,uuid,jsonb)') is not null stock_audit_helper;
 select column_name from information_schema.columns where table_schema='public' and table_name='refunds'
 and column_name in ('refund_method','refund_method_description','request_key','refund_type') order by 1;
 select conname,convalidated,pg_get_constraintdef(oid) from pg_constraint
