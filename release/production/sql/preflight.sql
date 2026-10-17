@@ -1,8 +1,36 @@
--- READ ONLY: verify project externally before running; no writes in this file.
-select current_database(), current_setting('server_version');
-select version,name from supabase_migrations.schema_migrations
-where version in ('20261017012542','20261017022803','20261017150000','20261017151000','20261017152000','20261017150500','20261017153000','20261017154000')
+-- READ ONLY. Verify the Production project externally before connecting.
+-- Intended migrations are matched by API-supplied name, not filename timestamp.
+-- A row already present for any intended name is a STOP condition; do not replay.
+with intended(name) as (
+  values
+    ('assignment_fix'),
+    ('cut_extra_stock_actor_acl'),
+    ('cutoff'),
+    ('refund_v1'),
+    ('email_pause'),
+    ('refund_total_rpc_acl')
+)
+select i.name,
+       count(m.version) as history_rows,
+       array_agg(m.version order by m.version)
+         filter (where m.version is not null) as actual_versions,
+       case count(m.version)
+         when 0 then 'NOT APPLIED'
+         when 1 then 'ALREADY APPLIED — STOP'
+         else 'DUPLICATE HISTORY — STOP'
+       end as status
+from intended i
+left join supabase_migrations.schema_migrations m on m.name = i.name
+group by i.name
+order by i.name;
+
+-- This candidate is explicitly excluded from initial Production rollout.
+select version, name
+from supabase_migrations.schema_migrations
+where name = 'refund_v1_write_lock'
 order by version;
+
+select current_database(), current_setting('server_version');
 select to_regprocedure('public._bind_rpc_actor(uuid)') is not null actor_binder,
  to_regprocedure('public._staff_role_code(uuid)') is not null role_helper,
  to_regprocedure('public.assign_extra_stock_to_order(uuid,uuid,uuid)') is not null assignment_rpc,

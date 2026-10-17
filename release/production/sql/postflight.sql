@@ -1,6 +1,30 @@
--- READ ONLY postflight.
-select version,name from supabase_migrations.schema_migrations
-where version in ('20261017150000','20261017151000','20261017150500','20261017152000','20261017153000','20261017154000') order by version;
+-- READ ONLY postflight. The migration API may generate versions different
+-- from filenames; match by supplied migration name and report actual version.
+with intended(name) as (
+  values
+    ('assignment_fix'),
+    ('cut_extra_stock_actor_acl'),
+    ('cutoff'),
+    ('refund_v1'),
+    ('email_pause'),
+    ('refund_total_rpc_acl')
+)
+select i.name,
+       count(m.version) as history_rows,
+       array_agg(m.version order by m.version)
+         filter (where m.version is not null) as actual_versions,
+       case when count(m.version) = 1 then 'PASS' else 'FAIL — STOP' end as status
+from intended i
+left join supabase_migrations.schema_migrations m on m.name = i.name
+group by i.name
+order by i.name;
+
+-- Any row for the excluded write-lock is an unexpected state: STOP.
+select version, name
+from supabase_migrations.schema_migrations
+where name = 'refund_v1_write_lock'
+order by version;
+
 select has_function_privilege('anon','public.assign_extra_stock_to_order(uuid,uuid,uuid)','EXECUTE') anon_assign,
  has_function_privilege('authenticated','public.assign_extra_stock_to_order(uuid,uuid,uuid)','EXECUTE') auth_assign,
  has_function_privilege('service_role','public.assign_extra_stock_to_order(uuid,uuid,uuid)','EXECUTE') service_assign,
