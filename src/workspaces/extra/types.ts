@@ -43,7 +43,7 @@ export type ExtraStockUnit = {
   rejectedBy: string | null;
   rejectedByName: string | null;
   rejectReason: string | null;
-  /** Derived: confirmed, unsold, uncut, now <= order cutoff, not actively held. */
+  /** Derived: confirmed, unsold, uncut, before cutoff, not actively held. */
   available: boolean;
   /** Library cake photo for this Extra size, same resolveCakePhoto rule as Fresh Picks. */
   imageUrl?: string | null;

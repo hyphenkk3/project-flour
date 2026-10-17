@@ -1,6 +1,6 @@
 /**
- * Singapore wall-clock instants for Extra order/pickup windows.
- * Asia/Singapore is UTC+8 year-round (no DST).
+ * Malaysia wall-clock instants for Extra order/pickup windows.
+ * Asia/Kuala_Lumpur is UTC+8 year-round (no DST).
  */
 
 import { toBusinessDateKey, formatBusinessCalendarDate, formatBusinessWeekdayAbbrev } from "@/lib/dates";
@@ -26,7 +26,7 @@ export function isExtraThroughSlot(hhmm: string): boolean {
   return parsed.minute === 0 || parsed.minute === 30;
 }
 
-export function singaporeDateTimeToIso(
+export function malaysiaDateTimeToIso(
   ymd: string,
   hhmm: string,
 ): string | null {
@@ -41,19 +41,22 @@ export function singaporeDateTimeToIso(
   return new Date(ms).toISOString();
 }
 
+/** @deprecated Use malaysiaDateTimeToIso. */
+export const singaporeDateTimeToIso = malaysiaDateTimeToIso;
+
 export function extraPickupThroughIso(
   preparedOnYmd: string,
   throughSlot: string,
 ): string | null {
   if (!isExtraThroughSlot(throughSlot)) return null;
-  return singaporeDateTimeToIso(preparedOnYmd, throughSlot);
+  return malaysiaDateTimeToIso(preparedOnYmd, throughSlot);
 }
 
-export function singaporeClockHhmm(iso: string): string | null {
+export function malaysiaClockHhmm(iso: string): string | null {
   const date = new Date(iso);
   if (!Number.isFinite(date.getTime())) return null;
   const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Singapore",
+    timeZone: "Asia/Kuala_Lumpur",
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
@@ -64,8 +67,11 @@ export function singaporeClockHhmm(iso: string): string | null {
   return `${hour}:${minute}`;
 }
 
+/** @deprecated Use malaysiaClockHhmm. */
+export const singaporeClockHhmm = malaysiaClockHhmm;
+
 export function formatExtraPickupThroughClock(iso: string): string {
-  const hhmm = singaporeClockHhmm(iso);
+  const hhmm = malaysiaClockHhmm(iso);
   if (!hhmm) return "—";
   const [hRaw, mRaw] = hhmm.split(":");
   const hours = Number(hRaw);
@@ -73,6 +79,30 @@ export function formatExtraPickupThroughClock(iso: string): string {
   const suffix = hours >= 12 ? "PM" : "AM";
   const hour12 = hours % 12 === 0 ? 12 : hours % 12;
   return `${hour12}:${minutes} ${suffix}`;
+}
+
+export function malaysiaDateTimeParts(
+  iso: string,
+): { date: string; time: string } | null {
+  const value = new Date(iso);
+  if (!Number.isFinite(value.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(value);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value;
+  const year = get("year");
+  const month = get("month");
+  const day = get("day");
+  const hour = get("hour");
+  const minute = get("minute");
+  if (!year || !month || !day || !hour || !minute) return null;
+  return { date: `${year}-${month}-${day}`, time: `${hour}:${minute}` };
 }
 
 /** Bakery ExtraBoard window instant, e.g. 18 Aug 2026 (Mon), 12:00 PM Malaysia time. */

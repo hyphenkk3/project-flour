@@ -24,7 +24,10 @@ import {
   extraPickupThroughIso,
   formatExtraBoardWindowInstant,
   formatExtraPickupThroughClock,
+  malaysiaDateTimeParts,
+  malaysiaDateTimeToIso,
   singaporeDateTimeToIso,
+  isExtraThroughSlot,
 } from "@/engines/extra/fresh-picks-time";
 import { freshPickDay, type FreshPickDay } from "@/engines/extra/customer-fresh-picks";
 
@@ -33,6 +36,8 @@ export {
   extraPickupThroughIso,
   formatExtraBoardWindowInstant,
   formatExtraPickupThroughClock,
+  malaysiaDateTimeParts,
+  malaysiaDateTimeToIso,
   singaporeDateTimeToIso,
 };
 export { isExtraThroughSlot } from "@/engines/extra/fresh-picks-time";
@@ -48,6 +53,8 @@ export const EXTRA_CUTOFF_BEYOND_PICKUP_PLUS_ONE =
 export const EXTRA_THROUGH_SLOT_REQUIRED =
   "Choose when orders are available through.";
 
+export const EXTRA_CUTOFF_DATE_REQUIRED = "Choose an order cutoff date.";
+
 export const EXTRA_PICKUP_FROM_REQUIRED =
   "Choose when pickup is available from.";
 
@@ -61,7 +68,7 @@ export const EXTRA_PICKUP_FROM_NOT_OPERATING =
   "Pickup available from must be a valid bakery pickup time for that date.";
 
 export const EXTRA_CUTOFF_NOT_OPERATING =
-  "Orders available through must be a valid 30-minute time on that date.";
+  "Choose a valid 30-minute order cutoff time.";
 
 export const EXTRA_FROM_AFTER_CUTOFF =
   "Pickup available from must not be after the order cutoff.";
@@ -178,15 +185,21 @@ export function extraOrderCutoffSlotsForDate(input: {
   cutoffDate: string;
   todayYmd: string;
   now?: Date;
+  allowPast?: boolean;
 }): Array<ExtraThroughSlot & { disabled: boolean }> {
   const now = input.now ?? new Date();
   const cutoff = input.cutoffDate.trim().slice(0, 10);
   const today = input.todayYmd.trim().slice(0, 10);
-  return extraOperatingSlotsForDate(cutoff).map((slot) => {
-    if (cutoff < today) return { ...slot, disabled: true };
-    if (cutoff > today) return { ...slot, disabled: false };
-    const iso = extraPickupThroughIso(cutoff, slot.value);
-    return { ...slot, disabled: !iso || Date.parse(iso) <= now.getTime() };
+  return Array.from({ length: 48 }, (_, index) => {
+    const minutes = index * EXTRA_THROUGH_SLOT_INTERVAL_MINUTES;
+    const value = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+    const iso = extraPickupThroughIso(cutoff, value);
+    const slot = { value, label: extraThroughSlotLabel(value) };
+    const isPast = !iso || Date.parse(iso) <= now.getTime();
+    return {
+      ...slot,
+      disabled: input.allowPast ? false : cutoff < today || (cutoff === today && isPast),
+    };
   });
 }
 
@@ -279,6 +292,9 @@ export function evaluateExtraConfirm(input: {
   if (!isExtraHorizonDate(pickupFromDate, input.todayYmd)) {
     return { ok: false, error: EXTRA_FRESH_PICKS_TODAY_OR_TOMORROW };
   }
+  if (!cutoffDate) {
+    return { ok: false, error: EXTRA_CUTOFF_DATE_REQUIRED };
+  }
   if (!isExtraOrderCutoffDateAllowed(pickupFromDate, cutoffDate)) {
     const delta = calendarDaysBetween(pickupFromDate, cutoffDate);
     if (delta != null && delta < 0) {
@@ -295,7 +311,7 @@ export function evaluateExtraConfirm(input: {
   if (!isExtraOperatingPickupSlot(pickupFromDate, pickupFromSlot)) {
     return { ok: false, error: EXTRA_PICKUP_FROM_NOT_OPERATING };
   }
-  if (!isExtraOperatingPickupSlot(cutoffDate, cutoffSlot)) {
+  if (!isExtraThroughSlot(cutoffSlot)) {
     return { ok: false, error: EXTRA_CUTOFF_NOT_OPERATING };
   }
   const pickupAvailableFromIso = extraPickupThroughIso(
@@ -305,9 +321,6 @@ export function evaluateExtraConfirm(input: {
   const orderCutoffIso = extraPickupThroughIso(cutoffDate, cutoffSlot);
   if (!pickupAvailableFromIso || !orderCutoffIso) {
     return { ok: false, error: EXTRA_THROUGH_SLOT_INTERVAL };
-  }
-  if (Date.parse(pickupAvailableFromIso) > Date.parse(orderCutoffIso)) {
-    return { ok: false, error: EXTRA_FROM_AFTER_CUTOFF };
   }
   const now = input.now ?? new Date();
   if (Date.parse(orderCutoffIso) <= now.getTime()) {
@@ -335,4 +348,44 @@ export function extraCustomerAvailabilityLabel(input: {
   const day = extraFreshPickDay(fromYmd, input.todayYmd);
   if (day === "tomorrow") return "Available tomorrow";
   return "Available today";
+}
+
+export type ExtraCutoffEditDecision =
+  | { ok: true; orderCutoffIso: string; closesImmediately: boolean }
+  | { ok: false; error: string };
+
+export function evaluateExtraOrderCutoffEdit(input: {
+  pickupAvailableFromAt: string | null | undefined;
+  currentCutoffAt: string | null | undefined;
+  cutoffDate: string | null | undefined;
+  cutoffSlot: string | null | undefined;
+  todayYmd: string;
+  now?: Date;
+}): ExtraCutoffEditDecision {
+  const now = input.now ?? new Date();
+  const currentCutoffMs = Date.parse(input.currentCutoffAt ?? "");
+  if (!Number.isFinite(currentCutoffMs) || currentCutoffMs <= now.getTime()) {
+    return { ok: false, error: "This order cutoff has already expired and can no longer be edited." };
+  }
+  const pickupFromDate = input.pickupAvailableFromAt
+    ? malaysiaDateTimeParts(input.pickupAvailableFromAt)?.date ?? ""
+    : "";
+  const cutoffDate = input.cutoffDate?.trim().slice(0, 10) ?? "";
+  const cutoffSlot = input.cutoffSlot?.trim() ?? "";
+  if (!pickupFromDate || !isExtraOrderCutoffDateAllowed(pickupFromDate, cutoffDate)) {
+    return { ok: false, error: EXTRA_CUTOFF_BEYOND_PICKUP_PLUS_ONE };
+  }
+  if (!isExtraThroughSlot(cutoffSlot)) {
+    return { ok: false, error: EXTRA_CUTOFF_NOT_OPERATING };
+  }
+  const orderCutoffIso = extraPickupThroughIso(cutoffDate, cutoffSlot);
+  if (!orderCutoffIso) return { ok: false, error: EXTRA_THROUGH_SLOT_INTERVAL };
+  if (Date.parse(orderCutoffIso) === currentCutoffMs) {
+    return { ok: false, error: "Choose a different order cutoff." };
+  }
+  return {
+    ok: true,
+    orderCutoffIso,
+    closesImmediately: Date.parse(orderCutoffIso) <= now.getTime(),
+  };
 }

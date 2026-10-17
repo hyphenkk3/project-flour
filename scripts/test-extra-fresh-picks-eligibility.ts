@@ -31,6 +31,7 @@ import {
   clampExtraOrderCutoffDate,
   defaultExtraOrderCutoffSlot,
   defaultExtraPickupFromSlot,
+  evaluateExtraOrderCutoffEdit,
   evaluateExtraConfirm,
   extraOperatingSlotsForDate,
   extraOrderCutoffDateOptions,
@@ -40,9 +41,12 @@ import {
   extraCustomerAvailabilityLabel,
   formatExtraBoardWindowInstant,
   formatExtraPickupThroughClock,
+  malaysiaDateTimeParts,
+  malaysiaDateTimeToIso,
   isExtraThroughSlot,
   singaporeDateTimeToIso,
 } from "@/engines/extra/fresh-picks-eligibility";
+import { initialExtraWindow, nextExtraWindow } from "@/workspaces/extra/extra-window";
 import { toBusinessDateKey } from "@/lib/dates";
 
 const TODAY = "2026-08-17"; // Monday
@@ -66,6 +70,11 @@ assert.equal(
   singaporeDateTimeToIso(TODAY, "00:00"),
   "2026-08-16T16:00:00.000Z",
 );
+assert.equal(malaysiaDateTimeToIso(TODAY, "10:00"), "2026-08-17T02:00:00.000Z");
+assert.deepEqual(malaysiaDateTimeParts("2026-08-17T02:00:00.000Z"), {
+  date: TODAY,
+  time: "10:00",
+});
 
 const mondaySlots = extraOperatingSlotsForDate(TODAY).map((s) => s.value);
 assert.equal(mondaySlots[0], "12:00");
@@ -86,6 +95,57 @@ assert.equal(wednesdaySlots[0], "12:00");
 assert.equal(wednesdaySlots.at(-1), "15:00");
 assert.equal(wednesdaySlots.includes("15:30"), false);
 assert.equal(wednesdaySlots.includes("17:30"), false);
+
+{
+  const morningCutoff = evaluateExtraConfirm({
+    pickupFromDate: TODAY,
+    pickupFromSlot: "12:00",
+    cutoffDate: TODAY,
+    cutoffSlot: "10:00",
+    todayYmd: TODAY,
+    now: new Date("2026-08-17T00:30:00.000Z"), // 8:30 AM Malaysia
+  });
+  assert.equal(morningCutoff.ok, true, "orders may close before pickup opens");
+  if (morningCutoff.ok) {
+    assert.equal(morningCutoff.pickupAvailableFromIso, extraPickupThroughIso(TODAY, "12:00"));
+    assert.equal(morningCutoff.orderCutoffIso, extraPickupThroughIso(TODAY, "10:00"));
+  }
+}
+
+{
+  const draft = initialExtraWindow(TODAY);
+  assert.equal(draft.cutoffDate, "", "Bakery must choose a cutoff date");
+  assert.equal(draft.cutoffSlot, "", "Bakery must choose a cutoff time");
+  const movedDate = nextExtraWindow(draft, { cutoffDate: TOMORROW }, TODAY);
+  assert.equal(movedDate.cutoffSlot, "", "changing cutoff date requires a fresh time choice");
+  const movedPickup = nextExtraWindow(draft, { pickupFromDate: TOMORROW }, TODAY);
+  assert.equal(movedPickup.cutoffDate, "", "changing pickup date requires a fresh cutoff date");
+  assert.equal(movedPickup.cutoffSlot, "", "changing pickup date does not invent a cutoff");
+}
+
+{
+  const current = extraPickupThroughIso(TODAY, "17:30")!;
+  const immediate = evaluateExtraOrderCutoffEdit({
+    pickupAvailableFromAt: extraPickupThroughIso(TODAY, "12:00"),
+    currentCutoffAt: current,
+    cutoffDate: TODAY,
+    cutoffSlot: "10:00",
+    todayYmd: TODAY,
+    now: MID_MORNING,
+  });
+  assert.equal(immediate.ok, true, "authorized edit can close the listing immediately");
+  if (immediate.ok) assert.equal(immediate.closesImmediately, true);
+
+  const expired = evaluateExtraOrderCutoffEdit({
+    pickupAvailableFromAt: extraPickupThroughIso(TODAY, "12:00"),
+    currentCutoffAt: extraPickupThroughIso(TODAY, "10:00"),
+    cutoffDate: TOMORROW,
+    cutoffSlot: "14:00",
+    todayYmd: TODAY,
+    now: new Date("2026-08-17T03:00:00.000Z"),
+  });
+  assert.equal(expired.ok, false, "an expired existing cutoff cannot be edited");
+}
 
 {
   const ok = evaluateExtraConfirm({
@@ -245,7 +305,7 @@ assert.equal(wednesdaySlots.includes("17:30"), false);
     todayYmd: TODAY,
     now: MID_MORNING,
   });
-  assert.equal(lateNight.ok, false, "11:30 PM is not an operating-hour cutoff");
+  assert.equal(lateNight.ok, true, "order cutoff is independent of pickup hours");
 }
 
 {
@@ -371,7 +431,9 @@ assert.equal(wednesdaySlots.includes("17:30"), false);
     todayYmd: TODAY,
     now: MID_MORNING,
   });
-  assert.equal(wedCutoffSlots.length > 0, true);
+  assert.equal(wedCutoffSlots.length, 48, "cutoff offers 30-minute times throughout the day");
+  assert.equal(wedCutoffSlots.some((slot) => slot.value === "10:00"), true);
+  assert.equal(wedCutoffSlots.some((slot) => slot.value === "23:30"), true);
   assert.equal(
     wedCutoffSlots.every((slot) => !slot.disabled),
     true,
@@ -733,10 +795,12 @@ assert.equal(toBusinessDateKey(new Date("2026-08-17T16:00:00.000Z")), TOMORROW);
     now: endOfHours,
   });
   assert.equal(
-    slots.every((slot) => slot.disabled),
+    slots.find((slot) => slot.value === "10:00")?.disabled,
     true,
-    "no remaining today cutoff after operating hours",
+    "past cutoff times are disabled on creation",
   );
+  assert.equal(slots.find((slot) => slot.value === "18:00")?.disabled, false,
+    "future cutoff time remains selectable after pickup hours close");
   assert.equal(
     defaultExtraOrderCutoffSlot({
       cutoffDate: TODAY,
@@ -826,12 +890,12 @@ const windowFieldsSrc = readFileSync(
 );
 assert.match(windowFieldsSrc, /extraOrderCutoffDateOptions/);
 assert.match(windowFieldsSrc, /Pickup available from/);
-assert.match(windowFieldsSrc, /Orders available through/);
+assert.match(windowFieldsSrc, /Order cutoff date/);
 assert.match(
   windowFieldsSrc,
-  /Order cutoff is the last time a new customer may place an order/,
+  /Choose the last date and time customers may place an order/,
 );
-assert.match(windowFieldsSrc, /Pickup times follow bakery hours/);
+assert.match(windowFieldsSrc, /Pickup remains available from 12:00 PM/);
 assert.doesNotMatch(windowFieldsSrc, /pickup through/i);
 assert.equal(/datetime-local/.test(windowFieldsSrc), false);
 assert.equal(/EXTRA_THROUGH_SLOTS/.test(windowFieldsSrc), false);
@@ -847,7 +911,7 @@ const extraTimeSrc = readFileSync(
 );
 assert.match(extraTimeSrc, /formatExtraBoardWindowInstant/);
 assert.match(extraTimeSrc, /Malaysia time/);
-assert.match(extraTimeSrc, /timeZone: "Asia\/Singapore"/);
+assert.match(extraTimeSrc, /timeZone: "Asia\/Kuala_Lumpur"/);
 
 const extraPageSrc = readFileSync(
   resolve(process.cwd(), "src/workspaces/storefront/home/StorefrontExtraPage.tsx"),
@@ -916,6 +980,7 @@ const actionsSrc = readFileSync(
 );
 assert.match(actionsSrc, /evaluateExtraConfirm/);
 assert.match(actionsSrc, /p_pickup_available_from_at/);
+assert.match(actionsSrc, /update_extra_stock_order_cutoff/);
 assert.match(actionsSrc, /unconfirm_extra_stock/);
 assert.doesNotMatch(actionsSrc, /storefront_collection_for_pickup_date/);
 

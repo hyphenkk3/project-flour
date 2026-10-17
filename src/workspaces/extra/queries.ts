@@ -428,7 +428,7 @@ export async function listHomeFreshPickUnits(): Promise<ExtraStockUnit[]> {
     .eq("lifecycle", "confirmed")
     .is("sold_at", null)
     .is("cut_into_slices_at", null)
-    .gte("pickup_through_at", now.toISOString())
+    .gt("pickup_through_at", now.toISOString())
     .order("pickup_through_at", { ascending: true });
 
   if (error) {

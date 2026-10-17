@@ -18,6 +18,7 @@ import {
   extraAvailabilityDayLabel,
   extraFreshPickDay,
   formatExtraBoardWindowInstant,
+  EXTRA_CUTOFF_DATE_REQUIRED,
   EXTRA_NO_TODAY_SLOTS_LEFT,
   EXTRA_THROUGH_SLOT_REQUIRED,
 } from "@/engines/extra/fresh-picks-eligibility";
@@ -33,6 +34,7 @@ import {
 } from "@/workspaces/extra/actions";
 import { AssignExtraToOrderDialog } from "@/workspaces/extra/AssignExtraToOrderDialog";
 import { CutExtraIntoSlicesDialog } from "@/workspaces/extra/CutExtraIntoSlicesDialog";
+import { ExtraOrderCutoffDialog } from "@/workspaces/extra/ExtraOrderCutoffDialog";
 import { ExtraWindowFields } from "@/workspaces/extra/ExtraWindowFields";
 import { MoveExtraWindowDialog } from "@/workspaces/extra/MoveExtraWindowDialog";
 import { WalkInHoldCompleteSaleDialog } from "@/workspaces/extra/WalkInHoldCompleteSaleDialog";
@@ -80,6 +82,7 @@ export function ExtraBoard({
     null,
   );
   const [movingUnit, setMovingUnit] = useState<ExtraStockUnit | null>(null);
+  const [cutoffUnit, setCutoffUnit] = useState<ExtraStockUnit | null>(null);
   const [slicingUnit, setSlicingUnit] = useState<ExtraStockUnit | null>(null);
   const [sellingUnit, setSellingUnit] = useState<ExtraStockUnit | null>(null);
   const [readyUnit, setReadyUnit] = useState<ExtraStockUnit | null>(null);
@@ -173,13 +176,15 @@ export function ExtraBoard({
       return;
     }
     setError(null);
-    if (mode === "create" && !createWindow.cutoffSlot) {
-      setError(
-        extraFreshPickDay(createWindow.cutoffDate, todayYmd) === "today"
-          ? EXTRA_NO_TODAY_SLOTS_LEFT
-          : EXTRA_THROUGH_SLOT_REQUIRED,
-      );
-      return;
+    if (mode === "create") {
+      if (!createWindow.cutoffDate) {
+        setError(EXTRA_CUTOFF_DATE_REQUIRED);
+        return;
+      }
+      if (!createWindow.cutoffSlot) {
+        setError(EXTRA_THROUGH_SLOT_REQUIRED);
+        return;
+      }
     }
     startTransition(async () => {
       if (mode === "propose") {
@@ -741,21 +746,38 @@ export function ExtraBoard({
                     </button>
                   ) : null}
                   {capabilities.canMoveExtraWindow ? (
-                    <button
-                      className={btnSecondary}
-                      disabled={pending || unit.walkInHeld}
-                      onClick={() => {
-                        if (unit.walkInHeld) {
-                          setError("This Fresh Pick is currently on walk-in hold.");
-                          return;
-                        }
-                        setError(null);
-                        setMovingUnit(unit);
-                      }}
-                      type="button"
-                    >
-                      Move pickup window
-                    </button>
+                    <>
+                      <button
+                        className={btnSecondary}
+                        disabled={pending || unit.walkInHeld}
+                        onClick={() => {
+                          if (unit.walkInHeld) {
+                            setError("This Fresh Pick is currently on walk-in hold.");
+                            return;
+                          }
+                          setError(null);
+                          setMovingUnit(unit);
+                        }}
+                        type="button"
+                      >
+                        Move pickup window
+                      </button>
+                      <button
+                        className={btnSecondary}
+                        disabled={pending || unit.walkInHeld}
+                        onClick={() => {
+                          if (unit.walkInHeld) {
+                            setError("This Fresh Pick is currently on walk-in hold.");
+                            return;
+                          }
+                          setError(null);
+                          setCutoffUnit(unit);
+                        }}
+                        type="button"
+                      >
+                        Edit order cutoff
+                      </button>
+                    </>
                   ) : null}
                   {capabilities.canCutExtraIntoSlices ? (
                     <button
@@ -1026,6 +1048,14 @@ export function ExtraBoard({
         onClose={() => setMovingUnit(null)}
         onMoved={() => setMovingUnit(null)}
         open={movingUnit != null}
+        todayYmd={todayYmd}
+      />
+
+      <ExtraOrderCutoffDialog
+        extra={cutoffUnit}
+        onClose={() => setCutoffUnit(null)}
+        onUpdated={() => setCutoffUnit(null)}
+        open={cutoffUnit != null}
         todayYmd={todayYmd}
       />
 

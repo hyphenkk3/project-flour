@@ -8,7 +8,12 @@ import {
   canSeeHomeFreshPicks,
 } from "@/engines/extra/capabilities";
 import { canAccessWorkspace } from "@/foundation/navigation/access";
-import { evaluateExtraConfirm } from "@/engines/extra/fresh-picks-eligibility";
+import {
+  evaluateExtraConfirm,
+  evaluateExtraOrderCutoffEdit,
+  extraPickupThroughIso,
+} from "@/engines/extra/fresh-picks-eligibility";
+import { malaysiaDateTimeParts } from "@/engines/extra/fresh-picks-time";
 import { normalizeExtraRejectReason } from "@/engines/extra/reject-reason";
 import { extraWalkInSalePickupDate } from "@/engines/extra/walk-in-sale";
 import { toBusinessDateKey } from "@/lib/dates";
@@ -73,7 +78,9 @@ function evaluateFreshPickConfirm(input: {
     pickupFromSlot: input.pickupFromSlot,
     cutoffDate: input.cutoffDate,
     cutoffSlot: input.cutoffSlot,
-    todayYmd: toBusinessDateKey(),
+    todayYmd:
+      malaysiaDateTimeParts(new Date().toISOString())?.date ??
+      toBusinessDateKey(),
     now: new Date(),
   });
 }
@@ -468,6 +475,56 @@ export async function moveExtraStockWindowAction(
   if (error) {
     return { error: error.message };
   }
+  revalidateExtraPaths();
+  return { error: null };
+}
+
+export async function updateExtraStockOrderCutoffAction(input: {
+  extraStockId: string;
+  orderCutoffAt: string;
+  confirmImmediateClose: boolean;
+}): Promise<{ error: string | null }> {
+  const staff = await requireExtraStaff();
+  const caps = buildExtraWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canMoveExtraWindow) {
+    return { error: "Not authorized to edit the Fresh Pick order cutoff." };
+  }
+
+  const extra = await getExtraStockUnitById(input.extraStockId);
+  if (!extra) return { error: "Fresh Pick not found." };
+  const parts = malaysiaDateTimeParts(input.orderCutoffAt);
+  if (
+    !parts ||
+    extraPickupThroughIso(parts.date, parts.time) !==
+      new Date(input.orderCutoffAt).toISOString()
+  ) {
+    return { error: "Choose a valid 30-minute order cutoff." };
+  }
+  const decision = evaluateExtraOrderCutoffEdit({
+    pickupAvailableFromAt: extra.pickupAvailableFromAt,
+    currentCutoffAt: extra.pickupThroughAt,
+    cutoffDate: parts.date,
+    cutoffSlot: parts.time,
+    todayYmd:
+      malaysiaDateTimeParts(new Date().toISOString())?.date ??
+      toBusinessDateKey(),
+  });
+  if (!decision.ok) return { error: decision.error };
+  if (decision.closesImmediately && !input.confirmImmediateClose) {
+    return { error: "Confirm that this cutoff will close ordering immediately." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("update_extra_stock_order_cutoff", {
+    p_extra_stock_id: input.extraStockId,
+    p_actor_staff_id: staff.id,
+    p_pickup_through_at: decision.orderCutoffIso,
+    p_confirm_immediate_close: decision.closesImmediately && input.confirmImmediateClose,
+  });
+  if (error) return { error: error.message };
   revalidateExtraPaths();
   return { error: null };
 }

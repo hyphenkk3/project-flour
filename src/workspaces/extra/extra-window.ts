@@ -3,12 +3,8 @@
  */
 
 import {
-  clampExtraOrderCutoffDate,
-  defaultExtraOrderCutoffSlot,
   defaultExtraPickupFromSlot,
-  extraFreshPickDates,
   extraFreshPickDay,
-  extraPickupThroughIso,
 } from "@/engines/extra/fresh-picks-eligibility";
 
 export type ExtraWindowDraft = {
@@ -26,28 +22,7 @@ export function initialExtraWindow(
   const pickupFromDate = locked && preparedOn ? preparedOn : todayYmd;
   const pickupFromSlot =
     defaultExtraPickupFromSlot({ pickupFromDate, todayYmd }) ?? "";
-  const fromIso = extraPickupThroughIso(pickupFromDate, pickupFromSlot);
-  const cutoffDate = todayYmd;
-  let cutoffSlot =
-    defaultExtraOrderCutoffSlot({
-      cutoffDate,
-      todayYmd,
-      notBeforeIso: fromIso ?? undefined,
-    }) ?? "";
-  if (!cutoffSlot && extraFreshPickDates(todayYmd).tomorrow) {
-    return {
-      pickupFromDate,
-      pickupFromSlot,
-      cutoffDate: extraFreshPickDates(todayYmd).tomorrow!,
-      cutoffSlot:
-        defaultExtraOrderCutoffSlot({
-          cutoffDate: extraFreshPickDates(todayYmd).tomorrow!,
-          todayYmd,
-          notBeforeIso: fromIso ?? undefined,
-        }) ?? "",
-    };
-  }
-  return { pickupFromDate, pickupFromSlot, cutoffDate, cutoffSlot };
+  return { pickupFromDate, pickupFromSlot, cutoffDate: "", cutoffSlot: "" };
 }
 
 export function nextExtraWindow(
@@ -64,24 +39,11 @@ export function nextExtraWindow(
       }) ?? "";
   }
   if (patch.pickupFromDate && patch.cutoffDate == null) {
-    next.cutoffDate = clampExtraOrderCutoffDate(
-      next.pickupFromDate,
-      next.cutoffDate,
-    );
+    next.cutoffDate = "";
+    next.cutoffSlot = "";
   }
-  if (patch.pickupFromDate || patch.pickupFromSlot || patch.cutoffDate) {
-    const fromIso = extraPickupThroughIso(
-      next.pickupFromDate,
-      next.pickupFromSlot,
-    );
-    if (patch.cutoffSlot == null) {
-      next.cutoffSlot =
-        defaultExtraOrderCutoffSlot({
-          cutoffDate: next.cutoffDate,
-          todayYmd,
-          notBeforeIso: fromIso ?? undefined,
-        }) ?? "";
-    }
+  if (patch.cutoffDate != null && patch.cutoffSlot == null) {
+    next.cutoffSlot = "";
   }
   return next;
 }

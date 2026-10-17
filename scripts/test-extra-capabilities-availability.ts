@@ -27,8 +27,8 @@ assert.equal(
     pickupThroughAt: through,
     now: new Date("2026-08-15T15:00:00.000Z"),
   }),
-  true,
-  "inclusive: now === pickup_through_at is still available",
+  false,
+  "ordering closes at the exact pickup_through_at boundary",
 );
 
 assert.equal(
@@ -79,6 +79,16 @@ assert.equal(
     now: new Date("2026-08-15T14:00:00.000Z"),
   }),
   true,
+);
+
+assert.equal(
+  isExtraConfirmedOnOffer({
+    lifecycle: "confirmed",
+    pickupThroughAt: through,
+    now: new Date("2026-08-15T15:00:00.000Z"),
+  }),
+  false,
+  "Fresh Pick listing closes at the exact cutoff instant",
 );
 
 assert.equal(

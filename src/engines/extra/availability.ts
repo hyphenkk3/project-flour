@@ -2,7 +2,7 @@
  * EXTRA Activation v1 — derived availability.
  *
  * `pickup_through_at` is the ORDER CUTOFF (new-order window), not last pickup.
- * Inclusive cutoff: new orders while now <= pickup_through_at.
+ * Exclusive cutoff: new orders only while now < pickup_through_at.
  * Sold (`sold_at`) is independent and hides the Extra without becoming Past.
  * An active walk-in hold is derived: walk_in_held_until >= now() is unavailable.
  */
@@ -55,7 +55,7 @@ export function isExtraConfirmedOnOffer(input: {
   const throughMs = Date.parse(input.pickupThroughAt);
   if (!Number.isFinite(throughMs)) return false;
   const nowMs = (input.now ?? new Date()).getTime();
-  return nowMs <= throughMs;
+  return nowMs < throughMs;
 }
 
 export function isExtraAvailable(input: {
