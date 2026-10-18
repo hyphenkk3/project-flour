@@ -150,3 +150,30 @@ This route can contain the currently hosted legacy Vercel deployment without kno
 For an approved later transition, edit only the Production-scoped RESEND_API_KEY in Project Flour > Settings > Environment Variables, entering Whitebird Production V2 directly from the secure Owner store. Leave both Preview entries untouched. Deploy the accepted application as a new Production deployment after migration; verify READY, Production target, domain routing, creation after the environment update, and no CLI override. Vercel metadata does not expose the deployed secret fingerprint, so verify the project variable locally with vercel env run -e production and compare a digest privately if desired. Never send a test email or put token/digest in reports.
 
 The six-migration allowlist remains unchanged and the refund write-lock remains excluded. Production and DEV remain untouched.
+
+## Final targeted Vercel / Resend containment check — 2026-10-18
+
+This is the latest decision and supersedes earlier conditional Trusted IP guidance. No control was activated or changed; Production/DEV remain untouched.
+
+**Verified Vercel plan and protection**
+
+- Dashboard identifies Hyphen Org as **Pro**. Trusted IP controls for Project Flour are disabled and explicitly Enterprise-only; Production-only Trusted IP protection is unavailable.
+- Vercel Authentication is enabled at the `all_except_custom_domains` scope. The dashboard offers Standard Protection (all except Production custom domains) or All Deployments (all domains). Thus the current Standard scope does not protect `whitebird.asia`; All Deployments would also protect Preview and is not acceptable.
+- Current Production alias `whitebird.asia` is on READY CLI deployment `dpl_9toGsEsDYhYHn17takiszAjxRgjy`, created 2026-10-13 10:53 UTC, with no verifiable source commit or deployment-time secret fingerprint. Alias metadata reports an active shareable-link bypass expiring 2026-10-19. A masked project automation-bypass secret is also configured. Both must be accounted for before relying on protection; do not reveal or copy either bypass credential.
+- Project Cron execution is enabled. The accepted application’s `vercel.json` has no Cron declarations, but the uploaded legacy deployment is CLI-sourced and its configuration response was truncated; its scheduled paths remain **unknown**. Vercel’s project Cron control is a separate reversible control and should be disabled during maintenance; wait for running work to finish. The three previously identified Supabase jobs also remain separate and require their own pause/drain.
+
+**Resend activity**
+
+The Resend key named Whitebird Production has Sending access and all-domain scope, with 2,662 recorded uses and last-used time 8 days ago. Its most recent inspected request was a Node.js POST to `/emails` rejected with HTTP 403 by the `resend.dev` test-domain restriction. It predates the current Vercel deployment and is not proof of a successful send or of the key configured in that deployment. Resend provides no Vercel deployment identifier in these logs. The relationship cannot be established reliably; stop key-correlation work here. Do not ask for the unavailable old token or send a test message.
+
+**Decision and required cutover gate**
+
+- **Option A — Production-only Trusted IP + drain: unavailable** on Pro. Standard protection leaves the customer domain public; All Deployments affects Preview.
+- **Option B — deploy the accepted app using Whitebird Production V2 and switch the domain: insufficient by itself.** Existing deployments retain their environment snapshots and unique URLs; alias switching does not prove old functions cannot execute. Keep the old deployment as an artifact until new-source smoke tests pass, but do not use it as an application rollback target after migrations without a compatibility proof.
+- **Option C — reversible Vercel project pause plus independent writer drain: best available candidate, not yet proven complete.** Vercel documents pause as stopping Production traffic and blocking the active Production deployment. It does not by itself establish that historical deployment URLs, bypasses, in-flight functions, or scheduled work are stopped.
+
+**Production email containment remains BLOCKED; do not begin migrations.** At a separately approved maintenance window, the Owner must: (1) pause Project Flour and disable Vercel Cron; (2) pause/drain the three known Supabase Cron jobs and activate the rehearsed write barrier; (3) revoke or let expire the active Production shareable link and resolve the project automation bypass without affecting Preview automation; (4) from a non-bypass client, confirm `whitebird.asia` and every known Production deployment URL cannot invoke the legacy deployment; and (5) confirm no Vercel/Supabase invocation is still running. If any URL, bypass, or job remains usable, STOP before the first migration. Keep database Email Pause enabled, keep the email sweep off, preserve queue/history/preferences, and prevent backlog catch-up.
+
+The supported project pause is reversible, but no Production change is authorized by this record. The old deployment should not be deleted as the first containment step; deletion removes a recovery artifact and still would not prove there are no other consumers of the old key. Keep the six migration allowlist unchanged and `20261017152100_refund_v1_write_lock.sql` excluded. Preserve the pending-task register.
+
+References: [Vercel project pause](https://vercel.com/docs/cli/project), [pause API](https://vercel.com/docs/rest-api/projects/pause-a-project), [Cron controls](https://vercel.com/docs/cron-jobs/manage-cron-jobs), [Deployment Protection](https://vercel.com/docs/deployment-protection), [Resend insights](https://resend.com/changelog/api-key-insights), [Resend logs](https://resend.com/changelog/logs-api).
