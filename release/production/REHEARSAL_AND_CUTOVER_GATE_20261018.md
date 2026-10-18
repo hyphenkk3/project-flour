@@ -85,3 +85,23 @@ Vercel environment metadata was inspected with decryption disabled. The project 
 ### Current cutover gates
 
 The isolated PostgREST/Supavisor write-barrier and local cron/pg_net containment checks previously accepted remain complete. Production scheduler controls are now identified but have not been changed. The actual Production write barrier still must be activated only in an approved cutover and verified before migrations. Direct legacy-app Resend behavior remains unverified and requires the provider-side Production-only containment above. The six-migration exact allowlist is unchanged; 20261017152100_refund_v1_write_lock.sql remains excluded.
+
+## Final pre-cutover update — 2026-10-18
+
+Preparation evidence at the start of this update: `d37e95a7d8ea76736cfe43b0766738fba8190c67`. The accepted application remains `e3445e7757cfed418f7ab8d0e6dcf5f6177fd24b`. The six-file migration allowlist above remains exact and unchanged; `20261017152100_refund_v1_write_lock.sql` remains excluded. The detailed executable gate is in [RUNBOOK.md](RUNBOOK.md); it supersedes earlier abbreviated cutover sequencing while preserving the evidence above.
+
+### Targeted Storage upload diagnosis
+
+The synthetic upload failure was isolated to the Storage upload upsert. Storage API image `v1.72.1` generates an insert into `storage.objects` with `ON CONFLICT (name, bucket_id)`. The October 17 restored Production schema has unique indexes for those columns only as partial indexes (`archived_at IS NULL` and `NOT is_versioned`), plus a separate unique key including `version`. A no-write local `EXPLAIN INSERT` reproduced SQLSTATE 42P10: no matching unique/exclusion constraint for the conflict target. No row was inserted and no historical object or metadata was modified.
+
+This proves a mismatch between the restored Production schema and the local Storage API image, not whether the managed Production Storage service has the same version/query. The exact managed Storage API build was not verified. The accepted application uses `.upload()` for both cake-photo upload/replacement and library-asset create/replacement. Therefore the existing photo workflow is affected in the isolated pairing and remains a compatibility risk for Production. **No schema or application correction was made.** Do not add a Storage migration to the six-file allowlist. Before relying on uploads during launch, obtain the managed Production Storage API build/version evidence and reproduce against a matching Storage image in isolation. Otherwise defer photo upload/edit during the release window; preserve existing object reads.
+
+### Production email key identity and containment
+
+Read-only Vercel environment metadata exposes scopes only: one Production `RESEND_API_KEY` entry and two Preview entries. It does not provide a safe value fingerprint or identify the underlying Resend key. No key was decrypted, copied, changed, revoked, or tested. Scope is not proof that the Production value is a dedicated Production key.
+
+The exact Owner-only step is to privately match the Vercel Production variable to the secured key-creation/inventory record and confirm the key is exclusive to Production. If that record cannot identify the value, do not guess or disable an existing key. A separately approved, dedicated Production-key provisioning/update and deployment is then needed before a safe provider-side pause. At cutover, pause only the verified Production-exclusive provider key, keep the database pause enabled, leave the email cron job inactive, preserve all queue rows/preferences, and do not enable backlog catch-up. Preview/DEV keys and environment entries remain untouched.
+
+### Authoritative cutover status
+
+Production and DEV remain unchanged. The release remains **BLOCKED** until a fresh encrypted database+Storage backup is executed and verified with separate Owner approval, Production email key identity and targeted pause are established, the three cron jobs are paused/drained, the write barrier is activated through the tested owner/admin path, the six migrations are individually applied with actual API versions/history verified, the pinned app is deployed, smoke checks pass, and the Owner explicitly authorizes reopening writes. Photo upload/edit compatibility also remains an open, scoped gate; no speculative schema fix is approved. Email must remain disabled after launch.
