@@ -123,3 +123,55 @@ A Production V2 deployment is the eventual replacement, not the pre-migration co
 
 Official control references: [Vercel project pause](https://vercel.com/docs/cli/project), [Vercel project pause API](https://vercel.com/docs/rest-api/projects/pause-a-project), [Vercel Cron management](https://vercel.com/docs/cron-jobs/manage-cron-jobs), [Deployment Protection](https://vercel.com/docs/deployment-protection), [Resend key insights](https://resend.com/changelog/api-key-insights), [Resend request logs](https://resend.com/changelog/logs-api).
 
+
+
+## Bounded Vercel project-pause rehearsal — preparation only (2026-10-18)
+
+This plan is **not authorization to pause the project**. Production and DEV were not changed. Run only in a separately approved short Production maintenance window. The six migration files and their order above remain unchanged; `20261017152100_refund_v1_write_lock.sql` remains excluded. The pending-task register is unchanged.
+
+### What is documented versus what is not
+
+Vercel documents `vercel project pause project-flour` as pausing Production traffic: the active Production deployment stops serving traffic, visitors receive an error, and auto-assignment of custom Production domains is disabled. The corresponding interactive `vercel project resume project-flour` reverses the pause and restores Production traffic. These are project control operations; the documentation does not require a rebuild or redeployment to resume. The project pause API explicitly says it blocks the **active Production deployment**. [Pause/resume CLI](https://vercel.com/docs/cli/project) · [Pause API](https://vercel.com/docs/rest-api/projects/pause-a-project) · [Resume API](https://vercel.com/docs/rest-api/sdk/projects/unpause-a-project)
+
+The documented scope is Production traffic for this project. It is not documented as pausing every Preview deployment or another Vercel project. Therefore, do not select a broad “All Deployments” access-protection mode and do not pause the DEV project. During the live test, verify the known DEV domain remains available; if it is affected, immediately resume and stop.
+
+Vercel documents blocking the active Production deployment, but does not establish that every older immutable deployment URL is blocked. The current Production alias points to the active Production deployment; pre-test records must enumerate all known Production deployment URLs without deleting them. Test the custom domain, active deployment URL, and each known prior Production URL separately while paused.
+
+Project pause is separate from deployment-protection bypass. Available documentation describes shareable links and automation bypasses for deployment protection but does not state whether either can override a project pause. The project's prior read-only metadata showed an active shareable-link bypass on the Production alias and a configured, masked automation bypass. Do not copy either secret into this document. The live test must check each existing bypass route, if still active, using a harmless read-only request. Do not create a new bypass. If any protected request reaches an application response rather than the paused response, treat containment as failed.
+
+Project pause documentation does not promise cancellation of already-running Functions. Vercel Cron is a separate control: Vercel documents that Cron invokes Production deployments; the project-level Cron execution control must be disabled separately for the test. An invocation already in progress must be observed until it finishes. Supabase's three independently scheduled jobs also require a separate temporary pause and drain: `staff-notification-email-dispatch-sweep`, `extra-walk-in-hold-reminders`, and `extra-walk-in-hold-expiry-cleanup`. No job is to be deleted or unscheduled. Preserve original schedules and active states; do not alter the notification queue.
+
+### Bounded live test procedure (requires separate Owner approval)
+
+**Expected impact:** while the project is paused, customers and staff cannot use Production pages or APIs served by this project. Plan a 15-minute maximum test window; actual downtime is the interval from successful pause until successful resume and the domain smoke check. If not complete within the window, resume immediately and mark the test inconclusive. DEV must remain untouched.
+
+**Before the window:**
+
+1. Owner schedules and approves the exact start/end time, customer/staff downtime, and named operator with Vercel project admin and Production Supabase scheduler access. Keep a second authorized operator able to resume Vercel if the first console/session fails. Do not begin if this recovery operator is unavailable.
+2. Read-only record: current Production alias-to-deployment mapping, active deployment ID and URL, all known prior Production deployment URLs, domain response, Vercel project Cron enabled state and configured job list, and DEV domain response. Keep all deployments. Do not assume an empty Cron list from the source tree: inspect the deployed project's Cron inventory.
+3. Record the prior active state, names, IDs, schedules, and latest run state of the three Supabase jobs above. Record notification queue counts/statuses and relevant recent invocation status using read-only views. Do not alter rows or send test traffic that could mutate business data.
+4. Confirm no deployment, migration, backup, or other release operation is underway. Confirm the Owner can use the interactive resume command. Announce the outage to staff and, if appropriate, customers.
+5. If any Production URL, bypass state, scheduler inventory, operator access, or restoration value is unknown, do not start.
+
+**During the window:**
+
+1. In Vercel Cron settings for this project, turn off Cron execution (do not delete jobs). Verify the setting is off. Wait for all previously started Vercel Cron/Function invocations to finish; inspect execution status/logs until none is running.
+2. In Production Supabase only, deactivate the three recorded pg_cron jobs using the previously reviewed scheduler control (do not delete or unschedule them). Verify each is inactive and no run is in progress. Do not pause DEV jobs.
+3. In the Vercel CLI, explicitly target the project and confirm interactively: `vercel project pause project-flour`. Do not use a project-agnostic linked-project command. Record the successful pause result and timestamp.
+4. From a normal non-bypass client, request `https://whitebird.asia`, the active deployment URL, and every known prior Production deployment URL. Expected result: Vercel's paused-deployment error (documented as a visitor error / 503 `DEPLOYMENT_PAUSED`). Repeat harmless GET checks through any existing shareable-link or automation-bypass path without exposing bypass values. None may reach an application response.
+5. Verify `https://dev.whitebird.asia` remains reachable and is not paused. Do not change its settings.
+6. Confirm no Vercel execution remains active, the three Supabase jobs remain inactive, and notification queue/history counts and statuses remain unchanged. Do not run a cron job manually.
+7. Resume immediately with `vercel project resume project-flour` and interactive confirmation. Restore the three Supabase jobs and Vercel Cron to their exact recorded prior states. Do not change queue contents or release historical email backlog.
+8. Verify the Production domain again serves the same preserved active deployment, the deployment ID/alias did not change, expected read-only home/health pages load, DEV stayed available, Vercel Cron and the three Supabase jobs have their original intended states, and no test wrote business data or sent communications.
+
+**Stop and recovery:** if pausing fails, any Production URL or bypass still reaches the app, an invocation remains active, the test exceeds 15 minutes, a job state differs from its recorded original state, or resume is uncertain, stop the test. Resume Vercel immediately through the second authorized operator; restore only the scheduler states that were changed, exactly from the pre-test record. Do not proceed to a migration. If resume fails, escalate to Vercel project admin support and keep all database changes stopped; never delete the deployment as a workaround. The test is complete only after production and DEV availability and all prior scheduler settings are verified.
+
+### Email containment decision
+
+A successful pause test would establish only that the tested Production entry points are blocked by the project pause during the test, and that separately disabled scheduled jobs do not execute during that window. It would **not by itself establish full legacy email containment for migration approval**: documentation does not cover older deployment URLs or bypass precedence; a project pause is not documented to terminate in-flight work; Vercel Cron and Supabase jobs are independent; and this test cannot exclude an out-of-band consumer of the legacy Resend credential. Do not claim otherwise.
+
+For migration approval, the minimum evidence is: every known Production deployment URL and existing bypass path returns the paused response; all Vercel and Supabase scheduled work is disabled and drained; all active invocations are complete; and the already-approved database email pause remains active with no backlog catch-up. If any old URL/bypass still executes, or active work cannot be drained, the pause is not a sufficient email barrier. The only stronger independently enforceable control would be a provider-side stop of a confirmed Production-exclusive key; that is not established here and must not be guessed or changed in this preparation task.
+
+### Separate Owner approval required
+
+A distinct Owner approval is required for the scheduled live Production outage and each temporary state change: project pause/resume, Vercel Cron disable/restore, pausing/restoring the three Production Supabase jobs, and any future migration or deployment. This document authorizes none of them.
