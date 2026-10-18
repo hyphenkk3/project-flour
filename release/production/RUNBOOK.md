@@ -53,7 +53,7 @@ Vercel documents that environment-variable edits apply to new deployments; exist
 1. In Resend, retain `Whitebird Production V2` as the new Production credential (Sending access, `whitebird.asia` domain). Do not place its token in chat, source, terminal command arguments, logs, or release documents.
 2. Privately identify the old credential used by the legacy deployment. From the linked Project Flour directory on the Owner’s Mac, compute only a digest of the currently configured Production variable:
    ```sh
-   vercel env run -e production -- node -e 'const k=process.env.RESEND_API_KEY;if(!k)process.exit(2);process.stdout.write(require("node:crypto").createHash("sha256").update(k).digest("hex")+"\\n")'
+   vercel env run -e production -- node -e 'const k=process.env.RESEND_API_KEY;if(!k)process.exit(2);console.log(require("node:crypto").createHash("sha256").update(k).digest("hex"))'
    ```
    In a separate local terminal prompt, compute the digest of each Owner-held Resend token without echoing or putting the token in shell history:
    ```sh
