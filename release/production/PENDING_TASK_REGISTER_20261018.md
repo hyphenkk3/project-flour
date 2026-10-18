@@ -6,13 +6,13 @@ This register preserves previously identified work. It does not reopen accepted 
 
 | Item | Status | Notes |
 |---|---|---|
-| Owner-level Production-shaped database barrier rehearsal | **Release blocker** | The isolated PostgreSQL owner-ACL/session test passed, but the restored Supabase-shaped database is owned by `supabase_admin`; the available reconstructed `postgres` role could not alter that database ACL. Rehearse as the actual database owner/admin before any Production cutover. |
+| Isolated API/pooler/background write-barrier checks | **PASS (isolated only)** | PostgREST/Supavisor denial and local cron/pg_net containment were accepted in the isolated rehearsal. This does not authorize or prove Production activation. Production cutover still requires the approved owner/admin path, in-flight drain, inactive-job verification, and a reversible reopening check. |
 | Contain old application database writers | **Release blocker** | The legacy Production source is unrecoverable; its database roles, active connections and any direct SQL path are unknown. Do not repeat source-recovery searches without new actionable evidence. Prove the barrier rejects all application roles and drains their live sessions. |
-| Production-only email containment | **Release blocker for email safety** | The database Email Pause covers tested database dispatch. Direct Resend behavior in the legacy app remains unknown. A Production-scoped provider pause is needed before release; do not reactivate queued email without backlog review and an explicit no-catch-up policy. |
-| Functional Auth/passkey and Storage recovery | **Release blocker for recovery confidence** | Database rows and object archive correspondence were checked, but password/passkey login and actual Storage API reads from a restored Supabase service were not demonstrated. |
+| Production-only email containment | **Release blocker for email safety** | Vercel metadata shows one Production-scoped and two Preview-scoped RESEND_API_KEY entries without revealing values, but does not map them to named Resend keys or prove the old deployment's effective key. Owner must privately identify and confirm a Production-dedicated key before any provider-side pause. Keep Preview keys untouched and the email queue disabled/preserved. |
+| Historical Auth data and Storage API recovery | **PASS in isolation** | Restored 10 Auth users, 4 passkey rows, and 10 linked profiles; the local Auth service read all 10 identities and pre/post row digests matched. All 34 archived Storage objects were read through the isolated API with matching sizes; private synthetic access denial and historical file-hash preservation passed. Historical-user login was not attempted. |
 | Migration API version registration in rehearsal | **Release blocker for execution evidence** | The six payloads passed direct SQL replay, which intentionally does not write Supabase migration history. Production must use the supported API one exact payload at a time and inspect the returned version/history before any retry. |
 
-## Accepted feature work / verification to retain
+| Production scheduler controls | **Read-only controls identified; cutover action pending** | Three Production cron jobs were active. cron.alter_job/cron.unschedule are executable by the inspected postgres role. pg_net extension/schema/functions were absent at inspection. During approved cutover, stop all three jobs, wait for no running executions, and resume only the two business jobs after postflight; keep email dispatch stopped. |\n\n## Accepted feature work / verification to retain
 
 | Item | Status | Notes |
 |---|---|---|
@@ -37,3 +37,7 @@ This register preserves previously identified work. It does not reopen accepted 
 ## Handling
 
 Keep these items separate from the six-migration release allowlist. Do not silently mark a pending item complete, repair historical Production records, activate email, or add deferred feature work to the October 25 release.
+
+## Auth/Storage verification status
+
+The historical Auth/Storage data-service checks above are complete. Do not rerun them without regression evidence. Historical Production passwords and passkeys must not be used for acceptance login. Remaining recovery limits are managed Auth configuration/key recovery and a real historical-user login path; retain these as recovery limitations, not failures of the restored-row/API checks.
