@@ -105,3 +105,15 @@ The exact Owner-only step is to privately match the Vercel Production variable t
 ### Authoritative cutover status
 
 Production and DEV remain unchanged. The release remains **BLOCKED** until a fresh encrypted database+Storage backup is executed and verified with separate Owner approval, Production email key identity and targeted pause are established, the three cron jobs are paused/drained, the write barrier is activated through the tested owner/admin path, the six migrations are individually applied with actual API versions/history verified, the pinned app is deployed, smoke checks pass, and the Owner explicitly authorizes reopening writes. Photo upload/edit compatibility also remains an open, scoped gate; no speculative schema fix is approved. Email must remain disabled after launch.
+
+
+## Targeted Storage and email-gate update — 2026-10-18
+
+This update supersedes the earlier Storage upload/edit compatibility row above. The accepted 34-of-34 historical-read result remains in effect.
+
+| Gate | Updated result | Evidence / action |
+|---|---|---|
+| Managed Storage version and upload/replacement | **PASS in isolated compatibility replay** | Read-only Production Storage logs identified managed API version `1.80.2`; read-only live metadata confirmed the `objects-current-version-index` marker and matching partial unique index. A fresh isolated clone ran that exact image and Production-shaped schema: synthetic create, upload, upsert replacement, read-back and cleanup all returned HTTP 200; no 42P10. A restored historical object also read successfully. The prior 42P10 came from the older local v1.72.1 image's incompatible conflict target. No new migration or schema correction is required. Production/DEV were not written. |
+| Production email key identity / containment | **OPEN — Owner action remains** | Read-only Vercel environment metadata was requested with decryption disabled. It exposes target/scope and environment-variable metadata but no provider key fingerprint or Resend key ID; Production scope alone does not prove provider-key identity or exclusivity. The Owner must privately cross-reference the Production `RESEND_API_KEY` with the Resend key inventory/creation record and confirm that exact key is dedicated to Production. Do not share, decrypt for Codex, or paste the value. If the mapping or exclusivity cannot be proven, do not disable an existing key; keep the email gate open and require a separately approved, safely isolated Production-only provider control. |
+
+The six-migration allowlist and order are unchanged. `20261017152100_refund_v1_write_lock.sql` remains excluded. The Storage result is a matched-version isolated test, not permission to make Production changes. All other cutover gates and explicit Owner approvals remain as recorded above.
