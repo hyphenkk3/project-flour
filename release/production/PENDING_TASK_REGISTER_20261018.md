@@ -31,7 +31,7 @@ This register preserves previously identified work. It does not reopen accepted 
 | Multi-item Waiting List | **Pending verification** | Retain the existing multi-item scenario. |
 | Staff Admin V1 | **Deferred feature** | Not required to rebuild or add to the current launch package. |
 | Email-change verification issue | **Pending follow-up** | Separate from the initial email-disabled launch. |
-| Photo recovery/editing follow-up | **Deferred follow-up** | Preserve existing recovery/editing task. |
+| Photo recovery/editing follow-up | **Deferred follow-up; upload compatibility unverified** | Historical Storage reads and access controls passed. A synthetic upload probe against the restored Production-shaped schema returned HTTP 500 / PostgreSQL 42P10; no historical object changed and no schema workaround was made. Revisit before relying on Storage uploads/editing in a launch-critical workflow. |
 | Production email backlog review | **Required before any future email reactivation** | Current launch decision keeps email disabled. Preserve historical queue records; do not mark them sent or delete them. Review failed/sent queue and define expiry/no-catch-up before re-enabling. |
 
 ## Handling
