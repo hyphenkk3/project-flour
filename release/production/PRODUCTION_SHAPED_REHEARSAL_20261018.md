@@ -134,3 +134,30 @@ This follow-up used a fresh database inside the existing local Supabase-compatib
 ### Current scope
 
 Historical Auth data/service readability and Storage API recovery are verified in isolation. Historical-user authentication recovery remains intentionally untested. Full accepted-application behavior against these historical Auth identities and Production-managed settings remains outside this targeted test.
+
+## Targeted Storage upload compatibility diagnosis — 2026-10-18
+
+The earlier synthetic Storage upload returned HTTP 500 / PostgreSQL 42P10. A focused follow-up used only the disposable restored Production-schema database and the isolated local Storage API container; no Production/DEV endpoint or record was accessed.
+
+The isolated Storage API image is `v1.72.1`. Its compiled object-upload query is:
+
+```sql
+INSERT INTO storage.objects (${insert.columns})
+VALUES (${insert.placeholders})
+ON CONFLICT (name, bucket_id)
+-- upsert uses DO UPDATE SET <selected metadata fields>;
+-- non-upsert uses DO NOTHING
+RETURNING *
+```
+
+The restored `storage.objects` unique indexes are:
+- `idx_objects_current_version` on `(bucket_id, name)` WHERE `archived_at IS NULL`
+- `idx_objects_null_version` on `(bucket_id, name)` WHERE `NOT is_versioned`
+- `objects_bucket_id_name_version_key` on `(bucket_id, name, version)`
+- primary key on `id`
+
+Neither partial index can satisfy the API’s unqualified two-column conflict target; the three-column key has an extra `version` column. A local no-write `EXPLAIN INSERT` using the same conflict target independently reproduced SQLSTATE 42P10 (“there is no unique or exclusion constraint matching the ON CONFLICT specification”). The request log confirms one synthetic Storage object-upload POST returned HTTP 500. The EXPLAIN probe inserted no row. No historical object/file was changed.
+
+This establishes a **schema/API-version mismatch in the isolated pairing**, not whether it is caused by local reconstruction or also exists in managed Production: the archive is the actual Production schema, but the managed Production Storage API build/version was not available for comparison. Do not make a speculative index or migration change. The six approved migration payloads are unchanged.
+
+At the accepted application SHA, `src/workspaces/library/cakes/photo-actions.ts` uploads for cake-photo creation and replacement, and `src/workspaces/library/assets/actions.ts` uploads for library-asset creation and replacement, through `supabase.storage.from(...).upload(...)`. Therefore these existing actions fail against the tested local API/schema pairing. Production impact remains **UNKNOWN** until the managed Storage API build is matched and the same focused synthetic upload is tested in an isolated clone. Existing historical object reads remain PASS. Keep photo upload/edit outside cutover smoke until then; no additional Production migration is authorized by this result.
