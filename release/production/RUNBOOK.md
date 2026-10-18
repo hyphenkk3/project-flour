@@ -1,10 +1,64 @@
 # Production release runbook — preparation only
 
-This document is an execution checklist, not authorization. No step below has been run against Production. The separate refund write-lock candidate is never part of this initial release.
+This runbook is a gated plan, not authorization. **No Production or DEV change is performed by this document.** Production cutover requires a separate explicit Owner go-ahead for the backup, provider control, maintenance window, migrations, deployment, and reopening. The existing notification history is preserved, and application email remains disabled after launch. The refund write-lock candidate is excluded.
 
-## 0. Source and package identity — read-only
+## Release pins and fixed migration allowlist
 
-Verify GitHub branch heads before release approval:
+- Accepted application source: `e3445e7757cfed418f7ab8d0e6dcf5f6177fd24b`
+- Preparation evidence before this update: `d37e95a7d8ea76736cfe43b0766738fba8190c67`
+- Preparation branch: `codex/production-release-preparation-20261017`
+- Production project: `cuowwlduhxxifmpvpltt`; domain: `whitebird.asia`
+- DEV project: `tzwtpxdcggesgjaqxkqr`; domain: `dev.whitebird.asia` (out of scope)
+
+Apply only these exact files, individually, in this order:
+
+1. `20261017150000_assignment_fix.sql`
+2. `20261017150500_cut_extra_stock_actor_acl.sql`
+3. `20261017151000_cutoff.sql`
+4. `20261017152000_refund_v1.sql`
+5. `20261017153000_email_pause.sql`
+6. `20261017154000_refund_total_rpc_acl.sql`
+
+**Excluded:** `20261017152100_refund_v1_write_lock.sql`. Do not use a wildcard, folder/bulk push, directory loop, `supabase db push`, `--include-all`, or any command that could select files by pattern. Do not move these candidate files into an automatically applied migration directory. Use the supported migration API once per exact payload, with its exact API name. The API-returned version—not a filename guess—is authoritative.
+
+## Cutover checklist: every gate must pass
+
+Each row is a separate Production action. A failed or ambiguous check means **STOP, retain maintenance, do not retry an ambiguous migration, and do not reopen writes**.
+
+| Gate | Preconditions and exact action | Required evidence | Stop condition and recovery | Owner approval |
+|---|---|---|---|---|
+| 1. Freeze and identify source | Confirm the remote preparation branch contains the reviewed package. Make a clean checkout of the application at exactly `e3445e7757cfed418f7ab8d0e6dcf5f6177fd24b`; verify the checkout is clean and the six payloads match the reviewed files. Keep the application source separate from this preparation branch. | Full commit SHA, clean-tree result, six-file allowlist/checksum manifest, and explicit confirmation the excluded write-lock is absent from the execution set. | Any SHA/tree/checksum mismatch: stop and re-pin from the reviewed remote source. Do not deploy a dirty checkout. | Required before the release window. |
+| 2. Fresh Production backup | With separate approval, run the established Mac workflow immediately before cutover: custom-format PostgreSQL backup over the approved Session Pooler with SSL, Storage object and metadata archive, encrypt both using the existing method, compute SHA-256, copy to the private Drive folder, and verify downloaded-copy checksums. Preserve older archives. | Timestamped database and Storage archive names, checksum match for local and downloaded copies, and confirmation archive contains the expected backup scope. Keep credentials and keys out of logs/chat. | Any export, encryption, upload, or checksum mismatch: stop before touching jobs, barrier, migrations, or app. Preserve both old and new files; repair backup process and rerun only with Owner approval. Restore evidence is incomplete for managed Auth/passkey service recovery, so do not describe this as fully tested disaster recovery. | **Separate Owner approval required to execute the fresh backup.** |
+| 3. Map and contain Production email | Before the window, the Owner privately establishes the exact key currently referenced by the Production `RESEND_API_KEY`, proves it is dedicated to Production, and obtains a provider-supported disable/pause action scoped only to that key/project. Vercel metadata showed one Production-scoped and two Preview-scoped entries, but no value/fingerprint identifying them; scope alone proves neither identity nor exclusivity. Do not reveal a key to Codex or paste it into logs. | Provider dashboard shows the Production-only key disabled; Preview/DEV keys remain unchanged. Record the non-secret key label/ID and time. Confirm no delivery test is sent. Keep database Email Pause enabled and do not modify queue/history/preferences. | If identity or dedicated scope cannot be proven, do not disable any candidate key and do not proceed with release. If provider offers only key revocation, use it only for a verified Production-dedicated key and only after approval; plan replacement/redeployment separately. Do not rely on removing a Vercel variable to stop an already deployed/CLI-uploaded instance. | **Separate Owner approval required for provider change.** |
+| 4. Pause and drain all scheduled writers | After backup and email containment, pause exactly the three inspected Production `pg_cron` jobs: `staff-notification-email-dispatch-sweep`, `extra-walk-in-hold-reminders`, and `extra-walk-in-hold-expiry-cleanup`. Use the supported cron job control as the authorized database operator; do not unschedule/delete jobs. Wait for run history to show no executions in progress. `pg_net` was absent at inspection; recheck only if project configuration has changed. | All three jobs report inactive; no active/running invocation remains; names, IDs, command targets, and original schedules are recorded for controlled resumption. Email queue counts/history are unchanged. | A job cannot be paused/drained, an unexpected writer/job exists, or queue rows/statuses change: stop; keep email containment and maintenance active. Resume only after reviewed recovery decision. | **Separate Owner approval required.** |
+| 5. Activate and verify the write barrier | Using the rehearsed Supabase owner/admin path, block new application writes through PostgREST and Supavisor, contain direct RPC/API writes, and drain/terminate existing application-role sessions. Keep one narrowly controlled migration/admin route available. Keep the app in maintenance presentation; do not rely on the page alone. Do not rely only on `REVOKE CONNECT`. | A fresh connection/write attempt using each application role is denied; existing sessions are drained; scheduled writers are inactive; no business row changed; migration/admin access remains available; barrier reversal path is staged and verified in the approved plan. | If any application/service role or old session can write, the privileged migration path is lost, or reversal is uncertain: do not migrate. Keep maintenance and jobs paused; restore only the verified prior barrier state after diagnosis. | **Separate Owner approval required to activate.** |
+| 6. Apply migrations one at a time | Confirm the exact DEV/Production project identity in the console and confirm no target API name already exists. Read one approved file from the pinned preparation commit, call the supported Supabase migration API once with its exact API name and full SQL payload, then wait for completion before continuing. Apply rows 1–6 above only. | For each call, save returned version; verify exactly one history row with the expected API name and returned version; inspect that migration’s postconditions before proceeding. After all six, confirm no history or object change for the excluded refund write-lock. | Error, timeout, transport ambiguity, unexpected generated version/history, extra migration, data-count change, or failed postcondition: do not retry. Inspect history and live definitions first; keep the barrier and jobs paused. Use a specifically reviewed recovery migration or restore decision; never assume application rollback undoes DDL. | **Separate Owner approval required for each migration window; no blanket authorization inferred.** |
+| 7. Post-migration verification | Run the reviewed read-only postflight against Production. Verify all six names and actual returned versions; function definitions, grants, constraints, pause guard, assignment/slicing/cutoff/refund RPC behavior predicates, historical counts/relationships, and notification queue. Preserve the known paid reciprocal-link inconsistencies; do not repair business rows. | Six expected rows only, no excluded write-lock, expected schema/permissions, unchanged tracked business counts and existing mismatch records, unchanged queue history, and all postflight checks pass. | Any unplanned object/history/data/permission difference: keep barrier and jobs paused; no deployment or retry until a targeted correction/recovery plan is approved. | Owner reviews evidence before deploy. |
+| 8. Deploy pinned application | In a clean checkout pinned to the accepted SHA, use the verified `project-flour` / `hyphen-org` Production project binding. Deploy only that commit. Do not use DEV variables or promote a Preview build. | Deployment is READY, domain is `whitebird.asia`, deployed source matches the exact SHA, and Production Supabase binding is verified without revealing values. | Wrong commit/domain/project/binding or failed build: keep database barrier and jobs paused. Roll back the app only to the previously identified deployment if Vercel confirms it is available; rollback does not reverse migrations. | **Separate Owner approval required.** |
+| 9. Read-only smoke and Auth/Storage checks | With writes still blocked, perform only checks supported by the approved read-only/maintenance setup: storefront and staff entry pages, authorized staff authentication path, role/RPC permission reads, public/private Storage reads, and migration/email pause status. No order, payment/refund, stock, customer, or notification mutation; no real historical-user password/passkey attempt. | Correct app SHA/environment; staff/Auth and role checks succeed through permitted read-only paths; Storage reads are authorized; email dispatch remains paused; no business rows, notification statuses, or external effects change. | If the barrier prevents the approved smoke path, do not create an exception that allows writes. Record the failed check, keep maintenance, and obtain a tested read-only path or Owner decision. | Owner reviews smoke evidence before reopening. |
+| 10. Controlled reopen; email remains off | Only after every previous gate passes, the Owner authorizes reversal. Restore the tested application-role access/write barrier state, then resume only the two business cron jobs (`extra-walk-in-hold-reminders`, `extra-walk-in-hold-expiry-cleanup`). Leave `staff-notification-email-dispatch-sweep` inactive, provider Production key paused, and database Email Pause enabled. | New authorized reads/writes work normally; no duplicate/partial business changes; two business jobs active and drained; email sweep inactive; provider key still paused; queue history/counts unchanged. | Any unexpected write, role failure, job activity, email attempt, or data/queue change: reactivate maintenance/barrier using the rehearsed path, stop jobs, and do not unpause email. Do not release backlog. | **Explicit Owner go/no-go required.** |
+
+## Email backlog and future reactivation
+
+Preserve notification history and recipient preferences. Do not delete, mark sent, reset status, or bulk requeue messages. The inspected queue had 412 failed and 19 sent records and no other statuses at that time. Keep the database Email Pause and provider key pause in place after launch. This prevents catch-up. Any future email reactivation is a separate release: first review aged/failed entries, approve an expiry/suppression disposition, then prove only explicitly approved new messages can dispatch. No automatic backlog release.
+
+The accepted app includes server-side email pause coverage, but the deployed legacy app has unknown direct Resend paths. The independent provider control is therefore required. The current Vercel env metadata cannot safely identify the Resend key. The minimum Owner action is to match the Production variable to a private key inventory/creation record and verify a Production-exclusive key. If that cannot be done without exposing or guessing a secret, do not target any existing key; a separately approved dedicated Production key migration is required before a provider pause can be considered safe. Preview/DEV entries must not be changed.
+
+## Storage upload compatibility finding
+
+The isolated restored Production schema and local Storage API `v1.72.1` reproduced HTTP 500 / SQLSTATE 42P10 on a synthetic upload. The API’s upload query uses `ON CONFLICT (name, bucket_id)`; the restored `storage.objects` table has unique indexes on those columns only with partial predicates (`archived_at IS NULL` or `NOT is_versioned`), plus a three-column unique index including `version`. A no-write `EXPLAIN INSERT` reproduced PostgreSQL’s “no unique or exclusion constraint matching the ON CONFLICT specification.” The accepted application commit calls Storage `.upload()` for cake-photo upload/replacement and library-asset creation/replacement. Thus this local API/schema pair fails an existing photo workflow. The archive is the Production schema, but the exact managed Production Storage API build was not available; it is not proven whether Production has this mismatch or whether the local service image is incompatible. No SQL or app correction is authorized or justified from this evidence. Keep photo upload/edit out of cutover smoke until the managed Storage API version/compatibility is confirmed in an isolated matching image. Any schema migration proposal is a separate review and is not part of the six-file allowlist.
+
+## Recovery principles
+
+- On any failure before reopening, keep application maintenance, write barrier, all three cron jobs paused, and Production email disabled.
+- Do not retry a migration with an ambiguous transport result; inspect its history row and live objects first.
+- Vercel rollback restores application routing/source only; it does not reverse SQL migrations.
+- The October 17 backup was restored with tracked records and files validated locally, but complete Supabase-managed Auth/passkey login/service recovery remains unverified. Do not claim full recovery. If a migration/data postflight fails, keep the barrier and use an Owner-approved, specific database recovery plan; do not restore or reset Production automatically.
+- Never repair the known paid-order/stock inconsistencies as part of this release.
+
+## Read-only source/history checks
+
+Verify source pins before the window:
 
 ```sh
 git ls-remote https://github.com/hyphenkk3/project-flour.git \
@@ -12,77 +66,4 @@ git ls-remote https://github.com/hyphenkk3/project-flour.git \
   refs/heads/codex/production-release-preparation-20261017
 ```
 
-Expected application commit: `e3445e7757cfed418f7ab8d0e6dcf5f6177fd24b`.
-Expected preparation commit at this review: `082c89d2dcc45169789fe8f061bf7e748e351524`.
-
-Use a new clean checkout for the application, pinned to the exact application SHA. Confirm `git rev-parse HEAD` equals that SHA and `git status --porcelain` is empty. Never deploy from a dirty or differently based checkout. Keep the preparation branch separate from the application source.
-
-## 1. Stop/go preflight — read-only
-
-1. Verify project reference `cuowwlduhxxifmpvpltt` in the Supabase dashboard/API and confirm the Production domain. Never infer identity from a linked local project.
-2. Confirm current migration history and baseline objects using `sql/preflight.sql`. If any intended migration name already exists, any excluded write-lock row exists, the project identity differs, a schema precondition fails, or mismatch counts unexpectedly increase: STOP. Do not retry or repair history.
-3. Confirm the latest backup evidence, current Production deployment identity, Supabase binding and provider email pause readiness. Do not assume Vercel rollback can reverse database changes.
-4. Resolve old-application compatibility before DDL: the exact legacy Production source/call sites are unavailable. Specifically establish whether it calls assignment, Fresh Pick checkout/cutoff, or any refund writer during the migration-to-deploy window. If that cannot be established, do not proceed without an Owner-approved controlled compatibility/maintenance plan.
-5. Verify the Owner has separately approved the migration window, provider-side pause, and application deployment.
-
-Read-only SQL invocation (use an approved read-only connection, with credentials supplied outside shell history):
-
-```sh
-psql "$PROD_READONLY_URL" -X -v ON_ERROR_STOP=1 -f release/production/sql/preflight.sql
-```
-
-## 2. Pause Production email at provider — external change; separate Owner approval required
-
-Before applying the database pause, the Owner should select the **Whitebird Production** sending project in Resend and apply a provider-supported pause scoped only to Production. Confirm from the dashboard that the Production sending capability is disabled while Development keys/projects remain enabled. Do not revoke/rotate keys. If no scoped pause is available, STOP and obtain a provider-supported Production-only control.
-
-The accepted DEV code's only identified Resend adapter is `src/foundation/staff/staff-notification-dispatch.ts`; route dispatch and scheduled helper call into that worker, and the accepted source has a hard-coded pause check. The old Production deployment may have other direct Resend send paths; its source is unavailable, so the provider pause is the independent barrier. Keep queues and history intact. Do not enable dispatch later until the failed backlog is reviewed and a no-catch-up disposition is approved.
-
-## 3. Apply the six exact SQL payloads — Production writes; separate Owner approval required
-
-Use the supported Supabase `apply_migration` API against project `cuowwlduhxxifmpvpltt`. For each row below, load only the exact named file from the reviewed preparation commit and make one API call with the listed `name`. The API-generated version is authoritative and must be captured in the execution log and verified in `schema_migrations`.
-
-Apply sequentially, waiting for success and verifying the recorded name/version before moving to the next row:
-
-| Order | API name | Exact SQL file |
-|---|---|---|
-| 1 | `assignment_fix` | `migrations/20261017150000_assignment_fix.sql` |
-| 2 | `cut_extra_stock_actor_acl` | `migrations/20261017150500_cut_extra_stock_actor_acl.sql` |
-| 3 | `cutoff` | `migrations/20261017151000_cutoff.sql` |
-| 4 | `refund_v1` | `migrations/20261017152000_refund_v1.sql` |
-| 5 | `email_pause` | `migrations/20261017153000_email_pause.sql` |
-| 6 | `refund_total_rpc_acl` | `migrations/20261017154000_refund_total_rpc_acl.sql` |
-
-Tool-call shape for each row (replace the name and SQL payload only from that row; this is an API call, not a shell command):
-
-```text
-supabase_apply_migration(
-  project_id = "cuowwlduhxxifmpvpltt",
-  name = "<exact API name from table>",
-  query = "<entire exact SQL file contents>"
-)
-```
-
-Never use a wildcard, a directory loop, `supabase db push`, `--include-all`, direct SQL execution for candidate DDL, or a call that applies more than one file. Never include `20261017152100_refund_v1_write_lock.sql`. Before every individual API call, recheck that its API name has no history row. After success, record the returned version and confirm exactly one history row by name. If response is ambiguous, do not retry: inspect history and live definitions first. If a name already exists, stop and inspect rather than replay.
-
-## 4. Verify after migrations — read-only
-
-Run `sql/postflight.sql` with a read-only Production connection. Require exactly one history row for each of the six API names; record the actual versions, verify function definitions/permissions, and ensure no row exists for `refund_v1_write_lock`. Compare pre/post mismatch counts, queue status counts, and existing business-record counts. Any unexpected difference is STOP.
-
-## 5. Deploy the pinned application — Production write; separate Owner approval required
-
-In a clean checkout at the exact accepted SHA, confirm Vercel is linked to team `hyphen-org` and project `project-flour`, verify the Production environment binds only to `cuowwlduhxxifmpvpltt`, and check the deployed branch/domain. Do not expose environment values.
-
-```sh
-vercel link --scope hyphen-org --project project-flour
-vercel deploy --prod --yes
-```
-
-Capture the new deployment ID, URL and source SHA. Confirm READY, `whitebird.asia`, and the intended Production Supabase binding before considering the release live. Do not use a rollback as a database undo.
-
-## 6. Non-mutating smoke checks — after approved deploy
-
-Load the public home/catalogue and sign-in pages; use authorized staff sessions to load relevant dashboards. Do not submit orders, change prices/stock, record payments/refunds, trigger email/WhatsApp, or alter customer data as smoke tests. Run the postflight and compare pre/post counts. Stop on financial, order/stock, authentication/passkey, storage, notification, or environment mismatch.
-
-## Excluded step
-
-`20261017152100_refund_v1_write_lock.sql` is explicitly excluded from this release. It must not appear in any API call, SQL Editor paste, shell command, wildcard, loop, or bulk migration operation. It requires a separate future compatibility review and approval.
+Expected app SHA: `e3445e7757cfed418f7ab8d0e6dcf5f6177fd24b`. The preparation branch SHA will advance when this package update is committed; always record the actual final SHA shown by GitHub. Do not expose environment secrets. No Production/DEV action is performed by the checks above.
