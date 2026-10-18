@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
 import { earliestPickupDateYmd } from "@/engines/business-calendar/pickup-slots";
 import {
   SPECIAL_MENU_DESCRIPTION,
@@ -240,7 +241,9 @@ function HomeMerchandisingFallback() {
   );
 }
 
-export function StorefrontHomePage() {
+export async function StorefrontHomePage() {
+  await connection();
+
   return (
     <main className="bg-paper min-h-dvh overflow-x-clip">
       <StorefrontTheme />

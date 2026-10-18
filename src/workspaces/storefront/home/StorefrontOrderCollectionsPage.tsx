@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import {
   SPECIAL_MENU_DESCRIPTION,
   SPECIAL_MENU_HEADING,
@@ -53,6 +54,8 @@ function CollectionChoiceCard({
 }
 
 export async function StorefrontOrderCollectionsPage() {
+  await connection();
+
   const todayYmd = toBusinessDateKey();
   const todayYm = businessYearMonth(todayYmd) ?? todayYmd.slice(0, 7);
   const [catalogues, specials] = await Promise.all([
