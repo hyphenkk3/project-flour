@@ -177,3 +177,32 @@ The Resend key named Whitebird Production has Sending access and all-domain scop
 The supported project pause is reversible, but no Production change is authorized by this record. The old deployment should not be deleted as the first containment step; deletion removes a recovery artifact and still would not prove there are no other consumers of the old key. Keep the six migration allowlist unchanged and `20261017152100_refund_v1_write_lock.sql` excluded. Preserve the pending-task register.
 
 References: [Vercel project pause](https://vercel.com/docs/cli/project), [pause API](https://vercel.com/docs/rest-api/projects/pause-a-project), [Cron controls](https://vercel.com/docs/cron-jobs/manage-cron-jobs), [Deployment Protection](https://vercel.com/docs/deployment-protection), [Resend insights](https://resend.com/changelog/api-key-insights), [Resend logs](https://resend.com/changelog/logs-api).
+
+
+## Final legacy containment rehearsal plan — 2026-10-18
+
+Preparation only: no pause, scheduler change, migration, deployment, provider change, data write, or email send occurred. This plan supersedes the prior untested project-pause candidate as a **bounded rehearsal plan**, not as proof of email safety. The six-migration allowlist and order are unchanged; `20261017152100_refund_v1_write_lock.sql` remains excluded. The pending-task register is preserved.
+
+### Documented Vercel behavior and live-test questions
+
+- **Documented:** Vercel project pause suspends Production traffic, blocks the active Production deployment, stops auto-assignment of custom Production domains, and shows visitors an error. Interactive `vercel project resume project-flour` reverses it. The docs describe pause/resume as platform controls, with no rebuild or redeploy step. Sources: [CLI pause/resume](https://vercel.com/docs/cli/project), [pause API](https://vercel.com/docs/rest-api/projects/pause-a-project), [resume API](https://vercel.com/docs/rest-api/sdk/projects/unpause-a-project).
+- **Preview/DEV:** docs scope the pause to Production traffic for this project; they do not say it pauses Preview deployments or a separate DEV project. Confirm `dev.whitebird.asia` stays reachable in the test. Do not select All Deployments protection and do not pause the DEV project.
+- **Older deployment URLs:** the API promises blocking the active Production deployment only. It does not settle access to previous deployment-specific URLs. Test the active and every known prior Production URL.
+- **Protection bypasses:** shareable and automation bypasses are documented for deployment protection, but Vercel docs do not establish whether they override project pause. Test existing bypass paths with harmless reads; never expose secrets or mint another bypass.
+- **Background work:** project pause is not documented to terminate running Functions or cancel Cron. Vercel Cron invokes Production deployments and has its own project-level execution control. Disable that control separately and drain invocations. Separately pause and drain the three known Production Supabase jobs: `staff-notification-email-dispatch-sweep`, `extra-walk-in-hold-reminders`, `extra-walk-in-hold-expiry-cleanup`. Preserve each job; do not delete or unschedule.
+
+### Separately approved bounded test
+
+Reserve a 15-minute maximum Production outage with a second authorized operator able to resume. Pre-record alias/active deployment identity, all known Production deployment URLs, current Vercel Cron state and inventory, the three Supabase job IDs/names/schedules/activity, queue counts/statuses, and DEV availability. Do not start if the bypass inventory, scheduler state, recovery operator, or resume access is uncertain.
+
+During the window: disable Vercel Cron execution; pause (without deleting) the three Supabase jobs; wait for running functions/jobs to finish; run `vercel project pause project-flour` with interactive confirmation; test the custom domain, active and previous Production URLs from a normal client and through existing bypass paths; verify the DEV URL still works; check there are no active executions and the notification queue/history is unchanged. No mutating probes, test orders, email sends, or manual cron invocations.
+
+Resume with `vercel project resume project-flour` interactively. Restore Vercel Cron and the three Supabase job states to the recorded pre-test values. Verify the same Production alias still points to the same retained deployment, Production and DEV read-only smoke pages work, schedulers match their intended state, and no queue or business data changed. Do not delete deployments. If any URL/bypass still reaches the application, work remains active, a state cannot be restored, or 15 minutes elapse, stop and resume immediately; do not migrate.
+
+The full checklist, expected responses, stop/recovery conditions, and approval list are in [RUNBOOK.md](RUNBOOK.md).
+
+### Decision: not sufficient by itself for email release approval
+
+A successful live test would verify that the specific tested URLs are paused during that window. It would not prove by itself that every old deployment URL or bypass is blocked, that in-flight Functions are cancelled, or that the legacy Resend credential has no other consumer. The email gate remains **OPEN / BLOCKED** until all known Production URLs and bypass paths fail closed, Vercel and Supabase scheduled work is stopped and drained, active work is absent, and the existing DB email pause remains effective without backlog catch-up. If these conditions cannot be independently verified, the project-pause test is insufficient for migration approval. A provider-side stop of a confirmed Production-exclusive key would be stronger, but its identity/exclusivity is not established here and no key should be guessed, revoked, or changed.
+
+Separate Owner approval is required before the live outage and temporary changes. This plan does not authorize or perform them.
