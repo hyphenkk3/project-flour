@@ -2,7 +2,7 @@
 
 **Purpose:** Run the already-prepared initial Production migration allowlist against the October 17 Production backup in an isolated environment, then record what was and was not established.
 
-**Result:** Database restoration and the six SQL payloads passed. This is a substantial Production-data/schema rehearsal, but not full application/Auth/Storage runtime acceptance and not cutover authorization.
+**Result:** The database restoration and six SQL payloads passed. Follow-up isolated runtime checks also verified that Supabase Auth can read the restored historical identities and that the Storage API can serve all 34 archived objects. This is not full end-user recovery acceptance and does not authorize cutover.
 
 ## Environment and isolation
 
@@ -25,7 +25,7 @@ Restored catalog counts:
 - 77 triggers
 - 163 RLS policies
 
-The Storage object archive contained 34 files. Its 34 object paths and byte sizes matched all 34 restored `storage.objects` metadata entries. A live Storage API read was not tested.
+The Storage object archive contained 34 files whose paths and byte sizes matched all 34 restored `storage.objects` metadata entries. The earlier SQL-only stage had not tested serving; the follow-up below completed all 34 Storage API reads.
 
 ## Data preservation
 
@@ -96,9 +96,9 @@ A transaction rollback probe in the separate empty database removed both its syn
 | Migration API version registration | **NOT TESTED**; direct SQL intentionally does not write history |
 | Full pre-existing per-object ACL/ownership fidelity | **PARTIAL**; role metadata was reconstructed from Owner-provided values; archive ACL coverage was incomplete |
 | Auth user/passkey database rows | **PASS** for restore/counts |
-| Actual password or passkey login/recovery | **NOT TESTED**; no running Supabase Auth service was wired to the restored database |
+| Historical password or passkey login/recovery | **NOT TESTED**; only synthetic identities were used for active login tests. Historical Auth users were read by the local Auth admin API; no historical user credentials were used. |
 | Storage archive/metadata correspondence | **PASS** |
-| Actual Storage API/object serving | **NOT TESTED** |
+| Actual Storage API/object serving | **PASS**; all 34 historical public objects were retrieved through the isolated API and response sizes matched metadata; an isolated private synthetic object was denied to anon and readable by the synthetic service role. |
 | Customer/staff application workflows connected to restored Production data | **NOT TESTED** |
 | Refund/provider transfer, external email/WhatsApp/webhooks | **NOT TESTED** and intentionally impossible in this environment |
 | DB email gate for the tested cron sweep | **PASS**; queue unchanged, egress denied |
@@ -110,3 +110,26 @@ A transaction rollback probe in the separate empty database removed both its syn
 ## Decision
 
 The earlier runtime blocker is resolved, and the six exact migration payloads have now passed a restore-and-replay against the October 17 database backup. **Production release remains blocked** until owner-level barrier activation/reversal is faithfully rehearsed, the old app's privileged database paths are contained, Production email is paused through a Production-scoped provider control, and actual Auth/passkey/Storage/application smoke paths are proven in a safe environment. No change is authorized on Production by these results.
+
+## Follow-up historical Auth and Storage runtime verification — 2026-10-18
+
+This follow-up used a fresh database inside the existing local Supabase-compatible Docker environment and a private internal-only network. It restored only the historical Auth, WebAuthn, relevant staff-profile, Storage metadata and sequence data from the October 17 backup. The original database and Storage archives were left unchanged. No Production or DEV credentials, real provider settings, real user sign-ins, emails, payments, WhatsApp, or external HTTP calls were used.
+
+### Auth and passkeys
+
+- The restored Auth database contains **10 users**, **4 WebAuthn credential rows**, and **10 relevant staff profiles**. All 10 profiles link to Auth users; all 4 credential rows link to an Auth user.
+- The isolated Supabase Auth service started and its health endpoint returned HTTP 200. Using only the synthetic local service key, its admin listing read **10** restored identities.
+- A private pre-start versus post-start digest comparison of all Auth-user and WebAuthn rows matched. This confirms the local Auth service did not alter historical user or passkey credential records during startup/read verification.
+- No historical user's password or passkey was used to authenticate. This proves database-record restoration, profile linkage, passkey metadata preservation, and Auth service readability; it does not prove that a historical user's password/passkey can log in or that the managed Production Auth service configuration can be recovered.
+
+### Storage objects and access control
+
+- Restored **2 historical buckets and 34 object metadata rows**. All 34 corresponding archived files were mapped into a private Linux Docker volume using the restored tenant, bucket, object-name, and version metadata; file sizes matched their metadata.
+- The isolated Storage API returned HTTP 200 for all **34 of 34** historical public objects, and every response byte count matched metadata.
+- A separate private synthetic bucket/object returned HTTP 400 to the local anon key and HTTP 200 with the expected synthetic content to the local service key. That test object and bucket were deleted through the local Storage API; the final database returned to 2 buckets and 34 historical objects.
+- A pre/post SHA-256 manifest comparison of the 34 historical files in the Docker volume matched. The API mounted the volume copy; the extracted archive and original backup archive were not modified.
+- The first host-bind test exposed the archive's export layout and macOS extended-attribute limitation. The test was corrected by creating a read-only Linux-volume copy with the service's tenant/version path layout. No historical file content or archive was changed to make the test pass.
+
+### Current scope
+
+Historical Auth data/service readability and Storage API recovery are verified in isolation. Historical-user authentication recovery remains intentionally untested. Full accepted-application behavior against these historical Auth identities and Production-managed settings remains outside this targeted test.
