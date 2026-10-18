@@ -161,3 +161,39 @@ Neither partial index can satisfy the API’s unqualified two-column conflict ta
 This establishes a **schema/API-version mismatch in the isolated pairing**, not whether it is caused by local reconstruction or also exists in managed Production: the archive is the actual Production schema, but the managed Production Storage API build/version was not available for comparison. Do not make a speculative index or migration change. The six approved migration payloads are unchanged.
 
 At the accepted application SHA, `src/workspaces/library/cakes/photo-actions.ts` uploads for cake-photo creation and replacement, and `src/workspaces/library/assets/actions.ts` uploads for library-asset creation and replacement, through `supabase.storage.from(...).upload(...)`. Therefore these existing actions fail against the tested local API/schema pairing. Production impact remains **UNKNOWN** until the managed Storage API build is matched and the same focused synthetic upload is tested in an isolated clone. Existing historical object reads remain PASS. Keep photo upload/edit outside cutover smoke until then; no additional Production migration is authorized by this result.
+
+
+## Managed Production Storage upload compatibility — 2026-10-18
+
+This focused follow-up supersedes the earlier unresolved Storage write-compatibility result above. Production and DEV were not modified.
+
+### Production evidence (read-only)
+
+- The Production Supabase project identity was confirmed as `cuowwlduhxxifmpvpltt`.
+- Recent managed `storage_logs` for Production reported `appVersion=1.80.2`; the query window covered 2026-10-17 08:27 UTC through 2026-10-18 08:27 UTC and returned only that Storage API version.
+- Read-only Production metadata confirmed the `storage.migrations` row `objects-current-version-index` is present.
+- The live `storage.objects` catalog contains the matching unique partial index `idx_objects_current_version` on `(bucket_id, name COLLATE "C") WHERE archived_at IS NULL`, plus the other version-related indexes recorded above.
+- The managed API image used for the isolated replay was `public.ecr.aws/supabase/storage-api:v1.80.2`, digest `sha256:95b217a9c59e0ac06c6dcb539df3189a1668a2445fb43dbf29660d6968ffd7d2`.
+
+### Isolated matched-version test
+
+A fresh disposable database was restored from the validated October 17 local backup copy with the Production-shaped schema and Storage metadata. It retained 2 buckets, 34 historical object rows, the `objects-current-version-index` migration marker, and the 3 relevant unique indexes. The API container ran on the internal-only Docker network; no Production or DEV credentials, external integrations, email, payment, WhatsApp, or outbound requests were configured.
+
+The v1.80.2 implementation checks the Storage migration marker and, when present, uses `ON CONFLICT (bucket_id, name COLLATE "C") WHERE archived_at IS NULL`, matching `idx_objects_current_version`. The earlier v1.72.1 image always used the incompatible unqualified `ON CONFLICT (name, bucket_id)`; with the restored partial indexes that older query produced SQLSTATE 42P10.
+
+Using a new synthetic bucket and object in the isolated service:
+
+- Bucket creation: HTTP 200.
+- First upload: HTTP 200.
+- Replacement with upsert: HTTP 200.
+- Read-back returned the replacement bytes: HTTP 200.
+- Synthetic object and bucket cleanup: HTTP 200.
+- SQLSTATE 42P10 was not reproduced with v1.80.2.
+- One restored historical object was retrieved through the API: HTTP 200, 2,192,014 bytes. The broader prior 34-of-34 historical read and size verification remains accepted and was not repeated.
+- Final isolated counts returned to 2 buckets and 34 objects; no historical Storage metadata or files were modified.
+
+The first attempt to read a historical object after switching image versions returned a local HTTP 500 because the isolated file backend had not been given the archive's synthetic `STORAGE_S3_BUCKET=stub` namespace. After setting that local-only namespace, the same restored object read succeeded. This was a local Storage file-path configuration artifact, not a Production schema defect.
+
+### Finding
+
+**Storage schema/API upload and replacement compatibility: PASS for the observed Production v1.80.2 service and the validated October 17 schema.** The earlier 42P10 was caused by testing the Production-shaped schema with an older local Storage API build. No schema change, application change, or additional Production migration is justified. This does not perform or authorize a Production write; recheck only if managed Storage version/schema changes or a new reproducible failure occurs.
