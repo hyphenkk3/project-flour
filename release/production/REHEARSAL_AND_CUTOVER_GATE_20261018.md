@@ -209,3 +209,39 @@ Separate Owner approval is required before the live outage and temporary changes
 
 
 Safe-probe limit: because old Production route semantics are unknown, a request to an older deployment URL or active bypass may execute legacy code. Do not make those requests in this no-email rehearsal. Use Vercel metadata only; mark their reachability and bypass precedence unverified and keep the email gate blocked.
+
+
+## Internal Production cutover decision — 2026-10-18
+
+**Status: NOT EXECUTABLE YET.** This is preparation only; no Production or DEV write, backup, scheduler action, project pause, migration, deployment, key change, or email send occurred. Accepted app pin remains `e3445e7757cfed418f7ab8d0e6dcf5f6177fd24b`. Vercel metadata confirms `whitebird.asia` belongs to `project-flour`; the known current `dpl_9toGsEsDYhYHn17takiszAjxRgjy` remains READY, Production-targeted, CLI-sourced, without a verifiable Git commit. Supabase Production must be checked by console project ID `cuowwlduhxxifmpvpltt` at any future execution. No old-source recovery investigation is reopened.
+
+### Checks already passed
+
+- Six exact migration payloads passed the October 17 Production-shaped PostgreSQL 17.11 restore/replay; migration API version recording still must be verified per actual Production API response.
+- Isolated Fresh Pick, Auth service read of historical identities, 34/34 historical Storage reads, local PostgREST/Supavisor barrier, and local cron containment are accepted evidence. Historical-user password/passkey login and complete managed Auth restore remain unverified.
+- October 17 rehearsal counts (83 orders, 81 payments, 81 allocations, 0 refunds, 10 Auth users, 10 staff profiles, 4 passkeys, 2 buckets, 34 Storage objects) are historical only. They are not the October 25 expected counts. Known reciprocal-link exceptions remain and must not be repaired.
+
+### Data-preservation gate
+
+After staff freeze, scheduler pause/drain, and verified database barrier, take the fresh encrypted DB/Storage backups and create a private timestamped pre-manifest. Compare pre/post counts, ordered primary-key-set digests, and keyed HMAC-SHA-256 row digests for orders/items, customers, catalogue/sizes/pricing/availability, payments/allocations/refunds, Fresh Pick/Extra Stock and reciprocal links, staff/Auth/passkey references, audit/timeline rows, and Storage metadata/file manifests. Keep digest key and manifests in the Owner’s private secure backup location; output no customer, credential, or payment detail. Compare all common pre-existing columns; validate newly added columns and approved pause-control metadata separately. Any unexpected business-row, relationship, audit, financial, identity, or object difference is STOP. No synthetic Production order or test refund is permitted.
+
+### Execution order
+
+1. Owner approves the precise downtime window, responsible operators, and preflight actions. Announce internal freeze; crew stops order, payment, refund, stock, and staff changes.
+2. Disable Vercel Cron; pause the three known Supabase jobs. Keep the email sweep inactive and queue/history/preferences unchanged. Wait for all in-flight work to finish.
+3. Activate the rehearsed PostgREST/Supavisor/direct-RPC write barrier, drain sessions, and retain only the authorized migration path. Project-pause `project-flour` to stop the current Production route. Stop if any writer remains or barrier reversal path is uncertain.
+4. With writers frozen and barrier active, run the fresh encrypted DB/Storage backup, verify local and downloaded Drive checksums, then capture the pre-manifest. This is deliberately after writer drain so backup and manifest describe the migration starting state.
+5. After separate Owner migration approval, apply individually and in order: `20261017150000_assignment_fix.sql`; `20261017150500_cut_extra_stock_actor_acl.sql`; `20261017151000_cutoff.sql`; `20261017152000_refund_v1.sql`; `20261017153000_email_pause.sql`; `20261017154000_refund_total_rpc_acl.sql`. Use only the exact API payloads; record returned versions/checksums; inspect each postcondition before proceeding. No wildcard/bulk push, no fabricated history, no retry on ambiguous results. The refund write-lock remains excluded.
+6. Compare post-manifest and migration history while writes remain blocked. Deploy only the pinned accepted app after separate Owner approval. Owner enters Whitebird Production V2 only into the Production-scoped variable using the secure Vercel session; Preview/DEV stay unchanged. Verify Production binding privately, no secret output, READY deployment, expected source/target, and new app read-only workflows.
+7. If the paused project will not allow the new deployment/domain assignment or read-only smoke, remain paused with the barrier active; do not unpause into the old app. Resolve through the approved Vercel operator path before opening writes.
+8. Show evidence to Owner for explicit go/no-go. Only then remove the barrier, restore approved business schedulers, and resume Production traffic. The email-dispatch sweep stays off; no backlog catch-up. Resume staff for genuine business transactions only.
+
+### Actual blockers and recovery limits
+
+- **Hard stop — legacy email:** project pause covers the active Production deployment but does not establish that every historical URL, bypass, in-flight function, or out-of-band use of the legacy Resend credential is contained. Vercel/Supabase scheduled jobs must be separately disabled and drained. Do not migrate while any legacy direct-send path is reachable or unverified.
+- **Fresh baseline outstanding:** October 17 backup is not current. Fresh backup and pre-manifest must be taken after freeze/barrier; neither was executed here.
+- **Recovery is partial:** Vercel has a READY old Production deployment, but it is CLI-sourced with unknown commit and is not a verified safe rollback after schema changes. Vercel rollback does not reverse migrations. Full managed Auth/passkey login recovery is unverified; restoring the backup after reopening can lose subsequent genuine transactions.
+- **Production controls are not active:** isolated barrier/scheduler tests passed, but their Production activation/reversal has not been performed. Run and verify them only in the Owner-approved window.
+- **Approval gates remain:** explicit Owner authorization for freeze/backup/scheduler/barrier/project pause; then separate migration/deployment approval after data and migration postflight; final Owner go before reopening. Owner’s prior permission for downtime does not authorize these Production mutations.
+
+The pending-task register is unchanged. The full pre/post data manifest and STOP/recovery procedure are in [RUNBOOK.md](RUNBOOK.md).
