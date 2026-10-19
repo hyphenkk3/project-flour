@@ -868,6 +868,33 @@ export function ExtraBoard({
                     {unit.assignedGuestName}
                   </p>
                 ) : null}
+                {unit.readyForCollection ? (
+                  <p className="text-status-success mt-2 text-sm font-semibold">
+                    Ready for Collection · this physical cake
+                  </p>
+                ) : null}
+                {unit.assignedOrderId &&
+                !unit.readyForCollection &&
+                capabilities.canMarkReadyForCollection ? (
+                  <div className="mt-3">
+                    <button
+                      className={btnPrimary}
+                      disabled={pending}
+                      onClick={() => {
+                        setError(null);
+                        setReadyReason("");
+                        setReadyUnit(unit);
+                      }}
+                      type="button"
+                    >
+                      Mark Physical Stock Ready
+                    </button>
+                    <p className="text-skyline mt-1 text-xs">
+                      The order becomes ready only after full payment and when
+                      every linked Fresh Pick unit is ready.
+                    </p>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -985,7 +1012,9 @@ export function ExtraBoard({
         confirmLabel="Mark this cake Ready"
         description={
           readyUnit
-            ? `Mark this physical ${readyUnit.cakeName} ${readyUnit.sizeLabel} Fresh Pick as Ready for Collection? This bypasses only the preparation cutoff for pickup and dine-in; normal hours and the item order window still apply.`
+            ? readyUnit.assignedOrderId
+              ? `Mark this assigned physical ${readyUnit.cakeName} ${readyUnit.sizeLabel} Fresh Pick as ready. This records stock readiness only; its order becomes Collection-ready only after full payment and when all linked Fresh Pick units are ready.`
+              : `Mark this physical ${readyUnit.cakeName} ${readyUnit.sizeLabel} Fresh Pick as Ready for Collection? This bypasses only the preparation cutoff for pickup and dine-in; normal hours and the item order window still apply.`
             : undefined
         }
         onCancel={() => {
