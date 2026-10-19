@@ -32,6 +32,8 @@ export type ExtraStockUnit = {
   assignedOrderId: string | null;
   assignedOrderNumber: string | null;
   assignedGuestName: string | null;
+  /** The stock row has a verified per-unit Fresh Pick order link. */
+  assignedStockReadinessAllowed: boolean;
   note: string | null;
   proposedAt: string;
   proposedBy: string;

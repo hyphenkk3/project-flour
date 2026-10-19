@@ -124,6 +124,7 @@ export function mapExtraStockRow(
     assignedOrderId: null,
     assignedOrderNumber: null,
     assignedGuestName: null,
+    assignedStockReadinessAllowed: false,
     note: row.note,
     proposedAt: row.proposed_at,
     proposedBy: row.proposed_by,
@@ -330,31 +331,48 @@ export async function listExtraStockUnits(): Promise<ExtraStockUnit[]> {
   const now = new Date();
   const stockRows = (data ?? []) as unknown as ExtraStockRow[];
   const units = stockRows.map((row) => mapExtraStockRow(row, now));
+  const soldIds = units.filter((unit) => unit.soldAt).map((unit) => unit.id);
   const linkedStockRows = stockRows.filter(
     (row) => row.sold_at && row.order_id,
   );
   let assignedUnits = units;
-  if (linkedStockRows.length > 0) {
+  if (soldIds.length > 0) {
     const linkedOrderIds = Array.from(
       new Set(linkedStockRows.map((row) => row.order_id as string)),
     );
-    const { data: orders, error: orderError } = await supabase
+    const { data: primaryOrders, error: primaryOrderError } = await supabase
       .from("orders")
-      .select("id, order_number, guest_name")
-      .in("id", linkedOrderIds);
-    if (orderError) {
-      throw new Error(orderError.message);
+      .select("id, order_number, guest_name, extra_stock_id")
+      .in("extra_stock_id", soldIds);
+    if (primaryOrderError) {
+      throw new Error(primaryOrderError.message);
+    }
+
+    let perUnitOrders: typeof primaryOrders = [];
+    if (linkedOrderIds.length > 0) {
+      const { data, error: linkedOrderError } = await supabase
+        .from("orders")
+        .select("id, order_number, guest_name, extra_stock_id")
+        .in("id", linkedOrderIds);
+      if (linkedOrderError) {
+        throw new Error(linkedOrderError.message);
+      }
+      perUnitOrders = data ?? [];
     }
 
     const byStock = mapAssignedOrderSummariesByStock(
-      linkedStockRows,
-      (orders ?? []).map((order) => ({
+      stockRows
+        .filter((row) => row.sold_at)
+        .map((row) => ({ id: row.id, order_id: row.order_id })),
+      [...(primaryOrders ?? []), ...perUnitOrders].map((order) => ({
         id: (order as { id: string }).id,
         order_number: String(
           (order as { order_number?: string }).order_number ?? "",
         ),
         guest_name:
           (order as { guest_name?: string | null }).guest_name ?? null,
+        extra_stock_id:
+          (order as { extra_stock_id?: string | null }).extra_stock_id ?? null,
       })),
     );
 
@@ -366,6 +384,7 @@ export async function listExtraStockUnits(): Promise<ExtraStockUnit[]> {
         assignedOrderId: linked.id,
         assignedOrderNumber: linked.order_number || null,
         assignedGuestName: linked.guest_name,
+        assignedStockReadinessAllowed: linked.readinessLinkVerified,
       };
     });
   }

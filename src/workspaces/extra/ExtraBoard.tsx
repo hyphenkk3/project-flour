@@ -874,6 +874,7 @@ export function ExtraBoard({
                   </p>
                 ) : null}
                 {unit.assignedOrderId &&
+                unit.assignedStockReadinessAllowed &&
                 !unit.readyForCollection &&
                 capabilities.canMarkReadyForCollection ? (
                   <div className="mt-3">
