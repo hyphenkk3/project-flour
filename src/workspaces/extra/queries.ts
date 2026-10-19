@@ -17,10 +17,12 @@ import { createClient } from "@/lib/supabase/server";
 import { isMissingCakePhotoSchema } from "@/workspaces/library/cakes/photo-storage";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import { loadFreshPicksPreparationConfig } from "@/workspaces/storefront/extra/config";
+import { mapAssignedOrderSummariesByStock } from "@/workspaces/extra/assigned-order-links";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
 
 type ExtraStockRow = {
   id: string;
+  order_id: string | null;
   lifecycle: ExtraLifecycle;
   cake_name: string;
   size_label: string;
@@ -53,6 +55,7 @@ type ExtraStockRow = {
 
 const EXTRA_SELECT = `
   id,
+  order_id,
   lifecycle,
   cake_name,
   size_label,
@@ -325,36 +328,38 @@ export async function listExtraStockUnits(): Promise<ExtraStockUnit[]> {
   }
 
   const now = new Date();
-  const units = ((data ?? []) as unknown as ExtraStockRow[]).map((row) =>
-    mapExtraStockRow(row, now),
+  const stockRows = (data ?? []) as unknown as ExtraStockRow[];
+  const units = stockRows.map((row) => mapExtraStockRow(row, now));
+  const linkedStockRows = stockRows.filter(
+    (row) => row.sold_at && row.order_id,
   );
-  const soldIds = units.filter((unit) => unit.soldAt).map((unit) => unit.id);
   let assignedUnits = units;
-  if (soldIds.length > 0) {
+  if (linkedStockRows.length > 0) {
+    const linkedOrderIds = Array.from(
+      new Set(linkedStockRows.map((row) => row.order_id as string)),
+    );
     const { data: orders, error: orderError } = await supabase
       .from("orders")
-      .select("id, order_number, guest_name, extra_stock_id")
-      .in("extra_stock_id", soldIds);
+      .select("id, order_number, guest_name")
+      .in("id", linkedOrderIds);
     if (orderError) {
       throw new Error(orderError.message);
     }
 
-    const byExtra = new Map<
-      string,
-      { id: string; order_number: string; guest_name: string | null }
-    >();
-    for (const order of orders ?? []) {
-      const extraId = (order as { extra_stock_id?: string | null }).extra_stock_id;
-      if (!extraId) continue;
-      byExtra.set(extraId, {
+    const byStock = mapAssignedOrderSummariesByStock(
+      linkedStockRows,
+      (orders ?? []).map((order) => ({
         id: (order as { id: string }).id,
-        order_number: String((order as { order_number?: string }).order_number ?? ""),
-        guest_name: (order as { guest_name?: string | null }).guest_name ?? null,
-      });
-    }
+        order_number: String(
+          (order as { order_number?: string }).order_number ?? "",
+        ),
+        guest_name:
+          (order as { guest_name?: string | null }).guest_name ?? null,
+      })),
+    );
 
     assignedUnits = units.map((unit) => {
-      const linked = byExtra.get(unit.id);
+      const linked = byStock.get(unit.id);
       if (!linked) return unit;
       return {
         ...unit,
