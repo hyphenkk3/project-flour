@@ -28,6 +28,8 @@ type OrderFulfilmentCreateFieldsProps = {
   scheduleMode?: "owner" | "slots";
   defaultDate?: string;
   defaultTime?: string;
+  /** Allow an existing date before the new-order minimum while it is unchanged. */
+  minDate?: string;
   onDateChange?: (date: string) => void;
   onTimeChange?: (time: string) => void;
   /** CO late-edit cutoff: muted scope cues near method vs pickup. */
@@ -45,6 +47,7 @@ export function OrderFulfilmentCreateFields({
   scheduleMode = "owner",
   defaultDate,
   defaultTime,
+  minDate,
   onDateChange,
   onTimeChange,
   lateEditCutoffHints = false,
@@ -78,7 +81,9 @@ export function OrderFulfilmentCreateFields({
       <fieldset className="space-y-2">
         <legend className="text-ink text-sm font-medium">Method</legend>
         {lateEditCutoffHints ? (
-          <p className="text-skyline text-sm">{LATE_ORDER_EDIT_SECTION_EXCLUDED}</p>
+          <p className="text-skyline text-sm">
+            {LATE_ORDER_EDIT_SECTION_EXCLUDED}
+          </p>
         ) : null}
         <div
           aria-label="Fulfilment method"
@@ -119,6 +124,7 @@ export function OrderFulfilmentCreateFields({
           defaultDate={defaultDate}
           defaultTime={defaultTime}
           hoursSnapshot={hoursSnapshot}
+          minDate={minDate}
           onDateChange={onDateChange}
           onTimeChange={onTimeChange}
           timeLabel={timeLabel}
@@ -138,7 +144,9 @@ export function OrderFulfilmentCreateFields({
       {isDelivery ? (
         <div className="border-fog space-y-4 rounded-lg border p-3">
           {lateEditCutoffHints ? (
-            <p className="text-skyline text-sm">{LATE_ORDER_EDIT_SECTION_EXCLUDED}</p>
+            <p className="text-skyline text-sm">
+              {LATE_ORDER_EDIT_SECTION_EXCLUDED}
+            </p>
           ) : null}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-ink text-xs font-semibold tracking-[0.12em] uppercase">

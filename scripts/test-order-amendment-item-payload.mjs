@@ -312,6 +312,26 @@ await test("14 foreign item ID rejected before RPC submission", async () => {
   assert.match(result.error, /no longer belongs/);
   assert.equal(calls.length, 0);
 });
+await test("15 unchanged historical pickup date stays valid while new dates keep the standard minimum", async () => {
+  const form = readFileSync(
+    "src/workspaces/owner/orders/OrderWorkspaceForm.tsx",
+    "utf8",
+  );
+  const fulfilment = readFileSync(
+    "src/workspaces/owner/orders/OrderFulfilmentCreateFields.tsx",
+    "utf8",
+  );
+  const pickupFields = readFileSync(
+    "src/components/ui/PickupSlotFields.tsx",
+    "utf8",
+  );
+  assert.match(
+    form,
+    /editPickupDate === order\.pickupDate \? order\.pickupDate : undefined/,
+  );
+  assert.match(fulfilment, /minDate=\{minDate\}/);
+  assert.match(pickupFields, /minDateProp\?\.trim\(\) \|\| earliest/);
+});
 console.log(
   `${count}/${count} real amendment action payload scenarios passed (external I/O mocked).`,
 );

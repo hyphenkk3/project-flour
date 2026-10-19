@@ -1,10 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
-  nextMonth,
   formatReportAsOf,
   percentChange,
   previousMonth,
@@ -67,7 +65,6 @@ export function ManagementReportDashboard({
   const router = useRouter();
   const { current, previous } = report;
   const latestMonth = reportMonth(new Date());
-  const canAdvanceMonth = current.month < latestMonth;
   const availableMonths = useMemo(() => {
     const months: string[] = [];
     for (
@@ -135,70 +132,24 @@ export function ManagementReportDashboard({
             </p>
           </div>
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
-            <nav
-              aria-label="Report month navigation"
-              className="flex min-h-12 w-full max-w-sm min-w-0 items-center justify-between gap-1 rounded-xl border border-slate-200 bg-white px-1 py-1 sm:w-auto sm:justify-start sm:gap-2 sm:px-2"
-            >
-              <Link
-                aria-label={`Previous month: ${new Intl.DateTimeFormat(
-                  "en-MY",
-                  {
-                    month: "long",
-                    year: "numeric",
-                    timeZone: "UTC",
-                  },
-                ).format(
-                  new Date(`${previousMonth(current.month)}-01T00:00:00Z`),
-                )}`}
-                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-xl text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none"
-                href={`/owner/management/reports?month=${previousMonth(current.month)}`}
-                scroll={false}
+            <div className="flex min-h-12 w-full max-w-sm min-w-0 items-center rounded-xl border border-slate-200 bg-white px-2 py-1 sm:w-auto">
+              <select
+                aria-label="Choose report month and year"
+                className="h-11 w-full min-w-0 cursor-pointer rounded-lg border-0 bg-transparent px-2 text-sm font-semibold text-slate-900 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none sm:min-w-[12rem]"
+                onChange={(event) => selectMonth(event.currentTarget.value)}
+                value={current.month}
               >
-                <span aria-hidden="true">‹</span>
-              </Link>
-              <div className="flex min-h-11 min-w-0 flex-1 items-center justify-center rounded-lg px-1 text-center hover:bg-slate-50 sm:min-w-[10.5rem]">
-                <select
-                  aria-label="Choose report month and year"
-                  className="h-11 w-full min-w-0 cursor-pointer rounded-lg border-0 bg-transparent px-2 text-center text-sm font-semibold text-slate-900 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none"
-                  onChange={(event) => selectMonth(event.currentTarget.value)}
-                  value={current.month}
-                >
-                  {availableMonths.map((month) => (
-                    <option key={month} value={month}>
-                      {new Intl.DateTimeFormat("en-MY", {
-                        month: "long",
-                        year: "numeric",
-                        timeZone: "UTC",
-                      }).format(new Date(`${month}-01T00:00:00Z`))}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {canAdvanceMonth ? (
-                <Link
-                  aria-label={`Next month: ${new Intl.DateTimeFormat("en-MY", {
-                    month: "long",
-                    year: "numeric",
-                    timeZone: "UTC",
-                  }).format(
-                    new Date(`${nextMonth(current.month)}-01T00:00:00Z`),
-                  )}`}
-                  className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg text-xl text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none"
-                  href={`/owner/management/reports?month=${nextMonth(current.month)}`}
-                  scroll={false}
-                >
-                  <span aria-hidden="true">›</span>
-                </Link>
-              ) : (
-                <span
-                  aria-disabled="true"
-                  aria-label="Next month unavailable"
-                  className="inline-flex min-h-11 min-w-11 shrink-0 cursor-not-allowed items-center justify-center rounded-lg text-xl text-slate-300"
-                >
-                  <span aria-hidden="true">›</span>
-                </span>
-              )}
-            </nav>
+                {availableMonths.map((month) => (
+                  <option key={month} value={month}>
+                    {new Intl.DateTimeFormat("en-MY", {
+                      month: "long",
+                      year: "numeric",
+                      timeZone: "UTC",
+                    }).format(new Date(`${month}-01T00:00:00Z`))}
+                  </option>
+                ))}
+              </select>
+            </div>
             <ReportExportControls month={current.month} />
           </div>
         </div>
