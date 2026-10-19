@@ -18,6 +18,9 @@ const addButtonSrc = readSrc(
   "src/workspaces/storefront/cart/AddToOrderSheet.tsx",
 );
 const cartSrc = readSrc("src/workspaces/storefront/cart/StorefrontCartShell.tsx");
+const freshPickCartSrc = readSrc(
+  "src/workspaces/storefront/extra/FreshPickCartShell.tsx",
+);
 const browseSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontBrowsePage.tsx",
 );
@@ -103,6 +106,12 @@ assert.match(
   /View Order\s*<span aria-hidden="true" className="text-lg leading-none">\s*→\s*<\/span>/,
 );
 assert.match(cartSrc, /fixed right-0 bottom-0 left-0 z-40/);
+assert.match(
+  freshPickCartSrc,
+  /bg-ink text-mist fixed right-0 bottom-0 left-0 z-40 flex min-h-\[4\.25rem\]/,
+);
+assert.match(freshPickCartSrc, /Your Order/);
+assert.match(freshPickCartSrc, /View Order/);
 assert.match(cartSrc, /md:hidden/);
 assert.match(cartSrc, /h-dvh/);
 assert.match(cartSrc, /createPortal/);
