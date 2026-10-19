@@ -313,25 +313,3 @@ create constraint trigger order_items_readiness_reconcile
   on public.order_items
   deferrable initially deferred
   for each row execute function public._reconcile_order_readiness_after_item_row_change();
-
--- Reconcile already-submitted active Fresh Pick orders whose complete linked
--- stock was approved ready before this migration. The helper rechecks the full
--- stock/item invariant and writes the established order-ready timeline event.
-do $$
-declare
-  v_order_id uuid;
-begin
-  for v_order_id in
-    select o.id
-    from public.orders o
-    where o.customer_id is null
-      and o.order_source = 'customer_website'
-      and o.extra_stock_id is not null
-      and o.ready_at is null
-      and o.status in ('submitted', 'pending_confirmation', 'awaiting_payment', 'paid')
-      and o.fulfilment_method in ('pickup', 'dine_in')
-  loop
-    perform public._sync_fresh_pick_order_readiness(v_order_id);
-  end loop;
-end;
-$$;
