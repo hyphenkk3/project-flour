@@ -21,7 +21,10 @@ import {
 } from "@/engines/operations/owner-attention";
 import { createClient } from "@/lib/supabase/client";
 import type { StorefrontOrderListItem } from "@/types/storefront";
-import { listGuestOrdersAction } from "@/workspaces/owner/orders/actions";
+import {
+  getGuestOrderListItemAction,
+  listGuestOrdersAction,
+} from "@/workspaces/owner/orders/actions";
 import { OwnerOrderCard } from "@/workspaces/owner/orders/OwnerOrderCard";
 import { OperationsBoardToolbar } from "@/workspaces/owner/OperationsBoardToolbar";
 import { OperationsApprovalsSection } from "@/workspaces/owner/approvals/OperationsApprovalsSection";
@@ -113,6 +116,62 @@ export function OperationsLiveBoard({
     listGuestOrdersAction,
     applyReconciliation,
   );
+  const pendingOrderRefreshesRef = useRef(
+    new Map<string, { revision: number; promise: Promise<void> }>(),
+  );
+  const orderRefreshGenerationsRef = useRef(new Map<string, number>());
+  const reconcileOrderFromServer = useCallback(
+    (id: string) => {
+      const generation = (orderRefreshGenerationsRef.current.get(id) ?? 0) + 1;
+      orderRefreshGenerationsRef.current.set(id, generation);
+      const pending = pendingOrderRefreshesRef.current.get(id);
+      if (pending) {
+        pending.revision = generation;
+        return pending.promise;
+      }
+
+      const request = { revision: generation, promise: Promise.resolve() };
+      request.promise = (async () => {
+        while (true) {
+          const requestedRevision = request.revision;
+          let latest: StorefrontOrderListItem | null;
+          try {
+            latest = await getGuestOrderListItemAction(id);
+          } catch {
+            await reconcileFromServer();
+            return;
+          }
+          if (requestedRevision !== request.revision) continue;
+
+          if (!knownIdsRef.current.has(id)) {
+            await reconcileFromServer();
+            return;
+          }
+
+          if (latest) knownIdsRef.current.add(id);
+          else knownIdsRef.current.delete(id);
+          setOrders((current) => {
+            if (
+              requestedRevision !== request.revision ||
+              orderRefreshGenerationsRef.current.get(id) !== requestedRevision
+            ) {
+              return current;
+            }
+            if (!latest) return current.filter((order) => order.id !== id);
+            return current.map((order) => (order.id === id ? latest : order));
+          });
+          return;
+        }
+      })().finally(() => {
+        if (pendingOrderRefreshesRef.current.get(id) === request) {
+          pendingOrderRefreshesRef.current.delete(id);
+        }
+      });
+      pendingOrderRefreshesRef.current.set(id, request);
+      return request.promise;
+    },
+    [reconcileFromServer],
+  );
 
   useEffect(() => {
     setOrders(initialOrders);
@@ -149,7 +208,11 @@ export function OperationsLiveBoard({
         (payload) => {
           const row = payload.new as OrderRowPayload;
           if (!isGuestOrderLiveEvent(row)) return;
-          void reconcileFromServer();
+          if (knownIdsRef.current.has(row.id)) {
+            void reconcileOrderFromServer(row.id);
+          } else {
+            void reconcileFromServer();
+          }
         },
       )
       .subscribe((status) => {
@@ -174,7 +237,7 @@ export function OperationsLiveBoard({
       window.removeEventListener("focus", reconcileOnFocus);
       void supabase.removeChannel(channel);
     };
-  }, [reconcileFromServer]);
+  }, [reconcileFromServer, reconcileOrderFromServer]);
 
   const visibleOrders = useMemo(
     () => filterAndSortOperationsOrders(orders, query),
