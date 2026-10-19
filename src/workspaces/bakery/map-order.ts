@@ -26,6 +26,7 @@ export type BakeryOrderRow = {
   production_started_at: string | null;
   production_started_by: string | null;
   ready_at: string | null;
+  extra_stock?: { ready_for_collection: boolean | null } | null;
   picked_up_at: string | null;
   out_for_delivery_at: string | null;
   include_receipt: boolean | null;
@@ -127,6 +128,7 @@ export function mapBakeryBoardOrder(row: BakeryOrderRow): BakeryBoardOrder {
     productionStartedAt: row.production_started_at ?? null,
     productionStartedBy: row.production_started_by ?? null,
     readyAt: row.ready_at,
+    physicalStockReady: row.extra_stock?.ready_for_collection === true,
     pickedUpAt: row.picked_up_at,
     outForDeliveryAt: row.out_for_delivery_at,
     includeReceipt: Boolean(row.include_receipt),

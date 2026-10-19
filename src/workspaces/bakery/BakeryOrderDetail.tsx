@@ -41,23 +41,28 @@ export function BakeryOrderDetail({
   const presentation = bakeryProductionPresentation({
     productionStartedAt: order.productionStartedAt,
     readyAt: order.readyAt,
+    physicalStockReady: order.physicalStockReady,
   });
   const paymentAttention = hasPaymentAttention({
     productionStartedAt: order.productionStartedAt,
     readyAt: order.readyAt,
+    physicalStockReady: order.physicalStockReady,
     status: order.status,
   });
   const packing = deriveBakeryPackingReminders(order);
   const fulfilment = bakeryFulfilmentCue(order.fulfilmentMethod);
   const secured = isBakeryOrderSecured(order.status);
-  const surface = bakeryProductionSurface({
-    presentation,
-    status: order.status,
-    canStartProduction: capabilities.canStartProduction,
-    canUndoStart: capabilities.canUndoStart,
-    canMarkReady: capabilities.canMarkReady,
-    canUndoReady: capabilities.canUndoReady,
-  });
+  const surface =
+    order.physicalStockReady && !order.readyAt
+      ? { kind: "none" as const }
+      : bakeryProductionSurface({
+          presentation,
+          status: order.status,
+          canStartProduction: capabilities.canStartProduction,
+          canUndoStart: capabilities.canUndoStart,
+          canMarkReady: capabilities.canMarkReady,
+          canUndoReady: capabilities.canUndoReady,
+        });
   const waitingConfirmation = isWaitingCustomerConfirmation(order.status);
   const earlyPickup = isEarlyPickupAttention(order.pickupDate, order.pickupTime);
   const attentionBadge = bakeryAttentionBadgeLabel({

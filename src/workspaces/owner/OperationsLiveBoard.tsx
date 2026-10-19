@@ -21,10 +21,7 @@ import {
 } from "@/engines/operations/owner-attention";
 import { createClient } from "@/lib/supabase/client";
 import type { StorefrontOrderListItem } from "@/types/storefront";
-import {
-  getGuestOrderListItemAction,
-  listGuestOrdersAction,
-} from "@/workspaces/owner/orders/actions";
+import { listGuestOrdersAction } from "@/workspaces/owner/orders/actions";
 import { OwnerOrderCard } from "@/workspaces/owner/orders/OwnerOrderCard";
 import { OperationsBoardToolbar } from "@/workspaces/owner/OperationsBoardToolbar";
 import { OperationsApprovalsSection } from "@/workspaces/owner/approvals/OperationsApprovalsSection";
@@ -40,6 +37,7 @@ import {
 } from "@/workspaces/owner/orders/guest-orders-live";
 import { isNewOrderNotificationEligible } from "@/workspaces/owner/orders/new-order-notifications";
 import { scrollWorkspaceSectionIntoView } from "@/workspaces/owner/orders/scroll-workspace-section";
+import { useCoalescedReconciliation } from "@/lib/useCoalescedReconciliation";
 
 const POLL_INTERVAL_MS = GUEST_ORDERS_LIVE_POLL_MS;
 const HIGHLIGHT_MS = 4500;
@@ -67,19 +65,9 @@ export function OperationsLiveBoard({
   );
 
   const knownIdsRef = useRef(new Set(initialOrders.map((order) => order.id)));
-  const notifiedIdsRef = useRef(new Set(initialOrders.map((order) => order.id)));
-
-  const upsertOrder = useCallback((item: StorefrontOrderListItem) => {
-    knownIdsRef.current.add(item.id);
-    setOrders((current) => {
-      const without = current.filter((order) => order.id !== item.id);
-      return [item, ...without];
-    });
-  }, []);
-
-  const removeOrder = useCallback((id: string) => {
-    setOrders((current) => current.filter((order) => order.id !== id));
-  }, []);
+  const notifiedIdsRef = useRef(
+    new Set(initialOrders.map((order) => order.id)),
+  );
 
   const highlightOrder = useCallback((id: string) => {
     setHighlightedIds((current) => {
@@ -106,60 +94,25 @@ export function OperationsLiveBoard({
     [highlightOrder],
   );
 
-  const loadListItem = useCallback(async (id: string) => {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const item = await getGuestOrderListItemAction(id);
-      if (item) return item;
-      await new Promise((resolve) => window.setTimeout(resolve, 350));
-    }
-    return null;
-  }, []);
-
-  const handleIncomingInsert = useCallback(
-    async (id: string) => {
-      if (knownIdsRef.current.has(id)) return;
-      const item = await loadListItem(id);
-      if (!item) return;
-      upsertOrder(item);
-      highlightArrivedOrder(item);
-    },
-    [loadListItem, highlightArrivedOrder, upsertOrder],
-  );
-
-  const handleIncomingUpdate = useCallback(
-    async (id: string) => {
-      const item = await loadListItem(id);
-      if (!item) {
-        removeOrder(id);
-        return;
-      }
-      upsertOrder(item);
-    },
-    [loadListItem, removeOrder, upsertOrder],
-  );
-
-  const reconcileFromServer = useCallback(async () => {
-    try {
-      const latest = await listGuestOrdersAction();
+  const applyReconciliation = useCallback(
+    (latest: StorefrontOrderListItem[]) => {
       const previousKnown = knownIdsRef.current;
-      const arrived: StorefrontOrderListItem[] = [];
-
-      for (const item of latest) {
-        if (!previousKnown.has(item.id) && !notifiedIdsRef.current.has(item.id)) {
-          arrived.push(item);
-        }
-      }
+      const arrived = latest.filter(
+        (item) =>
+          !previousKnown.has(item.id) && !notifiedIdsRef.current.has(item.id),
+      );
 
       knownIdsRef.current = new Set(latest.map((order) => order.id));
       setOrders(latest);
 
-      for (const item of arrived) {
-        highlightArrivedOrder(item);
-      }
-    } catch {
-      // Keep showing the last successful board state.
-    }
-  }, [highlightArrivedOrder]);
+      for (const item of arrived) highlightArrivedOrder(item);
+    },
+    [highlightArrivedOrder],
+  );
+  const reconcileFromServer = useCoalescedReconciliation(
+    listGuestOrdersAction,
+    applyReconciliation,
+  );
 
   useEffect(() => {
     setOrders(initialOrders);
@@ -187,7 +140,7 @@ export function OperationsLiveBoard({
         (payload) => {
           const row = payload.new as OrderRowPayload;
           if (!isGuestOrderLiveEvent(row)) return;
-          void handleIncomingInsert(row.id);
+          void reconcileFromServer();
         },
       )
       .on(
@@ -196,10 +149,20 @@ export function OperationsLiveBoard({
         (payload) => {
           const row = payload.new as OrderRowPayload;
           if (!isGuestOrderLiveEvent(row)) return;
-          void handleIncomingUpdate(row.id);
+          void reconcileFromServer();
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") void reconcileFromServer();
+      });
+
+    const reconcileWhenVisible = () => {
+      if (document.visibilityState === "visible") void reconcileFromServer();
+    };
+    const reconcileOnFocus = () => void reconcileFromServer();
+
+    document.addEventListener("visibilitychange", reconcileWhenVisible);
+    window.addEventListener("focus", reconcileOnFocus);
 
     const pollId = window.setInterval(() => {
       void reconcileFromServer();
@@ -207,9 +170,11 @@ export function OperationsLiveBoard({
 
     return () => {
       window.clearInterval(pollId);
+      document.removeEventListener("visibilitychange", reconcileWhenVisible);
+      window.removeEventListener("focus", reconcileOnFocus);
       void supabase.removeChannel(channel);
     };
-  }, [handleIncomingInsert, handleIncomingUpdate, reconcileFromServer]);
+  }, [reconcileFromServer]);
 
   const visibleOrders = useMemo(
     () => filterAndSortOperationsOrders(orders, query),
@@ -266,7 +231,7 @@ export function OperationsLiveBoard({
     return (
       <ul className="grid gap-3">
         {list.map((order) => (
-          <li className="min-w-0" key={order.id}>
+          <li key={order.id}>
             <OwnerOrderCard
               highlight={highlightedIds.has(order.id)}
               order={order}

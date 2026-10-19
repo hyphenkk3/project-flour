@@ -64,6 +64,13 @@ export function ManagementReportDashboard({ report }: { report: ManagementReport
   const { current, previous } = report;
   const latestMonth = reportMonth(new Date());
   const canAdvanceMonth = current.month < latestMonth;
+  const availableMonths = useMemo(() => {
+    const months: string[] = [];
+    for (let month = latestMonth; month >= "2020-01"; month = previousMonth(month)) {
+      months.push(month);
+    }
+    return months;
+  }, [latestMonth]);
   const monthLabel = new Intl.DateTimeFormat("en-MY", {
     month: "long",
     year: "numeric",
@@ -141,23 +148,24 @@ export function ManagementReportDashboard({ report }: { report: ManagementReport
               >
                 <span aria-hidden="true">‹</span>
               </Link>
-              <label className="relative flex min-h-11 min-w-0 flex-1 cursor-pointer items-center justify-center rounded-lg px-1 text-center focus-within:ring-2 focus-within:ring-teal-700 hover:bg-slate-50 sm:min-w-[10.5rem]">
-                <span aria-live="polite" className="pointer-events-none">
-                  <span className="text-sm font-semibold text-slate-900">
-                    {monthLabel}
-                  </span>
-                </span>
-                <input
+              <div className="flex min-h-11 min-w-0 flex-1 items-center justify-center rounded-lg px-1 text-center hover:bg-slate-50 sm:min-w-[10.5rem]">
+                <select
                   aria-label="Choose report month and year"
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  max={latestMonth}
-                  min="2020-01"
+                  className="h-11 w-full min-w-0 cursor-pointer rounded-lg border-0 bg-transparent px-2 text-center text-sm font-semibold text-slate-900 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none"
                   onChange={(event) => selectMonth(event.currentTarget.value)}
-                  title="Choose report month and year"
-                  type="month"
                   value={current.month}
-                />
-              </label>
+                >
+                  {availableMonths.map((month) => (
+                    <option key={month} value={month}>
+                      {new Intl.DateTimeFormat("en-MY", {
+                        month: "long",
+                        year: "numeric",
+                        timeZone: "UTC",
+                      }).format(new Date(`${month}-01T00:00:00Z`))}
+                    </option>
+                  ))}
+                </select>
+              </div>
               {canAdvanceMonth ? (
                 <Link
                   aria-label={`Next month: ${new Intl.DateTimeFormat("en-MY", {

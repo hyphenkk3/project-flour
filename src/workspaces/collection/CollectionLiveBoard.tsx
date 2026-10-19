@@ -1,15 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
 import { createClient } from "@/lib/supabase/client";
 import { formatLongBusinessDate } from "@/lib/dates";
-import {
-  getCollectionBoardOrderAction,
-  listCollectionOrdersForTabAction,
-} from "@/workspaces/collection/actions";
+import { listCollectionOrdersForTabAction } from "@/workspaces/collection/actions";
 import type { CollectionDineInVenueFilter } from "@/workspaces/collection/board-tab";
 import { CollectionDateNav } from "@/workspaces/collection/CollectionDateNav";
 import { CollectionOrderCard } from "@/workspaces/collection/CollectionOrderCard";
@@ -22,6 +19,7 @@ import {
   type CollectionBoardTab,
 } from "@/workspaces/collection/eligibility";
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
+import { useCoalescedReconciliation } from "@/lib/useCoalescedReconciliation";
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -37,6 +35,8 @@ type OrderRowPayload = {
   customer_id?: string | null;
   pickup_date?: string | null;
 };
+
+type OrderDeletePayload = { id?: string };
 
 function boardTitle(tab: CollectionBoardTab): string {
   switch (tab) {
@@ -139,33 +139,73 @@ export function CollectionLiveBoard({
 }: CollectionLiveBoardProps) {
   const [orders, setOrders] = useState(initialOrders);
   const [search, setSearch] = useState("");
+  const knownOrderIdsRef = useRef(new Set(initialOrders.map(({ id }) => id)));
 
-  const reconcileList = useCallback(async () => {
-    const next = await listCollectionOrdersForTabAction(tab, boardDate);
+  const applyReconciliation = useCallback((next: CollectionBoardOrder[]) => {
+    knownOrderIdsRef.current = new Set(next.map(({ id }) => id));
     setOrders(next);
-  }, [boardDate, tab]);
-
-  const handleIncoming = useCallback(
-    async (id: string) => {
-      const item = await getCollectionBoardOrderAction(id, boardDate, tab);
-      if (!item) {
-        setOrders((current) => current.filter((order) => order.id !== id));
-        return;
-      }
-      setOrders((current) => {
-        const without = current.filter((order) => order.id !== id);
-        return [...without, item];
-      });
-      void reconcileList();
-    },
-    [boardDate, reconcileList, tab],
+  }, []);
+  const loadCollectionOrders = useCallback(
+    () => listCollectionOrdersForTabAction(tab, boardDate),
+    [boardDate, tab],
+  );
+  const reconcileList = useCoalescedReconciliation(
+    loadCollectionOrders,
+    applyReconciliation,
   );
 
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
       .channel(`collection-board-${tab}-${boardDate}`)
-      .subscribe();
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "orders" },
+        (payload) => {
+          const row = payload.new as OrderRowPayload;
+          if (
+            row.id &&
+            row.customer_id == null &&
+            row.pickup_date === boardDate
+          ) {
+            void reconcileList();
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "orders" },
+        (payload) => {
+          const row = payload.new as OrderRowPayload;
+          if (
+            row.id &&
+            (knownOrderIdsRef.current.has(row.id) ||
+              (row.customer_id == null && row.pickup_date === boardDate))
+          ) {
+            void reconcileList();
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "orders" },
+        (payload) => {
+          const row = payload.old as OrderDeletePayload;
+          if (row.id && knownOrderIdsRef.current.has(row.id)) {
+            void reconcileList();
+          }
+        },
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") void reconcileList();
+      });
+
+    const reconcileWhenVisible = () => {
+      if (document.visibilityState === "visible") void reconcileList();
+    };
+    const reconcileOnFocus = () => void reconcileList();
+    document.addEventListener("visibilitychange", reconcileWhenVisible);
+    window.addEventListener("focus", reconcileOnFocus);
 
     const pollId = window.setInterval(() => {
       void reconcileList();
@@ -173,9 +213,11 @@ export function CollectionLiveBoard({
 
     return () => {
       window.clearInterval(pollId);
+      document.removeEventListener("visibilitychange", reconcileWhenVisible);
+      window.removeEventListener("focus", reconcileOnFocus);
       void supabase.removeChannel(channel);
     };
-  }, [boardDate, handleIncoming, reconcileList, tab]);
+  }, [boardDate, reconcileList, tab]);
 
   const now = new Date();
   const overdueCount =

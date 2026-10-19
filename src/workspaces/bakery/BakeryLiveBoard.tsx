@@ -107,6 +107,7 @@ export function BakeryLiveBoard({
       bakeryProductionPresentation({
         productionStartedAt: order.productionStartedAt,
         readyAt: order.readyAt,
+        physicalStockReady: order.physicalStockReady,
       }) === "not_started",
   );
   const inProduction = visibleOrders.filter(
@@ -114,6 +115,7 @@ export function BakeryLiveBoard({
       bakeryProductionPresentation({
         productionStartedAt: order.productionStartedAt,
         readyAt: order.readyAt,
+        physicalStockReady: order.physicalStockReady,
       }) === "in_production",
   );
   const ready = visibleOrders.filter(
@@ -121,6 +123,7 @@ export function BakeryLiveBoard({
       bakeryProductionPresentation({
         productionStartedAt: order.productionStartedAt,
         readyAt: order.readyAt,
+        physicalStockReady: order.physicalStockReady,
       }) === "ready",
   );
 

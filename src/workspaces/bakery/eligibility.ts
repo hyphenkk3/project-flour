@@ -127,18 +127,22 @@ export function isActiveOnBakeryBoard(input: BakeryEligibilityInput): boolean {
 export function hasPaymentAttention(input: {
   productionStartedAt?: string | null;
   readyAt: string | null;
+  physicalStockReady?: boolean;
   status: GuestOrderStatus | string;
 }): boolean {
   const inProduction =
-    Boolean(input.productionStartedAt) || Boolean(input.readyAt);
+    Boolean(input.productionStartedAt) ||
+    Boolean(input.readyAt) ||
+    Boolean(input.physicalStockReady);
   return inProduction && input.status !== "paid";
 }
 
 export function bakeryProductionPresentation(input: {
   productionStartedAt?: string | null;
   readyAt: string | null;
+  physicalStockReady?: boolean;
 }): BakeryProductionPresentation {
-  if (input.readyAt) return "ready";
+  if (input.readyAt || input.physicalStockReady) return "ready";
   if (input.productionStartedAt) return "in_production";
   return "not_started";
 }
@@ -362,6 +366,7 @@ export function matchesBakeryQueueFilter(
     status: GuestOrderStatus | string;
     productionStartedAt: string | null;
     readyAt: string | null;
+    physicalStockReady?: boolean;
   },
   filter: BakeryQueueFilter,
 ): boolean {
@@ -369,6 +374,7 @@ export function matchesBakeryQueueFilter(
   const presentation = bakeryProductionPresentation({
     productionStartedAt: order.productionStartedAt,
     readyAt: order.readyAt,
+    physicalStockReady: order.physicalStockReady,
   });
   if (filter === "preparing") return presentation === "in_production";
   if (filter === "ready") return presentation === "ready";
