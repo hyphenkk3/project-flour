@@ -137,8 +137,9 @@ export function hasPaymentAttention(input: {
 export function bakeryProductionPresentation(input: {
   productionStartedAt?: string | null;
   readyAt: string | null;
+  physicalStockReady?: boolean;
 }): BakeryProductionPresentation {
-  if (input.readyAt) return "ready";
+  if (input.readyAt || input.physicalStockReady) return "ready";
   if (input.productionStartedAt) return "in_production";
   return "not_started";
 }

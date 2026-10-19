@@ -41,6 +41,7 @@ export function BakeryOrderDetail({
   const presentation = bakeryProductionPresentation({
     productionStartedAt: order.productionStartedAt,
     readyAt: order.readyAt,
+    physicalStockReady: order.physicalStockReady,
   });
   const paymentAttention = hasPaymentAttention({
     productionStartedAt: order.productionStartedAt,

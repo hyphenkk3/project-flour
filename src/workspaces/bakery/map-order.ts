@@ -26,6 +26,10 @@ export type BakeryOrderRow = {
   production_started_at: string | null;
   production_started_by: string | null;
   ready_at: string | null;
+  extra_stock?:
+    | { ready_for_collection: boolean | null }
+    | Array<{ ready_for_collection: boolean | null }>
+    | null;
   picked_up_at: string | null;
   out_for_delivery_at: string | null;
   include_receipt: boolean | null;
@@ -113,6 +117,10 @@ function mapPaidAddons(row: BakeryOrderRow): BakeryPaidAddonLine[] {
 }
 
 export function mapBakeryBoardOrder(row: BakeryOrderRow): BakeryBoardOrder {
+  const physicalStock = Array.isArray(row.extra_stock)
+    ? row.extra_stock[0]
+    : row.extra_stock;
+
   return {
     id: row.id,
     orderNumber: row.order_number,
@@ -127,6 +135,7 @@ export function mapBakeryBoardOrder(row: BakeryOrderRow): BakeryBoardOrder {
     productionStartedAt: row.production_started_at ?? null,
     productionStartedBy: row.production_started_by ?? null,
     readyAt: row.ready_at,
+    physicalStockReady: physicalStock?.ready_for_collection === true,
     pickedUpAt: row.picked_up_at,
     outForDeliveryAt: row.out_for_delivery_at,
     includeReceipt: Boolean(row.include_receipt),

@@ -1537,6 +1537,9 @@ export function OrderWorkspaceForm({
             delivery={editDeliveryDraft}
             lateEditCutoffHints={blockDirectSave}
             method={editFulfilmentMethod}
+            minDate={
+              editPickupDate === order.pickupDate ? order.pickupDate : undefined
+            }
             onDateChange={setEditPickupDate}
             onDeliveryChange={setEditDeliveryDraft}
             onMethodChange={setEditFulfilmentMethod}

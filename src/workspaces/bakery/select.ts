@@ -15,6 +15,9 @@ export const BAKERY_ORDER_SELECT = `
   production_started_at,
   production_started_by,
   ready_at,
+  extra_stock:extra_stock!orders_extra_stock_id_fkey (
+    ready_for_collection
+  ),
   picked_up_at,
   out_for_delivery_at,
   include_receipt,

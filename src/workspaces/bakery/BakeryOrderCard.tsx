@@ -29,6 +29,7 @@ export function BakeryOrderCard({ order, boardDate }: BakeryOrderCardProps) {
   const presentation = bakeryProductionPresentation({
     productionStartedAt: order.productionStartedAt,
     readyAt: order.readyAt,
+    physicalStockReady: order.physicalStockReady,
   });
   const { cakeName, sizeLabel, additionalCakeCount } =
     bakeryPrimaryCakeSummary(order);

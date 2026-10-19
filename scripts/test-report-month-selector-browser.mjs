@@ -125,17 +125,18 @@ try {
     };
   });
   await page.goto(`http://127.0.0.1:${address.port}/?month=2026-09`);
-  const monthLabel = page.locator('nav[aria-label="Report month navigation"]');
   const picker = page.getByLabel("Choose report month and year");
-  await page.getByText("September 2026", { exact: true }).waitFor();
+  await page.waitForFunction(() => {
+    const picker = document.querySelector('select[aria-label="Choose report month and year"]');
+    return picker?.value === "2026-09";
+  });
   const exportPdf = page.locator("button").filter({ hasText: /PDF/ });
   const exportExcel = page.locator("button").filter({ hasText: /Excel/ });
   assert.equal(await exportPdf.count(), 1);
   assert.equal(await exportExcel.count(), 1);
-  assert.equal(await picker.getAttribute("type"), "month");
-  assert.equal(await picker.getAttribute("min"), "2020-01");
-  assert.equal(await picker.getAttribute("max"), "2026-10");
-  assert.ok(Number(await picker.getAttribute("tabindex")) >= 0);
+  assert.equal(await picker.evaluate((element) => element.tagName), "SELECT");
+  assert.equal(await picker.locator('option[value="2020-01"]').count(), 1);
+  assert.equal(await picker.locator('option[value="2026-10"]').count(), 1);
   assert.equal(
     await page.getByText("Choose month", { exact: true }).count(),
     0,
@@ -162,51 +163,21 @@ try {
   await page.evaluate(() => window.finishReportExport());
   await page.waitForFunction(() => window.lastDownload?.filename === "Whitebird_Report_2026-09.xlsx");
 
-  await monthLabel
-    .getByRole("link", { name: "Next month: October 2026" })
-    .click();
-  await page.getByText("October 2026", { exact: true }).waitFor();
+  await picker.selectOption("2026-10");
   assert.equal(
     await page.evaluate(() => window.lastReportUrl),
     "/owner/management/reports?month=2026-10",
   );
   assert.equal(await page.evaluate(() => window.lastScrollOption), false);
-  assert.equal(
-    await monthLabel.getByRole("link", { name: /Next month/ }).count(),
-    0,
-  );
-  assert.equal(
-    await monthLabel
-      .getByLabel("Next month unavailable")
-      .getAttribute("aria-disabled"),
-    "true",
-  );
-
-  await picker.evaluate((element) => {
-    const setter = Object.getOwnPropertyDescriptor(
-      HTMLInputElement.prototype,
-      "value",
-    ).set;
-    setter.call(element, "2026-08");
-    element.dispatchEvent(new Event("input", { bubbles: true }));
-    element.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  await page.getByText("August 2026", { exact: true }).waitFor();
+  await picker.selectOption("2026-08");
   assert.equal(
     await page.evaluate(() => window.lastReportUrl),
     "/owner/management/reports?month=2026-08",
   );
 
   await page.goto(`http://127.0.0.1:${address.port}/?month=2026-01`);
-  await page.getByText("January 2026", { exact: true }).waitFor();
-  await monthLabel
-    .getByRole("link", { name: "Previous month: December 2025" })
-    .click();
-  await page.getByText("December 2025", { exact: true }).waitFor();
-  await monthLabel
-    .getByRole("link", { name: "Next month: January 2026" })
-    .click();
-  await page.getByText("January 2026", { exact: true }).waitFor();
+  await picker.selectOption("2025-12");
+  await picker.selectOption("2026-01");
 
   for (const width of [320, 375, 390, 393, 430]) {
     await page.setViewportSize({ width, height: 844 });
@@ -222,12 +193,12 @@ try {
   }
   await page.setViewportSize({ width: 1280, height: 900 });
   assert.equal(
-    await monthLabel.isVisible(),
+    await picker.isVisible(),
     true,
     "month selector is available on desktop",
   );
   assert.equal(
-    await monthLabel.evaluate(
+    await picker.evaluate(
       (element) => element.scrollWidth <= element.clientWidth,
     ),
     true,

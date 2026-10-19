@@ -56,6 +56,8 @@ export type BakeryBoardOrder = {
   productionStartedAt: string | null;
   productionStartedBy: string | null;
   readyAt: string | null;
+  /** Physical Fresh Pick was marked ready before it was purchased. */
+  physicalStockReady?: boolean;
   pickedUpAt: string | null;
   outForDeliveryAt: string | null;
   includeReceipt: boolean;

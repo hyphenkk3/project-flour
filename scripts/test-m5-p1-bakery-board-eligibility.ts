@@ -199,6 +199,11 @@ assert.equal(
 
 assert.equal(bakeryProductionPresentation({ readyAt: null }), "not_started");
 assert.equal(
+  bakeryProductionPresentation({ readyAt: null, physicalStockReady: true }),
+  "ready",
+  "Fresh Pick stock already ready before purchase remains ready on the Bakery view",
+);
+assert.equal(
   bakeryProductionPresentation({
     productionStartedAt: "2026-09-15T07:00:00Z",
     readyAt: null,
@@ -348,6 +353,7 @@ const mapped = mapBakeryBoardOrder({
   production_started_at: null,
   production_started_by: null,
   ready_at: null,
+  extra_stock: { ready_for_collection: true },
   picked_up_at: null,
   out_for_delivery_at: null,
   include_receipt: true,
@@ -374,6 +380,7 @@ const mapped = mapBakeryBoardOrder({
 assert.equal(mapped.cakeLines.length, 2);
 assert.equal(mapped.customerNotes, "Less sweet");
 assert.equal(mapped.needsBakeryAttention, true);
+assert.equal(mapped.physicalStockReady, true);
 assert.equal(
   Object.prototype.hasOwnProperty.call(mapped, "internalNotes"),
   false,

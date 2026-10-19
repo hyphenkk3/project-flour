@@ -28,6 +28,8 @@ type OrderFulfilmentCreateFieldsProps = {
   scheduleMode?: "owner" | "slots";
   defaultDate?: string;
   defaultTime?: string;
+  /** Keep an unchanged historical date valid while new dates retain the minimum. */
+  minDate?: string;
   onDateChange?: (date: string) => void;
   onTimeChange?: (time: string) => void;
   /** CO late-edit cutoff: muted scope cues near method vs pickup. */
@@ -45,6 +47,7 @@ export function OrderFulfilmentCreateFields({
   scheduleMode = "owner",
   defaultDate,
   defaultTime,
+  minDate,
   onDateChange,
   onTimeChange,
   lateEditCutoffHints = false,
@@ -119,6 +122,7 @@ export function OrderFulfilmentCreateFields({
           defaultDate={defaultDate}
           defaultTime={defaultTime}
           hoursSnapshot={hoursSnapshot}
+          minDate={minDate}
           onDateChange={onDateChange}
           onTimeChange={onTimeChange}
           timeLabel={timeLabel}
