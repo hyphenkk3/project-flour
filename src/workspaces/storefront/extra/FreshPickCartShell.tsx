@@ -50,8 +50,12 @@ function ExtraOrderLines({ items }: { items: readonly FreshPickCartItem[] }) {
                   <p className="font-display text-ink text-[1.05rem] leading-snug tracking-tight">
                     {item.cakeName}
                   </p>
-                  <p className="text-skyline mt-0.5 text-sm">{item.sizeLabel}</p>
-                  <p className="text-skyline mt-1.5 text-sm">{pickupLabel(item)}</p>
+                  <p className="text-skyline mt-0.5 text-sm">
+                    {item.sizeLabel}
+                  </p>
+                  <p className="text-skyline mt-1.5 text-sm">
+                    {pickupLabel(item)}
+                  </p>
                 </div>
                 <button
                   className="text-skyline hover:text-ink shrink-0 text-sm font-medium"
@@ -99,7 +103,7 @@ function ExtraOrderSummary({
               : "Not selected yet"}
           </dd>
         </div>
-        </dl>
+      </dl>
       <CatalogueVoucherCartPanel
         draft={{
           pickupDate: cart.pickupDate,
@@ -162,7 +166,9 @@ export function FreshPickCartShell({
     function syncDesktop() {
       if (desktopRail && media.matches) setOpen(false);
       document.body.style.marginRight =
-        desktopRail && hasItems && media.matches ? DESKTOP_ORDER_RAIL_WIDTH : "";
+        desktopRail && hasItems && media.matches
+          ? DESKTOP_ORDER_RAIL_WIDTH
+          : "";
     }
     syncDesktop();
     media.addEventListener("change", syncDesktop);
@@ -200,8 +206,13 @@ export function FreshPickCartShell({
 
   return (
     <>
-      <div aria-hidden className="h-[calc(4.5rem+env(safe-area-inset-bottom))] md:hidden" />
-      {!desktopRail ? <div aria-hidden className="hidden h-24 md:block" /> : null}
+      <div
+        aria-hidden
+        className="h-[calc(4.5rem+env(safe-area-inset-bottom))] md:hidden"
+      />
+      {!desktopRail ? (
+        <div aria-hidden className="hidden h-24 md:block" />
+      ) : null}
 
       <button
         aria-label={`${itemLabel}, ${formatRm(total)}. View order.`}
@@ -246,7 +257,7 @@ export function FreshPickCartShell({
                 className={
                   desktopRail
                     ? "bg-mist text-ink fixed inset-0 z-[60] flex h-dvh flex-col"
-                    : "bg-mist text-ink fixed inset-0 z-[60] flex h-dvh flex-col md:inset-y-8 md:right-8 md:left-auto md:h-auto md:max-h-[calc(100dvh-4rem)] md:w-[24rem] md:rounded-lg md:border md:border-fog md:shadow-[0_8px_40px_rgba(28,25,22,0.12)]"
+                    : "bg-mist text-ink md:border-fog fixed inset-0 z-[60] flex h-dvh flex-col md:inset-y-8 md:right-8 md:left-auto md:h-auto md:max-h-[calc(100dvh-4rem)] md:w-[24rem] md:rounded-lg md:border md:shadow-[0_8px_40px_rgba(28,25,22,0.12)]"
                 }
                 role="dialog"
               >

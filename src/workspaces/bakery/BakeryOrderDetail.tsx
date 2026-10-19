@@ -64,7 +64,10 @@ export function BakeryOrderDetail({
           canUndoReady: capabilities.canUndoReady,
         });
   const waitingConfirmation = isWaitingCustomerConfirmation(order.status);
-  const earlyPickup = isEarlyPickupAttention(order.pickupDate, order.pickupTime);
+  const earlyPickup = isEarlyPickupAttention(
+    order.pickupDate,
+    order.pickupTime,
+  );
   const attentionBadge = bakeryAttentionBadgeLabel({
     needsBakeryAttention: order.needsBakeryAttention,
     pickupDate: order.pickupDate,
@@ -120,7 +123,9 @@ export function BakeryOrderDetail({
           </p>
         ) : null}
 
-        {!secured && order.status === "awaiting_payment" && !paymentAttention ? (
+        {!secured &&
+        order.status === "awaiting_payment" &&
+        !paymentAttention ? (
           <p className="border-status-warning/20 bg-status-warning-soft text-status-warning mt-6 rounded-2xl border px-4 py-3 text-sm leading-relaxed">
             Not secured — payment is still pending.
           </p>
@@ -194,7 +199,7 @@ export function BakeryOrderDetail({
                 <h2 className="text-ink text-xs font-semibold tracking-wide uppercase">
                   Customer notes
                 </h2>
-                <p className="text-ink mt-2 whitespace-pre-wrap text-sm leading-relaxed">
+                <p className="text-ink mt-2 text-sm leading-relaxed whitespace-pre-wrap">
                   {order.customerNotes.trim()}
                 </p>
               </section>
@@ -216,7 +221,7 @@ export function BakeryOrderDetail({
                 <h2 className="text-status-warning text-xs font-semibold tracking-wide uppercase">
                   Bakery Attention
                 </h2>
-                <p className="text-ink mt-2 whitespace-pre-wrap text-sm leading-relaxed">
+                <p className="text-ink mt-2 text-sm leading-relaxed whitespace-pre-wrap">
                   {order.bakeryAttentionNote.trim()}
                 </p>
               </section>

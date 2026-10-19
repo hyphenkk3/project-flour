@@ -143,13 +143,19 @@ try {
   await exportPdf.click();
   await page.getByRole("button", { name: "Preparing PDF…" }).waitFor();
   assert.equal(await exportPdf.isDisabled(), true);
-  assert.equal(await exportExcel.isDisabled(), true, "duplicate export requests are blocked");
+  assert.equal(
+    await exportExcel.isDisabled(),
+    true,
+    "duplicate export requests are blocked",
+  );
   assert.equal(
     await page.evaluate(() => window.lastExportUrl),
     "/api/owner/management/reports/export/pdf?month=2026-09",
   );
   await page.evaluate(() => window.finishReportExport());
-  await page.waitForFunction(() => window.lastDownload?.filename === "Whitebird_Report_2026-09.pdf");
+  await page.waitForFunction(
+    () => window.lastDownload?.filename === "Whitebird_Report_2026-09.pdf",
+  );
   await exportExcel.click();
   await page.getByRole("button", { name: "Preparing Excel…" }).waitFor();
   assert.equal(
@@ -157,7 +163,9 @@ try {
     "/api/owner/management/reports/export/excel?month=2026-09",
   );
   await page.evaluate(() => window.finishReportExport());
-  await page.waitForFunction(() => window.lastDownload?.filename === "Whitebird_Report_2026-09.xlsx");
+  await page.waitForFunction(
+    () => window.lastDownload?.filename === "Whitebird_Report_2026-09.xlsx",
+  );
 
   await monthLabel
     .getByRole("link", { name: "Next month: October 2026" })
@@ -200,8 +208,14 @@ try {
   if (cssName) {
     for (const width of [320, 375, 390, 393, 430]) {
       await page.setViewportSize({ width, height: 844 });
-      assert.equal(await page.getByRole("button", { name: "Export PDF" }).isVisible(), true);
-      assert.equal(await page.getByRole("button", { name: "Export Excel" }).isVisible(), true);
+      assert.equal(
+        await page.getByRole("button", { name: "Export PDF" }).isVisible(),
+        true,
+      );
+      assert.equal(
+        await page.getByRole("button", { name: "Export Excel" }).isVisible(),
+        true,
+      );
       assert.equal(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= window.innerWidth,

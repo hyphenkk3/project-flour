@@ -34,8 +34,5 @@ export function useCoalescedReconciliation<T>(
     };
   }, []);
 
-  return useCallback(
-    () => reconcileRef.current?.() ?? Promise.resolve(),
-    [],
-  );
+  return useCallback(() => reconcileRef.current?.() ?? Promise.resolve(), []);
 }

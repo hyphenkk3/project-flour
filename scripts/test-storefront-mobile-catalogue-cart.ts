@@ -13,18 +13,24 @@ function readSrc(rel: string): string {
 const catalogueSrc = readSrc(
   "src/workspaces/storefront/catalog/BrowseCakeCatalogue.tsx",
 );
-const cardSrc = readSrc("src/workspaces/storefront/catalog/StorefrontCakeCard.tsx");
+const cardSrc = readSrc(
+  "src/workspaces/storefront/catalog/StorefrontCakeCard.tsx",
+);
 const addButtonSrc = readSrc(
   "src/workspaces/storefront/cart/AddToOrderSheet.tsx",
 );
-const cartSrc = readSrc("src/workspaces/storefront/cart/StorefrontCartShell.tsx");
+const cartSrc = readSrc(
+  "src/workspaces/storefront/cart/StorefrontCartShell.tsx",
+);
 const freshPickCartSrc = readSrc(
   "src/workspaces/storefront/extra/FreshPickCartShell.tsx",
 );
 const browseSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontBrowsePage.tsx",
 );
-const draftSrc = readSrc("src/workspaces/storefront/checkout/preorder-draft.ts");
+const draftSrc = readSrc(
+  "src/workspaces/storefront/checkout/preorder-draft.ts",
+);
 
 assert.match(catalogueSrc, /grid grid-cols-2/);
 assert.match(catalogueSrc, /lg:grid-cols-3/);
@@ -47,7 +53,10 @@ assert.doesNotMatch(linkToSearch, /PreorderInProgressBar/);
 assert.match(browseSrc, /PreorderInProgressBar/);
 assert.match(catalogueSrc, /showMobileSize/);
 assert.match(catalogueSrc, /sizeId\}-mobile/);
-assert.match(catalogueSrc, /setFilters\(\{ \.\.\.filters, size: event\.target\.value \}\)/);
+assert.match(
+  catalogueSrc,
+  /setFilters\(\{ \.\.\.filters, size: event\.target\.value \}\)/,
+);
 assert.match(catalogueSrc, /options\.sizes\.map/);
 assert.match(catalogueSrc, /min-w-0 md:hidden/);
 assert.doesNotMatch(catalogueSrc, /id: "size"/);
@@ -74,7 +83,10 @@ assert.match(
 assert.match(addButtonSrc, /onClick=\{\(\) => setOpen\(true\)\}/);
 assert.match(addButtonSrc, /<AddToOrderSheet/);
 assert.match(addButtonSrc, /cake=\{cake\}/);
-assert.match(addButtonSrc, /from "@\/workspaces\/storefront\/StorefrontOverlay"/);
+assert.match(
+  addButtonSrc,
+  /from "@\/workspaces\/storefront\/StorefrontOverlay"/,
+);
 assert.match(addButtonSrc, /<StorefrontOverlay/);
 assert.match(addButtonSrc, /labelledBy=\{titleId\}/);
 assert.match(addButtonSrc, /max-h-\[100dvh\]/);

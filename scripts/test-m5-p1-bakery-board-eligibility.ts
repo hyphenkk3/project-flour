@@ -88,10 +88,7 @@ assert.equal(
   "unpaid + not Ready still visible (not secured)",
 );
 
-assert.equal(
-  isBakeryOrderSecured("awaiting_payment"),
-  false,
-);
+assert.equal(isBakeryOrderSecured("awaiting_payment"), false);
 assert.equal(isBakeryOrderSecured("paid"), true);
 
 assert.equal(
@@ -317,9 +314,7 @@ assert.equal(
   bakeryCustomerNotesExcerpt("Less sweet please"),
   "Less sweet please",
 );
-assert.ok(
-  (bakeryCustomerNotesExcerpt("x".repeat(100)) ?? "").endsWith("…"),
-);
+assert.ok((bakeryCustomerNotesExcerpt("x".repeat(100)) ?? "").endsWith("…"));
 
 const packing = deriveBakeryPackingReminders({
   complimentaryItems: [{ id: "c1", name: "Knife", quantity: 1 }],
@@ -385,10 +380,7 @@ assert.equal(
   Object.prototype.hasOwnProperty.call(mapped, "internalNotes"),
   false,
 );
-assert.equal(
-  Object.prototype.hasOwnProperty.call(mapped, "phone"),
-  false,
-);
+assert.equal(Object.prototype.hasOwnProperty.call(mapped, "phone"), false);
 
 const today = bakeryTodayYmd(new Date("2026-08-12T04:00:00Z"));
 assert.match(today, /^\d{4}-\d{2}-\d{2}$/);

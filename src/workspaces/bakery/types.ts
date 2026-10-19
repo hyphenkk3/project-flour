@@ -9,9 +9,7 @@ import type {
 
 /** P2 production presentation — Ready wins when both Start and Ready exist. */
 export type BakeryProductionPresentation =
-  | "not_started"
-  | "in_production"
-  | "ready";
+  "not_started" | "in_production" | "ready";
 
 export type BakeryCakeLine = {
   id: string;

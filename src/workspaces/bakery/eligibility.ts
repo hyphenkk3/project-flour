@@ -34,7 +34,8 @@ export const BAKERY_START_ELIGIBLE_STATUSES: readonly GuestOrderStatus[] = [
 export const BAKERY_WAITING_CONFIRMATION_REASON =
   "Waiting for customer confirmation before production can start.";
 
-export const BAKERY_WAITING_CONFIRMATION_START_LABEL = "Waiting for confirmation";
+export const BAKERY_WAITING_CONFIRMATION_START_LABEL =
+  "Waiting for confirmation";
 
 export const BAKERY_EARLY_PICKUP_DETAIL =
   "Early pickup — this order is due before the usual Bakery pickup window.";
@@ -253,12 +254,15 @@ export function bakeryFulfilmentCue(
   fulfilmentMethod: string | null | undefined,
 ): "Pickup" | "Delivery" | "Dine-in" {
   if (isDeliveryFulfilment(fulfilmentMethod as never)) return "Delivery";
-  if (normalizeFulfilmentMethod(fulfilmentMethod) === "dine_in") return "Dine-in";
+  if (normalizeFulfilmentMethod(fulfilmentMethod) === "dine_in")
+    return "Dine-in";
   return "Pickup";
 }
 
 /** Primary cake line + remaining count for board cards. */
-export function bakeryPrimaryCakeSummary(order: Pick<BakeryBoardOrder, "cakeLines">): {
+export function bakeryPrimaryCakeSummary(
+  order: Pick<BakeryBoardOrder, "cakeLines">,
+): {
   cakeName: string;
   sizeLabel: string;
   additionalCakeCount: number;
@@ -333,9 +337,9 @@ export function deriveBakeryPackingReminders(order: {
   return items;
 }
 
-export function sortBakeryBoardOrders<T extends { pickupTime: string; orderNumber: string }>(
-  orders: T[],
-): T[] {
+export function sortBakeryBoardOrders<
+  T extends { pickupTime: string; orderNumber: string },
+>(orders: T[]): T[] {
   return [...orders].sort((a, b) => {
     const timeCmp = a.pickupTime.localeCompare(b.pickupTime, "en");
     if (timeCmp !== 0) return timeCmp;
@@ -344,11 +348,7 @@ export function sortBakeryBoardOrders<T extends { pickupTime: string; orderNumbe
 }
 
 export type BakeryQueueFilter =
-  | "all"
-  | "not_ready"
-  | "awaiting_prep"
-  | "preparing"
-  | "ready";
+  "all" | "not_ready" | "awaiting_prep" | "preparing" | "ready";
 
 export const BAKERY_QUEUE_FILTERS: Array<{
   value: BakeryQueueFilter;

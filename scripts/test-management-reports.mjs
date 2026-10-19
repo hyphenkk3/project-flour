@@ -208,7 +208,9 @@ const completedWithUnpaidRemainder = {
       paidAt: "2026-10-05T00:00:00Z",
     },
   ],
-  refunds: [{ amount: 10, status: "recorded", refundedAt: "2026-10-10T00:00:00Z" }],
+  refunds: [
+    { amount: 10, status: "recorded", refundedAt: "2026-10-10T00:00:00Z" },
+  ],
 };
 const activeWithUnpaidRemainder = {
   ...base("active-unpaid"),
@@ -224,7 +226,9 @@ const activeWithUnpaidRemainder = {
       paidAt: "2026-10-05T00:00:00Z",
     },
   ],
-  refunds: [{ amount: 10, status: "recorded", refundedAt: "2026-10-10T00:00:00Z" }],
+  refunds: [
+    { amount: 10, status: "recorded", refundedAt: "2026-10-10T00:00:00Z" },
+  ],
 };
 assert.equal(orderFinancials(completedWithUnpaidRemainder).outstandingNow, 40);
 assert.equal(orderFinancials(activeWithUnpaidRemainder).outstandingNow, 60);
@@ -271,7 +275,15 @@ assert.equal(
 );
 assert.equal(
   summarizeCash(
-    [{ amount: 100, effectiveAmount: 100, status: "verified", method: "wb_qr", paidAt: "2026-10-05" }],
+    [
+      {
+        amount: 100,
+        effectiveAmount: 100,
+        status: "verified",
+        method: "wb_qr",
+        paidAt: "2026-10-05",
+      },
+    ],
     [{ amount: 20, status: "recorded", refundedAt: "2026-11-02" }],
   ).netReceipts,
   80,

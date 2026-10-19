@@ -80,9 +80,7 @@ export function BakeryOrderCard({ order, boardDate }: BakeryOrderCardProps) {
           label={guestOrderStatusLabel(order.status)}
           tone={guestOrderStatusBadgeTone(order.status)}
         />
-        {!secured ? (
-          <StatusBadge label="Not secured" tone="warning" />
-        ) : null}
+        {!secured ? <StatusBadge label="Not secured" tone="warning" /> : null}
         {attentionBadge ? (
           <StatusBadge label={attentionBadge} tone="warning" />
         ) : null}

@@ -341,7 +341,9 @@ export function CollectionLiveBoard({
               <h2 className="text-ink text-sm font-semibold tracking-wide">
                 {dineInVenueLabel("hyphen")}
               </h2>
-              <div className="mt-2 space-y-2.5">{renderCards(hyphenOrders)}</div>
+              <div className="mt-2 space-y-2.5">
+                {renderCards(hyphenOrders)}
+              </div>
             </section>
           ) : null}
           {whitebirdOrders.length > 0 ? (

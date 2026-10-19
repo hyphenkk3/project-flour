@@ -59,14 +59,22 @@ function Metric({
   );
 }
 
-export function ManagementReportDashboard({ report }: { report: ManagementReportData }) {
+export function ManagementReportDashboard({
+  report,
+}: {
+  report: ManagementReportData;
+}) {
   const router = useRouter();
   const { current, previous } = report;
   const latestMonth = reportMonth(new Date());
   const canAdvanceMonth = current.month < latestMonth;
   const availableMonths = useMemo(() => {
     const months: string[] = [];
-    for (let month = latestMonth; month >= "2020-01"; month = previousMonth(month)) {
+    for (
+      let month = latestMonth;
+      month >= "2020-01";
+      month = previousMonth(month)
+    ) {
       months.push(month);
     }
     return months;
@@ -261,15 +269,17 @@ export function ManagementReportDashboard({ report }: { report: ManagementReport
                 </div>
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-1 gap-3 border-t border-slate-200 pt-3 sm:grid-cols-2 xl:grid-cols-4 sm:gap-5">
+            <div className="mt-4 grid grid-cols-1 gap-3 border-t border-slate-200 pt-3 sm:grid-cols-2 sm:gap-5 xl:grid-cols-4">
               <div className="min-w-0">
-                <p className="text-xs text-slate-500">Outstanding for Selected Month</p>
+                <p className="text-xs text-slate-500">
+                  Outstanding for Selected Month
+                </p>
                 <p className="mt-1 text-sm font-semibold break-words text-slate-900 tabular-nums">
                   {currency(current.outstandingNow)}
                 </p>
                 <p className="mt-0.5 text-[11px] text-slate-500">
-                  As of {formatReportAsOf(report.asOf)}; not
-                  historical month-end
+                  As of {formatReportAsOf(report.asOf)}; not historical
+                  month-end
                 </p>
               </div>
               <div className="min-w-0">
@@ -672,7 +682,7 @@ export function ManagementReportDashboard({ report }: { report: ManagementReport
       </section>
       <section
         aria-labelledby="refund-breakdown"
-        className="min-w-0 max-w-full space-y-3"
+        className="max-w-full min-w-0 space-y-3"
       >
         <div>
           <h2
@@ -682,7 +692,8 @@ export function ManagementReportDashboard({ report }: { report: ManagementReport
             Refund Breakdown
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            Recorded refunds by refund date for {monthLabel}. Total: {currency(report.payments.refunds)}.
+            Recorded refunds by refund date for {monthLabel}. Total:{" "}
+            {currency(report.payments.refunds)}.
           </p>
         </div>
         <div
@@ -694,25 +705,47 @@ export function ManagementReportDashboard({ report }: { report: ManagementReport
           <table className="w-full min-w-[960px] border-collapse text-left text-sm">
             <thead className="bg-slate-50 text-xs font-semibold text-slate-600">
               <tr>
-                {["Order Number", "Refund Date", "Refund Amount", "Refund Method", "Refund Source / Type", "Recorded By", "Refund Reason"].map((heading) => (
-                  <th className="whitespace-nowrap px-3 py-3" key={heading} scope="col">
+                {[
+                  "Order Number",
+                  "Refund Date",
+                  "Refund Amount",
+                  "Refund Method",
+                  "Refund Source / Type",
+                  "Recorded By",
+                  "Refund Reason",
+                ].map((heading) => (
+                  <th
+                    className="px-3 py-3 whitespace-nowrap"
+                    key={heading}
+                    scope="col"
+                  >
                     {heading}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {report.refundBreakdown.length ? report.refundBreakdown.map((row, index) => (
-                <tr key={`${row.orderNumber}-${row.refundDate}-${index}`}>
-                  <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-900">{row.orderNumber}</td>
-                  <td className="whitespace-nowrap px-3 py-3">{refundDate(row.refundDate)}</td>
-                  <td className="whitespace-nowrap px-3 py-3 tabular-nums">{currency(row.amount)}</td>
-                  <td className="px-3 py-3">{row.method}</td>
-                  <td className="px-3 py-3">{row.source}</td>
-                  <td className="px-3 py-3">{row.recordedBy}</td>
-                  <td className="min-w-64 max-w-lg whitespace-normal break-words px-3 py-3">{row.reason}</td>
-                </tr>
-              )) : (
+              {report.refundBreakdown.length ? (
+                report.refundBreakdown.map((row, index) => (
+                  <tr key={`${row.orderNumber}-${row.refundDate}-${index}`}>
+                    <td className="px-3 py-3 font-medium whitespace-nowrap text-slate-900">
+                      {row.orderNumber}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {refundDate(row.refundDate)}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap tabular-nums">
+                      {currency(row.amount)}
+                    </td>
+                    <td className="px-3 py-3">{row.method}</td>
+                    <td className="px-3 py-3">{row.source}</td>
+                    <td className="px-3 py-3">{row.recordedBy}</td>
+                    <td className="max-w-lg min-w-64 px-3 py-3 break-words whitespace-normal">
+                      {row.reason}
+                    </td>
+                  </tr>
+                ))
+              ) : (
                 <tr>
                   <td className="px-3 py-4 text-slate-500" colSpan={7}>
                     No recorded refunds in this reporting month.
