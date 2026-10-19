@@ -41,6 +41,7 @@ import {
 import { isNewOrderNotificationEligible } from "@/workspaces/owner/orders/new-order-notifications";
 import { scrollWorkspaceSectionIntoView } from "@/workspaces/owner/orders/scroll-workspace-section";
 import { useCoalescedReconciliation } from "@/lib/useCoalescedReconciliation";
+import { traceWosSync } from "@/lib/wos-sync-diagnostics";
 
 const POLL_INTERVAL_MS = GUEST_ORDERS_LIVE_POLL_MS;
 const HIGHLIGHT_MS = 4500;
@@ -112,8 +113,24 @@ export function OperationsLiveBoard({
     },
     [highlightArrivedOrder],
   );
+  const loadGuestOrdersForSync = useCallback(async () => {
+    const startedAt = performance.now();
+    traceWosSync("full-refetch-start");
+    try {
+      const result = await listGuestOrdersAction();
+      traceWosSync("full-refetch-complete", {
+        durationMs: Math.round(performance.now() - startedAt),
+      });
+      return result;
+    } catch (error) {
+      traceWosSync("full-refetch-failed", {
+        durationMs: Math.round(performance.now() - startedAt),
+      });
+      throw error;
+    }
+  }, []);
   const reconcileFromServer = useCoalescedReconciliation(
-    listGuestOrdersAction,
+    loadGuestOrdersForSync,
     applyReconciliation,
   );
   const pendingOrderRefreshesRef = useRef(
@@ -134,10 +151,19 @@ export function OperationsLiveBoard({
       request.promise = (async () => {
         while (true) {
           const requestedRevision = request.revision;
+          const startedAt = performance.now();
+          traceWosSync("order-refetch-start");
           let latest: StorefrontOrderListItem | null;
           try {
             latest = await getGuestOrderListItemAction(id);
+            traceWosSync("order-refetch-complete", {
+              durationMs: Math.round(performance.now() - startedAt),
+              found: Boolean(latest),
+            });
           } catch {
+            traceWosSync("order-refetch-failed", {
+              durationMs: Math.round(performance.now() - startedAt),
+            });
             await reconcileFromServer();
             return;
           }
@@ -155,11 +181,15 @@ export function OperationsLiveBoard({
               requestedRevision !== request.revision ||
               orderRefreshGenerationsRef.current.get(id) !== requestedRevision
             ) {
+              traceWosSync("order-ui-apply-skipped", { reason: "superseded" });
               return current;
             }
             if (!latest) return current.filter((order) => order.id !== id);
             return current.map((order) => (order.id === id ? latest : order));
           });
+          window.requestAnimationFrame(() =>
+            traceWosSync("order-ui-committed"),
+          );
           return;
         }
       })().finally(() => {
@@ -198,7 +228,9 @@ export function OperationsLiveBoard({
         { event: "INSERT", schema: "public", table: "orders" },
         (payload) => {
           const row = payload.new as OrderRowPayload;
-          if (!isGuestOrderLiveEvent(row)) return;
+          const accepted = isGuestOrderLiveEvent(row);
+          traceWosSync("realtime-event", { event: "INSERT", accepted });
+          if (!accepted) return;
           void reconcileFromServer();
         },
       )
@@ -207,7 +239,9 @@ export function OperationsLiveBoard({
         { event: "UPDATE", schema: "public", table: "orders" },
         (payload) => {
           const row = payload.new as OrderRowPayload;
-          if (!isGuestOrderLiveEvent(row)) return;
+          const accepted = isGuestOrderLiveEvent(row);
+          traceWosSync("realtime-event", { event: "UPDATE", accepted });
+          if (!accepted) return;
           if (knownIdsRef.current.has(row.id)) {
             void reconcileOrderFromServer(row.id);
           } else {
@@ -216,18 +250,26 @@ export function OperationsLiveBoard({
         },
       )
       .subscribe((status) => {
+        traceWosSync("subscription-status", { status });
         if (status === "SUBSCRIBED") void reconcileFromServer();
       });
 
     const reconcileWhenVisible = () => {
-      if (document.visibilityState === "visible") void reconcileFromServer();
+      if (document.visibilityState === "visible") {
+        traceWosSync("visibility-recovery");
+        void reconcileFromServer();
+      }
     };
-    const reconcileOnFocus = () => void reconcileFromServer();
+    const reconcileOnFocus = () => {
+      traceWosSync("focus-recovery");
+      void reconcileFromServer();
+    };
 
     document.addEventListener("visibilitychange", reconcileWhenVisible);
     window.addEventListener("focus", reconcileOnFocus);
 
     const pollId = window.setInterval(() => {
+      traceWosSync("poll-fallback");
       void reconcileFromServer();
     }, POLL_INTERVAL_MS);
 

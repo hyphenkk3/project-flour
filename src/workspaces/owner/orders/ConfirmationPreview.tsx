@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { traceWosSync } from "@/lib/wos-sync-diagnostics";
 import {
   buildConfirmationPayloadFromOrder,
   generateConfirmationMessage,
@@ -107,8 +108,14 @@ export function ConfirmationPreview({
   function handleMarkSent() {
     if (confirmationLocked) return;
     setError(null);
+    traceWosSync("confirmation-write-start");
     startTransition(async () => {
       const result = await markConfirmationSentAction(order.id);
+      traceWosSync(
+        result.error
+          ? "confirmation-write-failed"
+          : "confirmation-write-returned",
+      );
       if (result.error) {
         setError(result.error);
         return;
@@ -159,7 +166,7 @@ export function ConfirmationPreview({
         </p>
       </div>
 
-      <pre className="border-fog text-ink overflow-x-auto whitespace-pre-wrap rounded-xl border bg-white p-4 text-sm leading-relaxed">
+      <pre className="border-fog text-ink overflow-x-auto rounded-xl border bg-white p-4 text-sm leading-relaxed whitespace-pre-wrap">
         {message}
       </pre>
 
