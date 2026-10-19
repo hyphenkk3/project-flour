@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { createCoalescedReconciliation } from "@/lib/coalescedReconciliation";
 
 /**
@@ -13,14 +13,7 @@ export function useCoalescedReconciliation<T>(
   const loadRef = useRef(load);
   const applyRef = useRef(apply);
   const activeRef = useRef(true);
-  const [reconcile] = useState(() =>
-    createCoalescedReconciliation(
-      () => loadRef.current(),
-      (value) => {
-        if (activeRef.current) applyRef.current(value);
-      },
-    ),
-  );
+  const reconcileRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     loadRef.current = load;
@@ -29,10 +22,20 @@ export function useCoalescedReconciliation<T>(
 
   useEffect(() => {
     activeRef.current = true;
+    reconcileRef.current = createCoalescedReconciliation(
+      () => loadRef.current(),
+      (value) => {
+        if (activeRef.current) applyRef.current(value);
+      },
+    );
     return () => {
       activeRef.current = false;
+      reconcileRef.current = null;
     };
   }, []);
 
-  return useCallback(() => reconcile(), [reconcile]);
+  return useCallback(
+    () => reconcileRef.current?.() ?? Promise.resolve(),
+    [],
+  );
 }
