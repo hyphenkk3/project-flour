@@ -44,6 +44,7 @@ const messages = loadTs("src/engines/orders/messages.ts", {
 const collectionReadyMessages = loadTs("src/workspaces/collection/ready-message.ts", {
   "@/engines/orders/messages": messages,
 });
+const whatsapp = loadTs("src/engines/orders/whatsapp.ts");
 
 const customText = "Kindly mention the Order Name and Cake Flavour at the Hyphen counter ya 😉";
 const templateEngineModule = templateEngine;
@@ -72,7 +73,12 @@ const collectionText = collectionReadyMessages.generateCollectionReadyMessage(
   templates,
 );
 assert.equal(collectionText, orderText, "Order and Collection use the same saved counter instruction");
-const whatsappText = encodeURIComponent(collectionText);
-assert.equal(decodeURIComponent(whatsappText), orderText, "WhatsApp preparation keeps the generated message text unchanged");
+const whatsappUrl = whatsapp.buildWhatsAppDeepLink("0123456789", collectionText);
+assert.ok(whatsappUrl);
+assert.equal(
+  new URL(whatsappUrl).searchParams.get("text"),
+  orderText,
+  "WhatsApp preparation keeps the generated message text unchanged",
+);
 
 console.log("Counter instruction integration passed: custom wording reaches Order, Collection and WhatsApp preparation; missing/invalid settings preserve prior output.");
