@@ -1,5 +1,9 @@
 import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
-import { renderCustomerMessageTemplate, type CustomerMessageTemplateRows } from "@/engines/customer-message-templates";
+import {
+  resolveCollectionCounterInstructions,
+  renderCustomerMessageTemplate,
+  type CustomerMessageTemplateRows,
+} from "@/engines/customer-message-templates";
 import {
   dineInSplitSeatingStaffLabel,
   formatDineInPartyComposition,
@@ -584,7 +588,7 @@ export function generateCustomerReadyMessage(
     {
       sender_name: sender,
       ready_notice: "Just to let you know that your order is ready for pick up ✨",
-      counter_instruction: "Kindly mention the Order Name and Cake Flavour at the Whitebird counter ya 😉",
+      counter_instruction: resolveCollectionCounterInstructions(templates),
       grabexpress_instruction: "If you would like to arrange GrabExpress, we recommend placing the booking before 3:00pm to avoid difficulty getting a driver and possible traffic delays.",
       car_plate_instruction: "💛 We can also help bring the cake down if needed. Just send us your driver’s:\n🚗 Car Plate Number: __________ (when you have arrived) __________",
       pickup_hours: "A gentle reminder that last pickup will be as follow.\nMon, Tue & Thurs :5:30pm\nWed :3:00pm\nFri-Sun :9:30pm",

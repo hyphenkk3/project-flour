@@ -1,5 +1,8 @@
 export type CustomerMessageTemplateRows = Partial<Record<CustomerMessageTemplateKey, string>>;
 
+export const DEFAULT_COLLECTION_COUNTER_INSTRUCTIONS =
+  "Kindly mention the Order Name and Cake Flavour at the Whitebird counter ya 😉";
+
 export type CustomerMessageTemplateCategory =
   | "Order Confirmation"
   | "Payment Request"
@@ -246,6 +249,16 @@ export const CUSTOMER_MESSAGE_TEMPLATE_DEFINITIONS = [
     }
   },
   {
+    "key": "collection_counter_instructions",
+    "category": "Ready for Pickup",
+    "displayName": "Collection Counter Instructions",
+    "description": "Customer-facing instructions shown in the shared Ready for Pickup message. Existing wording stays in use until Owner or Manager saves a change.",
+    "body": DEFAULT_COLLECTION_COUNTER_INSTRUCTIONS,
+    "allowed": [],
+    "required": [],
+    "sample": {}
+  },
+  {
     "key": "ready_pickup_closed",
     "category": "Ready for Pickup",
     "displayName": "Ready for Pickup — Whitebird Closed",
@@ -399,6 +412,19 @@ export function validateCustomerMessageTemplateBody(key: string, body: string): 
   return { valid: true };
 }
 
+export function resolveCollectionCounterInstructions(
+  templates?: CustomerMessageTemplateRows,
+): string {
+  const candidate = templates?.collection_counter_instructions;
+  return candidate &&
+    validateCustomerMessageTemplateBody(
+      "collection_counter_instructions",
+      candidate,
+    ).valid
+    ? candidate
+    : DEFAULT_COLLECTION_COUNTER_INSTRUCTIONS;
+}
+
 export function renderCustomerMessageTemplate(key: string, templates: CustomerMessageTemplateRows | undefined, values: Record<string, string>, fallbackMessage: string): string {
   const definition = getCustomerMessageTemplateDefinition(key);
   if (!definition) return fallbackMessage;
@@ -415,15 +441,23 @@ export function renderCustomerMessageTemplate(key: string, templates: CustomerMe
   return rendered.trim() ? rendered : fallbackMessage;
 }
 
-export function renderCustomerMessagePreview(key: string, body: string): string {
+export function renderCustomerMessagePreview(
+  key: string,
+  body: string,
+  templates?: CustomerMessageTemplateRows,
+): string {
   const definition = getCustomerMessageTemplateDefinition(key);
   if (!definition) return "";
   const validation = validateCustomerMessageTemplateBody(key, body);
   if (!validation.valid) return validation.reason;
+  const values = { ...definition.sample };
+  if (key === "ready_pickup") {
+    values.counter_instruction = resolveCollectionCounterInstructions(templates);
+  }
   return renderCustomerMessageTemplate(
     key,
-    { [key as CustomerMessageTemplateKey]: body },
-    definition.sample,
+    { ...templates, [key as CustomerMessageTemplateKey]: body },
+    values,
     body,
   );
 }

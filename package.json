@@ -11,7 +11,8 @@
     "format:check": "prettier --check .",
     "seed:dev": "node scripts/seed-dev-owner.mjs",
     "seed:milestone1": "node scripts/seed-milestone1.mjs",
-    "test:customer-message-templates": "node scripts/test-customer-message-templates.cjs"
+    "test:customer-message-templates": "node scripts/test-customer-message-templates.cjs",
+    "test:customer-message-counter-instructions": "node scripts/test-customer-message-counter-instructions.cjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

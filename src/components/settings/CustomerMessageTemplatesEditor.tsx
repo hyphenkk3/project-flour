@@ -67,10 +67,15 @@ export function CustomerMessageTemplatesEditor({
   const revisions = historyLoading ? [] : history.revisions;
   const selectedDefinition = CUSTOMER_MESSAGE_TEMPLATE_DEFINITIONS.find((row) => row.key === selectedKey);
   const validation = validateCustomerMessageTemplateBody(selectedKey, draft);
-  const preview = useMemo(
-    () => renderCustomerMessagePreview(selectedKey, draft),
-    [selectedKey, draft],
-  );
+  const preview = useMemo(() => {
+    const previewTemplates = Object.fromEntries(
+      templates.map((row) => [
+        row.template_key,
+        row.template_key === selectedKey ? draft : row.body,
+      ]),
+    ) as Partial<Record<CustomerMessageTemplateKey, string>>;
+    return renderCustomerMessagePreview(selectedKey, draft, previewTemplates);
+  }, [selectedKey, draft, templates]);
   const dirty = Boolean(selected && draft !== selected.body);
   const grouped = useMemo(() => {
     const categories = [...new Set(CUSTOMER_MESSAGE_TEMPLATE_DEFINITIONS.map((item) => item.category))];
