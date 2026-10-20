@@ -893,15 +893,23 @@ export async function markConfirmationSentAction(
     order,
     staffCustomerFacingName: staff.displayName,
   });
-  const messageBody = generateConfirmationMessage(payload);
+
+  const supabase = await createClient();
+  const { data: activeTemplate } = await supabase
+    .from("customer_message_templates")
+    .select("body")
+    .eq("template_key", "order_confirmation")
+    .maybeSingle();
+  const messageBody = generateConfirmationMessage(
+    payload,
+    activeTemplate?.body ? { order_confirmation: activeTemplate.body } : undefined,
+  );
   const isUpdated =
     shouldOfferUpdatedConfirmationAction({
       status: order.status,
       confirmationNeedsResend: order.confirmationNeedsResend,
     }) || order.status === "pending_confirmation";
   const nextStatus = nextStatusAfterConfirmationMarkedSent(order.status);
-
-  const supabase = await createClient();
 
   // Outdate any still-sent snapshots before inserting the new version
   await supabase

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useCustomerMessageTemplates, CustomerMessageTemplateNotice } from "@/engines/customer-message-templates-client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -63,7 +64,8 @@ export function ConfirmationPreview({
     order,
     staffCustomerFacingName: staffDisplayName,
   });
-  const message = generateConfirmationMessage(payload);
+  const { templates, usingFallback } = useCustomerMessageTemplates();
+  const message = generateConfirmationMessage(payload, templates);
   const whatsappUrl = buildWhatsAppDeepLink(order.phone, message);
 
   useEffect(() => {
@@ -126,6 +128,7 @@ export function ConfirmationPreview({
   if (confirmationLocked) {
     return (
       <div className="space-y-6">
+        <CustomerMessageTemplateNotice usingFallback={usingFallback} />
         <Link
           className="text-skyline hover:text-ink text-sm font-medium"
           href={workspaceHref}

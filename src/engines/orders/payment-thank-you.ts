@@ -1,4 +1,5 @@
 import { isDeliveryRecipientSameAsOrderingCustomer } from "@/engines/orders/fulfilment";
+import { renderCustomerMessageTemplate, type CustomerMessageTemplateRows } from "@/engines/customer-message-templates";
 import type {
   OrderPaymentAllocationView,
   StorefrontOrder,
@@ -59,24 +60,45 @@ export function customerPaymentThankYouVariant(
 
 export function generateCustomerPaymentThankYouMessage(
   order: PaymentThankYouOrder,
+  templates?: CustomerMessageTemplateRows,
 ): string {
   const variant = customerPaymentThankYouVariant(order);
   const mayInformRecipient =
     order.delivery?.recipientNotifyPreference === "inform_recipient";
 
-  if (!mayInformRecipient && variant === "delivery_same_recipient") {
-    return DELIVERY_SAME_RECIPIENT_NO_NOTIFY_MESSAGE;
-  }
+  let key:
+    | "payment_thank_you_pickup"
+    | "payment_thank_you_dine_in"
+    | "payment_thank_you_delivery_same_inform"
+    | "payment_thank_you_delivery_same_do_not_inform"
+    | "payment_thank_you_delivery_different_inform"
+    | "payment_thank_you_delivery_different_do_not_inform";
+  let fallback: string;
 
-  const message = CUSTOMER_PAYMENT_THANK_YOU_MESSAGES[variant];
-  if (!mayInformRecipient && variant === "delivery_different_recipient") {
-    return message.replace(
+  if (variant === "pickup") {
+    key = "payment_thank_you_pickup";
+    fallback = CUSTOMER_PAYMENT_THANK_YOU_MESSAGES.pickup;
+  } else if (variant === "dine_in") {
+    key = "payment_thank_you_dine_in";
+    fallback = CUSTOMER_PAYMENT_THANK_YOU_MESSAGES.dine_in;
+  } else if (variant === "delivery_same_recipient" && !mayInformRecipient) {
+    key = "payment_thank_you_delivery_same_do_not_inform";
+    fallback = DELIVERY_SAME_RECIPIENT_NO_NOTIFY_MESSAGE;
+  } else if (variant === "delivery_same_recipient") {
+    key = "payment_thank_you_delivery_same_inform";
+    fallback = CUSTOMER_PAYMENT_THANK_YOU_MESSAGES.delivery_same_recipient;
+  } else if (!mayInformRecipient) {
+    key = "payment_thank_you_delivery_different_do_not_inform";
+    fallback = CUSTOMER_PAYMENT_THANK_YOU_MESSAGES.delivery_different_recipient.replace(
       "We will inform you and also message recipient before delivery on that day ya!",
       "We will inform you before delivery on that day ya!",
     );
+  } else {
+    key = "payment_thank_you_delivery_different_inform";
+    fallback = CUSTOMER_PAYMENT_THANK_YOU_MESSAGES.delivery_different_recipient;
   }
 
-  return message;
+  return renderCustomerMessageTemplate(key, templates, {}, fallback);
 }
 
 export function hasVerifiedPaymentForPaymentThankYou(

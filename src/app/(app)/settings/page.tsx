@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireStaff } from "@/foundation/auth/session";
 import { getNotificationDefinitionsForRole } from "@/foundation/staff/notification-preferences";
 import { loadStaffNotificationPreferences } from "@/foundation/staff/notification-preferences-queries";
@@ -56,6 +57,25 @@ export default async function SettingsPage() {
           </div>
         </div>
       </section>
+
+      {(staff.role.code === "owner" || staff.role.code === "manager") && (
+        <section className="border-fog rounded-xl border bg-white p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 className="text-ink text-sm font-semibold">Customer Message Templates</h3>
+              <p className="text-skyline mt-1 text-sm">
+                Update customer-facing wording used by existing staff message workflows.
+              </p>
+            </div>
+            <Link
+              href="/settings/customer-message-templates"
+              className="bg-ink rounded-lg px-4 py-2 text-sm font-semibold text-white"
+            >
+              Manage Templates
+            </Link>
+          </div>
+        </section>
+      )}
 
       <StaffPasskeySettings />
 

@@ -1,4 +1,5 @@
 import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
+import { renderCustomerMessageTemplate, type CustomerMessageTemplateRows } from "@/engines/customer-message-templates";
 import {
   dineInSplitSeatingStaffLabel,
   formatDineInPartyComposition,
@@ -560,9 +561,12 @@ export function generateCrewOrderMessage(order: StorefrontOrder): string {
   return generatePickupCrewOrderMessage(order);
 }
 
-export function generateCustomerReadyMessage(senderName: string): string {
+export function generateCustomerReadyMessage(
+  senderName: string,
+  templates?: CustomerMessageTemplateRows,
+): string {
   const sender = senderName.trim() || "Whitebird";
-  return (
+  const fallback =
     `Good morning, ${sender} here ☀️\n` +
     `Just to let you know that your order is ready for pick up ✨\n` +
     `Kindly mention the Order Name and Cake Flavour at the Whitebird counter ya 😉\n\n` +
@@ -573,13 +577,27 @@ export function generateCustomerReadyMessage(senderName: string): string {
     `Mon, Tue & Thurs :5:30pm\n` +
     `Wed :3:00pm\n` +
     `Fri-Sun :9:30pm\n\n` +
-    `Thank you, and hope to see you soon! 🤭`
+    `Thank you, and hope to see you soon! 🤭`;
+  return renderCustomerMessageTemplate(
+    "ready_pickup",
+    templates,
+    {
+      sender_name: sender,
+      ready_notice: "Just to let you know that your order is ready for pick up ✨",
+      counter_instruction: "Kindly mention the Order Name and Cake Flavour at the Whitebird counter ya 😉",
+      grabexpress_instruction: "If you would like to arrange GrabExpress, we recommend placing the booking before 3:00pm to avoid difficulty getting a driver and possible traffic delays.",
+      car_plate_instruction: "💛 We can also help bring the cake down if needed. Just send us your driver’s:\n🚗 Car Plate Number: __________ (when you have arrived) __________",
+      pickup_hours: "A gentle reminder that last pickup will be as follow.\nMon, Tue & Thurs :5:30pm\nWed :3:00pm\nFri-Sun :9:30pm",
+      closing_remarks: "Thank you, and hope to see you soon! 🤭",
+    },
+    fallback,
   );
 }
 
 export function generateCustomerClosedPickupReadyMessage(
   senderName: string,
   latestPickupTime: string | null,
+  templates?: CustomerMessageTemplateRows,
 ): string {
   const sender = senderName.trim() || "Whitebird";
   const validLatestPickupTime =
@@ -589,12 +607,21 @@ export function generateCustomerClosedPickupReadyMessage(
   const readyLine = validLatestPickupTime
     ? `Just to let you know that your order above is ready for pickup ya from now until latest ${validLatestPickupTime} ya.`
     : "Just to let you know that your order above is ready for pickup ya.";
-
-  return (
+  const fallback =
     `Good morning, ${sender} here ☀️\n` +
     `${readyLine}\n\n` +
     `Do give us a CALL at ${whitebirdCustomerPhoneLocal()} when you arrive as we are closed today so we will open the door for you ya.\n` +
-    `(we might miss the message so please call, thank you)`
+    `(we might miss the message so please call, thank you)`;
+  return renderCustomerMessageTemplate(
+    "ready_pickup_closed",
+    templates,
+    {
+      sender_name: sender,
+      ready_line: readyLine,
+      call_instruction: `Do give us a CALL at ${whitebirdCustomerPhoneLocal()} when you arrive as we are closed today so we will open the door for you ya.`,
+      missed_call_remarks: "(we might miss the message so please call, thank you)",
+    },
+    fallback,
   );
 }
 
@@ -643,20 +670,35 @@ export function generateCustomerDeliveryReadyMessage(input: {
   senderName: string;
   scheduledTime: string;
   variant: DeliveryCustomerReadyVariant;
+  templates?: CustomerMessageTemplateRows;
 }): string {
   const sender = input.senderName.trim() || "Whitebird";
   if (input.variant === "contact_recipient") {
-    return (
-      `Good morning, ${sender} here.\n` +
-      `Just to inform you that your order is ready for delivery anytime now.\n` +
-      `We will contact the recipient for arranging the delivery ya ;)`
+    const readyStatus = "Just to inform you that your order is ready for delivery anytime now.";
+    const contactInstruction = "We will contact the recipient for arranging the delivery ya ;)";
+    const fallback = `Good morning, ${sender} here.\n${readyStatus}\n${contactInstruction}`;
+    return renderCustomerMessageTemplate(
+      "delivery_ready_contact_recipient",
+      input.templates,
+      { sender_name: sender, ready_status: readyStatus, recipient_contact_instruction: contactInstruction },
+      fallback,
     );
   }
   const time = formatCrewPickupTime({ pickupTime: input.scheduledTime });
-  return (
+  const earlierInvitation = "Do let us know if you like to deliver earlier ya ;)";
+  const fallback =
     `Good morning, ${sender} here.\n` +
     `Just to inform you that your order is ready for delivery anytime now, we will arrange delivery base on your schedule at ${time}.\n` +
-    `Do let us know if you like to deliver earlier ya ;)`
+    earlierInvitation;
+  return renderCustomerMessageTemplate(
+    "delivery_ready_scheduled",
+    input.templates,
+    {
+      sender_name: sender,
+      scheduled_delivery_line: `Just to inform you that your order is ready for delivery anytime now, we will arrange delivery base on your schedule at ${time}.`,
+      earlier_delivery_invitation: earlierInvitation,
+    },
+    fallback,
   );
 }
 
@@ -698,17 +740,21 @@ export function outForDeliveryContactForAudience(
   };
 }
 
-export function generateCustomerOutForDeliveryMessage(): string {
-  return CUSTOMER_OUT_FOR_DELIVERY_MESSAGE;
+export function generateCustomerOutForDeliveryMessage(
+  templates?: CustomerMessageTemplateRows,
+): string {
+  return renderCustomerMessageTemplate("out_for_delivery", templates, {}, CUSTOMER_OUT_FOR_DELIVERY_MESSAGE);
 }
 
-export function generateCustomerThankYouMessage(): string {
-  return CUSTOMER_THANK_YOU_MESSAGE;
+export function generateCustomerThankYouMessage(
+  templates?: CustomerMessageTemplateRows,
+): string {
+  return renderCustomerMessageTemplate("general_thank_you", templates, {}, CUSTOMER_THANK_YOU_MESSAGE);
 }
 
 export function generateOrderMessage(
   type: MessageType,
-  input: { order: StorefrontOrder; senderName?: string },
+  input: { order: StorefrontOrder; senderName?: string; templates?: CustomerMessageTemplateRows },
 ): string {
   switch (type) {
     case "crew":
@@ -719,7 +765,7 @@ export function generateOrderMessage(
           "Pickup Customer Ready Message is not used for Delivery.",
         );
       }
-      return generateCustomerReadyMessage(input.senderName ?? "");
+      return generateCustomerReadyMessage(input.senderName ?? "", input.templates);
     case "customer_delivery_ready":
       if (input.order.fulfilmentMethod !== "delivery") {
         throw new Error("Delivery Customer Ready is only for Delivery orders.");
@@ -728,12 +774,13 @@ export function generateOrderMessage(
         senderName: input.senderName ?? "",
         scheduledTime: input.order.pickupTime,
         variant: deliveryCustomerReadyVariant(input.order),
+        templates: input.templates,
       });
     case "customer_out_for_delivery":
-      return generateCustomerOutForDeliveryMessage();
+      return generateCustomerOutForDeliveryMessage(input.templates);
     case "customer_thank_you":
-      return generateCustomerThankYouMessage();
+      return generateCustomerThankYouMessage(input.templates);
     case "customer_payment_thank_you":
-      return generateCustomerPaymentThankYouMessage(input.order);
+      return generateCustomerPaymentThankYouMessage(input.order, input.templates);
   }
 }

@@ -1,5 +1,6 @@
 import { formatDateTime, formatShortBusinessDate } from "@/lib/dates";
 import { buildWhatsAppDeepLink } from "@/engines/orders/whatsapp";
+import { renderCustomerMessageTemplate, type CustomerMessageTemplateRows } from "@/engines/customer-message-templates";
 
 export type WaitingListConfirmationWhatsAppItem = {
   cakeName: string;
@@ -13,6 +14,7 @@ export type WaitingListConfirmationWhatsAppInput = {
   items: readonly WaitingListConfirmationWhatsAppItem[];
   confirmationUrl: string;
   deadlineAt: Date | string;
+  templates?: CustomerMessageTemplateRows;
 };
 
 export function waitingListConfirmationCustomerPath(rawToken: string): string {
@@ -48,8 +50,10 @@ export function buildWaitingListConfirmationWhatsAppMessage(
     .map((item) => `• ${waitingListConfirmationItemLine(item)}`)
     .join("\n");
   const deadline = formatDateTime(input.deadlineAt);
-
-  return [
+  const confirmationLinkInstruction =
+    "Please use the link below to confirm your fulfilment details and any options:";
+  const expiryInstruction = "The confirmation link will expire after this deadline.";
+  const fallback = [
     `Hi ${name} 👋`,
     "",
     `Good news — we can proceed with your Whitebird Waiting List request for ${dateLabel}.`,
@@ -57,16 +61,30 @@ export function buildWaitingListConfirmationWhatsAppMessage(
     "Your request:",
     itemLines,
     "",
-    "Please use the link below to confirm your fulfilment details and any options:",
+    confirmationLinkInstruction,
     "",
     input.confirmationUrl.trim(),
     "",
     `Please complete your confirmation by ${deadline}.`,
     "",
-    "The confirmation link will expire after this deadline.",
+    expiryInstruction,
     "",
     "Thank you! 🤍",
   ].join("\n");
+  return renderCustomerMessageTemplate(
+    "waiting_list_confirmation",
+    input.templates,
+    {
+      customer_name: name,
+      pickup_date: dateLabel,
+      item_lines: itemLines,
+      confirmation_link_instruction: confirmationLinkInstruction,
+      confirmation_url: input.confirmationUrl.trim(),
+      deadline,
+      expiry_instruction: expiryInstruction,
+    },
+    fallback,
+  );
 }
 
 export function waitingListConfirmationWhatsAppUrl(

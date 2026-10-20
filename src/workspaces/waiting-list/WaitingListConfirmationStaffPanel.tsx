@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { useCustomerMessageTemplates, CustomerMessageTemplateNotice } from "@/engines/customer-message-templates-client";
 import { FormError } from "@/components/ui/form";
 import {
   WAITING_LIST_CONFIRMATION_CONVERT_LABEL,
@@ -48,6 +49,7 @@ type WaitingListConfirmationStaffPanelProps = {
 export function WaitingListConfirmationStaffPanel({
   row,
 }: WaitingListConfirmationStaffPanelProps) {
+  const { templates, usingFallback } = useCustomerMessageTemplates();
   const link = row.confirmationLink;
   const eligible = eligibleWaitingListConfirmationItems(row.requestItems);
   const excluded = waitingListConfirmationExcludedItems(row.requestItems);
@@ -95,6 +97,7 @@ export function WaitingListConfirmationStaffPanel({
           items: previewItems,
           confirmationUrl,
           deadlineAt: effectiveLink?.expiresAt ?? row.responseDeadlineAt ?? "",
+          templates,
         })
       : "";
   const whatsappUrl = whatsappMessage
@@ -201,6 +204,7 @@ export function WaitingListConfirmationStaffPanel({
 
   return (
     <div className="border-fog space-y-3 rounded-lg border bg-white px-3 py-3">
+      <CustomerMessageTemplateNotice usingFallback={usingFallback} />
       <p className="text-ink text-sm font-medium">Customer confirmation</p>
 
       {previewItems.length > 0 ? (

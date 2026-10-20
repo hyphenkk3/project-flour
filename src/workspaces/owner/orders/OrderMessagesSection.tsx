@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useCustomerMessageTemplates, CustomerMessageTemplateNotice } from "@/engines/customer-message-templates-client";
 import {
   messageActionsForOperationalState,
   messageRecipientLabel,
@@ -65,6 +66,7 @@ export function OrderMessagesSection({
   compact = false,
 }: OrderMessagesSectionProps) {
   const [preview, setPreview] = useState<PreviewState | null>(null);
+  const { templates, usingFallback } = useCustomerMessageTemplates();
   const [senderName, setSenderName] = useState(
     () => staffDisplayName.trim() || "Whitebird",
   );
@@ -103,8 +105,9 @@ export function OrderMessagesSection({
     return generateOrderMessage(preview.type, {
       order,
       senderName,
+      templates,
     });
-  }, [preview, order, senderName]);
+  }, [preview, order, senderName, templates]);
 
   function openAction(action: MessageAction) {
     if (
@@ -124,6 +127,7 @@ export function OrderMessagesSection({
 
   return (
     <>
+      <CustomerMessageTemplateNotice usingFallback={usingFallback} />
       <section
         className={
           compact

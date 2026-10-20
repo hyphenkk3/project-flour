@@ -1,4 +1,5 @@
 import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
+import { renderCustomerMessageTemplate, type CustomerMessageTemplateRows } from "@/engines/customer-message-templates";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import {
   commercialEquationItems,
@@ -310,6 +311,7 @@ export function formatConfirmationFinancialBlock(
  */
 export function generateConfirmationMessage(
   payload: ConfirmationPayload,
+  templates?: CustomerMessageTemplateRows,
 ): string {
   const weekday = formatPickupWeekdayShort(payload.pickupDate);
   const dateShort = formatPickupDateShort(payload.pickupDate);
@@ -391,7 +393,7 @@ export function generateConfirmationMessage(
     })}`;
   }
 
-  return (
+  const fallback =
     `Hello ${payload.staffCustomerFacingName} here,\n\n` +
     `We've received your cakes preorder submission via online system. ;)\n\n` +
     `Here's the order confirmation.\n\n` +
@@ -401,7 +403,12 @@ export function generateConfirmationMessage(
     `Kindly review ALL the details in this confirmation carefully, as your order will be prepared based on the information provided above.\n\n` +
     `Once confirmed, any amendments or errors will not be our responsibility.\n` +
     `Important: Voucher orders are final and cannot be amended under any circumstances.\n\n` +
-    `We will proceed with payment once everything is confirmed 😊`
+    `We will proceed with payment once everything is confirmed 😊`;
+  return renderCustomerMessageTemplate(
+    "order_confirmation",
+    templates,
+    { staff_name: payload.staffCustomerFacingName, order_details: orderSection },
+    fallback,
   );
 }
 

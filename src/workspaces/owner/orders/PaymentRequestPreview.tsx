@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCustomerMessageTemplates, CustomerMessageTemplateNotice } from "@/engines/customer-message-templates-client";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -133,7 +134,8 @@ export function PaymentRequestPreview({
     wholecakePreorderQr,
   });
   const collectAmount = paymentRequestCollectAmount(payload);
-  const message = generatePaymentRequestMessage(payload);
+  const { templates, usingFallback } = useCustomerMessageTemplates();
+  const message = generatePaymentRequestMessage(payload, templates);
   const whatsappUrl = buildWhatsAppDeepLink(order.phone, message);
 
   useEffect(() => {
@@ -273,6 +275,7 @@ export function PaymentRequestPreview({
   if (order.status === "cancelled") {
     return (
       <div className="space-y-4">
+      <CustomerMessageTemplateNotice usingFallback={usingFallback} />
         <Link
           className="text-skyline hover:text-ink text-sm font-medium"
           href={workspaceHref}
@@ -305,6 +308,7 @@ export function PaymentRequestPreview({
 
   return (
     <div className="space-y-6">
+      <CustomerMessageTemplateNotice usingFallback={usingFallback} />
       <div>
         <Link
           className="text-skyline hover:text-ink text-sm font-medium"

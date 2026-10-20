@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useCustomerMessageTemplates, CustomerMessageTemplateNotice } from "@/engines/customer-message-templates-client";
 import { buildWhatsAppDeepLink } from "@/engines/orders/whatsapp";
 import { generateCustomerThankYouMessage } from "@/engines/orders/messages";
 import { formatTimelineDateTime } from "@/workspaces/owner/orders/labels";
@@ -22,6 +23,7 @@ export function CollectionReadyMessage({
   order: CollectionBoardOrder;
   staffDisplayName: string;
 }) {
+  const { templates, usingFallback } = useCustomerMessageTemplates();
   const [sent, setSent] = useState<CollectionReadyMessageSent | null>(
     order.readyMessageSent ?? null,
   );
@@ -38,10 +40,10 @@ export function CollectionReadyMessage({
       ? "customer_delivery_ready"
       : "customer_ready";
   const message = useMemo(
-    () => generateCollectionReadyMessage(order, senderName),
+    () => generateCollectionReadyMessage(order, senderName, templates),
     [order, senderName],
   );
-  const thankYouMessage = useMemo(() => generateCustomerThankYouMessage(), []);
+  const thankYouMessage = useMemo(() => generateCustomerThankYouMessage(templates), [templates]);
   const selectedWhatsAppMessage = useMemo(
     () =>
       selectCollectionWhatsAppMessage(message, thankYouMessage, Boolean(sent)),
@@ -92,6 +94,7 @@ export function CollectionReadyMessage({
       aria-label="Order messages"
       className="border-fog space-y-3 rounded-2xl border bg-white px-4 py-3.5"
     >
+      <CustomerMessageTemplateNotice usingFallback={usingFallback} />
       {showCustomer ? (
         <>
           <div>

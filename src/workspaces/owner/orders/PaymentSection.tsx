@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { useCustomerMessageTemplates, CustomerMessageTemplateNotice } from "@/engines/customer-message-templates-client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -69,6 +70,7 @@ export function PaymentSection({
   pendingDiscountApproval = null,
   canExtendPaymentDeadline = false,
 }: PaymentSectionProps) {
+  const { templates, usingFallback } = useCustomerMessageTemplates();
   const router = useRouter();
   const [showRecord, setShowRecord] = useState(false);
   const recordFormContainerRef = useRef<HTMLDivElement>(null);
@@ -144,7 +146,7 @@ export function PaymentSection({
   const paymentThankYouUrl = paymentThankYouAvailable
     ? buildWhatsAppDeepLink(
         order.phone,
-        generateOrderMessage("customer_payment_thank_you", { order }),
+        generateOrderMessage("customer_payment_thank_you", { order, templates }),
       )
     : null;
 
@@ -182,7 +184,9 @@ export function PaymentSection({
       className="border-fog scroll-mt-24 space-y-4 rounded-xl border bg-white p-5"
       id={OWNER_ORDER_PAYMENT_SECTION_ID}
       tabIndex={-1}
-    >      <div className="flex flex-wrap items-start justify-between gap-3">
+    >
+      <CustomerMessageTemplateNotice usingFallback={usingFallback} />
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
           Payment
         </h2>

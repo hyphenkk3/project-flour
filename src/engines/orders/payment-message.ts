@@ -10,6 +10,7 @@ import { moneyCompare } from "@/engines/orders/money";
 import { physicalVoucherNumberFromMetadata } from "@/engines/orders/promotions";
 import { formatOrderTotal } from "@/engines/orders/totals";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
+import { renderCustomerMessageTemplate, type CustomerMessageTemplateRows } from "@/engines/customer-message-templates";
 
 export type PaymentRequestAdjustmentLine = {
   label: string;
@@ -172,6 +173,7 @@ export function formatPaymentRequestAmountBlock(payload: {
  */
 export function generatePaymentRequestMessage(
   payload: PaymentRequestPayload,
+  templates?: CustomerMessageTemplateRows,
 ): string {
   const details = getPaymentRequestDetails(payload.method);
   const amountBlock = formatPaymentRequestAmountBlock(payload);
@@ -183,41 +185,73 @@ export function generatePaymentRequestMessage(
 
   if (details.method === "wb_qr") {
     if (payload.wholecakePreorderQr) {
-      return (
+      const fallback =
         `Thank you for confirming. ;)\n\n` +
         `Here are the payment details:\n\n` +
         `${amountBlock}\n\n` +
         `Please make payment using the attached Whitebird Wholecake Preorder Payment QR.\n\n` +
         `Just a note — this QR is for wholecake preorder payments only. It is not for dine-in, beverages, or other items.\n\n` +
-        `Once payment is completed, please send us the payment slip within 24 hours, with the payment status clearly shown (e.g. “Successful”) ya. 😊`
+        `Once payment is completed, please send us the payment slip within 24 hours, with the payment status clearly shown (e.g. “Successful”) ya. 😊`;
+      return renderCustomerMessageTemplate(
+        "payment_request_wb_qr_wholecake_preorder",
+        templates,
+        {
+          amount_block: amountBlock,
+          payment_instructions:
+            "Please make payment using the attached Whitebird Wholecake Preorder Payment QR.\n\nJust a note — this QR is for wholecake preorder payments only. It is not for dine-in, beverages, or other items.",
+          slip_instruction:
+            "Once payment is completed, please send us the payment slip within 24 hours, with the payment status clearly shown (e.g. “Successful”) ya. 😊",
+        },
+        fallback,
       );
     }
 
     const payLine = hasPrior
       ? `Please make payment of ${collectLabel} using the Whitebird QR code below.`
       : `Please make payment using the Whitebird QR code below.`;
-    return (
+    const fallback =
       `Thank you for confirming. ;)\n\n` +
       `Here are the payment details.\n\n` +
       `${amountBlock}\n\n` +
       `${payLine}\n\n` +
-      slipLine
+      slipLine;
+    return renderCustomerMessageTemplate(
+      hasPrior
+        ? "payment_request_wb_qr_outstanding"
+        : "payment_request_wb_qr_initial",
+      templates,
+      { amount_block: amountBlock, payment_instruction: payLine, slip_instruction: slipLine },
+      fallback,
     );
   }
 
   const payLine = hasPrior
     ? `Please transfer ${collectLabel} using the details below.`
     : null;
+  const paymentDestination =
+    `Bank: ${details.bankName}\n` +
+    `Account Name: ${details.accountName}\n` +
+    `Account No.: ${details.accountNumber}`;
 
-  return (
+  const fallback =
     `Thank you for confirming. ;)\n\n` +
     `Here are the payment details.\n\n` +
     `${amountBlock}\n\n` +
     (payLine ? `${payLine}\n\n` : "") +
-    `Bank: ${details.bankName}\n` +
-    `Account Name: ${details.accountName}\n` +
-    `Account No.: ${details.accountNumber}\n\n` +
-    slipLine
+    `${paymentDestination}\n\n` +
+    slipLine;
+  return renderCustomerMessageTemplate(
+    hasPrior
+      ? "payment_request_online_transfer_outstanding"
+      : "payment_request_online_transfer_initial",
+    templates,
+    {
+      amount_block: amountBlock,
+      payment_instruction: payLine ?? "",
+      payment_destination: paymentDestination,
+      slip_instruction: slipLine,
+    },
+    fallback,
   );
 }
 

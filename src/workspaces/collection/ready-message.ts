@@ -46,12 +46,14 @@ export function collectionReadyMessageVariant(
 export function generateCollectionReadyMessage(
   order: CollectionBoardOrder,
   senderName: string,
+  templates?: import("@/engines/customer-message-templates").CustomerMessageTemplateRows,
 ): string {
   if (order.fulfilmentMethod === "delivery") {
     return generateCustomerDeliveryReadyMessage({
       senderName,
       scheduledTime: order.pickupTime,
       variant: collectionReadyMessageVariant(order),
+      templates,
     });
   }
   if (
@@ -61,9 +63,10 @@ export function generateCollectionReadyMessage(
     return generateCustomerClosedPickupReadyMessage(
       senderName,
       order.readyMessageOperatingHours.pickupLatestBookable,
+      templates,
     );
   }
-  return generateCustomerReadyMessage(senderName);
+  return generateCustomerReadyMessage(senderName, templates);
 }
 
 function hasNoTimes(row: {
