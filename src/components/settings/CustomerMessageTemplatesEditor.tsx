@@ -200,6 +200,63 @@ export function CustomerMessageTemplatesEditor({
     });
   }
 
+  useEffect(() => {
+    const area = bodyRef.current;
+    if (!area) return;
+    area.style.height = "auto";
+    area.style.height = Math.min(area.scrollHeight, 520) + "px";
+    area.style.overflowY = area.scrollHeight > 520 ? "auto" : "hidden";
+  }, [draft, selectedKey]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    const guardNavigation = (event: MouseEvent) => {
+      if (!(event.target instanceof Element)) return;
+      const link = event.target.closest("a");
+      if (link?.origin === window.location.origin && !window.confirm("You have unsaved changes. Leave without saving?")) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    };
+    window.addEventListener("beforeunload", warn);
+    document.addEventListener("click", guardNavigation, true);
+    return () => {
+      window.removeEventListener("beforeunload", warn);
+      document.removeEventListener("click", guardNavigation, true);
+    };
+  }, [dirty]);
+
+  function variableName(token: string) {
+    const names: Record<string, string> = {
+      staff_name: "Staff Name", sender_name: "Staff Name", customer_name: "Customer Name",
+      ready_notice: "Ready Status", recipient_instructions: "Recipient Contact Instructions",
+      order_details: "Order and Fulfilment Details", amount_block: "Amount and Balance",
+      payment_instruction: "Payment Instructions", payment_instructions: "Payment Instructions",
+      payment_destination: "Payment Account Details", slip_instruction: "Payment Slip Instructions",
+      pickup_hours: "Pickup Hours", counter_instruction: "Collection Counter Instructions",
+      grabexpress_instruction: "GrabExpress Instructions", car_plate_instruction: "Car Plate Instructions",
+      closing_remarks: "Closing Remarks", confirmation_url: "Confirmation Link",
+      confirmation_deadline: "Confirmation Deadline", pickup_date: "Pickup Date", item_details: "Item Details",
+    };
+    return names[token] ?? token.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+  }
+
+  function malaysiaDate(value: string) {
+    return new Intl.DateTimeFormat("en-MY", { timeZone: "Asia/Kuala_Lumpur", dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  }
+
+  function revisionDiff(before: string | null, after: string) {
+    const oldLines = (before ?? "").split("\n");
+    const newLines = after.split("\n");
+    let first = 0;
+    while (first < oldLines.length && first < newLines.length && oldLines[first] === newLines[first]) first += 1;
+    let oldEnd = oldLines.length - 1;
+    let newEnd = newLines.length - 1;
+    while (oldEnd >= first && newEnd >= first && oldLines[oldEnd] === newLines[newEnd]) { oldEnd -= 1; newEnd -= 1; }
+    return { removed: oldLines.slice(first, oldEnd + 1), added: newLines.slice(first, newEnd + 1) };
+  }
+
   return (
     <main className="space-y-5 pb-6">
       <header>
