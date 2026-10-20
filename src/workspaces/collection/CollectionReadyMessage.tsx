@@ -41,7 +41,7 @@ export function CollectionReadyMessage({
       : "customer_ready";
   const message = useMemo(
     () => generateCollectionReadyMessage(order, senderName, templates),
-    [order, senderName],
+    [order, senderName, templates],
   );
   const thankYouMessage = useMemo(() => generateCustomerThankYouMessage(templates), [templates]);
   const selectedWhatsAppMessage = useMemo(

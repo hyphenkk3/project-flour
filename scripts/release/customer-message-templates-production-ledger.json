@@ -1,0 +1,650 @@
+{
+  "project_ref": "cuowwlduhxxifmpvpltt",
+  "historical_count": 161,
+  "entries": [
+    {
+      "version": "20260802120000",
+      "name": "20260802120000_staff_profiles_and_roles"
+    },
+    {
+      "version": "20260802140000",
+      "name": "20260802140000_customers_and_addresses"
+    },
+    {
+      "version": "20260803100000",
+      "name": "20260803100000_customer_ops_polish"
+    },
+    {
+      "version": "20260803120000",
+      "name": "20260803120000_orders_foundation"
+    },
+    {
+      "version": "20260803133000",
+      "name": "20260803133000_orders_drive_through"
+    },
+    {
+      "version": "20260806090000",
+      "name": "20260806090000_master_library_foundation"
+    },
+    {
+      "version": "20260806095000",
+      "name": "20260806095000_library_cakes_sharing_guide"
+    },
+    {
+      "version": "20260806100000",
+      "name": "library_cakes_price_drop_story"
+    },
+    {
+      "version": "20260806110000",
+      "name": "library_cake_size_pricing"
+    },
+    {
+      "version": "20260806140000",
+      "name": "milestone1_first_order"
+    },
+    {
+      "version": "20260806150000",
+      "name": "milestone1_architecture_unify"
+    },
+    {
+      "version": "20260807120000",
+      "name": "orders_realtime_publication"
+    },
+    {
+      "version": "20260807140000",
+      "name": "milestone2_customer_confirmation"
+    },
+    {
+      "version": "20260807150000",
+      "name": "fix_submit_guest_preorder_ambiguity"
+    },
+    {
+      "version": "20260807160000",
+      "name": "fix_order_items_delete_and_sync"
+    },
+    {
+      "version": "20260807180000",
+      "name": "milestone3_payment_foundation"
+    },
+    {
+      "version": "20260807200000",
+      "name": "milestone3_discounts_adjustments"
+    },
+    {
+      "version": "20260807210000",
+      "name": "milestone3_discount_lifecycle"
+    },
+    {
+      "version": "20260807220000",
+      "name": "optional_guest_email_and_receipt_preference"
+    },
+    {
+      "version": "20260807230000",
+      "name": "guest_order_edit_through_payment_lifecycle"
+    },
+    {
+      "version": "20260807240000",
+      "name": "discount_mutable_after_payment"
+    },
+    {
+      "version": "20260808090000",
+      "name": "preview3a1_operational_foundation"
+    },
+    {
+      "version": "20260808093000",
+      "name": "preview3a2_staff_guest_preorder"
+    },
+    {
+      "version": "20260808100000",
+      "name": "preview3a3_calendar_item_sync_realtime"
+    },
+    {
+      "version": "20260810090000",
+      "name": "m4_p1_paid_order_addons"
+    },
+    {
+      "version": "20260810093000",
+      "name": "m4_p1_revoke_internal_paid_addon_sync"
+    },
+    {
+      "version": "20260810110000",
+      "name": "m4_p1_paid_addon_per_card_messages"
+    },
+    {
+      "version": "20260810120000",
+      "name": "m4_p2_fulfilment_delivery_details"
+    },
+    {
+      "version": "20260810123000",
+      "name": "m4_p2_revoke_anon_fulfilment_sync"
+    },
+    {
+      "version": "20260811160000",
+      "name": "m4_p3_delivery_finance_authority"
+    },
+    {
+      "version": "20260811170000",
+      "name": "m4_p3_delivery_fee_waiver_restore"
+    },
+    {
+      "version": "20260811200000",
+      "name": "m4_p3_independent_fee_requests"
+    },
+    {
+      "version": "20260812080000",
+      "name": "m4_p3_manager_delivery_charges_authority"
+    },
+    {
+      "version": "20260812140000",
+      "name": "m4_p5_delivery_operational_lifecycle"
+    },
+    {
+      "version": "20260812213000",
+      "name": "m5_p2_start_production"
+    },
+    {
+      "version": "20260813120000",
+      "name": "m5_p3_bakery_ready_authority"
+    },
+    {
+      "version": "20260813140000",
+      "name": "collection_picked_up_authority"
+    },
+    {
+      "version": "20260813160000",
+      "name": "extra_activation_v1"
+    },
+    {
+      "version": "20260813170000",
+      "name": "extra_reject_hardening"
+    },
+    {
+      "version": "20260814140000",
+      "name": "collection_customer_operations_picked_up"
+    },
+    {
+      "version": "20260814150000",
+      "name": "operations_approval_requests"
+    },
+    {
+      "version": "20260814160000",
+      "name": "rm10_valid_path_customer_operations"
+    },
+    {
+      "version": "20260814170000",
+      "name": "late_order_edit_paid_addons"
+    },
+    {
+      "version": "20260815120000",
+      "name": "manager_cross_month_approval_request"
+    },
+    {
+      "version": "20260815220000",
+      "name": "harden_guest_preorder"
+    },
+    {
+      "version": "20260816160000",
+      "name": "catalogue_purpose"
+    },
+    {
+      "version": "20260816170000",
+      "name": "catalogue_special_dates"
+    },
+    {
+      "version": "20260816180000",
+      "name": "catalogue_website_override"
+    },
+    {
+      "version": "20260816190000",
+      "name": "order_availability"
+    },
+    {
+      "version": "20260816200000",
+      "name": "storefront_collection_for_pickup_date"
+    },
+    {
+      "version": "20260817120000",
+      "name": "extra_fresh_picks_confirm_window"
+    },
+    {
+      "version": "20260817140000",
+      "name": "extra_pickup_from_order_cutoff"
+    },
+    {
+      "version": "20260817150000",
+      "name": "extra_order_cutoff_plus_one_day"
+    },
+    {
+      "version": "20260818120000",
+      "name": "guest_preorder_options"
+    },
+    {
+      "version": "20260818130000",
+      "name": "fix_guest_preorder_addon_ambiguity"
+    },
+    {
+      "version": "20260818140000",
+      "name": "guest_preorder_include_receipt"
+    },
+    {
+      "version": "20260818150000",
+      "name": "guest_extra_include_receipt_complimentary"
+    },
+    {
+      "version": "20260818160000",
+      "name": "catalogue_display_order"
+    },
+    {
+      "version": "20260818170000",
+      "name": "catalogue_show_in_past_menu"
+    },
+    {
+      "version": "20260818200000",
+      "name": "fulfilment_method_dine_in"
+    },
+    {
+      "version": "20260818210000",
+      "name": "whole_cake_customer_fulfilment"
+    },
+    {
+      "version": "20260819100000",
+      "name": "dine_in_reservation_venue"
+    },
+    {
+      "version": "20260819120000",
+      "name": "operating_hours"
+    },
+    {
+      "version": "20260819140000",
+      "name": "dine_in_reservation_serving_window"
+    },
+    {
+      "version": "20260821130000",
+      "name": "collection_bakery_picked_up"
+    },
+    {
+      "version": "20260822100000",
+      "name": "staff_notification_preferences"
+    },
+    {
+      "version": "20260823150000",
+      "name": "fix_dine_in_reservation_invariant_permissions"
+    },
+    {
+      "version": "20260823160000",
+      "name": "unify_staff_notification_preferences"
+    },
+    {
+      "version": "20260824130000",
+      "name": "rework_staff_notification_categories"
+    },
+    {
+      "version": "20260825150000",
+      "name": "staff_notification_realtime_sources"
+    },
+    {
+      "version": "20260825161000",
+      "name": "staff_notification_orders_replica_identity"
+    },
+    {
+      "version": "20260826150000",
+      "name": "flexible_catalogue_complimentary_items"
+    },
+    {
+      "version": "20260827100000",
+      "name": "storefront_complimentary_customer_selectable"
+    },
+    {
+      "version": "20260902120000",
+      "name": "phase2_ordering_foundation"
+    },
+    {
+      "version": "20260902230000",
+      "name": "phase3_preorder_date_engine"
+    },
+    {
+      "version": "20260903100000",
+      "name": "set_production_capacity"
+    },
+    {
+      "version": "20260903120000",
+      "name": "waiting_list_engine"
+    },
+    {
+      "version": "20260903140000",
+      "name": "phase8_guest_order_cancel"
+    },
+    {
+      "version": "20260903160000",
+      "name": "staff_notification_reliability"
+    },
+    {
+      "version": "20260903180000",
+      "name": "library_cake_photo_media"
+    },
+    {
+      "version": "20260903220000",
+      "name": "staff_notification_email_dispatch_queue"
+    },
+    {
+      "version": "20260904120000",
+      "name": "staff_notification_pg_cron_sweep"
+    },
+    {
+      "version": "20260904190000",
+      "name": "staff_notification_dispatch_vault"
+    },
+    {
+      "version": "20260904200000",
+      "name": "library_cake_photo_bakery_storage"
+    },
+    {
+      "version": "20260904213000",
+      "name": "fix_submit_guest_preorder_item_ambiguity"
+    },
+    {
+      "version": "20260904220000",
+      "name": "fix_staff_notification_order_cake_name"
+    },
+    {
+      "version": "20260905010000",
+      "name": "staff_notification_new_order_content"
+    },
+    {
+      "version": "20260905120000",
+      "name": "library_cake_categories"
+    },
+    {
+      "version": "20260907120000",
+      "name": "library_cakes_popular_cakes"
+    },
+    {
+      "version": "20260908120000",
+      "name": "collection_cakes_homepage_preview"
+    },
+    {
+      "version": "20260908153000",
+      "name": "customer_cake_categories"
+    },
+    {
+      "version": "20260908170000",
+      "name": "assign_remaining_customer_cake_categories"
+    },
+    {
+      "version": "20260909120000",
+      "name": "extra_whole_cake_disposition"
+    },
+    {
+      "version": "20260909140000",
+      "name": "guest_extra_cart_multi_claim"
+    },
+    {
+      "version": "20260910120000",
+      "name": "post_payment_customer_change_guard"
+    },
+    {
+      "version": "20260910200000",
+      "name": "preorder_lead_time_exception_wiring"
+    },
+    {
+      "version": "20260911090000",
+      "name": "library_cake_tags"
+    },
+    {
+      "version": "20260911120000",
+      "name": "staff_master_owner"
+    },
+    {
+      "version": "20260912100000",
+      "name": "staff_must_change_password"
+    },
+    {
+      "version": "20260912120000",
+      "name": "staff_profiles_archived_at"
+    },
+    {
+      "version": "20260915120000",
+      "name": "library_cakes_browse_live_discovery"
+    },
+    {
+      "version": "20260916120000",
+      "name": "fresh_picks_fulfilment_preparation"
+    },
+    {
+      "version": "20260917120000",
+      "name": "staff_guest_preorder_dine_in"
+    },
+    {
+      "version": "20260917140000",
+      "name": "extra_walk_in_hold"
+    },
+    {
+      "version": "20260919120000",
+      "name": "extra_stock_public_select_held_visible"
+    },
+    {
+      "version": "20260920120000",
+      "name": "staff_notification_waiting_list_new_request"
+    },
+    {
+      "version": "20260920140000",
+      "name": "guest_waiting_list_closed_date"
+    },
+    {
+      "version": "20260920160000",
+      "name": "guest_waiting_list_multi_item"
+    },
+    {
+      "version": "20260920180000",
+      "name": "waiting_list_confirmation_links"
+    },
+    {
+      "version": "20260920190000",
+      "name": "waiting_list_confirmation_submit"
+    },
+    {
+      "version": "20260920200000",
+      "name": "waiting_list_confirmation_staff_review"
+    },
+    {
+      "version": "20260920210000",
+      "name": "waiting_list_confirmation_closed_date"
+    },
+    {
+      "version": "20260920220000",
+      "name": "waiting_list_confirmation_convert"
+    },
+    {
+      "version": "20260921100000",
+      "name": "waiting_list_confirmation_conversion_state"
+    },
+    {
+      "version": "20260921120000",
+      "name": "skip_noop_production_capacity_events"
+    },
+    {
+      "version": "20260921150000",
+      "name": "dine_in_party_composition"
+    },
+    {
+      "version": "20260922120000",
+      "name": "library_cake_size_prices"
+    },
+    {
+      "version": "20260922140000",
+      "name": "guest_preorder_price_ack"
+    },
+    {
+      "version": "20260922180000",
+      "name": "guest_preorder_delivery_processing_ack"
+    },
+    {
+      "version": "20260923080000",
+      "name": "guest_extra_delivery_processing_ack"
+    },
+    {
+      "version": "20260923120000",
+      "name": "storefront_faq_items"
+    },
+    {
+      "version": "20260923140000",
+      "name": "payment_correction_refunds"
+    },
+    {
+      "version": "20260923160000",
+      "name": "library_asset_image_upload"
+    },
+    {
+      "version": "20260923170000",
+      "name": "dine_in_venue_library_assets"
+    },
+    {
+      "version": "20260923180000",
+      "name": "staff_credential_events"
+    },
+    {
+      "version": "20260923200000",
+      "name": "rpc_actor_binding_and_payment_write_lock"
+    },
+    {
+      "version": "20260924120000",
+      "name": "record_overpayment_refund_atomic"
+    },
+    {
+      "version": "20260924150000",
+      "name": "rm10_physical_voucher_library"
+    },
+    {
+      "version": "20260924160000",
+      "name": "rm10_voucher_number_numeric_identity"
+    },
+    {
+      "version": "20260924170000",
+      "name": "20260924170000_preserve_library_rm10_expiry"
+    },
+    {
+      "version": "20260924180000",
+      "name": "20260924180000_authoritative_library_rm10_expiry"
+    },
+    {
+      "version": "20260924190000",
+      "name": "20260924190000_catalogue_voucher_engine"
+    },
+    {
+      "version": "20260925100000",
+      "name": "20260925100000_catalogue_voucher_order_type"
+    },
+    {
+      "version": "20260925120000",
+      "name": "20260925120000_submit_guest_preorder_with_catalogue_voucher"
+    },
+    {
+      "version": "20260926120000",
+      "name": "20260926120000_catalogue_voucher_redemption_controls"
+    },
+    {
+      "version": "20260926140000",
+      "name": "20260926140000_restore_cancel_guest_order_override"
+    },
+    {
+      "version": "20260929160000",
+      "name": "complete_extra_stock_walk_in_sale"
+    },
+    {
+      "version": "20261001002046",
+      "name": "fresh_pick_pricing_cancellation_release"
+    },
+    {
+      "version": "20261001093506",
+      "name": "walk_in_sale_physical_rm10_voucher"
+    },
+    {
+      "version": "20261005124341",
+      "name": "payment_correction_v1"
+    },
+    {
+      "version": "20261005124422",
+      "name": "fix_payment_correction_payment_status_enum"
+    },
+    {
+      "version": "20261006095525",
+      "name": "fresh_pick_ready_for_collection_override"
+    },
+    {
+      "version": "20261007142243",
+      "name": "owner_cancel_refund_fresh_pick"
+    },
+    {
+      "version": "20261007142453",
+      "name": "staff_notification_fresh_pick_hold_stale_suppression"
+    },
+    {
+      "version": "20261007142738",
+      "name": "restore_actor_bound_post_payment_customer_change"
+    },
+    {
+      "version": "20261007225926",
+      "name": "20261007150000_staff_notification_activation_boundary"
+    },
+    {
+      "version": "20261010082912",
+      "name": "cake_size_pickup_date_availability"
+    },
+    {
+      "version": "20261010103300",
+      "name": "cake_size_availability_trigger_acl_hardening"
+    },
+    {
+      "version": "20261010104124",
+      "name": "cake_size_order_amendment_safety"
+    },
+    {
+      "version": "20261011100225",
+      "name": "staff_creation_rpc_actor_authorization"
+    },
+    {
+      "version": "20261012044754",
+      "name": "waiting_list_accepted_quantity_metadata_compat"
+    },
+    {
+      "version": "20261018145717",
+      "name": "assignment_fix"
+    },
+    {
+      "version": "20261018145759",
+      "name": "cut_extra_stock_actor_acl"
+    },
+    {
+      "version": "20261018145831",
+      "name": "cutoff"
+    },
+    {
+      "version": "20261018145858",
+      "name": "refund_v1"
+    },
+    {
+      "version": "20261018145945",
+      "name": "email_pause"
+    },
+    {
+      "version": "20261018150013",
+      "name": "refund_total_rpc_acl"
+    },
+    {
+      "version": "20261019094554",
+      "name": "20261019094554_fresh_pick_order_collection_readiness"
+    },
+    {
+      "version": "20261019122055",
+      "name": "20261019122055_fresh_pick_readiness_requires_full_settlement"
+    },
+    {
+      "version": "20261019124500",
+      "name": "20261019124500_allow_assigned_fresh_pick_stock_readiness"
+    },
+    {
+      "version": "20261020002044",
+      "name": "20261020002044_fresh_pick_preserve_explicit_ready_undo"
+    }
+  ]
+}

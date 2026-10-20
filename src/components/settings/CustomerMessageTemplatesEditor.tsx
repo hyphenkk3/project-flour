@@ -51,8 +51,7 @@ export function CustomerMessageTemplatesEditor({
     initialTemplates[0]?.template_key ?? CUSTOMER_MESSAGE_TEMPLATE_DEFINITIONS[0].key,
   );
   const [draft, setDraft] = useState(initialTemplates[0]?.body ?? "");
-  const [revisions, setRevisions] = useState<RevisionRow[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
+  const [history, setHistory] = useState<{ key: string; revisions: RevisionRow[] }>({ key: "", revisions: [] });
   const [notice, setNotice] = useState("");
   const [pending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
@@ -63,6 +62,9 @@ export function CustomerMessageTemplatesEditor({
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   const selected = templates.find((row) => row.template_key === selectedKey);
+  const historyKey = `${selectedKey}:${selected?.revision ?? 0}`;
+  const historyLoading = history.key !== historyKey;
+  const revisions = historyLoading ? [] : history.revisions;
   const selectedDefinition = CUSTOMER_MESSAGE_TEMPLATE_DEFINITIONS.find((row) => row.key === selectedKey);
   const validation = validateCustomerMessageTemplateBody(selectedKey, draft);
   const preview = useMemo(
@@ -82,14 +84,13 @@ export function CustomerMessageTemplatesEditor({
 
   useEffect(() => {
     let live = true;
-    setHistoryLoading(true);
+    const key = `${selectedKey}:${selected?.revision ?? 0}`;
     void getCustomerMessageTemplateRevisionsAction(selectedKey).then((result) => {
       if (!live) return;
-      setRevisions(result.ok ? result.revisions as RevisionRow[] : []);
-      setHistoryLoading(false);
+      setHistory({ key, revisions: result.ok ? result.revisions as RevisionRow[] : [] });
     });
     return () => { live = false; };
-  }, [selectedKey, templates]);
+  }, [selectedKey, selected?.revision]);
 
   useEffect(() => {
     if (!dirty) return;

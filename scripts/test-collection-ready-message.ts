@@ -360,9 +360,35 @@ assert.match(
 assert.match(componentSource, /disabled={!whatsappUrl}/);
 assert.match(
   componentSource,
-  /generateCollectionReadyMessage\(order, senderName\)/,
+  /generateCollectionReadyMessage\(order, senderName, templates\)/,
 );
-assert.match(componentSource, /generateCustomerThankYouMessage\(\)/);
+assert.match(componentSource, /generateCustomerThankYouMessage\(templates\)/);
+assert.match(
+  componentSource,
+  /generateCollectionReadyMessage\(order, senderName, templates\),\s*\[order, senderName, templates\]/,
+  "Collection recomputes its message when the loaded template changes",
+);
+const updatedReadyTemplate = {
+  ready_pickup: "Hello {{sender_name}}. {{ready_notice}} {{counter_instruction}} {{pickup_hours}}",
+};
+const refreshedReadyMessage = generateCollectionReadyMessage(
+  pickup,
+  "Lily",
+  updatedReadyTemplate,
+);
+assert.notEqual(refreshedReadyMessage, pickupReadyMessage);
+assert.match(refreshedReadyMessage, /^Hello Lily\./);
+const refreshedSelection = selectCollectionWhatsAppMessage(
+  refreshedReadyMessage,
+  thankYouMessage,
+  false,
+);
+assert.equal(refreshedSelection.text, refreshedReadyMessage);
+assert.equal(
+  new URL(buildWhatsAppDeepLink(pickup.guestPhone ?? "", refreshedSelection.text)!).searchParams.get("text"),
+  refreshedReadyMessage,
+  "WhatsApp text follows a reloaded Collection template with the same order and sender",
+);
 assert.match(componentSource, /Boolean\(sent\)/);
 assert.match(
   componentSource,
