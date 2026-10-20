@@ -58,6 +58,7 @@ export function CustomerMessageTemplatesEditor({
   const [query, setQuery] = useState("");
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
   const [mobileEditor, setMobileEditor] = useState(false);
+  const [discardBackPrompt, setDiscardBackPrompt] = useState(false);
   const [comparisonRevision, setComparisonRevision] = useState<number | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
@@ -107,6 +108,7 @@ export function CustomerMessageTemplatesEditor({
     setSelectedKey(key);
     setDraft(next.body);
     setNotice("");
+    setDiscardBackPrompt(false);
   }
 
   function applyResult(message: string) {
@@ -203,9 +205,14 @@ export function CustomerMessageTemplatesEditor({
   useEffect(() => {
     const area = bodyRef.current;
     if (!area) return;
-    area.style.height = "auto";
-    area.style.height = Math.min(area.scrollHeight, 520) + "px";
-    area.style.overflowY = area.scrollHeight > 520 ? "auto" : "hidden";
+    const frame = requestAnimationFrame(() => {
+      area.style.height = "auto";
+      const contentHeight = area.scrollHeight;
+      const nextHeight = Math.min(Math.max(contentHeight, 128), 520);
+      area.style.height = nextHeight + "px";
+      area.style.overflowY = contentHeight > 520 ? "auto" : "hidden";
+    });
+    return () => cancelAnimationFrame(frame);
   }, [draft, selectedKey]);
 
   useEffect(() => {
@@ -302,7 +309,27 @@ export function CustomerMessageTemplatesEditor({
         {selected && selectedDefinition ? <section className={(mobileEditor ? "" : "hidden ") + "min-w-0 space-y-4 lg:block"}>
           <div className="border-fog overflow-hidden rounded-2xl border bg-white shadow-sm">
             <div className="border-b border-fog p-4 sm:p-6">
-              <button type="button" onClick={() => { if (!dirty || window.confirm("Discard your unsaved changes?")) { setDraft(selected.body); setNotice(""); setMobileEditor(false); } }} className="text-signal mb-3 min-h-10 text-sm font-medium lg:hidden">← Back to Templates</button>
+              <button type="button" onClick={() => {
+                if (dirty) {
+                  setDiscardBackPrompt(true);
+                  return;
+                }
+                setDraft(selected.body);
+                setNotice("");
+                setMobileEditor(false);
+              }} className="text-signal mb-3 min-h-10 text-sm font-medium lg:hidden">← Back to Templates</button>
+              {discardBackPrompt && <div role="group" aria-label="Confirm unsaved changes" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <p className="text-sm text-amber-950">You have unsaved changes. Discard them and return to templates?</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => setDiscardBackPrompt(false)} className="border-fog min-h-10 rounded-lg border bg-white px-3 text-sm font-medium">Keep editing</button>
+                  <button type="button" onClick={() => {
+                    setDraft(selected.body);
+                    setNotice("");
+                    setDiscardBackPrompt(false);
+                    setMobileEditor(false);
+                  }} className="bg-ink min-h-10 rounded-lg px-3 text-sm font-semibold text-white">Discard and go back</button>
+                </div>
+              </div>}
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div><p className="text-signal text-xs font-medium">{selected.category}</p><h2 className="text-ink mt-1 text-xl font-semibold">{selected.display_name}</h2><p className="text-skyline mt-1 text-sm leading-6">{selected.description}</p>
                   <p className="text-skyline mt-2 text-xs">Revision {selected.revision}{selected.updated_at ? " · Updated " + malaysiaDate(selected.updated_at) + " MYT" : " · Original wording"}</p></div>
@@ -313,27 +340,29 @@ export function CustomerMessageTemplatesEditor({
               <div>
                 <label htmlFor="customer-message-template-body" className="text-ink block text-sm font-semibold">Message wording</label>
                 <p className="text-skyline mt-1 text-xs">Line breaks, emojis and WhatsApp formatting are preserved.</p>
-                <textarea id="customer-message-template-body" ref={bodyRef} value={draft} onChange={(event) => setDraft(event.target.value)} rows={8} spellCheck
-                  className="border-fog text-ink mt-3 block min-h-60 w-full resize-y rounded-xl border bg-white px-4 py-3.5 font-sans text-[15px] leading-7 outline-none focus:border-ink focus:ring-2 focus:ring-ink/10" />
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <label htmlFor="insert-template-variable" className="text-ink text-xs font-semibold">Insert Variable</label>
-                  <select id="insert-template-variable" defaultValue="" onChange={(event) => { if (event.target.value) insertPlaceholder(event.target.value); event.currentTarget.value = ""; }}
-                    className="border-fog text-ink min-h-11 min-w-56 rounded-xl border bg-white px-3 text-sm">
-                    <option value="">Choose a variable…</option>
-                    {selected.allowed_placeholders.map((token) => <option key={token} value={token}>{variableName(token)} — {selected.required_placeholders.includes(token) ? "Required" : "Optional"}</option>)}
-                  </select>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">{selected.allowed_placeholders.map((token) => {
-                  const required = selected.required_placeholders.includes(token);
-                  return <button key={token} type="button" title={"Insert " + variableName(token)} onMouseDown={(event) => event.preventDefault()} onClick={() => insertPlaceholder(token)}
-                    className={"inline-flex min-h-10 items-center gap-2 rounded-full border px-3 text-xs " + (required ? "border-ink/20 bg-snow text-ink" : "border-fog text-skyline hover:bg-snow")}>
-                    <span className="font-medium">{variableName(token)}</span><span className="opacity-70">{required ? "Required" : "Optional"}</span>
-                  </button>;
-                })}{!selected.allowed_placeholders.length && <span className="text-skyline text-sm">No variables for this template.</span>}</div>
+                <textarea id="customer-message-template-body" ref={bodyRef} value={draft} onChange={(event) => setDraft(event.target.value)} rows={1} spellCheck
+                  className="border-fog text-ink mt-3 block min-h-32 max-h-[32.5rem] w-full resize-y rounded-xl border bg-white px-4 py-3.5 font-sans text-[15px] leading-7 outline-none focus:border-ink focus:ring-2 focus:ring-ink/10" />
+                {selected.allowed_placeholders.length > 0 && <>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <label htmlFor="insert-template-variable" className="text-ink text-xs font-semibold">Insert Variable</label>
+                    <select id="insert-template-variable" defaultValue="" onChange={(event) => { if (event.target.value) insertPlaceholder(event.target.value); event.currentTarget.value = ""; }}
+                      className="border-fog text-ink min-h-11 min-w-56 rounded-xl border bg-white px-3 text-sm">
+                      <option value="">Choose a variable…</option>
+                      {selected.allowed_placeholders.map((token) => <option key={token} value={token}>{variableName(token)} — {selected.required_placeholders.includes(token) ? "Required" : "Optional"}</option>)}
+                    </select>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">{selected.allowed_placeholders.map((token) => {
+                    const required = selected.required_placeholders.includes(token);
+                    return <button key={token} type="button" title={"Insert " + variableName(token)} onMouseDown={(event) => event.preventDefault()} onClick={() => insertPlaceholder(token)}
+                      className={"inline-flex min-h-10 items-center gap-2 rounded-full border px-3 text-xs " + (required ? "border-ink/20 bg-snow text-ink" : "border-fog text-skyline hover:bg-snow")}>
+                      <span className="font-medium">{variableName(token)}</span><span className="opacity-70">{required ? "Required" : "Optional"}</span>
+                    </button>;
+                  })}</div>
+                </>}
                 {!validation.valid && <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800">{validation.reason} Keep required operational information in the message before saving.</p>}
               </div>
               {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-900">{notice}</p>}
-              <div className="sticky bottom-0 -mx-4 flex flex-wrap gap-2 border-t border-fog bg-white/95 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0">
+              <div className="sticky bottom-[calc(3rem+env(safe-area-inset-bottom))] -mx-4 flex flex-wrap gap-2 border-t border-fog bg-white/95 px-4 py-3 pb-3 backdrop-blur sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0">
                 <button type="button" onClick={save} disabled={!dirty || !validation.valid || pending || !migrationReady} className="bg-ink min-h-11 rounded-xl px-5 text-sm font-semibold text-white disabled:opacity-45">{pending ? "Saving…" : "Save Changes"}</button>
                 <button type="button" onClick={() => { if (!dirty || window.confirm("Discard your unsaved changes?")) { setDraft(selected.body); setNotice(""); } }} disabled={!dirty || pending} className="border-fog text-ink min-h-11 rounded-xl border px-4 text-sm font-semibold disabled:opacity-45">Cancel Changes</button>
                 <div className="ml-auto flex gap-1"><button type="button" onClick={resetDefault} disabled={pending || !migrationReady || selected.body === selected.default_body} className="text-skyline min-h-11 rounded-xl px-3 text-sm font-medium disabled:opacity-45">Reset to Default</button><a href="#template-revision-history" className="text-skyline inline-flex min-h-11 items-center rounded-xl px-3 text-sm font-medium">Revision History</a></div>
