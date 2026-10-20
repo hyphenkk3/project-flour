@@ -214,7 +214,10 @@ export function CustomerMessageTemplatesEditor({
     const guardNavigation = (event: MouseEvent) => {
       if (!(event.target instanceof Element)) return;
       const link = event.target.closest("a");
-      if (link?.origin === window.location.origin && !window.confirm("You have unsaved changes. Leave without saving?")) {
+      if (link?.origin !== window.location.origin) return;
+      const destination = new URL(link.href);
+      if (destination.pathname === window.location.pathname && destination.search === window.location.search) return;
+      if (!window.confirm("You have unsaved changes. Leave without saving?")) {
         event.preventDefault();
         event.stopImmediatePropagation();
       }
@@ -238,6 +241,11 @@ export function CustomerMessageTemplatesEditor({
       grabexpress_instruction: "GrabExpress Instructions", car_plate_instruction: "Car Plate Instructions",
       closing_remarks: "Closing Remarks", confirmation_url: "Confirmation Link",
       confirmation_deadline: "Confirmation Deadline", pickup_date: "Pickup Date", item_details: "Item Details",
+      ready_line: "Ready Status", ready_status: "Ready Status", call_instruction: "Call Instructions",
+      missed_call_remarks: "Missed Call Remarks", scheduled_delivery_line: "Scheduled Delivery Details",
+      earlier_delivery_invitation: "Earlier Delivery Invitation", scheduled_delivery_instruction: "Delivery Schedule",
+      recipient_contact_instruction: "Recipient Contact Instructions", item_lines: "Item Details",
+      confirmation_link_instruction: "Confirmation Link Instructions", expiry_instruction: "Expiry Instructions",
     };
     return names[token] ?? token.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
   }
