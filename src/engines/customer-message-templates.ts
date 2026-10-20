@@ -420,8 +420,12 @@ export function renderCustomerMessagePreview(key: string, body: string): string 
   if (!definition) return "";
   const validation = validateCustomerMessageTemplateBody(key, body);
   if (!validation.valid) return validation.reason;
-  const rendered = body.replace(/\{\{([^{}]+)\}\}/g, (_match, token: string) => definition.sample[token] ?? "");
-  return rendered;
+  return renderCustomerMessageTemplate(
+    key,
+    { [key as CustomerMessageTemplateKey]: body },
+    definition.sample,
+    body,
+  );
 }
 
 export function customerMessageTemplateSample(key: string) {
