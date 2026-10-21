@@ -104,4 +104,3 @@ begin
     raise exception 'Rejected call wrote audit records';
   end if;
 end $$;
-

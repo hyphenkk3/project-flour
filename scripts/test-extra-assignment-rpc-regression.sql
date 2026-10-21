@@ -114,4 +114,3 @@ insert into public.order_items(id,order_id,cake_id,cake_size_id,cake_name,size_l
 ('50000000-0000-0000-0000-000000000011','40000000-0000-0000-0000-000000000010','60000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001','Cocoa','6 inch',1);
 insert into public.extra_stock(id,library_cake_id,library_cake_size_id,cake_name,size_label,lifecycle,pickup_through_at)
 values ('83000000-0000-0000-0000-000000000001','60000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001','Cocoa','6 inch','confirmed',now()+interval '5 days');
-
