@@ -546,7 +546,12 @@ assert.match(extraQueriesSrc, /sortCustomerFreshPicksByAvailabilityDay/);
 assert.match(extraQueriesSrc, /extraActionableFreshPickDays/);
 assert.match(extraQueriesSrc, /freshPickProductDescription/);
 assert.match(extraQueriesSrc, /library_cakes/);
-assert.match(extraQueriesSrc, /library_cake_sizes/);
+assert.match(extraQueriesSrc, /library_cake_size_id/);
+assert.match(
+  extraQueriesSrc,
+  /resolveCakePhoto\(photos, row\.library_cake_size_id\)/,
+  "Storefront Fresh Pick photo selection follows the stock row's canonical cake-size link",
+);
 assert.match(extraQueriesSrc, /description: string \| null/);
 
 const extraOrderSrc = readSrc(
@@ -606,7 +611,11 @@ assert.match(detailViewSrc, /overflow-hidden rounded-\[10px\]/);
 const addToOrderSrc = readSrc(
   "src/workspaces/storefront/cart/AddToOrderSheet.tsx",
 );
-assert.match(addToOrderSrc, /overflow-hidden rounded-\[10px\]/);
+assert.match(
+  addToOrderSrc,
+  /relative h-20 w-20 shrink-0 overflow-hidden rounded-lg/,
+  "add-to-order photo remains inside its clipped, rounded image container",
+);
 
 const cartSrc = readSrc(
   "src/workspaces/storefront/cart/StorefrontCartShell.tsx",
@@ -673,8 +682,12 @@ assert.doesNotMatch(checkoutPageSrc, /getCurrentCollection/);
 assert.doesNotMatch(checkoutPageSrc, /addBusinessCalendarDays\(fromDate, 120\)/);
 
 const checkoutRouteSrc = readSrc("src/app/order/checkout/page.tsx");
-assert.match(checkoutRouteSrc, /params\.pickup/);
+assert.match(checkoutRouteSrc, /StorefrontCheckoutPage/);
 assert.doesNotMatch(checkoutRouteSrc, /collection_id/);
+const checkoutDraftSrc = readSrc(
+  "src/workspaces/storefront/checkout/preorder-draft.ts",
+);
+assert.match(checkoutDraftSrc, /params\.set\("pickup", draft\.pickupDate\)/);
 
 const orderRouteSrc = readSrc("src/app/order/page.tsx");
 assert.match(orderRouteSrc, /StorefrontOrderCollectionsPage/);
