@@ -43,6 +43,10 @@ import { WalkInHoldPanel } from "@/workspaces/extra/WalkInHoldPanel";
 import { FreshPickTodayOrderabilityStatus } from "@/workspaces/extra/FreshPickTodayOrderabilityStatus";
 import { SoldExtraHistoryPanel } from "@/workspaces/extra/SoldExtraHistoryPanel";
 import {
+  PAST_STOCK_PAGE_SIZE,
+  visiblePastStockPage,
+} from "@/engines/extra/past-stock-display";
+import {
   initialExtraWindow,
   nextExtraWindow,
   type ExtraWindowDraft,
@@ -111,6 +115,10 @@ export function ExtraBoard({
   const [readyReason, setReadyReason] = useState("");
   const [undoReadyReason, setUndoReadyReason] = useState("");
   const [drafts, setDrafts] = useState<Record<string, ExtraWindowDraft>>({});
+  const [pastOpen, setPastOpen] = useState(false);
+  const [pastVisibleCount, setPastVisibleCount] = useState(
+    PAST_STOCK_PAGE_SIZE,
+  );
 
   useEffect(() => {
     const refreshId = window.setInterval(() => router.refresh(), 30_000);
@@ -159,6 +167,7 @@ export function ExtraBoard({
       ),
     [units],
   );
+  const visiblePast = visiblePastStockPage(past, pastVisibleCount);
 
   const [cakeId, setCakeId] = useState(cakes[0]?.id ?? "");
   const selectedCake = cakes.find((c) => c.id === cakeId) ?? cakes[0];
@@ -965,78 +974,103 @@ export function ExtraBoard({
       {surface === "full" ? <SoldExtraHistoryPanel /> : null}
 
       {surface === "full" ? (
-      <section className="mt-10">
-        <h2 className="text-ink text-sm font-semibold tracking-wide uppercase">
-          Past
-          <span className="text-skyline ml-2 font-normal normal-case">
-            {past.length}
+      <section className="border-fog bg-mist/40 mt-8 rounded-2xl border p-4 sm:p-5">
+        <button
+          aria-expanded={pastOpen}
+          className="text-ink flex min-h-11 w-full items-center justify-between gap-3 text-left font-semibold"
+          onClick={() => setPastOpen((value) => !value)}
+          type="button"
+        >
+          <span>
+            Past
+            <span className="text-skyline ml-2 font-normal">
+              {past.length}
+            </span>
           </span>
-        </h2>
-        <p className="text-skyline mt-1 text-sm">
-          Rejected proposals, extras cut into slices, and confirmed units whose
-          order cutoff has already passed.
-        </p>
-        {past.length === 0 ? (
-          <p className="text-skyline mt-3 text-sm">Nothing past yet.</p>
-        ) : (
-          <ul className="mt-4 space-y-3">
-            {past.map((unit) => (
-              <li
-                key={unit.id}
-                className="border-fog rounded-2xl border bg-white p-4"
+          <span className="text-skyline text-sm font-medium">
+            {pastOpen ? "Hide Past" : "View Past"}
+          </span>
+        </button>
+        {pastOpen ? (
+          <div className="mt-4">
+            <p className="text-skyline text-sm">
+              Rejected proposals, extras cut into slices, and confirmed units
+              whose order cutoff has already passed.
+            </p>
+            {past.length === 0 ? (
+              <p className="text-skyline mt-3 text-sm">Nothing past yet.</p>
+            ) : (
+              <ul className="mt-4 space-y-3">
+                {visiblePast.map((unit) => (
+                  <li
+                    key={unit.id}
+                    className="border-fog rounded-2xl border bg-white p-4"
+                  >
+                    <p className="text-ink text-base font-semibold">
+                      {unit.cakeName}{" "}
+                      <span className="text-skyline font-normal">
+                        {unit.sizeLabel}
+                      </span>
+                    </p>
+                    <p className="text-skyline mt-1 text-sm">
+                      {unit.lifecycle === "rejected"
+                        ? "Rejected"
+                        : unit.cutIntoSlicesAt
+                          ? "Cut into slices"
+                          : "Order cutoff passed"}
+                      {unit.preparedOn
+                        ? ` · prepared ${formatLongBusinessDate(unit.preparedOn)}`
+                        : null}
+                    </p>
+                    {unit.lifecycle === "rejected" && unit.rejectReason ? (
+                      <p className="text-ink mt-2 text-sm">
+                        Reason: {unit.rejectReason}
+                      </p>
+                    ) : null}
+                    {unit.lifecycle === "rejected" &&
+                    capabilities.canUndoRejectExtra ? (
+                      <div className="mt-3">
+                        <button
+                          className={btnSecondary}
+                          disabled={pending}
+                          onClick={() => runUndoReject(unit)}
+                          type="button"
+                        >
+                          Undo Reject
+                        </button>
+                      </div>
+                    ) : null}
+                    {unit.lifecycle === "confirmed" &&
+                    !unit.cutIntoSlicesAt &&
+                    capabilities.canUnconfirmExtra ? (
+                      <div className="mt-3">
+                        <button
+                          className={btnSecondary}
+                          disabled={pending}
+                          onClick={() => runUnconfirm(unit)}
+                          type="button"
+                        >
+                          Undo availability
+                        </button>
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {visiblePast.length < past.length ? (
+              <button
+                className="border-fog text-ink mt-4 min-h-11 rounded-xl border bg-white px-4 py-2 text-sm font-medium"
+                onClick={() =>
+                  setPastVisibleCount((count) => count + PAST_STOCK_PAGE_SIZE)
+                }
+                type="button"
               >
-                <p className="text-ink text-base font-semibold">
-                  {unit.cakeName}{" "}
-                  <span className="text-skyline font-normal">
-                    {unit.sizeLabel}
-                  </span>
-                </p>
-                <p className="text-skyline mt-1 text-sm">
-                  {unit.lifecycle === "rejected"
-                    ? "Rejected"
-                    : unit.cutIntoSlicesAt
-                      ? "Cut into slices"
-                      : "Order cutoff passed"}
-                  {unit.preparedOn
-                    ? ` · prepared ${formatLongBusinessDate(unit.preparedOn)}`
-                    : null}
-                </p>
-                {unit.lifecycle === "rejected" && unit.rejectReason ? (
-                  <p className="text-ink mt-2 text-sm">
-                    Reason: {unit.rejectReason}
-                  </p>
-                ) : null}
-                {unit.lifecycle === "rejected" &&
-                capabilities.canUndoRejectExtra ? (
-                  <div className="mt-3">
-                    <button
-                      className={btnSecondary}
-                      disabled={pending}
-                      onClick={() => runUndoReject(unit)}
-                      type="button"
-                    >
-                      Undo Reject
-                    </button>
-                  </div>
-                ) : null}
-                {unit.lifecycle === "confirmed" &&
-                !unit.cutIntoSlicesAt &&
-                capabilities.canUnconfirmExtra ? (
-                  <div className="mt-3">
-                    <button
-                      className={btnSecondary}
-                      disabled={pending}
-                      onClick={() => runUnconfirm(unit)}
-                      type="button"
-                    >
-                      Undo availability
-                    </button>
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
+                Load more Past items
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </section>
       ) : null}
 
