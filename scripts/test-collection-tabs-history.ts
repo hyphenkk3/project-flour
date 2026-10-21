@@ -3,6 +3,7 @@
  * Run: npx tsx scripts/test-collection-tabs-history.ts
  */
 import assert from "node:assert/strict";
+import { isCollectionLiveOrderEvent } from "../src/workspaces/collection/live-sync.ts";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -235,6 +236,25 @@ const boardSrc = readFileSync(
   resolve("src/workspaces/collection/CollectionLiveBoard.tsx"),
   "utf8",
 );
+assert.equal(
+  isCollectionLiveOrderEvent({ id: "guest-order", customer_id: null }),
+  true,
+  "guest order changes refresh the Collection board",
+);
+assert.equal(
+  isCollectionLiveOrderEvent({ id: "member-order", customer_id: "customer" }),
+  false,
+  "member order changes stay outside the guest Collection board",
+);
+assert.equal(
+  isCollectionLiveOrderEvent({ customer_id: null }),
+  false,
+  "rows without a stable order id are ignored",
+);
+assert.match(boardSrc, /\.on\(\s*"postgres_changes"[\s\S]*?event: "INSERT"[\s\S]*?table: "orders"/);
+assert.match(boardSrc, /\.on\(\s*"postgres_changes"[\s\S]*?event: "UPDATE"[\s\S]*?table: "orders"/);
+assert.match(boardSrc, /status === "SUBSCRIBED"/);
+assert.match(boardSrc, /visibilitychange/);
 assert.match(
   boardSrc,
   /Orders marked Ready appear here until their handoff is completed/,

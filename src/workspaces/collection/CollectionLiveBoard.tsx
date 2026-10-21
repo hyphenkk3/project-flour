@@ -7,7 +7,6 @@ import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
 import { createClient } from "@/lib/supabase/client";
 import { formatLongBusinessDate } from "@/lib/dates";
 import {
-  getCollectionBoardOrderAction,
   listCollectionOrdersForTabAction,
 } from "@/workspaces/collection/actions";
 import type { CollectionDineInVenueFilter } from "@/workspaces/collection/board-tab";
@@ -22,6 +21,7 @@ import {
   type CollectionBoardTab,
 } from "@/workspaces/collection/eligibility";
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
+import { isCollectionLiveOrderEvent } from "@/workspaces/collection/live-sync";
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -32,11 +32,7 @@ type CollectionLiveBoardProps = {
   venueFilter?: CollectionDineInVenueFilter;
 };
 
-type OrderRowPayload = {
-  id?: string;
-  customer_id?: string | null;
-  pickup_date?: string | null;
-};
+type OrderRowPayload = Parameters<typeof isCollectionLiveOrderEvent>[0];
 
 function boardTitle(tab: CollectionBoardTab): string {
   switch (tab) {
@@ -141,41 +137,90 @@ export function CollectionLiveBoard({
   const [search, setSearch] = useState("");
 
   const reconcileList = useCallback(async () => {
-    const next = await listCollectionOrdersForTabAction(tab, boardDate);
-    setOrders(next);
+    try {
+      const next = await listCollectionOrdersForTabAction(tab, boardDate);
+      setOrders(next);
+    } catch {
+      // Keep the last successful board state until the next live refresh.
+    }
   }, [boardDate, tab]);
-
-  const handleIncoming = useCallback(
-    async (id: string) => {
-      const item = await getCollectionBoardOrderAction(id, boardDate, tab);
-      if (!item) {
-        setOrders((current) => current.filter((order) => order.id !== id));
-        return;
-      }
-      setOrders((current) => {
-        const without = current.filter((order) => order.id !== id);
-        return [...without, item];
-      });
-      void reconcileList();
-    },
-    [boardDate, reconcileList, tab],
-  );
 
   useEffect(() => {
     const supabase = createClient();
+    let refreshTimer: number | null = null;
+    let refreshing = false;
+    let refreshQueued = false;
+    let disposed = false;
+
+    function refreshSoon() {
+      if (disposed) return;
+      if (refreshing) {
+        refreshQueued = true;
+        return;
+      }
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
+        if (disposed) return;
+        refreshing = true;
+        void reconcileList().finally(() => {
+          refreshing = false;
+          if (refreshQueued && !disposed) {
+            refreshQueued = false;
+            refreshSoon();
+          }
+        });
+      }, 120);
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") refreshSoon();
+    }
+
     const channel = supabase
       .channel(`collection-board-${tab}-${boardDate}`)
-      .subscribe();
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "orders" },
+        (payload) => {
+          if (isCollectionLiveOrderEvent(payload.new as OrderRowPayload)) {
+            refreshSoon();
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "orders" },
+        (payload) => {
+          if (isCollectionLiveOrderEvent(payload.new as OrderRowPayload)) {
+            refreshSoon();
+          }
+        },
+      )
+      .subscribe((status) => {
+        // Reconcile after initial join and every automatic reconnect so that
+        // writes made while this device was offline are not missed.
+        if (status === "SUBSCRIBED") refreshSoon();
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") refreshSoon();
+      });
 
     const pollId = window.setInterval(() => {
-      void reconcileList();
+      refreshSoon();
     }, POLL_INTERVAL_MS);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", refreshSoon);
+    window.addEventListener("online", refreshSoon);
 
     return () => {
+      disposed = true;
       window.clearInterval(pollId);
+      if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", refreshSoon);
+      window.removeEventListener("online", refreshSoon);
       void supabase.removeChannel(channel);
     };
-  }, [boardDate, handleIncoming, reconcileList, tab]);
+  }, [boardDate, reconcileList, tab]);
 
   const now = new Date();
   const overdueCount =
