@@ -851,15 +851,18 @@ export async function listAssignableOrdersForExtra(input: {
   if (primaryStocksResult.error) {
     throw new Error(primaryStocksResult.error.message);
   }
-  const allocatedById = new Map<
-    string,
-    FreshPickAssignedStock & {
-      order_id: string | null;
-      lifecycle: string;
-      sold_at: string | null;
-      cut_into_slices_at: string | null;
-    }
-  >();
+  type AssignedStockRow = {
+    id: string;
+    order_id: string | null;
+    lifecycle: string;
+    sold_at: string | null;
+    cut_into_slices_at: string | null;
+    cake_name: string;
+    size_label: string;
+    library_cake_id: string | null;
+    library_cake_size_id: string | null;
+  };
+  const allocatedById = new Map<string, AssignedStockRow>();
   for (const stockRow of [
     ...(linkedStocksResult.data ?? []),
     ...(primaryStocksResult.data ?? []),
