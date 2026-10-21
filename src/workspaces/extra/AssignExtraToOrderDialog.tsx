@@ -56,6 +56,7 @@ export function AssignExtraToOrderDialog({
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const requestId = useRef(0);
   const submitting = useRef(false);
   const stockId = extra?.id;
@@ -104,7 +105,7 @@ export function AssignExtraToOrderDialog({
       ++requestId.current;
       window.clearTimeout(timer);
     };
-  }, [open, stockId, search, older, matchingOnly, page]);
+  }, [open, stockId, search, older, matchingOnly, page, refreshVersion]);
 
   function runAssign() {
     if (!stockId || pending || submitting.current) return;
@@ -122,11 +123,15 @@ export function AssignExtraToOrderDialog({
         });
         if (result.error) {
           setError(result.error);
+          setSelected(null);
+          setRefreshVersion((value) => value + 1);
           return;
         }
         onAssigned?.();
         onClose();
       } catch {
+        setSelected(null);
+        setRefreshVersion((value) => value + 1);
         setError(
           "Could not assign this Fresh Pick. Please refresh the order list and try again.",
         );
@@ -222,14 +227,22 @@ export function AssignExtraToOrderDialog({
           ) : null}
           {!loading && !error && orders.length === 0 ? (
             <p className="text-skyline p-2 text-sm">
-              No orders found. Try another name, number or date range.
+              {matchingOnly
+                ? "No matching eligible orders found. Try another name, number or date range."
+                : "No orders found. Try another name, number or date range."}
             </p>
           ) : null}
           {!loading
             ? orders.map((order) => (
                 <button
                   aria-pressed={selected?.id === order.id}
-                  className={`w-full rounded-lg border p-3 text-left text-sm transition ${selected?.id === order.id ? "border-ink bg-mist" : "border-fog bg-white hover:bg-mist"}`}
+                  aria-describedby={
+                    order.unavailableReason
+                      ? `assign-order-reason-${order.id}`
+                      : undefined
+                  }
+                  className={`w-full rounded-lg border p-3 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${selected?.id === order.id ? "border-ink bg-mist" : "border-fog bg-white hover:bg-mist"}`}
+                  disabled={!order.canAssign}
                   key={order.id}
                   onClick={() => {
                     setSelected(order);
@@ -248,11 +261,16 @@ export function AssignExtraToOrderDialog({
                     {order.itemSummary}
                   </span>
                   <span
-                    className={`mt-1 block text-xs ${order.matchesStock ? "text-status-success" : "text-skyline"}`}
+                    className={`mt-1 block text-xs ${order.canAssign ? "text-status-success" : "text-status-danger"}`}
+                    id={
+                      order.unavailableReason
+                        ? `assign-order-reason-${order.id}`
+                        : undefined
+                    }
                   >
-                    {order.matchesStock
-                      ? "Matches this cake and size"
-                      : "Check cake and size before assigning"}
+                    {order.canAssign
+                      ? "Eligible · matching cake and size"
+                      : order.unavailableReason ?? "This order cannot be assigned."}
                   </span>
                 </button>
               ))

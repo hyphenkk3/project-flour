@@ -16,6 +16,12 @@ import {
   classifySoldExtra,
   type SoldExtraOrderSnapshot,
 } from "@/engines/extra/sold-stock-lifecycle";
+import {
+  assessFreshPickAssignmentEligibility,
+  type FreshPickAssignedStock,
+  type FreshPickAssignmentOrderItem,
+  type FreshPickAssignmentStock,
+} from "@/engines/extra/assignment-eligibility";
 import { resolveCakePhoto, type ResolvableCakePhoto } from "@/engines/menu/cake-photos";
 import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
 import { createClient } from "@/lib/supabase/server";
@@ -688,6 +694,8 @@ export type ExtraAssignableOrder = {
   fulfilmentMethod: string;
   status: string;
   matchesStock: boolean;
+  canAssign: boolean;
+  unavailableReason: string | null;
 };
 
 export type AssignableOrderPage = {
@@ -697,7 +705,7 @@ export type AssignableOrderPage = {
 
 const ASSIGN_ORDER_PAGE_SIZE = 16;
 
-/** Browse unassigned orders without loading the order history into the client. */
+/** Browse bounded order pages; the database RPC remains the assignment authority. */
 export async function listAssignableOrdersForExtra(input: {
   extraStockId: string;
   search: string;
@@ -708,11 +716,24 @@ export async function listAssignableOrdersForExtra(input: {
   const supabase = await createClient();
   const { data: stock, error: stockError } = await supabase
     .from("extra_stock")
-    .select("id, cake_name, size_label, library_cake_id, library_cake_size_id")
+    .select(
+      "id, cake_name, size_label, library_cake_id, library_cake_size_id, lifecycle, pickup_through_at, sold_at, cut_into_slices_at, walk_in_held_until",
+    )
     .eq("id", input.extraStockId)
     .single();
   if (stockError || !stock)
     throw new Error("This Fresh Pick is no longer available.");
+  if (
+    !isExtraAvailable({
+      lifecycle: stock.lifecycle,
+      pickupThroughAt: stock.pickup_through_at,
+      soldAt: stock.sold_at,
+      cutIntoSlicesAt: stock.cut_into_slices_at,
+      walkInHeldUntil: stock.walk_in_held_until,
+    })
+  ) {
+    throw new Error("This Fresh Pick is no longer available for assignment.");
+  }
 
   const page = Math.max(0, Math.min(1000, Math.trunc(input.page) || 0));
   const today = new Intl.DateTimeFormat("en-CA", {
@@ -721,23 +742,31 @@ export async function listAssignableOrdersForExtra(input: {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-  const filterByCake = Boolean(
-    input.matchingOnly && stock.library_cake_id && stock.library_cake_size_id,
-  );
-  const itemSelection = filterByCake
+  const itemSelection = input.matchingOnly
     ? "order_items!inner ( cake_id, cake_size_id, cake_name, size_label, quantity )"
     : "order_items ( cake_id, cake_size_id, cake_name, size_label, quantity )";
   let query = supabase
     .from("orders")
     .select(
-      `id, order_number, guest_name, customer_id, customers ( full_name ), pickup_date, pickup_time, fulfilment_method, extra_stock_id, status, ${itemSelection}`,
-    )
-    .neq("status", "cancelled")
-    .is("extra_stock_id", null);
-  if (filterByCake) {
+      "id, order_number, guest_name, customer_id, customers ( full_name ), pickup_date, pickup_time, fulfilment_method, extra_stock_id, status, picked_up_at, out_for_delivery_at, delivered_at, " +
+        itemSelection,
+    );
+  if (input.matchingOnly) {
     query = query
-      .eq("order_items.cake_id", stock.library_cake_id as string)
-      .eq("order_items.cake_size_id", stock.library_cake_size_id as string);
+      .not("status", "in", "(cancelled,completed)")
+      .is("picked_up_at", null)
+      .is("out_for_delivery_at", null)
+      .is("delivered_at", null);
+    if (stock.library_cake_id) {
+      query = query.eq("order_items.cake_id", stock.library_cake_id);
+    } else {
+      query = query.ilike("order_items.cake_name", stock.cake_name.trim());
+    }
+    if (stock.library_cake_size_id) {
+      query = query.eq("order_items.cake_size_id", stock.library_cake_size_id);
+    } else {
+      query = query.ilike("order_items.size_label", stock.size_label.trim());
+    }
   }
 
   query = input.older
@@ -784,6 +813,9 @@ export async function listAssignableOrdersForExtra(input: {
     fulfilment_method: string;
     extra_stock_id: string | null;
     status: string;
+    picked_up_at: string | null;
+    out_for_delivery_at: string | null;
+    delivered_at: string | null;
     order_items: Array<{
       cake_id: string | null;
       cake_size_id: string | null;
@@ -792,17 +824,103 @@ export async function listAssignableOrdersForExtra(input: {
       quantity: number;
     }> | null;
   }>;
-  const orders = rows.slice(0, ASSIGN_ORDER_PAGE_SIZE).map((row) => {
+  const pageRows = rows.slice(0, ASSIGN_ORDER_PAGE_SIZE);
+  const orderIds = pageRows.map((row) => row.id);
+  const primaryStockIds = pageRows
+    .map((row) => row.extra_stock_id)
+    .filter((id): id is string => Boolean(id));
+  const allocatedStockSelect =
+    "id, order_id, lifecycle, sold_at, cut_into_slices_at, cake_name, size_label, library_cake_id, library_cake_size_id";
+  const [linkedStocksResult, primaryStocksResult] = await Promise.all([
+    orderIds.length
+      ? supabase
+          .from("extra_stock")
+          .select(allocatedStockSelect)
+          .in("order_id", orderIds)
+      : Promise.resolve({ data: [], error: null }),
+    primaryStockIds.length
+      ? supabase
+          .from("extra_stock")
+          .select(allocatedStockSelect)
+          .in("id", primaryStockIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (linkedStocksResult.error) {
+    throw new Error(linkedStocksResult.error.message);
+  }
+  if (primaryStocksResult.error) {
+    throw new Error(primaryStocksResult.error.message);
+  }
+  const allocatedById = new Map<
+    string,
+    FreshPickAssignedStock & {
+      order_id: string | null;
+      lifecycle: string;
+      sold_at: string | null;
+      cut_into_slices_at: string | null;
+    }
+  >();
+  for (const stockRow of [
+    ...(linkedStocksResult.data ?? []),
+    ...(primaryStocksResult.data ?? []),
+  ] as Array<{
+    id: string;
+    order_id: string | null;
+    lifecycle: string;
+    sold_at: string | null;
+    cut_into_slices_at: string | null;
+    cake_name: string;
+    size_label: string;
+    library_cake_id: string | null;
+    library_cake_size_id: string | null;
+  }>) {
+    allocatedById.set(stockRow.id, stockRow);
+  }
+  const assignedStocks = [...allocatedById.values()];
+  const assignmentStock: FreshPickAssignmentStock = {
+    libraryCakeId: stock.library_cake_id,
+    libraryCakeSizeId: stock.library_cake_size_id,
+    cakeName: stock.cake_name,
+    sizeLabel: stock.size_label,
+  };
+  const orders = pageRows.map((row) => {
     const items = row.order_items ?? [];
-    const matchesStock = items.some((item) =>
-      stock.library_cake_id && stock.library_cake_size_id
-        ? item.cake_id === stock.library_cake_id &&
-          item.cake_size_id === stock.library_cake_size_id
-        : item.cake_name.trim().toLowerCase() ===
-            stock.cake_name.trim().toLowerCase() &&
-          item.size_label.trim().toLowerCase() ===
-            stock.size_label.trim().toLowerCase(),
+    const assignmentItems: FreshPickAssignmentOrderItem[] = items.map((item) => ({
+      cakeId: item.cake_id,
+      cakeSizeId: item.cake_size_id,
+      cakeName: item.cake_name,
+      sizeLabel: item.size_label,
+      quantity: Number(item.quantity) || 0,
+    }));
+    const orderAllocations = assignedStocks.filter(
+      (assigned) =>
+        assigned.order_id === row.id || assigned.id === row.extra_stock_id,
     );
+    const assessment = assessFreshPickAssignmentEligibility({
+      stock: assignmentStock,
+      orderItems: assignmentItems,
+      assignedStocks: orderAllocations.map((assigned) => ({
+        id: assigned.id,
+        libraryCakeId: assigned.library_cake_id,
+        libraryCakeSizeId: assigned.library_cake_size_id,
+        cakeName: assigned.cake_name,
+        sizeLabel: assigned.size_label,
+      })),
+      order: {
+        status: row.status,
+        pickedUpAt: row.picked_up_at,
+        outForDeliveryAt: row.out_for_delivery_at,
+        deliveredAt: row.delivered_at,
+      },
+    });
+    const hasConflictingAllocation = orderAllocations.some(
+      (assigned) =>
+        assigned.lifecycle !== "confirmed" ||
+        !assigned.sold_at ||
+        Boolean(assigned.cut_into_slices_at) ||
+        (assigned.order_id !== null && assigned.order_id !== row.id),
+    );
+    const canAssign = assessment.canAssign && !hasConflictingAllocation;
     return {
       id: row.id,
       orderNumber: row.order_number,
@@ -818,7 +936,11 @@ export async function listAssignableOrdersForExtra(input: {
           .join(", ") || "No cake lines",
       fulfilmentMethod: row.fulfilment_method,
       status: row.status,
-      matchesStock: Boolean(matchesStock),
+      matchesStock: assessment.matchesStock,
+      canAssign,
+      unavailableReason: hasConflictingAllocation
+        ? "This order has an existing stock link that needs staff review."
+        : assessment.reason,
     };
   });
   // Preserve date order inside each group while making exact stock matches
@@ -874,6 +996,9 @@ export async function findAssignableOrderForExtra(
     fulfilmentMethod: "",
     status: String((row as { status?: string }).status ?? ""),
     matchesStock: false,
+    canAssign: false,
+    unavailableReason:
+      "Use the Fresh Pick assignment list to verify stock and order eligibility.",
   };
 }
 

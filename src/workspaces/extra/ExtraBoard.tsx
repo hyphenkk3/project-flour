@@ -770,14 +770,22 @@ export function ExtraBoard({
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {capabilities.canAssignExtraToOrder ? (
-                    <button
-                      className={btnSecondary}
-                      disabled={pending}
-                      onClick={() => openAssign(unit)}
-                      type="button"
-                    >
-                      Assign to order
-                    </button>
+                    <>
+                      <button
+                        className={btnSecondary}
+                        disabled={pending || !unit.available}
+                        onClick={() => openAssign(unit)}
+                        type="button"
+                      >
+                        Assign to order
+                      </button>
+                      {!unit.available ? (
+                        <p className="text-skyline basis-full text-xs">
+                          This Fresh Pick is no longer available for order
+                          assignment.
+                        </p>
+                      ) : null}
+                    </>
                   ) : null}
                   {capabilities.canMoveExtraWindow ? (
                     <>

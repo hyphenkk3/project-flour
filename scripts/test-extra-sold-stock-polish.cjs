@@ -315,6 +315,11 @@ function resultBuilder(tableName) {
   return builder;
 }
 const queryExports = {};
+const assignmentHelper = {};
+const assignmentHelperSource = fs.readFileSync("src/engines/extra/assignment-eligibility.ts", "utf8");
+vm.runInNewContext(ts.transpileModule(assignmentHelperSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText, { exports: assignmentHelper, Map, Math, String });
 vm.runInNewContext(queryCompiled, {
   exports: queryExports,
   require: (id) => {
@@ -325,6 +330,7 @@ vm.runInNewContext(queryCompiled, {
         isExtraAvailable: () => false,
         isExtraConfirmedOnOffer: () => false,
       };
+    if (id === "@/engines/extra/assignment-eligibility") return assignmentHelper;
     if (id === "@/engines/extra/fresh-picks-fulfilment")
       return {
         extraCustomerVisibleFulfilmentDates: () => [],
