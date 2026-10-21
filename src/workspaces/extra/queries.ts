@@ -492,7 +492,147 @@ export type ExtraAssignableOrder = {
   pickupTime: string;
   extraStockId: string | null;
   itemSummary: string;
+  fulfilmentMethod: string;
+  status: string;
+  matchesStock: boolean;
 };
+
+export type AssignableOrderPage = {
+  orders: ExtraAssignableOrder[];
+  hasMore: boolean;
+};
+
+const ASSIGN_ORDER_PAGE_SIZE = 16;
+
+/** Browse unassigned orders without loading the order history into the client. */
+export async function listAssignableOrdersForExtra(input: {
+  extraStockId: string;
+  search: string;
+  older: boolean;
+  matchingOnly: boolean;
+  page: number;
+}): Promise<AssignableOrderPage> {
+  const supabase = await createClient();
+  const { data: stock, error: stockError } = await supabase
+    .from("extra_stock")
+    .select("id, cake_name, size_label, library_cake_id, library_cake_size_id")
+    .eq("id", input.extraStockId)
+    .single();
+  if (stockError || !stock)
+    throw new Error("This Fresh Pick is no longer available.");
+
+  const page = Math.max(0, Math.min(1000, Math.trunc(input.page) || 0));
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const filterByCake = Boolean(
+    input.matchingOnly && stock.library_cake_id && stock.library_cake_size_id,
+  );
+  const itemSelection = filterByCake
+    ? "order_items!inner ( cake_id, cake_size_id, cake_name, size_label, quantity )"
+    : "order_items ( cake_id, cake_size_id, cake_name, size_label, quantity )";
+  let query = supabase
+    .from("orders")
+    .select(
+      `id, order_number, guest_name, customer_id, customers ( full_name ), pickup_date, pickup_time, fulfilment_method, extra_stock_id, status, ${itemSelection}`,
+    )
+    .neq("status", "cancelled")
+    .is("extra_stock_id", null);
+  if (filterByCake) {
+    query = query
+      .eq("order_items.cake_id", stock.library_cake_id as string)
+      .eq("order_items.cake_size_id", stock.library_cake_size_id as string);
+  }
+
+  query = input.older
+    ? query.lt("pickup_date", today).order("pickup_date", { ascending: false })
+    : query.gte("pickup_date", today).order("pickup_date", { ascending: true });
+
+  // PostgREST's OR expression has its own punctuation grammar. Strip only
+  // syntax characters; staff can still search ordinary names and order IDs.
+  const search = input.search
+    .trim()
+    .slice(0, 80)
+    .replace(/[(),.%*\\]/g, "");
+  if (search) {
+    const { data: customers, error: customerError } = await supabase
+      .from("customers")
+      .select("id")
+      .ilike("full_name", `%${search}%`)
+      .limit(200);
+    if (customerError) throw new Error(customerError.message);
+    const ids = (customers ?? []).map((customer) => customer.id);
+    const filters = [
+      `order_number.ilike.%${search}%`,
+      `guest_name.ilike.%${search}%`,
+    ];
+    if (ids.length) filters.push(`customer_id.in.(${ids.join(",")})`);
+    query = query.or(filters.join(","));
+  }
+
+  const start = page * ASSIGN_ORDER_PAGE_SIZE;
+  const { data, error } = await query
+    .order("pickup_time", { ascending: true })
+    .order("id", { ascending: true })
+    .range(start, start + ASSIGN_ORDER_PAGE_SIZE);
+  if (error) throw new Error(error.message);
+
+  const rows = (data ?? []) as unknown as Array<{
+    id: string;
+    order_number: string;
+    guest_name: string | null;
+    customer_id: string | null;
+    customers: { full_name: string | null } | null;
+    pickup_date: string;
+    pickup_time: string;
+    fulfilment_method: string;
+    extra_stock_id: string | null;
+    status: string;
+    order_items: Array<{
+      cake_id: string | null;
+      cake_size_id: string | null;
+      cake_name: string;
+      size_label: string;
+      quantity: number;
+    }> | null;
+  }>;
+  const orders = rows.slice(0, ASSIGN_ORDER_PAGE_SIZE).map((row) => {
+    const items = row.order_items ?? [];
+    const matchesStock = items.some((item) =>
+      stock.library_cake_id && stock.library_cake_size_id
+        ? item.cake_id === stock.library_cake_id &&
+          item.cake_size_id === stock.library_cake_size_id
+        : item.cake_name.trim().toLowerCase() ===
+            stock.cake_name.trim().toLowerCase() &&
+          item.size_label.trim().toLowerCase() ===
+            stock.size_label.trim().toLowerCase(),
+    );
+    return {
+      id: row.id,
+      orderNumber: row.order_number,
+      guestName: row.guest_name || row.customers?.full_name || "Guest",
+      pickupDate: row.pickup_date,
+      pickupTime: row.pickup_time,
+      extraStockId: row.extra_stock_id,
+      itemSummary:
+        items
+          .map(
+            (item) => `${item.cake_name} ${item.size_label} ×${item.quantity}`,
+          )
+          .join(", ") || "No cake lines",
+      fulfilmentMethod: row.fulfilment_method,
+      status: row.status,
+      matchesStock: Boolean(matchesStock),
+    };
+  });
+  // Preserve date order inside each group while making exact stock matches
+  // visible first on each bounded page.
+  orders.sort((a, b) => Number(b.matchesStock) - Number(a.matchesStock));
+  return { orders, hasMore: rows.length > ASSIGN_ORDER_PAGE_SIZE };
+}
 
 export async function findAssignableOrderForExtra(
   query: string,
@@ -538,6 +678,9 @@ export async function findAssignableOrderForExtra(
     pickupTime: String((row as { pickup_time?: string }).pickup_time ?? ""),
     extraStockId: (row as { extra_stock_id?: string | null }).extra_stock_id ?? null,
     itemSummary: items || "No cake lines",
+    fulfilmentMethod: "",
+    status: String((row as { status?: string }).status ?? ""),
+    matchesStock: false,
   };
 }
 

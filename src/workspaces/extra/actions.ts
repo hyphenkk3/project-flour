@@ -21,11 +21,13 @@ import { createClient } from "@/lib/supabase/server";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import {
   findAssignableOrderForExtra,
+  listAssignableOrdersForExtra,
   getExtraStockUnitById,
   listExtraCakeOptions,
   listExtraStockUnits,
   listHomeFreshPickUnits,
   type ExtraAssignableOrder,
+  type AssignableOrderPage,
 } from "@/workspaces/extra/queries";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
 import type { PaymentMethod } from "@/engines/orders/payment-details";
@@ -404,6 +406,31 @@ export async function findAssignableOrderForExtraAction(
       order: null,
       error:
         error instanceof Error ? error.message : "Could not find that order.",
+    };
+  }
+}
+
+export async function listAssignableOrdersForExtraAction(input: {
+  extraStockId: string;
+  search: string;
+  older: boolean;
+  matchingOnly: boolean;
+  page: number;
+}): Promise<{ result: AssignableOrderPage | null; error: string | null }> {
+  const staff = await requireExtraStaff();
+  const caps = buildExtraWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canAssignExtraToOrder) {
+    return { result: null, error: "Not authorized to assign EXTRA." };
+  }
+  try {
+    return { result: await listAssignableOrdersForExtra(input), error: null };
+  } catch (error) {
+    return {
+      result: null,
+      error: error instanceof Error ? error.message : "Could not load orders.",
     };
   }
 }
