@@ -255,6 +255,11 @@ assert.match(boardSrc, /\.on\(\s*"postgres_changes"[\s\S]*?event: "INSERT"[\s\S]
 assert.match(boardSrc, /\.on\(\s*"postgres_changes"[\s\S]*?event: "UPDATE"[\s\S]*?table: "orders"/);
 assert.match(boardSrc, /status === "SUBSCRIBED"/);
 assert.match(boardSrc, /visibilitychange/);
+assert.match(boardSrc, /window\.addEventListener\("focus", refreshSoon\)/);
+assert.match(boardSrc, /window\.addEventListener\("online", refreshSoon\)/);
+assert.match(boardSrc, /clearInterval\(pollId\)/);
+assert.match(boardSrc, /removeEventListener\("visibilitychange"/);
+assert.match(boardSrc, /removeChannel\(channel\)/);
 assert.match(
   boardSrc,
   /Orders marked Ready appear here until their handoff is completed/,
@@ -359,3 +364,4 @@ assert.match(orderPageSrc, /boardDate=\{boardDate\}/);
 assert.match(orderPageSrc, /tab=\{tab\}/);
 
 console.log("PASS Collection tabs / history");
+
