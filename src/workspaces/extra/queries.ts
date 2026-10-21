@@ -11,6 +11,11 @@ import {
 import { compareHomeFreshPickUnits } from "@/engines/extra/home-fresh-picks";
 import type { FreshPicksPreparationConfig } from "@/engines/extra/fresh-picks-preparation";
 import { isExtraWalkInHeld } from "@/engines/extra/walk-in-hold";
+import {
+  canMarkAssignedPhysicalStockReady,
+  classifySoldExtra,
+  type SoldExtraOrderSnapshot,
+} from "@/engines/extra/sold-stock-lifecycle";
 import { resolveCakePhoto, type ResolvableCakePhoto } from "@/engines/menu/cake-photos";
 import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
 import { createClient } from "@/lib/supabase/server";
@@ -19,6 +24,7 @@ import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours
 import { loadFreshPicksPreparationConfig } from "@/workspaces/storefront/extra/config";
 import { mapAssignedOrderSummariesByStock } from "@/workspaces/extra/assigned-order-links";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
+import type { AssignedOrderSummary } from "@/workspaces/extra/assigned-order-links";
 
 type ExtraStockRow = {
   id: string;
@@ -124,7 +130,18 @@ export function mapExtraStockRow(
     assignedOrderId: null,
     assignedOrderNumber: null,
     assignedGuestName: null,
+    assignedOrderStatus: null,
+    assignedOrderSource: null,
+    assignedOrderCustomerId: null,
+    assignedOrderFulfilmentMethod: null,
+    assignedOrderPickupDate: null,
+    assignedOrderReadyAt: null,
+    assignedOrderPickedUpAt: null,
+    assignedOrderOutForDeliveryAt: null,
+    assignedOrderDeliveredAt: null,
+    assignedOrderCreatedAt: null,
     assignedStockReadinessAllowed: false,
+    assignedStockReadyActionAllowed: false,
     note: row.note,
     proposedAt: row.proposed_at,
     proposedBy: row.proposed_by,
@@ -319,75 +336,65 @@ async function attachHomeFreshPickPresentation(
 
 export async function listExtraStockUnits(): Promise<ExtraStockUnit[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const { data: unsoldData, error: unsoldError } = await supabase
     .from("extra_stock")
     .select(EXTRA_SELECT)
+    .is("sold_at", null)
     .order("proposed_at", { ascending: false });
 
-  if (error) {
-    throw new Error(error.message);
-  }
-
+  if (unsoldError) throw new Error(unsoldError.message);
   const now = new Date();
-  const stockRows = (data ?? []) as unknown as ExtraStockRow[];
-  const units = stockRows.map((row) => mapExtraStockRow(row, now));
-  const soldIds = units.filter((unit) => unit.soldAt).map((unit) => unit.id);
-  const linkedStockRows = stockRows.filter(
-    (row) => row.sold_at && row.order_id,
-  );
-  let assignedUnits = units;
-  if (soldIds.length > 0) {
-    const linkedOrderIds = Array.from(
-      new Set(linkedStockRows.map((row) => row.order_id as string)),
+  const unsoldRows = (unsoldData ?? []) as unknown as ExtraStockRow[];
+  const activeOrdersQuery = await supabase
+    .from("orders")
+    .select(ASSIGNED_ORDER_SELECT)
+    .in("status", [
+      "submitted",
+      "pending_confirmation",
+      "confirmed",
+      "awaiting_payment",
+      "paid",
+      "cancelled",
+    ])
+    .not("extra_stock_id", "is", null)
+    .or("order_source.neq.walk_in,order_source.is.null")
+    .or(
+      "and(fulfilment_method.eq.delivery,delivered_at.is.null),and(fulfilment_method.neq.delivery,picked_up_at.is.null),and(fulfilment_method.is.null,picked_up_at.is.null)",
     );
-    const { data: primaryOrders, error: primaryOrderError } = await supabase
-      .from("orders")
-      .select("id, order_number, guest_name, extra_stock_id")
-      .in("extra_stock_id", soldIds);
-    if (primaryOrderError) {
-      throw new Error(primaryOrderError.message);
-    }
+  if (activeOrdersQuery.error) throw new Error(activeOrdersQuery.error.message);
 
-    let perUnitOrders: typeof primaryOrders = [];
-    if (linkedOrderIds.length > 0) {
-      const { data, error: linkedOrderError } = await supabase
-        .from("orders")
-        .select("id, order_number, guest_name, extra_stock_id")
-        .in("id", linkedOrderIds);
-      if (linkedOrderError) {
-        throw new Error(linkedOrderError.message);
-      }
-      perUnitOrders = data ?? [];
-    }
-
-    const byStock = mapAssignedOrderSummariesByStock(
-      stockRows
-        .filter((row) => row.sold_at)
-        .map((row) => ({ id: row.id, order_id: row.order_id })),
-      [...(primaryOrders ?? []), ...perUnitOrders].map((order) => ({
-        id: (order as { id: string }).id,
-        order_number: String(
-          (order as { order_number?: string }).order_number ?? "",
-        ),
-        guest_name:
-          (order as { guest_name?: string | null }).guest_name ?? null,
-        extra_stock_id:
-          (order as { extra_stock_id?: string | null }).extra_stock_id ?? null,
-      })),
-    );
-
-    assignedUnits = units.map((unit) => {
-      const linked = byStock.get(unit.id);
-      if (!linked) return unit;
-      return {
-        ...unit,
-        assignedOrderId: linked.id,
-        assignedOrderNumber: linked.order_number || null,
-        assignedGuestName: linked.guest_name,
-        assignedStockReadinessAllowed: linked.readinessLinkVerified,
-      };
-    });
+  const activeOrders = (activeOrdersQuery.data ?? []) as unknown as AssignedOrderSummary[];
+  const activeOrderIds = [...new Set(activeOrders.map((order) => order.id))];
+  const primaryStockIds = [
+    ...new Set(
+      activeOrders
+        .map((order) => order.extra_stock_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  let activeSoldRows: ExtraStockRow[] = [];
+  if (activeOrderIds.length || primaryStockIds.length) {
+    const relationFilters = [
+      ...(activeOrderIds.length ? [`order_id.in.(${activeOrderIds.join(",")})`] : []),
+      ...(primaryStockIds.length ? [`id.in.(${primaryStockIds.join(",")})`] : []),
+    ];
+    const soldQuery = await supabase
+      .from("extra_stock")
+      .select(EXTRA_SELECT)
+      .not("sold_at", "is", null)
+      .or(relationFilters.join(","))
+      .order("proposed_at", { ascending: false });
+    if (soldQuery.error) throw new Error(soldQuery.error.message);
+    activeSoldRows = (soldQuery.data ?? []) as unknown as ExtraStockRow[];
   }
+
+  const stockRows = [...unsoldRows, ...activeSoldRows];
+  const units = stockRows.map((row) => mapExtraStockRow(row, now));
+  const assignedUnits = attachAssignedOrderDetails(
+    units,
+    stockRows,
+    activeOrders,
+  );
 
   const hasOrderabilityCandidates = assignedUnits.some(
     (unit) =>
@@ -403,6 +410,192 @@ export async function listExtraStockUnits(): Promise<ExtraStockUnit[]> {
     loadFreshPicksPreparationConfig(),
   ]);
   return attachTodayOrderability(assignedUnits, { now, snapshot, config });
+}
+
+const ASSIGNED_ORDER_SELECT =
+  "id, order_number, guest_name, customers(full_name), extra_stock_id, status, order_source, customer_id, fulfilment_method, pickup_date, ready_at, picked_up_at, out_for_delivery_at, delivered_at, created_at";
+
+function orderSnapshot(order: AssignedOrderSummary | null): SoldExtraOrderSnapshot | null {
+  if (!order) return null;
+  return {
+    id: order.id,
+    status: order.status ?? "",
+    orderSource: order.order_source ?? null,
+    customerId: order.customer_id ?? null,
+    extraStockId: order.extra_stock_id ?? null,
+    fulfilmentMethod: order.fulfilment_method ?? null,
+    pickedUpAt: order.picked_up_at ?? null,
+    deliveredAt: order.delivered_at ?? null,
+    outForDeliveryAt: order.out_for_delivery_at ?? null,
+    readyAt: order.ready_at ?? null,
+    createdAt: order.created_at ?? null,
+  };
+}
+
+function attachAssignedOrderDetails(
+  units: ExtraStockUnit[],
+  stockRows: ExtraStockRow[],
+  orders: AssignedOrderSummary[],
+): ExtraStockUnit[] {
+  if (!stockRows.some((row) => row.sold_at)) return units;
+  const byStock = mapAssignedOrderSummariesByStock(
+    stockRows
+      .filter((row) => row.sold_at)
+      .map((row) => ({ id: row.id, order_id: row.order_id })),
+    orders,
+  );
+  return units.map((unit) => {
+    const linked = byStock.get(unit.id);
+    if (!linked) return unit;
+    const snapshot = orderSnapshot(linked);
+    return {
+      ...unit,
+      assignedOrderId: linked.id,
+      assignedOrderNumber: linked.order_number || null,
+      assignedGuestName:
+        linked.guest_name ??
+        (Array.isArray(linked.customers)
+          ? linked.customers[0]?.full_name
+          : linked.customers?.full_name) ??
+        null,
+      assignedOrderStatus: linked.status ?? null,
+      assignedOrderSource: linked.order_source ?? null,
+      assignedOrderCustomerId: linked.customer_id ?? null,
+      assignedOrderFulfilmentMethod: linked.fulfilment_method ?? null,
+      assignedOrderPickupDate: linked.pickup_date ?? null,
+      assignedOrderReadyAt: linked.ready_at ?? null,
+      assignedOrderPickedUpAt: linked.picked_up_at ?? null,
+      assignedOrderOutForDeliveryAt: linked.out_for_delivery_at ?? null,
+      assignedOrderDeliveredAt: linked.delivered_at ?? null,
+      assignedOrderCreatedAt: linked.created_at ?? null,
+      assignedStockReadinessAllowed: linked.readinessLinkVerified,
+      assignedStockReadyActionAllowed: canMarkAssignedPhysicalStockReady({
+        lifecycle: unit.lifecycle,
+        soldAt: unit.soldAt,
+        orderId: unit.assignedOrderId ?? linked.id,
+        cutIntoSlicesAt: unit.cutIntoSlicesAt,
+        walkInHeld: unit.walkInHeld,
+        readyForCollection: unit.readyForCollection,
+        readinessLinkVerified: linked.readinessLinkVerified,
+        order: snapshot,
+      }),
+    };
+  });
+}
+
+export type SoldExtraHistoryPage = {
+  items: ExtraStockUnit[];
+  reviewItems: ExtraStockUnit[];
+  nextOffset: number;
+  hasMore: boolean;
+};
+
+export async function listSoldExtraHistoryPage(input: {
+  search: string;
+  soldFrom: string;
+  soldThrough: string;
+  offset: number;
+}): Promise<SoldExtraHistoryPage> {
+  const supabase = await createClient();
+  const pageSize = 20;
+  const offset = Math.max(0, Math.min(100_000, Math.trunc(input.offset) || 0));
+  const search = input.search.trim().slice(0, 80).replace(/[(),.%*\\"]/g, "");
+  let matchingOrderIds: string[] = [];
+  let matchingPrimaryStockIds: string[] = [];
+
+  if (search) {
+    const customerQuery = await supabase
+      .from("customers")
+      .select("id")
+      .ilike("full_name", `%${search}%`)
+      .limit(200);
+    if (customerQuery.error) throw new Error(customerQuery.error.message);
+    const customerIds = (customerQuery.data ?? []).map((row) => row.id);
+    const orderFilters = [
+      `order_number.ilike.%${search}%`,
+      `guest_name.ilike.%${search}%`,
+      ...(customerIds.length ? [`customer_id.in.(${customerIds.join(",")})`] : []),
+    ];
+    const orderQuery = await supabase
+      .from("orders")
+      .select("id, extra_stock_id")
+      .or(orderFilters.join(","))
+      .limit(500);
+    if (orderQuery.error) throw new Error(orderQuery.error.message);
+    matchingOrderIds = (orderQuery.data ?? []).map((row) => row.id);
+    matchingPrimaryStockIds = (orderQuery.data ?? [])
+      .map((row) => row.extra_stock_id)
+      .filter((id): id is string => Boolean(id));
+  }
+
+  let query = supabase
+    .from("extra_stock")
+    .select(EXTRA_SELECT, { count: "exact" })
+    .not("sold_at", "is", null)
+    .order("sold_at", { ascending: false })
+    .order("id", { ascending: false });
+  if (input.soldFrom) {
+    query = query.gte("sold_at", `${input.soldFrom}T00:00:00+08:00`);
+  }
+  if (input.soldThrough) {
+    const nextDay = new Date(`${input.soldThrough}T00:00:00.000Z`);
+    if (!Number.isNaN(nextDay.getTime())) {
+      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+      const nextYmd = nextDay.toISOString().slice(0, 10);
+      query = query.lt("sold_at", `${nextYmd}T00:00:00+08:00`);
+    }
+  }
+  if (search) {
+    const filters = [`cake_name.ilike.%${search}%`];
+    if (matchingOrderIds.length) {
+      filters.push(`order_id.in.(${matchingOrderIds.join(",")})`);
+    }
+    if (matchingPrimaryStockIds.length) {
+      filters.push(`id.in.(${matchingPrimaryStockIds.join(",")})`);
+    }
+    query = query.or(filters.join(","));
+  }
+  const result = await query.range(offset, offset + pageSize - 1);
+  if (result.error) throw new Error(result.error.message);
+  const rows = (result.data ?? []) as unknown as ExtraStockRow[];
+  const orderIds = [...new Set(rows.map((row) => row.order_id).filter((id): id is string => Boolean(id)))];
+  const stockIds = rows.map((row) => row.id);
+  let orders: AssignedOrderSummary[] = [];
+  if (orderIds.length || stockIds.length) {
+    const filters = [
+      ...(orderIds.length ? [`id.in.(${orderIds.join(",")})`] : []),
+      ...(stockIds.length ? [`extra_stock_id.in.(${stockIds.join(",")})`] : []),
+    ];
+    const orderDetails = await supabase
+      .from("orders")
+      .select(ASSIGNED_ORDER_SELECT)
+      .or(filters.join(","));
+    if (orderDetails.error) throw new Error(orderDetails.error.message);
+    orders = (orderDetails.data ?? []) as unknown as AssignedOrderSummary[];
+  }
+  const units = attachAssignedOrderDetails(
+    rows.map((row) => mapExtraStockRow(row)),
+    rows,
+    orders,
+  );
+  const items: ExtraStockUnit[] = [];
+  const reviewItems: ExtraStockUnit[] = [];
+  for (const unit of units) {
+    const linked = orders.find(
+      (order) =>
+        order.id === unit.assignedOrderId ||
+        order.extra_stock_id === unit.id,
+    );
+    const disposition = classifySoldExtra(orderSnapshot(linked ?? null));
+    if (disposition === "history") items.push(unit);
+    else if (disposition === "review") reviewItems.push(unit);
+  }
+  return {
+    items,
+    reviewItems,
+    nextOffset: offset + rows.length,
+    hasMore: rows.length === pageSize,
+  };
 }
 
 /**

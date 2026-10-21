@@ -13,6 +13,7 @@ import {
   isExtraConfirmedOnOffer,
   isExtraExpiredConfirmed,
 } from "@/engines/extra/availability";
+import { classifySoldExtra, type SoldExtraOrderSnapshot } from "@/engines/extra/sold-stock-lifecycle";
 import {
   evaluateExtraConfirm,
   extraAvailabilityDayLabel,
@@ -40,12 +41,30 @@ import { MoveExtraWindowDialog } from "@/workspaces/extra/MoveExtraWindowDialog"
 import { WalkInHoldCompleteSaleDialog } from "@/workspaces/extra/WalkInHoldCompleteSaleDialog";
 import { WalkInHoldPanel } from "@/workspaces/extra/WalkInHoldPanel";
 import { FreshPickTodayOrderabilityStatus } from "@/workspaces/extra/FreshPickTodayOrderabilityStatus";
+import { SoldExtraHistoryPanel } from "@/workspaces/extra/SoldExtraHistoryPanel";
 import {
   initialExtraWindow,
   nextExtraWindow,
   type ExtraWindowDraft,
 } from "@/workspaces/extra/extra-window";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
+
+function soldOrderSnapshot(unit: ExtraStockUnit): SoldExtraOrderSnapshot | null {
+  if (!unit.assignedOrderId) return null;
+  return {
+    id: unit.assignedOrderId,
+    status: unit.assignedOrderStatus ?? "",
+    orderSource: unit.assignedOrderSource,
+    customerId: unit.assignedOrderCustomerId,
+    extraStockId: unit.id,
+    fulfilmentMethod: unit.assignedOrderFulfilmentMethod,
+    pickedUpAt: unit.assignedOrderPickedUpAt,
+    deliveredAt: unit.assignedOrderDeliveredAt,
+    outForDeliveryAt: unit.assignedOrderOutForDeliveryAt,
+    readyAt: unit.assignedOrderReadyAt,
+    createdAt: unit.assignedOrderCreatedAt,
+  };
+}
 
 type ExtraBoardProps = {
   units: ExtraStockUnit[];
@@ -121,7 +140,13 @@ export function ExtraBoard({
     [units],
   );
   const sold = useMemo(
-    () => units.filter((u) => u.lifecycle === "confirmed" && Boolean(u.soldAt)),
+    () =>
+      units.filter(
+        (unit) =>
+          unit.lifecycle === "confirmed" &&
+          Boolean(unit.soldAt) &&
+          classifySoldExtra(soldOrderSnapshot(unit)) !== "history",
+      ),
     [units],
   );
   const past = useMemo(
@@ -834,73 +859,110 @@ export function ExtraBoard({
         )}
       </section>
 
-      {surface === "full" && sold.length > 0 ? (
+      {surface === "full" ? (
         <section className="mt-10">
           <h2 className="text-ink text-sm font-semibold tracking-wide uppercase">
-            Sold
+            Active / Needs Attention
             <span className="text-skyline ml-2 font-normal normal-case">
               {sold.length}
             </span>
           </h2>
           <p className="text-skyline mt-1 text-sm">
-            Sold Extra cakes leave Fresh Picks immediately. Pickup for the
-            existing order is unaffected.
+            Sold physical stock remains here while its linked order still needs
+            operational work. Completed sales and collections are kept in Sold
+            History below.
           </p>
-          <ul className="mt-4 space-y-3">
-            {sold.map((unit) => (
-              <li
-                key={unit.id}
-                className="border-fog rounded-2xl border bg-white p-4"
-              >
-                <p className="text-ink text-base font-semibold">
-                  {unit.cakeName}{" "}
-                  <span className="text-skyline font-normal">
-                    {unit.sizeLabel}
-                  </span>
-                </p>
-                <p className="text-skyline mt-1 text-sm">
-                  {unit.assignedOrderNumber
-                    ? `Assigned · ${unit.assignedOrderNumber}`
-                    : "Sold"}
-                </p>
-                {unit.assignedGuestName ? (
-                  <p className="text-skyline mt-1 text-sm">
-                    {unit.assignedGuestName}
-                  </p>
-                ) : null}
-                {unit.readyForCollection ? (
-                  <p className="text-status-success mt-2 text-sm font-semibold">
-                    Ready for Collection · this physical cake
-                  </p>
-                ) : null}
-                {unit.assignedOrderId &&
-                unit.assignedStockReadinessAllowed &&
-                !unit.readyForCollection &&
-                capabilities.canMarkReadyForCollection ? (
-                  <div className="mt-3">
-                    <button
-                      className={btnPrimary}
-                      disabled={pending}
-                      onClick={() => {
-                        setError(null);
-                        setReadyReason("");
-                        setReadyUnit(unit);
-                      }}
-                      type="button"
-                    >
-                      Mark Physical Stock Ready
-                    </button>
-                    <p className="text-skyline mt-1 text-xs">
-                      The order becomes ready only after full payment and when
-                      every linked Fresh Pick unit is ready.
+          {sold.length === 0 ? (
+            <p className="text-skyline mt-3 text-sm">
+              No sold stock currently needs attention.
+            </p>
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {sold.map((unit) => {
+                const disposition = classifySoldExtra(soldOrderSnapshot(unit));
+                const overdue = Boolean(
+                  unit.assignedOrderPickupDate &&
+                    unit.assignedOrderPickupDate < todayYmd,
+                );
+                return (
+                  <li
+                    key={unit.id}
+                    className="border-fog rounded-2xl border bg-white p-4"
+                  >
+                    <p className="text-ink text-base font-semibold">
+                      {unit.cakeName}{" "}
+                      <span className="text-skyline font-normal">
+                        {unit.sizeLabel}
+                      </span>
                     </p>
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+                    <p className="text-skyline mt-1 text-sm">
+                      {unit.assignedOrderNumber
+                        ? `Order ${unit.assignedOrderNumber}`
+                        : "Order details unavailable"}
+                    </p>
+                    {unit.assignedGuestName ? (
+                      <p className="text-skyline mt-1 text-sm">
+                        {unit.assignedGuestName}
+                      </p>
+                    ) : null}
+                    <p className="text-skyline mt-1 text-sm">
+                      {unit.assignedOrderFulfilmentMethod ??
+                        "Fulfilment not recorded"}
+                      {unit.assignedOrderPickupDate
+                        ? ` · ${formatLongBusinessDate(unit.assignedOrderPickupDate)}`
+                        : ""}
+                      {unit.assignedOrderStatus
+                        ? ` · ${unit.assignedOrderStatus.replaceAll("_", " ")}`
+                        : ""}
+                    </p>
+                    {overdue ? (
+                      <p className="text-status-warning mt-2 text-sm font-medium">
+                        Past scheduled date · still awaiting completion
+                      </p>
+                    ) : null}
+                    {disposition === "review" ? (
+                      <p className="text-status-warning mt-2 text-sm font-medium">
+                        Lifecycle needs staff review; this record remains
+                        visible.
+                      </p>
+                    ) : null}
+                    {unit.readyForCollection ? (
+                      <p className="text-status-success mt-2 text-sm font-semibold">
+                        Ready for Collection · this physical cake
+                      </p>
+                    ) : null}
+                    {unit.assignedOrderId &&
+                    unit.assignedStockReadyActionAllowed &&
+                    !unit.readyForCollection &&
+                    capabilities.canMarkReadyForCollection ? (
+                      <div className="mt-3">
+                        <button
+                          className={btnPrimary}
+                          disabled={pending}
+                          onClick={() => {
+                            setError(null);
+                            setReadyReason("");
+                            setReadyUnit(unit);
+                          }}
+                          type="button"
+                        >
+                          Mark Physical Stock Ready
+                        </button>
+                        <p className="text-skyline mt-1 text-xs">
+                          The order becomes ready only after full payment and
+                          when every linked Fresh Pick unit is ready.
+                        </p>
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </section>
       ) : null}
+
+      {surface === "full" ? <SoldExtraHistoryPanel /> : null}
 
       {surface === "full" ? (
       <section className="mt-10">

@@ -2,7 +2,18 @@ export type AssignedOrderSummary = {
   id: string;
   order_number: string;
   guest_name: string | null;
+  customers?: { full_name: string | null } | { full_name: string | null }[] | null;
   extra_stock_id?: string | null;
+  status?: string | null;
+  order_source?: string | null;
+  customer_id?: string | null;
+  fulfilment_method?: string | null;
+  pickup_date?: string | null;
+  ready_at?: string | null;
+  picked_up_at?: string | null;
+  out_for_delivery_at?: string | null;
+  delivered_at?: string | null;
+  created_at?: string | null;
 };
 
 export type AssignedStockOrder = AssignedOrderSummary & {

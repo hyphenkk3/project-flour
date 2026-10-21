@@ -117,6 +117,7 @@ export function OwnerOrderCard({
           ) : null}
         </div>
         <StatusBadge
+          className="shrink-0 whitespace-nowrap"
           label={orderLifecycleLabel({
             status: order.status,
             productionStartedAt: order.productionStartedAt,

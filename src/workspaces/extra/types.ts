@@ -32,6 +32,18 @@ export type ExtraStockUnit = {
   assignedOrderId: string | null;
   assignedOrderNumber: string | null;
   assignedGuestName: string | null;
+  assignedOrderStatus: string | null;
+  assignedOrderSource: string | null;
+  assignedOrderCustomerId: string | null;
+  assignedOrderFulfilmentMethod: string | null;
+  assignedOrderPickupDate: string | null;
+  assignedOrderReadyAt: string | null;
+  assignedOrderPickedUpAt: string | null;
+  assignedOrderOutForDeliveryAt: string | null;
+  assignedOrderDeliveredAt: string | null;
+  assignedOrderCreatedAt: string | null;
+  /** Mirrors the existing mark_extra_stock_ready_for_collection RPC guards. */
+  assignedStockReadyActionAllowed: boolean;
   /** The stock row has a verified per-unit Fresh Pick order link. */
   assignedStockReadinessAllowed: boolean;
   note: string | null;

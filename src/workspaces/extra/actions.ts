@@ -22,12 +22,14 @@ import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-s
 import {
   findAssignableOrderForExtra,
   listAssignableOrdersForExtra,
+  listSoldExtraHistoryPage,
   getExtraStockUnitById,
   listExtraCakeOptions,
   listExtraStockUnits,
   listHomeFreshPickUnits,
   type ExtraAssignableOrder,
   type AssignableOrderPage,
+  type SoldExtraHistoryPage,
 } from "@/workspaces/extra/queries";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
 import type { PaymentMethod } from "@/engines/orders/payment-details";
@@ -90,6 +92,33 @@ function evaluateFreshPickConfirm(input: {
 export async function listExtraStockUnitsAction(): Promise<ExtraStockUnit[]> {
   await requireExtraStaff();
   return listExtraStockUnits();
+}
+
+export async function listSoldExtraHistoryAction(input: {
+  search: string;
+  soldFrom: string;
+  soldThrough: string;
+  offset: number;
+}): Promise<SoldExtraHistoryPage> {
+  await requireExtraStaff();
+  const validDate = (value: string) => {
+    if (!value) return true;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  };
+  if (!validDate(input.soldFrom) || !validDate(input.soldThrough)) {
+    throw new Error("Choose valid Sold History dates.");
+  }
+  if (input.soldFrom && input.soldThrough && input.soldFrom > input.soldThrough) {
+    throw new Error("The start date must be before the end date.");
+  }
+  return listSoldExtraHistoryPage({
+    search: String(input.search ?? "").slice(0, 80),
+    soldFrom: input.soldFrom || "",
+    soldThrough: input.soldThrough || "",
+    offset: Number.isFinite(input.offset) ? input.offset : 0,
+  });
 }
 
 export async function listExtraCakeOptionsAction(): Promise<ExtraCakeOption[]> {
