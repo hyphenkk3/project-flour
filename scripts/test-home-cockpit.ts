@@ -229,8 +229,9 @@ assert.deepEqual(ownerNav, [
   "owner_calendar",
   "bakery",
   "collection",
-  "customer_operations",
   "library",
+  "customer_operations",
+  "management",
 ]);
 
 const managerNavIds = getNavigationForRole("manager").map((i) => i.id);
@@ -238,10 +239,11 @@ assert.deepEqual(managerNavIds, [
   "home",
   "owner",
   "owner_calendar",
-  "customer_operations",
   "bakery",
   "collection",
   "library",
+  "customer_operations",
+  "management",
 ]);
 
 const vivianNavIds = getNavigationForRole("customer_operations").map(
@@ -250,9 +252,9 @@ const vivianNavIds = getNavigationForRole("customer_operations").map(
 assert.deepEqual(vivianNavIds, [
   "home",
   "owner",
-  "customer_operations",
   "owner_calendar",
   "collection",
+  "customer_operations",
 ]);
 
 const ownerLinks = homeQuickLinksFromNavigation(
