@@ -831,7 +831,7 @@ This update is appended to the existing Master Status history. Earlier dated rec
 
 ## Current task — WOS cross-device synchronization
 
-- **ACTIVE — DEV investigation.** Reported symptom: cross-device updates that previously appeared in roughly 1–3 seconds later appeared in roughly 10–30 seconds. Root cause has not yet been established; no synchronization change is authorized without evidence.
+- **ACTIVE — DEV investigation and Owner acceptance.** Reported symptom: cross-device updates that previously appeared in roughly 1–3 seconds later appeared in roughly 10–30 seconds. Source review confirmed that Collection had no registered Realtime event handlers; the targeted DEV correction and acceptance test are recorded below. The broader cross-device latency remains unmeasured and unresolved.
 - Latest verified Production baseline for this task: `a63fd0042c0826621f80dd85446e32d49d92b958`, deployment `dpl_7RnPmSwnhFnz6tH9q5Ne69igGbyX`, ledger 166.
 - Current DEV work branch: `codex/wos-cross-device-sync-dev-20261021`, based on the verified Production source. The original `debug/mobile-add-to-order-safari` checkout was found with unrelated staged/unstaged and untracked work and has been left untouched.
 - Investigation must distinguish database commit, event publishing, Realtime delivery, client handling, cache/refetch and rendering; inspect channel lifecycle, filters, auth, polling fallback, focus/visibility and Safari behavior. Use isolated or DEV test data only. No Production mutation.
