@@ -128,8 +128,21 @@ export function BakeryProductionActions({
               </p>
             ) : surface.kind === "start_unsecured" ? (
               <p className="text-skyline mt-1.5 text-sm leading-relaxed">
-                Payment is still pending. You can start production if the cake
-                needs to be prepared now.
+                {surface.remainingQuantity !== undefined
+                  ? `Payment is still pending. You can start the ${surface.remainingQuantity} remaining cake${surface.remainingQuantity === 1 ? "" : "s"} shown above if they need to be prepared now.`
+                  : "Payment is still pending. You can start production if the cake needs to be prepared now."}
+              </p>
+            ) : surface.kind === "fresh_pick_fulfilled" ||
+              surface.kind === "allocation_review" ? (
+              <p
+                className={
+                  surface.kind === "allocation_review"
+                    ? "text-status-warning mt-1.5 text-sm leading-relaxed"
+                    : "text-signal mt-1.5 text-sm leading-relaxed"
+                }
+                role={surface.kind === "allocation_review" ? "alert" : undefined}
+              >
+                {surface.reason}
               </p>
             ) : (
               <p className="text-skyline mt-1.5 text-sm leading-relaxed">
@@ -196,9 +209,15 @@ export function BakeryProductionActions({
               }}
               type="button"
             >
-              {workingLabel("start", "Start Production")}
+              {workingLabel(
+                "start",
+                surface.remainingQuantity !== undefined
+                  ? "Start Remaining Production"
+                  : "Start Production",
+              )}
             </button>
-          ) : (
+          ) : surface.kind === "fresh_pick_fulfilled" ||
+            surface.kind === "allocation_review" ? null : (
             <button
               className={primaryClass}
               disabled={pending}
@@ -207,7 +226,12 @@ export function BakeryProductionActions({
               }
               type="button"
             >
-              {workingLabel("start", "Start Production")}
+              {workingLabel(
+                "start",
+                surface.kind === "start_paid" && surface.remainingQuantity !== undefined
+                  ? "Start Remaining Production"
+                  : "Start Production",
+              )}
             </button>
           )}
         </div>
@@ -220,8 +244,16 @@ export function BakeryProductionActions({
 
       <ConfirmDialog
         cancelLabel="Cancel"
-        confirmLabel="Start Production"
-        description="Payment is still pending for this preorder. Start production anyway?"
+        confirmLabel={
+          surface.kind === "start_unsecured" && surface.remainingQuantity !== undefined
+            ? "Start Remaining Production"
+            : "Start Production"
+        }
+        description={
+          surface.kind === "start_unsecured" && surface.remainingQuantity !== undefined
+            ? `Payment is still pending. Start production for the ${surface.remainingQuantity} remaining cake${surface.remainingQuantity === 1 ? "" : "s"} shown above?`
+            : "Payment is still pending for this preorder. Start production anyway?"
+        }
         onCancel={() => setConfirmOpen(false)}
         onConfirm={() =>
           run("start", () => startBakeryProductionAction(orderId))

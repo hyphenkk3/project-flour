@@ -262,6 +262,25 @@ assert.equal(
   }).kind,
   "start_paid",
 );
+const remainingProductionSurface = bakeryStartSurface({
+  presentation: "not_started",
+  status: "paid",
+  canStartProduction: true,
+  canUndoStart: true,
+  freshPickAllocation: {
+    status: "verified",
+    lines: [],
+    issues: [],
+    totalOrderedQuantity: 3,
+    totalAssignedQuantity: 2,
+    totalRemainingQuantity: 1,
+    fullyCovered: false,
+  },
+});
+assert.equal(remainingProductionSurface.kind, "start_paid");
+if (remainingProductionSurface.kind === "start_paid") {
+  assert.equal(remainingProductionSurface.remainingQuantity, 1);
+}
 assert.equal(
   bakeryStartSurface({
     presentation: "in_production",
@@ -301,8 +320,8 @@ assert.equal(bakeryFulfilmentCue("pickup"), "Pickup");
 
 const summary = bakeryPrimaryCakeSummary({
   cakeLines: [
-    { id: "1", cakeName: "Chocolate", sizeLabel: '6"', quantity: 1 },
-    { id: "2", cakeName: "Matcha", sizeLabel: '8"', quantity: 2 },
+    { id: "1", cakeName: "Chocolate", sizeLabel: '6"', quantity: 1, cakeId: null, sizeId: null },
+    { id: "2", cakeName: "Matcha", sizeLabel: '8"', quantity: 2, cakeId: null, sizeId: null },
   ],
 });
 assert.equal(summary.cakeName, "Chocolate");
@@ -351,15 +370,20 @@ const mapped = mapBakeryBoardOrder({
   picked_up_at: null,
   out_for_delivery_at: null,
   include_receipt: true,
+  extra_stock_id: null,
   order_items: [
     {
       id: "i1",
+      cake_id: "cake-chocolate",
+      cake_size_id: "size-6",
       cake_name: "Chocolate",
       size_label: '6"',
       quantity: 1,
     },
     {
       id: "i2",
+      cake_id: "cake-matcha",
+      cake_size_id: "size-8",
       cake_name: "Matcha",
       size_label: '8"',
       quantity: 1,

@@ -26,6 +26,7 @@ import {
   isWaitingCustomerConfirmation,
 } from "@/workspaces/bakery/eligibility";
 import type { BakeryBoardOrder } from "@/workspaces/bakery/types";
+import { BakeryAllocationBreakdown } from "@/workspaces/bakery/BakeryAllocationBreakdown";
 
 type BakeryOrderDetailProps = {
   order: BakeryBoardOrder;
@@ -57,6 +58,7 @@ export function BakeryOrderDetail({
     canUndoStart: capabilities.canUndoStart,
     canMarkReady: capabilities.canMarkReady,
     canUndoReady: capabilities.canUndoReady,
+    freshPickAllocation: order.freshPickAllocation,
   });
   const waitingConfirmation = isWaitingCustomerConfirmation(order.status);
   const earlyPickup = isEarlyPickupAttention(order.pickupDate, order.pickupTime);
@@ -165,22 +167,7 @@ export function BakeryOrderDetail({
               </dl>
             </section>
 
-            <section className="border-fog rounded-2xl border bg-white p-5">
-              <h2 className="text-ink text-xs font-semibold tracking-wide uppercase">
-                Cakes
-              </h2>
-              <ul className="mt-3 space-y-3">
-                {order.cakeLines.map((line) => (
-                  <li key={line.id} className="text-ink text-sm">
-                    <p className="font-medium">{line.cakeName}</p>
-                    <p className="text-skyline mt-0.5">
-                      {line.sizeLabel}
-                      {line.quantity > 1 ? ` · ×${line.quantity}` : null}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </section>
+            <BakeryAllocationBreakdown summary={order.freshPickAllocation} />
 
             <BakeryPackingChecklist items={packing} />
 

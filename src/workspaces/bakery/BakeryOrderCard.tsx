@@ -19,6 +19,7 @@ import {
   isBakeryOrderSecured,
 } from "@/workspaces/bakery/eligibility";
 import type { BakeryBoardOrder } from "@/workspaces/bakery/types";
+import { BakeryAllocationBreakdown } from "@/workspaces/bakery/BakeryAllocationBreakdown";
 
 type BakeryOrderCardProps = {
   order: BakeryBoardOrder;
@@ -87,6 +88,12 @@ export function BakeryOrderCard({ order, boardDate }: BakeryOrderCardProps) {
         {paymentAttention ? (
           <StatusBadge label="Payment Attention" tone="danger" />
         ) : null}
+      </div>
+      <div className="mt-3">
+        <BakeryAllocationBreakdown
+          compact
+          summary={order.freshPickAllocation}
+        />
       </div>
       {notesExcerpt ? (
         <p className="text-ink mt-2 text-sm font-medium">{notesExcerpt}</p>

@@ -10,6 +10,10 @@ import type {
   BakeryComplimentaryLine,
   BakeryPaidAddonLine,
 } from "@/workspaces/bakery/types";
+import {
+  summarizeBakeryFreshPickAllocations,
+  type BakeryAssignedStockInput,
+} from "@/engines/bakery/fresh-pick-allocation";
 
 export type BakeryOrderRow = {
   id: string;
@@ -29,8 +33,11 @@ export type BakeryOrderRow = {
   picked_up_at: string | null;
   out_for_delivery_at: string | null;
   include_receipt: boolean | null;
+  extra_stock_id?: string | null;
   order_items?: Array<{
     id: string;
+    cake_id: string | null;
+    cake_size_id: string | null;
     cake_name: string | null;
     size_label: string | null;
     quantity: number;
@@ -63,6 +70,8 @@ function mapCakeLines(row: BakeryOrderRow): BakeryCakeLine[] {
       cakeName: item.cake_name ?? "Cake",
       sizeLabel: item.size_label ?? "Size",
       quantity: Number(item.quantity) || 1,
+      cakeId: item.cake_id ?? null,
+      sizeId: item.cake_size_id ?? null,
     }));
 }
 
@@ -112,7 +121,11 @@ function mapPaidAddons(row: BakeryOrderRow): BakeryPaidAddonLine[] {
     });
 }
 
-export function mapBakeryBoardOrder(row: BakeryOrderRow): BakeryBoardOrder {
+export function mapBakeryBoardOrder(
+  row: BakeryOrderRow,
+  assignedStockRows: BakeryAssignedStockInput[] = [],
+): BakeryBoardOrder {
+  const cakeLines = mapCakeLines(row);
   return {
     id: row.id,
     orderNumber: row.order_number,
@@ -130,7 +143,19 @@ export function mapBakeryBoardOrder(row: BakeryOrderRow): BakeryBoardOrder {
     pickedUpAt: row.picked_up_at,
     outForDeliveryAt: row.out_for_delivery_at,
     includeReceipt: Boolean(row.include_receipt),
-    cakeLines: mapCakeLines(row),
+    cakeLines,
+    freshPickAllocation: summarizeBakeryFreshPickAllocations({
+      orderId: row.id,
+      primaryStockId: row.extra_stock_id ?? null,
+      cakeRequirements: cakeLines.map((line) => ({
+        cakeId: line.cakeId,
+        cakeName: line.cakeName,
+        sizeId: line.sizeId,
+        sizeLabel: line.sizeLabel,
+        quantity: line.quantity,
+      })),
+      stockRows: assignedStockRows,
+    }),
     complimentaryItems: mapComplimentary(row),
     paidAddons: mapPaidAddons(row),
   };

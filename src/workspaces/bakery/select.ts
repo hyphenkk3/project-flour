@@ -18,8 +18,11 @@ export const BAKERY_ORDER_SELECT = `
   picked_up_at,
   out_for_delivery_at,
   include_receipt,
+  extra_stock_id,
   order_items (
     id,
+    cake_id,
+    cake_size_id,
     cake_name,
     size_label,
     quantity

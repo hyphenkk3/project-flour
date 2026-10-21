@@ -16,6 +16,10 @@ import type {
   BakeryPackingReminderItem,
   BakeryProductionPresentation,
 } from "@/workspaces/bakery/types";
+import {
+  bakeryFreshPickStartBlock,
+  type BakeryAllocationSummary,
+} from "@/engines/bakery/fresh-pick-allocation";
 
 /** Active guest preorder statuses shown on Bakery (canonical lifecycle). */
 export const BAKERY_ACTIVE_PREORDER_STATUSES: readonly GuestOrderStatus[] = [
@@ -162,8 +166,10 @@ export function bakeryProductionBadgeTone(
 export type BakeryProductionSurface =
   | { kind: "none" }
   | { kind: "waiting_confirmation"; reason: string }
-  | { kind: "start_paid" }
-  | { kind: "start_unsecured" }
+  | { kind: "fresh_pick_fulfilled"; reason: string }
+  | { kind: "allocation_review"; reason: string }
+  | { kind: "start_paid"; remainingQuantity?: number }
+  | { kind: "start_unsecured"; remainingQuantity?: number }
   | {
       kind: "in_production";
       canUndoStart: boolean;
@@ -185,6 +191,7 @@ export function bakeryProductionSurface(input: {
   canUndoStart: boolean;
   canMarkReady: boolean;
   canUndoReady: boolean;
+  freshPickAllocation?: BakeryAllocationSummary;
 }): BakeryProductionSurface {
   if (input.presentation === "ready") {
     return input.canUndoReady ? { kind: "undo_ready" } : { kind: "none" };
@@ -203,8 +210,33 @@ export function bakeryProductionSurface(input: {
       reason: BAKERY_WAITING_CONFIRMATION_REASON,
     };
   }
-  if (input.status === "awaiting_payment") return { kind: "start_unsecured" };
-  if (input.status === "paid") return { kind: "start_paid" };
+  if (input.status === "awaiting_payment" || input.status === "paid") {
+    const allocationBlock = input.freshPickAllocation
+      ? bakeryFreshPickStartBlock(input.freshPickAllocation)
+      : null;
+    if (allocationBlock === "review") {
+      return {
+        kind: "allocation_review",
+        reason:
+          "Fresh Pick allocation could not be verified. Refresh and ask a Manager to review the stock links before starting production.",
+      };
+    }
+    if (allocationBlock === "fully_covered") {
+      return {
+        kind: "fresh_pick_fulfilled",
+        reason:
+          "All ordered cake quantities are supplied by assigned Fresh Pick. Use the existing Fresh Pick readiness controls; do not start Bakery production for these cakes.",
+      };
+    }
+    const remainingQuantity =
+      input.freshPickAllocation?.status === "verified" &&
+      input.freshPickAllocation.totalAssignedQuantity > 0
+        ? input.freshPickAllocation.totalRemainingQuantity
+        : undefined;
+    return input.status === "awaiting_payment"
+      ? { kind: "start_unsecured", remainingQuantity }
+      : { kind: "start_paid", remainingQuantity };
+  }
   return { kind: "none" };
 }
 
@@ -216,6 +248,7 @@ export function bakeryStartSurface(input: {
   canUndoStart: boolean;
   canMarkReady?: boolean;
   canUndoReady?: boolean;
+  freshPickAllocation?: BakeryAllocationSummary;
 }): BakeryProductionSurface {
   return bakeryProductionSurface({
     canMarkReady: input.canMarkReady ?? false,
@@ -224,6 +257,7 @@ export function bakeryStartSurface(input: {
     canUndoStart: input.canUndoStart,
     presentation: input.presentation,
     status: input.status,
+    freshPickAllocation: input.freshPickAllocation,
   });
 }
 

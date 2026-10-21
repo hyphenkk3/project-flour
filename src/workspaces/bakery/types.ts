@@ -6,6 +6,7 @@ import type {
   GuestOrderStatus,
   StorefrontOrderFulfilmentMethod,
 } from "@/types/storefront";
+import type { BakeryAllocationSummary } from "@/engines/bakery/fresh-pick-allocation";
 
 /** P2 production presentation — Ready wins when both Start and Ready exist. */
 export type BakeryProductionPresentation =
@@ -18,6 +19,8 @@ export type BakeryCakeLine = {
   cakeName: string;
   sizeLabel: string;
   quantity: number;
+  cakeId: string | null;
+  sizeId: string | null;
 };
 
 export type BakeryComplimentaryLine = {
@@ -60,6 +63,7 @@ export type BakeryBoardOrder = {
   outForDeliveryAt: string | null;
   includeReceipt: boolean;
   cakeLines: BakeryCakeLine[];
+  freshPickAllocation: BakeryAllocationSummary;
   complimentaryItems: BakeryComplimentaryLine[];
   paidAddons: BakeryPaidAddonLine[];
 };

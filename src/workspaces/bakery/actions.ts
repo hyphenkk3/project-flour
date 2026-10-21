@@ -10,8 +10,10 @@ import {
   canMarkGuestOrderReady,
   canStartGuestProduction,
 } from "@/engines/orders/lifecycle";
+import { bakeryFreshPickStartBlock } from "@/engines/bakery/fresh-pick-allocation";
 import { createClient } from "@/lib/supabase/server";
 import {
+  getBakeryFreshPickAllocationSummary,
   getBakeryBoardOrderById,
   listBakeryBoardOrders,
 } from "@/workspaces/bakery/queries";
@@ -56,7 +58,7 @@ export async function startBakeryProductionAction(
   const { data: row, error: loadError } = await supabase
     .from("orders")
     .select(
-      "id, customer_id, status, production_started_at, ready_at, picked_up_at, out_for_delivery_at, delivered_at",
+      "id, customer_id, extra_stock_id, status, production_started_at, ready_at, picked_up_at, out_for_delivery_at, delivered_at, order_items(id,cake_id,cake_size_id,cake_name,size_label,quantity)",
     )
     .eq("id", orderId)
     .maybeSingle();
@@ -80,6 +82,39 @@ export async function startBakeryProductionAction(
   );
   if (!startGate.ok) {
     return { error: startGate.error };
+  }
+
+  let allocation;
+  try {
+    allocation = await getBakeryFreshPickAllocationSummary(supabase, {
+      id: row.id,
+      extra_stock_id: row.extra_stock_id,
+      order_items: (row.order_items ?? []).map((item) => ({
+        cakeId: item.cake_id,
+        cakeName: item.cake_name,
+        sizeId: item.cake_size_id,
+        sizeLabel: item.size_label,
+        quantity: Number(item.quantity),
+      })),
+    });
+  } catch {
+    return {
+      error:
+        "Could not verify Fresh Pick allocation. Refresh and review the stock links before starting production.",
+    };
+  }
+  const allocationBlock = bakeryFreshPickStartBlock(allocation);
+  if (allocationBlock === "review") {
+    return {
+      error:
+        "Fresh Pick allocation needs review. Refresh and ask a Manager to review the stock links before starting production.",
+    };
+  }
+  if (allocationBlock === "fully_covered") {
+    return {
+      error:
+        "All ordered cake quantities are supplied by Fresh Pick. Use the existing Fresh Pick readiness controls; Bakery production was not started.",
+    };
   }
 
   const { error } = await supabase.rpc("mark_guest_order_production_started", {
