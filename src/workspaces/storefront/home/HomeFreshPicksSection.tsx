@@ -14,9 +14,13 @@ const FRESH_PICKS_DESCRIPTION =
 
 type HomeFreshPicksSectionProps = {
   picks: readonly StorefrontExtraPick[];
+  temporarilyUnavailable?: boolean;
 };
 
-export function HomeFreshPicksSection({ picks }: HomeFreshPicksSectionProps) {
+export function HomeFreshPicksSection({
+  picks,
+  temporarilyUnavailable = false,
+}: HomeFreshPicksSectionProps) {
   const todayYmd = toBusinessDateKey();
   const empty = picks.length <= 0;
 
@@ -41,11 +45,15 @@ export function HomeFreshPicksSection({ picks }: HomeFreshPicksSectionProps) {
         {empty ? (
           <div className="mt-4 max-w-[22rem]">
             <p className="text-skyline text-[13px] leading-relaxed">
-              Nothing extra is available right now.
+              {temporarilyUnavailable
+                ? "Fresh Picks are temporarily unavailable. Please try again shortly."
+                : "Nothing extra is available right now."}
             </p>
-            <p className="text-skyline mt-1 text-[13px] leading-relaxed">
-              Check back here for last-minute cake availability.
-            </p>
+            {temporarilyUnavailable ? null : (
+              <p className="text-skyline mt-1 text-[13px] leading-relaxed">
+                Check back here for last-minute cake availability.
+              </p>
+            )}
           </div>
         ) : (
           <div className="max-lg:contents lg:mt-4 lg:overflow-x-auto lg:overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -67,7 +75,9 @@ export function HomeFreshPicksSection({ picks }: HomeFreshPicksSectionProps) {
                 />
               ) : (
                 <span className="text-skyline flex h-full items-center justify-center px-1.5 text-center text-[10px]">
-                  Photo coming soon
+                  {pick.imageLookupFailed
+                    ? "Photo temporarily unavailable"
+                    : "Photo coming soon"}
                 </span>
               );
               return (

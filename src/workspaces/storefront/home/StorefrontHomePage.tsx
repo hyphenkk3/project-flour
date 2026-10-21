@@ -263,9 +263,15 @@ export async function StorefrontHomePage() {
 }
 
 async function HomeFreshPicksIsland() {
-  const rawPicks = await listStorefrontAvailableExtra();
+  const listing = await listStorefrontAvailableExtra();
+  const rawPicks = listing.picks;
   const picks = sortHomepageFreshPicks(rawPicks);
-  return <HomeFreshPicksSection picks={picks} />;
+  return (
+    <HomeFreshPicksSection
+      picks={picks}
+      temporarilyUnavailable={listing.temporarilyUnavailable}
+    />
+  );
 }
 
 async function HomeMerchandisingIsland() {

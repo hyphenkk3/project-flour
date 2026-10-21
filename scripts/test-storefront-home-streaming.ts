@@ -14,7 +14,7 @@ function readSrc(rel: string): string {
 
 const homeSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
 assert.doesNotMatch(homeSrc, /force-dynamic/);
-assert.match(homeSrc, /export function StorefrontHomePage/);
+assert.match(homeSrc, /export async function StorefrontHomePage/);
 assert.match(homeSrc, /<HomeHero/);
 assert.match(homeSrc, /Suspense/);
 assert.match(homeSrc, /HomeFreshPicksIsland/);
@@ -64,7 +64,25 @@ assert.doesNotMatch(availableFn, /unstable_cache/);
 const extraSrc = readSrc("src/workspaces/storefront/extra/queries.ts");
 assert.match(extraSrc, /createPublicClient/);
 assert.match(extraSrc, /await connection\(\)/);
-assert.doesNotMatch(extraSrc, /unstable_cache/);
+assert.match(extraSrc, /readCachedExtraPhotoRows = unstable_cache/);
+assert.match(extraSrc, /revalidate: 60/);
+assert.match(extraSrc, /STOREFRONT_PUBLISHED_CAKES_CACHE_TAG/);
+assert.match(extraSrc, /temporarilyUnavailable: true/);
+assert.match(extraSrc, /imageLookupFailed/);
+const photoCacheStart = extraSrc.indexOf("const readCachedExtraPhotoRows =");
+const photoLookupStart = extraSrc.indexOf("async function extraPhotosByCake(");
+assert.ok(photoCacheStart >= 0 && photoLookupStart > photoCacheStart);
+const photoCache = extraSrc.slice(photoCacheStart, photoLookupStart);
+assert.match(photoCache, /library_cake_photos/);
+assert.match(photoCache, /Throw so a transient read failure is never cached/);
+assert.match(photoCache, /throw new Error\("Public cake photos are temporarily unavailable\."\)/);
+assert.doesNotMatch(photoCache, /extra_stock/);
+const photoLookup = extraSrc.slice(
+  photoLookupStart,
+  extraSrc.indexOf("async function extraDescriptionsByCake", photoLookupStart),
+);
+assert.match(photoLookup, /lookupFailed: true/);
+assert.match(photoLookup, /lookupFailed: false/);
 assert.doesNotMatch(extraSrc, /await createClient\(/);
 
 const brandSrc = readSrc("src/workspaces/storefront/StorefrontBrand.tsx");

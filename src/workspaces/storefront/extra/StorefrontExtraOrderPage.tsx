@@ -102,6 +102,10 @@ async function ExtraOrderBody({
             src={extra.imageUrl}
           />
         </div>
+      ) : extra.imageLookupFailed ? (
+        <div className="bg-fog text-skyline mt-6 flex aspect-[4/3] items-center justify-center rounded-[10px] px-4 text-center text-sm">
+          Photo temporarily unavailable
+        </div>
       ) : null}
       {extra.walkInHeld ? null : (
         <div className="mt-8">
