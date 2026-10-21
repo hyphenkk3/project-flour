@@ -16,9 +16,18 @@ export type AssignExtraToOrderTarget = {
   sizeLabel: string;
 };
 
+export type AssignExtraCandidateOrder = {
+  id: string;
+  customerName: string;
+  pickupDate: string;
+  pickupTime: string;
+};
+
 type Props = {
   extra: AssignExtraToOrderTarget | null;
   open: boolean;
+  /** Existing callers may supply candidates; the picker now loads bounded pages. */
+  candidateOrders?: readonly AssignExtraCandidateOrder[];
   onClose: () => void;
   onAssigned?: () => void;
 };
