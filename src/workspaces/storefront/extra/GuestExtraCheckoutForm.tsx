@@ -1,6 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useActionState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -138,12 +145,45 @@ type GuestExtraCheckoutFormProps = {
   venuePhotos?: DineInVenuePhotoMap;
 };
 
+const subscribeClientReady = () => () => undefined;
+const getClientReadySnapshot = () => typeof window !== "undefined";
+const getServerClientReadySnapshot = () => false;
+
 export function GuestExtraCheckoutForm({
   hoursSnapshot = OPERATING_HOURS_SEED,
   preparationConfig = DEFAULT_FRESH_PICKS_PREPARATION_CONFIG,
   venuePhotos = EMPTY_DINE_IN_VENUE_PHOTOS,
 }: GuestExtraCheckoutFormProps) {
-  const cart = useFreshPickCart();
+  const clientReady = useSyncExternalStore(
+    subscribeClientReady,
+    getClientReadySnapshot,
+    getServerClientReadySnapshot,
+  );
+
+  if (!clientReady) {
+    return <p className="text-skyline text-sm" aria-live="polite">Preparing your Fresh Pick order…</p>;
+  }
+
+  return (
+    <GuestExtraCheckoutFormHydrated
+      cart={readFreshPickCart()}
+      hoursSnapshot={hoursSnapshot}
+      preparationConfig={preparationConfig}
+      venuePhotos={venuePhotos}
+    />
+  );
+}
+
+function GuestExtraCheckoutFormHydrated({
+  hoursSnapshot = OPERATING_HOURS_SEED,
+  preparationConfig = DEFAULT_FRESH_PICKS_PREPARATION_CONFIG,
+  venuePhotos = EMPTY_DINE_IN_VENUE_PHOTOS,
+  cart: initialCart,
+}: GuestExtraCheckoutFormProps & {
+  cart: ReturnType<typeof readFreshPickCart>;
+}) {
+  const currentCart = useFreshPickCart();
+  const cart = currentCart ?? initialCart;
   const router = useRouter();
   const [state, , pending] = useActionState(
     submitGuestExtraOrderAction,
@@ -164,17 +204,25 @@ export function GuestExtraCheckoutForm({
   const pendingSubmitRef = useRef<FormData | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [includeReceiptChoice, setIncludeReceiptChoice] =
-    useState<PhysicalReceiptChoice>("");
+    useState<PhysicalReceiptChoice>(cart?.includeReceiptChoice ?? "");
   const [complimentaryOptions, setComplimentaryOptions] = useState<
     CustomerComplimentaryOption[]
   >([]);
   const [paidAddonOptions, setPaidAddonOptions] = useState<
     CustomerPaidAddonOption[]
   >([]);
-  const [complimentaryCodes, setComplimentaryCodes] = useState<string[]>([]);
-  const [paidAddonCodes, setPaidAddonCodes] = useState<string[]>([]);
-  const [birthdayCardMessage, setBirthdayCardMessage] = useState("");
-  const [wishingCardMessage, setWishingCardMessage] = useState("");
+  const [complimentaryCodes, setComplimentaryCodes] = useState<string[]>(
+    cart?.complimentaryCodes ?? [],
+  );
+  const [paidAddonCodes, setPaidAddonCodes] = useState<string[]>(
+    cart?.paidAddonCodes ?? [],
+  );
+  const [birthdayCardMessage, setBirthdayCardMessage] = useState(
+    cart?.birthdayCardMessage ?? "",
+  );
+  const [wishingCardMessage, setWishingCardMessage] = useState(
+    cart?.wishingCardMessage ?? "",
+  );
 
   const pickupDate = cart?.pickupDate ?? "";
   const pickupTime = cart?.pickupTime ?? "";
@@ -238,36 +286,6 @@ export function GuestExtraCheckoutForm({
     useState("");
   const [clientError, setClientError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (!cart) return;
-    setIncludeReceiptChoice(cart.includeReceiptChoice);
-    setComplimentaryCodes(cart.complimentaryCodes);
-    setPaidAddonCodes(cart.paidAddonCodes);
-    setBirthdayCardMessage(cart.birthdayCardMessage);
-    setWishingCardMessage(cart.wishingCardMessage);
-    setFulfilmentMethod(cart.fulfilmentMethod);
-    setDineInVenue(cart.dineInVenue);
-    const nextParty = readDineInPartyDraftFields(cart);
-    setAdultCount(nextParty.adultCount);
-    setKidCount(nextParty.kidCount);
-    setToddlerCount(nextParty.toddlerCount);
-    setWhitebirdSplitSeatingAcknowledged(
-      nextParty.whitebirdSplitSeatingAcknowledged,
-    );
-    setReservationNote(cart.reservationNote);
-    setSameAsCustomer(cart.sameAsCustomer !== false);
-    setRecipientName(cart.recipientName);
-    setRecipientPhone(cart.recipientPhone);
-    setAddressLine1(cart.addressLine1);
-    setAddressLine2(cart.addressLine2);
-    setPostcode(cart.postcode);
-    setCity(cart.city || OWNER_DELIVERY_CITY);
-    setStateName(cart.state || OWNER_DELIVERY_STATE);
-    setRecipientNotifyPreference(cart.recipientNotifyPreference);
-    setSelectedDate(cart.pickupDate);
-    setSelectedTime(cart.pickupTime);
-  }, [cart]);
 
   useEffect(() => {
     let cancelled = false;

@@ -15,6 +15,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -341,6 +342,103 @@ function persistDraft(
 
 const checkoutPickupOfferCache = new Map<string, CheckoutPickupOffer>();
 const checkoutCakeSizePriceCache = new Map<string, Promise<number | null>>();
+const subscribeClientReady = () => () => undefined;
+const getClientReadySnapshot = () => typeof window !== "undefined";
+const getServerClientReadySnapshot = () => false;
+
+function createInitialPreorderFormState(
+  draft: PreorderDraft | null,
+  {
+    suggestedPickupDate,
+    minPickupDate,
+    maxPickupDate,
+    pickupScopeFrom,
+    pickupScopeTo,
+    pickupScopeConstrainsBounds,
+  }: GuestCheckoutFormProps,
+): { items: PreorderDraftItem[]; fields: PreorderDraftFields } {
+  const draftItems = draft?.items ?? [];
+  const suggested = suggestedPickupDate?.trim().slice(0, 10) ?? "";
+  const scopeFrom = pickupScopeFrom?.trim().slice(0, 10) ?? "";
+  const scopeTo = pickupScopeTo?.trim().slice(0, 10) ?? "";
+  const hasEntryScope =
+    /^\d{4}-\d{2}-\d{2}$/.test(scopeFrom) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(scopeTo);
+  const min = minPickupDate?.trim().slice(0, 10) ?? "";
+  const max = maxPickupDate?.trim().slice(0, 10) ?? "";
+  let pickupDate = /^\d{4}-\d{2}-\d{2}$/.test(suggested)
+    ? suggested
+    : hasEntryScope
+      ? ""
+      : (draft?.pickupDate ?? "");
+  if (
+    draftItems.length > 0 &&
+    /^\d{4}-\d{2}-\d{2}$/.test(draft?.pickupDate ?? "")
+  ) {
+    pickupDate = String(draft?.pickupDate);
+  }
+  if (max && pickupDate > max && draftItems.length === 0) pickupDate = "";
+  if (min && pickupDate && pickupDate < min && draftItems.length === 0) {
+    pickupDate =
+      /^\d{4}-\d{2}-\d{2}$/.test(suggested) &&
+      suggested >= min &&
+      (!max || suggested <= max)
+        ? suggested
+        : min;
+  }
+  if (!pickupDate && draftItems.length === 0) {
+    pickupDate =
+      (/^\d{4}-\d{2}-\d{2}$/.test(suggested) ? suggested : "") ||
+      min ||
+      emptyCartEarliestCollectionDate();
+  }
+
+  return {
+    items: draftItems,
+    fields: {
+      ...emptyPreorderFields(),
+      customerName: draft?.customerName ?? "",
+      phone: draft?.phone ?? "",
+      email: "",
+      emailSubmissionReceiptRequested: false,
+      includeReceiptChoice: draft?.includeReceiptChoice ?? "",
+      pickupDate,
+      pickupScopeFrom: hasEntryScope ? scopeFrom : (draft?.pickupScopeFrom ?? ""),
+      pickupScopeTo: hasEntryScope ? scopeTo : (draft?.pickupScopeTo ?? ""),
+      pickupScopeConstrainsBounds: hasEntryScope
+        ? Boolean(pickupScopeConstrainsBounds)
+        : (draft?.pickupScopeConstrainsBounds ?? false),
+      pickupTime: draft?.pickupTime ?? "",
+      reservationTime: draft?.reservationTime ?? "",
+      fulfilmentMethod: parseCustomerWebsiteFulfilmentMethod(
+        draft?.fulfilmentMethod,
+      ),
+      dineInVenue: draft?.dineInVenue ?? "",
+      adultCount: draft?.adultCount ?? "",
+      kidCount: draft?.kidCount ?? "",
+      toddlerCount: draft?.toddlerCount ?? "",
+      guestCount: draft?.guestCount ?? "",
+      whitebirdSplitSeatingAcknowledged:
+        draft?.whitebirdSplitSeatingAcknowledged ?? false,
+      reservationNote: draft?.reservationNote ?? "",
+      recipientName: draft?.recipientName ?? "",
+      recipientPhone: draft?.recipientPhone ?? "",
+      addressLine1: draft?.addressLine1 ?? "",
+      addressLine2: draft?.addressLine2 ?? "",
+      postcode: draft?.postcode ?? "",
+      city: draft?.city ?? OWNER_DELIVERY_CITY,
+      state: draft?.state ?? OWNER_DELIVERY_STATE,
+      recipientNotifyPreference: draft?.recipientNotifyPreference ?? "",
+      sameAsCustomer: draft?.sameAsCustomer ?? true,
+      notes: draft?.notes ?? "",
+      complimentaryCodes: draft?.complimentaryCodes ?? [],
+      paidAddonCodes: draft?.paidAddonCodes ?? [],
+      birthdayCardMessage: draft?.birthdayCardMessage ?? "",
+      wishingCardMessage: draft?.wishingCardMessage ?? "",
+      paidAddonUnitPriceByCode: draft?.paidAddonUnitPriceByCode ?? {},
+    },
+  };
+}
 
 export function GuestCheckoutForm({
   suggestedPickupDate = null,
@@ -350,6 +448,45 @@ export function GuestCheckoutForm({
   pickupScopeTo = null,
   pickupScopeConstrainsBounds = false,
 }: GuestCheckoutFormProps) {
+  const clientReady = useSyncExternalStore(
+    subscribeClientReady,
+    getClientReadySnapshot,
+    getServerClientReadySnapshot,
+  );
+
+  if (!clientReady) {
+    return (
+      <>
+        <CheckoutLoadStepProbe step="preparing_hydration_gate" />
+        <p className="text-skyline text-sm" aria-live="polite">
+          Preparing your preorder…
+        </p>
+      </>
+    );
+  }
+
+  return (
+    <GuestCheckoutFormHydrated
+      initialDraft={readPreorderDraft()}
+      maxPickupDate={maxPickupDate}
+      minPickupDate={minPickupDate}
+      pickupScopeConstrainsBounds={pickupScopeConstrainsBounds}
+      pickupScopeFrom={pickupScopeFrom}
+      pickupScopeTo={pickupScopeTo}
+      suggestedPickupDate={suggestedPickupDate}
+    />
+  );
+}
+
+function GuestCheckoutFormHydrated({
+  suggestedPickupDate = null,
+  minPickupDate = null,
+  maxPickupDate = null,
+  pickupScopeFrom = null,
+  pickupScopeTo = null,
+  pickupScopeConstrainsBounds = false,
+  initialDraft,
+}: GuestCheckoutFormProps & { initialDraft: PreorderDraft | null }) {
   const router = useRouter();
   const [state, , pending] = useActionState(
     submitGuestPreorderAction,
@@ -379,17 +516,6 @@ export function GuestCheckoutForm({
   const [deliveryProcessingAckSnapshot, setDeliveryProcessingAckSnapshot] =
     useState("");
 
-  useEffect(() => {
-    if (viewState.error) {
-      setConfirmOpen(false);
-      if (isCakePriceAckStaleError(viewState.error)) {
-        checkoutCakeSizePriceCache.clear();
-        setAcknowledgedSnapshot("");
-        setPriceRefreshKey((key) => key + 1);
-      }
-    }
-  }, [viewState.error]);
-
   useLayoutEffect(() => {
     const orderId = viewState.orderId;
     if (!orderId || viewState.error || navigatedRef.current) return;
@@ -399,11 +525,19 @@ export function GuestCheckoutForm({
     router.replace(`/order/success?order=${orderId}`);
   }, [router, viewState.error, viewState.orderId]);
 
-  const [items, setItems] = useState<PreorderDraftItem[]>([]);
-  const [fields, setFields] = useState<PreorderDraftFields>(() =>
-    emptyPreorderFields(),
+  const [initialFormState] = useState(() =>
+    createInitialPreorderFormState(initialDraft, {
+      suggestedPickupDate,
+      minPickupDate,
+      maxPickupDate,
+      pickupScopeFrom,
+      pickupScopeTo,
+      pickupScopeConstrainsBounds,
+    }),
   );
-  const [hydrated, setHydrated] = useState(false);
+  const [items, setItems] = useState(initialFormState.items);
+  const [fields, setFields] = useState(initialFormState.fields);
+  const hydrated = true;
   const [itemError, setItemError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [cakes, setCakes] = useState<StorefrontCake[]>([]);
@@ -821,100 +955,6 @@ export function GuestCheckoutForm({
     pickupScopeFrom,
     pickupScopeTo,
     suggestedPickupDate,
-  ]);
-
-  useLayoutEffect(() => {
-    const draft = readPreorderDraft();
-    const draftItems = draft?.items ?? [];
-    const suggested = suggestedPickupDate?.trim().slice(0, 10) ?? "";
-    const scopeFrom = pickupScopeFrom?.trim().slice(0, 10) ?? "";
-    const scopeTo = pickupScopeTo?.trim().slice(0, 10) ?? "";
-    const hasEntryScope =
-      /^\d{4}-\d{2}-\d{2}$/.test(scopeFrom) &&
-      /^\d{4}-\d{2}-\d{2}$/.test(scopeTo);
-    const min = minPickupDate?.trim().slice(0, 10) ?? "";
-    const max = maxPickupDate?.trim().slice(0, 10) ?? "";
-    let pickupDate = /^\d{4}-\d{2}-\d{2}$/.test(suggested)
-      ? suggested
-      : hasEntryScope
-        ? ""
-        : (draft?.pickupDate ?? "");
-    if (
-      draftItems.length > 0 &&
-      /^\d{4}-\d{2}-\d{2}$/.test(draft?.pickupDate ?? "")
-    ) {
-      pickupDate = String(draft?.pickupDate);
-    }
-    if (max && pickupDate > max && draftItems.length === 0) {
-      pickupDate = "";
-    }
-    if (min && pickupDate && pickupDate < min && draftItems.length === 0) {
-      pickupDate =
-        /^\d{4}-\d{2}-\d{2}$/.test(suggested) &&
-        suggested >= min &&
-        (!max || suggested <= max)
-          ? suggested
-          : min;
-    }
-    if (!pickupDate && draftItems.length === 0) {
-      pickupDate =
-        (/^\d{4}-\d{2}-\d{2}$/.test(suggested) ? suggested : "") ||
-        min ||
-        emptyCartEarliestCollectionDate();
-    }
-    setItems(draft?.items ?? []);
-    setFields({
-      ...emptyPreorderFields(),
-      customerName: draft?.customerName ?? "",
-      phone: draft?.phone ?? "",
-      email: "",
-      emailSubmissionReceiptRequested: false,
-      includeReceiptChoice: draft?.includeReceiptChoice ?? "",
-      pickupDate,
-      pickupScopeFrom: hasEntryScope
-        ? scopeFrom
-        : (draft?.pickupScopeFrom ?? ""),
-      pickupScopeTo: hasEntryScope ? scopeTo : (draft?.pickupScopeTo ?? ""),
-      pickupScopeConstrainsBounds: hasEntryScope
-        ? pickupScopeConstrainsBounds
-        : (draft?.pickupScopeConstrainsBounds ?? false),
-      pickupTime: draft?.pickupTime ?? "",
-      reservationTime: draft?.reservationTime ?? "",
-      fulfilmentMethod: parseCustomerWebsiteFulfilmentMethod(
-        draft?.fulfilmentMethod,
-      ),
-      dineInVenue: draft?.dineInVenue ?? "",
-      adultCount: draft?.adultCount ?? "",
-      kidCount: draft?.kidCount ?? "",
-      toddlerCount: draft?.toddlerCount ?? "",
-      guestCount: draft?.guestCount ?? "",
-      whitebirdSplitSeatingAcknowledged:
-        draft?.whitebirdSplitSeatingAcknowledged ?? false,
-      reservationNote: draft?.reservationNote ?? "",
-      recipientName: draft?.recipientName ?? "",
-      recipientPhone: draft?.recipientPhone ?? "",
-      addressLine1: draft?.addressLine1 ?? "",
-      addressLine2: draft?.addressLine2 ?? "",
-      postcode: draft?.postcode ?? "",
-      city: draft?.city ?? OWNER_DELIVERY_CITY,
-      state: draft?.state ?? OWNER_DELIVERY_STATE,
-      recipientNotifyPreference: draft?.recipientNotifyPreference ?? "",
-      sameAsCustomer: draft?.sameAsCustomer ?? true,
-      notes: draft?.notes ?? "",
-      complimentaryCodes: draft?.complimentaryCodes ?? [],
-      paidAddonCodes: draft?.paidAddonCodes ?? [],
-      birthdayCardMessage: draft?.birthdayCardMessage ?? "",
-      wishingCardMessage: draft?.wishingCardMessage ?? "",
-      paidAddonUnitPriceByCode: draft?.paidAddonUnitPriceByCode ?? {},
-    });
-    setHydrated(true);
-  }, [
-    suggestedPickupDate,
-    minPickupDate,
-    maxPickupDate,
-    pickupScopeFrom,
-    pickupScopeTo,
-    pickupScopeConstrainsBounds,
   ]);
 
   useEffect(() => {
@@ -1616,6 +1656,7 @@ export function GuestCheckoutForm({
     if (!formData) return;
     const checkoutAttemptId = readPreorderDraft()?.checkoutAttemptId;
     if (!isCheckoutRequestId(checkoutAttemptId)) {
+      setConfirmOpen(false);
       setActionState({
         error: "Checkout retry protection could not be prepared. Please refresh and try again.",
       });
@@ -1637,6 +1678,12 @@ export function GuestCheckoutForm({
       },
     });
     if (result.error) {
+      setConfirmOpen(false);
+      if (isCakePriceAckStaleError(result.error)) {
+        checkoutCakeSizePriceCache.clear();
+        setAcknowledgedSnapshot("");
+        setPriceRefreshKey((key) => key + 1);
+      }
       setActionState(result);
       setActionPending(false);
     }
