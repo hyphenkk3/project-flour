@@ -136,6 +136,7 @@ import {
   useCheckoutActionReturnPerf,
 } from "@/workspaces/storefront/checkout/CheckoutDevPerf";
 import { StorefrontSuccessLoading } from "@/workspaces/storefront/checkout/StorefrontSuccessLoading";
+import { ensureCheckoutRecoveryCookie } from "@/workspaces/storefront/checkout/checkout-recovery-client";
 
 const initialState: ExtraOrderState = { error: null };
 
@@ -615,6 +616,13 @@ function GuestExtraCheckoutFormHydrated({
     }
     formData.set("checkout_request_id", checkoutAttemptId);
     setActionPending(true);
+    if (!(await ensureCheckoutRecoveryCookie("fresh_pick"))) {
+      setActionPending(false);
+      setActionState({
+        error: "Secure checkout recovery could not be prepared. Please try again.",
+      });
+      return;
+    }
     const result = await submitGuestOrderAndNavigate({
       formData,
       flow: "extra",

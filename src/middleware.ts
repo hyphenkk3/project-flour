@@ -27,7 +27,11 @@ function isPublicPath(pathname: string) {
 
 function isMachineDispatchPath(pathname: string) {
   // Skip staff-session middleware only. Bearer auth is enforced by the route.
-  return pathname === "/api/staff/notifications/dispatch";
+  // Checkout recovery only issues a same-origin HttpOnly browser capability.
+  return (
+    pathname === "/api/staff/notifications/dispatch" ||
+    pathname === "/api/guest-checkout/recovery"
+  );
 }
 
 function staffLoginRedirect(request: NextRequest): NextResponse {

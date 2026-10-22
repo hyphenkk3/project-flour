@@ -172,6 +172,7 @@ import { clampCustomerPickupWindow } from "@/engines/menu/customer-browse";
 import {
   isCheckoutRequestId,
 } from "@/workspaces/storefront/checkout/checkout-attempt";
+import { ensureCheckoutRecoveryCookie } from "@/workspaces/storefront/checkout/checkout-recovery-client";
 import {
   emptyPreorderFields,
   fieldsAfterFulfilmentChange,
@@ -1664,6 +1665,13 @@ function GuestCheckoutFormHydrated({
     }
     formData.set("checkout_request_id", checkoutAttemptId);
     setActionPending(true);
+    if (!(await ensureCheckoutRecoveryCookie("whole_cake"))) {
+      setActionPending(false);
+      setActionState({
+        error: "Secure checkout recovery could not be prepared. Please try again.",
+      });
+      return;
+    }
     const result = await submitGuestOrderAndNavigate({
       formData,
       flow: "preorder",

@@ -35,6 +35,7 @@ import {
   type CustomerPaidAddonOption,
 } from "@/engines/orders/customer-preorder-options";
 import { createClient, createPublicClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import { getStorefrontCollectionForPickupDate } from "@/workspaces/storefront/catalog/queries";
 import { parseRequiredPhysicalReceipt } from "@/workspaces/storefront/checkout/preorder-draft";
@@ -46,6 +47,7 @@ import {
   isCheckoutRequestId,
 } from "@/workspaces/storefront/checkout/checkout-attempt";
 import { resolveCheckoutAttempt } from "@/workspaces/storefront/checkout/checkout-idempotency-server";
+import { getCheckoutRecoveryDigest } from "@/workspaces/storefront/checkout/checkout-recovery";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import {
   acceptPerfCorrelationId,
@@ -289,6 +291,7 @@ async function submitGuestExtraOrderActionBody(
     .map((value) => String(value).trim());
   const customerName = String(formData.get("customer_name") ?? "").trim();
   const requestId = String(formData.get("checkout_request_id") ?? "").trim();
+  const recoveryDigest = await getCheckoutRecoveryDigest("fresh_pick");
   const phone = String(formData.get("phone") ?? "").trim();
   const includeReceipt = parseRequiredPhysicalReceipt(
     String(formData.get("include_receipt") ?? "").trim(),
@@ -319,6 +322,9 @@ async function submitGuestExtraOrderActionBody(
   }
   if (!isCheckoutRequestId(requestId)) {
     return { error: "Checkout retry protection could not be verified. Please refresh and try again." };
+  }
+  if (!recoveryDigest) {
+    return { error: "Checkout recovery could not be verified. Please refresh checkout and try again." };
   }
   if (includeReceipt === null) {
     return {
@@ -464,12 +470,13 @@ async function submitGuestExtraOrderActionBody(
     },
   });
 
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const rpcStarted = performance.now();
   const { data, error } = await supabase.rpc(
-    "submit_guest_extra_order_idempotent_v2",
+    "submit_guest_extra_order_idempotent_v3",
     {
       p_request_id: requestId,
+      p_recovery_digest: recoveryDigest,
       p_submission_payload: checkoutSubmissionPayload(formData),
       p_customer_name: customerName,
       p_phone: phone,

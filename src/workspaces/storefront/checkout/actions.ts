@@ -38,6 +38,7 @@ import {
 import type { StorefrontCake, StorefrontCollection } from "@/types/storefront";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/admin";
 import {
   recordCheckoutDateHeaders,
   recordCheckoutDateStage,
@@ -88,6 +89,7 @@ import {
   isCheckoutRequestId,
 } from "@/workspaces/storefront/checkout/checkout-attempt";
 import { resolveCheckoutAttempt } from "@/workspaces/storefront/checkout/checkout-idempotency-server";
+import { getCheckoutRecoveryDigest } from "@/workspaces/storefront/checkout/checkout-recovery";
 import { customerNameValidationError } from "@/engines/orders/customer-name";
 import {
   acceptPerfCorrelationId,
@@ -331,6 +333,7 @@ async function submitGuestPreorderActionBody(
   const parseStarted = performance.now();
   const customerName = String(formData.get("customer_name") ?? "").trim();
   const requestId = String(formData.get("checkout_request_id") ?? "").trim();
+  const recoveryDigest = await getCheckoutRecoveryDigest("whole_cake");
   const phone = String(formData.get("phone") ?? "").trim();
   const includeReceipt = parseRequiredPhysicalReceipt(
     String(formData.get("include_receipt") ?? "").trim(),
@@ -352,6 +355,9 @@ async function submitGuestPreorderActionBody(
   }
   if (!isCheckoutRequestId(requestId)) {
     return { error: "Checkout retry protection could not be verified. Please refresh and try again." };
+  }
+  if (!recoveryDigest) {
+    return { error: "Checkout recovery could not be verified. Please refresh checkout and try again." };
   }
   const nameError = customerNameValidationError(customerName);
   if (nameError) {
@@ -460,6 +466,7 @@ async function submitGuestPreorderActionBody(
 
   const rpcArgs: Record<string, unknown> = {
     p_request_id: requestId,
+    p_recovery_digest: recoveryDigest,
     p_submission_payload: checkoutSubmissionPayload(formData),
     p_customer_name: customerName,
     p_phone: phone,
@@ -507,7 +514,7 @@ async function submitGuestPreorderActionBody(
     formData.get("catalogue_voucher_id") ?? "",
   ).trim();
   const clientStarted = performance.now();
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   logPerf("CHECKOUT_SUBMIT", "createClient", performance.now() - clientStarted);
   let usedCombinedSubmit = false;
   const rpcStarted = performance.now();
@@ -515,7 +522,7 @@ async function submitGuestPreorderActionBody(
   let error: { message: string } | null = null;
   if (catalogueVoucherId) {
     const combined = await supabase.rpc(
-      "submit_guest_preorder_with_catalogue_voucher_idempotent_v2",
+      "submit_guest_preorder_with_catalogue_voucher_idempotent_v3",
       {
         ...rpcArgs,
         p_catalogue_voucher_id: catalogueVoucherId,
@@ -532,7 +539,7 @@ async function submitGuestPreorderActionBody(
     );
   } else {
     const submitted = await supabase.rpc(
-      "submit_guest_preorder_idempotent_v2",
+      "submit_guest_preorder_idempotent_v3",
       rpcArgs,
     );
     data = submitted.data;
