@@ -141,10 +141,7 @@ const membershipFn = queriesSrc.slice(
 const detailByIdFn =
   membershipFn +
   "\n" +
-  queriesSrc.slice(
-    detailStart,
-    detailNext === -1 ? undefined : detailNext,
-  );
+  queriesSrc.slice(detailStart, detailNext === -1 ? undefined : detailNext);
 
 assert.match(browseFn, /isCurrentlyCustomerOrderable/);
 assert.match(browseFn, /website_override/);
@@ -155,10 +152,14 @@ assert.match(browseFn, /currentlyOffered/);
 assert.match(browseFn, /sortBrowsePublicationCakes/);
 assert.match(browseFn, /cakeById\.set/);
 assert.match(browseFn, /isOfferableStatus/);
-assert.match(browseFn, /cake\.sizes\.length === 0/);
+assert.match(browseFn, /readCachedStorefrontCakesByIds/);
 assert.match(browseFn, /from\("library_cakes"\)/);
 assert.match(browseFn, /\.in\("status", \["active", "seasonal"\]\)/);
-assert.match(browseFn, /cakeById\.has/);
+assert.match(
+  queriesSrc,
+  /filter\(\(cake\) => cake\.sizes\.length > 0\)/,
+  "display metadata loader omits cakes without a configured size",
+);
 assert.doesNotMatch(browseFn, /isCatalogueExpired/);
 assert.doesNotMatch(browseFn, /engines\/preorder/);
 assert.doesNotMatch(browseFn, /capacity/i);

@@ -523,6 +523,8 @@ const extraPageSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontExtraPage.tsx",
 );
 assert.match(extraPageSrc, /listStorefrontAvailableExtra/);
+assert.match(extraPageSrc, /listing\.picks/);
+assert.match(extraPageSrc, /listing\.temporarilyUnavailable/);
 assert.match(extraPageSrc, /FRESH_PICKS_ADD_TO_CART_CTA/);
 assert.match(extraPageSrc, /freshPickCustomerStatusLabel/);
 assert.match(extraPageSrc, /pick\.walkInHeld/);
@@ -562,6 +564,8 @@ assert.match(homeFreshSrc, /dateLabel \? \(/);
 assert.match(homeFreshSrc, /text-skyline mt-0\.5 text-xs leading-tight whitespace-nowrap/);
 assert.doesNotMatch(homeFreshSrc, / · \$\{dateLabel\}/);
 assert.match(homeFreshSrc, /Order →/);
+assert.match(homeFreshSrc, /Photo temporarily unavailable/);
+assert.match(homeFreshSrc, /Photo coming soon/);
 assert.doesNotMatch(homeFreshSrc, /Pickup today/);
 assert.doesNotMatch(homeFreshSrc, /Orders available through/);
 assert.doesNotMatch(homeFreshSrc, /Held by/);
@@ -571,7 +575,8 @@ assert.doesNotMatch(homeFreshSrc, /text-skyline text-\[11px\] leading-tight/);
 const homePageSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
 assert.match(homePageSrc, /listStorefrontAvailableExtra/);
 assert.match(homePageSrc, /sortHomepageFreshPicks/);
-assert.match(homePageSrc, /HomeFreshPicksSection picks=\{picks\}/);
+assert.match(homePageSrc, /HomeFreshPicksSection/);
+assert.match(homePageSrc, /temporarilyUnavailable=\{listing\.temporarilyUnavailable\}/);
 
 const publicHeldVisibleSrc = readSrc(
   "supabase/migrations/20260919120000_extra_stock_public_select_held_visible.sql",

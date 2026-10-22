@@ -13,8 +13,9 @@ import { isExtraWalkInHeld } from "@/engines/extra/walk-in-hold";
 import { resolveCakePhoto } from "@/engines/menu/cake-photos";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import { toBusinessDateKey } from "@/lib/dates";
-import { createPublicClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
 import { connection } from "next/server";
+import { createPublicClient } from "@/lib/supabase/server";
 import { isMissingCakePhotoSchema } from "@/workspaces/library/cakes/photo-storage";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import {
@@ -24,6 +25,7 @@ import {
   type StorefrontCakePhotoRow,
 } from "@/workspaces/storefront/catalog/cake-photo-map";
 import { loadFreshPicksPreparationConfig } from "@/workspaces/storefront/extra/config";
+import { STOREFRONT_PUBLISHED_CAKES_CACHE_TAG } from "@/workspaces/storefront/catalog/published-cake-cache";
 
 export type StorefrontExtraPick = {
   id: string;
@@ -44,8 +46,14 @@ export type StorefrontExtraPick = {
   availabilityLabel: string;
   imageUrl: string | null;
   imageAlt: string | null;
+  imageLookupFailed: boolean;
   unitPrice: number | null;
   description: string | null;
+};
+
+export type StorefrontExtraListing = {
+  picks: StorefrontExtraPick[];
+  temporarilyUnavailable: boolean;
 };
 
 type ExtraRow = {
@@ -107,36 +115,61 @@ function daysFromRemainingPickup(
   });
 }
 
+const readCachedExtraPhotoRows = unstable_cache(
+  async (cakeIds: string[]): Promise<PhotoRow[]> => {
+    const supabase = createPublicClient();
+    const run = (photoSelect: string) =>
+      supabase
+        .from("library_cake_photos")
+        .select(`cake_id, ${photoSelect}`)
+        .in("cake_id", cakeIds)
+        .order("sort_order", { ascending: true });
+
+    let result = await run(STOREFRONT_CAKE_PHOTO_SELECT);
+    if (result.error && isMissingCakePhotoSchema(result.error.message)) {
+      result = await run(STOREFRONT_CAKE_PHOTO_SELECT_LEGACY);
+    }
+    if (result.error) {
+      if (isMissingCakePhotoSchema(result.error.message)) return [];
+      // Throw so a transient read failure is never cached as "no photo".
+      throw new Error("Public cake photos are temporarily unavailable.");
+    }
+    return (result.data ?? []) as unknown as PhotoRow[];
+  },
+  ["storefront-extra-photos-v1"],
+  {
+    revalidate: 60,
+    tags: [STOREFRONT_PUBLISHED_CAKES_CACHE_TAG],
+  },
+);
+
 async function extraPhotosByCake(
-  supabase: ReturnType<typeof createPublicClient>,
   cakeIds: string[],
-): Promise<Map<string, ReturnType<typeof mapStorefrontCakePhoto>[]>> {
+): Promise<{
+  photosByCake: Map<string, ReturnType<typeof mapStorefrontCakePhoto>[]>;
+  lookupFailed: boolean;
+}> {
   const photosByCake = new Map<
     string,
     ReturnType<typeof mapStorefrontCakePhoto>[]
   >();
-  if (cakeIds.length === 0) return photosByCake;
+  if (cakeIds.length === 0) return { photosByCake, lookupFailed: false };
 
-  const run = (photoSelect: string) =>
-    supabase
-      .from("library_cake_photos")
-      .select(`cake_id, ${photoSelect}`)
-      .in("cake_id", cakeIds)
-      .order("sort_order", { ascending: true });
-
-  let result = await run(STOREFRONT_CAKE_PHOTO_SELECT);
-  if (result.error && isMissingCakePhotoSchema(result.error.message)) {
-    result = await run(STOREFRONT_CAKE_PHOTO_SELECT_LEGACY);
+  let rows: PhotoRow[];
+  try {
+    // Stable input order lets an unchanged public photo set share the cache.
+    rows = await readCachedExtraPhotoRows([...cakeIds].sort());
+  } catch {
+    return { photosByCake, lookupFailed: true };
   }
-  if (result.error) return photosByCake;
 
-  for (const photo of (result.data ?? []) as unknown as PhotoRow[]) {
+  for (const photo of rows) {
     if (!photo.image_url) continue;
     const list = photosByCake.get(photo.cake_id) ?? [];
     list.push(mapStorefrontCakePhoto(photo, list.length));
     photosByCake.set(photo.cake_id, list);
   }
-  return photosByCake;
+  return { photosByCake, lookupFailed: false };
 }
 
 async function extraDescriptionsByCake(
@@ -176,6 +209,7 @@ async function extraListingDetails(
   rows: ExtraRow[],
 ): Promise<{
   photosByCake: Map<string, ReturnType<typeof mapStorefrontCakePhoto>[]>;
+  photoLookupFailed: boolean;
   descriptionByCake: Map<string, string | null>;
 }> {
   const cakeIds = [
@@ -185,11 +219,15 @@ async function extraListingDetails(
         .filter((id): id is string => Boolean(id)),
     ),
   ];
-  const [photosByCake, descriptionByCake] = await Promise.all([
-    extraPhotosByCake(supabase, cakeIds),
+  const [photoLookup, descriptionByCake] = await Promise.all([
+    extraPhotosByCake(cakeIds),
     extraDescriptionsByCake(supabase, cakeIds),
   ]);
-  return { photosByCake, descriptionByCake };
+  return {
+    photosByCake: photoLookup.photosByCake,
+    photoLookupFailed: photoLookup.lookupFailed,
+    descriptionByCake,
+  };
 }
 
 function mapPick(
@@ -197,6 +235,7 @@ function mapPick(
   todayYmd: string,
   now: Date,
   photosByCake: Map<string, ReturnType<typeof mapStorefrontCakePhoto>[]>,
+  photoLookupFailed: boolean,
   unitPrice: number | null,
   description: string | null,
   snapshot: OperatingHoursSnapshot,
@@ -240,6 +279,7 @@ function mapPick(
     availabilityLabel: freshPickCustomerStatusLabel({ walkInHeld, days }),
     imageUrl: image?.url ?? null,
     imageAlt: image?.altText ?? null,
+    imageLookupFailed: photoLookupFailed && Boolean(row.library_cake_id),
     unitPrice,
     description,
   };
@@ -251,7 +291,7 @@ function mapPick(
  * values stay independent. Held units are listed but not orderable.
  */
 export async function listStorefrontAvailableExtra(): Promise<
-  StorefrontExtraPick[]
+  StorefrontExtraListing
 > {
   await connection();
   try {
@@ -267,7 +307,7 @@ export async function listStorefrontAvailableExtra(): Promise<
       .is("cut_into_slices_at", null);
 
     if (error) {
-      return [];
+      return { picks: [], temporarilyUnavailable: true };
     }
 
     const now = new Date();
@@ -305,6 +345,7 @@ export async function listStorefrontAvailableExtra(): Promise<
           todayYmd,
           now,
           details.photosByCake,
+          details.photoLookupFailed,
           priceByExtraId.get(row.id) ?? null,
           row.library_cake_id
             ? (details.descriptionByCake.get(row.library_cake_id) ?? null)
@@ -322,9 +363,12 @@ export async function listStorefrontAvailableExtra(): Promise<
         days: pick.days,
       }),
     }));
-    return sortCustomerFreshPicksByAvailabilityDay(picks);
+    return {
+      picks: sortCustomerFreshPicksByAvailabilityDay(picks),
+      temporarilyUnavailable: false,
+    };
   } catch {
-    return [];
+    return { picks: [], temporarilyUnavailable: true };
   }
 }
 
@@ -378,6 +422,7 @@ export async function getStorefrontExtraById(
       todayYmd,
       now,
       details.photosByCake,
+      details.photoLookupFailed,
       unitPrice,
       row.library_cake_id
         ? (details.descriptionByCake.get(row.library_cake_id) ?? null)

@@ -192,9 +192,12 @@ assert.deepEqual(
 const pageSrc = readSrc(
   "src/workspaces/storefront/home/StorefrontCollectionCakesPage.tsx",
 );
-assert.match(pageSrc, /listAvailableCakes\(collectionId\)/);
+assert.match(pageSrc, /listAvailableCakes\(collectionId/);
 assert.match(pageSrc, /BrowseCakeCatalogue/);
-assert.match(pageSrc, /emptyMessage="No cakes are listed in this collection yet."/);
+assert.match(
+  pageSrc,
+  /emptyMessage="No cakes are listed in this collection yet."/,
+);
 assert.doesNotMatch(pageSrc, /listBrowsePublishedCakes/);
 assert.doesNotMatch(pageSrc, /evaluateCollectionDate/);
 assert.doesNotMatch(pageSrc, /browse-sort/);

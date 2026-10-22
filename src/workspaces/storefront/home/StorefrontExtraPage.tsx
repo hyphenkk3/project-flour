@@ -64,17 +64,22 @@ export function StorefrontExtraPage() {
 }
 
 async function FreshPicksCatalogue() {
-  const picks = await listStorefrontAvailableExtra();
+  const listing = await listStorefrontAvailableExtra();
+  const picks = listing.picks;
   const todayYmd = toBusinessDateKey();
 
   if (picks.length === 0) {
     return (
       <section className="border-fog mt-10 border-t pt-8">
         <h2 className="text-ink text-lg font-medium tracking-tight">
-          No Fresh Picks right now
+          {listing.temporarilyUnavailable
+            ? "Fresh Picks are temporarily unavailable"
+            : "No Fresh Picks right now"}
         </h2>
         <p className="text-skyline mt-2 text-sm leading-relaxed">
-          Check back later — Bakery may add cakes for today or tomorrow.
+          {listing.temporarilyUnavailable
+            ? "Please refresh this page in a moment."
+            : "Check back later — Bakery may add cakes for today or tomorrow."}
         </p>
       </section>
     );
@@ -148,7 +153,9 @@ function FreshPickCatalogueRow({
           />
         ) : (
           <div className="text-skyline flex h-full min-h-[10rem] items-center justify-center px-4 text-center text-sm">
-            Photo coming soon
+            {pick.imageLookupFailed
+              ? "Photo temporarily unavailable"
+              : "Photo coming soon"}
           </div>
         )}
       </div>
