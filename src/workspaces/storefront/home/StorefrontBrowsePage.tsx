@@ -33,9 +33,16 @@ function BrowseCatalogueFallback() {
   );
 }
 
-async function BrowseCatalogueIsland() {
+async function BrowseCatalogueIsland({
+  injectCatalogueFailure,
+}: {
+  injectCatalogueFailure: boolean;
+}) {
   const [cakes, vouchers] = await Promise.all([
-    listBrowsePublishedCakes(),
+    listBrowsePublishedCakes(
+      undefined,
+      injectCatalogueFailure ? { testFailure: "browse" } : undefined,
+    ),
     listPublicCatalogueVouchers(),
   ]);
   const today = singaporeDateFromIso(new Date().toISOString());
@@ -59,7 +66,9 @@ async function BrowseCatalogueIsland() {
   );
 }
 
-export function StorefrontBrowsePage() {
+export function StorefrontBrowsePage({
+  injectCatalogueFailure = false,
+}: { injectCatalogueFailure?: boolean } = {}) {
   return (
     <main className="bg-paper mx-auto min-h-screen max-w-5xl px-5 py-4 sm:px-6 sm:py-10">
       <CakeEntryScopeClearOnUnscopedCakeClick />
@@ -97,7 +106,7 @@ export function StorefrontBrowsePage() {
       </p>
 
       <Suspense fallback={<BrowseCatalogueFallback />}>
-        <BrowseCatalogueIsland />
+        <BrowseCatalogueIsland injectCatalogueFailure={injectCatalogueFailure} />
       </Suspense>
 
       <p className="mt-10">

@@ -7,10 +7,18 @@ export const metadata: Metadata = {
 
 type CollectionOrderPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ __catalogue_failure?: string | string[] }>;
 };
 
-export default function CollectionOrderPage({
+export default async function CollectionOrderPage({
   params,
+  searchParams,
 }: CollectionOrderPageProps) {
-  return <StorefrontCollectionCakesPage params={params} />;
+  const failure = (await searchParams).__catalogue_failure;
+  return (
+    <StorefrontCollectionCakesPage
+      params={params}
+      injectCatalogueFailure={failure === "monthly"}
+    />
+  );
 }

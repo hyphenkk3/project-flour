@@ -10,10 +10,15 @@ export const metadata: Metadata = {
 
 export const viewport = storefrontViewport;
 
-export default function HomePage() {
+type HomePageProps = {
+  searchParams: Promise<{ __catalogue_failure?: string | string[] }>;
+};
+
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const failure = (await searchParams).__catalogue_failure;
   return (
     <StorefrontShell>
-      <StorefrontHomePage />
+      <StorefrontHomePage injectCatalogueFailure={failure === "home"} />
     </StorefrontShell>
   );
 }

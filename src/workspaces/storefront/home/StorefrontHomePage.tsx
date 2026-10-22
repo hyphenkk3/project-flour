@@ -241,7 +241,9 @@ function HomeMerchandisingFallback() {
   );
 }
 
-export async function StorefrontHomePage() {
+export async function StorefrontHomePage({
+  injectCatalogueFailure = false,
+}: { injectCatalogueFailure?: boolean } = {}) {
   await connection();
 
   return (
@@ -254,7 +256,7 @@ export async function StorefrontHomePage() {
       </Suspense>
       <CakeEntryScopeClearOnUnscopedCakeClick />
       <Suspense fallback={<HomeMerchandisingFallback />}>
-        <HomeMerchandisingIsland />
+        <HomeMerchandisingIsland injectCatalogueFailure={injectCatalogueFailure} />
       </Suspense>
 
       <PreorderInProgressBar desktopRail={false} />
@@ -274,10 +276,16 @@ async function HomeFreshPicksIsland() {
   );
 }
 
-async function HomeMerchandisingIsland() {
+async function HomeMerchandisingIsland({
+  injectCatalogueFailure,
+}: {
+  injectCatalogueFailure: boolean;
+}) {
   const todayYmd = toBusinessDateKey();
   const todayYm = businessYearMonth(todayYmd) ?? todayYmd.slice(0, 7);
-  const popularPromise = listHomepagePopularCakes();
+  const popularPromise = listHomepagePopularCakes(
+    injectCatalogueFailure ? { testFailure: "home" } : undefined,
+  );
   const [catalogues, specials] = await Promise.all([
     listOrderableMonthlyCatalogues(todayYmd),
     listCustomerSpecialCatalogues(todayYmd),

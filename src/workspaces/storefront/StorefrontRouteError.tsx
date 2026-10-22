@@ -11,6 +11,16 @@ export function StorefrontRouteError({
   title,
   unstable_retry,
 }: StorefrontRouteErrorProps) {
+  function retry() {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("__catalogue_failure")) {
+      url.searchParams.delete("__catalogue_failure");
+      window.location.assign(url.toString());
+      return;
+    }
+    unstable_retry();
+  }
+
   return (
     <main
       aria-live="polite"
@@ -30,7 +40,7 @@ export function StorefrontRouteError({
       <div className="mt-6 flex flex-wrap gap-3">
         <button
           className="bg-ink text-mist hover:bg-skyline min-h-11 rounded-md px-5 text-sm font-medium"
-          onClick={unstable_retry}
+          onClick={retry}
           type="button"
         >
           Try again

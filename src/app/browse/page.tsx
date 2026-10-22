@@ -8,6 +8,11 @@ export const metadata: Metadata = {
   description: "Browse Whitebird cakes published for discovery.",
 };
 
-export default function BrowsePage() {
-  return <StorefrontBrowsePage />;
+type BrowsePageProps = {
+  searchParams: Promise<{ __catalogue_failure?: string | string[] }>;
+};
+
+export default async function BrowsePage({ searchParams }: BrowsePageProps) {
+  const failure = (await searchParams).__catalogue_failure;
+  return <StorefrontBrowsePage injectCatalogueFailure={failure === "browse"} />;
 }

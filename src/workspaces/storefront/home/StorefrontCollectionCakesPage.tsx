@@ -40,10 +40,12 @@ import { Suspense } from "react";
 
 type StorefrontCollectionCakesPageProps = {
   params: Promise<{ id: string }>;
+  injectCatalogueFailure?: boolean;
 };
 
 type CollectionCakesBodyProps = {
   collectionId: string;
+  injectCatalogueFailure: boolean;
 };
 
 function scopedCheckoutHref(
@@ -65,12 +67,16 @@ function scopedCheckoutHref(
 
 export function StorefrontCollectionCakesPage({
   params,
+  injectCatalogueFailure = false,
 }: StorefrontCollectionCakesPageProps) {
   return (
     <main className="bg-paper mx-auto min-h-screen max-w-5xl px-5 py-4 sm:px-6 sm:py-10">
       <StorefrontHomeLink />
       <Suspense fallback={<CollectionCakesFallback />}>
-        <CollectionCakesFromParams params={params} />
+        <CollectionCakesFromParams
+          params={params}
+          injectCatalogueFailure={injectCatalogueFailure}
+        />
       </Suspense>
       <PreorderInProgressBar />
     </main>
@@ -79,9 +85,15 @@ export function StorefrontCollectionCakesPage({
 
 async function CollectionCakesFromParams({
   params,
+  injectCatalogueFailure = false,
 }: StorefrontCollectionCakesPageProps) {
   const { id } = await params;
-  return <CollectionCakesBody collectionId={id} />;
+  return (
+    <CollectionCakesBody
+      collectionId={id}
+      injectCatalogueFailure={injectCatalogueFailure}
+    />
+  );
 }
 
 function CollectionCakesFallback() {
@@ -102,11 +114,15 @@ function CollectionCakesFallback() {
 
 async function CollectionCakesBody({
   collectionId,
+  injectCatalogueFailure,
 }: CollectionCakesBodyProps) {
   const [monthly, specialCandidate, cakes, specials, vouchers] = await Promise.all([
     getOrderableMonthlyCatalogueById(collectionId),
     getCustomerSpecialCatalogueById(collectionId),
-    listAvailableCakes(collectionId, { currentEffectivePrice: true }),
+    listAvailableCakes(collectionId, {
+      currentEffectivePrice: true,
+      testFailure: injectCatalogueFailure ? "monthly" : undefined,
+    }),
     listCustomerSpecialCatalogues(),
     listPublicCatalogueVouchers(),
   ]);

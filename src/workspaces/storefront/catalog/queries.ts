@@ -61,6 +61,39 @@ import {
 
 export { formatRm, startingPrice };
 
+const PREVIEW_FAILURE_BRANCH = "codex/catalogue-failure-injection-20261022";
+const PREVIEW_FAILURE_DEV_PROJECT = "tzwtpxdcggesgjaqxkqr";
+type PreviewFailureScope = "monthly" | "browse" | "home";
+
+/** Temporary route-test fault. It is inert outside this protected DEV Preview branch. */
+function injectPreviewCatalogueFailure(
+  expectedScope: PreviewFailureScope,
+  requestedScope: PreviewFailureScope | undefined,
+): void {
+  if (
+    requestedScope !== expectedScope ||
+    process.env.VERCEL_ENV !== "preview" ||
+    process.env.VERCEL_GIT_COMMIT_REF !== PREVIEW_FAILURE_BRANCH
+  ) {
+    return;
+  }
+
+  const previewHost = process.env.VERCEL_URL?.toLowerCase();
+  if (!previewHost?.startsWith("project-flour-") || !previewHost.endsWith(".vercel.app")) {
+    return;
+  }
+
+  try {
+    const projectRef = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname
+      .split(".")[0];
+    if (projectRef !== PREVIEW_FAILURE_DEV_PROJECT) return;
+  } catch {
+    return;
+  }
+
+  throw new Error("Temporary preview-only catalogue query failure.");
+}
+
 /** Short merchandising TTL. Not used for checkout offers, orderability, or Fresh Pick stock. */
 const STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS = 30;
 const STOREFRONT_PRICE_LOOKUP_CONCURRENCY = 6;
@@ -836,8 +869,12 @@ const readCachedStorefrontCakesByIds = cache((cakeIdsKey: string) =>
 
 export async function listAvailableCakes(
   collectionId: string,
-  options: { currentEffectivePrice?: boolean } = {},
+  options: {
+    currentEffectivePrice?: boolean;
+    testFailure?: "monthly";
+  } = {},
 ): Promise<StorefrontCake[]> {
+  injectPreviewCatalogueFailure("monthly", options.testFailure);
   const supabase = createPublicClient();
   const { data, error } = await supabase
     .from("collection_cakes")
@@ -1429,7 +1466,9 @@ export async function getHistoricalCatalogueById(
  */
 export async function listBrowsePublishedCakes(
   todayYmd: string = toBusinessDateKey(),
+  options: { testFailure?: "browse" } = {},
 ): Promise<BrowseStorefrontCake[]> {
+  injectPreviewCatalogueFailure("browse", options.testFailure);
   const cakes = await loadBrowsePublishedCakes(todayYmd);
   return withEffectiveStorefrontPrices(cakes, todayYmd);
 }
@@ -1883,7 +1922,10 @@ const readCachedHomepagePopularCakes = cache(() =>
   )(),
 );
 
-export async function listHomepagePopularCakes(): Promise<StorefrontCake[]> {
+export async function listHomepagePopularCakes(
+  options: { testFailure?: "home" } = {},
+): Promise<StorefrontCake[]> {
+  injectPreviewCatalogueFailure("home", options.testFailure);
   const cakes = await readCachedHomepagePopularCakes();
   return withEffectiveStorefrontPrices(cakes, toBusinessDateKey());
 }
