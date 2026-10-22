@@ -14,6 +14,10 @@ import {
   type CustomerWebsiteFulfilmentMethod,
 } from "@/engines/orders/fulfilment";
 import type { PhysicalReceiptChoice } from "@/workspaces/storefront/checkout/preorder-draft";
+import {
+  createCheckoutRequestId,
+  isCheckoutRequestId,
+} from "@/workspaces/storefront/checkout/checkout-attempt";
 
 export const FRESH_PICK_CART_KEY = "whitebird-fresh-pick-cart-v1";
 export const FRESH_PICK_CART_CHANGED_EVENT =
@@ -36,6 +40,8 @@ export type FreshPickCartItem = {
 };
 
 export type FreshPickCart = {
+  /** Stable request identity for this physical-stock cart. */
+  checkoutAttemptId: string;
   pickupDate: string;
   pickupTime: string;
   fulfilmentMethod: CustomerWebsiteFulfilmentMethod;
@@ -96,6 +102,7 @@ export type FreshPickCartAddResult =
 
 export function emptyFreshPickCart(): FreshPickCart {
   return {
+    checkoutAttemptId: "",
     pickupDate: "",
     pickupTime: "",
     fulfilmentMethod: "pickup",
@@ -209,6 +216,9 @@ export function parseFreshPickCart(value: unknown): FreshPickCart | null {
   const empty = emptyFreshPickCart();
   return {
     ...empty,
+    checkoutAttemptId: isCheckoutRequestId(row.checkoutAttemptId)
+      ? row.checkoutAttemptId
+      : "",
     pickupDate: isYmd(pickupDate) ? pickupDate : (items[0]?.pickupDate ?? ""),
     pickupTime: isHm(pickupTime) ? pickupTime : (items[0]?.pickupTime ?? ""),
     fulfilmentMethod: parseCustomerWebsiteFulfilmentMethod(
@@ -264,8 +274,24 @@ export function readFreshPickCart(): FreshPickCart | null {
 
 export function writeFreshPickCart(cart: FreshPickCart): void {
   if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(FRESH_PICK_CART_KEY, JSON.stringify(cart));
+  const safeCart = {
+    ...cart,
+    checkoutAttemptId:
+      cart.items.length > 0 && !isCheckoutRequestId(cart.checkoutAttemptId)
+        ? createCheckoutRequestId()
+        : cart.checkoutAttemptId,
+  };
+  window.sessionStorage.setItem(FRESH_PICK_CART_KEY, JSON.stringify(safeCart));
   emitFreshPickCartChanged();
+}
+
+export function ensureFreshPickCheckoutAttemptId(): string | null {
+  const cart = readFreshPickCart();
+  if (!cart || cart.items.length === 0) return null;
+  if (isCheckoutRequestId(cart.checkoutAttemptId)) return cart.checkoutAttemptId;
+  const checkoutAttemptId = createCheckoutRequestId();
+  writeFreshPickCart({ ...cart, checkoutAttemptId });
+  return checkoutAttemptId;
 }
 
 export function clearFreshPickCart(): void {
