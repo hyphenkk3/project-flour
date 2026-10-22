@@ -61,8 +61,11 @@ import {
 
 export { formatRm, startingPrice };
 
-/** Short merchandising TTL. Not used for checkout offers, orderability, or Fresh Pick stock. */
-const STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS = 30;
+/**
+ * Public catalogue display data stays warm between edit-driven tag invalidations.
+ * Ordering prices, availability, checkout offers, and Fresh Pick stock are read live.
+ */
+const STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS = 300;
 const STOREFRONT_PRICE_LOOKUP_CONCURRENCY = 6;
 
 type CategoryEmbed = {
