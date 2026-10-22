@@ -42,7 +42,7 @@ const migration = read(
   "supabase/migrations/20261022012610_guest_checkout_idempotency.sql",
 );
 const recoveryMigration = read(
-  "supabase/migrations/20261022035506_checkout_receipt_recovery_capability.sql",
+  "supabase/migrations/20261022042322_checkout_receipt_recovery_capability.sql",
 );
 const recoveryServer = read(
   "src/workspaces/storefront/checkout/checkout-recovery.ts",
