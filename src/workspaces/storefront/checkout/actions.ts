@@ -83,6 +83,11 @@ import {
   parseDeliveryProcessingFeeAckPayload,
 } from "@/engines/orders/delivery-processing-fee-ack";
 import { setGuestPreorderReceiptCookie } from "@/workspaces/storefront/checkout/receipt";
+import {
+  checkoutSubmissionPayload,
+  isCheckoutRequestId,
+} from "@/workspaces/storefront/checkout/checkout-attempt";
+import { resolveCheckoutAttempt } from "@/workspaces/storefront/checkout/checkout-idempotency-server";
 import { customerNameValidationError } from "@/engines/orders/customer-name";
 import {
   acceptPerfCorrelationId,
@@ -250,12 +255,6 @@ function paidAddonPayloadFromForm(selections: CustomerPreorderSelections) {
   return customerPaidAddonMutationPayload({ options, selections });
 }
 
-function isMissingCombinedSubmitRpc(message: string): boolean {
-  return /Could not find the function|schema cache|does not exist|submit_guest_preorder_with_catalogue_voucher/i.test(
-    message,
-  );
-}
-
 function consolidateItems(items: SubmitItem[]): SubmitItem[] {
   const map = new Map<string, SubmitItem>();
   for (const item of items) {
@@ -290,7 +289,34 @@ async function submitGuestPreorderActionTimed(
   const totalStarted = performance.now();
   logPerf("CHECKOUT_SUBMIT", "action_start", 0);
   try {
-    const state = await submitGuestPreorderActionBody(formData);
+    const priorAttempt = await resolveCheckoutAttempt(formData, "whole_cake");
+    if (priorAttempt.error) {
+      return withDevCheckoutPerf(
+        { error: priorAttempt.error },
+        performance.now() - totalStarted,
+      );
+    }
+    if (priorAttempt.orderId) {
+      await setGuestPreorderReceiptCookie(priorAttempt.orderId);
+      return withDevCheckoutPerf(
+        { error: null, orderId: priorAttempt.orderId },
+        performance.now() - totalStarted,
+      );
+    }
+
+    let state = await submitGuestPreorderActionBody(formData);
+    if (state.error) {
+      const retryResolution = await resolveCheckoutAttempt(
+        formData,
+        "whole_cake",
+      );
+      if (retryResolution.error) {
+        state = { error: retryResolution.error };
+      } else if (retryResolution.orderId) {
+        await setGuestPreorderReceiptCookie(retryResolution.orderId);
+        state = { error: null, orderId: retryResolution.orderId };
+      }
+    }
     return withDevCheckoutPerf(state, performance.now() - totalStarted);
   } finally {
     logPerf("CHECKOUT_SUBMIT", "TOTAL", performance.now() - totalStarted, {
@@ -304,6 +330,7 @@ async function submitGuestPreorderActionBody(
 ): Promise<CheckoutState> {
   const parseStarted = performance.now();
   const customerName = String(formData.get("customer_name") ?? "").trim();
+  const requestId = String(formData.get("checkout_request_id") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const includeReceipt = parseRequiredPhysicalReceipt(
     String(formData.get("include_receipt") ?? "").trim(),
@@ -322,6 +349,9 @@ async function submitGuestPreorderActionBody(
 
   if (!customerName || !phone) {
     return { error: "Please fill in your name and WhatsApp phone number." };
+  }
+  if (!isCheckoutRequestId(requestId)) {
+    return { error: "Checkout retry protection could not be verified. Please refresh and try again." };
   }
   const nameError = customerNameValidationError(customerName);
   if (nameError) {
@@ -429,6 +459,8 @@ async function submitGuestPreorderActionBody(
   if (availability.error) return { error: availability.error };
 
   const rpcArgs: Record<string, unknown> = {
+    p_request_id: requestId,
+    p_submission_payload: checkoutSubmissionPayload(formData),
     p_customer_name: customerName,
     p_phone: phone,
     p_email: null,
@@ -483,7 +515,7 @@ async function submitGuestPreorderActionBody(
   let error: { message: string } | null = null;
   if (catalogueVoucherId) {
     const combined = await supabase.rpc(
-      "submit_guest_preorder_with_catalogue_voucher",
+      "submit_guest_preorder_with_catalogue_voucher_idempotent_v2",
       {
         ...rpcArgs,
         p_catalogue_voucher_id: catalogueVoucherId,
@@ -491,39 +523,23 @@ async function submitGuestPreorderActionBody(
     );
     data = combined.data;
     error = combined.error;
-    if (error && isMissingCombinedSubmitRpc(error.message)) {
-      logPerf(
-        "CHECKOUT_SUBMIT",
-        "submit_guest_preorder_with_catalogue_voucher",
-        performance.now() - rpcStarted,
-        { voucherApply: "missing_combined_rpc" },
-      );
-      const fallbackStarted = performance.now();
-      const fallback = await supabase.rpc("submit_guest_preorder", rpcArgs);
-      data = fallback.data;
-      error = fallback.error;
-      logPerf(
-        "CHECKOUT_SUBMIT",
-        "submit_guest_preorder",
-        performance.now() - fallbackStarted,
-        { voucherApply: "fallback" },
-      );
-    } else {
-      usedCombinedSubmit = !combined.error;
-      logPerf(
-        "CHECKOUT_SUBMIT",
-        "submit_guest_preorder_with_catalogue_voucher",
-        performance.now() - rpcStarted,
-        { voucherApply: usedCombinedSubmit ? "combined" : "combined_failed" },
-      );
-    }
+    usedCombinedSubmit = !combined.error;
+    logPerf(
+      "CHECKOUT_SUBMIT",
+      "submit_guest_preorder_with_catalogue_voucher_idempotent",
+      performance.now() - rpcStarted,
+      { voucherApply: usedCombinedSubmit ? "combined" : "combined_failed" },
+    );
   } else {
-    const submitted = await supabase.rpc("submit_guest_preorder", rpcArgs);
+    const submitted = await supabase.rpc(
+      "submit_guest_preorder_idempotent_v2",
+      rpcArgs,
+    );
     data = submitted.data;
     error = submitted.error;
     logPerf(
       "CHECKOUT_SUBMIT",
-      "submit_guest_preorder",
+      "submit_guest_preorder_idempotent",
       performance.now() - rpcStarted,
       { voucherApply: "skipped" },
     );
@@ -546,10 +562,7 @@ async function submitGuestPreorderActionBody(
     return { error: error.message };
   }
 
-  const orderId =
-    data && typeof data === "object" && "id" in data
-      ? String((data as { id: string }).id)
-      : "";
+  const orderId = isCheckoutRequestId(data) ? data : "";
 
   if (!orderId) {
     return { error: "Order was created but could not be confirmed." };

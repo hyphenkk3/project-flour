@@ -110,6 +110,7 @@ import {
   type FreshPickPrice,
 } from "@/workspaces/storefront/extra/actions";
 import {
+  ensureFreshPickCheckoutAttemptId,
   patchFreshPickCart,
   readFreshPickCart,
   writeFreshPickCart,
@@ -587,6 +588,14 @@ export function GuestExtraCheckoutForm({
     }
     const formData = pendingSubmitRef.current;
     if (!formData) return;
+    const checkoutAttemptId = ensureFreshPickCheckoutAttemptId();
+    if (!checkoutAttemptId) {
+      setActionState({
+        error: "Checkout retry protection could not be prepared. Please refresh and try again.",
+      });
+      return;
+    }
+    formData.set("checkout_request_id", checkoutAttemptId);
     setActionPending(true);
     const result = await submitGuestOrderAndNavigate({
       formData,

@@ -169,6 +169,9 @@ import {
 } from "@/workspaces/storefront/checkout/actions";
 import { clampCustomerPickupWindow } from "@/engines/menu/customer-browse";
 import {
+  isCheckoutRequestId,
+} from "@/workspaces/storefront/checkout/checkout-attempt";
+import {
   emptyPreorderFields,
   fieldsAfterFulfilmentChange,
   filterDraftItemsToOfferedCakes,
@@ -318,6 +321,7 @@ function persistDraft(
 ): void {
   const draft: PreorderDraft = {
     ...fields,
+    checkoutAttemptId: readPreorderDraft()?.checkoutAttemptId ?? "",
     email: "",
     emailSubmissionReceiptRequested: false,
     items: items.map((item) => ({
@@ -1610,6 +1614,14 @@ export function GuestCheckoutForm({
     }
     const formData = pendingSubmitRef.current;
     if (!formData) return;
+    const checkoutAttemptId = readPreorderDraft()?.checkoutAttemptId;
+    if (!isCheckoutRequestId(checkoutAttemptId)) {
+      setActionState({
+        error: "Checkout retry protection could not be prepared. Please refresh and try again.",
+      });
+      return;
+    }
+    formData.set("checkout_request_id", checkoutAttemptId);
     setActionPending(true);
     const result = await submitGuestOrderAndNavigate({
       formData,

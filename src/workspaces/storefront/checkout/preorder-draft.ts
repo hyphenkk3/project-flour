@@ -7,6 +7,10 @@ import {
   type CustomerWebsiteFulfilmentMethod,
 } from "@/engines/orders/fulfilment";
 import { calculateOrderTotal } from "@/engines/orders/totals";
+import {
+  createCheckoutRequestId,
+  isCheckoutRequestId,
+} from "@/workspaces/storefront/checkout/checkout-attempt";
 
 export type PreorderDraftSizeChoice = {
   id: string;
@@ -83,6 +87,8 @@ export type PreorderDraftFields = {
 
 export type PreorderDraft = PreorderDraftFields & {
   items: PreorderDraftItem[];
+  /** Stable request identity for this checkout draft; regenerated after success. */
+  checkoutAttemptId: string;
 };
 
 export const PREORDER_DRAFT_KEY = "whitebird-preorder-draft-v1";
@@ -149,6 +155,7 @@ export function emptyPreorderDraft(): PreorderDraft {
   return {
     ...emptyPreorderFields(),
     items: [],
+    checkoutAttemptId: "",
   };
 }
 
@@ -162,6 +169,9 @@ export function readPreorderDraft(): PreorderDraft | null {
     return {
       ...emptyPreorderFields(),
       ...parsed,
+      checkoutAttemptId: isCheckoutRequestId(parsed.checkoutAttemptId)
+        ? parsed.checkoutAttemptId
+        : "",
       customerName: String(parsed.customerName ?? ""),
       phone: String(parsed.phone ?? ""),
       email: String(parsed.email ?? ""),
@@ -252,7 +262,13 @@ export function readPreorderDraft(): PreorderDraft | null {
 
 export function writePreorderDraft(draft: PreorderDraft): void {
   if (typeof window === "undefined") return;
-  const payload = JSON.stringify(draft);
+  const safeDraft = {
+    ...draft,
+    checkoutAttemptId: isCheckoutRequestId(draft.checkoutAttemptId)
+      ? draft.checkoutAttemptId
+      : createCheckoutRequestId(),
+  };
+  const payload = JSON.stringify(safeDraft);
   if (window.sessionStorage.getItem(PREORDER_DRAFT_KEY) === payload) return;
   window.sessionStorage.setItem(PREORDER_DRAFT_KEY, payload);
   emitPreorderDraftChanged();

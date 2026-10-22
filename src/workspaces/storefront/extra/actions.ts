@@ -41,6 +41,11 @@ import { parseRequiredPhysicalReceipt } from "@/workspaces/storefront/checkout/p
 import { loadFreshPicksPreparationConfig } from "@/workspaces/storefront/extra/config";
 import { getStorefrontExtraById } from "@/workspaces/storefront/extra/queries";
 import { setGuestPreorderReceiptCookie } from "@/workspaces/storefront/checkout/receipt";
+import {
+  checkoutSubmissionPayload,
+  isCheckoutRequestId,
+} from "@/workspaces/storefront/checkout/checkout-attempt";
+import { resolveCheckoutAttempt } from "@/workspaces/storefront/checkout/checkout-idempotency-server";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import {
   acceptPerfCorrelationId,
@@ -56,6 +61,27 @@ export type ExtraOrderState = {
   orderId?: string;
   perf?: CheckoutServerPerf;
 };
+
+async function recoverFreshPickCheckoutAttempt(
+  formData: FormData,
+  orderId: string,
+): Promise<ExtraOrderState> {
+  await setGuestPreorderReceiptCookie(orderId);
+  const catalogueVoucherId = String(
+    formData.get("catalogue_voucher_id") ?? "",
+  ).trim();
+  if (catalogueVoucherId) {
+    const { applyGuestCatalogueVoucherAction } = await import(
+      "@/workspaces/vouchers/catalogue-actions"
+    );
+    const applied = await applyGuestCatalogueVoucherAction(
+      orderId,
+      catalogueVoucherId,
+    );
+    if (applied.error) return { error: applied.error };
+  }
+  return { error: null, orderId };
+}
 
 export type FreshPickPrice = {
   extraStockId: string;
@@ -210,7 +236,39 @@ async function submitGuestExtraOrderActionTimed(
   const totalStarted = performance.now();
   logPerf("EXTRA_SUBMIT", "action_start", 0);
   try {
-    const state = await submitGuestExtraOrderActionBody(formData);
+    const priorAttempt = await resolveCheckoutAttempt(formData, "fresh_pick");
+    if (priorAttempt.error) {
+      return withDevCheckoutPerf(
+        { error: priorAttempt.error },
+        performance.now() - totalStarted,
+      );
+    }
+    if (priorAttempt.orderId) {
+      const recovered = await recoverFreshPickCheckoutAttempt(
+        formData,
+        priorAttempt.orderId,
+      );
+      return withDevCheckoutPerf(
+        recovered,
+        performance.now() - totalStarted,
+      );
+    }
+
+    let state = await submitGuestExtraOrderActionBody(formData);
+    if (state.error) {
+      const retryResolution = await resolveCheckoutAttempt(
+        formData,
+        "fresh_pick",
+      );
+      if (retryResolution.error) {
+        state = { error: retryResolution.error };
+      } else if (retryResolution.orderId) {
+        state = await recoverFreshPickCheckoutAttempt(
+          formData,
+          retryResolution.orderId,
+        );
+      }
+    }
     return withDevCheckoutPerf(state, performance.now() - totalStarted);
   } finally {
     logPerf("EXTRA_SUBMIT", "TOTAL", performance.now() - totalStarted, {
@@ -230,6 +288,7 @@ async function submitGuestExtraOrderActionBody(
     .getAll("extra_cake_name")
     .map((value) => String(value).trim());
   const customerName = String(formData.get("customer_name") ?? "").trim();
+  const requestId = String(formData.get("checkout_request_id") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const includeReceipt = parseRequiredPhysicalReceipt(
     String(formData.get("include_receipt") ?? "").trim(),
@@ -257,6 +316,9 @@ async function submitGuestExtraOrderActionBody(
   }
   if (!customerName || !phone) {
     return { error: "Please fill in your name and WhatsApp phone number." };
+  }
+  if (!isCheckoutRequestId(requestId)) {
+    return { error: "Checkout retry protection could not be verified. Please refresh and try again." };
   }
   if (includeReceipt === null) {
     return {
@@ -404,26 +466,31 @@ async function submitGuestExtraOrderActionBody(
 
   const supabase = await createClient();
   const rpcStarted = performance.now();
-  const { data, error } = await supabase.rpc("submit_guest_extra_order", {
-    p_customer_name: customerName,
-    p_phone: phone,
-    p_email: null,
-    p_pickup_date: pickupDate,
-    p_pickup_time: pickupTime,
-    p_notes: notes || null,
-    p_extra_stock_id: extraStockIds[0],
-    p_extra_stock_ids: extraStockIds,
-    p_email_submission_receipt_requested: false,
-    p_include_receipt: includeReceipt,
-    p_complimentary: complimentary,
-    p_paid_addons: paidAddons,
-    p_fulfilment_method: fulfilmentMethod,
-    p_delivery: deliveryPayload,
-    p_dine_in: dineInPayload,
-    ...(fulfilmentMethod === "delivery"
-      ? { p_delivery_processing_fee_ack: deliveryProcessingAck }
-      : {}),
-  });
+  const { data, error } = await supabase.rpc(
+    "submit_guest_extra_order_idempotent_v2",
+    {
+      p_request_id: requestId,
+      p_submission_payload: checkoutSubmissionPayload(formData),
+      p_customer_name: customerName,
+      p_phone: phone,
+      p_email: null,
+      p_pickup_date: pickupDate,
+      p_pickup_time: pickupTime,
+      p_notes: notes || null,
+      p_extra_stock_id: extraStockIds[0],
+      p_extra_stock_ids: extraStockIds,
+      p_email_submission_receipt_requested: false,
+      p_include_receipt: includeReceipt,
+      p_complimentary: complimentary,
+      p_paid_addons: paidAddons,
+      p_fulfilment_method: fulfilmentMethod,
+      p_delivery: deliveryPayload,
+      p_dine_in: dineInPayload,
+      ...(fulfilmentMethod === "delivery"
+        ? { p_delivery_processing_fee_ack: deliveryProcessingAck }
+        : {}),
+    },
+  );
   logPerf(
     "EXTRA_SUBMIT",
     "submit_guest_extra_order",
@@ -443,10 +510,7 @@ async function submitGuestExtraOrderActionBody(
     return { error: extraSubmitCustomerError(error.message) };
   }
 
-  const orderId =
-    data && typeof data === "object" && "id" in data
-      ? String((data as { id: string }).id)
-      : "";
+  const orderId = isCheckoutRequestId(data) ? data : "";
   if (!orderId) {
     return { error: "Order was created but could not be confirmed." };
   }
