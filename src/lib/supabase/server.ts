@@ -19,19 +19,67 @@ type CreateClientOptions = {
   timeoutMs?: number;
 };
 
-function fetchForCheckoutDateTiming(timeoutMs: number): typeof fetch {
+const CATALOGUE_DIAGNOSTIC_DEV_REF = "tzwtpxdcggesgjaqxkqr";
+
+function isCatalogueDiagnosticPreview(url: string): boolean {
+  if (process.env.VERCEL_ENV !== "preview") return false;
+  try {
+    return new URL(url).hostname.startsWith(
+      `${CATALOGUE_DIAGNOSTIC_DEV_REF}.`,
+    );
+  } catch {
+    return false;
+  }
+}
+
+function fetchForCheckoutDateTiming(
+  timeoutMs: number,
+  catalogueDiagnostic = false,
+): typeof fetch {
   const bounded = fetchWithTimeout(timeoutMs);
   const collector = getCheckoutDatePerfCollector();
-  if (!collector) return bounded;
+  if (!collector && !catalogueDiagnostic) return bounded;
   return async (input, init) => {
     const started = performance.now();
+    const label = supabaseFetchLabel(input);
     try {
-      return await bounded(input, init);
-    } finally {
-      recordCheckoutDateDbCall(
-        supabaseFetchLabel(input),
-        performance.now() - started,
-      );
+      const response = await bounded(input, init);
+      const elapsedMs = Math.round(performance.now() - started);
+      if (collector) recordCheckoutDateDbCall(label, elapsedMs);
+      if (catalogueDiagnostic) {
+        console.info(
+          "[CATALOGUE_DIAGNOSTIC]",
+          JSON.stringify({
+            event: "supabase_fetch",
+            executionRegion: process.env.VERCEL_REGION ?? null,
+            label,
+            method: init?.method ?? "GET",
+            status: response.status,
+            elapsedMs,
+            startedAt: new Date(Date.now() - elapsedMs).toISOString(),
+          }),
+        );
+      }
+      return response;
+    } catch (error) {
+      const elapsedMs = Math.round(performance.now() - started);
+      if (collector) recordCheckoutDateDbCall(label, elapsedMs);
+      if (catalogueDiagnostic) {
+        console.info(
+          "[CATALOGUE_DIAGNOSTIC]",
+          JSON.stringify({
+            event: "supabase_fetch",
+            executionRegion: process.env.VERCEL_REGION ?? null,
+            label,
+            method: init?.method ?? "GET",
+            status: null,
+            elapsedMs,
+            startedAt: new Date(Date.now() - elapsedMs).toISOString(),
+            errorName: error instanceof Error ? error.name : "UnknownError",
+          }),
+        );
+      }
+      throw error;
     }
   };
 }
@@ -90,7 +138,10 @@ export function createPublicClient(options?: CreateClientOptions) {
       setAll() {},
     },
     global: {
-      fetch: fetchForCheckoutDateTiming(timeoutMs),
+      fetch: fetchForCheckoutDateTiming(
+        timeoutMs,
+        isCatalogueDiagnosticPreview(url),
+      ),
     },
   });
   if (collector) {
