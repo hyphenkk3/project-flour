@@ -33,11 +33,51 @@ function BrowseCatalogueFallback() {
   );
 }
 
+const CATALOGUE_DIAGNOSTIC_DEV_REF = "tzwtpxdcggesgjaqxkqr";
+
+function isCatalogueDiagnosticPreview(): boolean {
+  if (process.env.VERCEL_ENV !== "preview") return false;
+  try {
+    return (
+      new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname ===
+      `${CATALOGUE_DIAGNOSTIC_DEV_REF}.supabase.co`
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function BrowseCatalogueIsland() {
+  const diagnostic = isCatalogueDiagnosticPreview();
+  const started = performance.now();
+  let cakesMs = 0;
+  let vouchersMs = 0;
+  const time = async <T,>(fn: () => Promise<T>, record: (ms: number) => void) => {
+    const stageStarted = performance.now();
+    try {
+      return await fn();
+    } finally {
+      record(Math.round(performance.now() - stageStarted));
+    }
+  };
   const [cakes, vouchers] = await Promise.all([
-    listBrowsePublishedCakes(),
-    listPublicCatalogueVouchers(),
+    time(listBrowsePublishedCakes, (ms) => (cakesMs = ms)),
+    time(listPublicCatalogueVouchers, (ms) => (vouchersMs = ms)),
   ]);
+  if (diagnostic) {
+    console.info(
+      "[CATALOGUE_DIAGNOSTIC]",
+      JSON.stringify({
+        event: "browse_loader_complete",
+        executionRegion: process.env.VERCEL_REGION ?? null,
+        cakesMs,
+        vouchersMs,
+        totalMs: Math.round(performance.now() - started),
+        cakeCount: cakes.length,
+        voucherCount: vouchers.length,
+      }),
+    );
+  }
   const today = singaporeDateFromIso(new Date().toISOString());
   const promotions = Object.fromEntries(
     buildTargetedPromotionBadgeByCakeId(vouchers, today, "preorder"),
