@@ -11,7 +11,7 @@ function readSrc(path: string): string {
 }
 
 const queries = readSrc("src/workspaces/storefront/catalog/queries.ts");
-assert.match(queries, /STOREFRONT_PRICE_LOOKUP_CONCURRENCY = 6/);
+assert.match(queries, /STOREFRONT_PRICE_LOOKUP_CONCURRENCY = 12/);
 assert.match(queries, /data == null \|\| !Number\.isFinite\(Number\(data\)\)/);
 assert.match(queries, /The current cake price could not be verified/);
 assert.match(queries, /\.select\("library_cake_id, sort_order"\)/);

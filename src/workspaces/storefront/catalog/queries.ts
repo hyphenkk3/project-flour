@@ -63,7 +63,7 @@ export { formatRm, startingPrice };
 
 /** Short merchandising TTL. Not used for checkout offers, orderability, or Fresh Pick stock. */
 const STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS = 30;
-const STOREFRONT_PRICE_LOOKUP_CONCURRENCY = 6;
+const STOREFRONT_PRICE_LOOKUP_CONCURRENCY = 12;
 
 type CategoryEmbed = {
   id: string;
