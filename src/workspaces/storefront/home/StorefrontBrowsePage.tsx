@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { BrowseCakeCatalogue } from "@/workspaces/storefront/catalog/BrowseCakeCatalogue";
+import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
 import { StorefrontBrowsePerfProbe } from "@/workspaces/storefront/catalog/StorefrontBrowsePerfProbe";
 import { CakePhotoDisclaimer } from "@/workspaces/storefront/catalog/CakePhotoDisclaimer";
 import {
@@ -12,11 +13,23 @@ import { listBrowsePublishedCakes } from "@/workspaces/storefront/catalog/querie
 import { singaporeDateFromIso } from "@/engines/orders/promotions";
 import { buildTargetedPromotionBadgeByCakeId } from "@/engines/vouchers/catalogue-promotion-presentation";
 import { listPublicCatalogueVouchers } from "@/workspaces/vouchers/catalogue-queries";
-import {
-  StorefrontHomeLink,
-  StorefrontStaffSignIn,
-} from "@/workspaces/storefront/StorefrontBrand";
+import { StorefrontStaffSignIn } from "@/workspaces/storefront/StorefrontBrand";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
+
+function BrowseHomeLink() {
+  return (
+    <>
+      <StorefrontTheme />
+      <Link
+        className="text-skyline hover:text-ink text-sm font-medium transition-colors duration-200"
+        href="/"
+        prefetch={false}
+      >
+        ← Whitebird
+      </Link>
+    </>
+  );
+}
 
 function BrowseCatalogueFallback() {
   return (
@@ -63,7 +76,7 @@ export function StorefrontBrowsePage() {
   return (
     <main className="bg-paper mx-auto min-h-screen max-w-5xl px-5 py-4 sm:px-6 sm:py-10">
       <CakeEntryScopeClearOnUnscopedCakeClick />
-      <StorefrontHomeLink />
+      <BrowseHomeLink />
       <h1 className="font-display text-ink mt-3 text-2xl tracking-tight sm:mt-8 sm:text-4xl">
         Browse Cakes
       </h1>
@@ -83,6 +96,7 @@ export function StorefrontBrowsePage() {
         <Link
           className="text-ink hover:text-skyline text-sm font-medium transition-colors duration-200"
           href="/order"
+          prefetch={false}
         >
           Prefer a monthly collection or Special Menu? Choose a collection →
         </Link>
@@ -91,6 +105,7 @@ export function StorefrontBrowsePage() {
         <Link
           className="text-ink hover:text-skyline text-sm font-medium transition-colors duration-200"
           href="/offers"
+          prefetch={false}
         >
           Current offers →
         </Link>
@@ -101,7 +116,7 @@ export function StorefrontBrowsePage() {
       </Suspense>
 
       <p className="mt-10">
-        <StorefrontHomeLink />
+        <BrowseHomeLink />
       </p>
       <StorefrontStaffSignIn />
       <PreorderInProgressBar />
