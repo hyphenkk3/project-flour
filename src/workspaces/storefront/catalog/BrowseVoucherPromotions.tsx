@@ -47,10 +47,8 @@ export async function BrowseVoucherPromotions({
 
   const today = singaporeDateFromIso(new Date().toISOString());
   const cakeNames = new Map(cakes.map((cake) => [cake.id, cake.name]));
-  const promotions = buildTargetedPromotionBadgeByCakeId(
-    result.vouchers,
-    today,
-    "preorder",
+  const promotions = Array.from(
+    buildTargetedPromotionBadgeByCakeId(result.vouchers, today, "preorder"),
   ).filter(([cakeId]) => cakeNames.has(cakeId));
   if (promotions.length === 0) return null;
 
