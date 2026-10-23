@@ -41,6 +41,7 @@ export function CollectionOrderCard({
 }: CollectionOrderCardProps) {
   const desk = collectionDeskAttention({
     readyAt: order.readyAt,
+    readyForCollection: order.derivedReadyForCollection,
     pickedUpAt: order.pickedUpAt,
     deliveredAt: order.deliveredAt,
     outForDeliveryAt: order.outForDeliveryAt,

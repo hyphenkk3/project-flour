@@ -53,6 +53,7 @@ export function CollectionOrderDetail({
 }: CollectionOrderDetailProps) {
   const presentation = collectionDeskPresentation({
     readyAt: order.readyAt,
+    readyForCollection: order.derivedReadyForCollection,
     pickedUpAt: order.pickedUpAt,
     deliveredAt: order.deliveredAt,
     outForDeliveryAt: order.outForDeliveryAt,
@@ -60,6 +61,7 @@ export function CollectionOrderDetail({
   });
   const desk = collectionDeskAttention({
     readyAt: order.readyAt,
+    readyForCollection: order.derivedReadyForCollection,
     pickedUpAt: order.pickedUpAt,
     deliveredAt: order.deliveredAt,
     outForDeliveryAt: order.outForDeliveryAt,
@@ -83,12 +85,14 @@ export function CollectionOrderDetail({
     markCollectedEligible: dineIn
       ? isCollectionCompleteDineInEligible({
           readyAt: order.readyAt,
+          readyForCollection: order.derivedReadyForCollection,
           pickedUpAt: order.pickedUpAt,
           fulfilmentMethod: order.fulfilmentMethod,
           status: order.status,
         })
       : isCollectionMarkCollectedEligible({
           readyAt: order.readyAt,
+          readyForCollection: order.derivedReadyForCollection,
           pickedUpAt: order.pickedUpAt,
           fulfilmentMethod: order.fulfilmentMethod,
           status: order.status,

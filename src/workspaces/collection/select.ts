@@ -10,6 +10,7 @@ export const COLLECTION_ORDER_SELECT = `
   pickup_time,
   fulfilment_method,
   status,
+  payment_status,
   customer_notes,
   production_started_at,
   ready_at,

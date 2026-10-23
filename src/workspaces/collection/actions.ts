@@ -25,6 +25,8 @@ import {
 } from "@/workspaces/collection/queries";
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
 import { COLLECTION_READY_MESSAGE_SENT_EVENT } from "@/workspaces/collection/ready-message";
+import { getBakeryBoardOrderById } from "@/workspaces/bakery/queries";
+import { bakeryOrderProductionPresentation } from "@/workspaces/bakery/eligibility";
 
 async function requireCollectionStaff() {
   const staff = await requireStaff();
@@ -74,7 +76,7 @@ export async function markCollectionOrderCollectedAction(
   const { data: row, error: loadError } = await supabase
     .from("orders")
     .select(
-      "id, ready_at, picked_up_at, fulfilment_method, status, customer_id, production_started_at, delivered_at",
+      "id, ready_at, picked_up_at, fulfilment_method, status, payment_status, customer_id, production_started_at, delivered_at, pickup_date",
     )
     .eq("id", orderId)
     .is("customer_id", null)
@@ -87,16 +89,29 @@ export async function markCollectionOrderCollectedAction(
     return { error: "Order not found." };
   }
 
+  const bakeryOrder = await getBakeryBoardOrderById(orderId, row.pickup_date);
+  const bakeryReady = Boolean(
+    bakeryOrder && bakeryOrderProductionPresentation(bakeryOrder) === "ready",
+  );
+  const readyForCollection = bakeryOrder
+    ? bakeryReady &&
+      (Boolean(row.ready_at) ||
+        (row.status === "paid" &&
+          row.payment_status === "paid" &&
+          bakeryOrder.assignedFreshPickStocks.length > 0))
+    : Boolean(row.ready_at);
   const dineIn = isCollectionDineInMethod(row.fulfilment_method);
   const eligible = dineIn
     ? isCollectionCompleteDineInEligible({
         readyAt: row.ready_at,
+        readyForCollection,
         pickedUpAt: row.picked_up_at,
         fulfilmentMethod: row.fulfilment_method,
         status: row.status,
       })
     : isCollectionMarkCollectedEligible({
         readyAt: row.ready_at,
+        readyForCollection,
         pickedUpAt: row.picked_up_at,
         fulfilmentMethod: row.fulfilment_method,
         status: row.status,
@@ -118,12 +133,13 @@ export async function markCollectionOrderCollectedAction(
     },
     role: staff.role.code,
     surface: "collection",
+    collectionReady: readyForCollection,
   });
   if (!completeGate.ok) {
     return { error: completeGate.error };
   }
 
-  const { error } = await supabase.rpc("mark_guest_order_picked_up", {
+  const { error } = await supabase.rpc("mark_guest_order_picked_up_when_ready", {
     p_order_id: orderId,
     p_actor_staff_id: staff.id,
   });
@@ -134,6 +150,7 @@ export async function markCollectionOrderCollectedAction(
   revalidatePath("/collection");
   revalidatePath(`/collection/orders/${orderId}`);
   revalidatePath("/bakery");
+  revalidatePath("/home");
   return { error: null };
 }
 

@@ -28,9 +28,11 @@ export type CollectionOrderRow = {
   pickup_time: string;
   fulfilment_method: string | null;
   status: GuestOrderStatus;
+  payment_status?: string | null;
   customer_notes: string | null;
   production_started_at: string | null;
   ready_at: string | null;
+  derived_ready_for_collection?: boolean;
   picked_up_at: string | null;
   out_for_delivery_at: string | null;
   delivered_at: string | null;
@@ -214,6 +216,8 @@ export function mapCollectionBoardOrder(
     readyMessageSent: null,
     productionStartedAt: row.production_started_at,
     readyAt: row.ready_at,
+    derivedReadyForCollection:
+      row.derived_ready_for_collection ?? Boolean(row.ready_at),
     pickedUpAt: row.picked_up_at,
     outForDeliveryAt: row.out_for_delivery_at,
     deliveredAt: row.delivered_at,

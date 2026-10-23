@@ -79,6 +79,8 @@ export type CollectionBoardOrder = {
   readyMessageOperatingHours?: CollectionReadyMessageOperatingHours;
   productionStartedAt: string | null;
   readyAt: string | null;
+  /** Effective readiness derived from order lifecycle and Bakery allocation; never persisted. */
+  derivedReadyForCollection?: boolean;
   pickedUpAt: string | null;
   outForDeliveryAt: string | null;
   deliveredAt: string | null;

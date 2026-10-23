@@ -56,6 +56,16 @@ export function isCollectionDineInMethod(
   return normalizeFulfilmentMethod(fulfilmentMethod) === "dine_in";
 }
 
+function hasCollectionReadyPermission(input: {
+  readyAt: string | null;
+  readyForCollection?: boolean;
+  status: GuestOrderStatus | string;
+}): boolean {
+  if (input.readyForCollection === false) return false;
+  if (input.readyAt) return true;
+  return input.readyForCollection === true && input.status === "paid";
+}
+
 /** Pickup tab / legacy Ready board: pickup Ready, not yet Collected. */
 export function isActiveOnCollectionBoard(input: {
   customerId: string | null;
@@ -64,13 +74,14 @@ export function isActiveOnCollectionBoard(input: {
   status: GuestOrderStatus | string;
   fulfilmentMethod: string | null | undefined;
   readyAt: string | null;
+  readyForCollection?: boolean;
   pickedUpAt: string | null;
 }): boolean {
   if (input.customerId != null) return false;
   if (input.pickupDate !== input.selectedPickupDate) return false;
   if (!isCollectionActiveStatus(input.status)) return false;
   if (!isCollectionPickupMethod(input.fulfilmentMethod)) return false;
-  if (!input.readyAt) return false;
+  if (!hasCollectionReadyPermission(input)) return false;
   if (input.pickedUpAt) return false;
   return true;
 }
@@ -134,9 +145,10 @@ export function isActiveOnCollectionDineInReadyBoard(input: {
   status: GuestOrderStatus | string;
   fulfilmentMethod: string | null | undefined;
   readyAt: string | null;
+  readyForCollection?: boolean;
   pickedUpAt: string | null;
 }): boolean {
-  if (!input.readyAt) return false;
+  if (!hasCollectionReadyPermission(input)) return false;
   return isActiveOnCollectionDineInBoard(input);
 }
 
@@ -152,6 +164,7 @@ export function isActiveOnCollectionReadyQueue(input: {
   status: GuestOrderStatus | string;
   fulfilmentMethod: string | null | undefined;
   readyAt: string | null;
+  readyForCollection?: boolean;
   pickedUpAt: string | null;
   deliveredAt: string | null;
 }): boolean {
@@ -163,6 +176,7 @@ export function isActiveOnCollectionReadyQueue(input: {
       status: input.status,
       fulfilmentMethod: input.fulfilmentMethod,
       readyAt: input.readyAt,
+      readyForCollection: input.readyForCollection,
       pickedUpAt: input.pickedUpAt,
     })
   ) {
@@ -189,6 +203,7 @@ export function isActiveOnCollectionReadyQueue(input: {
     status: input.status,
     fulfilmentMethod: input.fulfilmentMethod,
     readyAt: input.readyAt,
+    readyForCollection: input.readyForCollection,
     pickedUpAt: input.pickedUpAt,
   });
 }
@@ -290,6 +305,7 @@ export function isVisibleOnCollectionDetail(input: {
   status: GuestOrderStatus | string;
   fulfilmentMethod: string | null | undefined;
   readyAt: string | null;
+  readyForCollection?: boolean;
   pickedUpAt: string | null;
   deliveredAt?: string | null;
 }): boolean {
@@ -318,7 +334,7 @@ export function isVisibleOnCollectionDetail(input: {
   }
   if (!isCollectionPickupMethod(input.fulfilmentMethod)) return false;
   // Active Pickup Ready queue
-  if (input.readyAt && !input.pickedUpAt) return true;
+  if (hasCollectionReadyPermission(input) && !input.pickedUpAt) return true;
   // Collected with Ready preserved — Undo path
   if (input.readyAt && input.pickedUpAt) return true;
   return false;
@@ -337,6 +353,7 @@ export type CollectionDeskPresentation =
 
 export function collectionDeskPresentation(input: {
   readyAt: string | null;
+  readyForCollection?: boolean;
   pickedUpAt: string | null;
   deliveredAt?: string | null;
   outForDeliveryAt?: string | null;
@@ -360,7 +377,9 @@ export function collectionDeskPresentation(input: {
   }
   if (isCollectionDineInMethod(input.fulfilmentMethod)) {
     if (input.pickedUpAt) return "dine_in_complete";
-    return input.readyAt ? "dine_in_ready" : "dine_in_pending";
+    return (input.readyForCollection ?? Boolean(input.readyAt))
+      ? "dine_in_ready"
+      : "dine_in_pending";
   }
   if (input.pickedUpAt) {
     return isCollectionPickupMethod(input.fulfilmentMethod ?? "pickup")
@@ -490,6 +509,7 @@ export const COLLECTION_PICKUP_OVERDUE_LABEL = "Pickup overdue";
 
 export function collectionDeskAttention(input: {
   readyAt: string | null;
+  readyForCollection?: boolean;
   pickedUpAt: string | null;
   deliveredAt?: string | null;
   outForDeliveryAt?: string | null;
@@ -504,6 +524,7 @@ export function collectionDeskAttention(input: {
 } {
   const presentation = collectionDeskPresentation({
     readyAt: input.readyAt,
+    readyForCollection: input.readyForCollection,
     pickedUpAt: input.pickedUpAt,
     deliveredAt: input.deliveredAt,
     outForDeliveryAt: input.outForDeliveryAt,
@@ -568,13 +589,14 @@ export function countCollectionPickupOverdue<
 /** Collection Mark Collected requires Ready (stricter than Owner Ops RPC). */
 export function isCollectionMarkCollectedEligible(input: {
   readyAt: string | null;
+  readyForCollection?: boolean;
   pickedUpAt: string | null;
   fulfilmentMethod: string | null | undefined;
   status: GuestOrderStatus | string;
 }): boolean {
   if (!isCollectionPickupMethod(input.fulfilmentMethod)) return false;
   if (!isCollectionActiveStatus(input.status)) return false;
-  if (!input.readyAt) return false;
+  if (!hasCollectionReadyPermission(input)) return false;
   if (input.pickedUpAt) return false;
   return true;
 }
@@ -582,13 +604,14 @@ export function isCollectionMarkCollectedEligible(input: {
 /** Collection Complete Dine-in follows the same Ready-before-complete desk rule. */
 export function isCollectionCompleteDineInEligible(input: {
   readyAt: string | null;
+  readyForCollection?: boolean;
   pickedUpAt: string | null;
   fulfilmentMethod: string | null | undefined;
   status: GuestOrderStatus | string;
 }): boolean {
   if (!isCollectionDineInMethod(input.fulfilmentMethod)) return false;
   if (!isCollectionActiveStatus(input.status)) return false;
-  if (!input.readyAt) return false;
+  if (!hasCollectionReadyPermission(input)) return false;
   if (input.pickedUpAt) return false;
   return true;
 }
