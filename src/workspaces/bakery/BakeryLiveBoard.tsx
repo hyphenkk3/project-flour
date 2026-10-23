@@ -11,7 +11,7 @@ import {
 import { BakeryDateNav } from "@/workspaces/bakery/BakeryDateNav";
 import { BakeryOrderCard } from "@/workspaces/bakery/BakeryOrderCard";
 import {
-  bakeryProductionPresentation,
+  bakeryOrderProductionPresentation,
   BAKERY_QUEUE_FILTERS,
   matchesBakeryQueueFilter,
   type BakeryQueueFilter,
@@ -104,24 +104,15 @@ export function BakeryLiveBoard({
 
   const notStarted = visibleOrders.filter(
     (order) =>
-      bakeryProductionPresentation({
-        productionStartedAt: order.productionStartedAt,
-        readyAt: order.readyAt,
-      }) === "not_started",
+      bakeryOrderProductionPresentation(order) === "not_started",
   );
   const inProduction = visibleOrders.filter(
     (order) =>
-      bakeryProductionPresentation({
-        productionStartedAt: order.productionStartedAt,
-        readyAt: order.readyAt,
-      }) === "in_production",
+      bakeryOrderProductionPresentation(order) === "in_production",
   );
   const ready = visibleOrders.filter(
     (order) =>
-      bakeryProductionPresentation({
-        productionStartedAt: order.productionStartedAt,
-        readyAt: order.readyAt,
-      }) === "ready",
+      bakeryOrderProductionPresentation(order) === "ready",
   );
 
   return (

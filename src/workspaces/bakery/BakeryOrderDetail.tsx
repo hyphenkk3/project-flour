@@ -17,7 +17,7 @@ import {
   bakeryFulfilmentCue,
   bakeryProductionBadgeTone,
   bakeryProductionLabel,
-  bakeryProductionPresentation,
+  bakeryOrderProductionPresentation,
   bakeryProductionSurface,
   deriveBakeryPackingReminders,
   hasPaymentAttention,
@@ -27,6 +27,8 @@ import {
 } from "@/workspaces/bakery/eligibility";
 import type { BakeryBoardOrder } from "@/workspaces/bakery/types";
 import { BakeryAllocationBreakdown } from "@/workspaces/bakery/BakeryAllocationBreakdown";
+import { BakeryFreshPickReadinessActions } from "@/workspaces/bakery/BakeryFreshPickReadinessActions";
+import { isDeliveryFulfilment } from "@/engines/orders/operational-state";
 
 type BakeryOrderDetailProps = {
   order: BakeryBoardOrder;
@@ -39,10 +41,7 @@ export function BakeryOrderDetail({
   boardDate,
   capabilities,
 }: BakeryOrderDetailProps) {
-  const presentation = bakeryProductionPresentation({
-    productionStartedAt: order.productionStartedAt,
-    readyAt: order.readyAt,
-  });
+  const presentation = bakeryOrderProductionPresentation(order);
   const paymentAttention = hasPaymentAttention({
     productionStartedAt: order.productionStartedAt,
     readyAt: order.readyAt,
@@ -67,6 +66,21 @@ export function BakeryOrderDetail({
     pickupDate: order.pickupDate,
     pickupTime: order.pickupTime,
   });
+  const freshPickAllocationVerified =
+    order.freshPickAllocation.status === "verified" &&
+    order.freshPickAllocation.totalAssignedQuantity > 0;
+  const freshPickFullySuppliesOrder =
+    freshPickAllocationVerified &&
+    order.freshPickAllocation.fullyCovered &&
+    !isDeliveryFulfilment(order.fulfilmentMethod);
+  const freshPickStillNeedsReadiness =
+    freshPickAllocationVerified &&
+    order.freshPickAllocation.totalRemainingQuantity > 0 &&
+    order.readyAt !== null &&
+    (order.assignedFreshPickStocks.length !==
+      order.freshPickAllocation.totalAssignedQuantity ||
+      order.assignedFreshPickStocks.some((stock) => !stock.readyForCollection)) &&
+    !isDeliveryFulfilment(order.fulfilmentMethod);
 
   return (
     <>
@@ -169,6 +183,16 @@ export function BakeryOrderDetail({
 
             <BakeryAllocationBreakdown summary={order.freshPickAllocation} />
 
+            <BakeryFreshPickReadinessActions
+              allocationVerified={order.freshPickAllocation.status === "verified"}
+              canMarkReady={capabilities.canMarkReady}
+              canUndoReady={capabilities.canUndoReady}
+              fulfilmentMethod={order.fulfilmentMethod}
+              outForDeliveryAt={order.outForDeliveryAt}
+              pickedUpAt={order.pickedUpAt}
+              stocks={order.assignedFreshPickStocks}
+            />
+
             <BakeryPackingChecklist items={packing} />
 
             {order.customerNotes?.trim() ? (
@@ -214,7 +238,9 @@ export function BakeryOrderDetail({
         </div>
       </main>
 
-      <BakeryProductionActions orderId={order.id} surface={surface} />
+      {!freshPickFullySuppliesOrder && !freshPickStillNeedsReadiness ? (
+        <BakeryProductionActions orderId={order.id} surface={surface} />
+      ) : null}
     </>
   );
 }

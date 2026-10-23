@@ -14,7 +14,7 @@ import {
   bakeryPrimaryCakeSummary,
   bakeryProductionBadgeTone,
   bakeryProductionLabel,
-  bakeryProductionPresentation,
+  bakeryOrderProductionPresentation,
   hasPaymentAttention,
   isBakeryOrderSecured,
 } from "@/workspaces/bakery/eligibility";
@@ -27,10 +27,7 @@ type BakeryOrderCardProps = {
 };
 
 export function BakeryOrderCard({ order, boardDate }: BakeryOrderCardProps) {
-  const presentation = bakeryProductionPresentation({
-    productionStartedAt: order.productionStartedAt,
-    readyAt: order.readyAt,
-  });
+  const presentation = bakeryOrderProductionPresentation(order);
   const { cakeName, sizeLabel, additionalCakeCount } =
     bakeryPrimaryCakeSummary(order);
   const notesExcerpt = bakeryCustomerNotesExcerpt(order.customerNotes);

@@ -27,6 +27,7 @@ type ExtraStockAllocationRow = {
   lifecycle: string;
   sold_at: string | null;
   cut_into_slices_at: string | null;
+  ready_for_collection: boolean | null;
   cake_name: string;
   size_label: string;
   library_cake_id: string | null;
@@ -42,6 +43,7 @@ function mapAllocationStock(row: ExtraStockAllocationRow): BakeryAssignedStockIn
     lifecycle: row.lifecycle,
     soldAt: row.sold_at,
     cutIntoSlicesAt: row.cut_into_slices_at,
+    readyForCollection: row.ready_for_collection === true,
     cakeId: row.library_cake_id,
     cakeName: row.cake_name,
     sizeId: row.library_cake_size_id,
@@ -62,7 +64,7 @@ async function loadAllocationRows(
   if (orderIds.length === 0) return new Map();
 
   const columns =
-    "id,order_id,lifecycle,sold_at,cut_into_slices_at,cake_name,size_label,library_cake_id,library_cake_size_id,walk_in_held_until";
+    "id,order_id,lifecycle,sold_at,cut_into_slices_at,ready_for_collection,cake_name,size_label,library_cake_id,library_cake_size_id,walk_in_held_until";
   const [linkedResult, primaryResult] = await Promise.all([
     supabase.from("extra_stock").select(columns).in("order_id", orderIds),
     primaryIds.length

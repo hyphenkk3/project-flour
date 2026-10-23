@@ -156,6 +156,16 @@ export function mapBakeryBoardOrder(
       })),
       stockRows: assignedStockRows,
     }),
+    assignedFreshPickStocks: assignedStockRows.map((stock) => ({
+      id: stock.id,
+      cakeName: stock.cakeName,
+      sizeLabel: stock.sizeLabel,
+      lifecycle: stock.lifecycle,
+      soldAt: stock.soldAt,
+      cutIntoSlicesAt: stock.cutIntoSlicesAt,
+      readyForCollection: stock.readyForCollection === true,
+      legacyLinkConflict: stock.legacyLinkConflict === true,
+    })),
     complimentaryItems: mapComplimentary(row),
     paidAddons: mapPaidAddons(row),
   };
