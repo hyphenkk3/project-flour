@@ -11,9 +11,13 @@ function readSrc(path: string): string {
 }
 
 const queries = readSrc("src/workspaces/storefront/catalog/queries.ts");
-assert.match(queries, /STOREFRONT_PRICE_LOOKUP_CONCURRENCY = 6/);
-assert.match(queries, /data == null \|\| !Number\.isFinite\(Number\(data\)\)/);
-assert.match(queries, /The current cake price could not be verified/);
+assert.match(queries, /library_cake_size_prices_on/);
+assert.match(queries, /data\.length !== sizes\.length/);
+assert.match(queries, /The current cake prices could not be verified/);
+assert.match(queries, /loadCakePhotosByIds/);
+assert.match(queries, /loadCakeCategoryAssignmentsByIds/);
+assert.match(queries, /loadCakeTagAssignmentsByIds/);
+assert.match(queries, /await Promise\.all\(\[/);
 assert.match(queries, /\.select\("library_cake_id, sort_order"\)/);
 assert.match(queries, /\.select\("library_cake_id, homepage_sort_order"\)/);
 assert.match(queries, /readCachedStorefrontCakesByIds/);

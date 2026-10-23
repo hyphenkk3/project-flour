@@ -44,15 +44,17 @@ const probeSrc = readSrc(
 assert.match(browsePage, /StorefrontBrowsePage/);
 assert.match(browseSrc, /listBrowsePublishedCakes/);
 assert.match(browseSrc, /BrowseCakeCatalogue cakes=\{cakes\}/);
-assert.match(browseSrc, /promotions=\{promotions\}/);
-assert.match(browseSrc, /StorefrontBrowsePerfProbe cakeCount=\{cakes\.length\}/);
+assert.match(browseSrc, /<Suspense fallback=\{<BrowseVoucherFallback \/>\}>/);
+assert.match(browseSrc, /<BrowseVoucherPromotions/);
+assert.match(browseSrc, /vouchersPromise/);
+assert.match(
+  browseSrc,
+  /StorefrontBrowsePerfProbe cakeCount=\{cakes\.length\}/,
+);
 assert.match(catalogueSrc, /StorefrontCakeCard/);
 assert.match(catalogueSrc, /detailHref=\{detailHrefs\?\.\[cake\.id\]\}/);
 
-assert.equal(
-  (cardSrc.match(/<StorefrontCakeDetailLink/g) ?? []).length,
-  3,
-);
+assert.equal((cardSrc.match(/<StorefrontCakeDetailLink/g) ?? []).length, 3);
 assert.match(cardSrc, /detailHref \?\? `\/cakes\/\$\{cake\.id\}`/);
 assert.doesNotMatch(cardSrc, /href=""/);
 
@@ -88,10 +90,7 @@ assert.match(listingIntentSrc, /router\.prefetch/);
 assert.match(listingIntentSrc, /href === "\/browse"/);
 assert.match(listingIntentSrc, /data-storefront-collection-intent/);
 assert.match(listingIntentSrc, /\/order\/collection\//);
-assert.match(
-  listingIntentSrc,
-  /markStorefrontNavIntent\(href, "collection"\)/,
-);
+assert.match(listingIntentSrc, /markStorefrontNavIntent\(href, "collection"\)/);
 assert.match(listingIntentSrc, /pointerdown/);
 assert.match(listingIntentSrc, /focusin/);
 assert.match(listingIntentSrc, /pointerover/);

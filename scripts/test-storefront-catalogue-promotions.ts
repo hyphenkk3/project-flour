@@ -25,12 +25,30 @@ assert.match(collectionPage, /listPublicCatalogueVouchers/);
 assert.match(collectionPage, /collectionMerchandising: true/);
 assert.match(collectionPage, /sortCakesForCataloguePromotionPresentation/);
 
-const browse = readSrc("src/workspaces/storefront/home/StorefrontBrowsePage.tsx");
-assert.match(browse, /listPublicCatalogueVouchers/);
-assert.match(browse, /buildTargetedPromotionBadgeByCakeId/);
-assert.equal((browse.match(/listPublicCatalogueVouchers\(\)/g) ?? []).length, 1);
+const browse = readSrc(
+  "src/workspaces/storefront/home/StorefrontBrowsePage.tsx",
+);
+assert.match(browse, /listPublicCatalogueVouchersForBrowse/);
+assert.match(browse, /BrowseVoucherPromotions/);
+assert.doesNotMatch(
+  browse,
+  /await Promise\.all\(\[\s*listBrowsePublishedCakes\(\),\s*listPublicCatalogueVouchers/,
+);
 
-const card = readSrc("src/workspaces/storefront/catalog/StorefrontCakeCard.tsx");
+const browseOffers = readSrc(
+  "src/workspaces/storefront/catalog/BrowseVoucherPromotions.tsx",
+);
+assert.match(browseOffers, /Current offer details are temporarily unavailable/);
+assert.match(browseOffers, /BrowseVoucherRetryButton/);
+assert.match(browseOffers, /buildTargetedPromotionBadgeByCakeId/);
+assert.match(
+  browseOffers,
+  /Eligibility and the final discount are verified at checkout/,
+);
+
+const card = readSrc(
+  "src/workspaces/storefront/catalog/StorefrontCakeCard.tsx",
+);
 assert.match(card, /StorefrontPromotionBadge/);
 assert.doesNotMatch(card, /listPublicCatalogueVouchers/);
 

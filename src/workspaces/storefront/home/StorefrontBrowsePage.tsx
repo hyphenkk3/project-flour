@@ -1,6 +1,10 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { BrowseCakeCatalogue } from "@/workspaces/storefront/catalog/BrowseCakeCatalogue";
+import {
+  BrowseVoucherFallback,
+  BrowseVoucherPromotions,
+} from "@/workspaces/storefront/catalog/BrowseVoucherPromotions";
 import { StorefrontBrowsePerfProbe } from "@/workspaces/storefront/catalog/StorefrontBrowsePerfProbe";
 import { CakePhotoDisclaimer } from "@/workspaces/storefront/catalog/CakePhotoDisclaimer";
 import {
@@ -9,9 +13,7 @@ import {
 } from "@/workspaces/storefront/catalog/CakeEntryScopeCapture";
 import { StorefrontListingRestore } from "@/workspaces/storefront/catalog/StorefrontListingRestore";
 import { listBrowsePublishedCakes } from "@/workspaces/storefront/catalog/queries";
-import { singaporeDateFromIso } from "@/engines/orders/promotions";
-import { buildTargetedPromotionBadgeByCakeId } from "@/engines/vouchers/catalogue-promotion-presentation";
-import { listPublicCatalogueVouchers } from "@/workspaces/vouchers/catalogue-queries";
+import { listPublicCatalogueVouchersForBrowse } from "@/workspaces/vouchers/catalogue-queries";
 import {
   StorefrontHomeLink,
   StorefrontStaffSignIn,
@@ -34,14 +36,8 @@ function BrowseCatalogueFallback() {
 }
 
 async function BrowseCatalogueIsland() {
-  const [cakes, vouchers] = await Promise.all([
-    listBrowsePublishedCakes(),
-    listPublicCatalogueVouchers(),
-  ]);
-  const today = singaporeDateFromIso(new Date().toISOString());
-  const promotions = Object.fromEntries(
-    buildTargetedPromotionBadgeByCakeId(vouchers, today, "preorder"),
-  );
+  const vouchersPromise = listPublicCatalogueVouchersForBrowse();
+  const cakes = await listBrowsePublishedCakes();
   const cakeScopes = Object.fromEntries(
     cakes.map((cake) => [cake.id, { origin: "browse" as const }]),
   );
@@ -52,7 +48,13 @@ async function BrowseCatalogueIsland() {
       </h2>
       <CakeEntryScopeCapture scopes={cakeScopes}>
         <StorefrontBrowsePerfProbe cakeCount={cakes.length} />
-        <BrowseCakeCatalogue cakes={cakes} promotions={promotions} />
+        <Suspense fallback={<BrowseVoucherFallback />}>
+          <BrowseVoucherPromotions
+            cakes={cakes}
+            vouchersPromise={vouchersPromise}
+          />
+        </Suspense>
+        <BrowseCakeCatalogue cakes={cakes} />
         <StorefrontListingRestore origin="browse" />
       </CakeEntryScopeCapture>
     </section>
@@ -69,13 +71,13 @@ export function StorefrontBrowsePage() {
       </h1>
       <p className="text-skyline mt-1.5 max-w-xl text-sm leading-snug sm:mt-3 sm:text-[0.95rem] sm:leading-relaxed">
         <span className="sm:hidden">
-          Explore cakes Whitebird has offered. Availability still depends on your
-          pickup date.
+          Explore cakes Whitebird has offered. Availability still depends on
+          your pickup date.
         </span>
         <span className="hidden sm:inline">
           Explore the full Whitebird collection, including flavours from earlier
-          menus. Availability for your order still depends on the pickup date you
-          choose.
+          menus. Availability for your order still depends on the pickup date
+          you choose.
         </span>
       </p>
       <CakePhotoDisclaimer className="mt-3 max-w-xl sm:mt-4" />

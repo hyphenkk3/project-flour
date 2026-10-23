@@ -10,7 +10,10 @@ import type {
   CatalogueVoucherRuleType,
   CatalogueVoucherRules,
 } from "@/types/catalogue-voucher";
-import type { LibraryVoucherStatus, LibraryVoucherType } from "@/types/library-voucher";
+import type {
+  LibraryVoucherStatus,
+  LibraryVoucherType,
+} from "@/types/library-voucher";
 import { loadCatalogueRulesForVouchers } from "@/workspaces/library/vouchers/rule-queries";
 
 type PublicRuleValue = {
@@ -93,10 +96,14 @@ function mapPublicVoucher(row: PublicVoucher): CatalogueVoucherRecord {
   };
 }
 
-async function loadPublicCatalogueVouchers(): Promise<CatalogueVoucherRecord[]> {
+async function loadPublicCatalogueVouchers(): Promise<
+  CatalogueVoucherRecord[]
+> {
   try {
     const supabase = createPublicClient();
-    const { data, error } = await supabase.rpc("list_public_catalogue_vouchers");
+    const { data, error } = await supabase.rpc(
+      "list_public_catalogue_vouchers",
+    );
     if (error) {
       throw new Error(error.message);
     }
@@ -109,10 +116,36 @@ async function loadPublicCatalogueVouchers(): Promise<CatalogueVoucherRecord[]> 
 
 const readPublicCatalogueVouchers = cache(loadPublicCatalogueVouchers);
 
+export type PublicCatalogueVouchersForBrowse =
+  { ok: true; vouchers: CatalogueVoucherRecord[] } | { ok: false };
+
+const readPublicCatalogueVouchersForBrowse = cache(
+  async (): Promise<PublicCatalogueVouchersForBrowse> => {
+    try {
+      const supabase = createPublicClient();
+      const { data, error } = await supabase.rpc(
+        "list_public_catalogue_vouchers",
+      );
+      if (error) return { ok: false };
+      const rows = Array.isArray(data) ? data : [];
+      return {
+        ok: true,
+        vouchers: (rows as PublicVoucher[]).map(mapPublicVoucher),
+      };
+    } catch {
+      return { ok: false };
+    }
+  },
+);
+
 export async function listPublicCatalogueVouchers(): Promise<
   CatalogueVoucherRecord[]
 > {
   return readPublicCatalogueVouchers();
+}
+
+export async function listPublicCatalogueVouchersForBrowse(): Promise<PublicCatalogueVouchersForBrowse> {
+  return readPublicCatalogueVouchersForBrowse();
 }
 
 export async function listStaffCatalogueVouchers(): Promise<
@@ -199,17 +232,19 @@ export async function loadCatalogueApplyOrder(
   }
   if (!order || order.customer_id) return null;
 
-  const [{ data: items, error: itemError }, { data: adjustments, error: adjError }] =
-    await Promise.all([
-      admin
-        .from("order_items")
-        .select("cake_id, cake_size_id, size_label, quantity, unit_price")
-        .eq("order_id", orderId),
-      admin
-        .from("order_adjustments")
-        .select("code, status, reverses_adjustment_id, label, metadata")
-        .eq("order_id", orderId),
-    ]);
+  const [
+    { data: items, error: itemError },
+    { data: adjustments, error: adjError },
+  ] = await Promise.all([
+    admin
+      .from("order_items")
+      .select("cake_id, cake_size_id, size_label, quantity, unit_price")
+      .eq("order_id", orderId),
+    admin
+      .from("order_adjustments")
+      .select("code, status, reverses_adjustment_id, label, metadata")
+      .eq("order_id", orderId),
+  ]);
   if (itemError) throw new Error(itemError.message);
   if (adjError) throw new Error(adjError.message);
 
@@ -243,5 +278,7 @@ export function voucherRelevantToCake(
   voucher: CatalogueVoucherRecord,
   cakeId: string,
 ): boolean {
-  return voucher.rules.cakeIds.length === 0 || voucher.rules.cakeIds.includes(cakeId);
+  return (
+    voucher.rules.cakeIds.length === 0 || voucher.rules.cakeIds.includes(cakeId)
+  );
 }
