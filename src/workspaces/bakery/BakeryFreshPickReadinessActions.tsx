@@ -3,8 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { FormField } from "@/components/ui/FormField";
-import { FormTextarea } from "@/components/ui/FormTextarea";
+import { FormField, FormTextarea } from "@/components/ui/form";
 import { isBakeryFreshPickReadinessEligible } from "@/workspaces/bakery/eligibility";
 import type { BakeryAssignedFreshPickStock } from "@/workspaces/bakery/types";
 import type { StorefrontOrderFulfilmentMethod } from "@/types/storefront";
