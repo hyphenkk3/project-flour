@@ -978,3 +978,16 @@ At the end of this investigation, append a dated outcome with root cause or rema
 - **Next:** Production/source verification and preservation, storefront candidate reconciliation, WOS broader latency as it affects operations.
 - **Deferred behind P0 unless needed for incident remediation:** complimentary persistence/Preview setup, Staff Administration V1, reservations, desktop month selector, pricing dropdown display, nonurgent visual polish.
 - Do not close P0 solely on healthy spot checks. No Production mutation is authorized by this record.
+
+
+### 24 October P0 correction — Supabase support escalation already submitted
+
+**DO NOT restart the completed incident diagnosis from zero.** Recovered from the prior chat (24 October) after the Owner highlighted missing handoff information:
+
+- **CONFIRMED OWNER ACTION:** A Supabase support case was submitted for Production project `project-flour-prod` (`cuowwlduhxxifmpvpltt`), covering **Database, Authentication, and Others/PostgREST**. **Awaiting Supabase's response.** The support ticket ID and exact outgoing text are not yet independently recovered; do not invent either.
+- Previously investigated evidence: intermittent multi-service timeouts, PostgreSQL cancellation/error code `57014`; `library_cakes`, `orders`, and `staff_profiles` HTTP 500s; Supabase Auth HTTP 500/timeouts; Vercel Collection/cache-revalidation timeouts. Representative query ID: `-3231686492694644454`.
+- Support context reported Production Vercel deployment `dpl_6gZLDJuwPgefyB9RJwh4ztZpJBRJ` and commit `ec9e982eb4c64b65191b71e6511f5f3fb1603978`. Distinguish this as incident-time evidence, not proof of current serving alias.
+- Earlier work concluded that **root cause is unconfirmed** and a **staff login error-handling defect was identified but not implemented**. The database/auth timeouts may produce cross-cutting storefront/photo/crew-login symptoms; no single causal explanation has yet been proven for all photos.
+- **NO-GO on speculative infrastructure actions:** No paid Supabase upgrade, database rollback/restore, staff password resets, or Production configuration/deployment changes solely as a workaround while support response is pending. Only an independently validated narrow fix may be considered through DEV and separate Owner approval.
+- **Next practical action:** Check for Supabase's reply in the existing case; preserve evidence and correlate any new incidents against already identified query IDs/error signatures. In parallel, inspect and implement the narrow staff-login error-handling correction and safe storefront failure handling in DEV, without assuming they repair Supabase's root cause. Avoid re-running expensive broad diagnostics already completed.
+- Prior master P0 entry described this as a new investigation but omitted the existing submitted ticket and cross-service findings. **This paragraph supersedes that framing.**
