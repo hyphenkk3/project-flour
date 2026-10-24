@@ -944,3 +944,10 @@ At the end of this investigation, append a dated outcome with root cause or rema
 ### Checkpoint integrity
 - This master update is intended for the isolated Fresh Pick branch only, **not** main or Production.
 - No assertion of local working tree verification, completed feature implementation, Production migration, or successful Production deployment is made here.
+
+
+### 24 October source audit follow-up — scope conflict found
+- A fresh GitHub compare of `main...codex/freshpick-complimentary-dev-20261024` shows **two documentation-only commits** (master status + recovery checkpoint), with zero feature-source file changes.
+- GitHub branch-name search for `compliment` found only this newly created branch; commit-text search found one September order-receipt commit `338a3e56d7292758a5795c4be4a49dc5c5505e9d`, not evidence of a new Fresh Pick complimentary persistence feature.
+- Critically, this same master previously lists **“Complimentary item persistence — explicitly on hold”** under Pending priorities (21 October). The new branch and infrastructure preparations do not themselves rescind that hold. Reconcile the latest owner decision and actual local candidate before any implementation or deployment.
+- Next gate: locate and preserve the original local working tree or developer candidate and establish whether the hold was lifted. Do not infer missing local code from remote GitHub search. No Production or DEV deployment is authorized by this audit.
