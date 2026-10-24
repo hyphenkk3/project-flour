@@ -63,6 +63,7 @@ import {
 import {
   getStorefrontCollectionForPickupDate,
   getCustomerCakePickupMemberships,
+  STOREFRONT_PRICE_LOOKUP_BATCH_SIZE,
   listAvailableCheckoutCakes,
   listCheckoutCakesForCakeIds,
   listCustomerSpecialCatalogues,
@@ -823,22 +824,42 @@ export async function resolveCheckoutCakeSizePrices(
     return {};
   }
   const supabase = await createClient();
-  const resolved = await Promise.all(
-    ids.map(async (id) => {
-      const { data, error } = await supabase.rpc("library_cake_size_price_on", {
-        p_cake_size_id: id,
-        p_pickup_date: key,
-      });
-      if (error || data == null) return null;
-      const price = Number(data);
-      if (!Number.isFinite(price)) return null;
-      return [id, price] as const;
-    }),
-  );
   const prices: Record<string, number> = {};
-  for (const row of resolved) {
-    if (!row) continue;
-    prices[row[0]] = row[1];
+  for (
+    let offset = 0;
+    offset < ids.length;
+    offset += STOREFRONT_PRICE_LOOKUP_BATCH_SIZE
+  ) {
+    const batchIds = ids.slice(
+      offset,
+      offset + STOREFRONT_PRICE_LOOKUP_BATCH_SIZE,
+    );
+    const { data, error } = await supabase.rpc(
+      "library_cake_size_prices_on",
+      {
+        p_cake_size_ids: batchIds,
+        p_pickup_date: key,
+      },
+    );
+    if (error || !Array.isArray(data)) continue;
+
+    const requestedIds = new Set(batchIds);
+    for (const row of data as Array<{
+      cake_size_id?: string | null;
+      price?: number | string | null;
+    }>) {
+      if (
+        !row?.cake_size_id ||
+        !requestedIds.has(row.cake_size_id) ||
+        row.price == null
+      ) {
+        continue;
+      }
+      const price = Number(row.price);
+      if (Number.isFinite(price)) {
+        prices[row.cake_size_id] = price;
+      }
+    }
   }
   return prices;
 }
