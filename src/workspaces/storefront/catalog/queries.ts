@@ -305,6 +305,17 @@ function libraryCakeEmbedSelect(
   includeTags = true,
   includeSizes = true,
 ): string {
+  // Category assignments are authoritative when available, so the legacy
+  // direct-category embed is only needed by the schema-compatibility fallback.
+  const primaryCategorySelect = includeAssignments
+    ? ""
+    : `
+      library_cake_categories!library_cakes_category_id_fkey (
+        id,
+        name,
+        is_active,
+        sort_order
+      ),`;
   const assignmentSelect = includeAssignments
     ? `
       library_cake_category_assignments!cake_id (
@@ -352,12 +363,7 @@ function libraryCakeEmbedSelect(
       status,
       sharing_guide,
       allergens,
-      library_cake_categories!library_cakes_category_id_fkey (
-        id,
-        name,
-        is_active,
-        sort_order
-      ),
+      ${primaryCategorySelect}
       ${assignmentSelect}
       ${tagSelect}
       ${sizeSelect}
