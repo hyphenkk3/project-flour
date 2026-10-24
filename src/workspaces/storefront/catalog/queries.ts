@@ -34,6 +34,10 @@ import {
 } from "@/lib/dates";
 import { createClient, createPublicClient } from "@/lib/supabase/server";
 import { cache } from "react";
+import {
+  coalesceInFlight,
+  normalizeCakeDisplayIds,
+} from "@/workspaces/storefront/catalog/in-flight-coalescer";
 import { unstable_cache } from "next/cache";
 import {
   STOREFRONT_PUBLISHED_CAKES_CACHE_TAG,
@@ -803,24 +807,38 @@ async function withEffectiveStorefrontPrices<T extends StorefrontCake>(
   return applyEffectiveStorefrontPrices(cakes, pricesBySizeId);
 }
 
-async function loadStorefrontCakesByIds(
+/**
+ * Shares only pending public catalogue reads inside this server module instance.
+ * It does not coordinate regeneration across separate Vercel instances.
+ */
+const pendingStorefrontCakeDisplayReads = new Map<
+  string,
+  Promise<CachedStorefrontCakeDisplay[]>
+>();
+
+function loadStorefrontCakesByIds(
   cakeIds: readonly string[],
 ): Promise<CachedStorefrontCakeDisplay[]> {
-  if (cakeIds.length === 0) return [];
-  const supabase = createPublicClient();
-  const data = await withCakePhotoSelectFallback(
-    (photoSelect, includeAssignments, includeTags) =>
-      supabase
-        .from("library_cakes")
-        .select(
-          libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags),
-        )
-        .in("id", [...cakeIds]),
-  );
+  const normalizedCakeIds = normalizeCakeDisplayIds(cakeIds);
+  if (normalizedCakeIds.length === 0) return Promise.resolve([]);
 
-  return ((data ?? []) as unknown as LibraryCakeEmbed[])
-    .filter((row) => row.library_cake_sizes?.length)
-    .map((row) => ({ cake: mapStorefrontCake(row), status: row.status }));
+  const key = normalizedCakeIds.join(",");
+  return coalesceInFlight(pendingStorefrontCakeDisplayReads, key, async () => {
+    const supabase = createPublicClient();
+    const data = await withCakePhotoSelectFallback(
+      (photoSelect, includeAssignments, includeTags) =>
+        supabase
+          .from("library_cakes")
+          .select(
+            libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags),
+          )
+          .in("id", normalizedCakeIds),
+    );
+
+    return ((data ?? []) as unknown as LibraryCakeEmbed[])
+      .filter((row) => row.library_cake_sizes?.length)
+      .map((row) => ({ cake: mapStorefrontCake(row), status: row.status }));
+  });
 }
 
 const readCachedStorefrontCakesByIds = cache((cakeIdsKey: string) =>
