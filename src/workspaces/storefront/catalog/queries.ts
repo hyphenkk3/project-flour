@@ -63,7 +63,7 @@ export { formatRm, startingPrice };
 
 /** Short merchandising TTL. Not used for checkout offers, orderability, or Fresh Pick stock. */
 const STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS = 30;
-const STOREFRONT_PRICE_LOOKUP_CONCURRENCY = 6;
+export const STOREFRONT_PRICE_LOOKUP_BATCH_SIZE = 64;
 
 type CategoryEmbed = {
   id: string;
@@ -774,32 +774,60 @@ async function withEffectiveStorefrontPrices<T extends StorefrontCake>(
   const sizes = cakes.flatMap((cake) => cake.sizes);
   if (sizes.length === 0) return cakes.map((cake) => ({ ...cake }));
 
+  const sizeIds = [...new Set(sizes.map((size) => size.id))];
   const supabase = createPublicClient();
   const pricesBySizeId = new Map<string, number>();
+
   for (
     let offset = 0;
-    offset < sizes.length;
-    offset += STOREFRONT_PRICE_LOOKUP_CONCURRENCY
+    offset < sizeIds.length;
+    offset += STOREFRONT_PRICE_LOOKUP_BATCH_SIZE
   ) {
-    const batch = sizes.slice(
+    const batchIds = sizeIds.slice(
       offset,
-      offset + STOREFRONT_PRICE_LOOKUP_CONCURRENCY,
+      offset + STOREFRONT_PRICE_LOOKUP_BATCH_SIZE,
     );
-    const resolved = await Promise.all(
-      batch.map(async (size) => {
-        const { data, error } = await supabase.rpc(
-          "library_cake_size_price_on",
-          { p_cake_size_id: size.id, p_pickup_date: priceDate },
-        );
-        if (error) throw new Error(error.message);
-        if (data == null || !Number.isFinite(Number(data))) {
-          throw new Error("The current cake price could not be verified.");
-        }
-        return [size.id, Number(data)] as const;
-      }),
+    const { data, error } = await supabase.rpc(
+      "library_cake_size_prices_on",
+      {
+        p_cake_size_ids: batchIds,
+        p_pickup_date: priceDate,
+      },
     );
-    for (const [sizeId, price] of resolved) pricesBySizeId.set(sizeId, price);
+    if (error) throw new Error(error.message);
+    if (!Array.isArray(data)) {
+      throw new Error("The current cake price could not be verified.");
+    }
+
+    const requestedIds = new Set(batchIds);
+    const batchPrices = new Map<string, number>();
+    for (const row of data as Array<{
+      cake_size_id?: string | null;
+      price?: number | string | null;
+    }>) {
+      if (
+        !row?.cake_size_id ||
+        !requestedIds.has(row.cake_size_id) ||
+        row.price == null ||
+        batchPrices.has(row.cake_size_id)
+      ) {
+        throw new Error("The current cake price could not be verified.");
+      }
+      const price = Number(row.price);
+      if (!Number.isFinite(price)) {
+        throw new Error("The current cake price could not be verified.");
+      }
+      batchPrices.set(row.cake_size_id, price);
+    }
+
+    if (batchPrices.size !== batchIds.length) {
+      throw new Error("The current cake price could not be verified.");
+    }
+    for (const [sizeId, price] of batchPrices) {
+      pricesBySizeId.set(sizeId, price);
+    }
   }
+
   return applyEffectiveStorefrontPrices(cakes, pricesBySizeId);
 }
 
