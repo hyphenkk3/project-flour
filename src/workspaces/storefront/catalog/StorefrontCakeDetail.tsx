@@ -5,19 +5,14 @@ import { isDevPerfEnabled } from "@/lib/perf/dev-only-shared";
 import { CakeDetailBackNav } from "@/workspaces/storefront/catalog/CakeDetailBackNav";
 import { CakeDetailPickupScope } from "@/workspaces/storefront/catalog/CakeDetailPickupScope";
 import { StorefrontCakeDetailPerfProbe } from "@/workspaces/storefront/catalog/StorefrontCakeDetailPerfProbe";
-import { StorefrontCakeDetailView } from "@/workspaces/storefront/catalog/StorefrontCakeDetailView";
 import { StorefrontRetryNotice } from "@/workspaces/storefront/StorefrontRetryNotice";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
-import {
-  loadCakeOfferVoucher,
-  type CakeOfferVoucher,
-} from "@/workspaces/storefront/offers/CakeOfferHint";
+import { loadCakeOfferVoucher } from "@/workspaces/storefront/offers/CakeOfferHint";
 import {
   getBrowseCakeDisplayById,
   getBrowsePublishedCakeById,
   mergeBrowseCakeDisplay,
 } from "@/workspaces/storefront/catalog/queries";
-import type { StorefrontCake } from "@/types/storefront";
 
 type CakeDetailSearchParams = Promise<
   Record<string, string | string[] | undefined>
