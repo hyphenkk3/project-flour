@@ -901,3 +901,46 @@ At the end of this investigation, append a dated outcome with root cause or rema
 - Recovery for an application-only regression is a compatible Vercel application rollback or a focused forward fix; no database restore or migration rollback is required.
 - Remaining work: broader WOS cross-device synchronization and measurable latency outside Collection; EXTRA stock polling/Realtime privacy review; monitor the isolated Bakery cache-refresh timeout; Financial Reports desktop month selector; Fresh Pick Share Payment delivery verification; Staff Administration V1; WhatsApp Business missing plus signs on iPhone; Complimentary item persistence remains explicitly on hold.
 - Follow-up note: this release record is a documentation-only commit after the application promotion. The connected Vercel project may create another Production deployment from that commit; verify its READY status and ensure it serves the same application tree before considering the release record complete.
+
+
+---
+
+## 24 October 2026 — Fresh Pick complimentary continuation and safety checkpoint
+
+**This update supplements, not supersedes, older dated evidence.** Treat the 21 October tables above as historical snapshots rather than claims about current live Production. Only observations actually checked below are current verification.
+
+### Canonical file and source rules
+- This file, `docs/PROJECT_FLOUR_MASTER_STATUS.md`, is the canonical project status and pending-work index. Append or precisely amend it after each meaningful change. Do not substitute scattered release/checkpoint notes for this master.
+- Preserve the existing file's historical evidence and identify stale assertions instead of silently replacing them.
+- Before any risky Git operation, inspect and preserve local dirty/untracked changes; never reset, clean, rebase, cherry-pick, checkout over changes, or delete user work without a recorded recovery point.
+- Store code in committed, durable Git refs; a chat transcript, Vercel build, or documentation-only commit is NOT the missing feature source.
+- DEV first; Production changes require explicit release authorization, compatibility checks, a recovery SHA, and post-release verification.
+- Never create .bak files, touch unrelated dirty files, or re-open closed historical source recovery without new evidence.
+
+### Fresh Pick complimentary current state (verified in connected services)
+- GitHub repository: `hyphenkk3/project-flour`; default branch `main`.
+- GitHub branch `codex/freshpick-complimentary-dev-20261024` was created on 24 October from `main` at `437228c81bcb8e5d70497f687990cf949b50fbe4`. Its initial Git comparison with main was identical (ahead=0, behind=0, files=0), so **the feature candidate was not on this new branch at creation**.
+- GitHub checkpoint commit `74063ff2c7ff399d2cb0a54931e6921c8f9a1286` added `release/checkpoints/freshpick-complimentary-20261024.md`, which is documentary evidence only. Its existence does not imply the feature source was recovered.
+- The original local candidate and any uncommitted work have **not** been inspected; they must be captured and reconciled before claiming recovery or proceeding with feature release.
+- Vercel project `project-flour`, ID `prj_3rmlAQzLSFOi15DEGczSuDYDq8xr` under `hyphen-org`. Preview disable setting was submitted successfully prior to branch creation. Branch deployment query returned none; verify the disable setting again before any Preview action.
+- Supabase projects were independently identified: DEV `tzwtpxdcggesgjaqxkqr`; Production `cuowwlduhxxifmpvpltt`. An earlier incorrectly entered Production URL as DEV was identified and corrected before any feature Preview deployment.
+- Branch-specific Preview `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are configured for verified DEV.
+- Branch-specific Preview `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `STAFF_NOTIFICATION_DISPATCH_SECRET`, and `CRON_SECRET` have intentionally invalid, nonfunctional placeholders. These are not working DEV credentials. Other inherited settings and application code paths remain unverified; do not enable Preview based only on this configuration.
+- Vercel Production-targeted historical deployment query most recently returned READY deployment `dpl_6gZLDJuwPgefyB9RJwh4ztZpJBRJ` from commit `ec9e982eb4c64b65191b71e6511f5f3fb1603978`. This does NOT prove that deployment currently serves `whitebird.asia`, and historical Production identity statements above may be stale.
+
+### Prior work to reconcile (do not classify as Production-released without verification)
+- Accepted DEV source `c6105eec0bbee64b86abcd45bb9be71f9eb2deeb` and DEV deployment `dpl_ACBKzrDigZ4gVaLh8cJ2CS2XRkjo` were recorded in this master as of 21 October: staff credential changes/passkeys, Fresh Pick Share Payment, payment corrections, Refund Recording V1, financial reports and exports, and iPhone Safari Operations fixes. Recheck current deployed identity before release.
+- Earlier Fresh Pick commits for source tracing include `14c9288e670c` (payment sharing/ready override), `2c4bb70d91bb` (Bakery allocations), and `11e21193fc7a` (assignment eligibility). Their existence does not establish that the new complimentary-order feature is present or Production-released.
+- Other known backlog topics requiring cross-chat reconciliation: Bakery Fresh Pick readiness/override and allocation flow; Refund Recording V1 Production compatibility; WOS fixes; storefront reliability and catalogue fixes; staff administration V1; iPhone WhatsApp plus-sign handoff; Hyphen × Whitebird integrated manual-confirmation reservation system; Fresh Pick delivery Share Payment real-order QA. Mark each with verified source/release state rather than assuming completion.
+
+### Immediate gated action order
+1. **SOURCE HOLD:** inspect original developer working tree (including dirty and untracked work) and recover the actual complimentary-order feature candidate. Preserve it in a named immutable SHA/ref without overwriting anything. Record origin, changed files, and migration dependencies here.
+2. Confirm branch-scoped Preview disable is truly active; enumerate all inherited Preview environment names without exposing secret values.
+3. Obtain/verify a DEV-only service-role key through a secure credential path; test code-level notification/cron suppression and use safe DEV-only configuration. Never borrow Production keys.
+4. Perform source-diff review and required migration compatibility checks, with tests on DEV first.
+5. Only after isolation gates pass, enable a guarded Preview and run Fresh Pick complimentary end-to-end QA. Record deployment ID and test evidence here.
+6. Production release **not authorized**. Keep a clear release comparison and recovery SHA before future release decisions.
+
+### Checkpoint integrity
+- This master update is intended for the isolated Fresh Pick branch only, **not** main or Production.
+- No assertion of local working tree verification, completed feature implementation, Production migration, or successful Production deployment is made here.
