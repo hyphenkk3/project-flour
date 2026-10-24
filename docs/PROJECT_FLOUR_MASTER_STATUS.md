@@ -999,3 +999,17 @@ At the end of this investigation, append a dated outcome with root cause or rema
 - Reverse compare from main base `437228c81bcb8e5d70497f687990cf949b50fbe4` to serving Production commit shows the Fresh Pick cross-workspace source plus later storefront reliability/photo handling changes in Production ancestry.
 - **Decision: DO NOT re-deploy or merge the older Fresh Pick branch.** It has no unreleased committed feature changes relative to the serving Production source; redeploying it risks reverting later P0 storefront improvements. Do not replay its four migrations: corresponding PROD entries already recorded with different versions.
 - The remaining Fresh Pick task is non-destructive Production behavior/Owner QA and checking any truly newer work not contained in this candidate. Preserve P0 storefront/photo/checkout/crew-login stability. No Production mutation occurred in this audit.
+
+
+### 24 October — authoritative deployed versus unreleased ledger (read-only reconciliation)
+| Scope | State | Exact evidence and limitation |
+|---|---|---|
+| Live whitebird.asia Vercel source | **DEPLOYED / VERIFIED** | Vercel domain lookup: Production READY deployment `dpl_6gZLDJuwPgefyB9RJwh4ztZpJBRJ`, source SHA `ec9e982eb4c64b65191b71e6511f5f3fb1603978`. |
+| October 23 Fresh Pick cross-workspace readiness | **IN LIVE SOURCE / VERIFIED GIT ANCESTRY** | Branch `codex/fresh-pick-cross-workspace-readiness-20261023` is 13 commits behind live source and 0 ahead; do not redeploy. |
+| Production Fresh Pick database safeguards | **APPLIED / VERIFIED LEDGER** | Production Supabase ledger has 170 entries including 20261023062001, 20261023135457, 20261023140034, 20261023140052. Do not reapply DEV version numbers. |
+| October 24 Calendar/Collection/complimentary r3 | **LOCAL CANDIDATE REPORTED, NOT VERIFIED DEPLOYED** | Prior chat identifies local r3 under `/Users/ycwee/Desktop/project-flour/recovery/freshpick-complimentary-candidate-ec9e982-20261024-r3`, starting from live `ec9e982`, with reported 18/18 tests, TypeScript, lint and build. This local source has not been independently opened in this session and no feature-source Git commit or deployment for r3 has been verified. Do not label it deployed. |
+| `codex/freshpick-complimentary-dev-20261024` | **DOCUMENTATION ONLY** | GitHub comparison to live SHA shows only master status and checkpoint paths changed; this branch does not contain r3 feature files. |
+| October 24 DEV Preview for r3 | **NOT VERIFIED / HOLD** | Branch-scoped DEV URL + anon key configured; invalid placeholders for service-role, Resend, dispatch, cron. Preview disabled at project-level in prior action; no validated DEV Preview from r3. |
+| Storefront P0 and crew login | **OPEN INCIDENT** | Live source has historical P0 fixes, intermittent failures unresolved; Supabase support case reported submitted and awaiting response. Do not conflate deployment with stability. |
+
+**Decision:** do not redeploy the October 23 branch or replay its migrations. Locate and verify the October 24 local r3 candidate and preserve its exact diff/commit independently before DEV-only testing. Production remains untouched. This ledger supersedes inaccurate general claims that all Fresh Pick work is already deployed.
