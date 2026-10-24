@@ -1761,7 +1761,7 @@ async function loadBrowsePublishedCakeById(
   todayYmd: string,
 ): Promise<BrowseStorefrontCake | null> {
   const supabase = createPublicClient();
-  void readCachedLibraryCakeDisplay(id);
+  void readCachedLibraryCakeDisplay(id).catch(() => undefined);
   const [commercial, catalogues] = await Promise.all([
     loadLiveCakeCommercialState(supabase, id),
     listCakePublicationCatalogues(supabase, id),
