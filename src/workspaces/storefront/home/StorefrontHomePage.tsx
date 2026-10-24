@@ -264,15 +264,32 @@ export async function StorefrontHomePage() {
 }
 
 async function HomeFreshPicksIsland() {
-  const listing = await listStorefrontAvailableExtra();
-  const rawPicks = listing.picks;
-  const picks = sortHomepageFreshPicks(rawPicks);
-  return (
-    <HomeFreshPicksSection
-      picks={picks}
-      temporarilyUnavailable={listing.temporarilyUnavailable}
-    />
-  );
+  try {
+    const listing = await listStorefrontAvailableExtra();
+    const rawPicks = listing.picks;
+    const picks = sortHomepageFreshPicks(rawPicks);
+    return (
+      <HomeFreshPicksSection
+        picks={picks}
+        temporarilyUnavailable={listing.temporarilyUnavailable}
+      />
+    );
+  } catch {
+    return (
+      <section className="px-6 pt-4 pb-2 sm:px-10 md:pt-8">
+        <div className="mx-auto w-full max-w-6xl">
+          <p className={storefrontKickerClass}>Last-minute</p>
+          <h2 className="font-display text-ink mt-2 text-[1.45rem] tracking-tight">
+            Fresh Picks
+          </h2>
+          <StorefrontRetryNotice
+            title="Fresh Picks are temporarily unavailable"
+            message="We couldn’t check current Fresh Pick stock. This does not mean that no stock is available."
+          />
+        </div>
+      </section>
+    );
+  }
 }
 
 async function HomeMerchandisingIsland() {
