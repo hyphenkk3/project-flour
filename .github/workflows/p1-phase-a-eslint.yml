@@ -1,4 +1,4 @@
-name: Phase A ESLint (pinned candidate)
+name: Phase A/B1 storefront ESLint
 
 on:
   push:
@@ -10,6 +10,7 @@ on:
       - src/workspaces/storefront/StorefrontRetryNotice.tsx
       - src/workspaces/storefront/catalog/StorefrontCakeDetail.tsx
       - src/workspaces/storefront/catalog/queries.ts
+      - src/workspaces/storefront/checkout/actions.ts
       - src/workspaces/storefront/home/StorefrontBrowsePage.tsx
       - src/workspaces/storefront/home/StorefrontHomePage.tsx
 
@@ -25,10 +26,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Check out exact Phase A candidate
+      - name: Check out exact pushed candidate
         uses: actions/checkout@v4
         with:
-          ref: 1849c3ed6a855699c090062148e32d2983f16a16
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Set up Node.js
@@ -40,12 +41,8 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Lint the six Phase A files
+      - name: Lint the Phase A/B1 changed storefront files
         run: >-
           ./node_modules/.bin/eslint --no-cache
-          src/components/ui/CakePhotoImage.tsx
-          src/workspaces/storefront/StorefrontRetryNotice.tsx
-          src/workspaces/storefront/catalog/StorefrontCakeDetail.tsx
           src/workspaces/storefront/catalog/queries.ts
-          src/workspaces/storefront/home/StorefrontBrowsePage.tsx
-          src/workspaces/storefront/home/StorefrontHomePage.tsx
+          src/workspaces/storefront/checkout/actions.ts
