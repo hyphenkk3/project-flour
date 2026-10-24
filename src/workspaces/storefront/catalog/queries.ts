@@ -55,6 +55,10 @@ import {
 } from "@/workspaces/storefront/catalog/cake-photo-map";
 import { comparePopularCakesOrder } from "@/engines/menu/homepage-popular-cakes";
 import {
+  attachCakeTagAssignments,
+  readWithStatementTimeoutFallback,
+} from "@/workspaces/storefront/catalog/statement-timeout-fallback";
+import {
   formatRm,
   startingPrice,
 } from "@/workspaces/storefront/catalog/pricing";
@@ -808,17 +812,49 @@ async function loadStorefrontCakesByIds(
 ): Promise<CachedStorefrontCakeDisplay[]> {
   if (cakeIds.length === 0) return [];
   const supabase = createPublicClient();
-  const data = await withCakePhotoSelectFallback(
-    (photoSelect, includeAssignments, includeTags) =>
-      supabase
-        .from("library_cakes")
+  const readCakes = (includeTagEmbed: boolean) =>
+    withCakePhotoSelectFallback<LibraryCakeEmbed[]>(
+      (photoSelect, includeAssignments, includeTags) =>
+        supabase
+          .from("library_cakes")
+          .select(
+            libraryCakeEmbedSelect(
+              photoSelect,
+              includeAssignments,
+              includeTagEmbed && includeTags,
+            ),
+          )
+          .in("id", [...cakeIds]),
+    );
+
+  const data = await readWithStatementTimeoutFallback(
+    () => readCakes(true),
+    async () => {
+      // A canceled nested read gets one bounded, simpler route to the same
+      // display data. Never substitute empty categories, tags, or prices.
+      const cakeRows = await readCakes(false);
+      const { data: tagRows, error: tagError } = await supabase
+        .from("library_cake_tag_assignments")
         .select(
-          libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags),
+          "cake_id, tag_id, sort_order, library_cake_tags!tag_id(id, name, is_active, sort_order)",
         )
-        .in("id", [...cakeIds]),
+        .in("cake_id", [...cakeIds]);
+      if (tagError && !isMissingCakeTagAssignmentSchema(tagError.message)) {
+        throw new Error(tagError.message);
+      }
+      return attachCakeTagAssignments(
+        cakeRows ?? [],
+        (tagRows ?? []) as Array<{
+          cake_id: string;
+          tag_id: string;
+          sort_order: number;
+          library_cake_tags?: CategoryEmbed | CategoryEmbed[] | null;
+        }>,
+      );
+    },
   );
 
-  return ((data ?? []) as unknown as LibraryCakeEmbed[])
+  return (data ?? [])
     .filter((row) => row.library_cake_sizes?.length)
     .map((row) => ({ cake: mapStorefrontCake(row), status: row.status }));
 }
