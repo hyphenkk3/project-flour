@@ -23,6 +23,7 @@ import {
   storefrontKickerClass,
 } from "@/workspaces/storefront/StorefrontBrand";
 import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
+import { StorefrontRetryNotice } from "@/workspaces/storefront/StorefrontRetryNotice";
 import {
   listHomepageCollectionPreviewCakes,
   listHomepagePopularCakes,
@@ -275,6 +276,27 @@ async function HomeFreshPicksIsland() {
 }
 
 async function HomeMerchandisingIsland() {
+  try {
+    return await HomeMerchandisingContent();
+  } catch {
+    return (
+      <section className="border-ink/[0.1] mt-8 border-t px-6 pt-8 sm:px-10">
+        <div className="mx-auto w-full max-w-6xl">
+          <StorefrontRetryNotice
+            title="Cake collections are temporarily unavailable"
+            message="We couldn’t load the latest cake selections. This does not mean cakes or collection dates are unavailable."
+          />
+          <div className="mt-5">
+            <HomeBrowseAllCakes />
+          </div>
+          <HomeVisitFooter lead={<HomeCatalogueBlock />} />
+        </div>
+      </section>
+    );
+  }
+}
+
+async function HomeMerchandisingContent() {
   const todayYmd = toBusinessDateKey();
   const todayYm = businessYearMonth(todayYmd) ?? todayYmd.slice(0, 7);
   const popularPromise = listHomepagePopularCakes();
@@ -288,7 +310,7 @@ async function HomeMerchandisingIsland() {
     monthlies: catalogues,
   });
 
-  const [popular, featured, vouchers] = await Promise.all([
+  const [popular, featured, voucherResult] = await Promise.all([
     popularPromise,
     Promise.all(
       selection.featured.map(async (candidate) => {
@@ -322,8 +344,11 @@ async function HomeMerchandisingIsland() {
       };
       }),
     ),
-    listPublicCatalogueVouchers(),
+    listPublicCatalogueVouchers()
+      .then((vouchers) => ({ vouchers, failed: false }))
+      .catch(() => ({ vouchers: [], failed: true })),
   ]);
+  const vouchers = voucherResult.vouchers;
   const offerToday = singaporeDateFromIso(new Date().toISOString());
   const featuredWithPromotions = featured.map((collection) => {
     const period =
@@ -373,6 +398,12 @@ async function HomeMerchandisingIsland() {
 
   return (
     <>
+      {voucherResult.failed ? (
+        <StorefrontRetryNotice
+          title="Current offers are temporarily unavailable"
+          message="Cake selections remain available, but promotion details could not be checked. Please retry before relying on any offer."
+        />
+      ) : null}
       <StorefrontCakePrefetch
         excludeIds={popular.map((cake) => cake.id)}
         hrefs={featuredWithPromotions.flatMap((collection) =>
