@@ -26,6 +26,7 @@ import {
   isCollectionDineInMethod,
   isCollectionMarkCollectedEligible,
   isCollectionOrderSecured,
+  isCollectionPaymentEligibleForHandoff,
   isCollectionUndoCollectedEligible,
   isCollectionUndoDineInEligible,
   type CollectionBoardTab,
@@ -78,11 +79,12 @@ export function CollectionOrderDetail({
   const packing = deriveCollectionPackingReminders(order);
   const dineIn = isCollectionDineInMethod(order.fulfilmentMethod);
   const isDelivery = order.fulfilmentMethod === "delivery";
-  const surface = collectionHandoffSurface({
-    presentation,
-    canMarkCollected: capabilities.canMarkCollected,
-    canUndoCollected: capabilities.canUndoCollected,
-    markCollectedEligible: dineIn
+  const markCollectedEligible =
+    isCollectionPaymentEligibleForHandoff({
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+    }) &&
+    (dineIn
       ? isCollectionCompleteDineInEligible({
           readyAt: order.readyAt,
           readyForCollection: order.derivedReadyForCollection,
@@ -96,7 +98,12 @@ export function CollectionOrderDetail({
           pickedUpAt: order.pickedUpAt,
           fulfilmentMethod: order.fulfilmentMethod,
           status: order.status,
-        }),
+        }));
+  const surface = collectionHandoffSurface({
+    presentation,
+    canMarkCollected: capabilities.canMarkCollected,
+    canUndoCollected: capabilities.canUndoCollected,
+    markCollectedEligible,
     undoCollectedEligible: dineIn
       ? isCollectionUndoDineInEligible({
           pickedUpAt: order.pickedUpAt,
@@ -126,6 +133,12 @@ export function CollectionOrderDetail({
             tone={guestOrderStatusBadgeTone(order.status)}
           />
           {!secured ? <StatusBadge label="Not secured" tone="warning" /> : null}
+          {order.paymentStatus !== "paid" ? (
+            <StatusBadge
+              label={order.paymentStatus === "refunded" ? "Payment refunded" : "Payment pending"}
+              tone="warning"
+            />
+          ) : null}
           {paymentAttention ? (
             <StatusBadge label="Payment Attention" tone="danger" />
           ) : null}
@@ -151,7 +164,8 @@ export function CollectionOrderDetail({
       {paymentAttention ? (
         <p className="border-status-danger/20 bg-status-danger-soft text-status-danger mt-4 rounded-2xl border px-4 py-2.5 text-sm leading-relaxed">
           Payment Attention — balance still needs Owner resolution. Collection
-          may complete handoff; do not take or correct payment here.
+          cannot complete handoff until payment is fully settled. Do not take or
+          correct payment here.
         </p>
       ) : null}
 

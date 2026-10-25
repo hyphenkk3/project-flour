@@ -256,11 +256,10 @@ export function isBakeryReadinessReadyForCollection(input: {
   if (
     bakeryAllocationProductionPresentation(input) !== "ready"
   ) return false;
-  return Boolean(input.readyAt) || (
-    input.status === "paid" &&
-    input.paymentStatus === "paid" &&
-    input.assignedFreshPickStocks.length > 0
-  );
+  // This predicate describes physical/order readiness, not payment eligibility.
+  // Collection's server-side handoff gate remains responsible for requiring
+  // full settlement before a pickup can be completed.
+  return Boolean(input.readyAt) || input.assignedFreshPickStocks.length > 0;
 }
 
 export function isBakeryFreshPickReadinessEligible(input: {

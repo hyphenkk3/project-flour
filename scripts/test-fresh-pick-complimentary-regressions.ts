@@ -221,11 +221,42 @@ assert.equal(
   isBakeryOrderReadyForCollection({
     order: readyFreshPick,
     readyAt: null,
-    status: "paid",
+    status: "submitted",
+    paymentStatus: "unpaid",
+  }),
+  true,
+  "physically ready stock remains ready for display before payment",
+);
+const unpaidReadinessInput = {
+  order: readyFreshPick,
+  readyAt: null,
+  status: "submitted",
+  paymentStatus: "unpaid",
+};
+const unpaidReadinessSnapshot = { ...unpaidReadinessInput };
+assert.equal(
+  isBakeryOrderReadyForCollection(unpaidReadinessInput),
+  true,
+);
+assert.deepEqual(
+  unpaidReadinessInput,
+  unpaidReadinessSnapshot,
+  "readiness calculation never mutates order or payment state",
+);
+assert.equal(
+  isBakeryOrderReadyForCollection({
+    order: {
+      ...readyFreshPick,
+      assignedFreshPickStocks: readyFreshPick.assignedFreshPickStocks.map(
+        (stock) => ({ ...stock, readyForCollection: false }),
+      ),
+    },
+    readyAt: null,
+    status: "submitted",
     paymentStatus: "unpaid",
   }),
   false,
-  "unsettled order is not derived ready",
+  "Undo Ready removes physical readiness independently of payment",
 );
 const mixedOrder: BakeryBoardOrder = {
   ...readyFreshPick,
@@ -444,8 +475,8 @@ void (async () => {
       readyForCollection: stock.readyForCollection === true,
       legacyLinkConflict: stock.legacyLinkConflict === true,
     })),
-    status: "paid",
-    paymentStatus: "paid",
+    status: "submitted",
+    paymentStatus: "unpaid",
   }), true, "reused Calendar order snapshot plus stock data preserves ready result");
   const conflictingCalls: QueryMock[] = [];
   const conflictingClient = {

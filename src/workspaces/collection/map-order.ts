@@ -212,6 +212,7 @@ export function mapCollectionBoardOrder(
     pickupTime: row.pickup_time,
     fulfilmentMethod: normalizeFulfilmentMethod(row.fulfilment_method),
     status: row.status,
+    paymentStatus: row.payment_status ?? null,
     customerNotes: row.customer_notes,
     readyMessageSent: null,
     productionStartedAt: row.production_started_at,

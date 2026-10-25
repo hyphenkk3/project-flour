@@ -74,6 +74,7 @@ export type CollectionBoardOrder = {
   pickupTime: string;
   fulfilmentMethod: StorefrontOrderFulfilmentMethod;
   status: GuestOrderStatus;
+  paymentStatus?: string | null;
   customerNotes: string | null;
   readyMessageSent?: CollectionReadyMessageSent | null;
   readyMessageOperatingHours?: CollectionReadyMessageOperatingHours;

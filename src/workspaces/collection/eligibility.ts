@@ -59,11 +59,18 @@ export function isCollectionDineInMethod(
 function hasCollectionReadyPermission(input: {
   readyAt: string | null;
   readyForCollection?: boolean;
-  status: GuestOrderStatus | string;
 }): boolean {
   if (input.readyForCollection === false) return false;
   if (input.readyAt) return true;
-  return input.readyForCollection === true && input.status === "paid";
+  return input.readyForCollection === true;
+}
+
+/** UI handoff affordance mirrors the existing server payment-status gate. */
+export function isCollectionPaymentEligibleForHandoff(input: {
+  status: GuestOrderStatus | string;
+  paymentStatus: string | null | undefined;
+}): boolean {
+  return input.status === "paid" && input.paymentStatus === "paid";
 }
 
 /** Pickup tab / legacy Ready board: pickup Ready, not yet Collected. */

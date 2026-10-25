@@ -205,6 +205,12 @@ export function CollectionOrderCard({
             tone={guestOrderStatusBadgeTone(order.status)}
           />
           {!secured ? <StatusBadge label="Not secured" tone="warning" /> : null}
+          {order.paymentStatus !== "paid" ? (
+            <StatusBadge
+              label={order.paymentStatus === "refunded" ? "Payment refunded" : "Payment pending"}
+              tone="warning"
+            />
+          ) : null}
           {paymentAttention && tab === "ready" ? (
             <StatusBadge label="Payment Attention" tone="danger" />
           ) : null}
