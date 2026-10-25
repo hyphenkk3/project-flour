@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   customerComplimentaryMutationPayload,
+  customerComplimentaryDisplayQuantity,
   type CustomerComplimentaryOption,
 } from "@/engines/orders/customer-preorder-options";
 import {
@@ -69,6 +70,26 @@ assert.equal(
   3,
   "multiple lines/line quantities are summed by caller",
 );
+for (const quantity of [1, 2, 3]) {
+  assert.equal(
+    customerComplimentaryDisplayQuantity(quantity),
+    quantity,
+    `Fresh Pick confirmation quantity follows ${quantity} eligible physical cakes`,
+  );
+}
+assert.equal(customerComplimentaryDisplayQuantity(0), 0);
+const confirmPromptSource = readFileSync(
+  resolve(process.cwd(), "src/workspaces/storefront/checkout/CheckoutConfirmPrompt.tsx"),
+  "utf8",
+);
+const extraFormSource = readFileSync(
+  resolve(process.cwd(), "src/workspaces/storefront/extra/GuestExtraCheckoutForm.tsx"),
+  "utf8",
+);
+assert.match(confirmPromptSource, /customerComplimentaryDisplayQuantity/);
+assert.match(confirmPromptSource, /quantity:\s*complimentaryQuantity/);
+assert.match(extraFormSource, /eligibleWholeCakeQuantity:\s*cart\?\.items\.length/);
+assert.match(confirmPromptSource, /quantity:\s*CUSTOMER_PAID_ADDON_QUANTITY/);
 assert.equal(
   payload(["candle"], 0).length,
   0,

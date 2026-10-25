@@ -43,6 +43,9 @@ import {
   extraCustomerVisibleFulfilmentDates,
   firstAvailableFreshPicksFulfilmentForItems,
   freshPicksChooserStatesForItems,
+  freshPicksDineInSlotsForVenue,
+  freshPicksDineInVenueSelection,
+  freshPicksDineInVenuesForSlots,
   freshPicksMethodAvailabilityForItems,
 } from "@/engines/extra/fresh-picks-fulfilment";
 import {
@@ -397,25 +400,42 @@ export function GuestExtraCheckoutForm({
         fulfilmentContext,
       )
     : null;
-  const usableSlots = methodAvailability?.slots ?? [];
+  const methodSlots = methodAvailability?.slots ?? [];
+  const selectedTimeHasDineInSlot = methodSlots.some(
+    (slot) => slot.value === selectedTime,
+  );
+  const dineInVenues =
+    resolvedMethod === "dine_in" && selectedDate
+      ? selectedTimeHasDineInSlot
+        ? availableDineInVenues(selectedDate, selectedTime, hoursSnapshot)
+        : freshPicksDineInVenuesForSlots(selectedDate, methodSlots, hoursSnapshot)
+      : [];
+  const selectedDineInVenue = freshPicksDineInVenueSelection(
+    dineInVenues,
+    dineInVenue,
+  );
+  const usableSlots =
+    resolvedMethod === "dine_in" && selectedDate && selectedDineInVenue
+      ? freshPicksDineInSlotsForVenue(
+          selectedDate,
+          methodSlots,
+          selectedDineInVenue,
+          hoursSnapshot,
+        )
+      : methodSlots;
   const timeStillValid = usableSlots.some(
     (slot) => slot.value === selectedTime,
   );
-  const dineInVenues = selectedDate
-    ? availableDineInVenues(
-        selectedDate,
-        timeStillValid ? selectedTime : "",
-        hoursSnapshot,
-      )
-    : [];
   const resolvedVenue =
     resolvedMethod === "dine_in" && selectedDate
-      ? resolveDineInVenueSelection(
-          selectedDate,
-          timeStillValid ? selectedTime : "",
-          dineInVenue,
-          hoursSnapshot,
+      ? timeStillValid
+        ? resolveDineInVenueSelection(
+            selectedDate,
+            selectedTime,
+            selectedDineInVenue,
+            hoursSnapshot,
         )
+        : selectedDineInVenue
       : "";
   const deliveryAckRequired = deliveryProcessingFeeAckRequired(resolvedMethod);
   const deliveryProcessingFeeAcknowledged = deliveryProcessingFeeAckSatisfied({
@@ -566,6 +586,7 @@ export function GuestExtraCheckoutForm({
         paidAddonCodes,
         complimentaryOptions,
         complimentaryCodes,
+        eligibleWholeCakeQuantity: cart?.items.length ?? 0,
         total: displayedTotal,
         catalogueVoucher,
       }),
@@ -805,7 +826,38 @@ export function GuestExtraCheckoutForm({
                   physicalItemContexts,
                   fulfilmentContext,
                 ).slots;
-                setSelectedTime(nextSlots[0]?.value ?? "");
+                const nextTimeIsAvailable = nextSlots.some(
+                  (slot) => slot.value === selectedTime,
+                );
+                const nextVenues =
+                  nextMethod !== "dine_in"
+                    ? []
+                    : nextTimeIsAvailable
+                      ? availableDineInVenues(next, selectedTime, hoursSnapshot)
+                      : freshPicksDineInVenuesForSlots(
+                          next,
+                          nextSlots,
+                          hoursSnapshot,
+                        );
+                const nextVenue = freshPicksDineInVenueSelection(
+                  nextVenues,
+                  dineInVenue,
+                );
+                setDineInVenue(nextVenue);
+                const validNextSlots =
+                  nextMethod === "dine_in" && nextVenue
+                    ? freshPicksDineInSlotsForVenue(
+                        next,
+                        nextSlots,
+                        nextVenue,
+                        hoursSnapshot,
+                      )
+                    : nextSlots;
+                setSelectedTime(
+                  validNextSlots.some((slot) => slot.value === selectedTime)
+                    ? selectedTime
+                    : "",
+                );
               }}
               required
               value={selectedDate}
@@ -843,7 +895,42 @@ export function GuestExtraCheckoutForm({
                   physicalItemContexts,
                   fulfilmentContext,
                 ).slots;
-                setSelectedTime(nextSlots[0]?.value ?? "");
+                const nextTimeIsAvailable = nextSlots.some(
+                  (slot) => slot.value === selectedTime,
+                );
+                const nextVenues =
+                  next !== "dine_in"
+                    ? []
+                    : nextTimeIsAvailable
+                      ? availableDineInVenues(
+                          selectedDate,
+                          selectedTime,
+                          hoursSnapshot,
+                        )
+                      : freshPicksDineInVenuesForSlots(
+                          selectedDate,
+                          nextSlots,
+                          hoursSnapshot,
+                        );
+                const nextVenue = freshPicksDineInVenueSelection(
+                  nextVenues,
+                  dineInVenue,
+                );
+                setDineInVenue(nextVenue);
+                const validSlots =
+                  next === "dine_in" && nextVenue
+                    ? freshPicksDineInSlotsForVenue(
+                        selectedDate,
+                        nextSlots,
+                        nextVenue,
+                        hoursSnapshot,
+                      )
+                    : nextSlots;
+                setSelectedTime(
+                  validSlots.some((slot) => slot.value === selectedTime)
+                    ? selectedTime
+                    : "",
+                );
               }}
               value={resolvedMethod}
             />
@@ -868,7 +955,28 @@ export function GuestExtraCheckoutForm({
                   : ""
               }
               id="checkout_pickup_time"
-              onChange={(event) => setSelectedTime(event.target.value)}
+              onChange={(event) => {
+                const nextTime = event.target.value;
+                setSelectedTime(nextTime);
+                if (resolvedMethod === "dine_in" && selectedDate) {
+                  const nextVenues = nextTime
+                    ? availableDineInVenues(
+                        selectedDate,
+                        nextTime,
+                        hoursSnapshot,
+                      )
+                    : freshPicksDineInVenuesForSlots(
+                        selectedDate,
+                        methodSlots,
+                        hoursSnapshot,
+                      );
+                  const nextVenue = freshPicksDineInVenueSelection(
+                    nextVenues,
+                    dineInVenue,
+                  );
+                  setDineInVenue(nextVenue);
+                }
+              }}
               required
               value={timeStillValid ? selectedTime : ""}
             >
@@ -893,6 +1001,20 @@ export function GuestExtraCheckoutForm({
                   markRequired
                   onChange={(next) => {
                     setDineInVenue(next.venue);
+                    const nextVenue = parseDineInVenue(next.venue);
+                    if (nextVenue) {
+                      const venueSlots = freshPicksDineInSlotsForVenue(
+                        selectedDate,
+                        methodSlots,
+                        nextVenue,
+                        hoursSnapshot,
+                      );
+                      if (
+                        !venueSlots.some((slot) => slot.value === selectedTime)
+                      ) {
+                        setSelectedTime("");
+                      }
+                    }
                     setAdultCount(next.adultCount);
                     setKidCount(next.kidCount);
                     setToddlerCount(next.toddlerCount);
@@ -902,7 +1024,7 @@ export function GuestExtraCheckoutForm({
                   }}
                   photos={venuePhotos}
                   value={{
-                    venue: resolvedVenue || dineInVenue,
+                    venue: resolvedVenue || selectedDineInVenue,
                     adultCount,
                     kidCount,
                     toddlerCount,
@@ -910,7 +1032,11 @@ export function GuestExtraCheckoutForm({
                   }}
                   venues={dineInVenues}
                 />
-              ) : null}
+              ) : (
+                <p className="text-ink text-sm" role="status">
+                  No dine-in venue is available for this date and the items in your cart.
+                </p>
+              )}
               <DineInReservationNotesNotice />
               <FormField
                 help="Optional."

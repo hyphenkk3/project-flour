@@ -175,6 +175,16 @@ export function customerComplimentaryMutationPayload(input: {
     }));
 }
 
+/** Display one selected complimentary item for each eligible physical cake. */
+export function customerComplimentaryDisplayQuantity(
+  eligibleWholeCakeQuantity: number,
+): number {
+  return Math.max(
+    0,
+    Math.floor(Number(eligibleWholeCakeQuantity) || 0),
+  );
+}
+
 export function customerPaidAddonMutationPayload(input: {
   options: readonly CustomerPaidAddonOption[];
   selections: CustomerPreorderSelections;

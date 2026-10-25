@@ -135,7 +135,9 @@ const actionsSrc = readFileSync(
 );
 assert.match(actionsSrc, /buildDineInReservationRpcPayload/);
 assert.match(actionsSrc, /reservationTime,/);
-assert.match(actionsSrc, /isValidDineInReservationPair/);
+assert.match(actionsSrc, /validateDineInPartyFromForm/);
+assert.match(actionsSrc, /p_dine_in:\s*fulfilmentMethod === "dine_in" \? dineInPayload : null/);
+assert.match(actionsSrc, /supabase\.rpc\("submit_guest_preorder"/);
 
 const sqlSrc = readFileSync(
   resolve(

@@ -5,8 +5,10 @@
 
 import { getDeliverySlotsForDate } from "@/engines/business-calendar/delivery-hours";
 import {
+  availableDineInVenues,
   getDineInSchedule,
   getDineInSlotsForDate,
+  type DineInVenue,
 } from "@/engines/business-calendar/dine-in-hours";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
@@ -77,6 +79,48 @@ export type FreshPicksPhysicalItemContext = {
   window: ExtraPickupWindow;
   readyForCollection: boolean;
 };
+
+/** Venues available for at least one currently eligible Fresh Pick slot. */
+export function freshPicksDineInVenuesForSlots(
+  dateYmd: string,
+  slots: readonly PickupSlot[],
+  snapshot: OperatingHoursSnapshot,
+): DineInVenue[] {
+  const available = new Set<DineInVenue>();
+  for (const slot of slots) {
+    for (const venue of availableDineInVenues(dateYmd, slot.value, snapshot)) {
+      available.add(venue);
+    }
+  }
+  const venues: readonly DineInVenue[] = ["hyphen", "whitebird"];
+  return venues.filter((venue) => available.has(venue));
+}
+
+/** Restrict the existing shared dine-in slots to one selected venue. */
+export function freshPicksDineInSlotsForVenue(
+  dateYmd: string,
+  slots: readonly PickupSlot[],
+  venue: DineInVenue,
+  snapshot: OperatingHoursSnapshot,
+): PickupSlot[] {
+  return slots.filter((slot) =>
+    availableDineInVenues(dateYmd, slot.value, snapshot).includes(venue),
+  );
+}
+
+/** Keep a still-valid venue; clear an invalid customer choice instead of replacing it. */
+export function freshPicksDineInVenueSelection(
+  availableVenues: readonly DineInVenue[],
+  currentVenue: string,
+): DineInVenue | "" {
+  if (availableVenues.includes(currentVenue as DineInVenue)) {
+    return currentVenue as DineInVenue;
+  }
+  if (!currentVenue && availableVenues.length === 1) {
+    return availableVenues[0] ?? "";
+  }
+  return "";
+}
 
 function contextDefaults(input: FreshPicksFulfilmentContext): {
   window: ExtraPickupWindow;

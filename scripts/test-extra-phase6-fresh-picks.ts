@@ -356,7 +356,9 @@ assert.match(receiptSrc, /extra_stock_id/);
 
 // 19. Existing Fresh Picks staff handling remains
 assert.match(extraBoardSrc, /EXTRA stock/);
-assert.match(extraBoardSrc, /Sold Extra cakes leave Fresh Picks immediately/);
+assert.match(extraBoardSrc, /classifySoldExtra\(soldOrderSnapshot\(unit\)\) !== "history"/);
+assert.match(extraBoardSrc, /Sold physical stock remains here while its linked order still needs/);
+assert.match(extraBoardSrc, /Completed sales and collections are kept in Sold/);
 assert.match(ownerCardSrc, /extraStockId \? " · Fresh Picks"/);
 assert.doesNotMatch(extraBoardSrc, /production_capacity/);
 assert.doesNotMatch(extraBoardSrc, /AvailabilityOverview/);

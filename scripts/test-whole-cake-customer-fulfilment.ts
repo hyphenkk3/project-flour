@@ -64,6 +64,10 @@ const thankYouSrc = readFileSync(
   resolve("src/workspaces/storefront/checkout/StorefrontSuccessPage.tsx"),
   "utf8",
 );
+const receiptRecapSrc = readFileSync(
+  resolve("src/workspaces/storefront/checkout/SuccessReceiptRecap.tsx"),
+  "utf8",
+);
 const enumMigration = readFileSync(
   resolve("supabase/migrations/20260818200000_fulfilment_method_dine_in.sql"),
   "utf8",
@@ -118,15 +122,12 @@ assert.match(extraActionsSrc, /p_fulfilment_method/);
 assert.match(checkoutActionsSrc, /p_fulfilment_method/);
 assert.match(checkoutActionsSrc, /p_dine_in/);
 assert.match(checkoutActionsSrc, /p_delivery/);
-assert.match(thankYouSrc, /workspaceScheduleDateLabel/);
-assert.match(thankYouSrc, /dineInVenueLabel/);
-assert.match(thankYouSrc, /Venue/);
-assert.match(thankYouSrc, /Dine-in reservation time/);
-assert.match(thankYouSrc, /Guests/);
-assert.doesNotMatch(
-  thankYouSrc.split("workspaceScheduleDateLabel")[0] ?? "",
-  />Pickup date</,
-);
+assert.match(thankYouSrc, /SuccessReceiptRecap/);
+assert.match(receiptRecapSrc, /workspaceScheduleDateLabel/);
+assert.match(receiptRecapSrc, /dineInVenueLabel/);
+assert.match(receiptRecapSrc, /Dine-in reservation time/);
+assert.match(receiptRecapSrc, /Guests/);
+assert.doesNotMatch(receiptRecapSrc, />Pickup date</);
 
 assert.match(enumMigration, /add value if not exists 'dine_in'/);
 assert.match(fulfilmentMigration, /order_dine_in_reservations/);

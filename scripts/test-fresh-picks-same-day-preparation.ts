@@ -5,7 +5,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { getDineInSlotsForDate } from "@/engines/business-calendar/dine-in-hours";
+import {
+  availableDineInVenues,
+  getDineInSlotsForDate,
+} from "@/engines/business-calendar/dine-in-hours";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import {
   extraCustomerPickupSlotsForDate,
@@ -15,6 +18,10 @@ import {
   extraCustomerSameDayUnavailableNotice,
   extraCustomerVisibleFulfilmentDates,
   freshPicksMethodAvailability,
+  freshPicksMethodAvailabilityForItems,
+  freshPicksDineInSlotsForVenue,
+  freshPicksDineInVenueSelection,
+  freshPicksDineInVenuesForSlots,
   isValidExtraCustomerFulfilment,
 } from "@/engines/extra/fresh-picks-fulfilment";
 import {
@@ -91,6 +98,78 @@ assert.equal(parseFreshPicksPreparationConfig({}).leadMinutes, 60);
     extraCustomerSameDayUnavailableNotice({ ...ctx, now }),
     sameDayFreshPicksCutoffCustomerMessage(),
   );
+}
+
+{
+  const afterCutoff = malaysiaNow(THU, "16:15:00");
+  const notReady = freshPicksMethodAvailability("pickup", THU, {
+    ...ctx,
+    now: afterCutoff,
+    readyForCollection: false,
+  });
+  const readyButUnpaid = freshPicksMethodAvailability("pickup", THU, {
+    ...ctx,
+    now: afterCutoff,
+    readyForCollection: true,
+  });
+  assert.equal(notReady.available, false, "not-ready stock keeps the cutoff");
+  assert.equal(notReady.reasonCode, "same_day_preparation_cutoff");
+  assert.equal(readyButUnpaid.available, true, "Ready stock bypasses preparation cutoff without payment state");
+  assert.equal(readyButUnpaid.slots[0]?.value, "16:30");
+  assert.equal(
+    isValidExtraCustomerFulfilment({
+      method: "pickup",
+      fulfilmentDate: THU,
+      fulfilmentTime: "16:30",
+      ...window,
+      readyForCollection: true,
+      now: afterCutoff,
+    }),
+    true,
+    "the specific ready item remains orderable after the preparation cutoff",
+  );
+  assert.equal(
+    isValidExtraCustomerFulfilment({
+      method: "pickup",
+      fulfilmentDate: THU,
+      fulfilmentTime: "16:30",
+      ...window,
+      readyForCollection: false,
+      now: afterCutoff,
+    }),
+    false,
+    "Undo Ready restores client-side rejection after cutoff",
+  );
+
+  const readyAndUnready = freshPicksMethodAvailabilityForItems(
+    "pickup",
+    THU,
+    [
+      { window, readyForCollection: true },
+      { window, readyForCollection: false },
+    ],
+    { now: afterCutoff, snapshot: OPERATING_HOURS_SEED },
+  );
+  assert.equal(readyAndUnready.available, false, "mixed stock must meet the unready item's cutoff too");
+
+  const beforeCutoff = malaysiaNow(THU, "15:00:00");
+  const mixedWithinCutoff = freshPicksMethodAvailabilityForItems(
+    "pickup",
+    THU,
+    [
+      { window, readyForCollection: true },
+      { window, readyForCollection: false },
+    ],
+    { now: beforeCutoff, snapshot: OPERATING_HOURS_SEED },
+  );
+  assert.equal(mixedWithinCutoff.available, true, "mixed items are available while the unready item's cutoff is met");
+
+  const undoReady = freshPicksMethodAvailability("pickup", THU, {
+    ...ctx,
+    now: afterCutoff,
+    readyForCollection: false,
+  });
+  assert.equal(undoReady.available, notReady.available, "Undo Ready restores the normal cutoff");
 }
 
 {
@@ -193,6 +272,92 @@ for (const example of dineInLeadCases) {
   assert.equal(slots.includes("12:15"), true);
   assert.equal(slots.includes("12:30"), true);
   assert.equal(slots[slots.length - 1], "17:00");
+}
+
+{
+  const slots = getDineInSlotsForDate(THU, OPERATING_HOURS_SEED);
+  const venues = freshPicksDineInVenuesForSlots(
+    THU,
+    slots,
+    OPERATING_HOURS_SEED,
+  );
+  assert.deepEqual(venues, ["hyphen", "whitebird"]);
+  assert.equal(
+    freshPicksDineInVenueSelection(["whitebird"], "hyphen"),
+    "",
+    "a date/time change clears an invalid previously selected venue",
+  );
+  assert.equal(
+    freshPicksDineInVenueSelection(["whitebird"], ""),
+    "whitebird",
+    "a sole venue may be selected when the customer has no prior choice",
+  );
+  assert.equal(
+    freshPicksDineInVenueSelection(["hyphen", "whitebird"], "whitebird"),
+    "whitebird",
+    "a still-available customer venue choice is preserved",
+  );
+  const whitebirdSlots = freshPicksDineInSlotsForVenue(
+    THU,
+    slots,
+    "whitebird",
+    OPERATING_HOURS_SEED,
+  );
+  assert.equal(whitebirdSlots.length > 0, true);
+  assert.equal(
+    whitebirdSlots.every((slot) =>
+      availableDineInVenues(THU, slot.value, OPERATING_HOURS_SEED).includes(
+        "whitebird",
+      ),
+    ),
+    true,
+    "venue-specific time options use the shared operating-hours resolver",
+  );
+  const restrictedVenueHours = {
+    ...OPERATING_HOURS_SEED,
+    overrides: [
+      {
+        capability: "whitebird" as const,
+        weekday: 4,
+        enabled: true,
+        opensAt: "10:00",
+        closesAt: "13:00",
+        latestBookable: "12:30",
+        usualStart: "10:00",
+        usualEnd: "13:00",
+        overrideDate: THU,
+        note: "synthetic venue-hours test",
+      },
+    ],
+  };
+  const restrictedSlots = getDineInSlotsForDate(THU, restrictedVenueHours);
+  const restrictedWhitebirdSlots = freshPicksDineInSlotsForVenue(
+    THU,
+    restrictedSlots,
+    "whitebird",
+    restrictedVenueHours,
+  );
+  assert.equal(
+    restrictedWhitebirdSlots.some((slot) => slot.value === "15:00"),
+    false,
+    "changing to a venue that closes earlier removes its now-invalid time",
+  );
+  assert.equal(
+    freshPicksDineInVenuesForSlots(
+      THU,
+      restrictedSlots,
+      restrictedVenueHours,
+    ).includes("whitebird"),
+    true,
+    "the venue remains selectable when it has other available times",
+  );
+  const extraCheckoutSrc = readSrc(
+    "src/workspaces/storefront/extra/GuestExtraCheckoutForm.tsx",
+  );
+  assert.match(extraCheckoutSrc, /freshPicksDineInVenuesForSlots/);
+  assert.match(extraCheckoutSrc, /freshPicksDineInSlotsForVenue/);
+  assert.match(extraCheckoutSrc, /No dine-in venue is available/);
+  assert.doesNotMatch(extraCheckoutSrc, /setSelectedTime\(nextSlots\[0\]/);
 }
 
 {

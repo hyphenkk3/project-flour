@@ -8,6 +8,7 @@ import {
 import { parseDineInPartyCounts } from "@/engines/orders/dine-in-party";
 import {
   CUSTOMER_PAID_ADDON_QUANTITY,
+  customerComplimentaryDisplayQuantity,
   type CustomerComplimentaryOption,
   type CustomerPaidAddonOption,
 } from "@/engines/orders/customer-preorder-options";
@@ -166,6 +167,8 @@ export function buildExtraCheckoutConfirmSnapshot(input: {
   complimentaryCodes: readonly string[];
   total: number;
   catalogueVoucher?: CatalogueVoucherPreview | null;
+  /** Number of physical Fresh Picks receiving each selected complimentary item. */
+  eligibleWholeCakeQuantity?: number;
   items?: readonly {
     extraStockId: string;
     cakeName: string;
@@ -201,12 +204,15 @@ export function buildExtraCheckoutConfirmSnapshot(input: {
       linePrice: option.unitPrice * CUSTOMER_PAID_ADDON_QUANTITY,
     }));
   const selectedComplimentary = new Set(input.complimentaryCodes);
+  const complimentaryQuantity = customerComplimentaryDisplayQuantity(
+    input.eligibleWholeCakeQuantity ?? input.items?.length ?? 1,
+  );
   const complimentaryLines: CheckoutConfirmLine[] = input.complimentaryOptions
     .filter((option) => selectedComplimentary.has(option.code))
     .map((option) => ({
       key: `comp:${option.code}`,
       name: option.name,
-      quantity: 1,
+      quantity: complimentaryQuantity,
       linePrice: 0,
       complimentary: true,
     }));
