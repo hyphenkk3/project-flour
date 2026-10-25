@@ -147,7 +147,63 @@ export function bakeryProductionPresentation(input: {
   return "not_started";
 }
 
-/** Derive whole-order readiness from bakery work and assigned physical stock. */
+/** Derive whole-order readiness from the shared Bakery allocation facts. */
+export function bakeryAllocationProductionPresentation(input: {
+  productionStartedAt: string | null;
+  readyAt: string | null;
+  fulfilmentMethod: BakeryBoardOrder["fulfilmentMethod"];
+  freshPickAllocation: BakeryBoardOrder["freshPickAllocation"];
+  assignedFreshPickStocks: Array<{
+    lifecycle: string;
+    soldAt: string | null;
+    cutIntoSlicesAt: string | null;
+    readyForCollection: boolean;
+    legacyLinkConflict: boolean;
+  }>;
+}): BakeryProductionPresentation {
+  const orderLifecycle = bakeryProductionPresentation({
+    productionStartedAt: input.productionStartedAt,
+    readyAt: input.readyAt,
+  });
+
+  if (
+    isDeliveryFulfilment(input.fulfilmentMethod as never) ||
+    input.assignedFreshPickStocks.length === 0
+  ) {
+    return orderLifecycle;
+  }
+
+  const allocation = input.freshPickAllocation;
+  if (allocation.status !== "verified") {
+    return orderLifecycle === "not_started" ? orderLifecycle : "in_production";
+  }
+
+  const assignedStocksAreValid = input.assignedFreshPickStocks.every(
+    (stock) =>
+      stock.lifecycle === "confirmed" &&
+      Boolean(stock.soldAt) &&
+      stock.cutIntoSlicesAt === null &&
+      !stock.legacyLinkConflict,
+  );
+  const allAssignedFreshPickIsReady =
+    assignedStocksAreValid &&
+    allocation.totalAssignedQuantity > 0 &&
+    input.assignedFreshPickStocks.length === allocation.totalAssignedQuantity &&
+    input.assignedFreshPickStocks.every((stock) => stock.readyForCollection);
+
+  if (
+    allAssignedFreshPickIsReady &&
+    (allocation.totalRemainingQuantity === 0 || Boolean(input.readyAt))
+  ) {
+    return "ready";
+  }
+
+  // The order-level timestamp covers Bakery-produced quantities, not stock.
+  if (input.readyAt && !allAssignedFreshPickIsReady) return "in_production";
+  return orderLifecycle;
+}
+
+/** Bakery board/detail uses the same allocation-based readiness calculation. */
 export function bakeryOrderProductionPresentation(
   order: Pick<
     BakeryBoardOrder,
@@ -158,46 +214,53 @@ export function bakeryOrderProductionPresentation(
     | "assignedFreshPickStocks"
   >,
 ): BakeryProductionPresentation {
-  const orderLifecycle = bakeryProductionPresentation({
-    productionStartedAt: order.productionStartedAt,
-    readyAt: order.readyAt,
+  return bakeryAllocationProductionPresentation(order);
+}
+
+/**
+ * Shared Collection readiness gate for persisted Bakery readiness and fully
+ * allocated physical Fresh Pick stock. This is display/eligibility logic only;
+ * it never writes orders.ready_at.
+ */
+export function isBakeryOrderReadyForCollection(input: {
+  order: BakeryBoardOrder | null;
+  readyAt: string | null;
+  status: GuestOrderStatus | string;
+  paymentStatus: string | null | undefined;
+}): boolean {
+  if (!input.order) return Boolean(input.readyAt);
+  return isBakeryReadinessReadyForCollection({
+    ...input.order,
+    readyAt: input.readyAt,
+    status: input.status,
+    paymentStatus: input.paymentStatus,
   });
+}
 
+/** Shared display/eligibility gate for full Bakery rows and Calendar snapshots. */
+export function isBakeryReadinessReadyForCollection(input: {
+  productionStartedAt: string | null;
+  readyAt: string | null;
+  fulfilmentMethod: BakeryBoardOrder["fulfilmentMethod"];
+  freshPickAllocation: BakeryBoardOrder["freshPickAllocation"];
+  assignedFreshPickStocks: Array<{
+    lifecycle: string;
+    soldAt: string | null;
+    cutIntoSlicesAt: string | null;
+    readyForCollection: boolean;
+    legacyLinkConflict: boolean;
+  }>;
+  status: GuestOrderStatus | string;
+  paymentStatus: string | null | undefined;
+}): boolean {
   if (
-    isDeliveryFulfilment(order.fulfilmentMethod as never) ||
-    order.assignedFreshPickStocks.length === 0
-  ) {
-    return orderLifecycle;
-  }
-
-  const allocation = order.freshPickAllocation;
-  if (allocation.status !== "verified") {
-    return orderLifecycle === "not_started" ? orderLifecycle : "in_production";
-  }
-
-  const assignedStocksAreValid = order.assignedFreshPickStocks.every(
-    (stock) =>
-      stock.lifecycle === "confirmed" &&
-      Boolean(stock.soldAt) &&
-      stock.cutIntoSlicesAt === null &&
-      !stock.legacyLinkConflict,
+    bakeryAllocationProductionPresentation(input) !== "ready"
+  ) return false;
+  return Boolean(input.readyAt) || (
+    input.status === "paid" &&
+    input.paymentStatus === "paid" &&
+    input.assignedFreshPickStocks.length > 0
   );
-  const allAssignedFreshPickIsReady =
-    assignedStocksAreValid &&
-    allocation.totalAssignedQuantity > 0 &&
-    order.assignedFreshPickStocks.length === allocation.totalAssignedQuantity &&
-    order.assignedFreshPickStocks.every((stock) => stock.readyForCollection);
-
-  if (
-    allAssignedFreshPickIsReady &&
-    (allocation.totalRemainingQuantity === 0 || Boolean(order.readyAt))
-  ) {
-    return "ready";
-  }
-
-  // The order-level timestamp covers Bakery-produced quantities, not stock.
-  if (order.readyAt && !allAssignedFreshPickIsReady) return "in_production";
-  return orderLifecycle;
 }
 
 export function isBakeryFreshPickReadinessEligible(input: {

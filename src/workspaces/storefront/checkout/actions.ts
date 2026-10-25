@@ -222,6 +222,7 @@ function parsePaidAddonOptions(rows: unknown): CustomerPaidAddonOption[] {
 
 function complimentaryPayloadFromForm(
   selections: CustomerPreorderSelections,
+  eligibleWholeCakeQuantity: number,
 ) {
   const options = selections.complimentaryCodes
     .map((code, index) => ({
@@ -234,6 +235,7 @@ function complimentaryPayloadFromForm(
   return customerComplimentaryMutationPayload({
     options,
     selectedCodes: selections.complimentaryCodes,
+    eligibleWholeCakeQuantity,
   });
 }
 
@@ -449,7 +451,10 @@ async function submitGuestPreorderActionBody(
     p_dine_in: fulfilmentMethod === "dine_in" ? dineInPayload : null,
   };
   if (persistOptions) {
-    rpcArgs.p_complimentary = complimentaryPayloadFromForm(selections);
+    rpcArgs.p_complimentary = complimentaryPayloadFromForm(
+      selections,
+      items.reduce((total, item) => total + item.quantity, 0),
+    );
     rpcArgs.p_paid_addons = paidAddonPayloadFromForm(selections);
   }
 

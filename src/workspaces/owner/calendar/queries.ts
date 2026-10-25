@@ -19,6 +19,8 @@ import type {
   CalendarEntry,
 } from "@/workspaces/owner/calendar/types";
 import { monthVisibleRange } from "@/workspaces/owner/calendar/month-grid";
+import { getBakeryFreshPickReadinessForOrders } from "@/workspaces/bakery/queries";
+import { isBakeryReadinessReadyForCollection } from "@/workspaces/bakery/eligibility";
 
 const GUEST_CALENDAR_STATUSES: GuestOrderStatus[] = [
   "submitted",
@@ -34,6 +36,7 @@ const CALENDAR_ORDER_SELECT = `
   pickup_time,
   fulfilment_method,
   status,
+  payment_status,
   order_source,
   crew_order,
   needs_bakery_attention,
@@ -41,8 +44,12 @@ const CALENDAR_ORDER_SELECT = `
   picked_up_at,
   out_for_delivery_at,
   delivered_at,
+  production_started_at,
+  extra_stock_id,
   order_items (
     id,
+    cake_id,
+    cake_size_id,
     cake_name,
     size_label,
     quantity,
@@ -52,6 +59,8 @@ const CALENDAR_ORDER_SELECT = `
 
 type CalendarItemRow = {
   id: string;
+  cake_id: string | null;
+  cake_size_id: string | null;
   cake_name: string | null;
   size_label: string | null;
   quantity: number;
@@ -65,10 +74,13 @@ type CalendarOrderRow = {
   pickup_time: string;
   fulfilment_method: string | null;
   status: string;
+  payment_status?: string | null;
   order_source: string;
   crew_order: boolean | null;
   needs_bakery_attention: boolean | null;
   ready_at: string | null;
+  production_started_at: string | null;
+  extra_stock_id: string | null;
   picked_up_at: string | null;
   out_for_delivery_at?: string | null;
   delivered_at?: string | null;
@@ -142,6 +154,7 @@ function mapItems(rows: CalendarItemRow[] | null | undefined): CalendarCakeItem[
 function mapEntry(
   row: CalendarOrderRow,
   hasEffectiveRm10: boolean,
+  derivedReadyForCollection: boolean,
 ): CalendarEntry {
   const status = row.status as GuestOrderStatus;
   const orderSource = row.order_source as OrderSource;
@@ -166,6 +179,7 @@ function mapEntry(
     }),
     hasEffectiveRm10,
     readyAt: row.ready_at,
+    derivedReadyForCollection,
     pickedUpAt: row.picked_up_at,
     outForDeliveryAt: row.out_for_delivery_at ?? null,
     deliveredAt: row.delivered_at ?? null,
@@ -247,10 +261,51 @@ export async function listCalendarEntriesForPickupRange(
   const rows = (data ?? []) as CalendarOrderRow[];
   if (rows.length === 0) return [];
 
-  const rm10ByOrder = await loadEffectiveRm10ByOrderId(rows.map((row) => row.id));
+  const orderIds = rows.map((row) => row.id);
+  const [rm10ByOrder, readinessByOrder] = await Promise.all([
+    loadEffectiveRm10ByOrderId(orderIds),
+    getBakeryFreshPickReadinessForOrders(
+      supabase,
+      rows.map((row) => ({
+        id: row.id,
+        extra_stock_id: row.extra_stock_id,
+        order_items: (row.order_items ?? []).map((item) => ({
+          cakeId: item.cake_id,
+          cakeName: item.cake_name,
+          sizeId: item.cake_size_id,
+          sizeLabel: item.size_label,
+          quantity: item.quantity,
+        })),
+      })),
+    ),
+  ]);
 
   return rows
-    .map((row) => mapEntry(row, rm10ByOrder.get(row.id) ?? false))
+    .map((row) => {
+      const readiness = readinessByOrder.get(row.id);
+      const derivedReadyForCollection = readiness
+        ? isBakeryReadinessReadyForCollection({
+        productionStartedAt: row.production_started_at,
+        readyAt: row.ready_at,
+        fulfilmentMethod: normalizeCalendarFulfilmentMethod(row.fulfilment_method),
+        freshPickAllocation: readiness.allocation,
+        assignedFreshPickStocks: readiness.assignedStocks.map((stock) => ({
+          lifecycle: stock.lifecycle,
+          soldAt: stock.soldAt,
+          cutIntoSlicesAt: stock.cutIntoSlicesAt,
+          readyForCollection: stock.readyForCollection === true,
+          legacyLinkConflict: stock.legacyLinkConflict === true,
+        })),
+        status: row.status,
+        paymentStatus: row.payment_status,
+      })
+        : Boolean(row.ready_at);
+      return mapEntry(
+        row,
+        rm10ByOrder.get(row.id) ?? false,
+        derivedReadyForCollection && !row.ready_at,
+      );
+    })
     .sort(compareCalendarEntries);
 }
 
@@ -319,7 +374,42 @@ export async function getCalendarEntryByOrderId(
   if (!data) return null;
 
   const row = data as CalendarOrderRow;
-  const rm10ByOrder = await loadEffectiveRm10ByOrderId([orderId]);
+  const [rm10ByOrder, readinessByOrder] = await Promise.all([
+    loadEffectiveRm10ByOrderId([orderId]),
+    getBakeryFreshPickReadinessForOrders(supabase, [{
+      id: row.id,
+      extra_stock_id: row.extra_stock_id,
+      order_items: (row.order_items ?? []).map((item) => ({
+        cakeId: item.cake_id,
+        cakeName: item.cake_name,
+        sizeId: item.cake_size_id,
+        sizeLabel: item.size_label,
+        quantity: item.quantity,
+      })),
+    }]),
+  ]);
+  const readiness = readinessByOrder.get(row.id);
+  const derivedReadyForCollection = readiness
+    ? isBakeryReadinessReadyForCollection({
+    productionStartedAt: row.production_started_at,
+    readyAt: row.ready_at,
+    fulfilmentMethod: normalizeCalendarFulfilmentMethod(row.fulfilment_method),
+    freshPickAllocation: readiness.allocation,
+    assignedFreshPickStocks: readiness.assignedStocks.map((stock) => ({
+      lifecycle: stock.lifecycle,
+      soldAt: stock.soldAt,
+      cutIntoSlicesAt: stock.cutIntoSlicesAt,
+      readyForCollection: stock.readyForCollection === true,
+      legacyLinkConflict: stock.legacyLinkConflict === true,
+    })),
+    status: row.status,
+    paymentStatus: row.payment_status,
+  })
+    : Boolean(row.ready_at);
 
-  return mapEntry(row, rm10ByOrder.get(orderId) ?? false);
+  return mapEntry(
+    row,
+    rm10ByOrder.get(orderId) ?? false,
+    derivedReadyForCollection && !row.ready_at,
+  );
 }

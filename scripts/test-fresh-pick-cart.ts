@@ -469,7 +469,11 @@ assert.doesNotMatch(
   cartShellSrc,
   /href=\{freshPickCheckoutHref\(\)\}[\s\S]{0,80}onClick=\{onContinue\}/,
 );
-assert.match(cartShellSrc, /\{itemLabel\} · \{formatRm\(total\)\}/);
+assert.match(
+  cartShellSrc,
+  /<span>\{itemLabel\}<\/span>\s*<span aria-hidden="true">·<\/span>\s*<span>\{formatRm\(total\)\}<\/span>/,
+);
+assert.match(cartShellSrc, /aria-label=\{`\$\{itemLabel\}, \$\{formatRm\(total\)\}\. View order\.`\}/);
 assert.match(cartShellSrc, /Remove/);
 assert.match(cartShellSrc, /pickupLabel/);
 assert.doesNotMatch(cartShellSrc, /production_capacity/);

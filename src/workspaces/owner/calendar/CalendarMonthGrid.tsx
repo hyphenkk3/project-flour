@@ -13,7 +13,10 @@ import type {
   CalendarEntry,
   CalendarViewMode,
 } from "@/workspaces/owner/calendar/types";
-import { withOperationalMarker } from "@/engines/orders/operational-state";
+import {
+  operationalMarkerFromTimestamps,
+  withOperationalMarker,
+} from "@/engines/orders/operational-state";
 
 const ORDERS_COLLAPSED_VISIBLE = 4;
 const CAKES_COLLAPSED_VISIBLE = 5;
@@ -147,18 +150,20 @@ function CalendarDayCellView({
       {view === "orders" ? (
         <ul className="space-y-0.5">
           {visibleOrders.map((entry) => {
-            const label = withOperationalMarker(entry.displayName, {
+            const markerInput = {
               readyAt: entry.readyAt,
+              derivedReadyForCollection: entry.derivedReadyForCollection,
               pickedUpAt: entry.pickedUpAt,
               outForDeliveryAt: entry.outForDeliveryAt,
               deliveredAt: entry.deliveredAt,
               fulfilmentMethod: entry.fulfilmentMethod,
-            });
+            };
+            const marker = operationalMarkerFromTimestamps(markerInput);
+            const label = withOperationalMarker(entry.displayName, markerInput);
             return (
               <li key={entry.id}>
                 <button
                   className={[
-                    calendarCustomerSignalClass(entry),
                     calendarFulfilmentBackgroundClass(entry.fulfilmentMethod),
                     "block w-full cursor-pointer truncate text-left text-[11px] leading-snug hover:underline sm:text-xs",
                     cell.inMonth ? "" : "opacity-50",
@@ -167,7 +172,10 @@ function CalendarDayCellView({
                   title={label}
                   type="button"
                 >
-                  {label}
+                  {marker ? <span aria-hidden="true">{marker} </span> : null}
+                  <span className={calendarCustomerSignalClass(entry)}>
+                    {entry.displayName}
+                  </span>
                 </button>
               </li>
             );
@@ -177,13 +185,19 @@ function CalendarDayCellView({
         <ul className="space-y-1">
           {visibleCakes.map((line) => {
             const cakeLabel = formatCakeLabel(line.item);
-            const customerLabel = withOperationalMarker(line.entry.displayName, {
+            const markerInput = {
               readyAt: line.entry.readyAt,
+              derivedReadyForCollection: line.entry.derivedReadyForCollection,
               pickedUpAt: line.entry.pickedUpAt,
               outForDeliveryAt: line.entry.outForDeliveryAt,
               deliveredAt: line.entry.deliveredAt,
               fulfilmentMethod: line.entry.fulfilmentMethod,
-            });
+            };
+            const marker = operationalMarkerFromTimestamps(markerInput);
+            const customerLabel = withOperationalMarker(
+              line.entry.displayName,
+              markerInput,
+            );
             const title = `${cakeLabel} — ${customerLabel}`;
             return (
               <li key={line.key}>
@@ -199,14 +213,14 @@ function CalendarDayCellView({
                   <span className="text-ink">{cakeLabel}</span>
                   <span className="text-zinc-500"> — </span>
                   <span
-                    className={[
-                      calendarCustomerSignalClass(line.entry),
-                      calendarFulfilmentBackgroundClass(
-                        line.entry.fulfilmentMethod,
-                      ),
-                    ].join(" ")}
+                    className={calendarFulfilmentBackgroundClass(
+                      line.entry.fulfilmentMethod,
+                    )}
                   >
-                    {customerLabel}
+                    {marker ? <span aria-hidden="true">{marker} </span> : null}
+                    <span className={calendarCustomerSignalClass(line.entry)}>
+                      {line.entry.displayName}
+                    </span>
                   </span>
                 </button>
               </li>

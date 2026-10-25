@@ -41,6 +41,8 @@ export type CalendarEntry = {
   hasEffectiveRm10: boolean;
   /** Operational Ready timestamp — independent of financial status. */
   readyAt: string | null;
+  /** Physical Fresh Pick readiness derived from the verified Bakery read model. */
+  derivedReadyForCollection?: boolean;
   /** Pickup Picked Up timestamp — independent of financial status. Ignored for Delivery markers. */
   pickedUpAt: string | null;
   /** Delivery Out for Delivery timestamp — independent of financial status. */

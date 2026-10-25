@@ -26,7 +26,7 @@ import {
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
 import { COLLECTION_READY_MESSAGE_SENT_EVENT } from "@/workspaces/collection/ready-message";
 import { getBakeryBoardOrderById } from "@/workspaces/bakery/queries";
-import { bakeryOrderProductionPresentation } from "@/workspaces/bakery/eligibility";
+import { isBakeryOrderReadyForCollection } from "@/workspaces/bakery/eligibility";
 
 async function requireCollectionStaff() {
   const staff = await requireStaff();
@@ -90,16 +90,12 @@ export async function markCollectionOrderCollectedAction(
   }
 
   const bakeryOrder = await getBakeryBoardOrderById(orderId, row.pickup_date);
-  const bakeryReady = Boolean(
-    bakeryOrder && bakeryOrderProductionPresentation(bakeryOrder) === "ready",
-  );
-  const readyForCollection = bakeryOrder
-    ? bakeryReady &&
-      (Boolean(row.ready_at) ||
-        (row.status === "paid" &&
-          row.payment_status === "paid" &&
-          bakeryOrder.assignedFreshPickStocks.length > 0))
-    : Boolean(row.ready_at);
+  const readyForCollection = isBakeryOrderReadyForCollection({
+    order: bakeryOrder,
+    readyAt: row.ready_at,
+    status: row.status,
+    paymentStatus: row.payment_status,
+  });
   const dineIn = isCollectionDineInMethod(row.fulfilment_method);
   const eligible = dineIn
     ? isCollectionCompleteDineInEligible({
@@ -233,16 +229,28 @@ export async function markCollectionReadyMessageSentAction(
   const { data: order, error: orderError } = await supabase
     .from("orders")
     .select(
-      "id, customer_id, status, fulfilment_method, ready_at, picked_up_at, delivered_at",
+      "id, customer_id, status, payment_status, fulfilment_method, ready_at, picked_up_at, delivered_at, pickup_date",
     )
     .eq("id", orderId)
     .is("customer_id", null)
     .maybeSingle();
   if (orderError) return { error: orderError.message };
   if (!order) return { error: "Order not found." };
+  let bakeryOrder: Awaited<ReturnType<typeof getBakeryBoardOrderById>>;
+  try {
+    bakeryOrder = await getBakeryBoardOrderById(orderId, order.pickup_date);
+  } catch {
+    return { error: "Unable to verify Collection readiness. Please try again." };
+  }
+  const readyForCollection = isBakeryOrderReadyForCollection({
+    order: bakeryOrder,
+    readyAt: order.ready_at,
+    status: order.status,
+    paymentStatus: order.payment_status,
+  });
   if (
     !COLLECTION_ACTIVE_PREORDER_STATUSES.includes(order.status) ||
-    !order.ready_at ||
+    !readyForCollection ||
     order.picked_up_at ||
     order.delivered_at
   ) {

@@ -390,6 +390,7 @@ async function submitGuestExtraOrderActionBody(
   const complimentary = customerComplimentaryMutationPayload({
     options: complimentaryOptions,
     selectedCodes: submittedComplimentaryCodes,
+    eligibleWholeCakeQuantity: extraStockIds.length,
   });
   const paidAddons = customerPaidAddonMutationPayload({
     options: paidAddonOptions,

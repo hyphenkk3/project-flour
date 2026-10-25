@@ -223,6 +223,8 @@ export async function submitWaitingListConfirmationAction(
     return { error: WAITING_LIST_CONFIRMATION_UNAVAILABLE_TITLE };
   }
 
+  const supabase = await createClient();
+
   const customerName = String(formData.get("customer_name") ?? "").trim();
   const phone = waitingListWhatsAppDigits(String(formData.get("phone") ?? ""));
   const includeReceipt = parseRequiredPhysicalReceipt(
@@ -386,10 +388,32 @@ export async function submitWaitingListConfirmationAction(
         optionsReady: false,
       };
 
+  // Complimentary quantities must come from the token's server-held offer
+  // snapshot, never a client-submitted item list or quantity.
+  const { data: confirmationData, error: confirmationError } = await supabase.rpc(
+    "lookup_waiting_list_confirmation_link",
+    { p_token_hash: tokenHash },
+  );
+  if (confirmationError) {
+    return {
+      error: "We couldn't load this confirmation right now. Please try again shortly.",
+    };
+  }
+  const confirmationPayload = (confirmationData ?? {}) as Record<string, unknown>;
+  const confirmationItems = parseDisplayItems(confirmationPayload.items);
+  if (parseOutcome(confirmationPayload.outcome) !== "usable" || confirmationItems.length === 0) {
+    return { error: WAITING_LIST_CONFIRMATION_UNAVAILABLE_TITLE };
+  }
+  const eligibleWholeCakeQuantity = confirmationItems.reduce(
+    (total, item) => total + item.quantity,
+    0,
+  );
+
   const complimentary = persistOptions
     ? customerComplimentaryMutationPayload({
         options: offer.complimentaryOptions,
         selectedCodes: selections.complimentaryCodes,
+        eligibleWholeCakeQuantity,
       })
     : [];
   const paidAddons = persistOptions
@@ -414,7 +438,6 @@ export async function submitWaitingListConfirmationAction(
     paid_addons: paidAddons,
   };
 
-  const supabase = await createClient();
   const { data, error } = await supabase.rpc(
     "submit_waiting_list_confirmation",
     {

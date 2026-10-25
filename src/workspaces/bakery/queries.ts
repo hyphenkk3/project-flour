@@ -65,20 +65,21 @@ async function loadAllocationRows(
 
   const columns =
     "id,order_id,lifecycle,sold_at,cut_into_slices_at,ready_for_collection,cake_name,size_label,library_cake_id,library_cake_size_id,walk_in_held_until";
-  const [linkedResult, primaryResult] = await Promise.all([
-    supabase.from("extra_stock").select(columns).in("order_id", orderIds),
-    primaryIds.length
-      ? supabase.from("extra_stock").select(columns).in("id", primaryIds)
-      : Promise.resolve({ data: [], error: null }),
-  ]);
-  if (linkedResult.error) throw new Error(linkedResult.error.message);
-  if (primaryResult.error) throw new Error(primaryResult.error.message);
+  // The two allocation sources are a union. Read them in one bounded query
+  // instead of issuing separate order_id and legacy-primary-pointer reads.
+  let stockQuery = supabase.from("extra_stock").select(columns);
+  if (primaryIds.length > 0) {
+    stockQuery = stockQuery.or(
+      `order_id.in.(${orderIds.join(",")}),id.in.(${primaryIds.join(",")})`,
+    );
+  } else {
+    stockQuery = stockQuery.in("order_id", orderIds);
+  }
+  const { data: stockRows, error: stockError } = await stockQuery;
+  if (stockError) throw new Error(stockError.message);
 
   const rowById = new Map<string, BakeryAssignedStockInput>();
-  for (const row of [
-    ...((linkedResult.data ?? []) as ExtraStockAllocationRow[]),
-    ...((primaryResult.data ?? []) as ExtraStockAllocationRow[]),
-  ]) {
+  for (const row of (stockRows ?? []) as ExtraStockAllocationRow[]) {
     rowById.set(row.id, mapAllocationStock(row));
   }
 
@@ -108,6 +109,41 @@ async function loadAllocationRows(
   return byOrder;
 }
 
+export type BakeryFreshPickReadinessForOrder = {
+  allocation: BakeryAllocationSummary;
+  assignedStocks: BakeryAssignedStockInput[];
+};
+
+/** Reuse a caller's already-fetched order rows; do not reload the Bakery board. */
+export async function getBakeryFreshPickReadinessForOrders(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orders: Array<{
+    id: string;
+    extra_stock_id: string | null;
+    order_items?: BakeryCakeRequirementInput[] | null;
+  }>,
+): Promise<Map<string, BakeryFreshPickReadinessForOrder>> {
+  if (orders.length === 0) return new Map();
+  const allocationRows = await loadAllocationRows(supabase, orders);
+  return new Map(
+    orders.map((order) => {
+      const assignedStocks = allocationRows.get(order.id) ?? [];
+      return [
+        order.id,
+        {
+          allocation: summarizeBakeryFreshPickAllocations({
+            orderId: order.id,
+            primaryStockId: order.extra_stock_id,
+            cakeRequirements: order.order_items ?? [],
+            stockRows: assignedStocks,
+          }),
+          assignedStocks,
+        },
+      ];
+    }),
+  );
+}
+
 export async function getBakeryFreshPickAllocationSummary(
   supabase: Awaited<ReturnType<typeof createClient>>,
   order: {
@@ -116,13 +152,8 @@ export async function getBakeryFreshPickAllocationSummary(
     order_items?: BakeryCakeRequirementInput[] | null;
   },
 ): Promise<BakeryAllocationSummary> {
-  const allocationRows = await loadAllocationRows(supabase, [order]);
-  return summarizeBakeryFreshPickAllocations({
-    orderId: order.id,
-    primaryStockId: order.extra_stock_id,
-    cakeRequirements: order.order_items ?? [],
-    stockRows: allocationRows.get(order.id) ?? [],
-  });
+  const readiness = await getBakeryFreshPickReadinessForOrders(supabase, [order]);
+  return readiness.get(order.id)!.allocation;
 }
 
 function rowPassesBoard(
@@ -149,12 +180,28 @@ function rowPassesBoard(
 export async function listBakeryBoardOrders(
   selectedPickupDate: string,
 ): Promise<BakeryBoardOrder[]> {
+  return listBakeryBoardOrdersForPickupRange(
+    selectedPickupDate,
+    selectedPickupDate,
+  );
+}
+
+/** Batch the normal Bakery read model over a bounded pickup-date range. */
+export async function listBakeryBoardOrdersForPickupRange(
+  fromPickupDate: string,
+  toPickupDate: string,
+  options: { includePickedUp?: boolean; orderIds?: string[] } = {},
+): Promise<BakeryBoardOrder[]> {
+  if (options.orderIds && options.orderIds.length === 0) return [];
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("orders")
     .select(BAKERY_ORDER_SELECT)
-    .is("customer_id", null)
-    .eq("pickup_date", selectedPickupDate)
+    .is("customer_id", null);
+  query = options.orderIds
+    ? query.in("id", options.orderIds)
+    : query.gte("pickup_date", fromPickupDate).lte("pickup_date", toPickupDate);
+  const { data, error } = await query
     .or(
       [
         `status.in.(${BAKERY_ACTIVE_PREORDER_STATUSES.join(",")})`,
@@ -168,9 +215,16 @@ export async function listBakeryBoardOrders(
     throw new Error(error.message);
   }
 
-  const activeRows = ((data ?? []) as BakeryOrderRow[]).filter((row) =>
-    rowPassesBoard(row, selectedPickupDate),
-  );
+  const activeRows = ((data ?? []) as BakeryOrderRow[]).filter((row) => {
+    if (rowPassesBoard(row, row.pickup_date)) return true;
+    return Boolean(
+      options.includePickedUp &&
+        row.picked_up_at &&
+        !row.out_for_delivery_at &&
+        row.status !== "cancelled" &&
+        BAKERY_ACTIVE_PREORDER_STATUSES.includes(row.status),
+    );
+  });
   const allocationRows = await loadAllocationRows(supabase, activeRows);
   const mapped = activeRows.map((row) =>
     mapBakeryBoardOrder(row, allocationRows.get(row.id) ?? []),

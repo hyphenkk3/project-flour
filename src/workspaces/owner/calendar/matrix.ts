@@ -15,6 +15,7 @@ export type MatrixCustomerEntry = {
   needsBakeryAttention: boolean;
   hasEffectiveRm10: boolean;
   readyAt: string | null;
+  derivedReadyForCollection?: boolean;
   pickedUpAt: string | null;
   outForDeliveryAt: string | null;
   deliveredAt: string | null;
@@ -161,6 +162,7 @@ export function buildCalendarMatrix(
           needsBakeryAttention: entry.needsBakeryAttention,
           hasEffectiveRm10: entry.hasEffectiveRm10,
           readyAt: entry.readyAt,
+          derivedReadyForCollection: entry.derivedReadyForCollection,
           pickedUpAt: entry.pickedUpAt,
           outForDeliveryAt: entry.outForDeliveryAt,
           deliveredAt: entry.deliveredAt,

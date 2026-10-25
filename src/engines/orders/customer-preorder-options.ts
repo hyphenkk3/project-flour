@@ -1,7 +1,8 @@
 /**
  * Customer Whole Cake preorder options — canonical complimentary / paid-card codes.
  * Prices come from paid_addon_types (via caller). Complimentary is always RM0.
- * Quantity on the public form is 0 or 1; Operations still supports card qty up to catalog max.
+ * Customer complimentary selections are order-wide opt-ins. Each selected
+ * complimentary item is supplied once per eligible whole cake.
  */
 
 import {
@@ -153,7 +154,13 @@ function messageForCode(
 export function customerComplimentaryMutationPayload(input: {
   options: readonly CustomerComplimentaryOption[];
   selectedCodes: readonly string[];
+  eligibleWholeCakeQuantity?: number;
 }): CustomerComplimentaryMutation[] {
+  const quantity = Math.max(
+    0,
+    Math.floor(Number(input.eligibleWholeCakeQuantity ?? 1) || 0),
+  );
+  if (quantity === 0) return [];
   const selected = new Set(
     selectedCustomerComplimentaryCodes(input.selectedCodes, input.options),
   );
@@ -163,7 +170,7 @@ export function customerComplimentaryMutationPayload(input: {
       type_id: option.typeId,
       code: option.code,
       name: option.name,
-      quantity: 1,
+      quantity,
       sort_order: option.sortOrder,
     }));
 }
