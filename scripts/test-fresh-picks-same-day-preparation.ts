@@ -31,6 +31,10 @@ import {
   sameDayFreshPicksCutoffCustomerMessage,
   slotPassesFreshPicksLead,
 } from "@/engines/extra/fresh-picks-preparation";
+import {
+  addFreshPickToCart,
+  parseFreshPickCart,
+} from "@/workspaces/storefront/extra/fresh-pick-cart";
 
 function readSrc(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -97,6 +101,35 @@ assert.equal(parseFreshPicksPreparationConfig({}).leadMinutes, 60);
   assert.equal(
     extraCustomerSameDayUnavailableNotice({ ...ctx, now }),
     sameDayFreshPicksCutoffCustomerMessage(),
+  );
+}
+
+{
+  // On 25 Oct, a not-ready physical stock item can show 26 Oct as its
+  // available date while retaining a notice that today's cutoff has passed.
+  const sunday = "2026-10-25";
+  const monday = "2026-10-26";
+  const now = malaysiaNow(sunday, "16:00:00");
+  const itemWindow = {
+    pickupAvailableFromAt: extraPickupThroughIso(sunday, "12:00")!,
+    orderCutoffAt: extraPickupThroughIso(monday, "21:00")!,
+  };
+  const itemContext = {
+    window: itemWindow,
+    now,
+    snapshot: OPERATING_HOURS_SEED,
+  };
+  assert.deepEqual(extraCustomerVisibleFulfilmentDates(itemContext), [monday]);
+  assert.equal(
+    extraCustomerSameDayUnavailableNotice(itemContext),
+    sameDayFreshPicksCutoffCustomerMessage(),
+    "the notice explains that 25 Oct is closed to new orders while 26 Oct remains selectable",
+  );
+  const readyItemContext = { ...itemContext, readyForCollection: true };
+  assert.equal(
+    extraCustomerSameDayUnavailableNotice(readyItemContext),
+    null,
+    "a ready physical item with remaining same-day slots does not show a stale cutoff notice",
   );
 }
 
@@ -460,11 +493,95 @@ for (const example of dineInLeadCases) {
 const extraFormSrc = readSrc(
   "src/workspaces/storefront/extra/GuestExtraOrderForm.tsx",
 );
+const extraDetailPageSrc = readSrc(
+  "src/workspaces/storefront/extra/StorefrontExtraOrderPage.tsx",
+);
 assert.match(extraFormSrc, /FulfilmentMethodChooser/);
 assert.match(extraFormSrc, /Dine-in/);
 assert.match(extraFormSrc, /freshPicksChooserStates/);
 assert.match(extraFormSrc, /extraCustomerSameDayUnavailableNotice/);
 assert.match(extraFormSrc, /includeFieldName=\{false\}/);
+assert.match(extraDetailPageSrc, /<GuestExtraOrderForm/);
+assert.match(extraFormSrc, /id="dine_in_venue"[\s\S]*name="dine_in_venue"/);
+assert.match(extraFormSrc, /freshPicksDineInVenuesForSlots/);
+assert.match(extraFormSrc, /freshPicksDineInSlotsForVenue/);
+assert.match(extraFormSrc, /dineInVenue: resolvedMethod === "dine_in" \? resolvedDineInVenue : ""/);
+assert.ok(
+  extraFormSrc.indexOf('id="dine_in_venue"') <
+    extraFormSrc.indexOf('id="pickup_time"'),
+  "product detail offers the venue before its reservation time",
+);
+assert.ok(
+  extraFormSrc.indexOf('id="pickup_time"') <
+    extraFormSrc.indexOf("<FormSubmitButton"),
+  "venue and time are chosen before Add to Cart",
+);
+
+{
+  const productDate = "2026-08-20";
+  const productNow = malaysiaNow(productDate, "15:00:00");
+  const productWindow = {
+    pickupAvailableFromAt: extraPickupThroughIso(productDate, "12:00")!,
+    orderCutoffAt: extraPickupThroughIso(productDate, "21:00")!,
+  };
+  const available = freshPicksMethodAvailability("dine_in", productDate, {
+    window: productWindow,
+    now: productNow,
+    snapshot: OPERATING_HOURS_SEED,
+  });
+  const venue = freshPicksDineInVenuesForSlots(
+    productDate,
+    available.slots,
+    OPERATING_HOURS_SEED,
+  )[0];
+  assert.ok(venue);
+  const slot = freshPicksDineInSlotsForVenue(
+    productDate,
+    available.slots,
+    venue,
+    OPERATING_HOURS_SEED,
+  )[0];
+  assert.ok(slot);
+  const productInput = {
+    extraStockId: "synthetic-product-detail-extra",
+    cakeId: "synthetic-cake",
+    cakeSizeId: "synthetic-size",
+    cakeName: "Synthetic Cake",
+    sizeLabel: '6"',
+    unitPrice: 90,
+    imageUrl: null,
+    pickupDate: productDate,
+    pickupTime: slot.value,
+    fulfilmentMethod: "dine_in" as const,
+    dineInVenue: venue,
+    pickupAvailableFromAt: productWindow.pickupAvailableFromAt,
+    orderCutoffAt: productWindow.orderCutoffAt,
+  };
+  const added = addFreshPickToCart(
+    null,
+    productInput,
+    productNow,
+    { snapshot: OPERATING_HOURS_SEED },
+  );
+  assert.equal(added.ok, true);
+  assert.equal(added.ok && added.cart.dineInVenue, venue);
+  assert.equal(added.ok && added.cart.pickupTime, slot.value);
+  assert.equal(
+    addFreshPickToCart(
+      null,
+      { ...productInput, dineInVenue: "" },
+      productNow,
+      { snapshot: OPERATING_HOURS_SEED },
+    ).ok,
+    false,
+    "Dine-in add-to-cart requires a venue",
+  );
+  if (added.ok) {
+    const restored = parseFreshPickCart(added.cart);
+    assert.equal(restored?.dineInVenue, venue);
+    assert.equal(restored?.pickupTime, slot.value);
+  }
+}
 
 const extraCheckoutSrc = readSrc(
   "src/workspaces/storefront/extra/GuestExtraCheckoutForm.tsx",
@@ -474,11 +591,13 @@ assert.match(extraCheckoutSrc, /includeFieldName=\{false\}/);
 assert.match(extraCheckoutSrc, /resolveDineInVenueSelection/);
 assert.match(extraCheckoutSrc, /extraCustomerSameDayUnavailableNotice/);
 assert.doesNotMatch(extraCheckoutSrc, /parseGuestCount/);
+assert.match(extraCheckoutSrc, /dineInVenue: resolvedVenue \|\| dineInVenue/);
 
 const extraActionsSrc = readSrc("src/workspaces/storefront/extra/actions.ts");
 assert.match(extraActionsSrc, /loadOperatingHoursSnapshot/);
 assert.match(extraActionsSrc, /isValidExtraCustomerFulfilment/);
 assert.match(extraActionsSrc, /p_fulfilment_method/);
+assert.match(extraActionsSrc, /p_dine_in/);
 assert.doesNotMatch(extraActionsSrc, /now:/);
 
 const checkoutSrc = readSrc(

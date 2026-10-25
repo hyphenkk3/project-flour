@@ -1,5 +1,9 @@
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
+  availableDineInVenues,
+  parseDineInVenue,
+} from "@/engines/business-calendar/dine-in-hours";
+import {
   FRESH_PICKS_ALREADY_IN_CART,
   FRESH_PICKS_CART_PICKUP_MISMATCH,
   FRESH_PICKS_CART_UNAVAILABLE_FOR_PICKUP,
@@ -79,6 +83,7 @@ export type FreshPickCartAddInput = {
   pickupDate: string;
   pickupTime: string;
   fulfilmentMethod?: CustomerWebsiteFulfilmentMethod;
+  dineInVenue?: string;
   pickupAvailableFromAt: string;
   orderCutoffAt: string;
   readyForCollection?: boolean;
@@ -383,6 +388,22 @@ export function addFreshPickToCart(
     };
   }
 
+  const dineInVenue = parseDineInVenue(input.dineInVenue);
+  if (
+    fulfilmentMethod === "dine_in" &&
+    (!dineInVenue ||
+      !availableDineInVenues(
+        input.pickupDate,
+        input.pickupTime,
+        context.snapshot,
+      ).includes(dineInVenue))
+  ) {
+    return {
+      ok: false,
+      error: "Please choose a valid dine-in venue and time.",
+    };
+  }
+
   const current = cart ?? emptyFreshPickCart();
   if (current.items.some((item) => item.extraStockId === extraStockId)) {
     return { ok: false, error: FRESH_PICKS_ALREADY_IN_CART };
@@ -395,6 +416,15 @@ export function addFreshPickToCart(
       current.fulfilmentMethod !== fulfilmentMethod
     ) {
       return { ok: false, error: FRESH_PICKS_CART_PICKUP_MISMATCH };
+    }
+    if (
+      fulfilmentMethod === "dine_in" &&
+      current.dineInVenue !== dineInVenue
+    ) {
+      return {
+        ok: false,
+        error: "Choose the same dine-in venue for Fresh Picks in your cart.",
+      };
     }
     if (
       current.items.some(
@@ -440,6 +470,12 @@ export function addFreshPickToCart(
       current.items.length > 0 ? current.pickupTime : input.pickupTime,
     fulfilmentMethod:
       current.items.length > 0 ? current.fulfilmentMethod : fulfilmentMethod,
+    dineInVenue:
+      current.items.length > 0
+        ? current.dineInVenue
+        : fulfilmentMethod === "dine_in"
+          ? dineInVenue ?? ""
+          : "",
     pickupAvailableFromAt:
       current.items.length > 0
         ? current.pickupAvailableFromAt

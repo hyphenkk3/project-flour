@@ -17,9 +17,15 @@ import {
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
+  dineInVenueLabel,
+  parseDineInVenue,
+} from "@/engines/business-calendar/dine-in-hours";
+import {
   extraCustomerSameDayUnavailableNotice,
   extraCustomerVisibleFulfilmentDates,
   firstAvailableFreshPicksFulfilment,
+  freshPicksDineInSlotsForVenue,
+  freshPicksDineInVenuesForSlots,
   freshPicksChooserStates,
   freshPicksMethodAvailability,
 } from "@/engines/extra/fresh-picks-fulfilment";
@@ -80,6 +86,11 @@ export function GuestExtraOrderForm({
   const [fulfilmentMethod, setFulfilmentMethod] =
     useState<CustomerWebsiteFulfilmentMethod>("pickup");
   const [pickupTime, setPickupTime] = useState("");
+  const cart = useFreshPickCart();
+  const [dineInVenueOverride, setDineInVenueOverride] = useState<string | null>(
+    null,
+  );
+  const dineInVenue = dineInVenueOverride ?? cart?.dineInVenue ?? "";
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [added, setAdded] = useState(false);
@@ -93,7 +104,6 @@ export function GuestExtraOrderForm({
   const unitPrice = priceReady ? priceResult.unitPrice : null;
   const priceError = priceResult.key === priceKey ? priceResult.error : null;
   const addedTimer = useRef<number | null>(null);
-  const cart = useFreshPickCart();
   const inCart = freshPickCartHasExtra(cart, extra.id);
 
   const methodStates = pickupDate
@@ -113,7 +123,31 @@ export function GuestExtraOrderForm({
         fulfilmentContext,
       )
     : null;
-  const usableSlots = methodAvailability?.slots ?? [];
+  const methodSlots = methodAvailability?.slots ?? [];
+  const dineInVenues =
+    resolvedMethod === "dine_in" && pickupDate
+      ? freshPicksDineInVenuesForSlots(
+          pickupDate,
+          methodSlots,
+          hoursSnapshot,
+        )
+      : [];
+  const parsedDineInVenue = parseDineInVenue(dineInVenue);
+  const resolvedDineInVenue =
+    parsedDineInVenue && dineInVenues.includes(parsedDineInVenue)
+      ? parsedDineInVenue
+      : "";
+  const usableSlots =
+    resolvedMethod === "dine_in"
+      ? resolvedDineInVenue && pickupDate
+        ? freshPicksDineInSlotsForVenue(
+            pickupDate,
+            methodSlots,
+            resolvedDineInVenue,
+            hoursSnapshot,
+          )
+        : []
+      : methodSlots;
   const timeStillValid = usableSlots.some((slot) => slot.value === pickupTime);
 
   useEffect(() => {
@@ -174,6 +208,40 @@ export function GuestExtraOrderForm({
     };
   }, []);
 
+  function updateFulfilmentSelection(
+    method: CustomerWebsiteFulfilmentMethod,
+    date: string,
+  ) {
+    const slots = freshPicksMethodAvailability(
+      method,
+      date,
+      fulfilmentContext,
+    ).slots;
+    if (method !== "dine_in") {
+      setDineInVenueOverride("");
+      setPickupTime(slots[0]?.value ?? "");
+      return;
+    }
+
+    const venues = freshPicksDineInVenuesForSlots(
+      date,
+      slots,
+      hoursSnapshot,
+    );
+    const currentVenue = parseDineInVenue(dineInVenue);
+    const nextVenue =
+      currentVenue && venues.includes(currentVenue) ? currentVenue : "";
+    setDineInVenueOverride(nextVenue);
+    const venueSlots = nextVenue
+      ? freshPicksDineInSlotsForVenue(date, slots, nextVenue, hoursSnapshot)
+      : [];
+    setPickupTime((currentTime) =>
+      venueSlots.some((slot) => slot.value === currentTime)
+        ? currentTime
+        : "",
+    );
+  }
+
   function addToCart() {
     setError(null);
     if (freshPickCartHasExtra(readFreshPickCart(), extra.id)) {
@@ -193,6 +261,7 @@ export function GuestExtraOrderForm({
         pickupDate,
         pickupTime: timeStillValid ? pickupTime : "",
         fulfilmentMethod: resolvedMethod,
+        dineInVenue: resolvedMethod === "dine_in" ? resolvedDineInVenue : "",
         pickupAvailableFromAt: extra.pickupAvailableFromAt ?? "",
         orderCutoffAt: extra.pickupThroughAt ?? "",
         readyForCollection: extra.readyForCollection,
@@ -273,12 +342,7 @@ export function GuestExtraOrderForm({
                 fulfilmentContext,
               );
               setFulfilmentMethod(nextMethod);
-              const nextSlots = freshPicksMethodAvailability(
-                nextMethod,
-                next,
-                fulfilmentContext,
-              ).slots;
-              setPickupTime(nextSlots[0]?.value ?? "");
+              updateFulfilmentSelection(nextMethod, next);
             }}
             required
             value={pickupDate}
@@ -305,15 +369,61 @@ export function GuestExtraOrderForm({
             onChange={(value) => {
               const next = parseCustomerWebsiteFulfilmentMethod(value);
               setFulfilmentMethod(next);
-              const nextSlots = freshPicksMethodAvailability(
-                next,
-                pickupDate,
-                fulfilmentContext,
-              ).slots;
-              setPickupTime(nextSlots[0]?.value ?? "");
+              updateFulfilmentSelection(next, pickupDate);
             }}
             value={resolvedMethod}
           />
+        ) : null}
+        {resolvedMethod === "dine_in" ? (
+          <div className="flex flex-col gap-1.5">
+            <label
+              className="text-sm font-medium text-ink"
+              htmlFor="dine_in_venue"
+            >
+              <span data-field-label="">
+                Dine-in venue
+                <RequiredAsterisk />
+              </span>
+            </label>
+            <FormSelect
+              aria-invalid={fieldErrors.dine_in_venue ? true : undefined}
+              className={fieldErrors.dine_in_venue ? formStyles.invalidControlClass : ""}
+              id="dine_in_venue"
+              name="dine_in_venue"
+              onChange={(event) => {
+                const nextVenue = event.target.value;
+                setDineInVenueOverride(nextVenue);
+                const parsedVenue = parseDineInVenue(nextVenue);
+                const venueSlots = parsedVenue
+                  ? freshPicksDineInSlotsForVenue(
+                      pickupDate,
+                      methodSlots,
+                      parsedVenue,
+                      hoursSnapshot,
+                    )
+                  : [];
+                setPickupTime((currentTime) =>
+                  venueSlots.some((slot) => slot.value === currentTime)
+                    ? currentTime
+                    : "",
+                );
+              }}
+              required
+              value={resolvedDineInVenue}
+            >
+              <option value="">Choose a venue</option>
+              {dineInVenues.map((venue) => (
+                <option key={venue} value={venue}>
+                  {dineInVenueLabel(venue)}
+                </option>
+              ))}
+            </FormSelect>
+            {fieldErrors.dine_in_venue ? (
+              <p className={formStyles.fieldErrorClass} role="alert">
+                {fieldErrors.dine_in_venue}
+              </p>
+            ) : null}
+          </div>
         ) : null}
         {sameDayNotice ? (
           <p className="text-skyline text-sm leading-relaxed" role="status">
@@ -385,7 +495,13 @@ export function GuestExtraOrderForm({
       ) : null}
 
       <FormActions>
-        <FormSubmitButton disabled={usableSlots.length === 0 || !priceReady}>
+        <FormSubmitButton
+          disabled={
+            (resolvedMethod === "dine_in"
+              ? methodSlots.length === 0
+              : usableSlots.length === 0) || !priceReady
+          }
+        >
           {inCart ? FRESH_PICKS_ADDED_TO_CART_CTA : FRESH_PICKS_ADD_TO_CART_CTA}
         </FormSubmitButton>
         <Link
