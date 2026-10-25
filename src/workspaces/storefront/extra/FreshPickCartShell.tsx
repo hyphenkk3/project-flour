@@ -6,6 +6,8 @@ import { createPortal } from "react-dom";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import { formatShortBusinessDate } from "@/lib/dates";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
+import { dineInVenueLabel, parseDineInVenue } from "@/engines/business-calendar/dine-in-hours";
+import { workspaceFulfilmentSectionTitle } from "@/engines/orders/fulfilment";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import {
   FRESH_PICK_CART_OPEN_EVENT,
@@ -25,16 +27,25 @@ import { CatalogueVoucherCartTotals } from "@/workspaces/storefront/offers/Catal
 
 const DESKTOP_ORDER_RAIL_WIDTH = "20.5rem";
 
-function pickupLabel(item: FreshPickCartItem): string {
+function pickupLabel(
+  item: FreshPickCartItem,
+  fulfilmentMethod: FreshPickCart["fulfilmentMethod"],
+): string {
   const date = formatShortBusinessDate(item.pickupDate) || item.pickupDate;
   const time = formatPickupTime(item.pickupTime);
-  return `${date} · ${time}`;
+  return fulfilmentMethod === "dine_in"
+    ? `${date} · Cake served ${time}`
+    : `${date} · ${time}`;
 }
 
-function ExtraOrderLines({ items }: { items: readonly FreshPickCartItem[] }) {
+function ExtraOrderLines({
+  cart,
+}: {
+  cart: FreshPickCart;
+}) {
   return (
     <ul className="divide-fog divide-y">
-      {items.map((item) => (
+      {cart.items.map((item) => (
         <li className="py-5" key={item.extraStockId}>
           <div className="flex items-start gap-3">
             {item.imageUrl ? (
@@ -51,7 +62,9 @@ function ExtraOrderLines({ items }: { items: readonly FreshPickCartItem[] }) {
                     {item.cakeName}
                   </p>
                   <p className="text-skyline mt-0.5 text-sm">{item.sizeLabel}</p>
-                  <p className="text-skyline mt-1.5 text-sm">{pickupLabel(item)}</p>
+                  <p className="text-skyline mt-1.5 text-sm">
+                    {pickupLabel(item, cart.fulfilmentMethod)}
+                  </p>
                 </div>
                 <button
                   className="text-skyline hover:text-ink shrink-0 text-sm font-medium"
@@ -91,15 +104,35 @@ function ExtraOrderSummary({
       <dl className="space-y-3 text-sm">
         <div>
           <dt className="text-skyline text-[11px] font-medium tracking-[0.16em] uppercase">
-            Pickup
+            {workspaceFulfilmentSectionTitle(cart.fulfilmentMethod)}
           </dt>
           <dd className="text-ink mt-1 font-medium">
-            {cart.pickupDate
-              ? `${formatShortBusinessDate(cart.pickupDate) || cart.pickupDate} · ${formatPickupTime(cart.pickupTime)}`
-              : "Not selected yet"}
+            {cart.pickupDate ? (
+              <>
+                {formatShortBusinessDate(cart.pickupDate) || cart.pickupDate}
+                {cart.fulfilmentMethod === "dine_in" ? (
+                  <>
+                    <br />
+                    Reservation · {formatPickupTime(cart.reservationTime)}
+                    <br />
+                    Cake served · {formatPickupTime(cart.pickupTime)}
+                    {parseDineInVenue(cart.dineInVenue) ? (
+                      <>
+                        <br />
+                        {dineInVenueLabel(parseDineInVenue(cart.dineInVenue)!)}
+                      </>
+                    ) : null}
+                  </>
+                ) : (
+                  <> · {formatPickupTime(cart.pickupTime)}</>
+                )}
+              </>
+            ) : (
+              "Not selected yet"
+            )}
           </dd>
         </div>
-        </dl>
+      </dl>
       <CatalogueVoucherCartPanel
         draft={{
           pickupDate: cart.pickupDate,
@@ -271,7 +304,7 @@ export function FreshPickCartShell({
                     </button>
                   </div>
                   <div className="min-h-0 flex-1 overflow-y-auto px-5">
-                    <ExtraOrderLines items={cart.items} />
+                    <ExtraOrderLines cart={cart} />
                   </div>
                   <div className="border-fog border-t px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
                     <ExtraOrderSummary
@@ -302,7 +335,7 @@ export function FreshPickCartShell({
                 <p className="text-skyline mt-1 text-sm">{itemLabel}</p>
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto px-6">
-                <ExtraOrderLines items={cart.items} />
+                <ExtraOrderLines cart={cart} />
               </div>
               <div className="px-6 pt-4 pb-8">
                 <ExtraOrderSummary cart={cart} />

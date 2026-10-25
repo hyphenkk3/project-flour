@@ -1,6 +1,9 @@
 "use server";
 
-import { isDineInVenueAvailable } from "@/engines/business-calendar/dine-in-hours";
+import {
+  isValidDineInReservationPair,
+  parseDineInVenue,
+} from "@/engines/business-calendar/dine-in-hours";
 import {
   buildDineInReservationRpcPayload,
   validateDineInPartyFromForm,
@@ -236,6 +239,9 @@ async function submitGuestExtraOrderActionBody(
   );
   const pickupDate = String(formData.get("pickup_date") ?? "").trim();
   const pickupTime = String(formData.get("pickup_time") ?? "").trim();
+  const reservationTime = String(
+    formData.get("reservation_time") ?? "",
+  ).trim();
   const fulfilmentMethod = parseCustomerWebsiteFulfilmentMethod(
     String(formData.get("fulfilment_method") ?? ""),
   );
@@ -303,21 +309,25 @@ async function submitGuestExtraOrderActionBody(
   let dineInPayload: Record<string, unknown> | null = null;
   let deliveryPayload: Record<string, unknown> | null = null;
   if (fulfilmentMethod === "dine_in") {
-    const reservationTime = pickupTime;
     const partyResult = validateDineInPartyFromForm(formData, true);
     if (!partyResult.ok) {
       return { error: partyResult.error };
     }
+    const venue = parseDineInVenue(partyResult.party.venue);
     if (
-      !isDineInVenueAvailable(
-        pickupDate,
+      !reservationTime ||
+      !venue ||
+      !isValidDineInReservationPair({
+        dateYmd: pickupDate,
         reservationTime,
-        partyResult.party.venue,
-        hoursSnapshot,
-      )
+        servingTime: pickupTime,
+        venue,
+        snapshot: hoursSnapshot,
+      })
     ) {
       return {
-        error: "Please choose a valid dine-in venue for that date and time.",
+        error:
+          "Please choose a valid reservation time, cake serving time and venue.",
       };
     }
     dineInPayload = buildDineInReservationRpcPayload({

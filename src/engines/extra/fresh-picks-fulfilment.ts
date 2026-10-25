@@ -6,8 +6,10 @@
 import { getDeliverySlotsForDate } from "@/engines/business-calendar/delivery-hours";
 import {
   availableDineInVenues,
+  cakeServingSlotsForReservation,
   getDineInSchedule,
   getDineInSlotsForDate,
+  venuesForReservationAndServing,
   type DineInVenue,
 } from "@/engines/business-calendar/dine-in-hours";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
@@ -105,6 +107,59 @@ export function freshPicksDineInSlotsForVenue(
 ): PickupSlot[] {
   return slots.filter((slot) =>
     availableDineInVenues(dateYmd, slot.value, snapshot).includes(venue),
+  );
+}
+
+/** Reservation starts that have at least one stock-eligible cake-serving time. */
+export function freshPicksDineInReservationSlots(
+  dateYmd: string,
+  stockEligibleServingSlots: readonly PickupSlot[],
+  snapshot: OperatingHoursSnapshot,
+): PickupSlot[] {
+  return getDineInSlotsForDate(dateYmd, snapshot).filter((reservation) =>
+    freshPicksDineInServingSlotsForReservation(
+      dateYmd,
+      reservation.value,
+      stockEligibleServingSlots,
+      snapshot,
+    ).some((serving) =>
+      venuesForReservationAndServing(
+        dateYmd,
+        reservation.value,
+        serving.value,
+        snapshot,
+      ).length > 0,
+    ),
+  );
+}
+
+/** Shared regular-Preorder serving window intersected with this stock's slots. */
+export function freshPicksDineInServingSlotsForReservation(
+  dateYmd: string,
+  reservationTime: string,
+  stockEligibleServingSlots: readonly PickupSlot[],
+  snapshot: OperatingHoursSnapshot,
+): PickupSlot[] {
+  const eligibleTimes = new Set(
+    stockEligibleServingSlots.map((slot) => slot.value),
+  );
+  return cakeServingSlotsForReservation(dateYmd, reservationTime, snapshot).filter(
+    (slot) => eligibleTimes.has(slot.value),
+  );
+}
+
+/** Venues must serve both the table reservation and the cake serving time. */
+export function freshPicksDineInVenuesForPair(
+  dateYmd: string,
+  reservationTime: string,
+  servingTime: string,
+  snapshot: OperatingHoursSnapshot,
+): DineInVenue[] {
+  return venuesForReservationAndServing(
+    dateYmd,
+    reservationTime,
+    servingTime,
+    snapshot,
   );
 }
 
@@ -447,6 +502,16 @@ export function extraCustomerSameDayUnavailableNotice(
   );
   if (cutoff?.message) return cutoff.message;
   return methods.find((method) => method.message)?.message ?? null;
+}
+
+/** Do not show today's cutoff warning when the customer selected another stock date. */
+export function extraCustomerSameDayUnavailableNoticeForDate(
+  dateYmd: string,
+  input: FreshPicksFulfilmentContext,
+): string | null {
+  const { now } = contextDefaults(input);
+  if (!isFreshPicksFulfilmentDateToday(dateYmd, now)) return null;
+  return extraCustomerSameDayUnavailableNotice({ ...input, now });
 }
 
 export function extraActionableFulfilmentDays(input: {

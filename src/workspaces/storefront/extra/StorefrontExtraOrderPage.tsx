@@ -10,6 +10,7 @@ import {
   StorefrontStaffSignIn,
 } from "@/workspaces/storefront/StorefrontBrand";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
+import { loadDineInVenuePhotos } from "@/workspaces/storefront/dine-in/queries";
 import { loadFreshPicksPreparationConfig } from "@/workspaces/storefront/extra/config";
 import { GuestExtraOrderForm } from "@/workspaces/storefront/extra/GuestExtraOrderForm";
 import { FreshPickCartShell } from "@/workspaces/storefront/extra/FreshPickCartShell";
@@ -57,10 +58,11 @@ async function ExtraOrderBody({
   params,
 }: StorefrontExtraOrderPageProps) {
   const { id: extraId } = await params;
-  const [extra, hoursSnapshot, preparationConfig] = await Promise.all([
+  const [extra, hoursSnapshot, preparationConfig, venuePhotos] = await Promise.all([
     getStorefrontExtraById(extraId),
     loadOperatingHoursSnapshot(),
     loadFreshPicksPreparationConfig(),
+    loadDineInVenuePhotos(),
   ]);
 
   if (!extra) {
@@ -113,6 +115,7 @@ async function ExtraOrderBody({
             extra={extra}
             hoursSnapshot={hoursSnapshot}
             preparationConfig={preparationConfig}
+            venuePhotos={venuePhotos}
           />
         </div>
       )}
