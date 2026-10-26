@@ -953,8 +953,9 @@ assert.match(
 );
 assert.match(extraCheckoutSrc, /name="complimentary_code"/);
 assert.match(extraCheckoutSrc, /loadExtraCustomerOptions/);
-assert.doesNotMatch(extraFormSrc, /<FormField[\s\S]*htmlFor="pickup_date"/);
-assert.doesNotMatch(extraFormSrc, /<FormField[\s\S]*htmlFor="pickup_time"/);
+// Date/time are visible labelled controls on the product page. Keep the
+// positive accessibility assertions above; the old negative checks described
+// the earlier hidden-field form and became stale when fulfilment was unified.
 assert.doesNotMatch(extraFormSrc, /submit_guest_preorder/);
 assert.doesNotMatch(extraFormSrc, /GuestCheckoutForm/);
 assert.doesNotMatch(extraFormSrc, /disabled=\{true\}/);

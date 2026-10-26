@@ -24,7 +24,11 @@ cleanup() {
 trap cleanup EXIT
 
 "$PGBIN/initdb" -D "$DATA" --no-locale --encoding=UTF8 --auth=trust >/dev/null
-"$PGBIN/pg_ctl" -D "$DATA" -l "$LOG" -o "-F -p $PORT -k $SOCKET -c listen_addresses='' -c timezone=UTC -c shared_memory_type=mmap -c dynamic_shared_memory_type=posix" -w start >/dev/null
+if ! "$PGBIN/pg_ctl" -D "$DATA" -l "$LOG" -o "-F -p $PORT -k $SOCKET -c listen_addresses='' -c timezone=UTC -c shared_memory_type=mmap -c dynamic_shared_memory_type=posix" -w start >/dev/null; then
+  echo "FAIL: isolated PostgreSQL could not start; diagnostic log follows" >&2
+  cat "$LOG" >&2 || true
+  exit 1
+fi
 export PGHOST="$SOCKET" PGPORT="$PORT" PGUSER="$(id -un)" PGDATABASE=postgres
 
 "$PGBIN/psql" -X -v ON_ERROR_STOP=1 -f "$ROOT/scripts/test-extra-assignment-rpc-fixture.sql" >/dev/null

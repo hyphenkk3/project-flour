@@ -42,6 +42,8 @@ $$;
 
 create table public.orders (
   id uuid primary key, order_number text not null unique, status text not null,
+  payment_status text not null default 'paid', ready_at timestamptz,
+  production_started_at timestamptz,
   pickup_date date not null default current_date + 1,
   picked_up_at timestamptz, out_for_delivery_at timestamptz, delivered_at timestamptz,
   extra_stock_id uuid unique, updated_at timestamptz not null default now()
@@ -54,6 +56,7 @@ create table public.extra_stock (
   id uuid primary key, library_cake_id uuid, library_cake_size_id uuid,
   cake_name text not null, size_label text not null, lifecycle text not null,
   sold_at timestamptz, cut_into_slices_at timestamptz, order_id uuid,
+  ready_for_collection boolean not null default false,
   pickup_through_at timestamptz, walk_in_held_until timestamptz, updated_at timestamptz not null default now()
 );
 create index extra_stock_order_id_idx on public.extra_stock(order_id);

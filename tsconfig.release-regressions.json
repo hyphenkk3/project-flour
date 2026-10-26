@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["scripts/test-fresh-pick-assignment-readiness-contract.ts"],
+  "exclude": ["node_modules"]
+}

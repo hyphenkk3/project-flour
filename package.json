@@ -12,7 +12,8 @@
     "seed:dev": "node scripts/seed-dev-owner.mjs",
     "seed:milestone1": "node scripts/seed-milestone1.mjs",
     "test:customer-message-templates": "node scripts/test-customer-message-templates.cjs",
-    "test:customer-message-counter-instructions": "node scripts/test-customer-message-counter-instructions.cjs"
+    "test:customer-message-counter-instructions": "node scripts/test-customer-message-counter-instructions.cjs",
+    "test:release-regressions": "node scripts/test-release-regressions.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

@@ -16,6 +16,28 @@ do $$ begin
   if (select count(*) from public.extra_stock_events where extra_stock_id='80000000-0000-0000-0000-000000000001' and event_type='assigned')<>1 then raise exception 'stock event missing'; end if;
 end $$;
 
+-- Assignment preserves the exact pre-existing physical readiness state. It
+-- must neither promote unready stock nor clear a staff Ready decision, and it
+-- must not change order payment or production lifecycle fields.
+insert into public.orders(id,order_number,status,payment_status,ready_at,production_started_at) values
+('40000000-0000-0000-0000-000000000013','TEST-READY-BEFORE-ASSIGNMENT','submitted','unpaid',null,null),
+('40000000-0000-0000-0000-000000000014','TEST-NOT-READY-BEFORE-ASSIGNMENT','submitted','unpaid',null,null);
+insert into public.order_items(id,order_id,cake_id,cake_size_id,cake_name,size_label,quantity) values
+('50000000-0000-0000-0000-000000000014','40000000-0000-0000-0000-000000000013','60000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001','Cocoa','6 inch',1),
+('50000000-0000-0000-0000-000000000015','40000000-0000-0000-0000-000000000014','60000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001','Cocoa','6 inch',1);
+insert into public.extra_stock(id,library_cake_id,library_cake_size_id,cake_name,size_label,lifecycle,pickup_through_at,ready_for_collection)
+values
+('84000000-0000-0000-0000-000000000001','60000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001','Cocoa','6 inch','confirmed',now()+interval '5 days',true),
+('84000000-0000-0000-0000-000000000002','60000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001','Cocoa','6 inch','confirmed',now()+interval '5 days',false);
+select public.assign_extra_stock_to_order('84000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000013','20000000-0000-0000-0000-000000000001');
+select public.assign_extra_stock_to_order('84000000-0000-0000-0000-000000000002','40000000-0000-0000-0000-000000000014','20000000-0000-0000-0000-000000000001');
+do $$ begin
+  if not exists(select 1 from public.extra_stock where id='84000000-0000-0000-0000-000000000001' and order_id='40000000-0000-0000-0000-000000000013' and ready_for_collection is true) then raise exception 'assignment reset pre-existing Ready stock'; end if;
+  if not exists(select 1 from public.extra_stock where id='84000000-0000-0000-0000-000000000002' and order_id='40000000-0000-0000-0000-000000000014' and ready_for_collection is false) then raise exception 'assignment automatically marked unready stock Ready'; end if;
+  if not exists(select 1 from public.orders where id='40000000-0000-0000-0000-000000000013' and status='submitted' and payment_status='unpaid' and ready_at is null and production_started_at is null) then raise exception 'Ready stock assignment changed order financial or lifecycle state'; end if;
+  if not exists(select 1 from public.orders where id='40000000-0000-0000-0000-000000000014' and status='submitted' and payment_status='unpaid' and ready_at is null and production_started_at is null) then raise exception 'unready stock assignment changed order financial or lifecycle state'; end if;
+end $$;
+
 -- Zero valid cake/size matches and all terminal lifecycle states fail without writes.
 insert into public.orders(id,order_number,status) values
 ('40000000-0000-0000-0000-000000000002','TEST-CAKE-MISMATCH','paid'),

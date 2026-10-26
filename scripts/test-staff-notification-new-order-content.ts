@@ -373,6 +373,10 @@ assert.doesNotMatch(sql, /create or replace function public\.staff_notification_
 
 console.log("PASS staff notification new-order content (static)");
 
+// Release regression runs use this mode to exercise only the offline contract.
+// The normal default still runs the existing hosted acceptance path.
+if (process.argv.includes("--source-only")) process.exit(0);
+
 loadEnvLocal();
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
