@@ -4,6 +4,11 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PGBIN="${PGBIN:-/opt/homebrew/opt/postgresql@17/bin}"
 SERVICE_CONTAINER_ID="${RELEASE_TEST_POSTGRES_CONTAINER_ID:-}"
+SQL_FILES=(
+  "$ROOT/scripts/test-extra-assignment-rpc-fixture.sql"
+  "$ROOT/supabase/migrations/20261021055655_harden_extra_stock_order_assignment_eligibility.sql"
+  "$ROOT/scripts/test-extra-assignment-rpc-regression.sql"
+)
 RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/pf-assignment-rpc.XXXXXX")"
 DATA="$RUN_DIR/data"
 SOCKET="$RUN_DIR/sock"
@@ -18,6 +23,15 @@ cleanup() {
   rm -rf "$RUN_DIR"
 }
 trap cleanup EXIT
+
+# Fail before touching the disposable database if any runner-side SQL file is
+# missing or unreadable. In service mode these files are streamed to psql.
+for sql_file in "${SQL_FILES[@]}"; do
+  if [[ ! -f "$sql_file" || ! -r "$sql_file" ]]; then
+    echo "FAIL: required SQL file is missing or unreadable: $sql_file" >&2
+    exit 1
+  fi
+done
 
 if [[ -n "$SERVICE_CONTAINER_ID" ]]; then
   # GitHub Actions supplies only the ID of this job's unexposed PostgreSQL
@@ -59,9 +73,14 @@ else
   }
 fi
 
-run_psql -X -v ON_ERROR_STOP=1 -f "$ROOT/scripts/test-extra-assignment-rpc-fixture.sql" >/dev/null
-run_psql -X -v ON_ERROR_STOP=1 -f "$ROOT/supabase/migrations/20261021055655_harden_extra_stock_order_assignment_eligibility.sql" >/dev/null
-run_psql -X -v ON_ERROR_STOP=1 -f "$ROOT/scripts/test-extra-assignment-rpc-regression.sql"
+run_psql_file() {
+  local sql_file="$1"
+  run_psql -X -v ON_ERROR_STOP=1 -f - <"$sql_file"
+}
+
+run_psql_file "${SQL_FILES[0]}" >/dev/null
+run_psql_file "${SQL_FILES[1]}" >/dev/null
+run_psql_file "${SQL_FILES[2]}"
 
 # A fixture-only delay keeps the first assignment's stock row lock open while a
 # second PostgreSQL session attempts to assign the same stock to another order.
