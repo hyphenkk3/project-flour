@@ -71,7 +71,7 @@ const suites = [
 let failed = 0;
 let blocked = 0;
 let passed = 0;
-function run(label, command, args, timeout = 120_000) {
+function run(label, command, args, timeout = 120_000, envOverrides = {}) {
   console.log(`\n=== ${label} ===`);
   const result = spawnSync(command, args, {
     cwd: root,
@@ -89,6 +89,7 @@ function run(label, command, args, timeout = 120_000) {
       TMPDIR: process.env.TMPDIR ?? "/tmp",
       CI: "1",
       NODE_NO_WARNINGS: "1",
+      ...envOverrides,
     },
   });
   if (result.error) {
@@ -130,9 +131,14 @@ for (const [label, file, extraArgs = []] of suites) {
 
 // Isolated SQL regression for the actual assignment RPC. It creates a private
 // loopback-free PostgreSQL cluster and removes only its own temporary directory.
+const postgresContainerId = process.env.RELEASE_TEST_POSTGRES_CONTAINER_ID;
+const postgresHarnessEnv = postgresContainerId
+  ? { RELEASE_TEST_POSTGRES_CONTAINER_ID: postgresContainerId }
+  : {};
+
 run("Disposable PostgreSQL Fresh Pick assignment RPC", "bash", [
   path.join(scriptsDir, "test-extra-assignment-rpc-postgres.sh"),
-  ], 90_000);
+  ], 90_000, postgresHarnessEnv);
 
 const tsc = path.join(root, "node_modules", ".bin", "tsc");
 run("Application TypeScript", tsc, ["--noEmit"], 60_000);

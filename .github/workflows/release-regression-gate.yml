@@ -1,0 +1,75 @@
+name: Permanent release regression gate
+
+on:
+  push:
+    branches:
+      - codex/freshpick-r3-dev-20261025
+  pull_request:
+    branches:
+      - codex/freshpick-r3-dev-20261025
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-regressions-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-regressions:
+    name: Offline release regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: project_flour_regression
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: gha-regression-only
+        options: >-
+          --health-cmd "pg_isready -U postgres -d project_flour_regression"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Check out source without retaining a write token
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install exact lockfile dependencies
+        run: npm ci
+
+      - name: Run permanent source and isolated PostgreSQL regressions
+        env:
+          RELEASE_TEST_POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: npm run test:release-regressions
+
+      - name: Report full-repository lint baseline (informational)
+        id: full-repository-lint
+        if: always()
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Label known full-repository lint debt
+        if: always()
+        env:
+          FULL_REPOSITORY_LINT_OUTCOME: ${{ steps.full-repository-lint.outcome }}
+        run: |
+          {
+            echo '### Full-repository lint baseline (informational)'
+            echo "Outcome: ${FULL_REPOSITORY_LINT_OUTCOME}"
+            if [ "${FULL_REPOSITORY_LINT_OUTCOME}" = "failure" ]; then
+              echo 'This remains a documented non-green baseline. The required release gate separately enforces full TypeScript and targeted regression-test lint.'
+              echo '::warning title=Known lint baseline::Full-repository lint remains non-green at the documented baseline.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
