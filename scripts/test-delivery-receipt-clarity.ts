@@ -188,7 +188,9 @@ assert.deepEqual(pendingCard.adjustments, [
 ]);
 const drawnText: Array<{ text: string; x: number; y: number }> = [];
 let textAlign = "left";
+const canvas = { width: 1080, height: 1800 };
 const canvasContext = {
+  canvas,
   save() {},
   restore() {},
   fillRect() {},
@@ -224,6 +226,7 @@ drawOrderDetailsCard(
   canvasContext as unknown as CanvasRenderingContext2D,
   pendingCard,
 );
+assert.equal(canvas.height, 1800);
 const drawnReceipt = drawnText.map((entry) => entry.text).join("\n");
 assert.match(drawnReceipt, /ORDER AMOUNT/);
 assert.match(drawnReceipt, /Delivery fee/);

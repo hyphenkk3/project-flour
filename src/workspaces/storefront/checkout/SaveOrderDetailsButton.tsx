@@ -9,7 +9,9 @@ import {
   orderDetailsCakeImageUrls,
   orderDetailsFileName,
   preloadOrderDetailsImages,
+  resolveOrderDetailsReceiptForSave,
   renderOrderDetailsPng,
+  runOrderDetailsSaveAttempt,
   shareOrDownloadOrderDetailsImage,
 } from "@/workspaces/storefront/checkout/order-details-card";
 
@@ -46,20 +48,24 @@ export function SaveOrderDetailsButton({
   async function handleSave() {
     if (busy) return;
     setError(null);
-    setBusy(true);
     try {
-      await ensureStorefrontCanvasFonts();
-      const current = resolveReceipt ? await resolveReceipt() : receipt;
-      const model = buildOrderDetailsCardModel(current);
-      const images = await preloadOrderDetailsImages(
-        orderDetailsCakeImageUrls(model),
-      );
-      const blob = renderOrderDetailsPng(model, images);
-      const result = await shareOrDownloadOrderDetailsImage({
-        blob,
-        fileName: orderDetailsFileName(current.orderNumber),
-        title: "Whitebird order details",
-      });
+      const result = await runOrderDetailsSaveAttempt(async () => {
+        await ensureStorefrontCanvasFonts();
+        const current = await resolveOrderDetailsReceiptForSave({
+          current: receipt,
+          resolve: resolveReceipt,
+        });
+        const model = buildOrderDetailsCardModel(current);
+        const images = await preloadOrderDetailsImages(
+          orderDetailsCakeImageUrls(model),
+        );
+        const blob = renderOrderDetailsPng(model, images);
+        return shareOrDownloadOrderDetailsImage({
+          blob,
+          fileName: orderDetailsFileName(current.orderNumber),
+          title: "Whitebird order details",
+        });
+      }, setBusy);
       if (result.action === "preview" && result.objectUrl) {
         setPreviewUrl((current) => {
           if (current) URL.revokeObjectURL(current);
@@ -68,8 +74,6 @@ export function SaveOrderDetailsButton({
       }
     } catch {
       setError("Could not save order details. Please try again.");
-    } finally {
-      setBusy(false);
     }
   }
 

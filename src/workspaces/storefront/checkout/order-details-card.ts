@@ -23,6 +23,8 @@ import {
 export const ORDER_DETAILS_CARD_FOOTER = "Please keep this for your reference.";
 export const ORDER_DETAILS_PNG_WIDTH = 1080;
 export const ORDER_DETAILS_PNG_HEIGHT = 1800;
+export const ORDER_DETAILS_RECEIPT_PHOTOS_TIMEOUT_MS = 4_000;
+export const ORDER_DETAILS_IMAGE_LOAD_TIMEOUT_MS = 8_000;
 export const ORDER_DETAILS_CARD_PAYMENT = "Payment Pending";
 export const ORDER_DETAILS_CARD_CONTACT =
   "Whitebird will contact you via WhatsApp to proceed with payment and confirm your order.";
@@ -85,12 +87,17 @@ export async function ensureStorefrontCanvasFonts(): Promise<void> {
       document.fonts.load(`500 15px ${sans}`),
     ]).catch(() => undefined);
   };
-  await Promise.race([
-    load(),
-    new Promise<void>((resolve) => {
-      window.setTimeout(resolve, CANVAS_FONT_WAIT_MS);
-    }),
-  ]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      load(),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, CANVAS_FONT_WAIT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 export type OrderDetailsCardLine = {
@@ -228,23 +235,69 @@ export function wrapCanvasText(
   maxWidth: number,
 ): string[] {
   const input = text.trim();
-  if (!input) return [];
+  if (!input || maxWidth <= 0) return [];
   const lines: string[] = [];
   for (const paragraph of input.split(/\n/)) {
     const words = paragraph.trim() ? paragraph.trim().split(/\s+/) : [""];
     let current = "";
     for (const word of words) {
-      const next = current ? `${current} ${word}` : word;
-      if (measure(next) <= maxWidth || !current) {
-        current = next;
-        continue;
+      const pieces: string[] = [];
+      if (measure(word) <= maxWidth) {
+        pieces.push(word);
+      } else {
+        let piece = "";
+        for (const character of Array.from(word)) {
+          const nextPiece = piece + character;
+          if (piece && measure(nextPiece) > maxWidth) {
+            pieces.push(piece);
+            piece = character;
+          } else {
+            piece = nextPiece;
+          }
+        }
+        if (piece) pieces.push(piece);
       }
-      lines.push(current);
-      current = word;
+
+      for (const piece of pieces) {
+        const next = current ? `${current} ${piece}` : piece;
+        if (current && measure(next) > maxWidth) {
+          lines.push(current);
+          current = piece;
+        } else {
+          current = next;
+        }
+      }
     }
     if (current || paragraph === "") lines.push(current);
   }
   return lines;
+}
+
+export async function resolveOrderDetailsReceiptForSave<T>(input: {
+  current: T;
+  resolve?: () => Promise<T>;
+  timeoutMs?: number;
+}): Promise<T> {
+  if (!input.resolve) return input.current;
+  const timeoutMs =
+    input.timeoutMs ?? ORDER_DETAILS_RECEIPT_PHOTOS_TIMEOUT_MS;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      input.resolve(),
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("Receipt photos took too long to load.")),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } catch {
+    // The already-authorized receipt remains complete without optional photos.
+    return input.current;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 type ShareNavigator = {
@@ -369,7 +422,7 @@ export function triggerBlobDownload(blob: Blob, fileName: string): void {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 export async function shareOrDownloadOrderDetailsImage(input: {
@@ -456,6 +509,18 @@ function fillTrackedText(
   for (const character of text) {
     ctx.fillText(character, cursor, y);
     cursor += ctx.measureText(character).width + tracking;
+  }
+}
+
+export async function runOrderDetailsSaveAttempt<T>(
+  operation: () => Promise<T>,
+  setBusy: (busy: boolean) => void,
+): Promise<T> {
+  setBusy(true);
+  try {
+    return await operation();
+  } finally {
+    setBusy(false);
   }
 }
 
@@ -596,7 +661,10 @@ export function orderDetailsCakeImageUrls(
   ];
 }
 
-export async function loadCanvasImage(url: string): Promise<HTMLImageElement> {
+export async function loadCanvasImage(
+  url: string,
+  signal?: AbortSignal,
+): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     if (typeof Image === "undefined") {
       reject(new Error("Image unavailable"));
@@ -604,24 +672,63 @@ export async function loadCanvasImage(url: string): Promise<HTMLImageElement> {
     }
     const image = new Image();
     image.crossOrigin = "anonymous";
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("Could not load image"));
+    const cleanup = () => {
+      image.onload = null;
+      image.onerror = null;
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const onAbort = () => {
+      cleanup();
+      image.src = "";
+      reject(new Error("Could not load image"));
+    };
+    image.onload = () => {
+      cleanup();
+      resolve(image);
+    };
+    image.onerror = () => {
+      cleanup();
+      reject(new Error("Could not load image"));
+    };
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
     image.src = url;
   });
 }
 
 export async function preloadOrderDetailsImages(
   urls: readonly string[],
-  loadImage: (url: string) => Promise<CanvasImageSource> = loadCanvasImage,
+  loadImage: (
+    url: string,
+    signal?: AbortSignal,
+  ) => Promise<CanvasImageSource> = loadCanvasImage,
+  timeoutMs = ORDER_DETAILS_IMAGE_LOAD_TIMEOUT_MS,
 ): Promise<Map<string, CanvasImageSource>> {
   const unique = [...new Set(urls.map((url) => url.trim()).filter(Boolean))];
   const loaded = new Map<string, CanvasImageSource>();
   await Promise.all(
     unique.map(async (url) => {
+      const controller = new AbortController();
+      let timer: ReturnType<typeof setTimeout> | undefined;
       try {
-        loaded.set(url, await loadImage(url));
+        const image = await Promise.race([
+          loadImage(url, controller.signal),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(
+              () => reject(new Error("Cake photo took too long to load.")),
+              timeoutMs,
+            );
+          }),
+        ]);
+        loaded.set(url, image);
       } catch {
+        controller.abort();
         // Omit the photo; keep the rest of the order details.
+      } finally {
+        if (timer) clearTimeout(timer);
       }
     }),
   );
@@ -629,17 +736,6 @@ export async function preloadOrderDetailsImages(
 }
 
 type DrawOp = () => void;
-
-function gapScaleForContent(naturalContent: number, available: number): number {
-  if (naturalContent <= available) return 1;
-  const minScale = 0.58;
-  const scale = available / naturalContent;
-  return scale < minScale ? minScale : scale;
-}
-
-function scaledFontPx(size: number, fontScale: number): number {
-  return Math.max(11, Math.round(size * fontScale));
-}
 
 export function drawOrderDetailsCard(
   ctx: CanvasRenderingContext2D,
@@ -672,8 +768,8 @@ export function drawOrderDetailsCard(
       ...model.complimentary.map((line) => ({ line, kind: "other" as const })),
     ];
 
-  const paint = (gapScale: number, fontScale: number) => {
-    const fs = (size: number) => scaledFontPx(size, fontScale);
+  const paint = (canvasHeight: number) => {
+    const fs = (size: number) => size;
     const sectionSize = fs(11);
     const brandSize = fs(15);
     const titleSize = fs(46);
@@ -695,16 +791,27 @@ export function drawOrderDetailsCard(
     const totalValueFont = `400 ${totalSize}px ${displayFont}`;
     const wrap = (font: string, text: string, width = CONTENT_WIDTH) =>
       wrapCanvasText((value) => measure(font, value), text, width);
+    const wrapTracked = (
+      font: string,
+      text: string,
+      width: number,
+      tracking: number,
+    ) =>
+      wrapCanvasText(
+        (value) =>
+          measure(font, value) + Math.max(0, Array.from(value).length - 1) * tracking,
+        text,
+        width,
+      );
 
     const ops: DrawOp[] = [];
     let y = 88;
-    const block = (comfortable: number) => comfortable * gapScale;
-    const line = (comfortable: number) =>
-      Math.max(comfortable * 0.88, comfortable * gapScale);
+    const block = (comfortable: number) => comfortable;
+    const line = (comfortable: number) => comfortable;
 
     ops.push(() => {
       ctx.fillStyle = PAPER;
-      ctx.fillRect(0, 0, ORDER_DETAILS_PNG_WIDTH, ORDER_DETAILS_PNG_HEIGHT);
+      ctx.fillRect(0, 0, ORDER_DETAILS_PNG_WIDTH, canvasHeight);
     });
 
     const brandY = y;
@@ -761,10 +868,18 @@ export function drawOrderDetailsCard(
     const noticePadX = 28;
     const noticePadY = 30;
     const noticeInner = CONTENT_WIDTH - noticePadX * 2;
+    const noticeTitleTracking = emTracking(noticeTitleSize, 0.12);
+    const noticeTitleLines = wrapTracked(
+      noticeTitleFont,
+      model.noticeTitle,
+      noticeInner,
+      noticeTitleTracking,
+    );
     const noticeBodyLines = wrap(noticeBodyFont, model.noticeBody, noticeInner);
     const noticeBoxH =
       noticePadY +
-      line(28) +
+      Math.max(noticeTitleLines.length, 1) * line(28) +
+      line(4) +
       Math.max(noticeBodyLines.length, 1) * line(32) +
       noticePadY;
     const noticeTop = y;
@@ -776,19 +891,25 @@ export function drawOrderDetailsCard(
       ctx.fill();
       ctx.stroke();
     });
-    const noticeTitleY = noticeTop + noticePadY + noticeTitleSize;
-    ops.push(() => {
-      ctx.fillStyle = SIGNAL;
-      ctx.font = noticeTitleFont;
-      fillSpacedText(
-        ctx,
-        model.noticeTitle,
-        PAD_X + noticePadX,
-        noticeTitleY,
-        emTracking(noticeTitleSize, 0.12),
-      );
-    });
-    let noticeBodyY = noticeTitleY + line(32);
+    let noticeTitleY = noticeTop + noticePadY + noticeTitleSize;
+    for (const titleLine of noticeTitleLines.length
+      ? noticeTitleLines
+      : [""]) {
+      const lineY = noticeTitleY;
+      ops.push(() => {
+        ctx.fillStyle = SIGNAL;
+        ctx.font = noticeTitleFont;
+        fillSpacedText(
+          ctx,
+          titleLine,
+          PAD_X + noticePadX,
+          lineY,
+          noticeTitleTracking,
+        );
+      });
+      noticeTitleY += line(28);
+    }
+    let noticeBodyY = noticeTitleY + line(4);
     for (const bodyLine of noticeBodyLines) {
       const lineY = noticeBodyY;
       ops.push(() => {
@@ -865,12 +986,7 @@ export function drawOrderDetailsCard(
           ? images.get(entry.line.imageUrl)
           : undefined;
       const hasPhoto = Boolean(photo);
-      const photoSize = Math.round(
-        Math.min(
-          140,
-          Math.max(96, ORDER_DETAILS_CAKE_PHOTO_SIZE * fontScale),
-        ),
-      );
+      const photoSize = ORDER_DETAILS_CAKE_PHOTO_SIZE;
       const photoGap = 20;
       const textX = hasPhoto ? PAD_X + photoSize + photoGap : PAD_X;
       const textWidth = hasPhoto
@@ -963,18 +1079,28 @@ export function drawOrderDetailsCard(
       });
       y += line(28);
       for (const adjustment of model.adjustments) {
-        const adjY = y;
         const adjLabel = adjustment.label;
         const adjAmount = adjustment.amount;
-        ops.push(() => {
-          ctx.fillStyle = INK;
-          ctx.font = summaryFont;
-          ctx.fillText(adjLabel, PAD_X, adjY);
-          ctx.textAlign = "right";
-          ctx.fillText(adjAmount, PAD_X + CONTENT_WIDTH, adjY);
-          ctx.textAlign = "left";
+        const amountWidth = measure(summaryFont, adjAmount);
+        const labelLines = wrap(
+          summaryFont,
+          adjLabel,
+          Math.max(1, CONTENT_WIDTH - amountWidth - 20),
+        );
+        (labelLines.length ? labelLines : [""]).forEach((labelLine, index) => {
+          const adjY = y + index * line(28);
+          ops.push(() => {
+            ctx.fillStyle = INK;
+            ctx.font = summaryFont;
+            ctx.fillText(labelLine, PAD_X, adjY);
+            if (index === 0) {
+              ctx.textAlign = "right";
+              ctx.fillText(adjAmount, PAD_X + CONTENT_WIDTH, adjY);
+              ctx.textAlign = "left";
+            }
+          });
         });
-        y += line(28);
+        y += Math.max(labelLines.length, 1) * line(28);
       }
       y += block(10);
     }
@@ -1071,19 +1197,17 @@ export function drawOrderDetailsCard(
     return { ops, y, titleY };
   };
 
-  const footerY = ORDER_DETAILS_PNG_HEIGHT - 52;
-  const available = footerY - 36;
-  const natural = paint(1, 1);
-  let fitted = natural;
-  if (natural.y > available) {
-    fitted = paint(gapScaleForContent(natural.y, available), 1);
+  const natural = paint(ORDER_DETAILS_PNG_HEIGHT);
+  const footerY = Math.max(ORDER_DETAILS_PNG_HEIGHT - 52, natural.y + 52);
+  const canvasHeight = Math.max(
+    ORDER_DETAILS_PNG_HEIGHT,
+    Math.ceil(footerY + 52),
+  );
+  if (canvasHeight > 32_767) {
+    throw new Error("The order details image is too tall to export safely.");
   }
-  if (fitted.y > available) {
-    fitted = paint(
-      gapScaleForContent(natural.y, available),
-      Math.max(0.88, available / fitted.y),
-    );
-  }
+  const fitted = paint(canvasHeight);
+  if (ctx.canvas.height !== canvasHeight) ctx.canvas.height = canvasHeight;
 
   const footerFont = `400 13px ${sansFont}`;
 
@@ -1096,12 +1220,18 @@ export function drawOrderDetailsCard(
   ctx.save();
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  for (const op of fitted.ops) op();
+  for (const op of fitted.ops) {
+    // Keep tracking local to the explicitly spaced headings. Some canvas
+    // implementations retain letterSpacing across draw operations, which can
+    // invalidate the measured wrapping of customer-provided text.
+    if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
+    op();
+  }
   ctx.restore();
 
   return {
     width: ORDER_DETAILS_PNG_WIDTH,
-    height: ORDER_DETAILS_PNG_HEIGHT,
+    height: canvasHeight,
   };
 }
 
