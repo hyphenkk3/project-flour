@@ -15,6 +15,10 @@ import {
 } from "@/engines/orders/payment-message";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type { GuestPreorderReceipt } from "@/workspaces/storefront/checkout/receipt";
+import {
+  DELIVERY_FEE_PENDING_RECEIPT_EXPLANATION,
+  receiptAmountPresentation,
+} from "@/engines/orders/receipt-amount-presentation";
 
 export const ORDER_DETAILS_CARD_FOOTER = "Please keep this for your reference.";
 export const ORDER_DETAILS_PNG_WIDTH = 1080;
@@ -122,6 +126,9 @@ export type OrderDetailsCardModel = {
   complimentary: OrderDetailsCardLine[];
   subtotal: string | null;
   adjustments: Array<{ label: string; amount: string }>;
+  amountLabel: "Order amount" | "Total";
+  deliveryFeePending: boolean;
+  deliveryFeeExplanation: string | null;
   total: string;
   notes: string | null;
   footer: string;
@@ -130,6 +137,7 @@ export type OrderDetailsCardModel = {
 export function buildOrderDetailsCardModel(
   receipt: GuestPreorderReceipt,
 ): OrderDetailsCardModel {
+  const amountPresentation = receiptAmountPresentation(receipt);
   const collectionTime =
     receipt.fulfilmentMethod === "dine_in" && receipt.reservationTime
       ? formatPickupTime(receipt.reservationTime)
@@ -195,6 +203,11 @@ export function buildOrderDetailsCardModel(
       label: customerFacingAdjustmentLabel(adjustment),
       amount: formatSignedRm(adjustment.amount),
     })),
+    amountLabel: amountPresentation.amountLabel,
+    deliveryFeePending: amountPresentation.deliveryFeePending,
+    deliveryFeeExplanation: amountPresentation.deliveryFeePending
+      ? DELIVERY_FEE_PENDING_RECEIPT_EXPLANATION
+      : null,
     total: formatRm(receipt.total),
     notes: receipt.notes,
     footer: ORDER_DETAILS_CARD_FOOTER,
@@ -972,7 +985,7 @@ export function drawOrderDetailsCard(
       ctx.font = totalLabelFont;
       fillSpacedText(
         ctx,
-        "TOTAL",
+        model.amountLabel.toUpperCase(),
         PAD_X,
         totalLabelY,
         emTracking(sectionSize, 0.18),
@@ -999,6 +1012,32 @@ export function drawOrderDetailsCard(
       );
     });
     y += line(36);
+
+    if (model.deliveryFeePending) {
+      const feeY = y;
+      ops.push(() => {
+        ctx.fillStyle = SKYLINE;
+        ctx.font = `400 ${fs(17)}px ${sansFont}`;
+        ctx.fillText("Delivery fee", PAD_X, feeY);
+        ctx.textAlign = "right";
+        ctx.fillText("To be confirmed", PAD_X + CONTENT_WIDTH, feeY);
+        ctx.textAlign = "left";
+      });
+      y += line(26);
+      const explanationLines = wrap(
+        noteFont,
+        model.deliveryFeeExplanation ?? "",
+      );
+      for (const explanationLine of explanationLines) {
+        const explanationY = y;
+        ops.push(() => {
+          ctx.fillStyle = SKYLINE;
+          ctx.font = noteFont;
+          ctx.fillText(explanationLine, PAD_X, explanationY);
+        });
+        y += line(22);
+      }
+    }
 
     const noteLines = model.notes ? wrap(noteFont, model.notes) : [];
     if (noteLines.length > 0) {

@@ -13,6 +13,10 @@ import {
 } from "@/workspaces/storefront/checkout/SuccessReceiptPhotos";
 import { SuccessRecapPerfProbe } from "@/workspaces/storefront/checkout/SuccessRecapPerfProbe";
 import type { GuestPreorderReceipt } from "@/workspaces/storefront/checkout/receipt";
+import {
+  DELIVERY_FEE_PENDING_RECEIPT_EXPLANATION,
+  receiptAmountPresentation,
+} from "@/engines/orders/receipt-amount-presentation";
 
 export function SuccessReceiptRecap({
   orderId,
@@ -21,6 +25,8 @@ export function SuccessReceiptRecap({
   orderId?: string;
   receipt: GuestPreorderReceipt;
 }) {
+  const amountPresentation = receiptAmountPresentation(receipt);
+
   return (
     <SuccessReceiptPhotoController orderId={orderId} receipt={receipt}>
       <SuccessRecapPerfProbe
@@ -110,11 +116,34 @@ export function SuccessReceiptRecap({
             </div>
           ) : null}
           <div className="flex justify-between gap-4">
-            <dt className="text-skyline">Total</dt>
+            <dt className="text-skyline">{amountPresentation.amountLabel}</dt>
             <dd className="font-display text-ink text-right text-xl tracking-tight tabular-nums">
               {formatRm(receipt.total)}
             </dd>
           </div>
+          {amountPresentation.processingFeeAmount != null ? (
+            <div className="flex justify-end">
+              <dt className="sr-only">Processing fee included</dt>
+              <dd className="text-skyline text-right text-xs">
+                Includes {formatRm(amountPresentation.processingFeeAmount)}{" "}
+                processing fee
+              </dd>
+            </div>
+          ) : null}
+          {amountPresentation.deliveryFeePending ? (
+            <>
+              <div className="flex justify-between gap-4">
+                <dt className="text-skyline">Delivery fee</dt>
+                <dd className="text-skyline text-right">To be confirmed</dd>
+              </div>
+              <div>
+                <dt className="sr-only">Delivery amount clarification</dt>
+                <dd className="text-skyline text-right text-xs">
+                  {DELIVERY_FEE_PENDING_RECEIPT_EXPLANATION}
+                </dd>
+              </div>
+            </>
+          ) : null}
           {receipt.notes ? (
             <div className="flex justify-between gap-4">
               <dt className="text-skyline">Notes</dt>
