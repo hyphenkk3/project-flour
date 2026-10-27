@@ -254,11 +254,10 @@ assert.equal(
 assert.match(boardSrc, /\.on\(\s*"postgres_changes"[\s\S]*?event: "INSERT"[\s\S]*?table: "orders"/);
 assert.match(boardSrc, /\.on\(\s*"postgres_changes"[\s\S]*?event: "UPDATE"[\s\S]*?table: "orders"/);
 assert.match(boardSrc, /status === "SUBSCRIBED"/);
-assert.match(boardSrc, /visibilitychange/);
+assert.match(boardSrc, /startVisibilityAwarePolling/);
 assert.match(boardSrc, /window\.addEventListener\("focus", refreshSoon\)/);
 assert.match(boardSrc, /window\.addEventListener\("online", refreshSoon\)/);
-assert.match(boardSrc, /clearInterval\(pollId\)/);
-assert.match(boardSrc, /removeEventListener\("visibilitychange"/);
+assert.match(boardSrc, /polling\.dispose\(\)/);
 assert.match(boardSrc, /removeChannel\(channel\)/);
 assert.match(
   boardSrc,

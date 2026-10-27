@@ -344,6 +344,6 @@ assert.match(
 
 const liveSrc = readSrc("src/workspaces/home/HomeLiveRefresh.tsx");
 assert.match(liveSrc, /table: "extra_stock"/);
-assert.match(liveSrc, /visibilitychange/);
+assert.match(liveSrc, /startVisibilityAwarePolling/);
 
 console.log("Home Fresh Picks operational quick actions: PASS");

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { createClient } from "@/lib/supabase/client";
 import { formatLongBusinessDate } from "@/lib/dates";
+import { startVisibilityAwarePolling } from "@/lib/visibility-aware-polling";
 import {
   getBakeryBoardOrderAction,
   listBakeryBoardOrdersAction,
@@ -68,6 +69,7 @@ export function BakeryLiveBoard({
 
   useEffect(() => {
     const supabase = createClient();
+    let noteRealtimeEvent = () => {};
     const channel = supabase
       .channel(`bakery-board-${boardDate}`)
       .on(
@@ -77,6 +79,7 @@ export function BakeryLiveBoard({
           const row = (payload.new ?? payload.old) as OrderRowPayload | null;
           if (!row?.id) return;
           if (row.customer_id != null) return;
+          noteRealtimeEvent();
           if (row.pickup_date && row.pickup_date !== boardDate) {
             setOrders((current) =>
               current.filter((order) => order.id !== row.id),
@@ -88,12 +91,15 @@ export function BakeryLiveBoard({
       )
       .subscribe();
 
-    const pollId = window.setInterval(() => {
-      void reconcileList();
-    }, POLL_INTERVAL_MS);
+    const polling = startVisibilityAwarePolling({
+      intervalMs: POLL_INTERVAL_MS,
+      poll: () => void reconcileList(),
+      onVisible: () => void reconcileList(),
+    });
+    noteRealtimeEvent = polling.noteRealtimeEvent;
 
     return () => {
-      window.clearInterval(pollId);
+      polling.dispose();
       void supabase.removeChannel(channel);
     };
   }, [boardDate, handleIncoming, reconcileList]);

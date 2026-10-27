@@ -20,6 +20,7 @@ import {
   partitionOwnerOperationsTodayOrders,
 } from "@/engines/operations/owner-attention";
 import { createClient } from "@/lib/supabase/client";
+import { startVisibilityAwarePolling } from "@/lib/visibility-aware-polling";
 import type { StorefrontOrderListItem } from "@/types/storefront";
 import {
   getGuestOrderListItemAction,
@@ -179,6 +180,7 @@ export function OperationsLiveBoard({
 
   useEffect(() => {
     const supabase = createClient();
+    let noteRealtimeEvent = () => {};
     const channel = supabase
       .channel("operations-guest-orders")
       .on(
@@ -187,6 +189,7 @@ export function OperationsLiveBoard({
         (payload) => {
           const row = payload.new as OrderRowPayload;
           if (!isGuestOrderLiveEvent(row)) return;
+          noteRealtimeEvent();
           void handleIncomingInsert(row.id);
         },
       )
@@ -196,17 +199,21 @@ export function OperationsLiveBoard({
         (payload) => {
           const row = payload.new as OrderRowPayload;
           if (!isGuestOrderLiveEvent(row)) return;
+          noteRealtimeEvent();
           void handleIncomingUpdate(row.id);
         },
       )
       .subscribe();
 
-    const pollId = window.setInterval(() => {
-      void reconcileFromServer();
-    }, POLL_INTERVAL_MS);
+    const polling = startVisibilityAwarePolling({
+      intervalMs: POLL_INTERVAL_MS,
+      poll: () => void reconcileFromServer(),
+      onVisible: () => void reconcileFromServer(),
+    });
+    noteRealtimeEvent = polling.noteRealtimeEvent;
 
     return () => {
-      window.clearInterval(pollId);
+      polling.dispose();
       void supabase.removeChannel(channel);
     };
   }, [handleIncomingInsert, handleIncomingUpdate, reconcileFromServer]);
