@@ -153,7 +153,7 @@ vm.runInNewContext(compiled, {
     if (name.includes("cake-size-availability")) return availability;
     if (name.includes("catalog/queries"))
       return {
-        listStorefrontCakesByIds: async () => {
+        listStorefrontCakeSizesForValidation: async () => {
           loads++;
           return liveCakes;
         },
@@ -212,6 +212,31 @@ assert.equal(cleared[0].availableFrom, null);
 assert.equal(cleared[0].availableUntil, null);
 async function main() {
   const validate = exports.validateCartSizeAvailability;
+  assert.equal(
+    (await validate([{ cakeId, sizeId: fourId }], "2026-11-01")).error,
+    null,
+  );
+  assert.equal(
+    (
+      await validate(
+        [
+          { cakeId, sizeId: fourId },
+          { cakeId, sizeId: sixId },
+        ],
+        "2026-11-01",
+      )
+    ).error,
+    null,
+  );
+  assert.match(
+    (
+      await validate(
+        [{ cakeId, sizeId: "20000000-0000-0000-0000-000000000099" }],
+        "2026-11-01",
+      )
+    ).error,
+    /A cake size is no longer available/,
+  );
   assert.match(
     (await validate([item], "2026-10-31")).error,
     /Available from 1 Nov 2026/,
@@ -234,6 +259,11 @@ async function main() {
         "2026-11-01",
       )
     ).error,
+    /no longer available/,
+  );
+  liveCakes = []; // As with the original reader, an RLS-hidden row is unavailable.
+  assert.match(
+    (await validate([item], "2026-11-01")).error,
     /no longer available/,
   );
   liveCakes = [

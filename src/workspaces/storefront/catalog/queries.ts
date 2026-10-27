@@ -1096,6 +1096,41 @@ export async function listStorefrontCakesByIds(
   return selectStorefrontCakesByRequestedIds(ids, loaded);
 }
 
+/** Live, RLS-scoped fields needed by cart-size validation only. */
+export async function listStorefrontCakeSizesForValidation(
+  cakeIds: readonly string[],
+): Promise<Array<{
+  id: string;
+  name: string;
+  sizes: Array<{
+    id: string;
+    size: string;
+    availableFrom: string | null;
+    availableUntil: string | null;
+  }>;
+}>> {
+  const ids = requestedStorefrontCakeIds(cakeIds);
+  if (ids.length === 0) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("library_cakes")
+    .select("id,name,library_cake_sizes(id,label,available_from,available_until)")
+    .in("id", ids);
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((cake) => ({
+    id: cake.id,
+    name: cake.name,
+    sizes: (cake.library_cake_sizes ?? []).map((size) => ({
+      id: size.id,
+      size: size.label,
+      availableFrom: size.available_from,
+      availableUntil: size.available_until,
+    })),
+  }));
+}
+
 /** Library cake by id when offerable (staff workspace). Not collection-gated. */
 export async function getAvailableCakeById(
   id: string,
