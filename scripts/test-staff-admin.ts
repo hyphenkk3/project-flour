@@ -188,10 +188,7 @@ assert.match(adminActions, /validateStaffUsername/);
 assert.match(adminActions, /findStaffByUsername/);
 assert.match(adminActions, /countActiveOwners/);
 assert.match(adminActions, /actorRole:\s*actor\.role\.code/);
-assert.equal(
-  adminActions.match(/actorRole:\s*actor\.role\.code/g)?.length,
-  6,
-);
+assert.equal(adminActions.match(/actorRole:\s*actor\.role\.code/g)?.length, 6);
 assert.match(adminActions, /staffAdminActivateError/);
 assert.match(adminActions, /auth\.admin\.createUser/);
 assert.match(adminActions, /email_confirm:\s*true/);
@@ -228,14 +225,14 @@ assert.doesNotMatch(adminActions, /updateUserById/);
 assert.doesNotMatch(adminActions, /updateUser\(\{\s*password/);
 assert.doesNotMatch(adminActions, /current_password/);
 assert.doesNotMatch(adminActions, /ban/);
-assert.doesNotMatch(adminActions, /registerPasskey|signInWithPasskey|passkey\./);
+assert.doesNotMatch(
+  adminActions,
+  /registerPasskey|signInWithPasskey|passkey\./,
+);
 assert.doesNotMatch(adminActions, /console\.(log|info|debug|warn|error)/);
 assert.doesNotMatch(adminActions, /from "next\/navigation"/);
 assert.doesNotMatch(adminActions, /\.update\(\{[^}]*email/);
-assert.match(
-  adminActions,
-  /createUser[\s\S]*staff_profiles[\s\S]*deleteUser/,
-);
+assert.match(adminActions, /createUser[\s\S]*staff_profiles[\s\S]*deleteUser/);
 assert.match(
   adminActions,
   /export async function createStaffAccountAction[\s\S]*requireStaffAdmin\(\)/,
@@ -278,18 +275,27 @@ assert.match(
   /export async function transferMasterOwnerAction[\s\S]*p_actor_staff_id:\s*actor\.id/,
 );
 
-const queries = readFileSync(resolve("src/foundation/staff/queries.ts"), "utf8");
+const queries = readFileSync(
+  resolve("src/foundation/staff/queries.ts"),
+  "utf8",
+);
 assert.match(queries, /export async function listStaffProfilesForAdmin/);
 assert.match(queries, /export async function listStaffRoles/);
 assert.match(queries, /export async function countActiveOwners/);
 assert.match(queries, /createServiceClient/);
 assert.match(queries, /isMasterOwner: Boolean\(row\.is_master_owner\)/);
-assert.match(queries, /mustChangePassword: Boolean\(row\.must_change_password\)/);
+assert.match(
+  queries,
+  /mustChangePassword: Boolean\(row\.must_change_password\)/,
+);
 assert.match(queries, /is_master_owner,/);
 assert.match(queries, /must_change_password,/);
 assert.match(queries, /archived_at,/);
 assert.match(queries, /archivedAt: row\.archived_at \?\? null/);
-assert.match(queries, /export async function listArchivedStaffProfilesForAdmin/);
+assert.match(
+  queries,
+  /export async function listArchivedStaffProfilesForAdmin/,
+);
 assert.match(queries, /\.is\("archived_at", null\)/);
 assert.match(queries, /\.not\("archived_at", "is", null\)/);
 
@@ -318,7 +324,7 @@ assert.match(staffPage, /archivedStaff=\{archivedStaff\}/);
 assert.match(staffPage, /actorIsMasterOwner=\{actor\.isMasterOwner\}/);
 assert.match(staffPage, /actorRole=\{actor\.role\.code\}/);
 assert.match(staffPage, /StaffCredentialActivity/);
-assert.match(staffPage, /listStaffCredentialEventsForAdmin/);
+assert.match(staffPage, /listStaffCredentialEventsPageForAdmin/);
 assert.doesNotMatch(staffPage, /password reset|Passkey/);
 
 const createForm = readFileSync(
@@ -387,7 +393,10 @@ assert.match(passkeySettings, /passkey\.list/);
 assert.match(passkeySettings, /passkey\.delete/);
 assert.doesNotMatch(passkeySettings, /admin-actions/);
 
-const passkeys = readFileSync(resolve("src/foundation/auth/passkeys.ts"), "utf8");
+const passkeys = readFileSync(
+  resolve("src/foundation/auth/passkeys.ts"),
+  "utf8",
+);
 assert.doesNotMatch(passkeys, /admin-actions|listStaffProfilesForAdmin/);
 
 const loginForm = readFileSync(resolve("src/components/LoginForm.tsx"), "utf8");
@@ -395,10 +404,7 @@ assert.match(loginForm, /signInWithPasskey/);
 assert.match(loginForm, /loginAction/);
 assert.doesNotMatch(loginForm, /admin-actions/);
 
-const session = readFileSync(
-  resolve("src/foundation/auth/session.ts"),
-  "utf8",
-);
+const session = readFileSync(resolve("src/foundation/auth/session.ts"), "utf8");
 assert.match(session, /!staff \|\| !staff\.isActive/);
 assert.match(session, /signOut/);
 
@@ -1067,14 +1073,8 @@ assert.equal(
   }),
   STAFF_ADMIN_COPY.cannotResetArchivedPassword,
 );
-assert.equal(
-  staffAdminActorError("bakery"),
-  STAFF_ADMIN_COPY.unauthorized,
-);
-assert.equal(
-  staffAdminActorError("collection"),
-  STAFF_ADMIN_COPY.unauthorized,
-);
+assert.equal(staffAdminActorError("bakery"), STAFF_ADMIN_COPY.unauthorized);
+assert.equal(staffAdminActorError("collection"), STAFF_ADMIN_COPY.unauthorized);
 assert.equal(
   staffAdminActorError("customer_operations"),
   STAFF_ADMIN_COPY.unauthorized,
@@ -1095,13 +1095,19 @@ const migration = readFileSync(
 assert.match(migration, /is_master_owner boolean not null default false/);
 assert.match(migration, /staff_profiles_one_master_owner_idx/);
 assert.match(migration, /where is_master_owner = true/);
-assert.match(migration, /create or replace function public\.transfer_master_owner/);
+assert.match(
+  migration,
+  /create or replace function public\.transfer_master_owner/,
+);
 assert.match(migration, /security definer/);
 assert.match(migration, /set search_path = public/);
 assert.match(migration, /for update/);
 assert.match(migration, /revoke all on function public\.transfer_master_owner/);
 assert.match(migration, /from public, anon, authenticated/);
-assert.match(migration, /grant execute on function public\.transfer_master_owner/);
+assert.match(
+  migration,
+  /grant execute on function public\.transfer_master_owner/,
+);
 assert.match(migration, /to service_role/);
 assert.match(migration, /app\.allow_master_transfer/);
 assert.match(migration, /Master Owner must remain active/);

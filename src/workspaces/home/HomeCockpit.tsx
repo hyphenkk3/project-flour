@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { PageHeader } from "@/components/shell/PageHeader";
 import { formatLongBusinessDate } from "@/lib/dates";
 import { formatPickupTime } from "@/workspaces/owner/orders/labels";
 import { ownerOrderWorkspaceHref } from "@/workspaces/owner/navigation/return-to";
@@ -130,9 +129,7 @@ function dineInPreviewMeta(item: HomeDineInHandoffPreview): string {
   const parts: string[] = [];
   if (item.venue) parts.push(dineInVenueLabel(item.venue));
   if (item.guestCount != null && item.guestCount > 0) {
-    parts.push(
-      `${item.guestCount} guest${item.guestCount === 1 ? "" : "s"}`,
-    );
+    parts.push(`${item.guestCount} guest${item.guestCount === 1 ? "" : "s"}`);
   }
   const reservation = item.reservationTime
     ? formatPickupTime(item.reservationTime)
@@ -216,16 +213,18 @@ export function HomeCockpit({
     schedule.total > 0;
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-8 px-1 pb-10 sm:px-0">
+    <div className="mx-auto w-full max-w-4xl space-y-5 px-1 pb-10 sm:px-0 md:space-y-8">
       <HomeLiveRefresh />
-      <div>
+      <div className="md:mb-8">
         <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
           Home
         </p>
-        <PageHeader
-          description={`${roleName} · ${dateLabel}`}
-          title={homeGreetingTitle(staffDisplayName)}
-        />
+        <h2 className="font-display text-ink text-3xl tracking-tight md:text-4xl">
+          {homeGreetingTitle(staffDisplayName)}
+        </h2>
+        <p className="text-skyline mt-1 max-w-2xl text-base md:mt-2">
+          {roleName} · {dateLabel}
+        </p>
       </div>
 
       <section aria-labelledby="home-today">
@@ -279,11 +278,7 @@ export function HomeCockpit({
               className="grid grid-cols-2 gap-2"
               role="group"
             >
-              <SummaryChip
-                label="Ready"
-                showZero
-                value={summary.ready}
-              />
+              <SummaryChip label="Ready" showZero value={summary.ready} />
               <SummaryChip
                 label="Completed"
                 showZero
@@ -324,7 +319,11 @@ export function HomeCockpit({
         />
         {attentionGroups.length === 0 &&
         summary.pendingApprovals === 0 &&
-        !(canViewWaitingList && waitingListAttention && waitingListAttention.count > 0) ? (
+        !(
+          canViewWaitingList &&
+          waitingListAttention &&
+          waitingListAttention.count > 0
+        ) ? (
           <p className="text-skyline text-sm">Nothing needs your attention.</p>
         ) : (
           <div className="space-y-2">
@@ -336,7 +335,9 @@ export function HomeCockpit({
                 href={waitingListAttention.href}
               >
                 <span className="flex items-center justify-between gap-3">
-                  <span className="text-ink text-sm font-medium">Waiting List</span>
+                  <span className="text-ink text-sm font-medium">
+                    Waiting List
+                  </span>
                   <span className="text-signal text-sm font-semibold">
                     {waitingListAttention.count === 1
                       ? "1 new customer request"

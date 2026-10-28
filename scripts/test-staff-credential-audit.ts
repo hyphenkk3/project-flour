@@ -14,6 +14,7 @@ import {
   STAFF_CREDENTIAL_EVENT_TYPES,
   buildStaffCredentialEventRow,
   formatStaffCredentialActivityDetail,
+  isValidStaffCredentialActivityCursor,
   sanitizeStaffCredentialMetadata,
   staffCredentialAuditWarning,
 } from "@/foundation/staff/credential-audit";
@@ -29,7 +30,9 @@ function extractFunction(source: string, name: string): string {
   assert.ok(start >= 0, `missing function ${name}`);
   const rest = source.slice(start + 1);
   const next = rest.search(/\n(?:export )?async function |\nexport function /);
-  return next === -1 ? source.slice(start) : source.slice(start, start + 1 + next);
+  return next === -1
+    ? source.slice(start)
+    : source.slice(start, start + 1 + next);
 }
 
 function assertRecordedOnceAfterFailures(
@@ -44,7 +47,10 @@ function assertRecordedOnceAfterFailures(
     1,
     `expected exactly one audit write for ${eventType}`,
   );
-  assert.match(fn.slice(recordIndex), new RegExp(`eventType:\\s*"${eventType}"`));
+  assert.match(
+    fn.slice(recordIndex),
+    new RegExp(`eventType:\\s*"${eventType}"`),
+  );
   for (const marker of failureMarkers) {
     const failureIndex = fn.search(marker);
     assert.ok(failureIndex >= 0, `missing failure path ${marker}`);
@@ -66,6 +72,18 @@ assert.deepEqual(STAFF_CREDENTIAL_EVENT_TYPES, [
   "passkey_added",
   "passkey_removed",
 ]);
+assert.equal(isValidStaffCredentialActivityCursor(null), false);
+assert.equal(
+  isValidStaffCredentialActivityCursor({ createdAt: "bad", id: "bad" }),
+  false,
+);
+assert.equal(
+  isValidStaffCredentialActivityCursor({
+    createdAt: "2026-10-28T10:25:00.000Z",
+    id: "11111111-1111-4111-8111-111111111111",
+  }),
+  true,
+);
 
 const sanitized = sanitizeStaffCredentialMetadata({
   old_username: `  ${SAFE_TEST_USERNAME}  `,
@@ -90,10 +108,7 @@ assert.deepEqual(sanitized, {
   new_username: "audit.staff.two",
   label: "Lily laptop",
 });
-assert.equal(
-  JSON.stringify(sanitized).includes("should-not-store"),
-  false,
-);
+assert.equal(JSON.stringify(sanitized).includes("should-not-store"), false);
 assert.doesNotMatch(JSON.stringify(sanitized), /password|hash|token|secret/i);
 
 const leaked = buildStaffCredentialEventRow({
@@ -110,7 +125,10 @@ const leaked = buildStaffCredentialEventRow({
 });
 assert.deepEqual(leaked.metadata, { source: "self_service" });
 assert.doesNotMatch(JSON.stringify(leaked), /should-not-store/);
-assert.doesNotMatch(JSON.stringify(leaked), /password_hash|current_password|new_password/);
+assert.doesNotMatch(
+  JSON.stringify(leaked),
+  /password_hash|current_password|new_password/,
+);
 
 const passkeyRow = buildStaffCredentialEventRow({
   eventType: "passkey_added",
@@ -125,7 +143,10 @@ const passkeyRow = buildStaffCredentialEventRow({
   },
 });
 assert.deepEqual(passkeyRow.metadata, { label: "Passkey" });
-assert.doesNotMatch(JSON.stringify(passkeyRow), /should-not-store|private_key|credential_id/);
+assert.doesNotMatch(
+  JSON.stringify(passkeyRow),
+  /should-not-store|private_key|credential_id/,
+);
 
 assert.equal(
   formatStaffCredentialActivityDetail("username_changed", {
@@ -150,7 +171,10 @@ assert.equal(
   }),
   "Lily laptop",
 );
-assert.equal(STAFF_CREDENTIAL_EVENT_LABELS.admin_password_reset, "Password reset");
+assert.equal(
+  STAFF_CREDENTIAL_EVENT_LABELS.admin_password_reset,
+  "Password reset",
+);
 assert.equal(
   staffCredentialAuditWarning({ ok: false, error: "insert failed" }),
   STAFF_CREDENTIAL_AUDIT_COPY.recordFailedAfterChange,
@@ -161,7 +185,10 @@ const profileActions = readSource("src/foundation/staff/profile-actions.ts");
 const usernameFn = extractFunction(profileActions, "updateStaffUsernameAction");
 const emailFn = extractFunction(profileActions, "updateStaffEmailAction");
 const passwordFn = extractFunction(profileActions, "updateStaffPasswordAction");
-const displayNameFn = extractFunction(profileActions, "updateStaffDisplayNameAction");
+const displayNameFn = extractFunction(
+  profileActions,
+  "updateStaffDisplayNameAction",
+);
 
 assertRecordedOnceAfterFailures(usernameFn, "username_changed", [
   /validateStaffUsername/,
@@ -192,8 +219,14 @@ assertRecordedOnceAfterFailures(passwordFn, "password_changed", [
   /if \(error\) \{/,
 ]);
 assert.match(passwordFn, /source:\s*"self_service"/);
-assert.doesNotMatch(passwordFn, /recordStaffCredentialEvent\([\s\S]*currentPassword/);
-assert.doesNotMatch(passwordFn, /recordStaffCredentialEvent\([\s\S]*newPassword/);
+assert.doesNotMatch(
+  passwordFn,
+  /recordStaffCredentialEvent\([\s\S]*currentPassword/,
+);
+assert.doesNotMatch(
+  passwordFn,
+  /recordStaffCredentialEvent\([\s\S]*newPassword/,
+);
 assert.doesNotMatch(
   passwordFn,
   /updateStaffPasswordAction[\s\S]*createServiceClient/,
@@ -210,8 +243,13 @@ assertRecordedOnceAfterFailures(managedUsernameFn, "username_changed", [
   /STAFF_USERNAME_COPY\.taken/,
 ]);
 
-const resetActions = readSource("src/foundation/staff/admin-password-actions.ts");
-const resetFn = extractFunction(resetActions, "resetManagedStaffPasswordAction");
+const resetActions = readSource(
+  "src/foundation/staff/admin-password-actions.ts",
+);
+const resetFn = extractFunction(
+  resetActions,
+  "resetManagedStaffPasswordAction",
+);
 const requireAdminFn = extractFunction(resetActions, "requireStaffAdmin");
 assertRecordedOnceAfterFailures(resetFn, "admin_password_reset", [
   /if \(!outcome\.success\)/,
@@ -242,22 +280,34 @@ assertRecordedOnceAfterFailures(completeFn, "password_changed", [
 ]);
 assert.match(completeFn, /source:\s*"forced_reset_completion"/);
 assert.match(completeFn, /recordStaffCredentialEvent\([\s\S]*redirect\(/);
-assert.doesNotMatch(completeFn, /recordStaffCredentialEvent\([\s\S]*newPassword/);
+assert.doesNotMatch(
+  completeFn,
+  /recordStaffCredentialEvent\([\s\S]*newPassword/,
+);
 
 const passkeyAction = readSource(
   "src/foundation/staff/credential-audit-actions.ts",
 );
 assert.match(passkeyAction, /"use server"/);
-assert.match(passkeyAction, /export async function recordOwnPasskeyCredentialEventAction/);
+assert.match(
+  passkeyAction,
+  /export async function recordOwnPasskeyCredentialEventAction/,
+);
 assert.match(passkeyAction, /requireStaff\(\)/);
 assert.match(passkeyAction, /kind: "added" \| "removed"/);
 assert.match(passkeyAction, /passkey_added/);
 assert.match(passkeyAction, /passkey_removed/);
 assert.match(passkeyAction, /subjectStaffId:\s*staff\.id/);
 assert.match(passkeyAction, /actorStaffId:\s*staff\.id/);
-assert.doesNotMatch(passkeyAction, /password_changed|username_changed|email_changed|admin_password_reset/);
+assert.doesNotMatch(
+  passkeyAction,
+  /password_changed|username_changed|email_changed|admin_password_reset/,
+);
 assert.doesNotMatch(passkeyAction, /formData\.get\("staffId"\)/);
-assert.doesNotMatch(passkeyAction, /credential_id|raw_id|private_key|passkey_id/);
+assert.doesNotMatch(
+  passkeyAction,
+  /credential_id|raw_id|private_key|passkey_id/,
+);
 
 const passkeySettings = readSource(
   "src/components/settings/StaffPasskeySettings.tsx",
@@ -279,13 +329,24 @@ assert.match(auditHelper, /from\("staff_credential_events"\)\.insert\(row\)/);
 assert.match(auditHelper, /credential mutation is committed first/);
 assert.match(auditHelper, /retries once/);
 assert.match(auditHelper, /FORBIDDEN_METADATA_KEY/);
-assert.match(auditHelper, /listStaffCredentialEventsForAdmin/);
+assert.match(auditHelper, /listStaffCredentialEventsPageForAdmin/);
+assert.match(auditHelper, /CREDENTIAL_ACTIVITY_PAGE_SIZE = 5/);
+assert.match(auditHelper, /\.order\("created_at", \{ ascending: false \}\)/);
+assert.match(auditHelper, /\.order\("id", \{ ascending: false \}\)/);
+assert.match(auditHelper, /isValidStaffCredentialActivityCursor/);
+assert.match(
+  auditHelper,
+  /hasMore: rows\.length > CREDENTIAL_ACTIVITY_PAGE_SIZE/,
+);
 assert.doesNotMatch(auditHelper, /password_hash|current_password|new_password/);
 
 const migration = readSource(
   "supabase/migrations/20260923180000_staff_credential_events.sql",
 );
-assert.match(migration, /create table if not exists public\.staff_credential_events/);
+assert.match(
+  migration,
+  /create table if not exists public\.staff_credential_events/,
+);
 assert.match(migration, /username_changed/);
 assert.match(migration, /email_changed/);
 assert.match(migration, /password_changed/);
@@ -293,10 +354,22 @@ assert.match(migration, /admin_password_reset/);
 assert.match(migration, /passkey_added/);
 assert.match(migration, /passkey_removed/);
 assert.match(migration, /enable row level security/);
-assert.match(migration, /revoke all on table public\.staff_credential_events from public, anon, authenticated/);
-assert.match(migration, /grant select on table public\.staff_credential_events to authenticated/);
-assert.match(migration, /grant all on table public\.staff_credential_events to service_role/);
-assert.match(migration, /_current_staff_role_code\(\) in \('owner', 'manager'\)/);
+assert.match(
+  migration,
+  /revoke all on table public\.staff_credential_events from public, anon, authenticated/,
+);
+assert.match(
+  migration,
+  /grant select on table public\.staff_credential_events to authenticated/,
+);
+assert.match(
+  migration,
+  /grant all on table public\.staff_credential_events to service_role/,
+);
+assert.match(
+  migration,
+  /_current_staff_role_code\(\) in \('owner', 'manager'\)/,
+);
 assert.doesNotMatch(migration, /for insert|for update|for delete|for all/);
 assert.doesNotMatch(migration, /password_hash|current_password|new_password/);
 assert.doesNotMatch(migration, /grant .* to anon/);
@@ -304,16 +377,38 @@ assert.doesNotMatch(migration, /grant .* to anon/);
 const staffPage = readSource("src/app/(app)/settings/staff/page.tsx");
 assert.match(staffPage, /canManageStaff/);
 assert.match(staffPage, /StaffCredentialActivity/);
-assert.match(staffPage, /listStaffCredentialEventsForAdmin/);
+assert.match(staffPage, /listStaffCredentialEventsPageForAdmin/);
+const staffActivityAction = readSource(
+  "src/app/(app)/settings/staff/actions.ts",
+);
+assert.match(staffActivityAction, /"use server"/);
+assert.match(staffActivityAction, /requireStaff\(\)/);
+assert.match(staffActivityAction, /canManageStaff/);
+assert.match(staffActivityAction, /isValidStaffCredentialActivityCursor/);
+assert.match(
+  staffActivityAction,
+  /listStaffCredentialEventsPageForAdmin\(cursor\)/,
+);
 assert.doesNotMatch(staffPage, /password reset|Passkey/);
 
 const activityUi = readSource(
   "src/components/settings/StaffCredentialActivity.tsx",
 );
+assert.match(activityUi, /<details className="group">/);
+assert.match(activityUi, /<summary/);
+assert.match(activityUi, /Load 5 older events/);
+assert.match(activityUi, /loadOlderStaffCredentialActivityAction/);
+assert.match(
+  activityUi,
+  /events\.filter\(\(event\) => !seen\.has\(event\.id\)\)/,
+);
 assert.match(activityUi, /Credential activity/);
 assert.match(activityUi, /Performed by/);
 assert.match(activityUi, /canManageStaff|Owner|Manager|actorName/);
-assert.doesNotMatch(activityUi, /createClient\(|from\("staff_credential_events"\)/);
+assert.doesNotMatch(
+  activityUi,
+  /createClient\(|from\("staff_credential_events"\)/,
+);
 assert.doesNotMatch(activityUi, /password_hash|current_password|new_password/);
 
 function walkFiles(dir: string, files: string[] = []): string[] {
@@ -339,10 +434,16 @@ for (const file of walkFiles(resolve("src/workspaces/storefront"))) {
 const storefrontBrowse = readSource(
   "src/workspaces/storefront/catalog/BrowseCakeCatalogue.tsx",
 );
-assert.doesNotMatch(storefrontBrowse, /staff_credential_events|recordStaffCredentialEvent/);
+assert.doesNotMatch(
+  storefrontBrowse,
+  /staff_credential_events|recordStaffCredentialEvent/,
+);
 
 const loginForm = readSource("src/components/LoginForm.tsx");
-assert.doesNotMatch(loginForm, /recordStaffCredentialEvent|staff_credential_events/);
+assert.doesNotMatch(
+  loginForm,
+  /recordStaffCredentialEvent|staff_credential_events/,
+);
 assert.match(loginForm, /signInWithPasskey/);
 
 console.log("test-staff-credential-audit: PASS");

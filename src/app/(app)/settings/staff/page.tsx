@@ -5,7 +5,7 @@ import { StaffAdminDirectory } from "@/components/settings/StaffAdminDirectory";
 import { requireStaff } from "@/foundation/auth/session";
 import { canManageStaff } from "@/foundation/navigation/access";
 import { StaffCredentialActivity } from "@/components/settings/StaffCredentialActivity";
-import { listStaffCredentialEventsForAdmin } from "@/foundation/staff/credential-audit";
+import { listStaffCredentialEventsPageForAdmin } from "@/foundation/staff/credential-audit";
 import {
   listArchivedStaffProfilesForAdmin,
   listStaffProfilesForAdmin,
@@ -24,7 +24,7 @@ export default async function StaffAdminPage() {
     listStaffProfilesForAdmin(),
     listArchivedStaffProfilesForAdmin(),
     listStaffRoles(),
-    listStaffCredentialEventsForAdmin(),
+    listStaffCredentialEventsPageForAdmin(),
   ]);
 
   return (
@@ -39,13 +39,15 @@ export default async function StaffAdminPage() {
         <p className="text-signal mt-3 text-[11px] font-medium tracking-[0.18em] uppercase">
           Account
         </p>
-        <h2 className="text-ink mt-1 text-2xl font-semibold">Staff Management</h2>
+        <h2 className="text-ink mt-1 text-2xl font-semibold">
+          Staff Management
+        </h2>
         <p className="text-skyline mt-1 text-sm">
           Create and manage Whitebird staff accounts.
         </p>
       </div>
 
-      <StaffCredentialActivity events={credentialEvents} />
+      <StaffCredentialActivity page={credentialEvents} />
 
       <StaffAdminCreateForm
         actorIsMasterOwner={actor.isMasterOwner}
