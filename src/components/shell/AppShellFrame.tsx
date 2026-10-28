@@ -4,7 +4,10 @@ import { usePathname } from "next/navigation";
 
 import type { ReactNode } from "react";
 
-import type { WorkspaceNavItem } from "@/foundation/navigation/workspaces";
+import {
+  getWorkspaceTitleForPathname,
+  type WorkspaceNavItem,
+} from "@/foundation/navigation/workspaces";
 import type { StaffProfile } from "@/types/staff";
 
 import { AppShell } from "@/components/shell/AppShell";
@@ -20,25 +23,6 @@ type AppShellFrameProps = {
   title?: string;
   children: ReactNode;
 };
-
-function titleForPath(pathname: string): string {
-  if (pathname.startsWith("/owner/management")) {
-    return "Management";
-  }
-  if (pathname.startsWith("/owner")) {
-    return "Operations";
-  }
-
-  if (pathname.startsWith("/customer-operations")) {
-    return "Customer Operations";
-  }
-
-  if (pathname.startsWith("/library")) {
-    return "Library";
-  }
-
-  return "Home";
-}
 
 export function AppShellFrame({
   staff,
@@ -59,7 +43,7 @@ export function AppShellFrame({
         currentPath={pathname}
         navigation={navigation}
         staff={staff}
-        title={title ?? titleForPath(pathname)}
+        title={title ?? getWorkspaceTitleForPathname(pathname) ?? "Staff"}
       >
         {children}
       </AppShell>

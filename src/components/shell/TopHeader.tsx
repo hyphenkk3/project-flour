@@ -3,10 +3,10 @@ import { UserMenu } from "@/components/shell/UserMenu";
 
 type TopHeaderProps = {
   staff: StaffProfile;
-  title?: string;
+  title: string;
 };
 
-export function TopHeader({ staff, title = "Home" }: TopHeaderProps) {
+export function TopHeader({ staff, title }: TopHeaderProps) {
   return (
     <header className="border-fog bg-mist/90 sticky top-0 z-30 border-b backdrop-blur-md">
       <div

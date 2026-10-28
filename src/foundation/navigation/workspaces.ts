@@ -14,6 +14,8 @@ export type WorkspaceNavItem = {
   id: WorkspaceId;
   label: string;
   href: string | null;
+  /** Route family roots used to resolve the shared staff header title. */
+  routePrefixes?: readonly string[];
   /** Fully implemented and navigable in the current version. */
   available: boolean;
   /** Desktop-only shortcut links shown beneath a workspace in the sidebar. */
@@ -30,51 +32,82 @@ export const WORKSPACE_CATALOG: Record<WorkspaceId, WorkspaceNavItem> = {
     id: "home",
     label: "Home",
     href: "/home",
+    routePrefixes: ["/home"],
     available: true,
   },
   owner: {
     id: "owner",
     label: "Operations",
     href: "/owner",
+    routePrefixes: ["/owner"],
     available: true,
   },
   owner_calendar: {
     id: "owner_calendar",
     label: "Whole Cake Calendar",
     href: "/owner/calendar",
+    routePrefixes: ["/owner/calendar"],
     available: true,
   },
   customer_operations: {
     id: "customer_operations",
     label: "Customer Operations",
     href: "/customer-operations/customers",
+    routePrefixes: ["/customer-operations"],
     available: true,
   },
   bakery: {
     id: "bakery",
     label: "Bakery",
     href: "/bakery",
+    routePrefixes: ["/bakery"],
     available: true,
   },
   collection: {
     id: "collection",
     label: "Collection",
     href: "/collection",
+    routePrefixes: ["/collection"],
     available: true,
   },
   library: {
     id: "library",
     label: "Library",
     href: "/library/cakes",
+    routePrefixes: ["/library"],
     available: true,
   },
   management: {
     id: "management",
     label: "Management",
     href: "/owner/management",
+    routePrefixes: ["/owner/management", "/settings/staff"],
     available: true,
   },
 };
+
+/** Resolve the shared header title from the most specific canonical workspace route. */
+export function getWorkspaceTitleForPathname(pathname: string): string | null {
+  const normalizedPath = pathname.replace(/\/+$/, "") || "/";
+  const match = Object.values(WORKSPACE_CATALOG)
+    .flatMap((item) =>
+      (item.routePrefixes ?? []).map((prefix) => ({
+        label: item.label,
+        prefix,
+      })),
+    )
+    .filter(
+      ({ prefix }) =>
+        normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`),
+    )
+    .sort((a, b) => b.prefix.length - a.prefix.length)[0];
+
+  if (match) return match.label;
+  if (normalizedPath === "/settings" || normalizedPath.startsWith("/settings/")) {
+    return "Settings";
+  }
+  return null;
+}
 
 /**
  * Central role → workspace visibility map.

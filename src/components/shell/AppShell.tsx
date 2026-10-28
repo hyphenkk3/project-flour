@@ -11,7 +11,7 @@ type AppShellProps = {
   staff: StaffProfile;
   navigation: WorkspaceNavItem[];
   currentPath: string;
-  title?: string;
+  title: string;
   children: ReactNode;
 };
 
@@ -19,7 +19,7 @@ export function AppShell({
   staff,
   navigation,
   currentPath,
-  title = "Home",
+  title,
   children,
 }: AppShellProps) {
   return (
@@ -56,3 +56,4 @@ export function AppShell({
     </div>
   );
 }
+
