@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
   formatReportAsOf,
-  nextMonth,
   percentChange,
   previousMonth,
   reportMonth,
@@ -129,38 +128,11 @@ export function ManagementReportDashboard({ report }: { report: ManagementReport
             </p>
           </div>
           <div className="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end xl:w-auto xl:flex-nowrap">
-            <div
-              aria-label="Report month navigation"
-              className="flex min-h-12 w-full min-w-0 items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 sm:w-auto"
-              role="group"
-            >
-              <button
-                aria-label="Previous report month"
-                aria-controls="report-month-select"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
-                disabled={current.month <= "2020-01"}
-                onClick={() => selectMonth(previousMonth(current.month))}
-                type="button"
-              >
-                <svg
-                  aria-hidden="true"
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path
-                    d="m15 18-6-6 6-6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
+            <div className="w-full min-w-0 sm:w-auto sm:flex-none">
               <select
                 id="report-month-select"
                 aria-label="Choose report month and year"
-                className="h-11 min-w-0 flex-1 cursor-pointer rounded-lg border-0 bg-transparent px-2 text-sm font-semibold text-slate-900 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none sm:w-48 sm:flex-none"
+                className="h-12 w-full min-w-0 cursor-pointer rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none sm:w-48"
                 onChange={(event) => selectMonth(event.currentTarget.value)}
                 value={current.month}
               >
@@ -174,29 +146,6 @@ export function ManagementReportDashboard({ report }: { report: ManagementReport
                   </option>
                 ))}
               </select>
-              <button
-                aria-label="Next report month"
-                aria-controls="report-month-select"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
-                disabled={current.month >= latestMonth}
-                onClick={() => selectMonth(nextMonth(current.month))}
-                type="button"
-              >
-                <svg
-                  aria-hidden="true"
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path
-                    d="m9 18 6-6-6-6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
             </div>
             <div className="w-full min-w-0 sm:w-auto sm:flex-none">
               <ReportExportControls month={current.month} />

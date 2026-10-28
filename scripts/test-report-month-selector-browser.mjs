@@ -19,10 +19,6 @@ function previousMonth(month) {
   const [year, number] = month.split("-").map(Number);
   return number === 1 ? (year - 1) + "-12" : year + "-" + String(number - 1).padStart(2, "0");
 }
-function nextMonth(month) {
-  const [year, number] = month.split("-").map(Number);
-  return number === 12 ? (year + 1) + "-01" : year + "-" + String(number + 1).padStart(2, "0");
-}
 function makeMonth(month) {
   return {
     month, netSales:0, gross:0, grossProducts:0, discounts:0, netProducts:0,
@@ -136,19 +132,14 @@ try {
   });
   const exportPdf = page.locator("button").filter({ hasText: /PDF/ });
   const exportExcel = page.locator("button").filter({ hasText: /Excel/ });
-  const previous = page.getByRole("button", { name: "Previous report month" });
-  const next = page.getByRole("button", { name: "Next report month" });
-  const monthControls = page.getByRole("group", {
-    name: "Report month navigation",
-  });
   assert.equal(await exportPdf.count(), 1);
   assert.equal(await exportExcel.count(), 1);
-  assert.equal(await previous.isVisible(), true);
-  assert.equal(await next.isVisible(), true);
-  assert.equal(await monthControls.count(), 1);
   assert.equal(await picker.evaluate((element) => element.tagName), "SELECT");
   assert.equal(await picker.locator('option[value="2020-01"]').count(), 1);
   assert.equal(await picker.locator('option[value="2026-10"]').count(), 1);
+  assert.equal(await picker.locator("option").first().getAttribute("value"), "2026-10");
+  assert.equal(await picker.locator("option").last().getAttribute("value"), "2020-01");
+  assert.equal(await page.getByRole("button", { name: /month/ }).count(), 0);
   assert.equal(
     await page.getByText("Choose month", { exact: true }).count(),
     0,
@@ -188,54 +179,40 @@ try {
   );
 
   await page.goto(`http://127.0.0.1:${address.port}/?month=2026-09`);
-  await previous.click();
-  assert.equal(
-    await page.evaluate(() => window.lastReportUrl),
-    "/owner/management/reports?month=2026-08",
-  );
-  await next.click();
-  assert.equal(
-    await page.evaluate(() => window.lastReportUrl),
-    "/owner/management/reports?month=2026-09",
-  );
-  await next.focus();
+  await picker.focus();
+  await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
   assert.equal(
     await page.evaluate(() => window.lastReportUrl),
-    "/owner/management/reports?month=2026-10",
-    "keyboard activation advances the selected report month",
+    "/owner/management/reports?month=2026-08",
+    "keyboard selection changes the month and URL",
   );
 
   await page.goto(`http://127.0.0.1:${address.port}/?month=2020-01`);
   assert.equal(
-    await previous.isDisabled(),
-    true,
-    "navigation stops at the first available month",
-  );
-  await next.click();
-  assert.equal(
-    await page.evaluate(() => window.lastReportUrl),
-    "/owner/management/reports?month=2020-02",
+    await picker.locator("option").last().getAttribute("value"),
+    "2020-01",
+    "the earliest selectable month is the first available month",
   );
   await page.goto(`http://127.0.0.1:${address.port}/?month=2026-10`);
   assert.equal(
-    await next.isDisabled(),
-    true,
-    "navigation stops at the current month",
+    await picker.locator("option").first().getAttribute("value"),
+    "2026-10",
+    "the latest selectable month is the current month",
   );
 
   await page.goto(`http://127.0.0.1:${address.port}/?month=2026-01`);
-  await previous.click();
+  await picker.selectOption("2025-12");
   assert.equal(
     await page.evaluate(() => window.lastReportUrl),
     "/owner/management/reports?month=2025-12",
-    "previous arrow crosses the year boundary",
+    "the dropdown can select the month before a year boundary",
   );
-  await next.click();
+  await picker.selectOption("2026-01");
   assert.equal(
     await page.evaluate(() => window.lastReportUrl),
     "/owner/management/reports?month=2026-01",
-    "next arrow crosses the year boundary",
+    "the dropdown can select the month after a year boundary",
   );
 
   for (const width of [
@@ -252,31 +229,31 @@ try {
       `report month selector and export controls fit a ${width}px viewport`,
     );
     const layout = await page.evaluate(() => {
-      const nav = document
-        .querySelector('[aria-label="Report month navigation"]')
+      const month = document
+        .querySelector('select[aria-label="Choose report month and year"]')
         ?.getBoundingClientRect();
       const pdf = [...document.querySelectorAll("button")]
         .find((button) => button.textContent?.includes("PDF"))
         ?.getBoundingClientRect();
-      if (!nav || !pdf) return null;
+      if (!month || !pdf) return null;
       return {
-        visible: nav.width > 0 && nav.height > 0,
+        visible: month.width > 0 && month.height > 0,
         overlaps:
-          nav.left < pdf.right &&
-          pdf.left < nav.right &&
-          nav.top < pdf.bottom &&
-          pdf.top < nav.bottom,
+          month.left < pdf.right &&
+          pdf.left < month.right &&
+          month.top < pdf.bottom &&
+          pdf.top < month.bottom,
       };
     });
     assert.equal(
       layout?.visible,
       true,
-      `month controls are visible at ${width}px`,
+      `month dropdown is visible at ${width}px`,
     );
     assert.equal(
       layout?.overlaps,
       false,
-      `month controls do not overlap PDF export at ${width}px`,
+      `month dropdown does not overlap PDF export at ${width}px`,
     );
   }
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -285,8 +262,6 @@ try {
     true,
     "month selector is available on desktop",
   );
-  assert.equal(await previous.isVisible(), true);
-  assert.equal(await next.isVisible(), true);
   assert.equal(
     await picker.evaluate(
       (element) => element.scrollWidth <= element.clientWidth,
@@ -307,5 +282,5 @@ try {
 }
 
 console.log(
-  "Report month selector browser checks passed for arrow and select navigation, keyboard activation, month bounds, export behavior, spacing, and responsive overflow.",
+  "Report month selector browser checks passed for dropdown navigation, keyboard selection, month bounds, export behavior, spacing, and responsive overflow.",
 );
