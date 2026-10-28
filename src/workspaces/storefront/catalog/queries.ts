@@ -63,6 +63,7 @@ export { formatRm, startingPrice };
 
 /** Short merchandising TTL. Not used for checkout offers, orderability, or Fresh Pick stock. */
 const STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS = 30;
+const STOREFRONT_CAKE_BATCH_REVALIDATE_SECONDS = 60;
 const STOREFRONT_PRICE_LOOKUP_CONCURRENCY = 6;
 
 type CategoryEmbed = {
@@ -828,7 +829,7 @@ const readCachedStorefrontCakesByIds = cache((cakeIdsKey: string) =>
     () => loadStorefrontCakesByIds(cakeIdsKey ? cakeIdsKey.split(",") : []),
     ["storefront-collection-cake-display-v1", cakeIdsKey],
     {
-      revalidate: STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS,
+      revalidate: STOREFRONT_CAKE_BATCH_REVALIDATE_SECONDS,
       tags: [STOREFRONT_PUBLISHED_CAKES_CACHE_TAG],
     },
   )(),
