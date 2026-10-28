@@ -9,10 +9,10 @@ type UserMenuProps = {
   compactHome?: boolean;
 };
 
-function SettingsLink() {
+function SettingsLink({ compactHome = false }: { compactHome?: boolean }) {
   return (
     <a
-      className="border-fog text-ink hover:border-signal block min-h-11 rounded-lg border bg-white px-3 py-2 text-xs font-medium transition md:min-h-0"
+      className={`border-fog text-ink hover:border-signal block rounded-lg border bg-white px-3 py-2 text-xs font-medium transition ${compactHome ? "min-h-11 md:min-h-0" : ""}`}
       href="/settings"
     >
       Settings
@@ -20,30 +20,22 @@ function SettingsLink() {
   );
 }
 
-export function UserMenu({
-  staff,
-  compact = false,
-  compactHome = false,
-}: UserMenuProps) {
+export function UserMenu({ staff, compact = false, compactHome = false }: UserMenuProps) {
   if (compact) {
     return (
-      <div
-        className={`flex min-w-0 flex-wrap items-center gap-2 md:gap-3 ${compactHome ? "justify-between md:justify-end" : "justify-end"}`}
-      >
-        <div
-          className={`min-w-0 ${compactHome ? "text-left md:text-right" : "text-right"}`}
-        >
+      <div className={`flex min-w-0 flex-wrap items-center gap-2 md:gap-3 ${compactHome ? "justify-between md:justify-end" : "justify-end"}`}>
+        <div className={`min-w-0 ${compactHome ? "text-left md:text-right" : "text-right"}`}>
           <p className="text-ink truncate text-sm font-medium">
             {staff.displayName}
           </p>
           <p className="text-skyline truncate text-xs">{staff.role.name}</p>
         </div>
 
-        <SettingsLink />
+        <SettingsLink compactHome={compactHome} />
 
         <form action={logoutAction}>
           <button
-            className="border-fog text-ink hover:border-signal min-h-11 rounded-lg border bg-white px-3 py-2 text-xs font-medium transition md:min-h-0"
+            className={`border-fog text-ink hover:border-signal rounded-lg border bg-white px-3 py-2 text-xs font-medium transition ${compactHome ? "min-h-11 md:min-h-0" : ""}`}
             type="submit"
           >
             Sign out
@@ -75,3 +67,4 @@ export function UserMenu({
     </div>
   );
 }
+
