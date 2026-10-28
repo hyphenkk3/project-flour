@@ -32,15 +32,17 @@ const makeEvents=(prefix,start,count)=>Array.from({length:count},(_,i)=>({id:pre
 const initial={events:makeEvents("recent-",30,5),nextCursor:{createdAt:"2026-10-28T10:25:00.000Z",id:"11111111-1111-4111-8111-111111111111"},hasMore:true};
 window.activityPages=[{ok:true,page:{events:makeEvents("older-",20,5),nextCursor:{createdAt:"2026-10-28T10:15:00.000Z",id:"22222222-2222-4222-8222-222222222222"},hasMore:true}},{ok:true,page:{events:makeEvents("oldest-",10,2),nextCursor:null,hasMore:false}}];
 function Harness(){
- const [showHome,setShowHome]=useState(true);
- window.showHome=()=>setShowHome(true); window.showActivity=()=>setShowHome(false);
- return showHome ? <AppShell currentPath="/home" staff={profile} navigation={navigation} title="Home"><HomeCockpit staffDisplayName="Owner" roleName="Owner" model={model} canAccessOperations={true} canAccessCollection={true} canAccessBakery={true} canAccessCalendar={true} canAccessApprovals={true} pendingApprovalsHref="/owner/approvals"/></AppShell> : <main className="mx-auto w-full max-w-5xl p-4"><StaffCredentialActivity page={initial}/></main>;
+ const [view,setView]=useState("Home");
+ const pagePaths={"Home":"/home","Operations":"/owner","Whole Cake Calendar":"/owner/calendar","Bakery":"/bakery","Collection":"/collection","Library":"/library","Customer Operations":"/customer-operations","Management":"/owner/management","Financial Reports":"/owner/management/reports","Staff Management":"/settings/staff"};
+ window.showHome=()=>setView("Home"); window.showActivity=()=>setView("Credential Activity"); window.setStaffPage=title=>setView(title);
+ if(view==="Credential Activity") return <main className="mx-auto w-full max-w-5xl p-4"><StaffCredentialActivity page={initial}/></main>;
+ return <AppShell currentPath={pagePaths[view]||"/owner"} staff={profile} navigation={navigation} title={view}>{view==="Home"?<HomeCockpit staffDisplayName="Owner" roleName="Owner" model={model} canAccessOperations={true} canAccessCollection={true} canAccessBakery={true} canAccessCalendar={true} canAccessApprovals={true} pendingApprovalsHref="/owner/approvals"/>:<div data-testid="workspace-placeholder"/>}</AppShell>;
 }
 rootNode.render(<Harness/>);
 `;
 const virtualModules = {
   "next/link": `import React from "react"; export default function Link({href,children,...props}) { return React.createElement("a", {href,...props}, children); }`,
-  "@/foundation/auth/actions": `export async function logoutAction() {}`,
+  "@/foundation/auth/actions": `export async function logoutAction() {window.logoutActionCalls=(window.logoutActionCalls||0)+1}`,
   "@/workspaces/home/HomeLiveRefresh": `import React from "react"; export function HomeLiveRefresh(){return React.createElement("span",{"data-testid":"home-live-refresh"})}`,
   "@/workspaces/home/HomeFreshPicksOperations": `import React from "react"; export function HomeFreshPicksOperations(){return React.createElement("div")}`,
   "@/app/(app)/settings/staff/actions": `export async function loadOlderStaffCredentialActivityAction(cursor){window.lastActivityCursor=cursor;return window.activityPages.shift()}`,
@@ -196,6 +198,83 @@ try {
     desktop.gap > mobile.gap,
     `desktop retains the original generous spacing while mobile Home is compact (mobile gap=${mobile.gap}, desktop gap=${desktop.gap})`,
   );
+
+  const workspaceTitles = [
+    "Home",
+    "Operations",
+    "Whole Cake Calendar",
+    "Bakery",
+    "Collection",
+    "Library",
+    "Customer Operations",
+    "Management",
+    "Financial Reports",
+    "Staff Management",
+  ];
+  for (const width of [320, 375, 390, 430, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 844 });
+    let expectedHeaderHeight = null;
+    for (const title of workspaceTitles) {
+      await page.evaluate((value) => window.setStaffPage(value), title);
+      await page.waitForFunction(
+        (value) => document.querySelector("header h1")?.textContent === value,
+        title,
+      );
+      const layout = await page.evaluate(() => {
+        const box = (selector) => {
+          const element = document.querySelector(selector);
+          const rect = element.getBoundingClientRect();
+          return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height, scrollWidth: element.scrollWidth, clientWidth: element.clientWidth };
+        };
+        const row = box("[data-testid='staff-header-row']");
+        const brand = box("[data-testid='staff-brand-group']");
+        const identity = box("[data-testid='staff-identity']");
+        const actions = box("[data-testid='staff-header-actions']");
+        const whitebird = box("[data-testid='staff-brand-group'] p");
+        const title = box("header h1");
+        const settings = box("header a[href='/settings']");
+        const signOut = box("header button[type='submit']");
+        return {
+          width: innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          headerHeight: document.querySelector("header").getBoundingClientRect().height,
+          row, brand, identity, actions, whitebird, title, settings, signOut,
+          rowPaddingTop: parseFloat(getComputedStyle(document.querySelector("[data-testid='staff-header-row']")).paddingTop),
+          settingsHref: document.querySelector("header a[href='/settings']")?.getAttribute("href"),
+          signOutType: document.querySelector("header button[type='submit']")?.type,
+        };
+      });
+      assert.equal(layout.scrollWidth, width, `${title} ${width}px has no horizontal overflow`);
+      assert.ok(layout.brand.right <= layout.identity.left + 0.5, `${title} ${width}px left and right header groups do not overlap`);
+      assert.ok(Math.abs((layout.brand.top + layout.brand.bottom) / 2 - (layout.identity.top + layout.identity.bottom) / 2) <= 2, `${title} ${width}px groups share one horizontal row`);
+      assert.ok(layout.title.left <= layout.whitebird.left + 1 && layout.title.top > layout.whitebird.top, `${title} ${width}px title sits below WHITEBIRD and stays left aligned`);
+      assert.ok(layout.settings.left >= layout.identity.right && layout.settings.left - layout.identity.right <= (width >= 768 ? 12 : 8), `${title} ${width}px identity sits immediately beside Settings (gap=${layout.settings.left - layout.identity.right}px)`);
+      assert.ok(layout.signOut.left >= layout.settings.right && layout.signOut.left - layout.settings.right <= 8, `${title} ${width}px Settings and Sign out stay grouped`);
+      assert.ok(layout.actions.right <= layout.row.right + 0.5, `${title} ${width}px actions remain inside the header row`);
+      assert.ok(layout.rowPaddingTop >= 12, `${title} ${width}px safe-area top clearance is retained`);
+      assert.equal(layout.settingsHref, "/settings", `${title} ${width}px Settings remains a real link`);
+      assert.equal(layout.signOutType, "submit", `${title} ${width}px Sign out remains a form action`);
+      if (width < 1024) {
+        assert.ok(layout.settings.height >= 44 && layout.signOut.height >= 44, `${title} ${width}px actions retain practical touch targets`);
+      }
+      if (expectedHeaderHeight === null) expectedHeaderHeight = layout.headerHeight;
+      assert.ok(Math.abs(layout.headerHeight - expectedHeaderHeight) <= 1, `${title} ${width}px header height is consistent across staff pages`);
+    }
+  }
+  await page.evaluate(() => window.showHome());
+  await page.waitForFunction(() => document.querySelector("header h1")?.textContent === "Home");
+  await page.evaluate(() => {
+    document.querySelector("header a[href='/settings']").addEventListener("click", (event) => {
+      event.preventDefault(); window.settingsActivated = true;
+    }, { once: true });
+    document.querySelector("header form").addEventListener("submit", (event) => {
+      event.preventDefault(); window.signOutActivated = true;
+    }, { once: true });
+  });
+  await page.locator("header a[href='/settings']").click();
+  assert.equal(await page.evaluate(() => window.settingsActivated), true, "Settings control activates without leaving the synthetic harness");
+  await page.locator("header button[type='submit']").click();
+  assert.equal(await page.evaluate(() => window.signOutActivated), true, "Sign out control submits its form without any real session");
 
   await page.evaluate(() => window.showActivity());
   const details = page.locator("details");

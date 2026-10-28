@@ -43,15 +43,9 @@ export function AppShell({
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <TopHeader
-            compactHome={currentPath === "/home"}
-            staff={staff}
-            title={title}
-          />
+          <TopHeader staff={staff} title={title} />
           <main className="flex-1">
-            <PageContainer compactHome={currentPath === "/home"}>
-              {children}
-            </PageContainer>
+            <PageContainer compactHome={currentPath === "/home"}>{children}</PageContainer>
           </main>
         </div>
       </div>
@@ -60,3 +54,4 @@ export function AppShell({
     </div>
   );
 }
+
