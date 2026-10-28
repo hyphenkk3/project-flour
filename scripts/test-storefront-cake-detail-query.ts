@@ -536,7 +536,7 @@ const detailPageSrc = readSrc(
 assert.match(detailPageSrc, /getBrowsePublishedCakeById/);
 assert.match(detailPageSrc, /getBrowseCakeDisplayById/);
 assert.match(detailPageSrc, /mergeBrowseCakeDisplay/);
-assert.match(detailPageSrc, /browseCakePreviewFromDisplay/);
+assert.match(detailPageSrc, /mergeBrowseCakeDisplay\(cake, display\)/);
 assert.match(detailPageSrc, /CakeDetailWithDisplay/);
 assert.match(detailPageSrc, /displayPromise/);
 assert.match(detailPageSrc, /Promise\.all/);

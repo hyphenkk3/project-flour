@@ -61,7 +61,7 @@ const detailSrc = readSrc(
   "src/workspaces/storefront/catalog/StorefrontCakeDetail.tsx",
 );
 assert.match(detailSrc, /getBrowsePublishedCakeById/);
-assert.match(detailSrc, /StorefrontCakeDetailView/);
+assert.match(detailSrc, /export function StorefrontCakeDetail/);
 assert.match(detailSrc, /CakeDetailPickupScope/);
 assert.match(detailSrc, /CakeDetailBackNav/);
 assert.doesNotMatch(detailSrc, /StorefrontHomeLink/);

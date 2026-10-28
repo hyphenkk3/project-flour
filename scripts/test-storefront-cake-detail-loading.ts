@@ -74,8 +74,19 @@ const liveAll = liveFn.slice(
   liveFn.indexOf("Promise.all"),
   liveFn.indexOf("]);") + 2,
 );
-assert.match(liveAll, /livePromise/);
+assert.match(liveAll, /displayPromise/);
 assert.doesNotMatch(liveAll, /offerPromise/);
+
+const displayFn = detailSrc.slice(
+  detailSrc.indexOf("async function CakeDetailWithDisplay"),
+  detailSrc.indexOf("async function CakeDetailResolved"),
+);
+const displayAll = displayFn.slice(
+  displayFn.indexOf("Promise.all"),
+  displayFn.indexOf("]);") + 2,
+);
+assert.match(displayAll, /livePromise/);
+assert.doesNotMatch(displayAll, /offerPromise/);
 
 const offerHintSrc = readSrc("src/workspaces/storefront/offers/CakeOfferHint.tsx");
 assert.match(offerHintSrc, /listPublicCatalogueVouchers/);
