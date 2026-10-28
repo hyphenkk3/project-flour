@@ -232,8 +232,28 @@ try {
         const actions = box("[data-testid='staff-header-actions']");
         const whitebird = box("[data-testid='staff-brand-group'] p");
         const title = box("header h1");
-        const settings = box("header a[href='/settings']");
-        const signOut = box("header button[type='submit']");
+        const actionMetrics = (selector) => {
+          const element = document.querySelector(selector);
+          const rect = element.getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          const textRect = range.getBoundingClientRect();
+          return {
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            bottom: rect.bottom,
+            width: rect.width,
+            height: rect.height,
+            textTop: textRect.top,
+            textBottom: textRect.bottom,
+            textCenter: (textRect.top + textRect.bottom) / 2,
+            textLineCount: range.getClientRects().length,
+            lineHeight: getComputedStyle(element).lineHeight,
+          };
+        };
+        const settings = actionMetrics("header a[href='/settings']");
+        const signOut = actionMetrics("header button[type='submit']");
         return {
           width: innerWidth,
           scrollWidth: document.documentElement.scrollWidth,
@@ -256,6 +276,19 @@ try {
       assert.equal(layout.signOutType, "submit", `${title} ${width}px Sign out remains a form action`);
       if (width < 1024) {
         assert.ok(layout.settings.height >= 44 && layout.signOut.height >= 44, `${title} ${width}px actions retain practical touch targets`);
+      }
+      if (width <= 430) {
+        assert.ok(Math.abs(layout.settings.top - layout.signOut.top) <= 0.5, `${title} ${width}px Settings and Sign out top edges align`);
+        assert.ok(Math.abs(layout.settings.bottom - layout.signOut.bottom) <= 0.5, `${title} ${width}px Settings and Sign out bottom edges align`);
+        assert.ok(Math.abs(layout.settings.height - layout.signOut.height) <= 0.5, `${title} ${width}px Settings and Sign out have identical heights`);
+        assert.equal(layout.settings.lineHeight, layout.signOut.lineHeight, `${title} ${width}px action labels use the same line height`);
+        assert.equal(layout.settings.textLineCount, 1, `${title} ${width}px Settings label stays on one line`);
+        assert.equal(layout.signOut.textLineCount, 1, `${title} ${width}px Sign out label stays on one line`);
+        assert.ok(Math.abs(layout.settings.textCenter - layout.signOut.textCenter) <= 0.5, `${title} ${width}px rendered label centers align`);
+        const settingsButtonCenter = (layout.settings.top + layout.settings.bottom) / 2;
+        const signOutButtonCenter = (layout.signOut.top + layout.signOut.bottom) / 2;
+        assert.ok(Math.abs(layout.settings.textCenter - settingsButtonCenter) <= 2, `${title} ${width}px Settings text is centered in its button`);
+        assert.ok(Math.abs(layout.signOut.textCenter - signOutButtonCenter) <= 2, `${title} ${width}px Sign out text is centered in its button`);
       }
       if (expectedHeaderHeight === null) expectedHeaderHeight = layout.headerHeight;
       assert.ok(Math.abs(layout.headerHeight - expectedHeaderHeight) <= 1, `${title} ${width}px header height is consistent across staff pages`);
@@ -343,7 +376,7 @@ try {
     "no more button after final page",
   );
   console.log(
-    "PASS combined UI browser: actual Home/AppShell flow at 320/375/390/430/768/1024/1440px; no overflow; mobile targets and sticky nav; details keyboard toggle; 5-event first page; older pages append in descending order",
+    "PASS combined UI browser: shared header rendered Settings/Sign out centers and edges align at 320/375/390/430px across 10 staff pages; no overflow; mobile targets and sticky nav; details keyboard toggle; 5-event first page; older pages append in descending order",
   );
 } finally {
   await browser.close();

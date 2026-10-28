@@ -8,12 +8,15 @@ type UserMenuProps = {
   compact?: boolean;
 };
 
+const compactHeaderActionClassName =
+  "border-fog text-ink hover:border-signal inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-lg border bg-white px-2 py-2 text-[11px] leading-[1.5] font-medium transition lg:min-h-0 lg:px-3 lg:text-xs";
+
 function SettingsLink({ compact = false }: { compact?: boolean }) {
   return (
     <a
       className={
         compact
-          ? "border-fog text-ink hover:border-signal block min-h-11 whitespace-nowrap rounded-lg border bg-white px-2 py-2 text-[11px] font-medium transition lg:min-h-0 lg:px-3 lg:text-xs"
+          ? compactHeaderActionClassName
           : "border-fog text-ink hover:border-signal block rounded-lg border bg-white px-3 py-2 text-xs font-medium transition"
       }
       href="/settings"
@@ -46,7 +49,7 @@ export function UserMenu({ staff, compact = false }: UserMenuProps) {
           <SettingsLink compact />
           <form action={logoutAction} className="shrink-0">
             <button
-              className="border-fog text-ink hover:border-signal min-h-11 whitespace-nowrap rounded-lg border bg-white px-2 py-2 text-[11px] font-medium transition lg:min-h-0 lg:px-3 lg:text-xs"
+              className={compactHeaderActionClassName}
               type="submit"
             >
               Sign out
