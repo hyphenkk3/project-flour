@@ -229,20 +229,32 @@ try {
       `report month selector and export controls fit a ${width}px viewport`,
     );
     const layout = await page.evaluate(() => {
+      const title = document.querySelector("header h1")?.getBoundingClientRect();
+      const description = document
+        .querySelector("header > p")
+        ?.getBoundingClientRect();
       const month = document
         .querySelector('select[aria-label="Choose report month and year"]')
         ?.getBoundingClientRect();
       const pdf = [...document.querySelectorAll("button")]
         .find((button) => button.textContent?.includes("PDF"))
         ?.getBoundingClientRect();
-      if (!month || !pdf) return null;
+      const excel = [...document.querySelectorAll("button")]
+        .find((button) => button.textContent?.includes("Excel"))
+        ?.getBoundingClientRect();
+      if (!title || !description || !month || !pdf || !excel) return null;
+      const controlsTop = Math.min(month.top, pdf.top, excel.top);
+      const controlsBottom = Math.max(month.bottom, pdf.bottom, excel.bottom);
+      const overlap = (a, b) =>
+        a.left < b.right &&
+        b.left < a.right &&
+        a.top < b.bottom &&
+        b.top < a.bottom;
       return {
         visible: month.width > 0 && month.height > 0,
-        overlaps:
-          month.left < pdf.right &&
-          pdf.left < month.right &&
-          month.top < pdf.bottom &&
-          pdf.top < month.bottom,
+        titleDescriptionOverlap: overlap(title, description),
+        descriptionControlsOverlap:
+          description.top < controlsBottom && controlsTop < description.bottom,
       };
     });
     assert.equal(
@@ -251,9 +263,14 @@ try {
       `month dropdown is visible at ${width}px`,
     );
     assert.equal(
-      layout?.overlaps,
+      layout?.titleDescriptionOverlap,
       false,
-      `month dropdown does not overlap PDF export at ${width}px`,
+      `report title and description do not overlap at ${width}px`,
+    );
+    assert.equal(
+      layout?.descriptionControlsOverlap,
+      false,
+      `report description and month/export controls do not overlap at ${width}px`,
     );
   }
   await page.setViewportSize({ width: 1280, height: 900 });
