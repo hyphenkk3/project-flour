@@ -1,4 +1,5 @@
 import { revalidateTag } from "next/cache";
+import { notePublishedCakeInvalidation } from "@/workspaces/storefront/catalog/public-cake-read";
 
 export const STOREFRONT_PUBLISHED_CAKES_CACHE_TAG =
   "storefront-published-cakes";
@@ -13,4 +14,5 @@ export function revalidateStorefrontPublishedCakeCache(cakeId?: string): void {
   if (cakeId) {
     revalidateTag(storefrontCakeCacheTag(cakeId), "max");
   }
+  notePublishedCakeInvalidation();
 }

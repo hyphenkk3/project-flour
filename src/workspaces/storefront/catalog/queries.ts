@@ -54,6 +54,7 @@ import {
   type StorefrontCakePhotoRow,
 } from "@/workspaces/storefront/catalog/cake-photo-map";
 import { comparePopularCakesOrder } from "@/engines/menu/homepage-popular-cakes";
+import { coalescePublicCakeRead, retryStatementTimeoutRead } from "@/workspaces/storefront/catalog/public-cake-read";
 import {
   formatRm,
   startingPrice,
@@ -807,20 +808,24 @@ async function loadStorefrontCakesByIds(
   cakeIds: readonly string[],
 ): Promise<CachedStorefrontCakeDisplay[]> {
   if (cakeIds.length === 0) return [];
-  const supabase = createPublicClient();
-  const data = await withCakePhotoSelectFallback(
-    (photoSelect, includeAssignments, includeTags) =>
-      supabase
-        .from("library_cakes")
-        .select(
-          libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags),
-        )
-        .in("id", [...cakeIds]),
-  );
+  return coalescePublicCakeRead(cakeIds.join(","), () =>
+    retryStatementTimeoutRead(async () => {
+      const supabase = createPublicClient();
+      const data = await withCakePhotoSelectFallback(
+        (photoSelect, includeAssignments, includeTags) =>
+          supabase
+            .from("library_cakes")
+            .select(
+              libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags),
+            )
+            .in("id", [...cakeIds]),
+      );
 
-  return ((data ?? []) as unknown as LibraryCakeEmbed[])
-    .filter((row) => row.library_cake_sizes?.length)
-    .map((row) => ({ cake: mapStorefrontCake(row), status: row.status }));
+      return ((data ?? []) as unknown as LibraryCakeEmbed[])
+        .filter((row) => row.library_cake_sizes?.length)
+        .map((row) => ({ cake: mapStorefrontCake(row), status: row.status }));
+    }),
+  );
 }
 
 const readCachedStorefrontCakesByIds = cache((cakeIdsKey: string) =>
