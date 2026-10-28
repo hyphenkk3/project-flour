@@ -19,6 +19,10 @@ function previousMonth(month) {
   const [year, number] = month.split("-").map(Number);
   return number === 1 ? (year - 1) + "-12" : year + "-" + String(number - 1).padStart(2, "0");
 }
+function nextMonth(month) {
+  const [year, number] = month.split("-").map(Number);
+  return number === 12 ? (year + 1) + "-01" : year + "-" + String(number + 1).padStart(2, "0");
+}
 function makeMonth(month) {
   return {
     month, netSales:0, gross:0, grossProducts:0, discounts:0, netProducts:0,
@@ -35,7 +39,7 @@ function Harness() {
     window.lastReportUrl = url.pathname + url.search;
     setMonth(url.searchParams.get("month") || "2026-09");
   };
-  return <ManagementReportDashboard report={{current:makeMonth(month),previous:makeMonth(previousMonth(month)),bookings:{count:0,value:0,sources:[]},payments:{collected:0,refunds:0,methods:[]},asOf:"2026-10-13T00:00:00Z"}}/>;
+  return <ManagementReportDashboard report={{current:makeMonth(month),previous:makeMonth(previousMonth(month)),bookings:{count:0,value:0,sources:[]},payments:{collected:0,refunds:0,methods:[]},refundBreakdown:[],asOf:"2026-10-13T00:00:00Z"}}/>;
 }
 createRoot(document.getElementById("root")).render(<Harness/>);
 `;
@@ -132,8 +136,16 @@ try {
   });
   const exportPdf = page.locator("button").filter({ hasText: /PDF/ });
   const exportExcel = page.locator("button").filter({ hasText: /Excel/ });
+  const previous = page.getByRole("button", { name: "Previous report month" });
+  const next = page.getByRole("button", { name: "Next report month" });
+  const monthControls = page.getByRole("group", {
+    name: "Report month navigation",
+  });
   assert.equal(await exportPdf.count(), 1);
   assert.equal(await exportExcel.count(), 1);
+  assert.equal(await previous.isVisible(), true);
+  assert.equal(await next.isVisible(), true);
+  assert.equal(await monthControls.count(), 1);
   assert.equal(await picker.evaluate((element) => element.tagName), "SELECT");
   assert.equal(await picker.locator('option[value="2020-01"]').count(), 1);
   assert.equal(await picker.locator('option[value="2026-10"]').count(), 1);
@@ -175,11 +187,60 @@ try {
     "/owner/management/reports?month=2026-08",
   );
 
-  await page.goto(`http://127.0.0.1:${address.port}/?month=2026-01`);
-  await picker.selectOption("2025-12");
-  await picker.selectOption("2026-01");
+  await page.goto(`http://127.0.0.1:${address.port}/?month=2026-09`);
+  await previous.click();
+  assert.equal(
+    await page.evaluate(() => window.lastReportUrl),
+    "/owner/management/reports?month=2026-08",
+  );
+  await next.click();
+  assert.equal(
+    await page.evaluate(() => window.lastReportUrl),
+    "/owner/management/reports?month=2026-09",
+  );
+  await next.focus();
+  await page.keyboard.press("Enter");
+  assert.equal(
+    await page.evaluate(() => window.lastReportUrl),
+    "/owner/management/reports?month=2026-10",
+    "keyboard activation advances the selected report month",
+  );
 
-  for (const width of [320, 375, 390, 393, 430]) {
+  await page.goto(`http://127.0.0.1:${address.port}/?month=2020-01`);
+  assert.equal(
+    await previous.isDisabled(),
+    true,
+    "navigation stops at the first available month",
+  );
+  await next.click();
+  assert.equal(
+    await page.evaluate(() => window.lastReportUrl),
+    "/owner/management/reports?month=2020-02",
+  );
+  await page.goto(`http://127.0.0.1:${address.port}/?month=2026-10`);
+  assert.equal(
+    await next.isDisabled(),
+    true,
+    "navigation stops at the current month",
+  );
+
+  await page.goto(`http://127.0.0.1:${address.port}/?month=2026-01`);
+  await previous.click();
+  assert.equal(
+    await page.evaluate(() => window.lastReportUrl),
+    "/owner/management/reports?month=2025-12",
+    "previous arrow crosses the year boundary",
+  );
+  await next.click();
+  assert.equal(
+    await page.evaluate(() => window.lastReportUrl),
+    "/owner/management/reports?month=2026-01",
+    "next arrow crosses the year boundary",
+  );
+
+  for (const width of [
+    320, 375, 390, 393, 430, 600, 768, 1024, 1280, 1440,
+  ]) {
     await page.setViewportSize({ width, height: 844 });
     assert.equal(await page.getByRole("button", { name: "Export PDF" }).isVisible(), true);
     assert.equal(await page.getByRole("button", { name: "Export Excel" }).isVisible(), true);
@@ -188,7 +249,34 @@ try {
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
       true,
-      `report month selector and export controls fit a ${width}px phone viewport`,
+      `report month selector and export controls fit a ${width}px viewport`,
+    );
+    const layout = await page.evaluate(() => {
+      const nav = document
+        .querySelector('[aria-label="Report month navigation"]')
+        ?.getBoundingClientRect();
+      const pdf = [...document.querySelectorAll("button")]
+        .find((button) => button.textContent?.includes("PDF"))
+        ?.getBoundingClientRect();
+      if (!nav || !pdf) return null;
+      return {
+        visible: nav.width > 0 && nav.height > 0,
+        overlaps:
+          nav.left < pdf.right &&
+          pdf.left < nav.right &&
+          nav.top < pdf.bottom &&
+          pdf.top < nav.bottom,
+      };
+    });
+    assert.equal(
+      layout?.visible,
+      true,
+      `month controls are visible at ${width}px`,
+    );
+    assert.equal(
+      layout?.overlaps,
+      false,
+      `month controls do not overlap PDF export at ${width}px`,
     );
   }
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -197,6 +285,8 @@ try {
     true,
     "month selector is available on desktop",
   );
+  assert.equal(await previous.isVisible(), true);
+  assert.equal(await next.isVisible(), true);
   assert.equal(
     await picker.evaluate(
       (element) => element.scrollWidth <= element.clientWidth,
@@ -217,5 +307,5 @@ try {
 }
 
 console.log(
-  "Report month selector browser checks passed for navigation, direct month selection, URL/data synchronization, year boundaries, future-month blocking, English display, keyboard label, and mobile width.",
+  "Report month selector browser checks passed for arrow and select navigation, keyboard activation, month bounds, export behavior, spacing, and responsive overflow.",
 );

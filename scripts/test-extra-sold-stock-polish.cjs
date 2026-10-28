@@ -49,6 +49,24 @@ assert.equal(
   ),
   "history",
 );
+const paidPickupAlreadyCollected = order({
+  status: "paid",
+  fulfilmentMethod: "pickup",
+  pickedUpAt: "2026-10-19T06:22:43.092758Z",
+});
+assert.equal(
+  moduleExports.classifySoldExtra(paidPickupAlreadyCollected),
+  "history",
+  "sold stock linked to a paid pickup with a recorded handoff belongs in Sold History",
+);
+assert.equal(
+  moduleExports.soldExtraCompletedAt(
+    paidPickupAlreadyCollected,
+    "2026-10-19T06:21:03Z",
+  ),
+  "2026-10-19T06:22:43.092758Z",
+  "history records the pickup handoff rather than leaving the cake in attention work",
+);
 assert.equal(
   moduleExports.classifySoldExtra(
     order({ fulfilmentMethod: "dine_in", pickedUpAt: "2026-10-02T00:00:00Z" }),
@@ -396,6 +414,8 @@ assert.match(history, /type="date"/);
 assert.match(history, /Search history/);
 const queries = fs.readFileSync("src/workspaces/extra/queries.ts", "utf8");
 assert.match(queries, /\.range\(offset, offset \+ pageSize - 1\)/);
+assert.match(queries, /ASSIGNED_ORDER_SELECT[\s\S]*?picked_up_at/);
+assert.match(queries, /picked_up_at\.is\.null/);
 const actions = fs.readFileSync("src/workspaces/extra/actions.ts", "utf8");
 assert.match(
   actions,
