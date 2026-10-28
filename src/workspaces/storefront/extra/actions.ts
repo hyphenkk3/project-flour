@@ -37,6 +37,7 @@ import {
   type CustomerComplimentaryOption,
   type CustomerPaidAddonOption,
 } from "@/engines/orders/customer-preorder-options";
+import { formatNewOrderPersonName } from "@/engines/orders/customer-name";
 import { createClient, createPublicClient } from "@/lib/supabase/server";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import { getStorefrontCollectionForPickupDate } from "@/workspaces/storefront/catalog/queries";
@@ -233,6 +234,7 @@ async function submitGuestExtraOrderActionBody(
     .getAll("extra_cake_name")
     .map((value) => String(value).trim());
   const customerName = String(formData.get("customer_name") ?? "").trim();
+  const formattedCustomerName = formatNewOrderPersonName(customerName);
   const phone = String(formData.get("phone") ?? "").trim();
   const includeReceipt = parseRequiredPhysicalReceipt(
     String(formData.get("include_receipt") ?? "").trim(),
@@ -342,8 +344,10 @@ async function submitGuestExtraOrderActionBody(
       String(formData.get("same_as_customer") ?? "") === "true";
     const deliveryDraft: DeliveryCreateDraft = {
       recipientName: sameAsCustomer
-        ? customerName
-        : String(formData.get("recipient_name") ?? ""),
+        ? formattedCustomerName
+        : formatNewOrderPersonName(
+            String(formData.get("recipient_name") ?? ""),
+          ),
       recipientPhone: sameAsCustomer
         ? phone
         : String(formData.get("recipient_phone") ?? ""),
@@ -416,7 +420,7 @@ async function submitGuestExtraOrderActionBody(
   const supabase = await createClient();
   const rpcStarted = performance.now();
   const { data, error } = await supabase.rpc("submit_guest_extra_order", {
-    p_customer_name: customerName,
+    p_customer_name: formattedCustomerName,
     p_phone: phone,
     p_email: null,
     p_pickup_date: pickupDate,

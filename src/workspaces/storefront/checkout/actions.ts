@@ -83,7 +83,10 @@ import {
   parseDeliveryProcessingFeeAckPayload,
 } from "@/engines/orders/delivery-processing-fee-ack";
 import { setGuestPreorderReceiptCookie } from "@/workspaces/storefront/checkout/receipt";
-import { customerNameValidationError } from "@/engines/orders/customer-name";
+import {
+  customerNameValidationError,
+  formatNewOrderPersonName,
+} from "@/engines/orders/customer-name";
 import {
   acceptPerfCorrelationId,
   logPerf,
@@ -329,6 +332,7 @@ async function submitGuestPreorderActionBody(
   if (nameError) {
     return { error: nameError };
   }
+  const formattedCustomerName = formatNewOrderPersonName(customerName);
   if (includeReceipt === null) {
     return {
       error: "Please choose whether you would like a copy of the receipt.",
@@ -393,8 +397,10 @@ async function submitGuestPreorderActionBody(
       String(formData.get("same_as_customer") ?? "") === "true";
     deliveryDraft = {
       recipientName: sameAsCustomer
-        ? customerName
-        : String(formData.get("recipient_name") ?? ""),
+        ? formattedCustomerName
+        : formatNewOrderPersonName(
+            String(formData.get("recipient_name") ?? ""),
+          ),
       recipientPhone: sameAsCustomer
         ? phone
         : String(formData.get("recipient_phone") ?? ""),
@@ -431,7 +437,7 @@ async function submitGuestPreorderActionBody(
   if (availability.error) return { error: availability.error };
 
   const rpcArgs: Record<string, unknown> = {
-    p_customer_name: customerName,
+    p_customer_name: formattedCustomerName,
     p_phone: phone,
     p_email: null,
     p_pickup_date: pickupDate,

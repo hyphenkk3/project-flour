@@ -22,6 +22,7 @@ import {
   validateOwnerCreateFulfilment,
 } from "@/engines/orders/fulfilment";
 import { createStaffGuestPreorderRecord } from "@/workspaces/owner/orders/create-staff-preorder";
+import { formatNewOrderPersonName } from "@/engines/orders/customer-name";
 import {
   parseDeliveryDraftFromForm,
   parseStaffPreorderItemsFromForm,
@@ -2711,7 +2712,7 @@ export async function duplicateGuestOrderAction(
   const fulfilmentMethod = normalizeOwnerCreateFulfilmentMethod(
     source.fulfilmentMethod === "dine_in" ? "pickup" : source.fulfilmentMethod,
   );
-  const deliveryDraft =
+  const deliveryDraftSource =
     fulfilmentMethod === "delivery"
       ? deliveryDraftFromPersistedOrder({
           customerName: source.customerName,
@@ -2720,6 +2721,12 @@ export async function duplicateGuestOrderAction(
           delivery: source.delivery,
         })
       : defaultDeliveryCreateDraft();
+  const deliveryDraft = {
+    ...deliveryDraftSource,
+    recipientName: formatNewOrderPersonName(
+      deliveryDraftSource.recipientName,
+    ),
+  };
 
   const dateGuard = await assertStaffCollectionDateAllowed({
     pickupDate,
@@ -2769,7 +2776,7 @@ export async function duplicateGuestOrderAction(
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("create_staff_guest_preorder", {
     p_actor_staff_id: staff.id,
-    p_customer_name: source.customerName,
+    p_customer_name: formatNewOrderPersonName(source.customerName),
     p_phone: source.phone || null,
     p_email: source.email || null,
     p_order_source: orderSource,

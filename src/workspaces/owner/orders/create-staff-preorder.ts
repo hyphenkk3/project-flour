@@ -17,6 +17,7 @@ import {
   type DeliveryCreateDraft,
   type OwnerCreateFulfilmentMethod,
 } from "@/engines/orders/fulfilment";
+import { formatNewOrderPersonName } from "@/engines/orders/customer-name";
 import type { PaidAddonMutationPayload } from "@/engines/orders/paid-addons";
 import { createClient } from "@/lib/supabase/server";
 import { isStaffGuestOrderSource } from "@/workspaces/owner/orders/labels";
@@ -63,6 +64,10 @@ export async function createStaffGuestPreorderRecord(
   input: CreateStaffGuestPreorderInput,
 ): Promise<{ orderId: string } | { error: string }> {
   const guestName = input.guestName.trim();
+  const delivery = {
+    ...input.delivery,
+    recipientName: formatNewOrderPersonName(input.delivery.recipientName),
+  };
   if (!guestName) {
     return { error: "Please enter the customer name." };
   }
@@ -94,7 +99,7 @@ export async function createStaffGuestPreorderRecord(
       method: fulfilmentMethod,
       dateYmd: input.pickupDate,
       timeValue: input.pickupTime,
-      delivery: input.delivery,
+      delivery,
       dineIn,
       closedDates: input.closedDates,
       hoursSnapshot: input.hoursSnapshot ?? OPERATING_HOURS_SEED,
@@ -104,7 +109,7 @@ export async function createStaffGuestPreorderRecord(
     }
     fulfilmentRpc = buildAssistedFulfilmentRpcParams({
       method: fulfilmentMethod,
-      delivery: input.delivery,
+      delivery,
       dineIn,
     });
   } else {
@@ -116,7 +121,7 @@ export async function createStaffGuestPreorderRecord(
         method: "dine_in",
         dateYmd: input.pickupDate,
         timeValue: input.pickupTime,
-        delivery: input.delivery,
+        delivery,
         dineIn,
         hoursSnapshot: input.hoursSnapshot ?? OPERATING_HOURS_SEED,
       });
@@ -125,7 +130,7 @@ export async function createStaffGuestPreorderRecord(
       }
       fulfilmentRpc = buildAssistedFulfilmentRpcParams({
         method: "dine_in",
-        delivery: input.delivery,
+        delivery,
         dineIn,
       });
     } else {
@@ -136,7 +141,7 @@ export async function createStaffGuestPreorderRecord(
         method: fulfilmentMethod,
         pickupDate: input.pickupDate,
         pickupTime: input.pickupTime,
-        delivery: input.delivery,
+        delivery,
       });
       if (fulfilmentError) {
         return { error: fulfilmentError };
@@ -151,7 +156,7 @@ export async function createStaffGuestPreorderRecord(
       }
       fulfilmentRpc = buildCreateStaffFulfilmentRpcParams({
         method: fulfilmentMethod,
-        delivery: input.delivery,
+        delivery,
       });
     }
   }
@@ -178,7 +183,7 @@ export async function createStaffGuestPreorderRecord(
   const supabase = await createClient();
   const rpcArgs: Record<string, unknown> = {
     p_actor_staff_id: input.actorStaffId,
-    p_customer_name: guestName,
+    p_customer_name: formatNewOrderPersonName(guestName),
     p_phone: input.guestPhone,
     p_email: input.guestEmail,
     p_order_source: input.orderSource,
