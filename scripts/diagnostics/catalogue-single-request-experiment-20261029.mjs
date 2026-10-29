@@ -225,7 +225,7 @@ function eligibility(rows) {
     && row.cake.library_cake_sizes.length > 0
     && row.available === true && row.showOnHomepage === true);
 }
-function categorySummary(rows) {
+function categoryFingerprint(rows) {
   return (rows ?? []).map((row) => {
     const cake = row.cake;
     if (!cake) return { rowPresent: false };
@@ -233,12 +233,14 @@ function categorySummary(rows) {
     const categories = assignments
       .map((assignment) => unwrapOne(assignment.library_cake_categories))
       .filter(Boolean)
-      .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0));
+      .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0)
+        || String(a.id ?? "").localeCompare(String(b.id ?? "")));
     const primary = categories[0]?.id ?? unwrapOne(cake.library_cake_categories)?.id ?? cake.category_id ?? null;
     return {
       rowPresent: true,
       assignmentCount: categories.length,
-      primaryPresent: primary != null,
+      primaryHash: sha(primary),
+      orderedAssignmentsHash: sha(categories.map((category) => category.id)),
       categoriesActive: categories.every((category) => category.is_active === true),
     };
   });
@@ -311,6 +313,7 @@ async function discoverCollection() {
 const { collectionId, size, discovery } = await discoverCollection();
 const paritySamples = { A: [], B: [] };
 const machineDiffs = [];
+const categoryParityPairs = [];
 let planCakeIds = [];
 for (let i = 0; i < parityPairs; i++) {
   const order = i % 2 === 0 ? ["A", "B"] : ["B", "A"];
@@ -331,10 +334,14 @@ for (let i = 0; i < parityPairs; i++) {
   const a = canonical(runs.A.rows);
   const b = canonical(runs.B.rows);
   if (i === 0) planCakeIds = (runs.A.rows ?? []).map((row) => row.cake?.id).filter(Boolean);
+  const categoryA = categoryFingerprint(runs.A.rows);
+  const categoryB = categoryFingerprint(runs.B.rows);
+  categoryParityPairs.push({ pair: i + 1, matches: sha(categoryA) === sha(categoryB) });
   const diffs = fieldDiffs(a, b, "rows", [], 80);
   if (diffs.length) machineDiffs.push({ pair: i + 1, paths: diffs });
 }
 const parityPass = machineDiffs.length === 0
+  && categoryParityPairs.every((pair) => pair.matches)
   && paritySamples.A.every((sample) => !sample.failed)
   && paritySamples.B.every((sample) => !sample.failed);
 
@@ -347,6 +354,7 @@ if (!parityPass) {
       pass: false,
       architectureA: paritySamples.A,
       architectureB: paritySamples.B,
+      categoryPrimaryAndAssignmentsParity: categoryParityPairs,
       machineReadableDifferences: machineDiffs,
       performanceMeasurementsStarted: false,
     },
@@ -377,7 +385,7 @@ if (!emptyParity || !excludedFixturePass || !eligibilityParity) {
     experiment: "catalogue-single-request-dev-20261029",
     projectRef: DEV_REF,
     authMode: "public key apikey header only; no Authorization token; anonymous RLS",
-    parity: { pass: false, emptyParity, excludedFixturePass, eligibilityParity, machineReadableDifferences: emptyDiffs, performanceMeasurementsStarted: false },
+    parity: { pass: false, emptyParity, excludedFixturePass, eligibilityParity, categoryPrimaryAndAssignmentsParity: categoryParityPairs, machineReadableDifferences: emptyDiffs, performanceMeasurementsStarted: false },
     requestTimeoutMs: timeoutMs,
     totalRequestsIssued: requestCount,
     safetyCap: maxRequests,
@@ -473,6 +481,7 @@ console.log(JSON.stringify({
     emptyCollectionPass: emptyParity,
     excludedSyntheticFixturePass: excludedFixturePass,
     eligibleRowsMatch: eligibilityParity,
+    primaryCategoryAndOrderedAssignmentsMatch: categoryParityPairs.every((pair) => pair.matches),
     actualExcludedRows: {
       A: size - visibleA.length,
       B: size - visibleB.length,
