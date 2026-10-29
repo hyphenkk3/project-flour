@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { retryTimedOutGet } from "../src/lib/supabase/fetch-timeout.ts";
 import {
   coalescePublicCakeRead,
   notePublishedCakeInvalidation,
@@ -76,3 +77,40 @@ assert.equal(sharedRetryCalls, 2, "eight callers cause one initial read and one 
 for (const result of sharedRecovered) assert.deepEqual(result, ["correct-cake"]);
 
 console.log("PASS public cake in-flight coalescing, invalidation boundary, cleanup and bounded timeout retry");
+
+let getCalls = 0;
+const recoveredGet = retryTimedOutGet(async () => {
+  getCalls += 1;
+  if (getCalls === 1) {
+    throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+  }
+  return new Response("ok", { status: 200 });
+});
+assert.equal((await recoveredGet("https://example.test/catalogue")).status, 200);
+assert.equal(getCalls, 2, "an internally timed-out GET gets exactly one retry");
+
+let postCalls = 0;
+const timedOutPost = retryTimedOutGet(async () => {
+  postCalls += 1;
+  throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+});
+await assert.rejects(timedOutPost("https://example.test/rpc", { method: "POST" }), /timeout/);
+assert.equal(postCalls, 1, "non-GET requests are never retried");
+
+let abortCalls = 0;
+const cancelledGet = retryTimedOutGet(async () => {
+  abortCalls += 1;
+  throw new DOMException("The operation was aborted", "AbortError");
+});
+await assert.rejects(cancelledGet("https://example.test/catalogue"), /aborted/);
+assert.equal(abortCalls, 1, "caller cancellation is not retried");
+
+let persistentTimeoutCalls = 0;
+const persistentTimeout = retryTimedOutGet(async () => {
+  persistentTimeoutCalls += 1;
+  throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+});
+await assert.rejects(persistentTimeout("https://example.test/catalogue"), /timeout/);
+assert.equal(persistentTimeoutCalls, 2, "a persistent timeout stops after one retry");
+
+console.log("PASS one bounded GET retry for the observed AbortSignal timeout; POST and caller abort remain single-attempt");

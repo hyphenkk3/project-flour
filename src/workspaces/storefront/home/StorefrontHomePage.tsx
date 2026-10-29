@@ -52,6 +52,7 @@ import { HomeOrderSummary } from "@/workspaces/storefront/home/HomeOrderSummary"
 import { HomePopularCakes } from "@/workspaces/storefront/home/HomePopularCakes";
 import { HomeVisitFooter } from "@/workspaces/storefront/home/HomeVisitFooter";
 import { StorefrontCakePrefetch } from "@/workspaces/storefront/home/StorefrontCakePrefetch";
+import { settlePublicCatalogueRead } from "@/workspaces/storefront/home/settle-public-catalogue-read";
 import type { StorefrontCake } from "@/types/storefront";
 import { singaporeDateFromIso } from "@/engines/orders/promotions";
 import {
@@ -325,55 +326,71 @@ async function HomeMerchandisingIsland() {
 async function HomeMerchandisingContent() {
   const todayYmd = toBusinessDateKey();
   const todayYm = businessYearMonth(todayYmd) ?? todayYmd.slice(0, 7);
-  const popularPromise = listHomepagePopularCakes();
-  const [catalogues, specials] = await Promise.all([
-    listOrderableMonthlyCatalogues(todayYmd),
-    listCustomerSpecialCatalogues(todayYmd),
+  const popularPromise = settlePublicCatalogueRead(listHomepagePopularCakes());
+  const [catalogueResult, specialResult] = await Promise.all([
+    settlePublicCatalogueRead(listOrderableMonthlyCatalogues(todayYmd)),
+    settlePublicCatalogueRead(listCustomerSpecialCatalogues(todayYmd)),
   ]);
+  const catalogues = catalogueResult.ok ? catalogueResult.value : [];
+  const specials = specialResult.ok ? specialResult.value : [];
   const selection = selectHomepageFeaturedCollections({
     todayYearMonth: todayYm,
     specials,
     monthlies: catalogues,
   });
 
-  const [popular, featured, voucherResult] = await Promise.all([
+  const [popularResult, featuredResults, voucherResult] = await Promise.all([
     popularPromise,
     Promise.all(
       selection.featured.map(async (candidate) => {
-      const monthly =
-        catalogues.find((catalogue) => catalogue.id === candidate.id) ?? null;
-      const special =
-        specials.find((row) => row.id === candidate.id) ?? null;
-      const cakes = await listHomepageCollectionPreviewCakes(candidate.id);
-      const copy = featuredCopy({
-        kind: candidate.kind,
-        month: monthly?.month ?? null,
-        todayYm,
-        special: special ?? undefined,
-      });
-      const cakeEntries = collectionCakeEntries({
-        kind: candidate.kind,
-        month: monthly?.month ?? null,
-        startDate: special?.startDate,
-        endDate: special?.endDate,
-        cakes,
-      });
-      return {
-        id: candidate.id,
-        href: `/order/collection/${candidate.id}`,
-        cakes,
-        cakeHrefs: cakeEntries.hrefs,
-        cakeScopes: cakeEntries.scopes,
-        fulfilmentFrom: cakeEntries.fulfilmentFrom,
-        fulfilmentTo: cakeEntries.fulfilmentTo,
-        ...copy,
-      };
+        const monthly =
+          catalogues.find((catalogue) => catalogue.id === candidate.id) ?? null;
+        const special =
+          specials.find((row) => row.id === candidate.id) ?? null;
+        const cakeResult = await settlePublicCatalogueRead(
+          listHomepageCollectionPreviewCakes(candidate.id),
+        );
+        if (!cakeResult.ok) return null;
+        const cakes = cakeResult.value;
+        const copy = featuredCopy({
+          kind: candidate.kind,
+          month: monthly?.month ?? null,
+          todayYm,
+          special: special ?? undefined,
+        });
+        const cakeEntries = collectionCakeEntries({
+          kind: candidate.kind,
+          month: monthly?.month ?? null,
+          startDate: special?.startDate,
+          endDate: special?.endDate,
+          cakes,
+        });
+        return {
+          id: candidate.id,
+          href: `/order/collection/${candidate.id}`,
+          cakes,
+          cakeHrefs: cakeEntries.hrefs,
+          cakeScopes: cakeEntries.scopes,
+          fulfilmentFrom: cakeEntries.fulfilmentFrom,
+          fulfilmentTo: cakeEntries.fulfilmentTo,
+          ...copy,
+        };
       }),
     ),
     listPublicCatalogueVouchers()
       .then((vouchers) => ({ vouchers, failed: false }))
       .catch(() => ({ vouchers: [], failed: true })),
   ]);
+  const popular = popularResult.ok ? popularResult.value : [];
+  const featured = featuredResults.filter(
+    (collection): collection is NonNullable<typeof collection> =>
+      collection !== null,
+  );
+  const catalogueSectionsUnavailable =
+    !catalogueResult.ok ||
+    !specialResult.ok ||
+    !popularResult.ok ||
+    featured.length !== selection.featured.length;
   const vouchers = voucherResult.vouchers;
   const offerToday = singaporeDateFromIso(new Date().toISOString());
   const featuredWithPromotions = featured.map((collection) => {
@@ -429,6 +446,16 @@ async function HomeMerchandisingContent() {
           title="Current offers are temporarily unavailable"
           message="Cake selections remain available, but promotion details could not be checked. Please retry before relying on any offer."
         />
+      ) : null}
+      {catalogueSectionsUnavailable ? (
+        <section className="px-6 pt-4 sm:px-10" aria-live="polite">
+          <div className="mx-auto w-full max-w-6xl">
+            <StorefrontRetryNotice
+              title="Some cake selections are temporarily unavailable"
+              message="Other available selections are still shown. Please try again to refresh the missing selections."
+            />
+          </div>
+        </section>
       ) : null}
       <StorefrontCakePrefetch
         excludeIds={popular.map((cake) => cake.id)}

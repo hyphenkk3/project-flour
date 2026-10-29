@@ -32,7 +32,10 @@ import {
   formatBusinessMonthYear,
   toBusinessDateKey,
 } from "@/lib/dates";
-import { createClient, createPublicClient } from "@/lib/supabase/server";
+import {
+  createClient,
+  createPublicClient as createSupabasePublicClient,
+} from "@/lib/supabase/server";
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import {
@@ -65,6 +68,10 @@ export { formatRm, startingPrice };
 /** Short merchandising TTL. Not used for checkout offers, orderability, or Fresh Pick stock. */
 const STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS = 30;
 const STOREFRONT_PRICE_LOOKUP_CONCURRENCY = 6;
+
+function createPublicClient() {
+  return createSupabasePublicClient({ retryTransientGet: true });
+}
 
 type CategoryEmbed = {
   id: string;

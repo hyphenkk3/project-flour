@@ -15,7 +15,7 @@ import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operati
 import { toBusinessDateKey } from "@/lib/dates";
 import { unstable_cache } from "next/cache";
 import { connection } from "next/server";
-import { createPublicClient } from "@/lib/supabase/server";
+import { createPublicClient as createSupabasePublicClient } from "@/lib/supabase/server";
 import { isMissingCakePhotoSchema } from "@/workspaces/library/cakes/photo-storage";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import {
@@ -26,6 +26,10 @@ import {
 } from "@/workspaces/storefront/catalog/cake-photo-map";
 import { loadFreshPicksPreparationConfig } from "@/workspaces/storefront/extra/config";
 import { STOREFRONT_PUBLISHED_CAKES_CACHE_TAG } from "@/workspaces/storefront/catalog/published-cake-cache";
+
+function createPublicClient() {
+  return createSupabasePublicClient({ retryTransientGet: true });
+}
 
 export type StorefrontExtraPick = {
   id: string;
