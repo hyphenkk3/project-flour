@@ -1,0 +1,379 @@
+{
+  "schemaVersion": 1,
+  "projectRef": "cuowwlduhxxifmpvpltt",
+  "deploymentId": "dpl_66qLpJLTdJdZZkFKqPQfn5MmHGkG",
+  "window": {
+    "startUtc": "2026-10-28T04:40:00Z",
+    "endUtc": "2026-10-28T04:43:30Z"
+  },
+  "edgeCatalogue": [
+    {
+      "originMs": 654,
+      "requestIdSha256": "0809F70E16661A53F32DEBA2EC6BA3201BFC67A58519A69F816C67BBAF0CFA47",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:41:08.298000000Z",
+      "traceIdSha256": "937B5BECE128F5EA54CAFB23B91928986F3BD72027B97C3E4A822B4DA6DDDD86"
+    },
+    {
+      "originMs": 43,
+      "requestIdSha256": "CEB4D6E27F0805385E4BBA49FD8BA952CBD79D6FE86AC49E54087EFA8CB9637A",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:41:08.900000000Z",
+      "traceIdSha256": "D0C17FA4B78C6B3360FA4E6C3DEBA7511ADFFE8D410BBFB0BF094AC06463B0E6"
+    },
+    {
+      "originMs": 44,
+      "requestIdSha256": "A945BFCDD979DF205B9B77CF136F4EE434B8C5E300ECB127D90967E93D70689F",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:41:08.973000000Z",
+      "traceIdSha256": "06CEB931640BB869A6A46F5EF9697EFD4DB01552AD5A5311BD9DC589C276E24F"
+    },
+    {
+      "originMs": 21472,
+      "requestIdSha256": "382AAA93280187AE71C240E33E6D8FF4E7AABBF31F44A8941936689FF27A16DB",
+      "status": "500",
+      "timestampUtc": "2026-10-28T04:41:08.994000000Z",
+      "traceIdSha256": "081804EF5965A4059D7D07E3D471F39FBA31B485F13E1691A8AF118525F242E3"
+    },
+    {
+      "originMs": 6293,
+      "requestIdSha256": "F068ADE3D0813692D5A9A73A5ACB71EC1273788106819F4AD0184223F11A38BA",
+      "status": "500",
+      "timestampUtc": "2026-10-28T04:41:08.995000000Z",
+      "traceIdSha256": "7246CF6B3ECAC85A5B23A2CA87CBB39C4BEEE32ED2EA27862B228B41AB2AE0F4"
+    },
+    {
+      "originMs": 21568,
+      "requestIdSha256": "59DE58C35A122281D04A2DB31D3CC8BC94B4A492C3E3D3752DBFC99CF1E185F0",
+      "status": "500",
+      "timestampUtc": "2026-10-28T04:41:08.996000000Z",
+      "traceIdSha256": "72833FFEE37AD1A09B87C5E7EEB9B08D0445AF46BD45F9E287B18DEFE349E44A"
+    },
+    {
+      "originMs": 6165,
+      "requestIdSha256": "C7625D3D313DF538B432398E0C6EE569754089903E4E2CB9E48ECF51FF2AC85E",
+      "status": "500",
+      "timestampUtc": "2026-10-28T04:41:09.086000000Z",
+      "traceIdSha256": "F07945915212991E9465A20226A493F528824242D14132985381A0CF871AEBDC"
+    },
+    {
+      "originMs": 35,
+      "requestIdSha256": "1B72C5E5650607F81A5CBC66492DF95517F2BC803450D3B0F266296E87C567E0",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:41:09.096000000Z",
+      "traceIdSha256": "A0BD7BB2445F7413F89791BCBB17230066B456F5686397CBD8034D0A597B0541"
+    },
+    {
+      "originMs": 5814,
+      "requestIdSha256": "B2F9323D402B8107DDB1C9D29A559272AEC993A15A644AFCD6456F5870DBCD16",
+      "status": "500",
+      "timestampUtc": "2026-10-28T04:41:09.156000000Z",
+      "traceIdSha256": "11D9319635207DD936C1C660041337D2CC8BBFFE0951B2178AFB0D64BE0000A8"
+    },
+    {
+      "originMs": 17889,
+      "requestIdSha256": "4BC06C34FAC7A77D4C6E8EB9A9A69063BE61835CFA2FFB9EC3CF738847BEF0DC",
+      "status": "500",
+      "timestampUtc": "2026-10-28T04:41:12.847000000Z",
+      "traceIdSha256": "38EEC2EA9F6B14036690D03775466487008B3088F63B6675C52187BD19C6B3EF"
+    },
+    {
+      "originMs": 506,
+      "requestIdSha256": "E4ED6BD1B032FFDCFC45EE0A0B7175B3EC76A5003216052BB787F2663A9BCC69",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:41:57.623000000Z",
+      "traceIdSha256": "6AA98B2B7BA2BD90835F127D2732792D97383E372611C711C3EC84F6F5AD90D1"
+    },
+    {
+      "originMs": 593,
+      "requestIdSha256": "24B5A9E2134CC972E36D0AB6428CEA32420F7DD042939C382B56BB46B2AE0018",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:41:58.156000000Z",
+      "traceIdSha256": "23A3F99B70EF8A1CEE4FCC85E9C68C332ABC0D1EFDF419F9A79E6C7D2BA69209"
+    },
+    {
+      "originMs": 570,
+      "requestIdSha256": "FD45F8CB36C1DE34153CB9255BB95D0A6197335E44442FEA81CA18A09AD766A5",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:41:58.162000000Z",
+      "traceIdSha256": "EB769F86F536964EF3AE0B7E531EF31667AF475F713C936DD0068EA8287D0EB7"
+    },
+    {
+      "originMs": 26,
+      "requestIdSha256": "3CA9DDAA10B04CFB0A3EABB21BD9B0381E5B33A69AE628A89893923D74ED20FD",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:41:58.163000000Z",
+      "traceIdSha256": "75E0B18EF89EC8544259021A1D8F7F9067CFB063CB7E5C77C63E7749A5EF6599"
+    },
+    {
+      "originMs": 574,
+      "requestIdSha256": "5DE69775359843127C1532CA8381A616A4C6ED2B0F2EC6283A0A01032A41F666",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:41:58.169000000Z",
+      "traceIdSha256": "658F513140EC8134028DCCA7761B4BC4D0E052EE233E0DCA71F10969DB86B268"
+    },
+    {
+      "originMs": 54,
+      "requestIdSha256": "603C0535A34C9BBBDA1F401F3C014FF642828A82DC947281B121585CC7E675AD",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:42:13.632000000Z",
+      "traceIdSha256": "E2BAE6854F793887DFBFA4CF6A445F871D3AF78827F02F14B9D63C6833BFAD79"
+    },
+    {
+      "originMs": 211,
+      "requestIdSha256": "F9F768D67944DF8EAC9FA75F859AE80AD917E76F0E931C5EC734F50502F54B59",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:42:13.714000000Z",
+      "traceIdSha256": "C5F6A55C14A02689670766FF8EBFAC53AADE56D58F767D5F35413A326E652184"
+    },
+    {
+      "originMs": 537,
+      "requestIdSha256": "64836C8197F932E6ED1AA0CEA5FF551AC8123E0CA62BEECCC12B23F57C720636",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:42:14.262000000Z",
+      "traceIdSha256": "72FAF69ED203A2692CA5BF08AADB80B0A995B2B0F9DE16805253B95AFEF107C9"
+    },
+    {
+      "originMs": 529,
+      "requestIdSha256": "A6F6EF0BD640582A7C2051E49BA16110E01DA003F130D23F01FC3355FD065A6C",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:42:14.264000000Z",
+      "traceIdSha256": "3EA1751FE7A592C4F943E7902393CBC412F44041F987AFED95FDCB6B4D4CF480"
+    },
+    {
+      "originMs": 523,
+      "requestIdSha256": "46A40C67C2E86569F6DD3FBF0B60D1016D9CE16D7C0864406BB54BCAE717A119",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:42:14.273000000Z",
+      "traceIdSha256": "CAB2D438383DB418583597BFD14BE277775871635129110AC97939C993C02044"
+    },
+    {
+      "originMs": 19,
+      "requestIdSha256": "8D7259059292AE6F19FC16212E2F2C66077CD5F03389D7EFA991F5D36A36F0E6",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:42:37.424000000Z",
+      "traceIdSha256": "C4509A13517905CCB078F608EDF4AB4BB68B23B3DD151F39CFAF7388E079ABFF"
+    },
+    {
+      "originMs": 97,
+      "requestIdSha256": "8D4E081ACD764FC21E4503F35D59B9F8B7E48547370D582900DD5EEE21E3F1AD",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:42:40.765000000Z",
+      "traceIdSha256": "01713D31C06FE6F93DF07517AAC5671DCA119C74D4BA6FE9AD3FC883F3D8BAB7"
+    },
+    {
+      "originMs": 433,
+      "requestIdSha256": "12E30D6C148A34F3F9166E81ED355F4866692C442657C088DA768DB3088D8EE2",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:42:40.769000000Z",
+      "traceIdSha256": "40F6AD070FA899321191B39361833D5A833384D30344D9E9D52D50F726D4BE61"
+    },
+    {
+      "originMs": 736,
+      "requestIdSha256": "A9D6AD1EAA201CD43DC692A2E1F5B94F4B2025970149723198A4A513CECBC86D",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:43:19.566000000Z",
+      "traceIdSha256": "C603D17A32231C882F4EAA46EEB36AFE7DBBA7EAB67E43DFC4B47A517A08917F"
+    },
+    {
+      "originMs": 1448,
+      "requestIdSha256": "0ECEFB9903D1937F4A6AF0E6CC917B5673B5C3C576B43A021420D2407AFF77B3",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:43:20.287000000Z",
+      "traceIdSha256": "7F287E6C66F99A1C6A5A4E9E954F139E2A697264F1C731538DDC52F1AFE33F4C"
+    },
+    {
+      "originMs": 1429,
+      "requestIdSha256": "82D2AB5DF18342F29BF0F2F91B4762CFFEA8D7A86F59286684CAABC7CD473C5F",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:43:20.314000000Z",
+      "traceIdSha256": "1E2BBA225BC17CEC5EAADFD94AEB8A79B5C3AABBF31BF3ACC5D609807FEA907A"
+    },
+    {
+      "originMs": 1401,
+      "requestIdSha256": "16ACAFD76A183784ECCEC05B632850D65585B53A58DB22F59A5BCDC0C6DBA03B",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:43:20.325000000Z",
+      "traceIdSha256": "225490E7A69FAA9DECB91E84F5A01D31832E929C65F717C41AD410540D2A56F6"
+    },
+    {
+      "originMs": 868,
+      "requestIdSha256": "3C205AFA30B8D2B26A3CDC453361189A27B89B8D01CF4C2E46B893A9D9135510",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:43:20.371000000Z",
+      "traceIdSha256": "F97699BE962D50E3728F21AAD8F56398823824E49270923EF4C16F6A89B8CC53"
+    },
+    {
+      "originMs": 1209,
+      "requestIdSha256": "0C5CC6B8FF96F1644544696C49BD11A7E54B95099956D1677D797C09DDCE81A8",
+      "status": "200",
+      "timestampUtc": "2026-10-28T04:43:20.439000000Z",
+      "traceIdSha256": "D7CFBCC4BBD4688973A8DB28F68B4974466387222593341996F49A197A3C8FF4"
+    }
+  ],
+  "postgresTimeouts": [
+    {
+      "queryId": "-3231686492694644454",
+      "sessionIdSha256": "DF35037FC6A9FF4BFFBD3EFAF41B1C148D35CF1857B15850CBE5271F4098AA7E",
+      "sessionLineNum": "1",
+      "severity": "ERROR",
+      "sqlstate": "57014",
+      "timestampUtc": "2026-10-28T04:41:12.521000000Z"
+    },
+    {
+      "queryId": "-3231686492694644454",
+      "sessionIdSha256": "92DC791AD7E720F2D3EF173FB9190F5C77A5F842B1963F2238246B4651026240",
+      "sessionLineNum": "1",
+      "severity": "ERROR",
+      "sqlstate": "57014",
+      "timestampUtc": "2026-10-28T04:41:12.556000000Z"
+    },
+    {
+      "queryId": "-3231686492694644454",
+      "sessionIdSha256": "DC559DDE332EB18187CD2BF9F94C646E7A1C5ECFBAEC8E1DBDA079A269451F83",
+      "sessionLineNum": "1",
+      "severity": "ERROR",
+      "sqlstate": "57014",
+      "timestampUtc": "2026-10-28T04:41:12.686000000Z"
+    },
+    {
+      "queryId": "-3231686492694644454",
+      "sessionIdSha256": "4A3702E9A757B039DEBF927B6AB17B46B6EAD58AFC2845DD53E7034961B0FA05",
+      "sessionLineNum": "1",
+      "severity": "ERROR",
+      "sqlstate": "57014",
+      "timestampUtc": "2026-10-28T04:41:29.935000000Z"
+    },
+    {
+      "queryId": "-3231686492694644454",
+      "sessionIdSha256": "BD6C69AB303C9889C0DCBCD183306BA9ED92EF68F308D70A558FDA2A0A311183",
+      "sessionLineNum": "1",
+      "severity": "ERROR",
+      "sqlstate": "57014",
+      "timestampUtc": "2026-10-28T04:41:29.961000000Z"
+    },
+    {
+      "queryId": "-3231686492694644454",
+      "sessionIdSha256": "F30E93D11BDF2D5DA0D9ABD0CC9A916A6E4C823DBC5B0979ACA4BD88D326CE5B",
+      "sessionLineNum": "1",
+      "severity": "ERROR",
+      "sqlstate": "57014",
+      "timestampUtc": "2026-10-28T04:41:30.423000000Z"
+    }
+  ],
+  "postgrestTimeoutMessages": [
+    {
+      "repeatedLogRows": 1,
+      "timestampUtc": "2026-10-28T04:41:13.000000Z",
+      "wording": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "repeatedLogRows": 2,
+      "timestampUtc": "2026-10-28T04:41:14.000000Z",
+      "wording": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "repeatedLogRows": 3,
+      "timestampUtc": "2026-10-28T04:41:30.000000Z",
+      "wording": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}"
+    },
+    {
+      "repeatedLogRows": 13,
+      "timestampUtc": "2026-10-28T04:41:57.000000Z",
+      "wording": "Warp server error: Thread killed by timeout manager"
+    },
+    {
+      "repeatedLogRows": 4,
+      "timestampUtc": "2026-10-28T04:41:57.000000Z",
+      "wording": "Warp server error: Thread killed by timeout manager28/Oct/2026:04:41:57 +0000: Warp server error: Thread killed by timeout manager"
+    },
+    {
+      "repeatedLogRows": 9,
+      "timestampUtc": "2026-10-28T04:42:57.000000Z",
+      "wording": "Warp server error: Thread killed by timeout manager"
+    },
+    {
+      "repeatedLogRows": 2,
+      "timestampUtc": "2026-10-28T04:42:57.000000Z",
+      "wording": "Warp server error: Thread killed by timeout manager28/Oct/2026:04:42:57 +0000: Warp server error: Thread killed by timeout manager28/Oct/2026:04:42:57 +0000: Warp server error: Thread killed by timeout manager"
+    }
+  ],
+  "pricingByMinute": [
+    {
+      "logRows": 84,
+      "maxOriginMs": 3310,
+      "minuteUtc": "2026-10-28T04:41:00Z",
+      "p50OriginMs": 130,
+      "p95OriginMs": 609,
+      "status": "200",
+      "uniqueRequestIds": 84
+    },
+    {
+      "logRows": 65,
+      "maxOriginMs": 894,
+      "minuteUtc": "2026-10-28T04:42:00Z",
+      "p50OriginMs": 27,
+      "p95OriginMs": 347,
+      "status": "200",
+      "uniqueRequestIds": 65
+    },
+    {
+      "logRows": 28,
+      "maxOriginMs": 1647,
+      "minuteUtc": "2026-10-28T04:43:00Z",
+      "p50OriginMs": 704,
+      "p95OriginMs": 927,
+      "status": "200",
+      "uniqueRequestIds": 28
+    }
+  ],
+  "vercel": {
+    "matchingLogs": 0,
+    "query": "Production deployment runtime errors/warnings; text search catalog; exact incident window",
+    "note": "No logs found for the specified criteria."
+  },
+  "resourceSnapshot": {
+    "observedUtc": "2026-10-29T06:28:40.338889Z",
+    "relativeToIncident": "after the historical incident; not causal evidence",
+    "numBackends": 13,
+    "activityByState": [
+      {
+        "backendType": "client backend",
+        "state": "idle",
+        "waitEventType": "Client",
+        "waitEvent": "ClientRead",
+        "sessions": 10
+      },
+      {
+        "backendType": "pg_cron launcher",
+        "state": null,
+        "waitEventType": "Extension",
+        "waitEvent": "Extension",
+        "sessions": 1
+      },
+      {
+        "backendType": "pg_net 0.20.4 worker",
+        "state": "idle",
+        "waitEventType": "Extension",
+        "waitEvent": "Extension",
+        "sessions": 1
+      }
+    ],
+    "currentSessionDefaults": {
+      "anonStatementTimeout": "3s",
+      "authenticatedStatementTimeout": "8s",
+      "authenticatorStatementTimeout": "8s",
+      "authenticatorLockTimeout": "8s"
+    },
+    "functionSettings": [
+      {
+        "function": "public.library_cake_size_price_on(uuid,date)",
+        "proconfig": [
+          "search_path=public"
+        ],
+        "statementTimeoutOverride": null
+      }
+    ],
+    "historicalCpuMemoryIoPoolMetrics": "not available from queried supported interfaces"
+  }
+}
