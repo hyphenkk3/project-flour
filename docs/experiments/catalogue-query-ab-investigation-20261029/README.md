@@ -70,7 +70,7 @@ The Supabase SQL connector can run read-only SQL as `anon`, but it cannot expose
 
 ## Reproducible probe
 
-Run from a network-connected Mac Terminal after using the DEV project's public anon/publishable key only. Do not use a service-role key. Read the key via a hidden prompt so it is not echoed or written to shell history:
+In a network-connected Mac Terminal, first start a Bash shell, then run this block. Use only the DEV project's public anon/publishable key; do not use a service-role key. The hidden prompt prevents the key from being echoed or written to shell history:
 
 ```bash
 cd ~/Desktop/project-flour/work/catalogue-query-ab-investigation-20261029
