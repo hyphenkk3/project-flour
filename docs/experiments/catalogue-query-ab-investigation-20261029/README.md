@@ -90,6 +90,5 @@ The script uses 10 counterbalanced sequential A/B pairs followed by three parall
 ## Investigation source commit
 
 - GitHub branch: `codex/catalogue-query-ab-investigation-20261029`
-- GitHub commit: `0390bda0d670c06df237f5f447d03f86431fd448`
-- Local bundle branch commit: recorded in the external recovery manifest; its source tree matches the GitHub commit tree.
+- The GitHub branch head and local bundle commit are recorded in the external recovery manifest; the committed source trees match.
 - Source changes are limited to this diagnostic report and the bounded DEV probe. No application behavior changed.
