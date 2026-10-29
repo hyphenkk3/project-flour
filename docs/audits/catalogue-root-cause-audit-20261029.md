@@ -23,7 +23,7 @@ GitHub API commit reads independently verified these four owner-provided commits
 |---|---|---|
 | Earlier Production baseline | 0e4007fbd7f603acd4b00b979661fcc27e072afb | Reachable on GitHub; catalogue query present |
 | Current live Production source | d5a29146958556a5a8910cb30001527c363f4124 | Reachable; no catalogue query changes versus 0e4007f |
-| Initial stabilization | 23bb7d036cb958f2a79e5e2cee898c823718089f | Reachable; adds in-process public-read coalescing and bounded 57014 retry |
+| Initial stabilization snapshot | 23bb7d036cb958f2a79e5e2cee898c823718089f | Reachable; cumulative candidate contains in-process coalescing and bounded 57014 retry, implemented by ancestor commit 95985ec |
 | Latest DEV refinement | 910d9f37eac9db330432c13022e969f034fa321b | Reachable; removes retry of the separate app-generated TimeoutError |
 
 The active Production deployment was read as READY: dpl_66qLpJLTdJdZZkFKqPQfn5MmHGkG, SHA d5a29146958556a5a8910cb30001527c363f4124, project prj_3rmlAQzLSFOi15DEGczSuDYDq8xr, region sin1. Its deployment-alias listing includes whitebird.asia and www.whitebird.asia (plus the project alias). Application rollback remains dpl_AQdJv7YhMrkK7D9ePYoAyhMV1Vt4.
