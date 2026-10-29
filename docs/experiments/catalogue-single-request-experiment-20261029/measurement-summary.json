@@ -17,7 +17,7 @@
       "category assignments including multiple assignments",
       "empty and excluded fixtures"
     ],
-    "differences": "No differences in tested canonical projection; known architectural projection distinction remains documented in README."
+    "differences": "No differences detected in the tested canonical projection and fixtures; this does not establish parity outside the measured public projection and fixtures."
   },
   "sequential": {
     "paired_samples": 30,
