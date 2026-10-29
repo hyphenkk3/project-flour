@@ -2,9 +2,11 @@
 
 ## Scope and result
 
-This is a diagnostic-only branch. It makes no storefront implementation changes, Production changes, database changes, cache changes, or deployments. The intended comparison is the historical October 22 collection-embed query (A) versus the refactored membership-then-root-cake query (B), using a 5–6-cake DEV homepage collection under anonymous RLS.
+This diagnostic-only experiment compares the historical October 22 collection-embed query (A) with the refactored membership-then-root-cake query (B), using the same DEV project, public anonymous API key, collection, and shared response fields. It changes no storefront implementation, Production data, database schema, cache, or deployment.
 
-**The end-to-end A/B experiment is BLOCKED in this runtime.** DEV project identity and an anonymous, read-only SQL role check passed, but this environment could not resolve `tzwtpxdcggesgjaqxkqr.supabase.co` (`curl` exited with DNS error 6; Node `fetch` failed). No REST request reached Supabase. Consequently there are no measured HTTP timings, REST response sizes, REST error counts, completeness comparison, or PostgREST query plans from this run. The supplied script is a bounded, secret-free-output probe for execution from an environment that can resolve the DEV host; its results have not been run and must not be treated as evidence.
+**The bounded DEV HTTP experiment completed.** It ran 10 counterbalanced sequential A/B pairs and three concurrent requests per architecture against a six-cake DEV collection. All measured requests succeeded without HTTP failures or timeouts. The common selected fields and ordered membership IDs matched, but B returned an additional category-assignment projection that differed for one of six cakes. Therefore common-field results match, while full category output is not equivalent.
+
+Observed per-sample total latency was higher for B (median 178 ms vs 144 ms; nearest-rank p95/max 343 ms vs 291 ms). B used two sequential REST requests and returned more bytes per sample. This is evidence of modest request-path overhead for this DEV dataset, not proof of Production `57014` causation or of an intrinsic slowdown in B's root SQL query. The probe bypasses Next.js cache behavior and cannot split network, gateway, PostgREST, and SQL time.
 
 ## Preserved source and ancestry
 
@@ -34,35 +36,40 @@ The price-cache relocation has a separate invalidation concern: current price-sc
 
 ## DEV access evidence
 
-- Supabase project metadata returned ref `tzwtpxdcggesgjaqxkqr`, status `ACTIVE_HEALTHY`, PostgreSQL 17.6.1.155, region `ap-southeast-1`.
-- A read-only transaction with `SET LOCAL ROLE anon` reported `current_user=anon`, `transaction_read_only=on`; three collections were visible to that role.
-- The three DEV collections had respectively 5, 5 and 6 available homepage memberships. This supplies representative public DEV data without reading business records.
-- Across the 13 unique cakes in those homepage selections, all 13 had visible category assignments and 5 had multiple assignments. Per collection, counts were 6 cakes/1 multi-category, 5/2 and 5/3. All direct `category_id` values matched at least one assignment in aggregate. Thus the actual A and B projections differ, and B can return multiple category refs where A had only the direct category embed. Full output equivalence is not established.
-- Those visible active/seasonal cakes had 8, 7 and 8 size rows by collection. `withEffectiveStorefrontPrices` performs one `library_cake_size_price_on` RPC per size, in batches of six. Before the refactor these RPCs ran inside the homepage `unstable_cache` callback keyed by collection and price date; after it, they run outside the cached result on every `listHomepageCollectionPreviewCakes` call. Source plus DEV size counts therefore establishes 7–8 price RPCs on a current warm homepage preview call versus zero on a warm old whole-result cache hit. This is a concrete request-count regression; its latency and Production impact remain unmeasured.
-- Production project, Production data, customer records and live domains were not queried or modified for this experiment.
-- The failed direct-network checks stopped at name resolution; no anonymous REST request was sent. The direct SQL check is not a substitute for an HTTP/PostgREST A/B measurement.
+- Supabase project identity was `tzwtpxdcggesgjaqxkqr`; the probe verified that exact host before sending requests.
+- A preflight using the DEV public publishable key returned HTTP 200 for one bounded `collection_cakes` GET. The diagnostic requests used only the `apikey` header, with no user `Authorization` token, so they exercised anonymous access/RLS.
+- The selected public homepage collection contained six memberships. The probe's additional setup discovery GET returned 200 (958 bytes, about 298 ms).
+- The A/B probe performed 40 bounded GETs: A made 13 underlying REST requests (10 sequential plus three concurrent); B made 26 (two sequential REST calls for each of 10 sequential and three concurrent flows); one collection-discovery request was excluded from the A/B totals. The separate key preflight was one additional GET.
+- No cake names, IDs, prices, image URLs, row bodies, or credentials were emitted. The returned data was processed in memory and summarized by hashes, counts, timings and byte totals.
+- Earlier aggregate DEV metadata showed 13 unique cakes across three collections, 5 with multiple category assignments; the actual six-cake A/B sample showed one differing category set and one B cake with multiple assignments.
+- No Production project, customer records, or Production business data were accessed or modified.
 
 ## Results and interpretation
 
-| Measure | A — old embed | B — refactor | Status |
+| Measure | A — historical embed | B — refactor | Notes |
 |---|---:|---:|---|
-| Base catalogue REST calls on an uncached request | 1 by source shape | 2 by source shape (membership, then root cakes) | Static source count only; no request observed |
-| Effective-price RPCs on cold homepage cache fill | 7–8 by source and DEV size-row count | 7–8 by source and DEV size-row count | Static call path plus DEV aggregate counts; not HTTP-measured |
-| Effective-price RPCs on warm homepage cache hit | 0 while old whole-result cache hits | 7–8 on each current invocation | Source-confirmed call placement plus DEV aggregate counts; runtime timing not measured |
-| Cold/warm latency, median/p95/max | — | — | BLOCKED |
-| Underlying REST request latency | — | — | BLOCKED |
-| Response bytes | — | — | BLOCKED |
-| HTTP/SQL timeout rate | — | — | BLOCKED |
-| Concurrent behavior | — | — | BLOCKED |
-| Exact PostgREST query plan | — | — | BLOCKED; API unavailable here |
-| Common raw-projection completeness/equivalence | — | — | BLOCKED |
-| Full mapped category equivalence | Single direct category | Assignments may yield multiple categories | Not equivalent field set; no HTTP response comparison |
+| Sequential flows | 10 | 10 | 10 alternating A/B pairs; A-first then B-first by pair |
+| REST calls per sequential flow | 1 | 2 | B performs membership GET followed by root-cake GET |
+| Sequential total latency, median | 144.0 ms | 177.6 ms | B +33.6 ms / +23.3% in this sample |
+| Sequential total latency, p95 / maximum | 290.5 / 290.5 ms | 342.6 / 342.6 ms | Nearest-rank p95 with n=10 equals maximum |
+| Individual REST subrequest median / maximum | 143.9 / 290.4 ms | 68.8 / 245.2 ms | B values combine membership and root requests; not an end-to-end comparison |
+| Response bytes per sequential flow, median | 8,944 | 10,747 | B +1,803 bytes / +20.2%; B includes a separate membership response and category assignments |
+| HTTP failures / timeouts | 0 / 0 | 0 / 0 | Across 10 sequential flows and three concurrent flows per architecture |
+| Concurrent group | 3 flows; 3 REST calls; 333.6 ms; 26,832 bytes | 3 flows; 6 REST calls; 321.6 ms; 32,241 bytes | Three concurrent flows only; B's aggregate group finished about 12 ms sooner despite twice the calls; too small to establish an advantage |
+| Common selected projection | 6 rows | 6 rows | Hashes match: `ad346b9e…15c6330`; ordered membership IDs match |
+| Category-assignment projection | Direct category only | Assignments included | One of six cakes differs; one B cake has multiple assignments. Full category output is not equivalent |
+| Effective-price RPCs | Not measured by HTTP probe | Not measured by HTTP probe | Source-level estimate remains 0 on old warm whole-result cache hit vs 7–8 per current warm homepage call |
+| PostgREST/SQL plan and server execution time | — | — | Not available from this client probe |
 
-The two-call source path does not mean B necessarily makes two backend reads on every homepage response: the outer Next cache can avoid both requests on a cache hit; on an outer cache miss the membership request runs, while the nested 30-second root-cake cache may hit or miss. No cache hit/revalidation instrumentation was available in this run. For `listAvailableCakes`, the source does not wrap the entire membership-plus-root operation in the same homepage cache, so its request behavior differs. Do not generalize one path's request count to all catalogue surfaces.
+### Interpretation
 
-There is a source-confirmed warm-hit increase in effective-price DB requests: the old cache contained effective prices, while the new code applies the same 7–8 per-size RPCs after the cache. This is evidence the October 22 refactor increased warm homepage database work. The cold path also adds a membership REST request and the B root query adds category-assignment data.
+For this modest DEV collection, B is slower end-to-end in the sequential measurement because its flow performs two dependent REST calls. Its individual REST subrequests are shorter in aggregate median, but those per-call values cannot be compared to A's one-call flow as if they represented total completion time. B's response is larger because it includes the extra membership response and category-assignment data. The common fields (including photos and sizes selected by both paths) and collection order match; the added category projection does not.
 
-These changes plausibly add homepage latency and database pressure. They do not prove the `library_cakes` statement-timeout root cause: `library_cake_size_price_on` is a separate RPC, and no incident trace ties its calls to fingerprint `-3231686492694644454`. Direct A/B HTTP latency, response size, errors and query-time impact remain **UNKNOWN / INCONCLUSIVE**. A first failure near READY does not prove cold cache caused it; later failures hours later weaken that explanation.
+The three-flow concurrency result was close and is not evidence of a consistent concurrent benefit or regression. No requests timed out, so the experiment did not reproduce the intermittent stall. The 10-pair latency sample is small, uses one six-cake DEV collection, and measures client-observed HTTP time—not isolated SQL execution. No overall batch wall-clock duration was emitted by the probe.
+
+The separate warm effective-price cost is not included in these A/B REST timings. Existing source/data analysis indicates 7–8 price RPCs can run on each current warm homepage preview call, versus zero on an old whole-result cache hit. The probe does not instrument Next.js cache hits or these RPCs, and this request-frequency change is not linked by trace to Production fingerprint `-3231686492694644454`.
+
+**Causal conclusion: PARTIAL.** The October 22 architecture has a measured, modest end-to-end latency and payload overhead on this DEV sample, chiefly consistent with an extra dependent membership request and extra projection. This is a measurable path regression under the tested conditions, not evidence that the root `library_cakes` query itself is slower or that the refactor caused Production `57014` cancellations. Production cause and timeout reliability remain unresolved.
 
 ## Query-plan boundary
 
@@ -70,33 +77,42 @@ The Supabase SQL connector can run read-only SQL as `anon`, but it cannot expose
 
 ## Reproducible probe
 
-In a network-connected Mac Terminal, first start a Bash shell, then run this block. Use only the DEV project's public anon/publishable key; do not use a service-role key. The hidden prompt prevents the key from being echoed or written to shell history:
+The exact diagnostic script is `scripts/diagnostics/catalogue-query-ab-20261029.mjs`. It uses only Node built-ins and has an eight-second timeout per HTTP request. It sends at most 40 GETs within the probe: one setup discovery, ten counterbalanced sequential pairs, and three parallel flows per architecture. Peak parallelism is three flows; in B, each flow performs its membership and cake requests sequentially. It makes no retries and never prints keys or returned records.
+
+In Mac Terminal, first start a Bash shell with `bash`. At the `bash-3.2$` prompt, enter the hidden-key command **by itself**:
 
 ```bash
-cd ~/Desktop/project-flour/work/catalogue-query-ab-investigation-20261029
-read -s -p 'DEV public anon/publishable key: ' SUPABASE_ANON_KEY; printf '\n'; export SUPABASE_ANON_KEY
+read -r -s -p 'DEV public anon/publishable key: ' SUPABASE_ANON_KEY; printf '\n'
+```
+
+When the hidden prompt appears, paste only the enabled public key from DEV project `tzwtpxdcggesgjaqxkqr`, press Return, and wait for the Bash prompt to return. Do not paste the remaining commands while `read` is waiting. Then enter:
+
+```bash
+export SUPABASE_ANON_KEY
 export SUPABASE_URL='https://tzwtpxdcggesgjaqxkqr.supabase.co'
 node scripts/diagnostics/catalogue-query-ab-20261029.mjs
 unset SUPABASE_ANON_KEY SUPABASE_URL
 ```
 
-The script uses 10 counterbalanced sequential A/B pairs followed by three parallel requests per architecture (40 REST requests maximum including the one collection-discovery request), each request capped at 8 seconds. It prints aggregate timings, bytes, status counts, common-field hashes, cake-order parity and category projection differences only. “First request” is not a guarantee of a database-cold cache. It does not exercise Next.js `unstable_cache`, Vercel multi-instance behavior, staff invalidation, or checkout. Any common-projection mismatch invalidates the latency comparison until explained. No automated retries are performed by the probe.
+The recorded run used Node `v26.5.1`. A separate preflight confirmed the key was accepted (HTTP 200); the probe itself then returned the sanitized JSON captured in this report. The probe does not control for database-cold cache state, execute the Next.js `unstable_cache`, measure actual homepage price-RPC counts, or provide a Postgres execution plan. Any category mismatch must be preserved as a correctness difference, not treated as parity.
 
 ## Safety and actions not performed
 
-- No storefront implementation file changed.
-- No Production or hosted DEV writes, DDL, migration, RLS/index/role/config changes, orders, stock, checkout, payments, notifications, domain/alias changes, or deployment occurred.
-- The DEV check read only minimal public catalogue metadata under role `anon`.
-- No `EXPLAIN ANALYZE`, load test, REST request, or cache mutation was performed.
-- Existing accepted branches, reports and recovery archives were preserved.
+- No storefront implementation file changed; only the diagnostic report and probe are on this branch.
+- All measured requests were read-only GETs to DEV under anonymous public-key access. No business records, orders, stock, checkout, payments, notifications, schema, RLS, indexes, credentials, or configuration were changed.
+- No Production database connection, deployment, promotion, or alias change occurred.
+- No `EXPLAIN ANALYZE` or load test was run. Concurrent testing was limited to three simultaneous flows per architecture.
+- The production domains remain on the previously verified live deployment; no operation in this experiment could move aliases.
 
 ## Decision
 
-**Causal conclusion: PARTIAL.** A source- and DEV-data-backed warm-hit request-count regression is confirmed: 7–8 effective-price RPCs run on each current homepage preview call, while the prior warm whole-result cache avoided those calls. The new cold path also makes two catalogue REST calls instead of one. Actual latency and any causal contribution to Production 57014 remain unmeasured; the refactor is not proven to cause the intermittent timeouts.
+**Measured result:** B had a 23.3% higher median sequential flow latency and 17.9% higher nearest-rank p95/max than A for the tested DEV collection, with zero failures in either architecture. B also used twice as many underlying REST calls per flow and returned 20.2% more bytes. In the three-flow concurrency sample, B completed slightly sooner; the sample is too small to establish a concurrent advantage.
 
-**Recommended correction to evaluate after the diagnostic:** reduce the repeated warm-hit effective-price reads while preserving date-sensitive freshness and explicit invalidation. A price cache is only safe after verifying the price-schedule actions invalidate it; the low-risk control is an isolated DEV experiment that compares the old cache boundary and current per-call RPC path while checking changed schedule visibility. Separately, measure A/B base query latency and exact result parity. No source fix is authorized by this experiment.
+**Correctness:** Common raw fields and ordered memberships matched; the full projections did not. B returned category assignments, with one category-set difference among six cakes. The probe did not compare date-derived effective prices. Do not claim full functional equivalence.
 
-**Next action:** execute the committed bounded probe from a network-connected Mac Terminal using only the DEV public key. Review common-field parity, category differences and timing. Then verify price-schedule cache invalidation before recommending any cache-boundary change; obtain exact anonymous PostgREST plans/trace evidence before attributing the Production `57014` incidents.
+**Recommended correction to evaluate, not implement here:** if lower request latency is prioritized, compare a single-request historical embed against a refactored projection that retains any required category-assignment behavior. Before caching effective prices again, verify explicit invalidation after price-schedule edits. Neither finding proves the Production `57014` root cause, and no fix or release is authorized by this experiment.
+
+**Next action:** preserve these measurements, then obtain a second modest DEV sample with the category output contract made explicit and measure price-schedule invalidation/RPCs separately. Any application change needs separate authorization and focused review.
 
 ## Investigation source commit
 
