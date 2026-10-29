@@ -105,7 +105,7 @@ Current aggregate counts: 23 library cakes, 10 categories, 35 category assignmen
 
 Current project metadata: ACTIVE_HEALTHY, PostgreSQL 17.6.1.166, region ap-southeast-1. Vercel function region sin1 is nominally colocated. A later point-in-time activity/locks snapshot had no waiting locks; it cannot prove there was no historical contention. Sampled PgBouncer logs contained no pool-timeout keywords, but coverage is not enough to rule out pool pressure. Historical CPU, memory, I/O, connection occupancy and PostgREST worker telemetry were unavailable. Project health is a current summary, not an incident trace.
 
-Relevant catalogue schema migrations for categories, tags, photos, browsing and sizes/prices accumulated from early September into October. The manually executed Oct 27 compatibility migration changed complimentary-entitlement/order RPCs and a helper; it did not change library_cakes reads, their indexes/policies or data.
+Relevant catalogue schema migrations for categories, tags, photos, browsing and sizes/prices accumulated from early September into October. The Supabase migration ledger returned 170 entries and its latest recorded version is 20261023140052 (2026-10-23); no later entry appears in the ledger. The manually executed Oct 27 compatibility migration changed complimentary-entitlement/order RPCs and a helper and was not recorded as a ledger entry; its reviewed SQL did not change library_cakes reads, their indexes/policies or data.
 
 ## Distinguishing timeout mechanisms
 
