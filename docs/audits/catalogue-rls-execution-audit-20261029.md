@@ -79,7 +79,7 @@ collections_authenticated_all grants authenticated ALL with USING(true), WITH CH
 
 library_cake_categories_select, library_cake_category_assignments_select, library_cake_tags_select and library_cake_tag_assignments_select are PERMISSIVE SELECT policies for anon and authenticated with USING(true). Their public SELECT policies have no correlated visibility EXISTS. Authenticated write policies on these tables are separate from public SELECT.
 
-RLS is enabled, not forced, on the nine inspected tables; owner is postgres. Production and DEV policy text/role fingerprint: 44 policy rows; MD5 fingerprint 9856391f81289e0ead52110c91a72cb8 for each. This confirms policy-definition parity, not table-data, role-session, or execution-plan parity.
+RLS is enabled, not forced, on the nine inspected tables; owner is postgres. Production and DEV policy text/role fingerprint: 44 policy rows; MD5 fingerprint 9856391f81289e0ead52110c91a72cb8 for each. This confirms policy-definition parity, not table-data, role-session, or execution-plan parity. The complete 44-row Production policy inventory, including exact USING/WITH CHECK expressions and authenticated write policies, is preserved in docs/audits/catalogue-rls-policy-inventory-20261029.json.
 
 ## RLS and nested-query DEV measurements
 
