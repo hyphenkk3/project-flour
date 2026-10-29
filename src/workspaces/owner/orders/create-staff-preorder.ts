@@ -18,9 +18,9 @@ import {
   type OwnerCreateFulfilmentMethod,
 } from "@/engines/orders/fulfilment";
 import { formatNewOrderPersonName } from "@/engines/orders/customer-name";
+import { normalizeNewStaffOrderSourceInput } from "@/engines/orders/staff-order-source";
 import type { PaidAddonMutationPayload } from "@/engines/orders/paid-addons";
 import { createClient } from "@/lib/supabase/server";
-import { isStaffGuestOrderSource } from "@/workspaces/owner/orders/labels";
 import type { StaffPreorderFormItem } from "@/workspaces/owner/orders/staff-preorder-form";
 import { listOfferableLibraryCakes } from "@/workspaces/storefront/catalog/queries";
 
@@ -30,6 +30,7 @@ export type CreateStaffGuestPreorderInput = {
   guestPhone: string | null;
   guestEmail: string | null;
   orderSource: string;
+  orderSourceOther?: string | null;
   crewOrder?: boolean;
   pickupDate: string;
   pickupTime: string;
@@ -71,9 +72,11 @@ export async function createStaffGuestPreorderRecord(
   if (!guestName) {
     return { error: "Please enter the customer name." };
   }
-  if (!isStaffGuestOrderSource(input.orderSource)) {
-    return { error: "Please choose a valid order source." };
-  }
+  const sourceInput = normalizeNewStaffOrderSourceInput(
+    input.orderSource,
+    input.orderSourceOther ?? "",
+  );
+  if ("error" in sourceInput) return { error: sourceInput.error };
   if (
     input.guestEmail &&
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.guestEmail)
@@ -186,7 +189,8 @@ export async function createStaffGuestPreorderRecord(
     p_customer_name: formatNewOrderPersonName(guestName),
     p_phone: input.guestPhone,
     p_email: input.guestEmail,
-    p_order_source: input.orderSource,
+    p_order_source: sourceInput.orderSource,
+    p_order_source_other: sourceInput.orderSourceOther,
     p_crew_order: Boolean(input.crewOrder),
     p_pickup_date: input.pickupDate,
     p_pickup_time: input.pickupTime,
@@ -213,7 +217,7 @@ export async function createStaffGuestPreorderRecord(
   }
 
   const { data, error } = await supabase.rpc(
-    "create_staff_guest_preorder",
+    "create_staff_guest_preorder_with_source_detail",
     rpcArgs,
   );
 

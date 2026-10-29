@@ -26,6 +26,9 @@ const actions = read("src/workspaces/customer-operations/orders/actions.ts");
 const form = read(
   "src/workspaces/customer-operations/orders/AssistedOrderForm.tsx",
 );
+const sourceFields = read(
+  "src/workspaces/owner/orders/StaffGuestOrderSourceFields.tsx",
+);
 const newPage = read(
   "src/app/(app)/customer-operations/orders/new/page.tsx",
 );
@@ -108,8 +111,10 @@ assert.match(createHelper, /cake_size_id: item.cakeSizeId/);
 assert.match(createHelper, /quantity: item.quantity/);
 
 // M. Existing staff/manual order source
-assert.match(form, /name="order_source"/);
-assert.match(form, /defaultValue="whatsapp"/);
+assert.match(form, /<StaffGuestOrderSourceFields \/>/);
+assert.match(sourceFields, /name="order_source"/);
+assert.match(sourceFields, /value=\{source\}/);
+assert.match(sourceFields, /"whatsapp"/);
 assert.equal(isStaffGuestOrderSource("whatsapp"), true);
 assert.equal(isStaffGuestOrderSource("customer_website"), false);
 assert.match(actions, /isStaffGuestOrderSource/);

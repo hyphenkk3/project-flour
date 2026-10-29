@@ -30,7 +30,7 @@ import {
   createStaffGuestOrderAction,
   type CreateStaffGuestOrderState,
 } from "@/workspaces/owner/orders/actions";
-import { STAFF_GUEST_ORDER_SOURCES } from "@/workspaces/owner/orders/labels";
+import { StaffGuestOrderSourceFields } from "@/workspaces/owner/orders/StaffGuestOrderSourceFields";
 import { OrderPaidAddonsEditor } from "@/workspaces/owner/orders/OrderPaidAddonsEditor";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
@@ -237,20 +237,7 @@ export function StaffGuestOrderForm({
             value={guestPhone}
           />
         </FormField>
-        <FormField htmlFor="order_source" label="Order source">
-          <FormSelect
-            defaultValue="jotform"
-            id="order_source"
-            name="order_source"
-            required
-          >
-            {STAFF_GUEST_ORDER_SOURCES.map((source) => (
-              <option key={source.value} value={source.value}>
-                {source.label}
-              </option>
-            ))}
-          </FormSelect>
-        </FormField>
+        <StaffGuestOrderSourceFields />
         <FormCheckbox
           help="Shows as (crew) later. Does not change payment or discounts."
           label="Crew order"

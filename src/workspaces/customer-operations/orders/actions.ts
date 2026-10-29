@@ -194,6 +194,9 @@ export async function createOrderAction(
   if (!isStaffGuestOrderSource(orderSource)) {
     return { error: "Please choose a valid order source." };
   }
+  const orderSourceOther = String(
+    formData.get("order_source_other") ?? "",
+  );
 
   const pickupDate = String(formData.get("pickup_date") ?? "").trim();
   const pickupTime = String(formData.get("pickup_time") ?? "").trim();
@@ -214,6 +217,7 @@ export async function createOrderAction(
     guestPhone: snapshot.guestPhone,
     guestEmail: null,
     orderSource,
+    orderSourceOther,
     pickupDate,
     pickupTime,
     items,

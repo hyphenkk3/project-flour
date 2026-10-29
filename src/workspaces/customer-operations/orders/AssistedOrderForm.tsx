@@ -28,7 +28,7 @@ import {
   type OrderActionState,
 } from "@/workspaces/customer-operations/orders/actions";
 import { AssistedOrderFulfilmentFields } from "@/workspaces/customer-operations/orders/AssistedOrderFulfilmentFields";
-import { STAFF_GUEST_ORDER_SOURCES } from "@/workspaces/owner/orders/labels";
+import { StaffGuestOrderSourceFields } from "@/workspaces/owner/orders/StaffGuestOrderSourceFields";
 import {
   verifiedSelectedCakeSizePrices,
   verifiedStaffCakeSizeSubmission,
@@ -198,20 +198,7 @@ export function AssistedOrderForm({
         </p>
       ) : null}
 
-      <FormField htmlFor="order_source" label="Order source">
-        <FormSelect
-          defaultValue="whatsapp"
-          id="order_source"
-          name="order_source"
-          required
-        >
-          {STAFF_GUEST_ORDER_SOURCES.map((source) => (
-            <option key={source.value} value={source.value}>
-              {source.label}
-            </option>
-          ))}
-        </FormSelect>
-      </FormField>
+      <StaffGuestOrderSourceFields />
 
       <AssistedOrderFulfilmentFields
         canOverrideCustomerFulfilmentSchedule={

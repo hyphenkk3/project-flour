@@ -51,6 +51,7 @@ type OrderRow = {
   collection_id: string | null;
   extra_stock_id: string | null;
   order_source: OrderSource | null;
+  order_source_other: string | null;
   crew_order: boolean | null;
   include_receipt: boolean | null;
   needs_bakery_attention: boolean | null;
@@ -290,6 +291,7 @@ function mapOrder(
     collectionId: row.collection_id,
     extraStockId: row.extra_stock_id ?? null,
     orderSource: row.order_source ?? "customer_website",
+    orderSourceOther: row.order_source_other ?? null,
     crewOrder: Boolean(row.crew_order),
     includeReceipt: Boolean(row.include_receipt),
     needsBakeryAttention: Boolean(row.needs_bakery_attention),
@@ -343,6 +345,7 @@ const orderSelect = `
   collection_id,
   extra_stock_id,
   order_source,
+  order_source_other,
   crew_order,
   include_receipt,
   needs_bakery_attention,
@@ -522,6 +525,7 @@ function mapListItem(row: OrderRow): StorefrontOrderListItem {
     createdAt: order.createdAt,
     confirmationNeedsResend: order.confirmationNeedsResend,
     orderSource: order.orderSource,
+    orderSourceOther: order.orderSourceOther ?? null,
     crewOrder: order.crewOrder,
     extraStockId: row.extra_stock_id ?? null,
     fulfilmentMethod: order.fulfilmentMethod,

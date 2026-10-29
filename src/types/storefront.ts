@@ -109,6 +109,7 @@ export type OrderSource =
   | "whitebird_instagram"
   | "wee"
   | "lex"
+  | "kin"
   | "walk_in"
   | "last_minute"
   | "other";
@@ -349,6 +350,8 @@ export type StorefrontOrder = {
    */
   extraStockId?: string | null;
   orderSource: OrderSource;
+  /** Optional human-entered explanation for the `other` source category. */
+  orderSourceOther?: string | null;
   /** Crew Order flag — not an order source. Display precedence later: (crew) over source suffix. */
   crewOrder: boolean;
   /** Physical purchase receipt with cake at pickup. Independent of email submission preference. */
@@ -402,6 +405,7 @@ export type StorefrontOrderListItem = {
   createdAt: string;
   confirmationNeedsResend: boolean;
   orderSource: OrderSource;
+  orderSourceOther?: string | null;
   crewOrder: boolean;
   extraStockId: string | null;
   fulfilmentMethod: StorefrontOrderFulfilmentMethod;

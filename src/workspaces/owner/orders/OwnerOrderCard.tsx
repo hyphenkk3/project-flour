@@ -10,7 +10,7 @@ import {
 } from "@/engines/orders/operational-state";
 import {
   formatPickupTime,
-  orderSourceLabel,
+  orderSourceLabelWithDetail,
 } from "@/workspaces/owner/orders/labels";
 import {
   deriveOrderLifecycleStage,
@@ -93,7 +93,10 @@ export function OwnerOrderCard({
             {order.customerName}
           </p>
           <p className="text-skyline truncate text-sm">
-            {orderSourceLabel(order.orderSource)}
+            {orderSourceLabelWithDetail(
+              order.orderSource,
+              order.orderSourceOther,
+            )}
             {order.extraStockId ? " · Fresh Picks" : ""}
           </p>
           <p className={completed ? "text-skyline break-words text-sm" : "text-ink break-words text-sm"}>

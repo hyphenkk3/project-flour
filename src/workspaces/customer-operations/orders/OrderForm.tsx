@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/form";
 import type { Customer } from "@/types/customer";
 import type { OrderDetail } from "@/types/order";
+import { orderSourceLabelWithDetail } from "@/workspaces/owner/orders/labels";
 import {
   updateOrderAction,
   type OrderActionState,
@@ -41,6 +42,14 @@ export function OrderForm({
 
   return (
     <form action={formAction} className="flex max-w-xl flex-col gap-6">
+      {order.orderSource ? (
+        <p className="text-skyline text-sm">
+          Source · {orderSourceLabelWithDetail(
+            order.orderSource,
+            order.orderSourceOther,
+          )}
+        </p>
+      ) : null}
       <FormField
         help="Orders must be linked to an existing customer."
         htmlFor="customer_id"

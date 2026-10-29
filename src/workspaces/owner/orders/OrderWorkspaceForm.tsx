@@ -143,6 +143,7 @@ import {
   guestOrderStatusLabel,
   isGuestOrderEditable,
   orderSourceLabel,
+  orderSourceLabelWithDetail,
   STAFF_GUEST_ORDER_SOURCES,
 } from "@/workspaces/owner/orders/labels";
 import { withOwnerReturnTo } from "@/workspaces/owner/navigation/return-to";
@@ -888,7 +889,10 @@ export function OrderWorkspaceForm({
               {order.email.trim() ? order.email : "No email"}
             </p>
             <p className="text-skyline text-sm">
-              Source · {orderSourceLabel(order.orderSource)}
+              Source · {orderSourceLabelWithDetail(
+                order.orderSource,
+                order.orderSourceOther,
+              )}
               {order.crewOrder ? " · Crew order" : ""}
             </p>
           </div>

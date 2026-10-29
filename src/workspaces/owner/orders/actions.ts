@@ -22,6 +22,7 @@ import {
   validateOwnerCreateFulfilment,
 } from "@/engines/orders/fulfilment";
 import { createStaffGuestPreorderRecord } from "@/workspaces/owner/orders/create-staff-preorder";
+import { normalizeNewStaffOrderSourceInput } from "@/engines/orders/staff-order-source";
 import { formatNewOrderPersonName } from "@/engines/orders/customer-name";
 import {
   parseDeliveryDraftFromForm,
@@ -379,6 +380,9 @@ export async function createStaffGuestOrderAction(
   const guestPhone = String(formData.get("guest_phone") ?? "").trim();
   const guestEmail = String(formData.get("guest_email") ?? "").trim();
   const orderSource = String(formData.get("order_source") ?? "").trim();
+  const orderSourceOther = String(
+    formData.get("order_source_other") ?? "",
+  );
   const crewOrder = String(formData.get("crew_order") ?? "") === "1";
   const pickupDate = String(formData.get("pickup_date") ?? "").trim();
   const pickupTime = String(formData.get("pickup_time") ?? "").trim();
@@ -404,6 +408,7 @@ export async function createStaffGuestOrderAction(
     guestPhone: guestPhone || null,
     guestEmail: guestEmail || null,
     orderSource,
+    orderSourceOther,
     crewOrder,
     pickupDate,
     pickupTime,
@@ -2757,6 +2762,14 @@ export async function duplicateGuestOrderAction(
   const orderSource = isStaffGuestOrderSource(source.orderSource)
     ? source.orderSource
     : "other";
+  const orderSourceOtherValue = formData.has("order_source_other")
+    ? String(formData.get("order_source_other") ?? "")
+    : source.orderSourceOther ?? "";
+  const sourceInput = normalizeNewStaffOrderSourceInput(
+    orderSource,
+    orderSourceOtherValue,
+  );
+  if ("error" in sourceInput) return { error: sourceInput.error };
 
   let fulfilmentRpc: ReturnType<typeof buildCreateStaffFulfilmentRpcParams>;
   try {
@@ -2774,44 +2787,48 @@ export async function duplicateGuestOrderAction(
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("create_staff_guest_preorder", {
-    p_actor_staff_id: staff.id,
-    p_customer_name: formatNewOrderPersonName(source.customerName),
-    p_phone: source.phone || null,
-    p_email: source.email || null,
-    p_order_source: orderSource,
-    p_crew_order: source.crewOrder,
-    p_pickup_date: pickupDate,
-    p_pickup_time: pickupTime,
-    p_pickup_instruction: null,
-    p_items: source.items.map((item) => ({
-      cake_id: item.cakeId,
-      cake_size_id: item.cakeSizeId,
-      quantity: item.quantity,
-    })),
-    p_complimentary: source.complimentaryItems
-      .filter((item) => item.quantity > 0 && item.complimentaryItemTypeId)
-      .map((item) => ({
-        type_id: item.complimentaryItemTypeId,
-        name: item.name,
+  const { data, error } = await supabase.rpc(
+    "create_staff_guest_preorder_with_source_detail",
+    {
+      p_actor_staff_id: staff.id,
+      p_customer_name: formatNewOrderPersonName(source.customerName),
+      p_phone: source.phone || null,
+      p_email: source.email || null,
+      p_order_source: sourceInput.orderSource,
+      p_order_source_other: sourceInput.orderSourceOther,
+      p_crew_order: source.crewOrder,
+      p_pickup_date: pickupDate,
+      p_pickup_time: pickupTime,
+      p_pickup_instruction: null,
+      p_items: source.items.map((item) => ({
+        cake_id: item.cakeId,
+        cake_size_id: item.cakeSizeId,
         quantity: item.quantity,
-        sort_order: item.sortOrder,
       })),
-    p_paid_addons: source.paidAddons
-      .filter((item) => item.quantity > 0)
-      .map((item) => ({
-        code: item.code,
-        quantity: item.quantity,
-        messages: item.messages.map((message) => message.writtenMessage),
-      })),
-    p_include_receipt: source.includeReceipt,
-    p_needs_bakery_attention: false,
-    p_bakery_attention_note: null,
-    p_customer_notes: source.notes,
-    p_internal_notes: null,
-    p_fulfilment_method: fulfilmentRpc.p_fulfilment_method,
-    p_delivery: fulfilmentRpc.p_delivery,
-  });
+      p_complimentary: source.complimentaryItems
+        .filter((item) => item.quantity > 0 && item.complimentaryItemTypeId)
+        .map((item) => ({
+          type_id: item.complimentaryItemTypeId,
+          name: item.name,
+          quantity: item.quantity,
+          sort_order: item.sortOrder,
+        })),
+      p_paid_addons: source.paidAddons
+        .filter((item) => item.quantity > 0)
+        .map((item) => ({
+          code: item.code,
+          quantity: item.quantity,
+          messages: item.messages.map((message) => message.writtenMessage),
+        })),
+      p_include_receipt: source.includeReceipt,
+      p_needs_bakery_attention: false,
+      p_bakery_attention_note: null,
+      p_customer_notes: source.notes,
+      p_internal_notes: null,
+      p_fulfilment_method: fulfilmentRpc.p_fulfilment_method,
+      p_delivery: fulfilmentRpc.p_delivery,
+    },
+  );
 
   if (error) {
     return { error: error.message };

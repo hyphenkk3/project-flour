@@ -14,6 +14,7 @@ import { REFUND_METHOD_OPTIONS, todayMalaysiaDate } from "@/engines/orders/refun
 import type { GuestOrderWorkspaceCapabilities } from "@/engines/orders/delivery-finance-capabilities";
 import { isGuestOrderCancelled } from "@/engines/orders/lifecycle";
 import type { RefundMethodCode, StorefrontOrder } from "@/types/storefront";
+import { isStaffGuestOrderSource } from "@/workspaces/owner/orders/labels";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import {
   cancelAndRefundFreshPickAction,
@@ -44,6 +45,11 @@ export function OrderLifecycleActions({
   const [freshPickRefundDate, setFreshPickRefundDate] = useState(todayMalaysiaDate());
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [pickupDate, setPickupDate] = useState(order.pickupDate);
+  const [duplicateSourceOther, setDuplicateSourceOther] = useState(
+    order.orderSourceOther ?? "",
+  );
+  const duplicateUsesOther =
+    order.orderSource === "other" || !isStaffGuestOrderSource(order.orderSource);
 
   const isPaidFreshPick =
     Boolean(order.extraStockId) && order.status === "paid";
@@ -125,6 +131,9 @@ export function OrderLifecycleActions({
       const formData = new FormData();
       formData.set("pickup_date", pickupDate);
       formData.set("pickup_time", order.pickupTime);
+      if (duplicateUsesOther) {
+        formData.set("order_source_other", duplicateSourceOther);
+      }
       const result = await duplicateGuestOrderAction(order.id, formData);
       if (result?.error) {
         setError(result.error);
@@ -143,6 +152,7 @@ export function OrderLifecycleActions({
             onClick={() => {
               setError(null);
               setPickupDate(order.pickupDate);
+              setDuplicateSourceOther(order.orderSourceOther ?? "");
               setDuplicateOpen(true);
             }}
             type="button"
@@ -295,6 +305,19 @@ export function OrderLifecycleActions({
             value={pickupDate}
           />
         </FormField>
+        {duplicateUsesOther ? (
+          <FormField
+            htmlFor="duplicate-order-source-other"
+            label="Specify order source"
+          >
+            <FormInput
+              id="duplicate-order-source-other"
+              onChange={(event) => setDuplicateSourceOther(event.target.value)}
+              required
+              value={duplicateSourceOther}
+            />
+          </FormField>
+        ) : null}
       </ConfirmDialog>
     </div>
   );
