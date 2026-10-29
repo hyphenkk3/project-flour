@@ -6,6 +6,8 @@ import {
   isJotformAvailableForNewStaffOrder,
   normalizeNewStaffOrderSourceInput,
 } from "../src/engines/orders/staff-order-source";
+import { evaluateAugustPromoEligibility } from "../src/engines/orders/promotions";
+import type { OrderSource } from "../src/types/order";
 import {
   STAFF_GUEST_ORDER_SOURCES,
   defaultStaffGuestNewOrderSource,
@@ -64,6 +66,54 @@ assert.equal(
 );
 assert.equal(reportOrderSourceLabel("other", "  Friend referral "), "Other — Friend referral");
 assert.equal(orderSourceLabelWithDetail("jotform", null), "Jotform");
+
+const promoWindow = {
+  orderDate: "2026-08-08",
+  pickupDate: "2026-08-31",
+  cakeSubtotal: 120,
+  hasAugustPromo: false,
+  hasRm10Card: false,
+  hasVerifiedPayments: false,
+  orderStatus: "submitted",
+} as const;
+const promotionSources: OrderSource[] = [
+  "kin",
+  "other",
+  "jotform",
+  "whatsapp",
+  "whitebird_instagram",
+  "wee",
+  "lex",
+  "walk_in",
+  "last_minute",
+];
+for (const orderSource of promotionSources) {
+  assert.equal(
+    evaluateAugustPromoEligibility({ ...promoWindow, orderSource }).eligible,
+    false,
+    `${orderSource} must remain ineligible for August Promo`,
+  );
+}
+assert.equal(
+  evaluateAugustPromoEligibility({
+    ...promoWindow,
+    orderSource: "customer_website",
+  }).eligible,
+  true,
+  "customer website eligibility must remain unchanged",
+);
+const describedOtherOrder = {
+  orderSource: "other" as const,
+  orderSourceOther: "Community referral",
+};
+assert.equal(
+  evaluateAugustPromoEligibility({
+    ...promoWindow,
+    orderSource: describedOtherOrder.orderSource,
+  }).eligible,
+  false,
+  "an Other description must not change source-based eligibility",
+);
 
 const ownerForm = source("src/workspaces/owner/orders/StaffGuestOrderForm.tsx");
 const assistedForm = source("src/workspaces/customer-operations/orders/AssistedOrderForm.tsx");
