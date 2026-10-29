@@ -96,8 +96,16 @@ assert(reports.includes("order_source_other"));
 assert(migration.includes("add column order_source_other text"));
 assert(migration.includes("'kin'"));
 assert(migration.includes("transaction_timestamp() >= timestamptz '2026-10-31 16:00:00+00'"));
-assert(migration.includes("if p_order_source = 'other' and v_source_other is null"));
+assert(migration.includes("if v_source = 'other' and v_source_other is null"));
+assert(migration.includes("v_source := nullif(trim(coalesce(p_order_source, '')), '')"));
 assert(migration.includes("public.create_staff_guest_preorder_with_source_detail"));
+assert(migration.includes("p_order_source_other text"));
+assert(migration.includes("create_waiting_list_preorder_with_source_detail"));
+assert(migration.includes("p_internal_notes, null,"));
+assert(!migration.includes("app.staff_order_source_other"));
+assert(!migration.includes("current_setting("));
+assert(!migration.includes("set_config("));
+assert(!/create\s+or\s+replace\s+function\s+public\.create_staff_guest_preorder\s*\(/i.test(migration));
 assert(!/\b(update|delete)\s+public\.orders\b/i.test(migration));
 
 console.log("PASS staff order source amendment focused regression");

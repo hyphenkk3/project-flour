@@ -14,6 +14,9 @@ begin
   if to_regprocedure('public.create_staff_guest_preorder_with_source_detail(uuid,text,text,text,text,text,boolean,date,time,text,jsonb,jsonb,boolean,boolean,text,text,text,jsonb,public.fulfilment_method,jsonb,jsonb)') is not null then
     raise exception 'Extended staff-order RPC already exists; reconcile instead of applying this migration';
   end if;
+  if to_regprocedure('staff_preorder_private.create_waiting_list_preorder_with_source_detail(uuid,text,text,text,text,boolean,date,time,text,jsonb,jsonb,boolean,boolean,text,text,text,text,jsonb,public.fulfilment_method,jsonb,jsonb)') is not null then
+    raise exception 'Extended private staff-order helper already exists; reconcile instead of applying this migration';
+  end if;
   if not exists (
     select 1 from pg_proc p
     where p.oid = to_regprocedure('staff_preorder_private.create_waiting_list_preorder(uuid,text,text,text,text,boolean,date,time,text,jsonb,jsonb,boolean,boolean,text,text,text,jsonb,public.fulfilment_method,jsonb,jsonb)')
@@ -42,6 +45,9 @@ begin
   ) then
     raise exception 'Order-source check baseline mismatch; stop and reconcile';
   end if;
+  if not has_table_privilege('authenticated', 'public.orders', 'select') then
+    raise exception 'Authenticated order-read grant is missing; stop and reconcile';
+  end if;
 end;
 $preflight$;
 
@@ -59,7 +65,7 @@ alter table public.orders add constraint orders_order_source_check check (
   )
 );
 
-create or replace function staff_preorder_private.create_waiting_list_preorder(
+create function staff_preorder_private.create_waiting_list_preorder_with_source_detail(
   p_actor_staff_id uuid,
   p_customer_name text,
   p_phone text,
@@ -76,6 +82,7 @@ create or replace function staff_preorder_private.create_waiting_list_preorder(
   p_bakery_attention_note text,
   p_customer_notes text,
   p_internal_notes text,
+  p_order_source_other text,
   p_paid_addons jsonb default '[]'::jsonb,
   p_fulfilment_method public.fulfilment_method default 'pickup',
   p_delivery jsonb default null,
@@ -156,7 +163,7 @@ begin
     raise exception 'Invalid order source';
   end if;
 
-  v_source_other := nullif(trim(coalesce(pg_catalog.current_setting('app.staff_order_source_other', true), '')), '');
+  v_source_other := nullif(trim(coalesce(p_order_source_other, '')), '');
   if v_source_other is not null and v_source is distinct from 'other' then
     raise exception 'A source description is only valid for Other';
   end if;
@@ -394,9 +401,12 @@ begin
   return new_order;
 end;
 $$;
-alter function staff_preorder_private.create_waiting_list_preorder(uuid, text, text, text, text, boolean, date, time, text, jsonb, jsonb, boolean, boolean, text, text, text, jsonb, public.fulfilment_method, jsonb, jsonb) owner to postgres;
-revoke all on function staff_preorder_private.create_waiting_list_preorder(uuid, text, text, text, text, boolean, date, time, text, jsonb, jsonb, boolean, boolean, text, text, text, jsonb, public.fulfilment_method, jsonb, jsonb) from public, anon, authenticated, service_role;
-create or replace function public.create_staff_guest_preorder(
+alter function staff_preorder_private.create_waiting_list_preorder_with_source_detail(uuid, text, text, text, text, boolean, date, time, text, jsonb, jsonb, boolean, boolean, text, text, text, text, jsonb, public.fulfilment_method, jsonb, jsonb) owner to postgres;
+revoke all on function staff_preorder_private.create_waiting_list_preorder_with_source_detail(uuid, text, text, text, text, boolean, date, time, text, jsonb, jsonb, boolean, boolean, text, text, text, text, jsonb, public.fulfilment_method, jsonb, jsonb) from public, anon, authenticated, service_role;
+
+-- Keep the original private signature and its positional/default-argument
+-- resolution for existing waiting-list and historical callers.
+create or replace function staff_preorder_private.create_waiting_list_preorder(
   p_actor_staff_id uuid,
   p_customer_name text,
   p_phone text,
@@ -419,54 +429,23 @@ create or replace function public.create_staff_guest_preorder(
   p_dine_in jsonb default null
 )
 returns public.orders
-language plpgsql
+language sql
 security definer
 set search_path = ''
 as $$
-begin
-  -- Verified request identity survives nested SECURITY DEFINER calls.
-  if auth.uid() is null or p_actor_staff_id is null or not exists (
-    select 1 from public.staff_profiles sp
-    join public.roles r on r.id = sp.role_id
-    where sp.auth_user_id = auth.uid()
-      and sp.id = p_actor_staff_id
-      and sp.is_active = true
-      and r.code in ('owner', 'manager', 'customer_operations')
-  ) then
-    raise exception using errcode = '42501', message = 'Not authorized: an active staff session with the required role is required';
-  end if;
-  if p_order_source = 'other' and nullif(trim(coalesce(pg_catalog.current_setting('app.staff_order_source_other', true), '')), '') is null then
-    raise exception 'Please specify the order source';
-  end if;
-  return staff_preorder_private.create_waiting_list_preorder(
-    p_actor_staff_id,
-    p_customer_name,
-    p_phone,
-    p_email,
-    p_order_source,
-    p_crew_order,
-    p_pickup_date,
-    p_pickup_time,
-    p_pickup_instruction,
-    p_items,
-    p_complimentary,
-    p_include_receipt,
-    p_needs_bakery_attention,
-    p_bakery_attention_note,
-    p_customer_notes,
-    p_internal_notes,
-    p_paid_addons,
-    p_fulfilment_method,
-    p_delivery,
-    p_dine_in
+  select staff_preorder_private.create_waiting_list_preorder_with_source_detail(
+    p_actor_staff_id, p_customer_name, p_phone, p_email, p_order_source,
+    p_crew_order, p_pickup_date, p_pickup_time, p_pickup_instruction,
+    p_items, p_complimentary, p_include_receipt, p_needs_bakery_attention,
+    p_bakery_attention_note, p_customer_notes, p_internal_notes, null,
+    p_paid_addons, p_fulfilment_method, p_delivery, p_dine_in
   );
-end;
 $$;
-
-revoke execute on function public.create_staff_guest_preorder(uuid, text, text, text, text, boolean, date, time, text, jsonb, jsonb, boolean, boolean, text, text, text, jsonb, public.fulfilment_method, jsonb, jsonb) from public, anon, service_role;
-grant execute on function public.create_staff_guest_preorder(uuid, text, text, text, text, boolean, date, time, text, jsonb, jsonb, boolean, boolean, text, text, text, jsonb, public.fulfilment_method, jsonb, jsonb) to authenticated;
--- Explicit extended RPC for new staff orders. The old public signature remains
--- compatible with existing callers but cannot create Other without a detail.
+alter function staff_preorder_private.create_waiting_list_preorder(uuid, text, text, text, text, boolean, date, time, text, jsonb, jsonb, boolean, boolean, text, text, text, jsonb, public.fulfilment_method, jsonb, jsonb) owner to postgres;
+revoke all on function staff_preorder_private.create_waiting_list_preorder(uuid, text, text, text, text, boolean, date, time, text, jsonb, jsonb, boolean, boolean, text, text, text, jsonb, public.fulfilment_method, jsonb, jsonb) from public, anon, authenticated, service_role;
+-- The existing public create_staff_guest_preorder signature and body are left
+-- untouched. This keeps currently deployed callers working; the revised staff
+-- application uses the explicit-detail RPC below for new orders.
 create function public.create_staff_guest_preorder_with_source_detail(
   p_actor_staff_id uuid,
   p_customer_name text,
@@ -496,8 +475,8 @@ security definer
 set search_path = ''
 as $$
 declare
+  v_source text;
   v_source_other text;
-  v_previous_setting text;
   v_order public.orders;
 begin
   if auth.uid() is null or p_actor_staff_id is null or not exists (
@@ -511,50 +490,111 @@ begin
     raise exception using errcode = '42501', message = 'Not authorized: an active staff session with the required role is required';
   end if;
 
+  v_source := nullif(trim(coalesce(p_order_source, '')), '');
+  if v_source is null then
+    raise exception 'Order source is required';
+  end if;
   v_source_other := nullif(trim(coalesce(p_order_source_other, '')), '');
-  if p_order_source = 'other' and v_source_other is null then
+  if v_source = 'other' and v_source_other is null then
     raise exception 'Please specify the order source';
   end if;
-  if p_order_source is distinct from 'other' and v_source_other is not null then
+  if v_source is distinct from 'other' and v_source_other is not null then
     raise exception 'A source description is only valid for Other';
   end if;
 
-  v_previous_setting := pg_catalog.current_setting('app.staff_order_source_other', true);
-  perform pg_catalog.set_config('app.staff_order_source_other', coalesce(v_source_other, ''), true);
-  begin
-    v_order := public.create_staff_guest_preorder(
-      p_actor_staff_id,
-      p_customer_name,
-      p_phone,
-      p_email,
-      p_order_source,
-      p_crew_order,
-      p_pickup_date,
-      p_pickup_time,
-      p_pickup_instruction,
-      p_items,
-      p_complimentary,
-      p_include_receipt,
-      p_needs_bakery_attention,
-      p_bakery_attention_note,
-      p_customer_notes,
-      p_internal_notes,
-      p_paid_addons,
-      p_fulfilment_method,
-      p_delivery,
-      p_dine_in
-    );
-  exception when others then
-    perform pg_catalog.set_config('app.staff_order_source_other', coalesce(v_previous_setting, ''), true);
-    raise;
-  end;
-  perform pg_catalog.set_config('app.staff_order_source_other', coalesce(v_previous_setting, ''), true);
+  v_order := staff_preorder_private.create_waiting_list_preorder_with_source_detail(
+    p_actor_staff_id,
+    p_customer_name,
+    p_phone,
+    p_email,
+    v_source,
+    p_crew_order,
+    p_pickup_date,
+    p_pickup_time,
+    p_pickup_instruction,
+    p_items,
+    p_complimentary,
+    p_include_receipt,
+    p_needs_bakery_attention,
+    p_bakery_attention_note,
+    p_customer_notes,
+    p_internal_notes,
+    v_source_other,
+    p_paid_addons,
+    p_fulfilment_method,
+    p_delivery,
+    p_dine_in
+  );
   return v_order;
 end;
 $$;
 alter function public.create_staff_guest_preorder_with_source_detail(uuid, text, text, text, text, text, boolean, date, time, text, jsonb, jsonb, boolean, boolean, text, text, text, jsonb, public.fulfilment_method, jsonb, jsonb) owner to postgres;
 revoke all on function public.create_staff_guest_preorder_with_source_detail(uuid, text, text, text, text, text, boolean, date, time, text, jsonb, jsonb, boolean, boolean, text, text, text, jsonb, public.fulfilment_method, jsonb, jsonb) from public, anon, service_role;
 grant execute on function public.create_staff_guest_preorder_with_source_detail(uuid, text, text, text, text, text, boolean, date, time, text, jsonb, jsonb, boolean, boolean, text, text, text, jsonb, public.fulfilment_method, jsonb, jsonb) to authenticated;
+
+do $postflight$
+begin
+  if not exists (
+    select 1 from pg_proc p
+    where p.oid = to_regprocedure('staff_preorder_private.create_waiting_list_preorder(uuid,text,text,text,text,boolean,date,time,text,jsonb,jsonb,boolean,boolean,text,text,text,jsonb,public.fulfilment_method,jsonb,jsonb)')
+      and p.prosecdef and pg_get_userbyid(p.proowner) = 'postgres'
+      and p.proconfig = array['search_path=""']
+      and p.proacl::text = '{postgres=X/postgres}'
+  ) then
+    raise exception 'Legacy private helper signature/security changed';
+  end if;
+  if not exists (
+    select 1 from pg_proc p
+    where p.oid = to_regprocedure('staff_preorder_private.create_waiting_list_preorder_with_source_detail(uuid,text,text,text,text,boolean,date,time,text,jsonb,jsonb,boolean,boolean,text,text,text,text,jsonb,public.fulfilment_method,jsonb,jsonb)')
+      and p.prosecdef and pg_get_userbyid(p.proowner) = 'postgres'
+      and p.proconfig = array['search_path=""']
+      and p.proacl::text = '{postgres=X/postgres}'
+  ) then
+    raise exception 'New private helper signature/security mismatch';
+  end if;
+  if not exists (
+    select 1 from pg_proc p
+    where p.oid = to_regprocedure('public.create_staff_guest_preorder(uuid,text,text,text,text,boolean,date,time,text,jsonb,jsonb,boolean,boolean,text,text,text,jsonb,public.fulfilment_method,jsonb,jsonb)')
+      and p.prosecdef and pg_get_userbyid(p.proowner) = 'postgres'
+      and p.proconfig = array['search_path=""']
+      and p.proacl::text = '{postgres=X/postgres,authenticated=X/postgres}'
+      and md5(regexp_replace(p.prosrc, '\s', '', 'g')) = 'a5d5974aa48c46725c80d01a41bc4210'
+  ) then
+    raise exception 'Legacy public RPC changed; existing application compatibility check failed';
+  end if;
+  if not exists (
+    select 1 from pg_proc p
+    where p.oid = to_regprocedure('public.create_staff_guest_preorder_with_source_detail(uuid,text,text,text,text,text,boolean,date,time,text,jsonb,jsonb,boolean,boolean,text,text,text,jsonb,public.fulfilment_method,jsonb,jsonb)')
+      and p.prosecdef and pg_get_userbyid(p.proowner) = 'postgres'
+      and p.proconfig = array['search_path=""']
+      and p.proacl::text = '{postgres=X/postgres,authenticated=X/postgres}'
+      and p.proargnames[6] = 'p_order_source_other'
+      and p.pronargdefaults = 4
+  ) then
+    raise exception 'New authenticated RPC signature/security mismatch';
+  end if;
+  if not has_column_privilege('authenticated', 'public.orders', 'order_source_other', 'select') then
+    raise exception 'Authenticated order-source detail read grant is missing';
+  end if;
+  if not exists (
+    select 1 from pg_constraint c
+    where c.conrelid = 'public.orders'::regclass
+      and c.conname = 'orders_order_source_check'
+      and c.convalidated
+      and pg_get_constraintdef(c.oid) like '%''kin''%'
+  ) then
+    raise exception 'Kin source constraint postflight failed';
+  end if;
+  if not exists (
+    select 1 from pg_constraint c
+    where c.conrelid = 'public.orders'::regclass
+      and c.conname = 'orders_order_source_other_nonblank_check'
+      and c.convalidated
+  ) then
+    raise exception 'Other source-detail constraint postflight failed';
+  end if;
+end;
+$postflight$;
 
 notify pgrst, 'reload schema';
 commit;
