@@ -30,6 +30,8 @@ At `4bca39e` and in the current candidate, this path first selects `library_cake
 
 The exact source-generated select strings and HTTP parameters are encoded in `scripts/diagnostics/catalogue-query-ab-20261029.mjs`. The probe compares common raw fields by hash without printing cake names, prices, photo URLs, IDs or response bodies, and separately counts actual category-set differences from B's added assignment embed. It uses only the DEV public key in the `apikey` header, sends no user Authorization token, enforces the exact DEV host, and applies the same 8-second request budget. It does not alter data.
 
+The price-cache relocation has a separate invalidation concern: current price-schedule actions call `revalidatePath` for Library routes but do not explicitly call `revalidateStorefrontPublishedCakeCache`. The previous homepage data cache was keyed by price date and tagged with the published-cakes tag; whether `revalidatePath` alone evicted that `unstable_cache` entry was not experimentally verified here. Do not simply move the pricing calls back inside a shared cache until that behavior is verified, or price-schedule updates could appear stale. The probe measures only catalogue REST shapes, not this cache/invalidation behavior.
+
 ## DEV access evidence
 
 - Supabase project metadata returned ref `tzwtpxdcggesgjaqxkqr`, status `ACTIVE_HEALTHY`, PostgreSQL 17.6.1.155, region `ap-southeast-1`.
@@ -92,7 +94,9 @@ The script uses 10 counterbalanced sequential A/B pairs followed by three parall
 
 **Causal conclusion: PARTIAL.** A source- and DEV-data-backed warm-hit request-count regression is confirmed: 7–8 effective-price RPCs run on each current homepage preview call, while the prior warm whole-result cache avoided those calls. The new cold path also makes two catalogue REST calls instead of one. Actual latency and any causal contribution to Production 57014 remain unmeasured; the refactor is not proven to cause the intermittent timeouts.
 
-**Next action:** execute the committed bounded probe from a network-connected Mac Terminal using only the DEV public key. Review common-field parity and category differences, then obtain exact anonymous PostgREST plans/trace data for those same calls before attributing the Production 57014 incidents. No source fix is authorized by this experiment.
+**Recommended correction to evaluate after the diagnostic:** reduce the repeated warm-hit effective-price reads while preserving date-sensitive freshness and explicit invalidation. A price cache is only safe after verifying the price-schedule actions invalidate it; the low-risk control is an isolated DEV experiment that compares the old cache boundary and current per-call RPC path while checking changed schedule visibility. Separately, measure A/B base query latency and exact result parity. No source fix is authorized by this experiment.
+
+**Next action:** execute the committed bounded probe from a network-connected Mac Terminal using only the DEV public key. Review common-field parity, category differences and timing. Then verify price-schedule cache invalidation before recommending any cache-boundary change; obtain exact anonymous PostgREST plans/trace evidence before attributing the Production `57014` incidents.
 
 ## Investigation source commit
 
