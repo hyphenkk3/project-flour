@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "target": {
+    "projectRef": "cuowwlduhxxifmpvpltt",
+    "deploymentId": "dpl_66qLpJLTdJdZZkFKqPQfn5MmHGkG"
+  },
+  "incidentWindowUtc": {
+    "start": "2026-10-28T04:40:00Z",
+    "end": "2026-10-28T04:43:30Z",
+    "durationSeconds": 210
+  },
+  "limits": {
+    "maxWindowSeconds": 600,
+    "maxInputRecords": 2000,
+    "inputRecordCount": 45
+  },
+  "edgeCatalogue": {
+    "inputLogRows": 29,
+    "uniqueRequestsWithHashedId": 29,
+    "duplicateRowsByRequestId": 0,
+    "rowsWithoutRequestId": 0,
+    "uniqueRequestCountsByStatus": {
+      "200": 23,
+      "500": 6
+    },
+    "originLatencyByStatus": {
+      "200": {
+        "n": 23,
+        "medianMs": 529,
+        "p95NearestRankMs": 1429,
+        "maxMs": 1448
+      },
+      "500": {
+        "n": 6,
+        "medianMs": 12091,
+        "p95NearestRankMs": 21568,
+        "maxMs": 21568
+      }
+    }
+  },
+  "postgres": {
+    "inputLogRows": 6,
+    "uniqueEventsAfterSessionLineDedup": 6,
+    "duplicateRowsRemoved": 0,
+    "uniqueSessionCount": 6,
+    "sqlstateCounts": {
+      "57014": 6
+    },
+    "queryFingerprintCounts": {
+      "-3231686492694644454": 6
+    },
+    "eventTimesUtc": [
+      "2026-10-28T04:41:12.521000000Z",
+      "2026-10-28T04:41:12.556000000Z",
+      "2026-10-28T04:41:12.686000000Z",
+      "2026-10-28T04:41:29.935000000Z",
+      "2026-10-28T04:41:29.961000000Z",
+      "2026-10-28T04:41:30.423000000Z"
+    ]
+  },
+  "postgrest": {
+    "inputGroups": 7,
+    "representedLogRows": 34,
+    "exactWordingGroups": [
+      {
+        "wording": "{\"code\":\"57014\",\"details\":null,\"hint\":null,\"message\":\"canceling statement due to statement timeout\"}",
+        "sampledGroups": 3,
+        "representedLogRows": 6,
+        "timestampsUtc": [
+          "2026-10-28T04:41:13.000000Z",
+          "2026-10-28T04:41:14.000000Z",
+          "2026-10-28T04:41:30.000000Z"
+        ]
+      },
+      {
+        "wording": "Warp server error: Thread killed by timeout manager",
+        "sampledGroups": 2,
+        "representedLogRows": 22,
+        "timestampsUtc": [
+          "2026-10-28T04:41:57.000000Z",
+          "2026-10-28T04:42:57.000000Z"
+        ]
+      },
+      {
+        "wording": "Warp server error: Thread killed by timeout manager28/Oct/2026:04:41:57 +0000: Warp server error: Thread killed by timeout manager",
+        "sampledGroups": 1,
+        "representedLogRows": 4,
+        "timestampsUtc": [
+          "2026-10-28T04:41:57.000000Z"
+        ]
+      },
+      {
+        "wording": "Warp server error: Thread killed by timeout manager28/Oct/2026:04:42:57 +0000: Warp server error: Thread killed by timeout manager28/Oct/2026:04:42:57 +0000: Warp server error: Thread killed by timeout manager",
+        "sampledGroups": 1,
+        "representedLogRows": 2,
+        "timestampsUtc": [
+          "2026-10-28T04:42:57.000000Z"
+        ]
+      }
+    ]
+  },
+  "pricingRpc": {
+    "inputMinuteBuckets": 3,
+    "responseCountsByStatus": {
+      "200": 177
+    },
+    "minuteBuckets": [
+      {
+        "minuteUtc": "2026-10-28T04:41:00Z",
+        "status": "200",
+        "logRows": 84,
+        "uniqueRequestIds": 84,
+        "p50OriginMs": 130,
+        "p95OriginMs": 609,
+        "maxOriginMs": 3310
+      },
+      {
+        "minuteUtc": "2026-10-28T04:42:00Z",
+        "status": "200",
+        "logRows": 65,
+        "uniqueRequestIds": 65,
+        "p50OriginMs": 27,
+        "p95OriginMs": 347,
+        "maxOriginMs": 894
+      },
+      {
+        "minuteUtc": "2026-10-28T04:43:00Z",
+        "status": "200",
+        "logRows": 28,
+        "uniqueRequestIds": 28,
+        "p50OriginMs": 704,
+        "p95OriginMs": 927,
+        "maxOriginMs": 1647
+      }
+    ]
+  },
+  "vercel": {
+    "matchingLogs": 0,
+    "query": "Production deployment runtime errors/warnings; text search catalog; exact incident window",
+    "note": "No logs found for the specified criteria."
+  },
+  "resourceSnapshot": {
+    "observedUtc": "2026-10-29T06:28:40.338889Z",
+    "relationToIncident": "after the historical incident; not causal evidence",
+    "numBackends": 13,
+    "activityByState": [
+      {
+        "backendType": "client backend",
+        "state": "idle",
+        "waitEventType": "Client",
+        "waitEvent": "ClientRead",
+        "sessions": 10
+      },
+      {
+        "backendType": "pg_cron launcher",
+        "state": null,
+        "waitEventType": "Extension",
+        "waitEvent": "Extension",
+        "sessions": 1
+      },
+      {
+        "backendType": "pg_net 0.20.4 worker",
+        "state": "idle",
+        "waitEventType": "Extension",
+        "waitEvent": "Extension",
+        "sessions": 1
+      }
+    ],
+    "historicalCpuMemoryIoPoolMetrics": "not available from queried supported interfaces"
+  },
+  "correlation": {
+    "edgeRequestIdsAndPostgreSqlSessionIdsDirectlyLinked": false,
+    "reason": "No shared request/session correlation key was available in the retained evidence. Timing overlap and matching query fingerprint are not treated as an individual-request join."
+  }
+}
