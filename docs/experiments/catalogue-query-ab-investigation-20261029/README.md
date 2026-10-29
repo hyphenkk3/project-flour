@@ -86,3 +86,10 @@ The script uses 10 counterbalanced sequential A/B pairs followed by three parall
 **Causal conclusion: INCONCLUSIVE.** The refactor changes both query architecture and projections/caching; there is a statically visible extra membership request on a cold homepage path and a larger root projection, but no measured latency, response-size or reliability delta. This is not enough to classify the refactor as a regression or to recommend reverting it.
 
 **Next action:** execute the committed bounded probe from a network-connected Mac Terminal using only the DEV public key. If it passes network access, review the equivalence hashes and then use authenticated DEV observability to obtain query plans for the same anonymous calls. Until those results exist, retain the current source and do not claim a performance fix or regression.
+
+## Investigation source commit
+
+- GitHub branch: `codex/catalogue-query-ab-investigation-20261029`
+- GitHub commit: `0390bda0d670c06df237f5f447d03f86431fd448`
+- Local bundle branch commit: recorded in the external recovery manifest; its source tree matches the GitHub commit tree.
+- Source changes are limited to this diagnostic report and the bounded DEV probe. No application behavior changed.
