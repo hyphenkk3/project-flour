@@ -39,3 +39,47 @@ UNION ALL SELECT 'category_assignments', count(*) FROM public.library_cake_categ
 UNION ALL SELECT 'tag_assignments', count(*) FROM public.library_cake_tag_assignments
 UNION ALL SELECT 'sizes', count(*) FROM public.library_cake_sizes
 UNION ALL SELECT 'photos', count(*) FROM public.library_cake_photos;
+
+-- Current global timeout/connection settings only (not historical values).
+SELECT name, setting, unit, source
+FROM pg_settings
+WHERE name IN (
+  'statement_timeout',
+  'lock_timeout',
+  'idle_in_transaction_session_timeout',
+  'transaction_timeout',
+  'max_connections'
+);
+
+-- Current role-level timeout settings; setdatabase=0 means global role setting.
+SELECT r.rolname, s.setdatabase, setting
+FROM pg_db_role_setting AS s
+JOIN pg_roles AS r ON r.oid = s.setrole
+CROSS JOIN LATERAL unnest(s.setconfig) AS setting
+WHERE s.setdatabase IN (
+    0,
+    (SELECT oid FROM pg_database WHERE datname = current_database())
+  )
+  AND r.rolname IN ('anon', 'authenticated', 'authenticator')
+  AND setting LIKE 'statement_timeout=%'
+ORDER BY r.rolname;
+
+-- Index inventory only; no index definitions or user rows.
+SELECT tablename, indexname
+FROM pg_indexes
+WHERE schemaname = 'public'
+  AND tablename IN (
+    'library_cakes',
+    'library_cake_categories',
+    'library_cake_category_assignments',
+    'library_cake_tag_assignments',
+    'library_cake_tags',
+    'library_cake_sizes',
+    'library_cake_photos'
+  )
+ORDER BY tablename, indexname;
+
+-- Point-in-time ungranted lock count only; not historical contention evidence.
+SELECT count(*) AS waiting_lock_count
+FROM pg_locks
+WHERE NOT granted;
