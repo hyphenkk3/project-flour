@@ -136,18 +136,55 @@ const comparable = (run) => {
   const byId = new Map((run.result.cakes ?? []).map((cake) => [cake.id, cake]));
   return run.result.memberships.map((row) => ({ order: row.homepage_sort_order, cake: sharedProjection(byId.get(row.library_cake_id) ?? null) }));
 };
+const rawCakesInRun = (run) => run.label === "A"
+  ? (run.result ?? []).map(cakeOf).filter(Boolean)
+  : run.result
+    ? (run.result.cakes ?? [])
+    : [];
+const categoryIdsForA = (cake) => {
+  const category = Array.isArray(cake.library_cake_categories)
+    ? cake.library_cake_categories[0]
+    : cake.library_cake_categories;
+  const id = category?.id ?? cake.category_id;
+  return id ? [id] : [];
+};
+const categoryIdsForB = (cake) => (cake.library_cake_category_assignments ?? [])
+  .map((assignment) => {
+    const category = Array.isArray(assignment.library_cake_categories)
+      ? assignment.library_cake_categories[0]
+      : assignment.library_cake_categories;
+    return category?.id ?? assignment.category_id;
+  })
+  .filter(Boolean)
+  .sort();
+const categoryProjectionDifferenceCount = (A, B) => {
+  const bById = new Map(rawCakesInRun(B).map((cake) => [cake.id, cake]));
+  return rawCakesInRun(A).filter((cake) => {
+    const refactored = bById.get(cake.id);
+    if (!refactored) return false;
+    const oldIds = categoryIdsForA(cake).sort();
+    const newIds = categoryIdsForB(refactored);
+    return JSON.stringify(oldIds) !== JSON.stringify(newIds);
+  }).length;
+};
 
 const summarizeSamples = (samples) => {
   const sorted = samples.map((sample) => sample.totalMs).sort((a, b) => a - b);
   const percentile = (p) => sorted.length ? sorted[Math.ceil(p * sorted.length) - 1] : null;
   const requestDurations = samples.flatMap((sample) => sample.requests.map((request) => request.durationMs));
   const bytesBySample = samples.map((sample) => sample.requests.reduce((sum, request) => sum + request.bytes, 0)).sort((a, b) => a - b);
+  const median = (values) => {
+    if (!values.length) return null;
+    const ordered = [...values].sort((a, b) => a - b);
+    const middle = Math.floor(ordered.length / 2);
+    return ordered.length % 2 ? ordered[middle] : (ordered[middle - 1] + ordered[middle]) / 2;
+  };
   return {
     n: samples.length,
-    totalLatencyMs: { median: percentile(0.5), p95NearestRank: percentile(0.95), max: sorted.at(-1) ?? null },
+    totalLatencyMs: { median: median(sorted), p95NearestRank: percentile(0.95), max: sorted.at(-1) ?? null },
     requestsPerSample: samples.map((sample) => sample.requests.length),
-    subrequestLatencyMs: { median: requestDurations.length ? [...requestDurations].sort((a,b)=>a-b)[Math.floor((requestDurations.length-1)/2)] : null, max: requestDurations.length ? Math.max(...requestDurations) : null },
-    responseBytesPerSample: { median: percentileFrom(bytesBySample, 0.5), p95NearestRank: percentileFrom(bytesBySample, 0.95), max: bytesBySample.at(-1) ?? null },
+    subrequestLatencyMs: { median: median(requestDurations), max: requestDurations.length ? Math.max(...requestDurations) : null },
+    responseBytesPerSample: { median: median(bytesBySample), p95NearestRank: percentileFrom(bytesBySample, 0.95), max: bytesBySample.at(-1) ?? null },
     httpFailures: samples.reduce((sum, sample) => sum + sample.requests.filter((request) => request.status < 200 || request.status >= 300).length, 0),
     timeoutFailures: samples.reduce((sum, sample) => sum + sample.requests.filter((request) => request.status === 0 || request.code === "57014" || request.code === "57000").length, 0),
   };
@@ -175,7 +212,16 @@ for (let i = 0; i < sequentialPairs; i++) {
     const B = { label: "B", result: samples.B[0].result };
     const aValue = comparable(A);
     const bValue = comparable(B);
-    correctness = { sharedProjectionMatches: digest(aValue) === digest(bValue), aHash: digest(aValue), bHash: digest(bValue), aVisibleRows: aValue.length, bVisibleRows: bValue.length };
+    correctness = {
+      commonRawProjectionMatches: digest(aValue) === digest(bValue),
+      aHash: digest(aValue),
+      bHash: digest(bValue),
+      aRows: aValue.length,
+      bRows: bValue.length,
+      orderedMembershipIdsMatch: JSON.stringify(aValue.map((row) => row.cake?.id ?? null)) === JSON.stringify(bValue.map((row) => row.cake?.id ?? null)),
+      actualCategoryProjectionDiffCount: categoryProjectionDifferenceCount(A, B),
+      actualRefactorCakeRowsWithMultipleAssignments: rawCakesInRun(B).filter((cake) => (cake.library_cake_category_assignments ?? []).length > 1).length,
+    };
   }
 }
 
@@ -206,6 +252,7 @@ console.log(JSON.stringify({
   firstRequestAfterStart: "observed only; not a database-cold-cache guarantee",
   requestLatencyAndBytes: { A: summarizeSamples(samples.A), B: summarizeSamples(samples.B) },
   concurrent: { A: concurrent.A, B: concurrent.B },
-  sharedProjectionCorrectness: correctness,
+  commonProjectionCorrectness: correctness,
+  sourceKnownProjectionDifference: "A omits category assignments; B's shared root read includes them. The probe reports the observed category-set difference separately.",
   importantLimits: ["Direct REST probe does not exercise Next.js unstable_cache or Vercel runtime.", "Browser-to-API elapsed time does not separate network, PostgREST and SQL time.", "It does not provide a PostgreSQL plan or prove Prod timeout resolution."],
 }, null, 2));
