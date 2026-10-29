@@ -1,0 +1,447 @@
+{
+  "source": "Production pg_policies, read-only transaction",
+  "retrievedAt": "2026-10-29",
+  "project": "cuowwlduhxxifmpvpltt",
+  "policies": [
+    {
+      "schemaname": "public",
+      "tablename": "collection_cakes",
+      "policyname": "collection_cakes_authenticated_all",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "collection_cakes",
+      "policyname": "collection_cakes_public_select",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "((available = true) AND (EXISTS ( SELECT 1\n   FROM collections c\n  WHERE ((c.id = collection_cakes.collection_id) AND (c.status = 'active'::collection_status)))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "collection_cakes",
+      "policyname": "collection_cakes_public_select_customer_history",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "((available = true) AND (EXISTS ( SELECT 1\n   FROM collections c\n  WHERE ((c.id = collection_cakes.collection_id) AND (c.status = ANY (ARRAY['active'::collection_status, 'archived'::collection_status])) AND (c.purpose = ANY (ARRAY['monthly'::text, 'special'::text])) AND ((c.purpose = 'monthly'::text) OR (c.website_override = true) OR (c.show_in_past_menu = true))))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "collections",
+      "policyname": "collections_authenticated_all",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "ALL",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "collections",
+      "policyname": "collections_public_select_active",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "(status = 'active'::collection_status)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "collections",
+      "policyname": "collections_public_select_customer_history",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "((status = ANY (ARRAY['active'::collection_status, 'archived'::collection_status])) AND (purpose = ANY (ARRAY['monthly'::text, 'special'::text])) AND ((purpose = 'monthly'::text) OR (website_override = true) OR (show_in_past_menu = true)))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_categories",
+      "policyname": "Authenticated staff can insert library cake categories",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_categories",
+      "policyname": "library_cake_categories_select",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_categories",
+      "policyname": "Authenticated staff can update library cake categories",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_category_assignments",
+      "policyname": "Authenticated staff can delete cake category assignments",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "DELETE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_category_assignments",
+      "policyname": "Authenticated staff can insert cake category assignments",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_category_assignments",
+      "policyname": "library_cake_category_assignments_select",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_category_assignments",
+      "policyname": "Authenticated staff can update cake category assignments",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_photos",
+      "policyname": "Authenticated staff can delete library cake photos",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "DELETE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_photos",
+      "policyname": "Authenticated staff can insert library cake photos",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_photos",
+      "policyname": "Authenticated staff can select library cake photos",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_photos",
+      "policyname": "library_cake_photos_public_select_catalogue_history",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM ((library_cakes cake\n     JOIN collection_cakes cc ON ((cc.library_cake_id = cake.id)))\n     JOIN collections c ON ((c.id = cc.collection_id)))\n  WHERE ((cake.id = library_cake_photos.cake_id) AND (cc.available = true) AND (c.status = ANY (ARRAY['active'::collection_status, 'archived'::collection_status])) AND (c.purpose = ANY (ARRAY['monthly'::text, 'special'::text])) AND ((c.purpose = 'monthly'::text) OR (c.website_override = true) OR (c.show_in_past_menu = true)))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_photos",
+      "policyname": "library_cake_photos_public_select_in_active_collection",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM ((library_cakes cake\n     JOIN collection_cakes cc ON ((cc.library_cake_id = cake.id)))\n     JOIN collections c ON ((c.id = cc.collection_id)))\n  WHERE ((cake.id = library_cake_photos.cake_id) AND (cc.available = true) AND (c.status = 'active'::collection_status))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_photos",
+      "policyname": "library_cake_photos_public_select_live_browse",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM library_cakes cake\n  WHERE ((cake.id = library_cake_photos.cake_id) AND (cake.status = ANY (ARRAY['active'::library_cake_status, 'seasonal'::library_cake_status])))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_photos",
+      "policyname": "library_cake_photos_public_select_popular_cakes",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM library_cakes cake\n  WHERE ((cake.id = library_cake_photos.cake_id) AND (cake.show_in_popular_cakes = true))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_photos",
+      "policyname": "Authenticated staff can update library cake photos",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_sizes",
+      "policyname": "Authenticated staff can delete library cake sizes",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "DELETE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_sizes",
+      "policyname": "Authenticated staff can insert library cake sizes",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_sizes",
+      "policyname": "Authenticated staff can select library cake sizes",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_sizes",
+      "policyname": "library_cake_sizes_public_select_catalogue_history",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM ((library_cakes cake\n     JOIN collection_cakes cc ON ((cc.library_cake_id = cake.id)))\n     JOIN collections c ON ((c.id = cc.collection_id)))\n  WHERE ((cake.id = library_cake_sizes.cake_id) AND (cc.available = true) AND (c.status = ANY (ARRAY['active'::collection_status, 'archived'::collection_status])) AND (c.purpose = ANY (ARRAY['monthly'::text, 'special'::text])) AND ((c.purpose = 'monthly'::text) OR (c.website_override = true) OR (c.show_in_past_menu = true)))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_sizes",
+      "policyname": "library_cake_sizes_public_select_in_active_collection",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM ((library_cakes cake\n     JOIN collection_cakes cc ON ((cc.library_cake_id = cake.id)))\n     JOIN collections c ON ((c.id = cc.collection_id)))\n  WHERE ((cake.id = library_cake_sizes.cake_id) AND (cc.available = true) AND (c.status = 'active'::collection_status))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_sizes",
+      "policyname": "library_cake_sizes_public_select_live_browse",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM library_cakes cake\n  WHERE ((cake.id = library_cake_sizes.cake_id) AND (cake.status = ANY (ARRAY['active'::library_cake_status, 'seasonal'::library_cake_status])))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_sizes",
+      "policyname": "library_cake_sizes_public_select_popular_cakes",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM library_cakes cake\n  WHERE ((cake.id = library_cake_sizes.cake_id) AND (cake.show_in_popular_cakes = true))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_sizes",
+      "policyname": "Authenticated staff can update library cake sizes",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_tag_assignments",
+      "policyname": "Authenticated staff can delete cake tag assignments",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "DELETE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_tag_assignments",
+      "policyname": "Authenticated staff can insert cake tag assignments",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_tag_assignments",
+      "policyname": "library_cake_tag_assignments_select",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_tag_assignments",
+      "policyname": "Authenticated staff can update cake tag assignments",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_tags",
+      "policyname": "Authenticated staff can insert library cake tags",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_tags",
+      "policyname": "library_cake_tags_select",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cake_tags",
+      "policyname": "Authenticated staff can update library cake tags",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cakes",
+      "policyname": "Authenticated staff can delete library cakes",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "DELETE",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cakes",
+      "policyname": "Authenticated staff can insert library cakes",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cakes",
+      "policyname": "Authenticated staff can select library cakes",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cakes",
+      "policyname": "library_cakes_public_select_catalogue_history",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM (collection_cakes cc\n     JOIN collections c ON ((c.id = cc.collection_id)))\n  WHERE ((cc.library_cake_id = library_cakes.id) AND (cc.available = true) AND (c.status = ANY (ARRAY['active'::collection_status, 'archived'::collection_status])) AND (c.purpose = ANY (ARRAY['monthly'::text, 'special'::text])) AND ((c.purpose = 'monthly'::text) OR (c.website_override = true) OR (c.show_in_past_menu = true)))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cakes",
+      "policyname": "library_cakes_public_select_in_active_collection",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM (collection_cakes cc\n     JOIN collections c ON ((c.id = cc.collection_id)))\n  WHERE ((cc.library_cake_id = library_cakes.id) AND (cc.available = true) AND (c.status = 'active'::collection_status))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cakes",
+      "policyname": "library_cakes_public_select_live_browse",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "(status = ANY (ARRAY['active'::library_cake_status, 'seasonal'::library_cake_status]))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cakes",
+      "policyname": "library_cakes_public_select_popular_cakes",
+      "permissive": "PERMISSIVE",
+      "roles": "{anon,authenticated}",
+      "cmd": "SELECT",
+      "qual": "(show_in_popular_cakes = true)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "library_cakes",
+      "policyname": "Authenticated staff can update library cakes",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "true",
+      "with_check": "true"
+    }
+  ]
+}
