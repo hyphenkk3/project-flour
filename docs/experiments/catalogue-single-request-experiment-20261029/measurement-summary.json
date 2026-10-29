@@ -1,0 +1,79 @@
+{
+  "experiment": "catalogue-single-request-DEV-2026-10-29",
+  "environment": {
+    "supabase_project_ref": "tzwtpxdcggesgjaqxkqr",
+    "access": "anonymous public-key GET requests; no writes",
+    "result_provenance": "User-provided sanitized Mac Terminal output in the project conversation"
+  },
+  "parity": {
+    "status": "PASS",
+    "paired_parity_checks": 3,
+    "performance_sample_count_per_architecture": 30,
+    "common_projection_hash_A": "4ccff2e6143ebfac1f13a91a2930ebc4e24097e140d071d9925c2a9ed1c75d38",
+    "common_projection_hash_B": "4ccff2e6143ebfac1f13a91a2930ebc4e24097e140d071d9925c2a9ed1c75d38",
+    "checks": [
+      "full relevant projection",
+      "collection membership and ordering",
+      "category assignments including multiple assignments",
+      "empty and excluded fixtures"
+    ],
+    "differences": "No differences in tested canonical projection; known architectural projection distinction remains documented in README."
+  },
+  "sequential": {
+    "paired_samples": 30,
+    "order": "A/B execution order alternated",
+    "request_timeout_ms": 8000,
+    "A_historical_two_request": {
+      "rest_requests_per_flow": 2,
+      "median_total_latency_ms": 137.533,
+      "p95_total_latency_ms": 210.867,
+      "maximum_latency_ms": null,
+      "response_bytes": null,
+      "http_failures": 0,
+      "timeouts": 0
+    },
+    "B_single_embedded_request": {
+      "rest_requests_per_flow": 1,
+      "median_total_latency_ms": 146.351,
+      "p95_total_latency_ms": 236.727,
+      "maximum_latency_ms": null,
+      "response_bytes": null,
+      "http_failures": 0,
+      "timeouts": 0
+    },
+    "interpretation": {
+      "median_B_vs_A_percent": 6.41,
+      "p95_B_vs_A_percent": 12.25,
+      "fewer_http_requests": true,
+      "measured_latency_improvement": false
+    }
+  },
+  "concurrent": {
+    "simultaneous_flows_per_architecture": 3,
+    "A_historical_two_request": {
+      "aggregate_elapsed_ms": 198.035,
+      "underlying_rest_calls": 6
+    },
+    "B_single_embedded_request": {
+      "aggregate_elapsed_ms": 267.077,
+      "underlying_rest_calls": 3
+    },
+    "interpretation": "B used half the REST calls but aggregate elapsed time was 34.86% higher in this single bounded concurrency group."
+  },
+  "http_status_totals": {
+    "http_200": 114,
+    "http_406_optional_query_plan_requests": 3,
+    "catalogue_http_failures": 0,
+    "catalogue_timeouts": 0
+  },
+  "query_plans": {
+    "status": "UNAVAILABLE",
+    "reason": "Three optional planner requests returned HTTP 406; no plan or SQL execution-time evidence was obtained."
+  },
+  "limitations": [
+    "The complete original sanitized JSON output was not found in the preserved local checkout; this file records only fields supplied in the conversation.",
+    "Maximum latency and response-byte measurements were not supplied and are null, not inferred.",
+    "The experiment measured direct DEV HTTP request timing, not Next.js rendering, SQL execution time, or Production behavior.",
+    "The measurements do not establish database-cold or cache-warm conditions."
+  ]
+}
