@@ -4,7 +4,6 @@ import { getSupabaseEnv } from "@/lib/supabase/env";
 import {
   DATA_FETCH_TIMEOUT_MS,
   fetchWithTimeout,
-  retryTimedOutGet,
 } from "@/lib/supabase/fetch-timeout";
 import {
   getCheckoutDatePerfCollector,
@@ -18,18 +17,10 @@ import {
 type CreateClientOptions = {
   /** Abort in-flight Supabase fetches after this many ms. */
   timeoutMs?: number;
-  /** Retry one internally timed-out GET. Never retries caller cancellation or non-GET requests. */
-  retryTransientGet?: boolean;
 };
 
-function fetchForCheckoutDateTiming(
-  timeoutMs: number,
-  retryTransientGet = false,
-): typeof fetch {
-  const timeoutBounded = fetchWithTimeout(timeoutMs);
-  const bounded = retryTransientGet
-    ? retryTimedOutGet(timeoutBounded)
-    : timeoutBounded;
+function fetchForCheckoutDateTiming(timeoutMs: number): typeof fetch {
+  const bounded = fetchWithTimeout(timeoutMs);
   const collector = getCheckoutDatePerfCollector();
   if (!collector) return bounded;
   return async (input, init) => {
@@ -99,7 +90,7 @@ export function createPublicClient(options?: CreateClientOptions) {
       setAll() {},
     },
     global: {
-      fetch: fetchForCheckoutDateTiming(timeoutMs, options?.retryTransientGet),
+      fetch: fetchForCheckoutDateTiming(timeoutMs),
     },
   });
   if (collector) {

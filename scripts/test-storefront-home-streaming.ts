@@ -29,6 +29,16 @@ assert.match(homeSrc, /listCustomerSpecialCatalogues/);
 assert.doesNotMatch(homeSrc, /listAvailableCakes/);
 assert.doesNotMatch(homeSrc, /listBrowsePublishedCakes/);
 
+const heroPosition = homeSrc.indexOf("<HomeHero");
+const freshPicksBoundaryPosition = homeSrc.indexOf("<Suspense fallback={<HomeFreshPicksFallback");
+const merchandisingBoundaryPosition = homeSrc.indexOf("<Suspense fallback={<HomeMerchandisingFallback");
+assert.ok(
+  heroPosition >= 0 &&
+    heroPosition < freshPicksBoundaryPosition &&
+    freshPicksBoundaryPosition < merchandisingBoundaryPosition,
+  "the homepage hero is outside separate Fresh Picks and merchandising Suspense boundaries",
+);
+
 const queriesSrc = readSrc("src/workspaces/storefront/catalog/queries.ts");
 assert.match(queriesSrc, /readCachedStorefrontCakesByIds/);
 assert.match(queriesSrc, /STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS/);
