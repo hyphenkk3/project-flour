@@ -97,13 +97,13 @@ The sampled catalogue gateway maximum of 41.551 s is much longer than the curren
 
 ## Effective-price RPC source analysis
 
-Source inspection indicates the storefront has a per-size RPC pricing path:
+Source inspection of the Production-baseline-equivalent code identifies a per-size RPC pricing path:
 
-- `withEffectiveStorefrontPrices` calls `library_cake_size_price_on` once per cake size, with a local maximum concurrency of six.
-- Homepage featured collection previews invoke that pricing wrapper after reading the cached display catalogue. Consequently, a warm catalogue cache does not, by itself, eliminate those per-size price RPCs on a new server render.
-- The homepage requests its selected collection previews concurrently through `Promise.all`.
-- Browse pricing is applied to published cakes; cake detail applies pricing for its cake. Collection-page loading requests current effective prices as well.
-- Checkout/date-specific price resolution is a distinct path. This report does not claim that the display helper is the final authoritative order-submission validation; order submission logic was not changed or exercised.
+- `src/workspaces/storefront/catalog/queries.ts:771-804` implements `withEffectiveStorefrontPrices`: one `library_cake_size_price_on` RPC per cake size, issued in batches with up to six concurrent calls.
+- `src/workspaces/storefront/catalog/queries.ts:1025-1030` calls that wrapper after `readCachedHomepageCollectionPreviewCakes`. Therefore a warm cached homepage display-catalogue read does not, by itself, eliminate per-size price RPCs on a new render.
+- `src/workspaces/storefront/home/StorefrontHomePage.tsx:351` loads featured collection previews concurrently. The earlier source trace estimated roughly 7–8 price RPCs for the observed warm-homepage shape; this is a code-path estimate, not a route-correlated HTTP measurement.
+- Browse calls `listBrowsePublishedCakes` (`queries.ts:1470-1474`), cake detail calls the same wrapper for the selected cake (`queries.ts:1799-1830`), and collection pages request current effective prices (`queries.ts:1042` and `src/workspaces/storefront/home/StorefrontCollectionCakesPage.tsx:109`).
+- Checkout/date-specific resolution is separate in `src/workspaces/storefront/checkout/actions.ts:825-852`, with one RPC per unique size ID for the selected pickup date. This report does not claim that the display helper is the final authoritative order-submission validation; order submission logic was not changed or exercised.
 
 The 851 price RPC calls/hour in the high-error hour and 3,244 in six hours show volume. The long-tail gateway timings show some RPC HTTP requests take seconds. Logs do not expose page-route attribution, request-to-caller mapping, unique visitor counts, or SQL cost per route. Thus it is not possible to calculate “RPCs per homepage visit” from Production telemetry here. The source code supports the mechanism of repeated per-size calls; it does not establish that the RPCs caused the catalogue errors.
 
