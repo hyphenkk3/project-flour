@@ -2,9 +2,9 @@
 
 ## Status
 
-**Experiment status: PREPARED; live anonymous HTTP measurements NOT RUN in this execution environment.** The DEV project metadata identity was verified as `tzwtpxdcggesgjaqxkqr`, but the local process has no public DEV key in its environment. This report does not contain fabricated timing or parity results. Run the preserved probe from Mac Terminal using the DEV public key at its hidden prompt; no key should be sent in chat or stored in files.
+**Experiment status: COMPLETED — bounded anonymous DEV HTTP measurements and projection parity passed.** The results were supplied from the owner's Mac Terminal run against DEV `tzwtpxdcggesgjaqxkqr`; no Production traffic or writes were involved. The complete sanitized JSON output was not found in the preserved local checkout, so [`measurement-summary.json`](measurement-summary.json) records only the values actually supplied. Missing maximum-latency and response-byte values remain null.
 
-This phase is read-only. It does not change application behavior, database/schema/RLS, prices, cache, Production deployments, aliases, or data.
+The experiment is diagnostic only. It does not change application behavior, database/schema/RLS, prices, cache, Production deployments, aliases, or data. Full Production telemetry findings are in [`catalogue-production-telemetry-20261029.md`](../../audits/catalogue-production-telemetry-20261029.md).
 
 ## Exact tested designs
 
@@ -66,14 +66,14 @@ Wait for `read` to return to the Bash prompt before pasting the next commands. T
 
 ## Measurement record
 
-No HTTP experiment result is claimed yet. Populate this section only from the actual sanitized terminal output:
-
-- Parity: NOT RUN.
-- A latency/request counts/bytes/status: NOT RUN.
-- B latency/request counts/bytes/status: NOT RUN.
-- Three-flow concurrency: NOT RUN.
-- PostgREST planner output: NOT RUN.
-- Recommendation: INCONCLUSIVE until the bounded probe runs; no application implementation is authorized by this diagnostic.
+- Projection parity: PASS; both reported common-projection hashes are `4ccff2e6143ebfac1f13a91a2930ebc4e24097e140d071d9925c2a9ed1c75d38`.
+- Paired sequential samples: 30 per design, execution order alternated.
+- A: two REST requests/flow; median 137.533 ms; p95 210.867 ms.
+- B: one REST request/flow; median 146.351 ms; p95 236.727 ms.
+- Three simultaneous flows: A 198.035 ms / six REST calls; B 267.077 ms / three REST calls.
+- HTTP results: 114 HTTP 200; zero catalogue failures/timeouts. Three optional query-plan requests returned HTTP 406; no plans obtained.
+- Full supplied metrics and limitations: [`measurement-summary.json`](measurement-summary.json).
+- Interpretation: B reduced request count but was slower in the reported sequential medians/tails and the one concurrency group. This bounded result does not establish SQL performance, Production behavior, or an improvement in timeout risk. Recommendation: **HOLD** implementation pending a performance or telemetry-supported reason.
 
 ## Safety
 
