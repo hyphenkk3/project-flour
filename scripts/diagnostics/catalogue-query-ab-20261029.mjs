@@ -14,6 +14,13 @@ if (base.protocol !== "https:" || base.hostname !== DEV_HOST) {
 if (!apiKey || /service[_-]?role|sb_secret/i.test(apiKey)) {
   throw new Error("STOP: provide only the DEV anon or publishable public key.");
 }
+const jwtParts = apiKey.split(".");
+if (jwtParts.length === 3) {
+  let role = "";
+  try { role = JSON.parse(Buffer.from(jwtParts[1], "base64url").toString("utf8")).role ?? ""; }
+  catch { throw new Error("STOP: could not validate the JWT role; use the DEV public anon key."); }
+  if (role !== "anon") throw new Error("STOP: JWT key is not an anon key.");
+}
 
 const REST = new URL("/rest/v1/", base);
 const timeoutMs = 8_000;

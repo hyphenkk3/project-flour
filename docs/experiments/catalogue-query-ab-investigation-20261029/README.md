@@ -71,7 +71,7 @@ node scripts/diagnostics/catalogue-query-ab-20261029.mjs
 unset SUPABASE_ANON_KEY SUPABASE_URL
 ```
 
-The script uses 10 counterbalanced sequential A/B pairs followed by three parallel requests per architecture (45 REST requests maximum including the one collection-discovery request), each request capped at 8 seconds. It prints aggregate timings, bytes, status counts and SHA-256s only. “First request” is not a guarantee of a database-cold cache. It does not exercise Next.js `unstable_cache`, Vercel multi-instance behavior, staff invalidation, or checkout. Any A/B common-projection mismatch invalidates the latency comparison until explained. No automated retries are performed by the probe.
+The script uses 10 counterbalanced sequential A/B pairs followed by three parallel requests per architecture (40 REST requests maximum including the one collection-discovery request), each request capped at 8 seconds. It prints aggregate timings, bytes, status counts and SHA-256s only. “First request” is not a guarantee of a database-cold cache. It does not exercise Next.js `unstable_cache`, Vercel multi-instance behavior, staff invalidation, or checkout. Any A/B common-projection mismatch invalidates the latency comparison until explained. No automated retries are performed by the probe.
 
 ## Safety and actions not performed
 
