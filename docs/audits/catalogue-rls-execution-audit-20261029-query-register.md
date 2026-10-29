@@ -164,7 +164,7 @@ WHERE source='postgrest_logs'
 
 ## Earlier Phase 6 statements
 
-Earlier in this same phase, the execution history available to the current continuation records that Production catalog/policy/index/table-statistics/role-setting/activity statements were read-only and that DEV fixture discovery and plan queries ran inside read-only transactions. It does not retain the verbatim SQL text for every earlier catalog scan or the exact generated root-only query. This is a provenance limitation; no query text has been reconstructed as if it were verbatim. The aggregate findings and exact policy definitions are captured in the companion audit report. The one intentionally failed pg_catalog.pg_stat_statements relation lookup was read-only; the extension was then located in schema extensions and queried successfully.
+Earlier in this same phase, the execution history available to the current continuation records that Production catalog/policy/index/table-statistics/role-setting/activity statements were read-only and that DEV fixture discovery and plan queries ran inside read-only transactions. It does not retain the verbatim SQL text for every earlier catalog scan or the exact generated root-only query. This is a provenance limitation; no query text has been reconstructed as if it were verbatim. The aggregate findings and exact policy definitions are captured in the companion audit report; the full 44-row exact policy inventory (including write checks) is docs/audits/catalogue-rls-policy-inventory-20261029.json. The one intentionally failed pg_catalog.pg_stat_statements relation lookup was read-only; the extension was then located in schema extensions and queried successfully.
 
 ## Tool calls outside SQL
 
