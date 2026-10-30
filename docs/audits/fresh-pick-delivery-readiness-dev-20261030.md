@@ -63,7 +63,11 @@ Production order `ORD-20261026-0003` was not modified. No new read-only query wa
 
 ## Recovery status
 
-This document is intended to be committed with the source correction. GitHub remote verification, a complete Git bundle, SHA-256, and isolated restoration remain incomplete until the source commit is pushed and archived. No older recovery bundle or manifest was overwritten.
+- GitHub branch verified at `cbeabd7b0827d559a15f64d278918c4f7fb2165e`, parent `f0a81f342102672bf3a74bd12415497332d17f38`.
+- The complete bundle under `recovery/fresh-pick-delivery-readiness-20261030/verified-final/` was verified and cloned independently. Restored HEAD is `c0f1900c437d8c22dfebf060b4be1cc674543d0e`; restored tree `697da2977bb24455ddeb4f8e646b39781c186490` matches the verified GitHub commit tree. The bundle commit SHA differs from the GitHub commit SHA because the connected GitHub service created the remote commit with its own commit metadata; the source tree and parent are identical.
+- Bundle SHA-256: `e421342a6dd596e5f7b924b1ec3121bad3f33447df2db3cbadb8c6886585453c`.
+- A Vercel Preview and remote build are still blocked because no environment variables are scoped to this feature branch and the inherited Preview binding was not proven DEV-only.
+- No older recovery bundle or manifest was overwritten.
 
 ## Files changed
 
