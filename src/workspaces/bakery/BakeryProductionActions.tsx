@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { type CSSProperties, useLayoutEffect, useState } from "react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DATA_FETCH_TIMEOUT_MS } from "@/lib/supabase/fetch-timeout";
 import {
@@ -57,6 +57,31 @@ export function BakeryProductionActions({
   const [pending, setPending] = useState(false);
   const [activeKind, setActiveKind] = useState<MutationKind | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [mobileNavigationHeight, setMobileNavigationHeight] =
+    useState<number | null>(null);
+
+  useLayoutEffect(() => {
+    const navigation = document.querySelector<HTMLElement>(
+      'nav[aria-label="Workspaces"]',
+    );
+    if (!navigation) return;
+
+    const updateNavigationHeight = () => {
+      const height = navigation.getBoundingClientRect().height;
+      setMobileNavigationHeight(height > 0 ? height : null);
+    };
+
+    updateNavigationHeight();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(updateNavigationHeight);
+      observer.observe(navigation);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener("resize", updateNavigationHeight);
+    return () => window.removeEventListener("resize", updateNavigationHeight);
+  }, []);
 
   if (surface.kind === "none") {
     return null;
@@ -113,7 +138,14 @@ export function BakeryProductionActions({
 
   return (
     <>
-      <div className="border-fog sticky bottom-0 z-20 border-t bg-white/95 backdrop-blur">
+      <div
+        className="border-fog sticky bottom-0 z-20 border-t bg-white/95 backdrop-blur max-sm:bottom-[var(--workspace-navigation-height)]"
+        style={
+          {
+            "--workspace-navigation-height": `${mobileNavigationHeight ?? 0}px`,
+          } as CSSProperties
+        }
+      >
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-5 py-4 sm:px-8 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-xl min-w-0">
             <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
