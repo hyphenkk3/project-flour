@@ -1,12 +1,19 @@
 "use client";
 
 import {
+  cakeSizeEligibleDateInPickupRange,
   cakeSizeAvailability,
+  isAvailabilityDate,
   validCakeSizeSelection,
 } from "@/engines/menu/cake-size-availability";
 import { validateCartSizeAvailability } from "@/workspaces/storefront/cart/actions";
 import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
 import { usePreorderDraft } from "@/workspaces/storefront/cart/usePreorderDraft";
+import { malaysiaPreorderBusinessDate } from "@/engines/preorder/business-date";
+import {
+  lineEarliestCollectionDate,
+  readPreorderDays,
+} from "@/engines/preorder/lead";
 import { useEffect, useLayoutEffect, useId, useRef, useState } from "react";
 import { CakePhotoImage } from "@/components/ui/CakePhotoImage";
 import { StorefrontOverlay } from "@/workspaces/storefront/StorefrontOverlay";
@@ -60,20 +67,85 @@ export function AddToOrderSheet({
   const [chosenPickupDate, setChosenPickupDate] = useState<string | null>(null);
   const pickupDate =
     chosenPickupDate ?? pickupScope?.pickup ?? draftState?.pickupDate ?? null;
+  const initialSelectedId = initialSizeId || cake.sizes[0]?.id || "";
+  const [requestedSizeId, setSizeId] = useState(initialSelectedId);
+  const hasValidPickupScope = Boolean(
+    pickupScope &&
+    isAvailabilityDate(pickupScope.from) &&
+    isAvailabilityDate(pickupScope.to) &&
+    pickupScope.from <= pickupScope.to,
+  );
+  const preorderBusinessDate = malaysiaPreorderBusinessDate(new Date());
+
+  function scopedEligibilityDate(
+    size: (typeof cake.sizes)[number],
+  ): string | null {
+    if (!hasValidPickupScope || !pickupScope) return null;
+    const earliest = lineEarliestCollectionDate(
+      {
+        lineId: `${cake.id}::${size.id}`,
+        cakeId: cake.id,
+        cakeSizeId: size.id,
+        cakeName: cake.name,
+        sizeLabel: size.size,
+        quantity: 1,
+        preorderDays: readPreorderDays(size.preorderDays),
+      },
+      preorderBusinessDate,
+    );
+    const firstEligible = cakeSizeEligibleDateInPickupRange(
+      size,
+      pickupScope.from,
+      pickupScope.to,
+      earliest,
+    );
+    if (!firstEligible) return null;
+    const suggested = pickupScope.pickup?.trim().slice(0, 10) ?? "";
+    return isAvailabilityDate(suggested) &&
+      suggested >= firstEligible &&
+      suggested <= pickupScope.to &&
+      cakeSizeAvailability(size, suggested).available
+      ? suggested
+      : firstEligible;
+  }
+
+  function availabilityForSize(size: (typeof cake.sizes)[number]) {
+    if (!hasValidPickupScope) return cakeSizeAvailability(size, pickupDate);
+    const eligibleDate = scopedEligibilityDate(size);
+    if (eligibleDate) return cakeSizeAvailability(size, eligibleDate);
+    const period = cakeSizeAvailability(size, null).message?.replace(
+      ". Select a pickup date.",
+      "",
+    );
+    return {
+      available: false,
+      message: period
+        ? `${period}. This size is not available within this collection's pickup dates and preorder window.`
+        : "No date in this collection meets this size's availability and preorder requirements.",
+    };
+  }
+
+  const requestedBaseSize = cake.sizes.find(
+    (size) => size.id === requestedSizeId,
+  );
+  const requestedScopedDate = requestedBaseSize
+    ? scopedEligibilityDate(requestedBaseSize)
+    : null;
+  const pricePickupDate = hasValidPickupScope
+    ? (requestedScopedDate ?? pickupScope?.pickup ?? null)
+    : pickupDate;
   const pickupDateRef = useRef(pickupDate);
   useLayoutEffect(() => {
     pickupDateRef.current = pickupDate;
   }, [pickupDate]);
   const addingRef = useRef(false);
   const { cakes: pricedCakes, ready: pickupPricesReady } =
-    usePickupDatePricedCakes([cake], pickupDate);
+    usePickupDatePricedCakes([cake], pricePickupDate);
   const pricedCake = pricedCakes[0] ?? cake;
-  const initialSelectedId = initialSizeId || cake.sizes[0]?.id || "";
-  const [requestedSizeId, setSizeId] = useState(initialSelectedId);
   const sizeId = validCakeSizeSelection(
     pricedCake.sizes,
     requestedSizeId,
-    pickupDate,
+    hasValidPickupScope ? requestedScopedDate : pickupDate,
   );
   const [availabilityError, setAvailabilityError] = useState<string | null>(
     null,
@@ -91,9 +163,15 @@ export function AddToOrderSheet({
   const [adding, setAdding] = useState(false);
 
   const selected = pricedCake.sizes.find((size) => size.id === sizeId);
+  const selectedAvailability = selected ? availabilityForSize(selected) : null;
+  const selectedPickupDate = selected
+    ? hasValidPickupScope
+      ? scopedEligibilityDate(selected)
+      : pickupDate
+    : null;
   const singleSize = pricedCake.sizes.length === 1 ? pricedCake.sizes[0] : null;
   const singleAvailability = singleSize
-    ? cakeSizeAvailability(singleSize, pickupDate)
+    ? availabilityForSize(singleSize)
     : null;
   const photo = storefrontPhotoForSize(pricedCake.photos, sizeId);
   const existingQuantity = selected
@@ -112,11 +190,18 @@ export function AddToOrderSheet({
   }
 
   async function addToOrder() {
-    if (!selected || !pickupPricesReady || addingRef.current) return;
+    if (
+      !selected ||
+      !selectedAvailability?.available ||
+      (hasValidPickupScope && !selectedPickupDate) ||
+      !pickupPricesReady ||
+      addingRef.current
+    )
+      return;
     addingRef.current = true;
     setAdding(true);
     setAvailabilityError(null);
-    const checkedDate = pickupDate || null;
+    const checkedDate = selectedPickupDate || null;
     const draftSnapshot = JSON.stringify(readPreorderDraft());
     const result = await validateCartSizeAvailability(
       [{ cakeId: pricedCake.id, sizeId: selected.id }],
@@ -124,7 +209,9 @@ export function AddToOrderSheet({
     ).catch(() => ({
       error: "Unable to check cake size availability. Please try again.",
     }));
-    const currentDate = pickupDateRef.current || null;
+    const currentDate = hasValidPickupScope
+      ? scopedEligibilityDate(selected)
+      : pickupDateRef.current || null;
     if (
       result.error ||
       checkedDate !== currentDate ||
@@ -145,7 +232,8 @@ export function AddToOrderSheet({
         selected.id,
         quantity,
       );
-      if (pickupDate) writePreorderDraft({ ...updated, pickupDate });
+      if (selectedPickupDate)
+        writePreorderDraft({ ...updated, pickupDate: selectedPickupDate });
       onAdded("updated");
       return;
     }
@@ -180,7 +268,7 @@ export function AddToOrderSheet({
       next.pickupScopeTo = to;
       next.pickupScopeConstrainsBounds = !isFullMonthPickupScope(from, to);
     }
-    if (pickupDate) next.pickupDate = pickupDate;
+    if (selectedPickupDate) next.pickupDate = selectedPickupDate;
     writePreorderDraft(next);
     onAdded("added");
   }
@@ -279,7 +367,7 @@ export function AddToOrderSheet({
 
           {cake.sizes.some(
             (size) => size.availableFrom || size.availableUntil,
-          ) ? (
+          ) && !hasValidPickupScope ? (
             <PickupSlotFields
               dateId={`${titleId}-pickup-date`}
               defaultDate={pickupDate ?? ""}
@@ -304,7 +392,7 @@ export function AddToOrderSheet({
               <ul className="grid gap-2">
                 {pricedCake.sizes.map((size) => {
                   const selectedSize = size.id === sizeId;
-                  const availability = cakeSizeAvailability(size, pickupDate);
+                  const availability = availabilityForSize(size);
                   const availabilityId = `${titleId}-size-${size.id}-availability`;
                   return (
                     <li key={size.id}>
@@ -414,7 +502,13 @@ export function AddToOrderSheet({
           <button
             aria-busy={adding}
             className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 w-full cursor-pointer items-center justify-center rounded-lg px-5 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!selected || !pickupPricesReady || adding}
+            disabled={
+              !selected ||
+              !selectedAvailability?.available ||
+              (hasValidPickupScope && !selectedPickupDate) ||
+              !pickupPricesReady ||
+              adding
+            }
             type="submit"
           >
             {adding
