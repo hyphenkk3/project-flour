@@ -77,11 +77,8 @@ export function AddToOrderSheet({
   );
   const preorderBusinessDate = malaysiaPreorderBusinessDate(new Date());
 
-  function scopedEligibilityDate(
-    size: (typeof cake.sizes)[number],
-  ): string | null {
-    if (!hasValidPickupScope || !pickupScope) return null;
-    const earliest = lineEarliestCollectionDate(
+  function scopedPreorderFloor(size: (typeof cake.sizes)[number]): string {
+    return lineEarliestCollectionDate(
       {
         lineId: `${cake.id}::${size.id}`,
         cakeId: cake.id,
@@ -93,6 +90,13 @@ export function AddToOrderSheet({
       },
       preorderBusinessDate,
     );
+  }
+
+  function scopedEligibilityDate(
+    size: (typeof cake.sizes)[number],
+  ): string | null {
+    if (!hasValidPickupScope || !pickupScope) return null;
+    const earliest = scopedPreorderFloor(size);
     const firstEligible = cakeSizeEligibleDateInPickupRange(
       size,
       pickupScope.from,
@@ -117,6 +121,16 @@ export function AddToOrderSheet({
       ". Select a pickup date.",
       "",
     );
+    if (size.availableFrom && pickupScope && size.availableFrom > pickupScope.to)
+      return {
+        available: false,
+        message: `This size is not yet available in this collection. ${period ?? ""}`.trim(),
+      };
+    if (pickupScope && scopedPreorderFloor(size) > pickupScope.to)
+      return {
+        available: false,
+        message: "Preorder deadline has passed for this collection.",
+      };
     return {
       available: false,
       message: period
@@ -173,6 +187,9 @@ export function AddToOrderSheet({
   const singleAvailability = singleSize
     ? availabilityForSize(singleSize)
     : null;
+  const summaryUnavailable = Boolean(
+    singleSize ? !singleAvailability?.available : selected && !selectedAvailability?.available,
+  );
   const photo = storefrontPhotoForSize(pricedCake.photos, sizeId);
   const existingQuantity = selected
     ? draftLineQuantity(readPreorderDraft(), pricedCake.id, selected.id)
@@ -310,8 +327,8 @@ export function AddToOrderSheet({
             </button>
           </div>
 
-          <div className="border-fog bg-paper flex min-w-0 items-center gap-3 rounded-xl border p-2.5 sm:gap-4 sm:p-3">
-            <div className="bg-fog relative h-20 w-20 shrink-0 overflow-hidden rounded-lg">
+          <div className={`border-fog flex min-w-0 items-center gap-3 rounded-xl border p-2.5 sm:gap-4 sm:p-3 ${summaryUnavailable ? "bg-fog/50" : "bg-paper"}`}>
+            <div className={`bg-fog relative h-20 w-20 shrink-0 overflow-hidden rounded-lg ${summaryUnavailable ? "grayscale opacity-60" : ""}`}>
               {photo ? (
                 <CakePhotoImage
                   alt={photo.altText || `${cake.name} cake`}
@@ -334,10 +351,10 @@ export function AddToOrderSheet({
               </p>
               {selected ? (
                 <div className="mt-1 flex min-w-0 items-baseline justify-between gap-3">
-                  <span className="text-ink truncate text-base font-semibold">
+                  <span className={`${summaryUnavailable ? "text-skyline" : "text-ink"} truncate text-base font-semibold`}>
                     {selected.size}
                   </span>
-                  <span className="text-ink shrink-0 text-base font-semibold tabular-nums">
+                  <span className={`${summaryUnavailable ? "text-skyline" : "text-ink"} shrink-0 text-base font-semibold tabular-nums`}>
                     {pickupPricesReady
                       ? formatRm(selected.price)
                       : "Checking price…"}
@@ -345,10 +362,10 @@ export function AddToOrderSheet({
                 </div>
               ) : singleSize ? (
                 <div className="mt-1 flex min-w-0 items-baseline justify-between gap-3">
-                  <span className="text-ink truncate text-base font-semibold">
+                  <span className={`${summaryUnavailable ? "text-skyline" : "text-ink"} truncate text-base font-semibold`}>
                     {singleSize.size}
                   </span>
-                  <span className="text-ink shrink-0 text-base font-semibold tabular-nums">
+                  <span className={`${summaryUnavailable ? "text-skyline" : "text-ink"} shrink-0 text-base font-semibold tabular-nums`}>
                     {pickupPricesReady
                       ? formatRm(singleSize.price)
                       : "Checking price…"}
@@ -400,7 +417,7 @@ export function AddToOrderSheet({
                         className={[
                           "flex min-h-14 items-center justify-between gap-3 rounded-lg border px-3 py-2.5 transition-colors focus-within:ring-2 focus-within:ring-teal-700 focus-within:ring-offset-2 sm:px-4",
                           !availability.available
-                            ? "border-fog bg-fog/50 cursor-not-allowed opacity-65"
+                            ? "border-fog bg-fog/50 text-skyline cursor-not-allowed"
                             : selectedSize
                               ? "text-ink cursor-pointer border-teal-700 bg-teal-50/70"
                               : "border-fog bg-paper hover:border-skyline text-ink cursor-pointer",
@@ -419,7 +436,7 @@ export function AddToOrderSheet({
                           }
                         />
                         <span className="min-w-0">
-                          <span className="text-ink block text-sm font-semibold">
+                          <span className={`${availability.available ? "text-ink" : "text-skyline"} block text-sm font-semibold`}>
                             {size.size}
                           </span>
                           <span className="text-skyline mt-0.5 block text-xs leading-snug">
@@ -434,7 +451,7 @@ export function AddToOrderSheet({
                             </span>
                           ) : null}
                         </span>
-                        <span className="text-ink shrink-0 text-sm font-semibold tabular-nums">
+                        <span className={`${availability.available ? "text-ink" : "text-skyline"} shrink-0 text-sm font-semibold tabular-nums`}>
                           {pickupPricesReady
                             ? formatRm(size.price)
                             : "Checking price…"}

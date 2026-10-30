@@ -129,6 +129,50 @@ try {
       .then(({ width, height }) => ({ width, height })),
     { width: 80, height: 80 },
   );
+  const availableSingleColor = await dialog
+    .getByText('4"', { exact: true })
+    .evaluate((element) => getComputedStyle(element).color);
+  await page.evaluate(() => {
+    window.fixtureCakes[0].sizes[0].availableFrom = "2026-11-01";
+    window.setFixtureCake(0, "size-1-0", {
+      from: "2026-10-01",
+      to: "2026-10-31",
+      pickup: "2026-10-12",
+    });
+  });
+  dialog = page.getByRole("dialog");
+  assert.equal(
+    await dialog.getByRole("button", { name: "Add to Order" }).isDisabled(),
+    true,
+    "unavailable single-size cakes cannot be added",
+  );
+  assert.match(await dialog.innerText(), /not yet available in this collection/i);
+  assert.notEqual(
+    await dialog
+      .getByText('4"', { exact: true })
+      .evaluate((element) => getComputedStyle(element).color),
+    availableSingleColor,
+    "single-size summary text is visibly muted",
+  );
+  assert.notEqual(
+    await dialog
+      .getByRole("img", { name: "Cake photo" })
+      .evaluate((element) => getComputedStyle(element.parentElement.parentElement).filter),
+    "none",
+    "single-size summary photo is visibly muted",
+  );
+  await page.evaluate(() => {
+    window.fixtureCakes[0].sizes[0].availableFrom = null;
+    window.setFixtureCake(0, "size-1-0");
+  });
+  dialog = page.getByRole("dialog");
+  assert.equal(
+    await dialog
+      .getByText('4"', { exact: true })
+      .evaluate((element) => getComputedStyle(element).color),
+    availableSingleColor,
+    "available single-size summary keeps its normal appearance",
+  );
 
   await page.evaluate(() => window.setFixtureCake(1, "size-2-1"));
   dialog = page.getByRole("dialog");
@@ -244,8 +288,23 @@ try {
   );
   assert.match(
     await dialog.locator('[id$="-size-size-3-0-availability"]').innerText(),
-    /Available from 1 Nov 2026.*not available within this collection/i,
+    /not yet available in this collection.*Available from 1 Nov 2026/i,
   );
+  const unavailableOption = await radios.nth(0).evaluate((radio) => {
+    const label = radio.closest("label");
+    return {
+      opacity: getComputedStyle(label).opacity,
+      color: getComputedStyle(label.querySelector("span span")).color,
+      priceColor: getComputedStyle(label.lastElementChild).color,
+    };
+  });
+  const availableOption = await radios.nth(1).evaluate((radio) => {
+    const label = radio.closest("label");
+    return getComputedStyle(label.querySelector("span span")).color;
+  });
+  assert.equal(unavailableOption.opacity, "1", "availability text retains contrast");
+  assert.equal(unavailableOption.color, unavailableOption.priceColor);
+  assert.notEqual(unavailableOption.color, availableOption);
   assert.equal(
     await dialog.getByRole("button", { name: "Add to Order" }).isDisabled(),
     true,
@@ -269,6 +328,17 @@ try {
     await page.evaluate(() => window.fixtureDraft.pickupDate),
     "2026-10-12",
   );
+
+  await page.evaluate(() => {
+    window.setFixtureCake(2, "size-3-1", {
+      from: "2026-10-10",
+      to: "2026-10-11",
+      pickup: "2026-10-11",
+    });
+  });
+  dialog = page.getByRole("dialog");
+  assert.equal(await dialog.locator('input[type="radio"]').nth(1).isDisabled(), true);
+  assert.match(await dialog.innerText(), /Preorder deadline has passed for this collection/);
 
   await page.evaluate(() => {
     window.setFixtureCake(2, "size-3-0", {
