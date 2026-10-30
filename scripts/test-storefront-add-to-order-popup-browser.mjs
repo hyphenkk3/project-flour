@@ -337,7 +337,7 @@ try {
   );
 
   await page.evaluate(() => {
-    window.setFixtureCake(2, "size-3-1", {
+    window.setFixtureCake(1, "size-2-1", {
       from: "2026-10-10",
       to: "2026-10-11",
       pickup: "2026-10-11",
