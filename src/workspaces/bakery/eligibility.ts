@@ -306,6 +306,7 @@ export type BakeryProductionSurface =
   | { kind: "waiting_confirmation"; reason: string }
   | { kind: "fresh_pick_fulfilled"; reason: string }
   | { kind: "allocation_review"; reason: string }
+  | { kind: "fresh_pick_delivery_ready" }
   | { kind: "start_paid"; remainingQuantity?: number }
   | { kind: "start_unsecured"; remainingQuantity?: number }
   | {
@@ -325,13 +326,33 @@ export type BakeryStartSurface = BakeryProductionSurface;
 export function bakeryProductionSurface(input: {
   presentation: BakeryProductionPresentation;
   status: GuestOrderStatus | string;
+  readyAt?: string | null;
+  fulfilmentMethod?: string | null;
+  freshPickDeliveryReady?: boolean;
   canStartProduction: boolean;
   canUndoStart: boolean;
   canMarkReady: boolean;
   canUndoReady: boolean;
   freshPickAllocation?: BakeryAllocationSummary;
 }): BakeryProductionSurface {
+  if (
+    input.freshPickDeliveryReady &&
+    isDeliveryFulfilment(input.fulfilmentMethod as never) &&
+    input.canMarkReady
+  ) {
+    return { kind: "fresh_pick_delivery_ready" };
+  }
   if (input.presentation === "ready") {
+    if (
+      isDeliveryFulfilment(input.fulfilmentMethod as never) &&
+      !input.readyAt
+    ) {
+      return {
+        kind: "fresh_pick_fulfilled",
+        reason:
+          "Fresh Pick stock is physically ready. Whole-order Delivery readiness requires full payment and an authorized staff confirmation.",
+      };
+    }
     return input.canUndoReady ? { kind: "undo_ready" } : { kind: "none" };
   }
   if (input.presentation === "in_production") {
@@ -362,8 +383,9 @@ export function bakeryProductionSurface(input: {
     if (allocationBlock === "fully_covered") {
       return {
         kind: "fresh_pick_fulfilled",
-        reason:
-          "All ordered cake quantities are supplied by assigned Fresh Pick. Use the existing Fresh Pick readiness controls; do not start Bakery production for these cakes.",
+        reason: isDeliveryFulfilment(input.fulfilmentMethod as never)
+          ? "All ordered cake quantities are assigned to Fresh Pick. Wait until every cake is physically marked ready, then confirm the order here; do not start Bakery production."
+          : "All ordered cake quantities are supplied by assigned Fresh Pick. Use the existing Fresh Pick readiness controls; do not start Bakery production for these cakes.",
       };
     }
     const remainingQuantity =
@@ -395,6 +417,9 @@ export function bakeryStartSurface(input: {
     canUndoStart: input.canUndoStart,
     presentation: input.presentation,
     status: input.status,
+    fulfilmentMethod: undefined,
+    readyAt: null,
+    freshPickDeliveryReady: false,
     freshPickAllocation: input.freshPickAllocation,
   });
 }

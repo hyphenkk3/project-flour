@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DATA_FETCH_TIMEOUT_MS } from "@/lib/supabase/fetch-timeout";
 import {
   markBakeryOrderReadyAction,
+  markFreshPickDeliveryOrderReadyAction,
   startBakeryProductionAction,
   undoBakeryOrderReadyAction,
   undoBakeryProductionStartAction,
@@ -40,7 +41,12 @@ type BakeryProductionActionsProps = {
   surface: BakeryProductionSurface;
 };
 
-type MutationKind = "start" | "undo_start" | "mark_ready" | "undo_ready";
+type MutationKind =
+  | "start"
+  | "undo_start"
+  | "mark_ready"
+  | "mark_fresh_pick_ready"
+  | "undo_ready";
 
 export function BakeryProductionActions({
   orderId,
@@ -122,6 +128,11 @@ export function BakeryProductionActions({
                 Mark Ready when this order can leave Bakery. Undo Start only if
                 production has not finished.
               </p>
+            ) : surface.kind === "fresh_pick_delivery_ready" ? (
+              <p className="text-skyline mt-1.5 text-sm leading-relaxed">
+                Every ordered cake is covered by confirmed, physically ready
+                Fresh Pick stock. Confirm the order is ready to enter Delivery.
+              </p>
             ) : surface.kind === "undo_ready" ? (
               <p className="text-skyline mt-1.5 text-sm leading-relaxed">
                 This order is Ready. Undo Ready only before Collection handoff.
@@ -188,6 +199,19 @@ export function BakeryProductionActions({
                 </button>
               ) : null}
             </div>
+          ) : surface.kind === "fresh_pick_delivery_ready" ? (
+            <button
+              className={primaryClass}
+              disabled={pending}
+              onClick={() =>
+                run("mark_fresh_pick_ready", () =>
+                  markFreshPickDeliveryOrderReadyAction(orderId),
+                )
+              }
+              type="button"
+            >
+              {workingLabel("mark_fresh_pick_ready", "Mark Ready for Delivery")}
+            </button>
           ) : surface.kind === "undo_ready" ? (
             <button
               className={secondaryClass}
