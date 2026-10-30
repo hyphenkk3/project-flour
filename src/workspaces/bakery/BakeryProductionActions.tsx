@@ -57,10 +57,13 @@ export function BakeryProductionActions({
   const [pending, setPending] = useState(false);
   const [activeKind, setActiveKind] = useState<MutationKind | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [mobileNavigationHeight, setMobileNavigationHeight] = useState<number | null>(null);
+  const [mobileNavigationHeight, setMobileNavigationHeight] =
+    useState<number | null>(null);
 
   useLayoutEffect(() => {
-    const navigation = document.querySelector<HTMLElement>('nav[aria-label="Workspaces"]');
+    const navigation = document.querySelector<HTMLElement>(
+      'nav[aria-label="Workspaces"]',
+    );
     if (!navigation) return;
 
     const updateNavigationHeight = () => {
@@ -135,7 +138,7 @@ export function BakeryProductionActions({
 
   return (
     <>
-            <div
+      <div
         className="border-fog sticky bottom-0 z-20 border-t bg-white/95 backdrop-blur max-sm:bottom-[var(--workspace-navigation-height)]"
         style={
           {
