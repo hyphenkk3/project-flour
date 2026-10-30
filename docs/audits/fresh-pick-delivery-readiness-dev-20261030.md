@@ -57,7 +57,9 @@ The test fixtures were isolated to DEV. Cleanup removed the removable synthetic 
 
 ## Preview and release status
 
-No DEV Preview was created. Vercel returned zero environment variables scoped to `codex/fresh-pick-delivery-readiness-20261030`. Existing project Preview variables were branch-scoped to other work, so effective bindings for this branch were ambiguous. The change is therefore not ready for Production release.
+Vercel Preview protection is enabled. Before deployment, a secure comparison confirmed the selected `sb_publishable_` key is enabled in DEV project `tzwtpxdcggesgjaqxkqr` and exactly matches an existing verified DEV branch binding. Six variables were added only to this feature branch: DEV public URL and key, plus inert overrides for service-role, email, cron and staff-notification credentials. No project-wide or Production variable changed. Effective branch scope and values were re-read and verified without displaying the key.
+
+The first Preview build `dpl_FrZXMFSWsD6Z8p5wgjpTHiJqGnki` failed TypeScript at `BakeryOrderDetail.tsx` because `deliveredAt` was missing from the Bakery board DTO. Its Preview URL is not accepted as a working Preview. The follow-up source commit must be built and browser-tested before owner acceptance or Production consideration.
 
 Production order `ORD-20261026-0003` was not modified. No new read-only query was run in this execution; the previously supplied Production evidence remains the latest evidence available here.
 
