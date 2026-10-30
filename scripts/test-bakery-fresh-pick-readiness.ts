@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { buildBakeryWorkspaceCapabilities } from "@/engines/bakery/capabilities";
 import { buildExtraWorkspaceCapabilities } from "@/engines/extra/capabilities";
 import {
+  bakeryProductionSurface,
   bakeryOrderProductionPresentation,
   isBakeryFreshPickReadinessEligible,
   matchesBakeryQueueFilter,
@@ -75,6 +76,68 @@ assert.equal(
   "ready",
   "fully Fresh Pick-supplied WhatsApp-style order derives Ready without order timestamps",
 );
+assert.equal(
+  bakeryProductionSurface({
+    presentation: "ready",
+    status: "paid",
+    readyAt: null,
+    fulfilmentMethod: "delivery",
+    freshPickDeliveryReady: true,
+    canStartProduction: true,
+    canUndoStart: true,
+    canMarkReady: true,
+    canUndoReady: true,
+  }).kind,
+  "fresh_pick_delivery_ready",
+  "fully verified ready Fresh Pick Delivery exposes explicit whole-order Ready action",
+);
+assert.equal(
+  bakeryProductionSurface({
+    presentation: "ready",
+    status: "awaiting_payment",
+    readyAt: null,
+    fulfilmentMethod: "delivery",
+    freshPickDeliveryReady: false,
+    canStartProduction: true,
+    canUndoStart: true,
+    canMarkReady: true,
+    canUndoReady: true,
+  }).kind,
+  "fresh_pick_fulfilled",
+  "Delivery stock readiness alone does not create an order Ready action or Undo Ready control",
+);
+assert.equal(
+  bakeryProductionSurface({
+    presentation: "in_production",
+    status: "paid",
+    readyAt: null,
+    fulfilmentMethod: "delivery",
+    freshPickDeliveryReady: false,
+    canStartProduction: true,
+    canUndoStart: true,
+    canMarkReady: true,
+    canUndoReady: true,
+  }).kind,
+  "in_production",
+  "standard Bakery completion action remains unchanged",
+);
+for (const fulfilmentMethod of ["pickup", "dine_in"] as const) {
+  assert.notEqual(
+    bakeryProductionSurface({
+      presentation: "ready",
+      status: "paid",
+      readyAt: "persisted-ready",
+      fulfilmentMethod,
+      freshPickDeliveryReady: true,
+      canStartProduction: true,
+      canUndoStart: true,
+      canMarkReady: true,
+      canUndoReady: true,
+    }).kind,
+    "fresh_pick_delivery_ready",
+    `${fulfilmentMethod} retains the existing Fresh Pick synchronizer workflow`,
+  );
+}
 assert.equal(
   bakeryOrderProductionPresentation(order({ stockReady: [true, true] })),
   "ready",

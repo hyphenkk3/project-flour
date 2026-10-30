@@ -32,6 +32,7 @@ export type BakeryOrderRow = {
   ready_at: string | null;
   picked_up_at: string | null;
   out_for_delivery_at: string | null;
+  delivered_at: string | null;
   include_receipt: boolean | null;
   extra_stock_id?: string | null;
   order_items?: Array<{
@@ -142,6 +143,7 @@ export function mapBakeryBoardOrder(
     readyAt: row.ready_at,
     pickedUpAt: row.picked_up_at,
     outForDeliveryAt: row.out_for_delivery_at,
+    deliveredAt: row.delivered_at,
     includeReceipt: Boolean(row.include_receipt),
     cakeLines,
     freshPickAllocation: summarizeBakeryFreshPickAllocations({

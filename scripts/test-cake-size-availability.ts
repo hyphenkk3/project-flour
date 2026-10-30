@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import ts from "typescript";
-import { parsePreorderDays } from "@/engines/preorder/lead";
+import {
+  lineEarliestCollectionDate,
+  parsePreorderDays,
+} from "@/engines/preorder/lead";
+import { malaysiaPreorderBusinessDate } from "@/engines/preorder/business-date";
 import { parseNonNegativeNumber } from "@/workspaces/library/labels";
 import * as availability from "@/engines/menu/cake-size-availability";
 import { resolveCakeSizePriceOn } from "@/engines/orders/cake-size-price";
@@ -15,6 +19,7 @@ import {
 } from "@/workspaces/storefront/checkout/preorder-draft";
 const {
   cakeSizeAvailability: check,
+  cakeSizeEligibleDateInPickupRange: eligibleDate,
   cakeSizeAvailabilityRangeError: range,
   validCakeSizeSelection: selection,
 } = availability;
@@ -104,6 +109,73 @@ assert.equal(range(null, null), null);
 assert.equal(range("2026-11-01", "2026-11-01"), null);
 assert.equal(check(six, "2026-10-31").available, true);
 assert.equal(check(six, "2026-11-01").available, true);
+const octoberBusinessDate = malaysiaPreorderBusinessDate(
+  new Date("2026-10-10T04:00:00.000Z"),
+);
+const novemberBusinessDate = malaysiaPreorderBusinessDate(
+  new Date("2026-10-30T04:00:00.000Z"),
+);
+function earliestFor(size: typeof four, businessDate: string): string {
+  return lineEarliestCollectionDate(
+    {
+      lineId: `${cakeId}::${size.id}`,
+      cakeId,
+      cakeSizeId: size.id,
+      cakeName: cake.name,
+      sizeLabel: size.size,
+      quantity: 1,
+      preorderDays: size.preorderDays,
+    },
+    businessDate,
+  );
+}
+assert.equal(octoberBusinessDate, "2026-10-10");
+assert.equal(novemberBusinessDate, "2026-10-30");
+assert.equal(
+  eligibleDate(
+    four,
+    "2026-10-01",
+    "2026-10-31",
+    earliestFor(four, octoberBusinessDate),
+  ),
+  null,
+  "November-only 4 inch cannot be added from the October collection",
+);
+assert.equal(
+  eligibleDate(
+    six,
+    "2026-10-01",
+    "2026-10-31",
+    earliestFor(six, octoberBusinessDate),
+  ),
+  "2026-10-12",
+  "6 inch is eligible within October after the two-day lead time",
+);
+assert.equal(
+  eligibleDate(
+    four,
+    "2026-11-01",
+    "2026-11-30",
+    earliestFor(four, novemberBusinessDate),
+  ),
+  "2026-11-01",
+  "4 inch is eligible from the first November date",
+);
+assert.equal(
+  eligibleDate(
+    { ...four, availableUntil: "2026-11-03" },
+    "2026-11-01",
+    "2026-11-30",
+    "2026-11-04",
+  ),
+  null,
+  "a collection is not eligible when the whole size window ends before its preorder floor",
+);
+assert.equal(
+  eligibleDate(four, "2026-11-01", "2026-10-31", "2026-10-01"),
+  null,
+  "invalid collection bounds cannot authorize a size",
+);
 assert.equal(selection(cake.sizes, fourId, "2026-11-01"), fourId);
 assert.equal(selection(cake.sizes, fourId, "2026-10-31"), "");
 assert.equal(selection(cake.sizes, "", "2026-11-01"), ""); // No automatic substitution/restoration.
@@ -136,7 +208,7 @@ assert.equal(mergeDraftItem(emptyPreorderDraft(), item).items[0].unitPrice, 78);
 // The loader is deliberately changed between requests to model an old browser snapshot.
 let liveCakes: (typeof cake)[] = [cake];
 let loads = 0;
-const exports: Record<string, any> = {};
+const exports: Record<string, unknown> = {};
 const source = readFileSync(
   "src/workspaces/storefront/cart/actions.ts",
   "utf8",
@@ -169,7 +241,7 @@ const parserSource = adminSource.slice(
   adminSource.indexOf("function parseSizes("),
   adminSource.indexOf("async function parseCakeInput("),
 );
-const parserExports: Record<string, any> = {};
+const parserExports: Record<string, unknown> = {};
 vm.runInNewContext(
   ts.transpileModule(parserSource + "\nexports.parseSizes = parseSizes;", {
     compilerOptions: { module: ts.ModuleKind.CommonJS },
@@ -194,24 +266,38 @@ function sizeForm(from: string, until: string) {
     data.append(name, value);
   return data;
 }
-const adminParsed = parserExports.parseSizes(sizeForm("2026-11-01", ""));
+const parseSizes = parserExports.parseSizes as (formData: FormData) => unknown;
+const adminParsed = parseSizes(sizeForm("2026-11-01", "")) as Array<{
+  id: string;
+  price: number;
+  availableFrom: string | null;
+  availableUntil: string | null;
+}>;
 assert.equal(adminParsed[0].id, fourId);
 assert.equal(adminParsed[0].price, 78);
 assert.equal(adminParsed[0].availableFrom, "2026-11-01");
 assert.equal(adminParsed[0].availableUntil, null);
 assert.match(
-  parserExports.parseSizes(sizeForm("2026-11-01", "2026-10-31")),
+  parseSizes(sizeForm("2026-11-01", "2026-10-31")) as string,
   /earlier/,
 );
 assert.match(
-  parserExports.parseSizes(sizeForm("2026-11-01T00:00:00Z", "")),
+  parseSizes(sizeForm("2026-11-01T00:00:00Z", "")) as string,
   /valid availability dates/,
 );
-const cleared = parserExports.parseSizes(sizeForm("", ""));
+const cleared = parseSizes(sizeForm("", "")) as Array<{
+  id: string;
+  price: number;
+  availableFrom: string | null;
+  availableUntil: string | null;
+}>;
 assert.equal(cleared[0].availableFrom, null);
 assert.equal(cleared[0].availableUntil, null);
 async function main() {
-  const validate = exports.validateCartSizeAvailability;
+  const validate = exports.validateCartSizeAvailability as (
+    items: Array<{ cakeId: string; sizeId: string }>,
+    pickupDate: string | null,
+  ) => Promise<{ error: string | null }>;
   assert.equal(
     (await validate([{ cakeId, sizeId: fourId }], "2026-11-01")).error,
     null,
@@ -242,6 +328,11 @@ async function main() {
     /Available from 1 Nov 2026/,
   );
   assert.equal((await validate([item], "2026-11-01")).error, null);
+  assert.match(
+    (await validate([item, { cakeId, sizeId: sixId }], "2026-10-31")).error,
+    /Available from 1 Nov 2026/,
+    "a valid second line cannot let an unavailable size bypass checkout validation",
+  );
   assert.match((await validate([item], null)).error, /Select a pickup date/);
   assert.equal((await validate([{ cakeId, sizeId: sixId }], null)).error, null);
   assert.match(
@@ -284,6 +375,27 @@ async function main() {
     ),
     /public\.create_staff_guest_preorder\(/,
   );
+  const checkoutSource = readFileSync(
+    "src/workspaces/storefront/checkout/actions.ts",
+    "utf8",
+  );
+  const submitStart = checkoutSource.indexOf(
+    "async function submitGuestPreorderActionBody",
+  );
+  const submitCheckout = checkoutSource.slice(submitStart);
+  assert.match(
+    submitCheckout,
+    /validateCartSizeAvailability\([\s\S]*?pickupDate,\s*\)/,
+    "checkout revalidates every item against the actual chosen pickup date",
+  );
+  assert.match(submitCheckout, /p_pickup_date: pickupDate/);
+  const dateGuardSql = readFileSync(
+    "supabase/migrations/20261010082912_cake_size_pickup_date_availability.sql",
+    "utf8",
+  );
+  assert.match(dateGuardSql, /order_items_preorder_size_availability/);
+  assert.match(dateGuardSql, /v_pickup_date < v_from/);
+  assert.match(dateGuardSql, /v_pickup_date > v_until/);
   console.log(
     "PASS: availability boundaries, invalid ranges, no date, date changes, no substitution, photos, pricing, unchanged sizes, direct Server Action requests and stale carts",
   );

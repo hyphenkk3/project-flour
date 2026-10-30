@@ -123,7 +123,7 @@ const detailSource = readFileSync(
   "src/workspaces/collection/CollectionOrderDetail.tsx",
   "utf8",
 );
-assert.match(detailSource, /isDelivery\s*\?\s*\(/);
+assert.match(detailSource, /order\.fulfilmentMethod\s*===\s*"delivery"\s*\?/);
 assert.match(detailSource, /<CollectionDeliveryActions/);
 assert.match(detailSource, /<CollectionHandoffActions/);
 

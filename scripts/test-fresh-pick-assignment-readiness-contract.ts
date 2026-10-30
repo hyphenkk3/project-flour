@@ -54,6 +54,7 @@ function mappedOrder(readyForCollection: boolean, productionStartedAt: string | 
       ready_at: null,
       picked_up_at: null,
       out_for_delivery_at: null,
+      delivered_at: null,
       include_receipt: false,
       extra_stock_id: null,
       order_items: [{

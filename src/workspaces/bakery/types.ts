@@ -72,6 +72,7 @@ export type BakeryBoardOrder = {
   readyAt: string | null;
   pickedUpAt: string | null;
   outForDeliveryAt: string | null;
+  deliveredAt: string | null;
   includeReceipt: boolean;
   cakeLines: BakeryCakeLine[];
   freshPickAllocation: BakeryAllocationSummary;

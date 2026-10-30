@@ -50,15 +50,6 @@ export function BakeryOrderDetail({
   const packing = deriveBakeryPackingReminders(order);
   const fulfilment = bakeryFulfilmentCue(order.fulfilmentMethod);
   const secured = isBakeryOrderSecured(order.status);
-  const surface = bakeryProductionSurface({
-    presentation,
-    status: order.status,
-    canStartProduction: capabilities.canStartProduction,
-    canUndoStart: capabilities.canUndoStart,
-    canMarkReady: capabilities.canMarkReady,
-    canUndoReady: capabilities.canUndoReady,
-    freshPickAllocation: order.freshPickAllocation,
-  });
   const waitingConfirmation = isWaitingCustomerConfirmation(order.status);
   const earlyPickup = isEarlyPickupAttention(order.pickupDate, order.pickupTime);
   const attentionBadge = bakeryAttentionBadgeLabel({
@@ -69,6 +60,39 @@ export function BakeryOrderDetail({
   const freshPickAllocationVerified =
     order.freshPickAllocation.status === "verified" &&
     order.freshPickAllocation.totalAssignedQuantity > 0;
+  const freshPickDeliveryReady =
+    isDeliveryFulfilment(order.fulfilmentMethod) &&
+    order.status === "paid" &&
+    order.readyAt === null &&
+    order.productionStartedAt === null &&
+    order.pickedUpAt === null &&
+    order.outForDeliveryAt === null &&
+    order.deliveredAt === null &&
+    freshPickAllocationVerified &&
+    order.freshPickAllocation.fullyCovered &&
+    order.freshPickAllocation.totalRemainingQuantity === 0 &&
+    order.assignedFreshPickStocks.length ===
+      order.freshPickAllocation.totalAssignedQuantity &&
+    order.assignedFreshPickStocks.every(
+      (stock) =>
+        stock.lifecycle === "confirmed" &&
+        stock.soldAt !== null &&
+        stock.cutIntoSlicesAt === null &&
+        stock.readyForCollection &&
+        !stock.legacyLinkConflict,
+    );
+  const surface = bakeryProductionSurface({
+    presentation,
+    status: order.status,
+    readyAt: order.readyAt,
+    fulfilmentMethod: order.fulfilmentMethod,
+    freshPickDeliveryReady,
+    canStartProduction: capabilities.canStartProduction,
+    canUndoStart: capabilities.canUndoStart,
+    canMarkReady: capabilities.canMarkReady,
+    canUndoReady: capabilities.canUndoReady,
+    freshPickAllocation: order.freshPickAllocation,
+  });
   const freshPickFullySuppliesOrder =
     freshPickAllocationVerified &&
     order.freshPickAllocation.fullyCovered &&

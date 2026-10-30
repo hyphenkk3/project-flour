@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { type CSSProperties, useLayoutEffect, useState } from "react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DATA_FETCH_TIMEOUT_MS } from "@/lib/supabase/fetch-timeout";
 import {
   markBakeryOrderReadyAction,
+  markFreshPickDeliveryOrderReadyAction,
   startBakeryProductionAction,
   undoBakeryOrderReadyAction,
   undoBakeryProductionStartAction,
@@ -40,7 +41,12 @@ type BakeryProductionActionsProps = {
   surface: BakeryProductionSurface;
 };
 
-type MutationKind = "start" | "undo_start" | "mark_ready" | "undo_ready";
+type MutationKind =
+  | "start"
+  | "undo_start"
+  | "mark_ready"
+  | "mark_fresh_pick_ready"
+  | "undo_ready";
 
 export function BakeryProductionActions({
   orderId,
@@ -51,6 +57,31 @@ export function BakeryProductionActions({
   const [pending, setPending] = useState(false);
   const [activeKind, setActiveKind] = useState<MutationKind | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [mobileNavigationHeight, setMobileNavigationHeight] =
+    useState<number | null>(null);
+
+  useLayoutEffect(() => {
+    const navigation = document.querySelector<HTMLElement>(
+      'nav[aria-label="Workspaces"]',
+    );
+    if (!navigation) return;
+
+    const updateNavigationHeight = () => {
+      const height = navigation.getBoundingClientRect().height;
+      setMobileNavigationHeight(height > 0 ? height : null);
+    };
+
+    updateNavigationHeight();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(updateNavigationHeight);
+      observer.observe(navigation);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener("resize", updateNavigationHeight);
+    return () => window.removeEventListener("resize", updateNavigationHeight);
+  }, []);
 
   if (surface.kind === "none") {
     return null;
@@ -107,7 +138,14 @@ export function BakeryProductionActions({
 
   return (
     <>
-      <div className="border-fog sticky bottom-0 z-20 border-t bg-white/95 backdrop-blur">
+      <div
+        className="border-fog sticky bottom-0 z-20 border-t bg-white/95 backdrop-blur max-sm:bottom-[var(--workspace-navigation-height)]"
+        style={
+          {
+            "--workspace-navigation-height": `${mobileNavigationHeight ?? 0}px`,
+          } as CSSProperties
+        }
+      >
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-5 py-4 sm:px-8 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-xl min-w-0">
             <p className="text-signal text-[11px] font-medium tracking-[0.18em] uppercase">
@@ -121,6 +159,11 @@ export function BakeryProductionActions({
               <p className="text-skyline mt-1.5 text-sm leading-relaxed">
                 Mark Ready when this order can leave Bakery. Undo Start only if
                 production has not finished.
+              </p>
+            ) : surface.kind === "fresh_pick_delivery_ready" ? (
+              <p className="text-skyline mt-1.5 text-sm leading-relaxed">
+                Every ordered cake is covered by confirmed, physically ready
+                Fresh Pick stock. Confirm the order is ready to enter Delivery.
               </p>
             ) : surface.kind === "undo_ready" ? (
               <p className="text-skyline mt-1.5 text-sm leading-relaxed">
@@ -188,6 +231,19 @@ export function BakeryProductionActions({
                 </button>
               ) : null}
             </div>
+          ) : surface.kind === "fresh_pick_delivery_ready" ? (
+            <button
+              className={primaryClass}
+              disabled={pending}
+              onClick={() =>
+                run("mark_fresh_pick_ready", () =>
+                  markFreshPickDeliveryOrderReadyAction(orderId),
+                )
+              }
+              type="button"
+            >
+              {workingLabel("mark_fresh_pick_ready", "Mark Ready for Delivery")}
+            </button>
           ) : surface.kind === "undo_ready" ? (
             <button
               className={secondaryClass}

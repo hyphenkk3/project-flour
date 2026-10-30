@@ -71,6 +71,45 @@ export function cakeSizeAvailability(
   };
 }
 
+/**
+ * First pickup date in a collection window that satisfies both the size's
+ * published availability window and the cart's authoritative preorder floor.
+ * The date is only an eligibility probe; checkout still validates the date
+ * the customer actually selects.
+ */
+export function cakeSizeEligibleDateInPickupRange(
+  size: CakeSizeAvailability,
+  pickupFrom: string,
+  pickupTo: string,
+  earliestPickupDate: string,
+): string | null {
+  if (
+    !isAvailabilityDate(pickupFrom) ||
+    !isAvailabilityDate(pickupTo) ||
+    !isAvailabilityDate(earliestPickupDate) ||
+    pickupFrom > pickupTo ||
+    (size.availableFrom && !isAvailabilityDate(size.availableFrom)) ||
+    (size.availableUntil && !isAvailabilityDate(size.availableUntil)) ||
+    (size.availableFrom &&
+      size.availableUntil &&
+      size.availableUntil < size.availableFrom)
+  ) {
+    return null;
+  }
+
+  const first = [
+    pickupFrom,
+    earliestPickupDate,
+    size.availableFrom ?? pickupFrom,
+  ].reduce((latest, value) => (value > latest ? value : latest));
+  const last =
+    size.availableUntil && size.availableUntil < pickupTo
+      ? size.availableUntil
+      : pickupTo;
+
+  return first <= last ? first : null;
+}
+
 /** Clear an invalid selection; never choose its replacement. */
 export function validCakeSizeSelection<
   T extends CakeSizeAvailability & { id: string },
