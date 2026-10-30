@@ -154,12 +154,19 @@ try {
     availableSingleColor,
     "single-size summary text is visibly muted",
   );
-  assert.notEqual(
+  assert.equal(
     await dialog
       .getByRole("img", { name: "Cake photo" })
       .evaluate((element) => getComputedStyle(element.parentElement.parentElement).filter),
     "none",
-    "single-size summary photo is visibly muted",
+    "unavailable single-size summary photo keeps its original colours",
+  );
+  assert.equal(
+    await dialog
+      .getByRole("img", { name: "Cake photo" })
+      .evaluate((element) => getComputedStyle(element.parentElement.parentElement).opacity),
+    "1",
+    "unavailable single-size summary photo remains fully opaque",
   );
   await page.evaluate(() => {
     window.fixtureCakes[0].sizes[0].availableFrom = null;

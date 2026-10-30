@@ -328,7 +328,7 @@ export function AddToOrderSheet({
           </div>
 
           <div className={`border-fog flex min-w-0 items-center gap-3 rounded-xl border p-2.5 sm:gap-4 sm:p-3 ${summaryUnavailable ? "bg-fog/50" : "bg-paper"}`}>
-            <div className={`bg-fog relative h-20 w-20 shrink-0 overflow-hidden rounded-lg ${summaryUnavailable ? "grayscale opacity-60" : ""}`}>
+            <div className="bg-fog relative h-20 w-20 shrink-0 overflow-hidden rounded-lg">
               {photo ? (
                 <CakePhotoImage
                   alt={photo.altText || `${cake.name} cake`}
