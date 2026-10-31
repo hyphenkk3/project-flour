@@ -26,7 +26,7 @@ for (const note of rejected) assert.equal(hasCakeWordingRequest(note), true, `sh
 for (const note of allowed) assert.equal(hasCakeWordingRequest(note), false, `should allow: ${note}`);
 console.log(`Cake wording note guard: ${rejected.length + allowed.length} scenarios passed`);
 
-const possible = ["wish you all the best", "birthday boy all the best", "best wishes", "祝你一切顺利"];
+const possible = ["wish you all the best", "birthday boy all the best", "best wishes", "祝你一切顺利", "happy bday boyfriend", "happy b-day daddy", "hbd babe", "bday girl all the best"];
 for (const note of possible) {
   assert.equal(hasCakeWordingRequest(note), false, `ambiguous note should not hard-block: ${note}`);
   assert.equal(hasPossibleCakeWording(note), true, `ambiguous note should ask for confirmation: ${note}`);
