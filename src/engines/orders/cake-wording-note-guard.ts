@@ -13,8 +13,8 @@ export function hasCakeWordingRequest(note: string): boolean {
   // A standalone birthday greeting in the order notes is usually a request
   // for cake lettering, even without the words "write on cake".
   // Do not flag a greeting explicitly directed to a greeting/wishing card.
-  const cardContext = /\\b(?:birthday|greeting|wishing)\\s+card\\b|\\bon\\s+(?:the\\s+)?card\\b/i.test(text);
-  if (!cardContext && /^(?:please\\s+)?(?:happy\\s+(?:birthday|anniversary)|congratulations|congrats)\\b(?:[\\s!,.:—-]+|$)/i.test(text)) return true;
+  const cardContext = /\b(?:birthday|greeting|wishing)\s+card\b|\bon\s+(?:the\s+)?card\b/i.test(text);
+  if (!cardContext && /^(?:please\s+)?(?:happy\s+(?:birthday|anniversary)|congratulations|congrats)\b(?:[\s!,.:—-]+|$)/i.test(text)) return true;
   if (!cardContext && /^(?:生日快乐|生日快樂|祝你生日快乐|祝你生日快樂|生日快樂呀|生日快乐呀)/.test(text)) return true;
   const direct = [
     /\b(?:write|writing|written|wording|inscribe|inscription|lettering|spell)\b.{0,75}\b(?:cake|top|icing|frosting|words?|name|message|birthday|anniversary)\b/i,
