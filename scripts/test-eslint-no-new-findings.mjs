@@ -26,7 +26,8 @@ function eslintDiagnostics(source, file) {
   return payload.flatMap((entry) => entry.messages).map((message) => ({
     ruleId: message.ruleId ?? "fatal",
     severity: message.severity,
-    message: message.message,
+    // ESLint appends location and source excerpts; line shifts are not new diagnostics.
+    message: message.message.split(/\n\n\//, 1)[0],
   }));
 }
 
