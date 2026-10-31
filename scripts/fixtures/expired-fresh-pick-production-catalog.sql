@@ -380,6 +380,16 @@ CREATE TABLE public.staff_profiles (
   archived_at timestamp with time zone
 );
 
+-- Exact Production dispatch configuration table shape; no dispatch URL or customer data is copied.
+CREATE TABLE public.staff_notification_dispatch_config (
+  id boolean DEFAULT true NOT NULL,
+  dispatch_url text,
+  per_event_enabled boolean DEFAULT false NOT NULL,
+  updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+ALTER TABLE public.staff_notification_dispatch_config ADD CONSTRAINT staff_notification_dispatch_config_pkey PRIMARY KEY (id);
+ALTER TABLE public.staff_notification_dispatch_config ADD CONSTRAINT staff_notification_dispatch_config_id_check CHECK (id);
 ALTER TABLE public.catalogue_voucher_redemptions ADD CONSTRAINT catalogue_voucher_redemptions_adjustment_unique UNIQUE (adjustment_id);
 ALTER TABLE public.catalogue_voucher_redemptions ADD CONSTRAINT catalogue_voucher_redemptions_order_voucher_unique UNIQUE (order_id, voucher_id);
 ALTER TABLE public.catalogue_voucher_redemptions ADD CONSTRAINT catalogue_voucher_redemptions_pkey PRIMARY KEY (id);
@@ -3128,6 +3138,8 @@ ALTER FUNCTION public._sync_order_readiness_after_stock_link() OWNER TO postgres
 REVOKE ALL ON FUNCTION public._sync_order_readiness_after_stock_link() FROM PUBLIC, anon, authenticated, service_role;
 
 -- Catalog fingerprints for pre/post migration definition and privilege checks.
+ALTER TABLE public.staff_notification_dispatch_config ENABLE ROW LEVEL SECURITY;
+
 CREATE TABLE public.production_function_manifest (signature text PRIMARY KEY, definition_md5 text NOT NULL, owner text NOT NULL, security_definer boolean NOT NULL, config text[], acl text NOT NULL);
 INSERT INTO public.production_function_manifest VALUES ('_bind_rpc_actor(uuid)','030d35baf1701b9740b0a4628a751016','postgres',true,ARRAY['search_path=public']::text[],'{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}');
 INSERT INTO public.production_function_manifest VALUES ('_extra_stock_event_on_order_link()','773404e82bb304a247a930a8f935cb0d','postgres',true,ARRAY['search_path=public']::text[],'{=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}');
