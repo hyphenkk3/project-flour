@@ -949,8 +949,7 @@ export async function listAssignableOrdersForExtra(input: {
         Boolean(assigned.cut_into_slices_at) ||
         (assigned.order_id !== null && assigned.order_id !== row.id),
     );
-    const withinRecoveryDate = Date.parse(stock.pickup_through_at ?? "") > Date.now() ||
-      canAssignExpiredStockToPickupDate(stock.pickup_through_at, row.pickup_date);
+    const withinRecoveryDate = canAssignExpiredStockToPickupDate(stock.pickup_through_at, row.pickup_date);
     const canAssign = assessment.canAssign && !hasConflictingAllocation && withinRecoveryDate;
     return {
       id: row.id,
