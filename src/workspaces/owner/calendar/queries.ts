@@ -155,6 +155,7 @@ function mapEntry(
   row: CalendarOrderRow,
   hasEffectiveRm10: boolean,
   derivedReadyForCollection: boolean,
+  readyStock: ReadonlyArray<{ cakeId: string | null; sizeId: string | null; cakeName: string; sizeLabel: string; lifecycle: string; soldAt: string | null; cutIntoSlicesAt: string | null; readyForCollection: boolean; legacyLinkConflict: boolean }> = [],
 ): CalendarEntry {
   const status = row.status as GuestOrderStatus;
   const orderSource = row.order_source as OrderSource;
@@ -183,7 +184,17 @@ function mapEntry(
     pickedUpAt: row.picked_up_at,
     outForDeliveryAt: row.out_for_delivery_at ?? null,
     deliveredAt: row.delivered_at ?? null,
-    items: mapItems(row.order_items),
+    items: mapItems(row.order_items).map((item) => {
+      const source = row.order_items?.find((candidate) => candidate.id === item.id);
+      const match = readyStock.filter((stock) =>
+        (source?.cake_id && source?.cake_size_id
+          ? stock.cakeId === source.cake_id && stock.sizeId === source.cake_size_id
+          : stock.cakeName.trim().toLowerCase() === item.cakeName.trim().toLowerCase() && stock.sizeLabel.trim().toLowerCase() === item.sizeLabel.trim().toLowerCase()) &&
+        stock.lifecycle === "confirmed" && Boolean(stock.soldAt) && !stock.cutIntoSlicesAt &&
+        stock.readyForCollection && !stock.legacyLinkConflict,
+      );
+      return { ...item, readyFreshPick: match.length >= item.quantity };
+    }),
   };
 }
 
@@ -304,6 +315,7 @@ export async function listCalendarEntriesForPickupRange(
         row,
         rm10ByOrder.get(row.id) ?? false,
         derivedReadyForCollection && !row.ready_at,
+        readiness?.assignedStocks ?? [],
       );
     })
     .sort(compareCalendarEntries);
