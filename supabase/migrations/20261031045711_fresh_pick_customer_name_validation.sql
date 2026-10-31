@@ -91,3 +91,4 @@ WHEN (
   AND NEW.extra_stock_id IS NOT NULL
 )
 EXECUTE FUNCTION public._guard_fresh_pick_customer_name();
+REVOKE ALL ON FUNCTION public._guard_fresh_pick_customer_name() FROM service_role;
