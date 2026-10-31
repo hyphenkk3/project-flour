@@ -28,8 +28,25 @@ IDENTITY="$(psql_db -Atqc "select current_database() || ':' || (current_setting(
 [[ "$IDENTITY" == "$DB:17:postgres" ]] || { echo "FAIL: wrong disposable DB identity $IDENTITY" >&2; exit 1; }
 
 # Structural comparison for the exact catalog subset captured from Production.
+psql_db -P pager=off <<'SQL'
+SELECT m.signature,
+       md5(pg_get_functiondef(p.oid)) AS actual_definition_md5, m.definition_md5 AS expected_definition_md5,
+       pg_get_userbyid(p.proowner) AS actual_owner, m.owner AS expected_owner,
+       p.prosecdef AS actual_security_definer, m.security_definer AS expected_security_definer,
+       p.proconfig AS actual_config, m.config AS expected_config,
+       coalesce(p.proacl::text,'DEFAULT') AS actual_acl, m.acl AS expected_acl
+FROM public.production_function_manifest m
+LEFT JOIN pg_proc p ON p.oid=('public.'||m.signature)::regprocedure
+WHERE p.oid IS NULL OR md5(pg_get_functiondef(p.oid)) IS DISTINCT FROM m.definition_md5
+   OR pg_get_userbyid(p.proowner) IS DISTINCT FROM m.owner
+   OR p.prosecdef IS DISTINCT FROM m.security_definer
+   OR p.proconfig IS DISTINCT FROM m.config
+   OR coalesce(p.proacl::text,'DEFAULT') IS DISTINCT FROM m.acl
+ORDER BY m.signature;
+SQL
+
 psql_db <<'SQL' >/dev/null
-DO $$
+DO $
 DECLARE n bigint;
 BEGIN
   SELECT count(*) INTO n FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid
@@ -254,4 +271,4 @@ echo "production_trigger_definitions_and_body_fingerprints=PASS"
 echo "function_signature_owner_security_grants=PASS"
 echo "migration_source_replay=PASS"
 echo "postgres_version=$(psql_db -Atqc 'show server_version')"
-echo "scope=Production catalog-derived schema-only; trigger bodies disabled placeholders; no customer or staff data"
+echo "scope=Production catalog-derived schema-only; 42 exact trigger definitions and 59 actual function bodies fingerprint-checked; no customer or staff rows"
