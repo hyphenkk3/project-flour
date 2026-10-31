@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { hasCakeWordingRequest } from "../src/engines/orders/cake-wording-note-guard.ts";
+import { hasCakeWordingRequest, hasPossibleCakeWording } from "../src/engines/orders/cake-wording-note-guard.ts";
 
 const rejected = [
   "Please write Happy Birthday Sarah on the cake",
@@ -25,3 +25,11 @@ const allowed = [
 for (const note of rejected) assert.equal(hasCakeWordingRequest(note), true, `should reject: ${note}`);
 for (const note of allowed) assert.equal(hasCakeWordingRequest(note), false, `should allow: ${note}`);
 console.log(`Cake wording note guard: ${rejected.length + allowed.length} scenarios passed`);
+
+const possible = ["wish you all the best", "birthday boy all the best", "best wishes", "祝你一切顺利"];
+for (const note of possible) {
+  assert.equal(hasCakeWordingRequest(note), false, `ambiguous note should not hard-block: ${note}`);
+  assert.equal(hasPossibleCakeWording(note), true, `ambiguous note should ask for confirmation: ${note}`);
+}
+for (const note of allowed) assert.equal(hasPossibleCakeWording(note), false, `ordinary note should not prompt: ${note}`);
+console.log(`Ambiguous wording: ${possible.length} acknowledgement scenarios passed`);
