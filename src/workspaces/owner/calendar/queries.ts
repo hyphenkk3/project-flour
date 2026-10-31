@@ -155,7 +155,7 @@ function mapEntry(
   row: CalendarOrderRow,
   hasEffectiveRm10: boolean,
   derivedReadyForCollection: boolean,
-  readyStock: ReadonlyArray<{ cakeId: string | null; sizeId: string | null; cakeName: string; sizeLabel: string; lifecycle: string; soldAt: string | null; cutIntoSlicesAt: string | null; readyForCollection: boolean; legacyLinkConflict: boolean }> = [],
+  readyStock: ReadonlyArray<{ cakeId: string | null; sizeId: string | null; cakeName: string; sizeLabel: string; lifecycle: string; soldAt: string | null; cutIntoSlicesAt: string | null; readyForCollection: boolean; legacyLinkConflict?: boolean }> = [],
 ): CalendarEntry {
   const status = row.status as GuestOrderStatus;
   const orderSource = row.order_source as OrderSource;
