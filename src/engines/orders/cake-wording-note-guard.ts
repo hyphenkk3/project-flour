@@ -36,6 +36,8 @@ export function hasPossibleCakeWording(note: string): boolean {
   if (!text || hasCakeWordingRequest(text)) return false;
   if (/\b(?:greeting|birthday|wishing)\s+card\b|\bon\s+(?:the\s+)?card\b/i.test(text)) return false;
   if (/\b(?:please|kindly)\s+(?:call|contact|deliver|leave|prepare|collect|keep|arrange)\b/i.test(text)) return false;
+  // Common inscription shorthand, including "happy bday boyfriend".
+  if (/\\b(?:hbd|happy\\s+(?:b[ -]?day|bday|bdy|bdae|birtday)|b[ -]?day\\s+(?:boy|girl|boyfriend|girlfriend|babe|dad|mom)|birthday\\s+(?:boy|girl|boyfriend|girlfriend))\\b/i.test(text)) return true;
   return /\b(?:wish(?:ing)?\s+(?:you|u)|all\s+the\s+best|birthday\s+(?:boy|girl)|best\s+wishes|many\s+happy\s+returns|congratulations|congrats|happy\s+(?:birthday|anniversary)|dear\s+\w+)\b/i.test(text) ||
     /(?:祝你|祝您|生日快乐|生日快樂|一切顺利|一切順利|祝福|恭喜|万事如意|萬事如意)/.test(text);
 }
