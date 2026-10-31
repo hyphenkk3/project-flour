@@ -3672,29 +3672,29 @@ INSERT INTO supabase_migrations.schema_migrations(version,name) VALUES ('2026103
 INSERT INTO supabase_migrations.schema_migrations(version,name) VALUES ('20261031074456','allow_bakery_assignment_after_fresh_pick_customer_cutoff');
 
 -- Relevant Production non-constraint indexes captured read-only.
-CREATE UNIQUE INDEX catalogue_voucher_redemptions_one_active_per_order ON public.catalogue_voucher_redemptions USING btree (order_id) WHERE (status = 'redeemed'::text)
-CREATE INDEX catalogue_voucher_redemptions_order_idx ON public.catalogue_voucher_redemptions USING btree (order_id)
-CREATE INDEX catalogue_voucher_redemptions_voucher_status_idx ON public.catalogue_voucher_redemptions USING btree (voucher_id, status, redeemed_at DESC)
-CREATE INDEX library_cake_sizes_cake_id_idx ON public.library_cake_sizes USING btree (cake_id)
-CREATE INDEX library_cake_sizes_preorder_days_idx ON public.library_cake_sizes USING btree (preorder_days)
-CREATE INDEX library_cakes_category_id_idx ON public.library_cakes USING btree (category_id)
-CREATE INDEX library_cakes_name_idx ON public.library_cakes USING btree (name)
-CREATE INDEX library_cakes_popular_cakes_idx ON public.library_cakes USING btree (popular_cakes_sort_order, name) WHERE (show_in_popular_cakes = true)
-CREATE INDEX library_cakes_status_idx ON public.library_cakes USING btree (status)
-CREATE UNIQUE INDEX order_adjustments_order_active_code_unique ON public.order_adjustments USING btree (order_id, code) WHERE ((code IS NOT NULL) AND (status = 'active'::text) AND (reverses_adjustment_id IS NULL))
-CREATE INDEX order_adjustments_order_idx ON public.order_adjustments USING btree (order_id, created_at)
-CREATE INDEX order_paid_addons_order_sort_idx ON public.order_paid_addons USING btree (order_id, sort_order)
-CREATE INDEX order_paid_addons_type_idx ON public.order_paid_addons USING btree (paid_addon_type_id)
-CREATE INDEX payment_allocations_order_idx ON public.payment_allocations USING btree (order_id)
-CREATE INDEX payment_allocations_payment_idx ON public.payment_allocations USING btree (payment_id)
-CREATE INDEX payment_corrections_actor_created_idx ON public.payment_corrections USING btree (corrected_by, corrected_at DESC)
-CREATE INDEX payment_corrections_order_created_idx ON public.payment_corrections USING btree (order_id, corrected_at DESC)
-CREATE INDEX payments_paid_at_idx ON public.payments USING btree (paid_at DESC)
-CREATE INDEX payments_verified_by_idx ON public.payments USING btree (verified_by)
-CREATE INDEX refunds_order_idx ON public.refunds USING btree (order_id)
-CREATE UNIQUE INDEX refunds_request_key_uidx ON public.refunds USING btree (request_key) WHERE (request_key IS NOT NULL)
-CREATE INDEX staff_notification_events_code_idx ON public.staff_notification_events USING btree (code)
-CREATE INDEX staff_notification_events_created_at_idx ON public.staff_notification_events USING btree (created_at DESC)
+CREATE UNIQUE INDEX catalogue_voucher_redemptions_one_active_per_order ON public.catalogue_voucher_redemptions USING btree (order_id) WHERE (status = 'redeemed'::text);
+CREATE INDEX catalogue_voucher_redemptions_order_idx ON public.catalogue_voucher_redemptions USING btree (order_id);
+CREATE INDEX catalogue_voucher_redemptions_voucher_status_idx ON public.catalogue_voucher_redemptions USING btree (voucher_id, status, redeemed_at DESC);
+CREATE INDEX library_cake_sizes_cake_id_idx ON public.library_cake_sizes USING btree (cake_id);
+CREATE INDEX library_cake_sizes_preorder_days_idx ON public.library_cake_sizes USING btree (preorder_days);
+CREATE INDEX library_cakes_category_id_idx ON public.library_cakes USING btree (category_id);
+CREATE INDEX library_cakes_name_idx ON public.library_cakes USING btree (name);
+CREATE INDEX library_cakes_popular_cakes_idx ON public.library_cakes USING btree (popular_cakes_sort_order, name) WHERE (show_in_popular_cakes = true);
+CREATE INDEX library_cakes_status_idx ON public.library_cakes USING btree (status);
+CREATE UNIQUE INDEX order_adjustments_order_active_code_unique ON public.order_adjustments USING btree (order_id, code) WHERE ((code IS NOT NULL) AND (status = 'active'::text) AND (reverses_adjustment_id IS NULL));
+CREATE INDEX order_adjustments_order_idx ON public.order_adjustments USING btree (order_id, created_at);
+CREATE INDEX order_paid_addons_order_sort_idx ON public.order_paid_addons USING btree (order_id, sort_order);
+CREATE INDEX order_paid_addons_type_idx ON public.order_paid_addons USING btree (paid_addon_type_id);
+CREATE INDEX payment_allocations_order_idx ON public.payment_allocations USING btree (order_id);
+CREATE INDEX payment_allocations_payment_idx ON public.payment_allocations USING btree (payment_id);
+CREATE INDEX payment_corrections_actor_created_idx ON public.payment_corrections USING btree (corrected_by, corrected_at DESC);
+CREATE INDEX payment_corrections_order_created_idx ON public.payment_corrections USING btree (order_id, corrected_at DESC);
+CREATE INDEX payments_paid_at_idx ON public.payments USING btree (paid_at DESC);
+CREATE INDEX payments_verified_by_idx ON public.payments USING btree (verified_by);
+CREATE INDEX refunds_order_idx ON public.refunds USING btree (order_id);
+CREATE UNIQUE INDEX refunds_request_key_uidx ON public.refunds USING btree (request_key) WHERE (request_key IS NOT NULL);
+CREATE INDEX staff_notification_events_code_idx ON public.staff_notification_events USING btree (code);
+CREATE INDEX staff_notification_events_created_at_idx ON public.staff_notification_events USING btree (created_at DESC);
 
 
 
