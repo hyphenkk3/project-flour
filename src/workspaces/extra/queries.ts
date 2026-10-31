@@ -743,13 +743,11 @@ export async function listAssignableOrdersForExtra(input: {
   if (stockError || !stock)
     throw new Error("This Fresh Pick is no longer available.");
   if (
-    !isExtraAvailable({
-      lifecycle: stock.lifecycle,
-      pickupThroughAt: stock.pickup_through_at,
-      soldAt: stock.sold_at,
-      cutIntoSlicesAt: stock.cut_into_slices_at,
-      walkInHeldUntil: stock.walk_in_held_until,
-    })
+    stock.lifecycle !== "confirmed" ||
+    stock.sold_at !== null ||
+    stock.cut_into_slices_at !== null ||
+    (stock.walk_in_held_until !== null &&
+      new Date(stock.walk_in_held_until).getTime() >= Date.now())
   ) {
     throw new Error("This Fresh Pick is no longer available for assignment.");
   }
