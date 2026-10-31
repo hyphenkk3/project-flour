@@ -80,6 +80,14 @@ begin
   end if;
   -- Refresh the time after lock waits so stock expiry/hold checks are current.
   v_now := clock_timestamp();
+  -- Recheck under both row locks so this migration is safe even before the
+  -- later canonical post-lock hardening migration is applied.
+  if stock_row.pickup_through_at is null or
+     timezone('Asia/Kuala_Lumpur', v_now)::date not between
+       timezone('Asia/Kuala_Lumpur', stock_row.pickup_through_at)::date
+       and timezone('Asia/Kuala_Lumpur', stock_row.pickup_through_at)::date + 1 then
+    raise exception 'The two-day Bakery recovery window has ended';
+  end if;
   if order_row.pickup_date not in (
     timezone('Asia/Kuala_Lumpur', stock_row.pickup_through_at)::date,
     timezone('Asia/Kuala_Lumpur', stock_row.pickup_through_at)::date + 1
