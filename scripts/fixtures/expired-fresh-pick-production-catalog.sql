@@ -2,17 +2,17 @@
 
 -- Captured from Supabase cuowwlduhxxifmpvpltt, PostgreSQL 17.6, 2026-10-31.
 
--- No customer, payment, stock, or staff rows are copied. Trigger bodies are metadata-only placeholders, disabled for this structural rehearsal.
+-- Sanitized schema-only capture: actual Production function and trigger definitions are recreated and fingerprint-checked; no customer, payment, stock, or staff rows are copied.
 
 CREATE EXTENSION IF NOT EXISTS citext;
 
-DO $ BEGIN
+DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='supabase_auth_admin') THEN CREATE ROLE supabase_auth_admin NOLOGIN; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='dashboard_user') THEN CREATE ROLE dashboard_user NOLOGIN; END IF;
-END $;
+END $$;
 
 CREATE SCHEMA auth; CREATE TABLE auth.users (id uuid PRIMARY KEY);
 
