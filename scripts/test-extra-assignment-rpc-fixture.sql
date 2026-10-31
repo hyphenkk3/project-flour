@@ -1,7 +1,17 @@
 \set ON_ERROR_STOP on
-create role anon nologin;
-create role authenticated nologin;
-create role service_role nologin;
+DO $fixture_roles$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    CREATE ROLE anon NOLOGIN;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE ROLE authenticated NOLOGIN;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+    CREATE ROLE service_role NOLOGIN;
+  END IF;
+END;
+$fixture_roles$;
 create schema auth;
 
 create function auth.uid() returns uuid language sql stable as $$
