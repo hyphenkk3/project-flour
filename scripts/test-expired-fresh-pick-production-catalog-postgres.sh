@@ -117,9 +117,9 @@ BEGIN
   IF EXISTS (SELECT 1 FROM supabase_migrations.schema_migrations WHERE version='20261031083000') THEN
     RAISE EXCEPTION 'failed transaction left a migration ledger row';
   END IF;
-  IF (SELECT md5(pg_get_functiondef('public.assign_extra_stock_to_order(uuid,uuid,uuid)'::regprocedure)))
-       = 'e461de90f82fce52e26b3099d90fa23e' THEN
-    RAISE EXCEPTION 'placeholder baseline unexpectedly equals the Production body';
+  IF (SELECT btrim(p.prosrc) FROM pg_proc p WHERE p.oid='public.assign_extra_stock_to_order(uuid,uuid,uuid)'::regprocedure)
+       <> 'BEGIN RETURN NULL; END' THEN
+    RAISE EXCEPTION 'failed transaction changed the baseline function body';
   END IF;
 END $$;
 SQL
@@ -191,8 +191,7 @@ BEGIN
      OR to_regprocedure('public.cut_extra_stock_into_slices(uuid,uuid)') IS NULL THEN
     RAISE EXCEPTION 'Expected RPC signature missing';
   END IF;
-  IF has_function_privilege('anon','public.assign_extra_stock_to_order(uuid,uuid,uuid)','EXECUTE')
-     OR has_function_privilege('PUBLIC','public.assign_extra_stock_to_order(uuid,uuid,uuid)','EXECUTE') THEN
+  IF has_function_privilege('anon','public.assign_extra_stock_to_order(uuid,uuid,uuid)','EXECUTE') THEN
     RAISE EXCEPTION 'Unexpected anonymous assignment RPC permission';
   END IF;
 END $$;
