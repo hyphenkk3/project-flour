@@ -9,6 +9,7 @@ export const CAKE_WORDING_REQUEST_ERROR =
 export function hasCakeWordingRequest(note: string): boolean {
   const text = note.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
   if (!text) return false;
+  if (/\b(?:do not|don\x27t|dont|no|without)\s+(?:write|writing|wording|words?|message)\b.{0,35}\b(?:cake|icing|top)\b/i.test(text)) return false;
   const direct = [
     /\b(?:write|writing|written|wording|inscribe|inscription|lettering|spell)\b.{0,75}\b(?:cake|top|icing|frosting|words?|name|message|birthday|anniversary)\b/i,
     /\b(?:cake|icing|frosting)\b.{0,75}\b(?:write|writing|written|wording|inscribe|inscription|lettering)\b/i,
