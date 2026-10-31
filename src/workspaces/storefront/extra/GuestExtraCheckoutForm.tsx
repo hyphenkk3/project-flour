@@ -163,6 +163,14 @@ export function GuestExtraCheckoutForm({
   const [notes, setNotes] = useState(cart?.notes ?? "");
   const [notesExpanded, setNotesExpanded] = useState(Boolean(cart?.notes));
   const [notesNotWordingAcknowledged, setNotesNotWordingAcknowledged] = useState(false);
+  const notesHydratedRef = useRef(false);
+  useEffect(() => {
+    if (!cart || notesHydratedRef.current) return;
+    notesHydratedRef.current = true;
+    setNotes(cart.notes ?? "");
+    setNotesExpanded(Boolean(cart.notes));
+  }, [cart]);
+
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmSnapshot, setConfirmSnapshot] =
     useState<CheckoutConfirmSnapshot | null>(null);
