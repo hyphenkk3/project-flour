@@ -16,6 +16,8 @@ export type CalendarCakeItem = {
   cakeName: string;
   sizeLabel: string;
   quantity: number;
+  /** All physical Fresh Pick units for this cake line are ready. */
+  readyFreshPick?: boolean;
 };
 
 export type CalendarEntry = {
