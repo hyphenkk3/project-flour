@@ -65,7 +65,7 @@ create table public.order_items (
 create table public.extra_stock (
   id uuid primary key, library_cake_id uuid, library_cake_size_id uuid,
   cake_name text not null, size_label text not null, lifecycle text not null,
-  sold_at timestamptz, cut_into_slices_at timestamptz, order_id uuid,
+  sold_at timestamptz, cut_into_slices_at timestamptz, cut_into_slices_by uuid, order_id uuid,
   ready_for_collection boolean not null default false,
   pickup_through_at timestamptz, walk_in_held_until timestamptz, updated_at timestamptz not null default now()
 );
