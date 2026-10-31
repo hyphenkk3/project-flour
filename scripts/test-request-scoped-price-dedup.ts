@@ -156,6 +156,13 @@ const checkoutSource = readFileSync(
   resolvePath(process.cwd(), "src/workspaces/storefront/checkout/actions.ts"),
   "utf8",
 );
+const pricingMigration = readFileSync(
+  resolvePath(
+    process.cwd(),
+    "supabase/migrations/20260922120000_library_cake_size_prices.sql",
+  ),
+  "utf8",
+);
 const resilientSource = readFileSync(
   resolvePath(
     process.cwd(),
@@ -175,6 +182,11 @@ assert.match(homeSource, /candidate\.id,\s*todayYmd,\s*requestPriceContext/s);
 assert.match(querySource, /const STOREFRONT_PRICE_LOOKUP_CONCURRENCY = 6/);
 assert.match(querySource, /library_cake_size_price_on/);
 assert.match(checkoutSource, /library_cake_size_price_on/);
+assert.match(checkoutSource, /submit_guest_preorder/);
+assert.match(
+  pricingMigration,
+  /library_cake_size_price_on\(size_row\.id, p_pickup_date\)/,
+);
 assert.match(resilientSource, /Retry/);
 
 console.log("PASS request-scoped price deduplication correctness checks");
