@@ -28,3 +28,17 @@ export function hasCakeWordingRequest(note: string): boolean {
   ];
   return direct.some((pattern) => pattern.test(text));
 }
+
+
+/** A greeting without clear instructions may be an inscription; ask, don't assume. */
+export function hasPossibleCakeWording(note: string): boolean {
+  const text = note.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
+  if (!text || hasCakeWordingRequest(text)) return false;
+  if (/\b(?:greeting|birthday|wishing)\s+card\b|\bon\s+(?:the\s+)?card\b/i.test(text)) return false;
+  if (/\b(?:please|kindly)\s+(?:call|contact|deliver|leave|prepare|collect|keep|arrange)\b/i.test(text)) return false;
+  return /\b(?:wish(?:ing)?\s+(?:you|u)|all\s+the\s+best|birthday\s+(?:boy|girl)|best\s+wishes|many\s+happy\s+returns|congratulations|congrats|happy\s+(?:birthday|anniversary)|dear\s+\w+)\b/i.test(text) ||
+    /(?:祝你|祝您|生日快乐|生日快樂|一切顺利|一切順利|祝福|恭喜|万事如意|萬事如意)/.test(text);
+}
+
+export const POSSIBLE_CAKE_WORDING_MESSAGE =
+  "Just checking — if this is a message you'd like written on the cake, please remove it, as we don't offer cake wording. If it's simply additional information, you may keep it and confirm below.";
