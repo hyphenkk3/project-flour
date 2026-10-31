@@ -61,8 +61,6 @@ SELECT public.cut_extra_stock_into_slices(
   '83000000-0000-0000-0000-000000000002',
   '40000000-0000-0000-0000-000000000001'
 );
-SET CONSTRAINTS ALL IMMEDIATE;
-
 DO $behavior$
 DECLARE v_primary uuid; v_ready_at timestamptz; v_production_started_at timestamptz;
 BEGIN
@@ -75,8 +73,8 @@ BEGIN
   SELECT extra_stock_id, ready_at, production_started_at
     INTO v_primary, v_ready_at, v_production_started_at
   FROM public.orders WHERE id='50000000-0000-0000-0000-000000000001';
-  IF v_primary IS DISTINCT FROM '83000000-0000-0000-0000-000000000001'::uuid THEN
-    RAISE EXCEPTION 'legacy primary pointer expected stock, got %',v_primary;
+  IF v_primary IS NOT NULL THEN
+    RAISE EXCEPTION 'mixed Fresh Pick allocation must not prematurely set the legacy primary pointer, got %',v_primary;
   END IF;
   IF v_ready_at IS NOT NULL THEN
     RAISE EXCEPTION 'mixed order was unexpectedly marked ready at %',v_ready_at;
