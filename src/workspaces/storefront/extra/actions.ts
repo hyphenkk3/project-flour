@@ -1,3 +1,4 @@
+import { CAKE_WORDING_REQUEST_ERROR, hasCakeWordingRequest, hasPossibleCakeWording } from "@/engines/orders/cake-wording-note-guard";
 "use server";
 
 import {
@@ -251,6 +252,8 @@ async function submitGuestExtraOrderActionBody(
     String(formData.get("fulfilment_method") ?? ""),
   );
   const notes = String(formData.get("notes") ?? "").trim();
+  if (hasCakeWordingRequest(notes)) return { error: CAKE_WORDING_REQUEST_ERROR };
+  if (hasPossibleCakeWording(notes) && formData.get("notes_not_cake_wording_ack") !== "yes") return { error: "Please confirm that your note is not a request for writing on the cake." };
   const submittedComplimentaryCodes = formData
     .getAll("complimentary_code")
     .map((value) => String(value).trim())
