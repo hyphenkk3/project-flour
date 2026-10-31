@@ -154,125 +154,137 @@ CREATE TABLE public.staff_profiles (
   archived_at timestamp with time zone
 );
 
-ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_cake_name_nonempty CHECK (length(TRIM(BOTH FROM cake_name)) > 0);
-
-ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_confirmed_by_fkey FOREIGN KEY (confirmed_by) REFERENCES staff_profiles(id);
-
-ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_confirmed_requires_fields CHECK (lifecycle <> 'confirmed'::extra_stock_lifecycle OR prepared_on IS NOT NULL AND pickup_through_at IS NOT NULL AND pickup_available_from_at IS NOT NULL AND confirmed_at IS NOT NULL AND confirmed_by IS NOT NULL);
-
-ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_cut_into_slices_by_fkey FOREIGN KEY (cut_into_slices_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
-
-ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_library_cake_id_fkey FOREIGN KEY (library_cake_id) REFERENCES library_cakes(id) ON DELETE SET NULL;
-
-ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_library_cake_size_id_fkey FOREIGN KEY (library_cake_size_id) REFERENCES library_cake_sizes(id) ON DELETE SET NULL;
-
-ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_order_id_fkey FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL;
-
-ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_pickup_from_order_cutoff_fields CHECK (pickup_available_from_at IS NULL OR pickup_through_at IS NOT NULL);
-
 ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_proposed_by_fkey FOREIGN KEY (proposed_by) REFERENCES staff_profiles(id);
-
-ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_rejected_by_fkey FOREIGN KEY (rejected_by) REFERENCES staff_profiles(id);
-
-ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_rejected_requires_fields CHECK (lifecycle <> 'rejected'::extra_stock_lifecycle OR rejected_at IS NOT NULL AND rejected_by IS NOT NULL);
-
-ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_size_label_nonempty CHECK (length(TRIM(BOTH FROM size_label)) > 0);
-
-ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_sliced_requires_confirmed CHECK (cut_into_slices_at IS NULL OR lifecycle = 'confirmed'::extra_stock_lifecycle AND cut_into_slices_by IS NOT NULL);
-
-ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_sold_or_sliced_mutex CHECK (sold_at IS NULL OR cut_into_slices_at IS NULL);
-
-ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_sold_requires_confirmed CHECK (sold_at IS NULL OR lifecycle = 'confirmed'::extra_stock_lifecycle);
-
-ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_terminal_mutex CHECK (NOT (confirmed_at IS NOT NULL AND rejected_at IS NOT NULL));
-
-ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_walk_in_held_by_fkey FOREIGN KEY (walk_in_held_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
-
-ALTER TABLE public.extra_stock_events ADD CONSTRAINT extra_stock_events_actor_staff_id_fkey FOREIGN KEY (actor_staff_id) REFERENCES staff_profiles(id) ON DELETE SET NULL;
-
-ALTER TABLE public.extra_stock_events ADD CONSTRAINT extra_stock_events_extra_stock_id_fkey FOREIGN KEY (extra_stock_id) REFERENCES extra_stock(id) ON DELETE CASCADE;
-
 ALTER TABLE public.extra_stock_events ADD CONSTRAINT extra_stock_events_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.extra_stock_events ADD CONSTRAINT extra_stock_events_type_not_blank CHECK (char_length(TRIM(BOTH FROM event_type)) > 0);
-
-ALTER TABLE public.order_items ADD CONSTRAINT order_items_cake_id_fkey FOREIGN KEY (cake_id) REFERENCES library_cakes(id) ON DELETE RESTRICT;
-
-ALTER TABLE public.order_items ADD CONSTRAINT order_items_cake_size_id_fkey FOREIGN KEY (cake_size_id) REFERENCES library_cake_sizes(id) ON DELETE RESTRICT;
-
-ALTER TABLE public.order_items ADD CONSTRAINT order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE;
-
 ALTER TABLE public.order_items ADD CONSTRAINT order_items_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.order_items ADD CONSTRAINT order_items_quantity_positive CHECK (quantity > 0);
-
-ALTER TABLE public.order_items ADD CONSTRAINT order_items_unit_price_non_negative CHECK (unit_price >= 0::numeric);
-
-ALTER TABLE public.order_timeline_events ADD CONSTRAINT order_timeline_events_actor_staff_id_fkey FOREIGN KEY (actor_staff_id) REFERENCES staff_profiles(id) ON DELETE SET NULL;
-
-ALTER TABLE public.order_timeline_events ADD CONSTRAINT order_timeline_events_order_id_fkey FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE;
-
 ALTER TABLE public.order_timeline_events ADD CONSTRAINT order_timeline_events_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.order_timeline_events ADD CONSTRAINT order_timeline_events_type_not_blank CHECK (char_length(TRIM(BOTH FROM event_type)) > 0);
-
-ALTER TABLE public.orders ADD CONSTRAINT orders_collection_id_fkey FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE SET NULL;
-
-ALTER TABLE public.orders ADD CONSTRAINT orders_created_by_fkey FOREIGN KEY (created_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
-
-ALTER TABLE public.orders ADD CONSTRAINT orders_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT;
-
-ALTER TABLE public.orders ADD CONSTRAINT orders_delivered_by_fkey FOREIGN KEY (delivered_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
-
-ALTER TABLE public.orders ADD CONSTRAINT orders_extra_stock_id_fkey FOREIGN KEY (extra_stock_id) REFERENCES extra_stock(id) ON DELETE RESTRICT;
-
-ALTER TABLE public.orders ADD CONSTRAINT orders_guest_or_customer CHECK (customer_id IS NOT NULL OR customer_id IS NULL AND guest_name IS NOT NULL AND char_length(TRIM(BOTH FROM guest_name)) > 0);
-
-ALTER TABLE public.orders ADD CONSTRAINT orders_order_number_format CHECK (order_number ~ '^ORD-[0-9]{8}-[0-9]{4}$'::text);
-
 ALTER TABLE public.orders ADD CONSTRAINT orders_order_number_key UNIQUE (order_number);
-
-ALTER TABLE public.orders ADD CONSTRAINT orders_order_source_check CHECK (order_source = ANY (ARRAY['customer_website'::text, 'jotform'::text, 'whatsapp'::text, 'whitebird_instagram'::text, 'wee'::text, 'lex'::text, 'kin'::text, 'walk_in'::text, 'last_minute'::text, 'other'::text]));
-
-ALTER TABLE public.orders ADD CONSTRAINT orders_order_source_other_nonblank_check CHECK (order_source_other IS NULL OR char_length(btrim(order_source_other)) > 0);
-
-ALTER TABLE public.orders ADD CONSTRAINT orders_out_for_delivery_by_fkey FOREIGN KEY (out_for_delivery_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
-
-ALTER TABLE public.orders ADD CONSTRAINT orders_picked_up_by_fkey FOREIGN KEY (picked_up_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
-
 ALTER TABLE public.orders ADD CONSTRAINT orders_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.orders ADD CONSTRAINT orders_post_payment_change_override_by_fkey FOREIGN KEY (post_payment_change_override_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
-
-ALTER TABLE public.orders ADD CONSTRAINT orders_post_payment_customer_change_count_nonneg CHECK (post_payment_customer_change_count >= 0);
-
-ALTER TABLE public.orders ADD CONSTRAINT orders_production_started_by_fkey FOREIGN KEY (production_started_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
-
-ALTER TABLE public.orders ADD CONSTRAINT orders_ready_by_fkey FOREIGN KEY (ready_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
-
-ALTER TABLE public.orders ADD CONSTRAINT orders_rm10_suppression_code_check CHECK (rm10_card_issuance_suppression_code IS NULL OR (rm10_card_issuance_suppression_code = ANY (ARRAY['august_promo_applied'::text, 'rm10_voucher_redeemed'::text])));
-
-ALTER TABLE public.orders ADD CONSTRAINT orders_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
-
 ALTER TABLE public.roles ADD CONSTRAINT roles_code_key UNIQUE (code);
-
 ALTER TABLE public.roles ADD CONSTRAINT roles_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.staff_profiles ADD CONSTRAINT staff_profiles_archived_inactive_chk CHECK (archived_at IS NULL OR is_active = false);
-
-ALTER TABLE public.staff_profiles ADD CONSTRAINT staff_profiles_auth_user_id_fkey FOREIGN KEY (auth_user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
-
 ALTER TABLE public.staff_profiles ADD CONSTRAINT staff_profiles_auth_user_id_key UNIQUE (auth_user_id);
-
 ALTER TABLE public.staff_profiles ADD CONSTRAINT staff_profiles_pkey PRIMARY KEY (id);
-
-ALTER TABLE public.staff_profiles ADD CONSTRAINT staff_profiles_role_id_fkey FOREIGN KEY (role_id) REFERENCES roles(id);
-
-ALTER TABLE public.staff_profiles ADD CONSTRAINT staff_profiles_username_format CHECK (username ~ '^[a-zA-Z0-9._-]{3,32}$'::citext);
-
 ALTER TABLE public.staff_profiles ADD CONSTRAINT staff_profiles_username_key UNIQUE (username);
+ALTER TABLE supabase_migrations.schema_migrations ADD CONSTRAINT schema_migrations_idempotency_key_key UNIQUE (idempotency_key);
+ALTER TABLE supabase_migrations.schema_migrations ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_cake_name_nonempty CHECK (length(TRIM(BOTH FROM cake_name)) > 0);
+ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_confirmed_by_fkey FOREIGN KEY (confirmed_by) REFERENCES staff_profiles(id);
+ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_confirmed_requires_fields CHECK (lifecycle <> 'confirmed'::extra_stock_lifecycle OR prepared_on IS NOT NULL AND pickup_through_at IS NOT NULL AND pickup_available_from_at IS NOT NULL AND confirmed_at IS NOT NULL AND confirmed_by IS NOT NULL);
+ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_cut_into_slices_by_fkey FOREIGN KEY (cut_into_slices_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_library_cake_id_fkey FOREIGN KEY (library_cake_id) REFERENCES library_cakes(id) ON DELETE SET NULL;
+ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_library_cake_size_id_fkey FOREIGN KEY (library_cake_size_id) REFERENCES library_cake_sizes(id) ON DELETE SET NULL;
+ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_order_id_fkey FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL;
+ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_pickup_from_order_cutoff_fields CHECK (pickup_available_from_at IS NULL OR pickup_through_at IS NOT NULL);
+ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_proposed_by_fkey FOREIGN KEY (proposed_by) REFERENCES staff_profiles(id);
+ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_rejected_by_fkey FOREIGN KEY (rejected_by) REFERENCES staff_profiles(id);
+ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_rejected_requires_fields CHECK (lifecycle <> 'rejected'::extra_stock_lifecycle OR rejected_at IS NOT NULL AND rejected_by IS NOT NULL);
+ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_size_label_nonempty CHECK (length(TRIM(BOTH FROM size_label)) > 0);
+ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_sliced_requires_confirmed CHECK (cut_into_slices_at IS NULL OR lifecycle = 'confirmed'::extra_stock_lifecycle AND cut_into_slices_by IS NOT NULL);
+ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_sold_or_sliced_mutex CHECK (sold_at IS NULL OR cut_into_slices_at IS NULL);
+ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_sold_requires_confirmed CHECK (sold_at IS NULL OR lifecycle = 'confirmed'::extra_stock_lifecycle);
+ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_terminal_mutex CHECK (NOT (confirmed_at IS NOT NULL AND rejected_at IS NOT NULL));
+ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_walk_in_held_by_fkey FOREIGN KEY (walk_in_held_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.extra_stock_events ADD CONSTRAINT extra_stock_events_actor_staff_id_fkey FOREIGN KEY (actor_staff_id) REFERENCES staff_profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.extra_stock_events ADD CONSTRAINT extra_stock_events_extra_stock_id_fkey FOREIGN KEY (extra_stock_id) REFERENCES extra_stock(id) ON DELETE CASCADE;
+ALTER TABLE public.extra_stock_events ADD CONSTRAINT extra_stock_events_type_not_blank CHECK (char_length(TRIM(BOTH FROM event_type)) > 0);
+ALTER TABLE public.order_items ADD CONSTRAINT order_items_cake_id_fkey FOREIGN KEY (cake_id) REFERENCES library_cakes(id) ON DELETE RESTRICT;
+ALTER TABLE public.order_items ADD CONSTRAINT order_items_cake_size_id_fkey FOREIGN KEY (cake_size_id) REFERENCES library_cake_sizes(id) ON DELETE RESTRICT;
+ALTER TABLE public.order_items ADD CONSTRAINT order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE;
+ALTER TABLE public.order_items ADD CONSTRAINT order_items_quantity_positive CHECK (quantity > 0);
+ALTER TABLE public.order_items ADD CONSTRAINT order_items_unit_price_non_negative CHECK (unit_price >= 0::numeric);
+ALTER TABLE public.order_timeline_events ADD CONSTRAINT order_timeline_events_actor_staff_id_fkey FOREIGN KEY (actor_staff_id) REFERENCES staff_profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.order_timeline_events ADD CONSTRAINT order_timeline_events_order_id_fkey FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE;
+ALTER TABLE public.order_timeline_events ADD CONSTRAINT order_timeline_events_type_not_blank CHECK (char_length(TRIM(BOTH FROM event_type)) > 0);
+ALTER TABLE public.orders ADD CONSTRAINT orders_collection_id_fkey FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE SET NULL;
+ALTER TABLE public.orders ADD CONSTRAINT orders_created_by_fkey FOREIGN KEY (created_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.orders ADD CONSTRAINT orders_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE RESTRICT;
+ALTER TABLE public.orders ADD CONSTRAINT orders_delivered_by_fkey FOREIGN KEY (delivered_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.orders ADD CONSTRAINT orders_extra_stock_id_fkey FOREIGN KEY (extra_stock_id) REFERENCES extra_stock(id) ON DELETE RESTRICT;
+ALTER TABLE public.orders ADD CONSTRAINT orders_guest_or_customer CHECK (customer_id IS NOT NULL OR customer_id IS NULL AND guest_name IS NOT NULL AND char_length(TRIM(BOTH FROM guest_name)) > 0);
+ALTER TABLE public.orders ADD CONSTRAINT orders_order_number_format CHECK (order_number ~ '^ORD-[0-9]{8}-[0-9]{4}$'::text);
+ALTER TABLE public.orders ADD CONSTRAINT orders_order_source_check CHECK (order_source = ANY (ARRAY['customer_website'::text, 'jotform'::text, 'whatsapp'::text, 'whitebird_instagram'::text, 'wee'::text, 'lex'::text, 'kin'::text, 'walk_in'::text, 'last_minute'::text, 'other'::text]));
+ALTER TABLE public.orders ADD CONSTRAINT orders_order_source_other_nonblank_check CHECK (order_source_other IS NULL OR char_length(btrim(order_source_other)) > 0);
+ALTER TABLE public.orders ADD CONSTRAINT orders_out_for_delivery_by_fkey FOREIGN KEY (out_for_delivery_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.orders ADD CONSTRAINT orders_picked_up_by_fkey FOREIGN KEY (picked_up_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.orders ADD CONSTRAINT orders_post_payment_change_override_by_fkey FOREIGN KEY (post_payment_change_override_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.orders ADD CONSTRAINT orders_post_payment_customer_change_count_nonneg CHECK (post_payment_customer_change_count >= 0);
+ALTER TABLE public.orders ADD CONSTRAINT orders_production_started_by_fkey FOREIGN KEY (production_started_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.orders ADD CONSTRAINT orders_ready_by_fkey FOREIGN KEY (ready_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.orders ADD CONSTRAINT orders_rm10_suppression_code_check CHECK (rm10_card_issuance_suppression_code IS NULL OR (rm10_card_issuance_suppression_code = ANY (ARRAY['august_promo_applied'::text, 'rm10_voucher_redeemed'::text])));
+ALTER TABLE public.orders ADD CONSTRAINT orders_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES staff_profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.staff_profiles ADD CONSTRAINT staff_profiles_archived_inactive_chk CHECK (archived_at IS NULL OR is_active = false);
+ALTER TABLE public.staff_profiles ADD CONSTRAINT staff_profiles_auth_user_id_fkey FOREIGN KEY (auth_user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+ALTER TABLE public.staff_profiles ADD CONSTRAINT staff_profiles_role_id_fkey FOREIGN KEY (role_id) REFERENCES roles(id);
+ALTER TABLE public.staff_profiles ADD CONSTRAINT staff_profiles_username_format CHECK (username ~ '^[a-zA-Z0-9._-]{3,32}$'::citext);
+ALTER TABLE public.extra_stock ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.extra_stock_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.order_timeline_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.staff_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.extra_stock DISABLE TRIGGER USER;
+ALTER TABLE public.orders DISABLE TRIGGER USER;
+ALTER TABLE public.order_items DISABLE TRIGGER USER;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 CREATE INDEX extra_stock_lifecycle_idx ON public.extra_stock USING btree (lifecycle);
 
@@ -332,19 +344,12 @@ CREATE UNIQUE INDEX staff_profiles_one_master_owner_idx ON public.staff_profiles
 
 CREATE INDEX staff_profiles_role_id_idx ON public.staff_profiles USING btree (role_id);
 
-ALTER TABLE public.extra_stock ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE public.extra_stock_events ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE public.order_timeline_events ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;
 
-ALTER TABLE public.staff_profiles ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY extra_stock_authenticated_select ON public.extra_stock AS PERMISSIVE FOR SELECT TO authenticated USING (true);
 
@@ -466,11 +471,8 @@ CREATE CONSTRAINT TRIGGER staff_notification_on_orders_insert_new_order AFTER IN
 
 CREATE TRIGGER staff_notification_on_orders_update AFTER UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION staff_notification_on_orders();
 
-ALTER TABLE public.extra_stock DISABLE TRIGGER USER;
 
-ALTER TABLE public.orders DISABLE TRIGGER USER;
 
-ALTER TABLE public.order_items DISABLE TRIGGER USER;
 
 CREATE TABLE public.production_trigger_manifest(table_name text NOT NULL, trigger_name text NOT NULL, definition text NOT NULL, PRIMARY KEY(table_name,trigger_name));
 
@@ -528,9 +530,7 @@ CREATE SCHEMA supabase_migrations;
 
 CREATE TABLE supabase_migrations.schema_migrations (version text NOT NULL, name text, statements text[], created_at timestamptz DEFAULT now() NOT NULL, created_by text, idempotency_key text, rollback text[]);
 
-ALTER TABLE supabase_migrations.schema_migrations ADD CONSTRAINT schema_migrations_idempotency_key_key UNIQUE (idempotency_key);
 
-ALTER TABLE supabase_migrations.schema_migrations ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
 
 INSERT INTO supabase_migrations.schema_migrations(version,name) VALUES ('20260802120000','20260802120000_staff_profiles_and_roles');
 
