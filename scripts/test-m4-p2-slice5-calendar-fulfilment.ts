@@ -677,4 +677,22 @@ const cakeItem = {
   }
 }
 
+// Fresh Pick readiness reconciliation updates the order row; the Calendar
+// must refresh its separate physical-stock markers from the existing realtime
+// order channel instead of waiting for the 30-second poll.
+{
+  const calendarRealtime = readFileSync(
+    resolve("src/workspaces/owner/calendar/WholeCakeCalendar.tsx"),
+    "utf8",
+  );
+  assert.match(calendarRealtime, /const scheduleExtrasRefresh = \(\) => \{/);
+  assert.equal(
+    calendarRealtime.match(/scheduleExtrasRefresh\(\);/g)?.length,
+    2,
+    "Order insert and update realtime events both refresh Fresh Pick markers",
+  );
+  assert.match(calendarRealtime, /void refreshExtrasOnly\(\);/);
+  assert.match(calendarRealtime, /window\.clearTimeout\(extrasRefreshTimeout\)/);
+}
+
 console.log("M4-P2 Slice 5 calendar-fulfilment tests: PASSED");
