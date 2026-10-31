@@ -201,7 +201,7 @@ psql_db < "$BEHAVIOR_FIXTURE" >/dev/null
 echo "production_trigger_assignment_mixed_readiness_audit_and_slice=PASS"
 
 psql_db <<'SQL' >/dev/null
-DO $
+DO $postflight$
 DECLARE n bigint; before_meta jsonb; after_meta jsonb;
 BEGIN
   SELECT count(*) INTO n FROM supabase_migrations.schema_migrations
@@ -268,7 +268,7 @@ BEGIN
         AND pg_get_triggerdef(t.oid,true)=m.definition
     )
   ) THEN RAISE EXCEPTION 'A Production trigger changed during migration'; END IF;
-END $$;
+END $postflight$;
 SQL
 
 # Source replay checks CREATE OR REPLACE repeatability without altering history.
