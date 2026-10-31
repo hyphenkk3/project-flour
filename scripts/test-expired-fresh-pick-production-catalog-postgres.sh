@@ -195,8 +195,13 @@ for file in "${MIGRATIONS[@]}"; do
   apply_one "$file"
 done
 
+BEHAVIOR_FIXTURE="$ROOT/scripts/fixtures/expired-fresh-pick-production-trigger-behavior.sql"
+[[ -r "$BEHAVIOR_FIXTURE" ]] || { echo "FAIL: missing actual-trigger behavior fixture" >&2; exit 1; }
+psql_db < "$BEHAVIOR_FIXTURE" >/dev/null
+echo "production_trigger_assignment_mixed_readiness_audit_and_slice=PASS"
+
 psql_db <<'SQL' >/dev/null
-DO $$
+DO $
 DECLARE n bigint; before_meta jsonb; after_meta jsonb;
 BEGIN
   SELECT count(*) INTO n FROM supabase_migrations.schema_migrations
