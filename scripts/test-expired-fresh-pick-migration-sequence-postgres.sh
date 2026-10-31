@@ -301,7 +301,7 @@ do $$ begin
  if not exists(select 1 from public.extra_stock where id='83000000-0000-0000-0000-000000000025' and order_id is null and sold_at is null) then raise exception 'expired assignment rejection mutated stock'; end if;
  if exists(select 1 from public.order_timeline_events where order_id in ('40000000-0000-0000-0000-000000000022','40000000-0000-0000-0000-000000000023')) then raise exception 'rejected direct assignment wrote timeline'; end if;
  if exists(select 1 from public.extra_stock_events where extra_stock_id in ('83000000-0000-0000-0000-000000000024','83000000-0000-0000-0000-000000000025')) then raise exception 'rejected direct assignment wrote stock audit'; end if;
-end $;
+end $$;
 SQL
 echo "wrong_pickup_and_direct_expiry_rejection=PASS"
 
