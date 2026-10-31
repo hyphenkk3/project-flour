@@ -372,6 +372,16 @@ vm.runInNewContext(queryCompiled, {
             }),
           );
         },
+        missingAssignedDirectOrderIds: (stocks, orders) => {
+          const knownOrderIds = new Set(orders.map((order) => order.id));
+          return [
+            ...new Set(
+              stocks
+                .map((stock) => stock.order_id)
+                .filter((id) => Boolean(id) && !knownOrderIds.has(id)),
+            ),
+          ];
+        },
       };
     }
     if (id === "@/engines/menu/cake-photos")

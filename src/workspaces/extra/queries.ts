@@ -28,7 +28,10 @@ import { createClient } from "@/lib/supabase/server";
 import { isMissingCakePhotoSchema } from "@/workspaces/library/cakes/photo-storage";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import { loadFreshPicksPreparationConfig } from "@/workspaces/storefront/extra/config";
-import { mapAssignedOrderSummariesByStock } from "@/workspaces/extra/assigned-order-links";
+import {
+  mapAssignedOrderSummariesByStock,
+  missingAssignedDirectOrderIds,
+} from "@/workspaces/extra/assigned-order-links";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
 import type { AssignedOrderSummary } from "@/workspaces/extra/assigned-order-links";
 
@@ -394,13 +397,29 @@ export async function listExtraStockUnits(): Promise<ExtraStockUnit[]> {
     activeSoldRows = (soldQuery.data ?? []) as unknown as ExtraStockRow[];
   }
 
-  const stockRows = [...unsoldRows, ...activeSoldRows];
-  const units = stockRows.map((row) => mapExtraStockRow(row, now));
-  const assignedUnits = attachAssignedOrderDetails(
-    units,
-    stockRows,
+  const directOrderIdsToResolve = missingAssignedDirectOrderIds(
+    activeSoldRows.map(({ id, order_id }) => ({ id, order_id })),
     activeOrders,
   );
+  let directOrderDetails: AssignedOrderSummary[] = [];
+  if (directOrderIdsToResolve.length) {
+    const directOrderDetailsQuery = await supabase
+      .from("orders")
+      .select(ASSIGNED_ORDER_SELECT)
+      .in("id", directOrderIdsToResolve);
+    if (directOrderDetailsQuery.error) {
+      throw new Error(directOrderDetailsQuery.error.message);
+    }
+    directOrderDetails = (directOrderDetailsQuery.data ??
+      []) as unknown as AssignedOrderSummary[];
+  }
+
+  const stockRows = [...unsoldRows, ...activeSoldRows];
+  const units = stockRows.map((row) => mapExtraStockRow(row, now));
+  const assignedUnits = attachAssignedOrderDetails(units, stockRows, [
+    ...activeOrders,
+    ...directOrderDetails,
+  ]);
 
   const hasOrderabilityCandidates = assignedUnits.some(
     (unit) =>
