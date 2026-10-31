@@ -1,0 +1,49 @@
+name: Customer order notes DEV gate
+on:
+  push:
+    branches:
+      - codex/customer-order-notes-wording-guard-20261101
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - codex/expired-fresh-pick-bakery-management-20261031
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: project_flour_regression
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: gha-regression-only
+        options: >-
+          --health-cmd "pg_isready -U postgres -d project_flour_regression"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Note wording behavior
+        run: node scripts/test-cake-wording-note-guard.mjs
+      - name: Strict lint on new guard and server submission
+        run: npx eslint src/engines/orders/cake-wording-note-guard.ts src/workspaces/storefront/checkout/actions.ts
+      - name: Report existing GuestCheckoutForm hook lint baseline
+        continue-on-error: true
+        run: npx eslint src/workspaces/storefront/checkout/GuestCheckoutForm.tsx
+      - name: Existing release regression suite
+        env:
+          RELEASE_TEST_POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: npm run test:release-regressions
+      - name: Production build and TypeScript
+        run: npm run build
