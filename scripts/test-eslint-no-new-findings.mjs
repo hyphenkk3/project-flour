@@ -23,12 +23,10 @@ function eslintDiagnostics(source, file) {
   } catch {
     throw new Error(`ESLint did not return JSON for ${file}: ${result.stderr || result.stdout}`);
   }
-  const messages = payload.flatMap((entry) => entry.messages);
-  return messages.map((message) => ({
+  return payload.flatMap((entry) => entry.messages).map((message) => ({
     ruleId: message.ruleId ?? "fatal",
     severity: message.severity,
     message: message.message,
-    source: message.source ?? "",
   }));
 }
 
