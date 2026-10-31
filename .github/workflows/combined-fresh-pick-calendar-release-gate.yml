@@ -42,6 +42,10 @@ jobs:
         env:
           RELEASE_TEST_POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
         run: bash scripts/test-expired-fresh-pick-migration-sequence-postgres.sh
+      - name: Production catalog-derived schema migration rehearsal
+        env:
+          RELEASE_TEST_POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: bash scripts/test-expired-fresh-pick-production-catalog-postgres.sh
       - name: Production build and TypeScript
         run: npm run build
       - name: Release-scoped ESLint regression delta
