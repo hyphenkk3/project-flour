@@ -53,6 +53,7 @@ jobs:
           src/workspaces/owner/calendar/matrix.ts
           src/workspaces/owner/calendar/queries.ts
           src/workspaces/owner/calendar/types.ts
+          src/workspaces/owner/calendar/WholeCakeCalendar.tsx
       - name: Report inherited full-repository ESLint debt
         continue-on-error: true
         run: npm run lint
