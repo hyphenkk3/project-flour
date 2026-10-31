@@ -162,6 +162,23 @@ declare v_now timestamptz;
 begin select now_at into v_now from public.test_clock; return v_now; end $$;
 SQL
 psql_db --single-transaction < "$TMP/930_test_clock.sql" >/dev/null
+# Instrument the existing slice guard with the same deterministic test clock.
+# Only the clock provider is substituted; all other SQL remains byte-identical.
+python3 - "$ROOT/supabase/migrations/\${MIGRATIONS[2]}" "$TMP/900_test_clock.sql" <<'PY'
+import pathlib, sys
+source = pathlib.Path(sys.argv[1]).read_text()
+needle = "clock_timestamp()"
+count = source.count(needle)
+if count < 1:
+    raise SystemExit(f"FAIL: expected the slice guard clock check, found {count} clock calls")
+instrumented = source.replace(needle, "public.test_clock_timestamp()")
+if instrumented.replace("public.test_clock_timestamp()", needle) != source:
+    raise SystemExit("FAIL: slice test instrumentation changed more than the clock provider")
+pathlib.Path(sys.argv[2]).write_text(instrumented)
+print(f"slice_deterministic_clock_substitutions={count}; other SQL bytes unchanged")
+PY
+psql_db --single-transaction < "$TMP/900_test_clock.sql" >/dev/null
+
 
 # Supported happy path proves the post-sequence assignment still preserves
 # allocation, permissions, and both append-only audit records.
