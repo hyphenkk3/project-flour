@@ -38,6 +38,10 @@ jobs:
         env:
           RELEASE_TEST_POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
         run: npm run test:release-regressions
+      - name: Four-migration rehearsal and two-session recovery boundary
+        env:
+          RELEASE_TEST_POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: bash scripts/test-expired-fresh-pick-migration-sequence-postgres.sh
       - name: Production build and TypeScript
         run: npm run build
       - name: Strict ESLint on release application changes
