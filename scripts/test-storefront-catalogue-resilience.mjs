@@ -123,6 +123,7 @@ async function run() {
   );
   assert.match(collectionPage, /if \(!monthlyResult\.ok\)/);
   assert.match(collectionPage, /if \(!specialCandidateResult\.ok\)/);
+  assert.match(collectionPage, /if \(!monthly\?\.month\)/);
 
   const homePage = fs.readFileSync(
     path.join(repo, "src/workspaces/storefront/home/StorefrontHomePage.tsx"),
@@ -143,7 +144,7 @@ async function run() {
   assert.match(voucherQueries, /if \(error\) throw new Error\(error\.message\)/);
 
   console.log(
-    "PASS: 28 catalogue resilience assertions; no automatic retry loop.",
+    "PASS: 29 catalogue resilience assertions; no automatic retry loop.",
   );
 }
 

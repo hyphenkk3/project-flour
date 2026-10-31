@@ -25,6 +25,7 @@ import {
   getOrderableMonthlyCatalogueById,
   listAvailableCakes,
   listCustomerSpecialCatalogues,
+  type StorefrontSpecialCatalogue,
 } from "@/workspaces/storefront/catalog/queries";
 import { StorefrontHomeLink } from "@/workspaces/storefront/StorefrontBrand";
 import { StorefrontRetryNotice } from "@/workspaces/storefront/StorefrontRetryNotice";
@@ -108,10 +109,9 @@ function CollectionCakesFallback() {
 async function CollectionCakesBody({
   collectionId,
 }: CollectionCakesBodyProps) {
-  const [monthlyResult, specialCandidateResult] = await Promise.all([
-    settleStorefrontRead(() => getOrderableMonthlyCatalogueById(collectionId)),
-    settleStorefrontRead(() => getCustomerSpecialCatalogueById(collectionId)),
-  ]);
+  const monthlyResult = await settleStorefrontRead(() =>
+    getOrderableMonthlyCatalogueById(collectionId),
+  );
   if (!monthlyResult.ok) {
     return (
       <div className="mt-6">
@@ -131,28 +131,33 @@ async function CollectionCakesBody({
       </div>
     );
   }
-  if (!specialCandidateResult.ok) {
-    return (
-      <div className="mt-6">
-        <Link
-          className="text-skyline hover:text-ink inline-block text-sm font-medium"
-          href="/order"
-        >
-          ← Choose your collection
-        </Link>
-        <StorefrontRetryNotice
-          title="This collection is temporarily unavailable"
-          message={storefrontReadFailureMessage(
-            specialCandidateResult.error,
-            "collection details",
-          )}
-        />
-      </div>
-    );
-  }
   const monthly = monthlyResult.value;
-  const specialCandidate = specialCandidateResult.value;
-  const special = monthly ? null : specialCandidate;
+  let special: StorefrontSpecialCatalogue | null = null;
+  if (!monthly?.month) {
+    const specialCandidateResult = await settleStorefrontRead(() =>
+      getCustomerSpecialCatalogueById(collectionId),
+    );
+    if (!specialCandidateResult.ok) {
+      return (
+        <div className="mt-6">
+          <Link
+            className="text-skyline hover:text-ink inline-block text-sm font-medium"
+            href="/order"
+          >
+            ← Choose your collection
+          </Link>
+          <StorefrontRetryNotice
+            title="This collection is temporarily unavailable"
+            message={storefrontReadFailureMessage(
+              specialCandidateResult.error,
+              "collection details",
+            )}
+          />
+        </div>
+      );
+    }
+    special = specialCandidateResult.value;
+  }
   if (!monthly?.month && !special) {
     notFound();
   }
