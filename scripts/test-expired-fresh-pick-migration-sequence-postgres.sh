@@ -47,13 +47,13 @@ done
 # the existing assignment-RPC regression, then install the already-deployed
 # assignment baseline on which the four follow-up migrations depend.
 git -C "$ROOT" show "HEAD:scripts/test-extra-assignment-rpc-fixture.sql" >"$TMP/assignment-fixture.sql"
-psql_db -f "$TMP/assignment-fixture.sql" >/dev/null
+psql_db < "$TMP/assignment-fixture.sql" >/dev/null
 BASELINE="$ROOT/supabase/migrations/20261021055655_harden_extra_stock_order_assignment_eligibility.sql"
 if [[ ! -r "$BASELINE" ]]; then
   echo "FAIL: existing assignment baseline migration is missing" >&2
   exit 1
 fi
-psql_db --single-transaction -f "$BASELINE" >/dev/null
+psql_db --single-transaction < "$BASELINE" >/dev/null
 psql_db <<'SQL' >/dev/null
 create schema supabase_migrations;
 create table supabase_migrations.schema_migrations (
@@ -129,7 +129,7 @@ SQL
 # Replaying the source migrations must be safe in this disposable database, but
 # must not duplicate or rewrite migration-history rows.
 for file in "${MIGRATIONS[@]}"; do
-  psql_db --single-transaction -f "$ROOT/supabase/migrations/$file" >/dev/null
+  psql_db --single-transaction < "$ROOT/supabase/migrations/$file" >/dev/null
 done
 LEDGER_COUNTS="$(psql_db -Atqc "select count(*) || ':' || count(distinct version) from supabase_migrations.schema_migrations where version in ('20261031083000','20261031085000','20261031090000','20261031093000')")"
 if [[ "$LEDGER_COUNTS" != "4:4" ]]; then
@@ -161,7 +161,7 @@ language plpgsql volatile set search_path=public as $$
 declare v_now timestamptz;
 begin select now_at into v_now from public.test_clock; return v_now; end $$;
 SQL
-psql_db --single-transaction -f "$TMP/930_test_clock.sql" >/dev/null
+psql_db --single-transaction < "$TMP/930_test_clock.sql" >/dev/null
 
 # Supported happy path proves the post-sequence assignment still preserves
 # allocation, permissions, and both append-only audit records.
