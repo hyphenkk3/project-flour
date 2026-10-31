@@ -109,10 +109,31 @@ async function loadPublicCatalogueVouchers(): Promise<CatalogueVoucherRecord[]> 
 
 const readPublicCatalogueVouchers = cache(loadPublicCatalogueVouchers);
 
+async function loadPublicCatalogueVouchersStrict(): Promise<
+  CatalogueVoucherRecord[]
+> {
+  const supabase = createPublicClient();
+  const { data, error } = await supabase.rpc("list_public_catalogue_vouchers");
+  if (error) throw new Error(error.message);
+  const rows = Array.isArray(data) ? data : [];
+  return (rows as PublicVoucher[]).map(mapPublicVoucher);
+}
+
+const readPublicCatalogueVouchersStrict = cache(
+  loadPublicCatalogueVouchersStrict,
+);
+
 export async function listPublicCatalogueVouchers(): Promise<
   CatalogueVoucherRecord[]
 > {
   return readPublicCatalogueVouchers();
+}
+
+/** Public storefront reads that need to distinguish an empty result from failure. */
+export async function listPublicCatalogueVouchersStrict(): Promise<
+  CatalogueVoucherRecord[]
+> {
+  return readPublicCatalogueVouchersStrict();
 }
 
 export async function listStaffCatalogueVouchers(): Promise<

@@ -27,6 +27,7 @@ import {
   listCustomerSpecialCatalogues,
 } from "@/workspaces/storefront/catalog/queries";
 import { StorefrontHomeLink } from "@/workspaces/storefront/StorefrontBrand";
+import { StorefrontRetryNotice } from "@/workspaces/storefront/StorefrontRetryNotice";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
 import { singaporeDateFromIso } from "@/engines/orders/promotions";
 import {
@@ -35,7 +36,11 @@ import {
   sortCakesForCataloguePromotionPresentation,
 } from "@/engines/vouchers/catalogue-promotion-presentation";
 import { cataloguePromotionPeriodFromWindow } from "@/engines/vouchers/catalogue-voucher";
-import { listPublicCatalogueVouchers } from "@/workspaces/vouchers/catalogue-queries";
+import { listPublicCatalogueVouchersStrict } from "@/workspaces/vouchers/catalogue-queries";
+import {
+  settleStorefrontRead,
+  storefrontReadFailureMessage,
+} from "@/workspaces/storefront/catalog/storefront-read-resilience";
 import { Suspense } from "react";
 
 type StorefrontCollectionCakesPageProps = {
@@ -103,17 +108,64 @@ function CollectionCakesFallback() {
 async function CollectionCakesBody({
   collectionId,
 }: CollectionCakesBodyProps) {
-  const [monthly, specialCandidate, cakes, specials, vouchers] = await Promise.all([
-    getOrderableMonthlyCatalogueById(collectionId),
-    getCustomerSpecialCatalogueById(collectionId),
-    listAvailableCakes(collectionId, { currentEffectivePrice: true }),
-    listCustomerSpecialCatalogues(),
-    listPublicCatalogueVouchers(),
+  const [monthlyResult, specialCandidateResult] = await Promise.all([
+    settleStorefrontRead(() => getOrderableMonthlyCatalogueById(collectionId)),
+    settleStorefrontRead(() => getCustomerSpecialCatalogueById(collectionId)),
   ]);
+  if (!monthlyResult.ok) {
+    return (
+      <div className="mt-6">
+        <Link
+          className="text-skyline hover:text-ink inline-block text-sm font-medium"
+          href="/order"
+        >
+          ← Choose your collection
+        </Link>
+        <StorefrontRetryNotice
+          title="This collection is temporarily unavailable"
+          message={storefrontReadFailureMessage(
+            monthlyResult.error,
+            "collection details",
+          )}
+        />
+      </div>
+    );
+  }
+  if (!specialCandidateResult.ok) {
+    return (
+      <div className="mt-6">
+        <Link
+          className="text-skyline hover:text-ink inline-block text-sm font-medium"
+          href="/order"
+        >
+          ← Choose your collection
+        </Link>
+        <StorefrontRetryNotice
+          title="This collection is temporarily unavailable"
+          message={storefrontReadFailureMessage(
+            specialCandidateResult.error,
+            "collection details",
+          )}
+        />
+      </div>
+    );
+  }
+  const monthly = monthlyResult.value;
+  const specialCandidate = specialCandidateResult.value;
   const special = monthly ? null : specialCandidate;
   if (!monthly?.month && !special) {
     notFound();
   }
+  const [cakesResult, specialsResult, vouchersResult] = await Promise.all([
+    settleStorefrontRead(() =>
+      listAvailableCakes(collectionId, { currentEffectivePrice: true }),
+    ),
+    settleStorefrontRead(() => listCustomerSpecialCatalogues()),
+    settleStorefrontRead(() => listPublicCatalogueVouchersStrict()),
+  ]);
+  const cakes = cakesResult.ok ? cakesResult.value : [];
+  const specials = specialsResult.ok ? specialsResult.value : [];
+  const vouchers = vouchersResult.ok ? vouchersResult.value : [];
   const earliest = earliestPickupDateYmd();
   const todayYm =
     businessYearMonth(toBusinessDateKey()) ?? toBusinessDateKey().slice(0, 7);
@@ -237,39 +289,69 @@ async function CollectionCakesBody({
           {note}
         </p>
       ) : null}
+      {monthly?.month && !specialsResult.ok ? (
+        <StorefrontRetryNotice
+          title="Some collection date notes are temporarily unavailable"
+          message={storefrontReadFailureMessage(
+            specialsResult.error,
+            "special collection dates",
+          )}
+        />
+      ) : null}
+      {!vouchersResult.ok ? (
+        <StorefrontRetryNotice
+          title="Current offers are temporarily unavailable"
+          message={storefrontReadFailureMessage(
+            vouchersResult.error,
+            "current offer details",
+          )}
+        />
+      ) : null}
       <CakePhotoDisclaimer className="mt-3 max-w-xl" />
 
       <section aria-labelledby="collection-cakes-heading" className="mt-6 sm:mt-8">
         <h2 className="sr-only" id="collection-cakes-heading">
           Cakes in this collection
         </h2>
-        <CakeEntryScopeCapture scopes={cakeScopes}>
-          <BrowseCakeCatalogue
-            cakes={orderedCakes}
-            detailHrefs={detailHrefs}
-            promotions={promotions}
-            emptyMessage="No cakes are listed in this collection yet."
-            pickupScope={
-              scope
-                ? {
-                    from: scope.from,
-                    to: scope.to,
-                    pickup: scope.pickup,
-                  }
-                : null
-            }
+        {cakesResult.ok ? (
+          <CakeEntryScopeCapture scopes={cakeScopes}>
+            <BrowseCakeCatalogue
+              cakes={orderedCakes}
+              detailHrefs={detailHrefs}
+              promotions={promotions}
+              emptyMessage="No cakes are listed in this collection yet."
+              pickupScope={
+                scope
+                  ? {
+                      from: scope.from,
+                      to: scope.to,
+                      pickup: scope.pickup,
+                    }
+                  : null
+              }
+            />
+            <CollectionBrowseRestore collectionId={collectionId} />
+          </CakeEntryScopeCapture>
+        ) : (
+          <StorefrontRetryNotice
+            title="Cakes in this collection are temporarily unavailable"
+            message={storefrontReadFailureMessage(
+              cakesResult.error,
+              "current cake list and prices",
+            )}
           />
-          <CollectionBrowseRestore collectionId={collectionId} />
-        </CakeEntryScopeCapture>
+        )}
       </section>
 
       <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3">
-        <Link
-          className="bg-ink text-mist hover:bg-skyline inline-flex min-h-11 items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200"
-          href={checkoutHref}
-        >
-          Continue to preorder
-        </Link>
+        {cakesResult.ok ? (
+          <Link
+            className="bg-ink text-mist hover:bg-skyline inline-flex min-h-11 items-center justify-center rounded-md px-5 text-sm font-medium transition duration-200"
+            href={checkoutHref}
+          >
+            Continue to preorder
+          </Link>
+        ) : null}
         <Link
           className="text-ink hover:text-skyline inline-flex min-h-11 items-center text-sm font-medium"
           href="/browse"
