@@ -164,7 +164,7 @@ SQL
 psql_db --single-transaction < "$TMP/930_test_clock.sql" >/dev/null
 # Instrument the existing slice guard with the same deterministic test clock.
 # Only the clock provider is substituted; all other SQL remains byte-identical.
-python3 - "$ROOT/supabase/migrations/\${MIGRATIONS[2]}" "$TMP/900_test_clock.sql" <<'PY'
+python3 - "$ROOT/supabase/migrations/20261031090000_bakery_slice_expired_stock_two_day_guard.sql" "$TMP/900_test_clock.sql" <<'PY'
 import pathlib, sys
 source = pathlib.Path(sys.argv[1]).read_text()
 needle = "clock_timestamp()"
