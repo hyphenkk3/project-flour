@@ -28,6 +28,14 @@ IDENTITY="$(psql_db -Atqc "select current_database() || ':' || (current_setting(
 [[ "$IDENTITY" == "$DB:17:postgres" ]] || { echo "FAIL: wrong disposable DB identity $IDENTITY" >&2; exit 1; }
 
 # Structural comparison for the exact catalog subset captured from Production.
+psql_db <<'SQL' >/dev/null
+CREATE OR REPLACE FUNCTION public.release_gate_acl_signature(p_acl text)
+RETURNS text[] LANGUAGE sql IMMUTABLE AS $acl$
+  SELECT coalesce(array_agg(item ORDER BY item), ARRAY[]::text[])
+  FROM regexp_split_to_table(trim(both '{}' from coalesce(p_acl,'')), ',') AS pieces(item)
+$acl$;
+SQL
+
 psql_db -P pager=off <<'SQL'
 SELECT m.signature,
        md5(pg_get_functiondef(p.oid)) AS actual_definition_md5, m.definition_md5 AS expected_definition_md5,
@@ -41,12 +49,12 @@ WHERE p.oid IS NULL OR md5(pg_get_functiondef(p.oid)) IS DISTINCT FROM m.definit
    OR pg_get_userbyid(p.proowner) IS DISTINCT FROM m.owner
    OR p.prosecdef IS DISTINCT FROM m.security_definer
    OR p.proconfig IS DISTINCT FROM m.config
-   OR coalesce(p.proacl::text,'DEFAULT') IS DISTINCT FROM m.acl
+   OR public.release_gate_acl_signature(coalesce(p.proacl::text,'')) IS DISTINCT FROM public.release_gate_acl_signature(m.acl)
 ORDER BY m.signature;
 SQL
 
 psql_db <<'SQL' >/dev/null
-DO $
+DO $catalog$
 DECLARE n bigint;
 BEGIN
   SELECT count(*) INTO n FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid
@@ -112,9 +120,9 @@ BEGIN
        OR pg_get_userbyid(p.proowner) IS DISTINCT FROM m.owner
        OR p.prosecdef IS DISTINCT FROM m.security_definer
        OR p.proconfig IS DISTINCT FROM m.config
-       OR coalesce(p.proacl::text,'DEFAULT') IS DISTINCT FROM m.acl
+       OR public.release_gate_acl_signature(coalesce(p.proacl::text,'')) IS DISTINCT FROM public.release_gate_acl_signature(m.acl)
   ) THEN RAISE EXCEPTION 'Actual Production function definition or permissions differ from captured manifest'; END IF;
-END $$;
+END $catalog$;
 SQL
 echo "production_catalog_fixture=PASS; core_tables=7 columns=112 constraints=60 indexes=29 policies=14 actual_triggers=42 actual_function_definitions=59 ledger_versions=175"
 
@@ -242,7 +250,7 @@ BEGIN
           AND pg_get_userbyid(p.proowner)=m.owner
           AND p.prosecdef=m.security_definer
           AND p.proconfig IS NOT DISTINCT FROM m.config
-          AND coalesce(p.proacl::text,'DEFAULT')=m.acl
+          AND public.release_gate_acl_signature(coalesce(p.proacl::text,'')) IS NOT DISTINCT FROM public.release_gate_acl_signature(m.acl)
       )
   ) THEN RAISE EXCEPTION 'A non-target Production trigger/dependency function changed during migration'; END IF;
 
