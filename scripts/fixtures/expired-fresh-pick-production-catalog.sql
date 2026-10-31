@@ -48,9 +48,14 @@ GRANT EXECUTE ON FUNCTION auth.uid() TO PUBLIC, dashboard_user;
 
 CREATE TABLE public.customers(id uuid PRIMARY KEY); CREATE TABLE public.collections(id uuid PRIMARY KEY);
 -- Exact schema-only tables required by the captured Production trigger/function call graph.
--- Supabase Vault is provider-managed; no secret rows or key material are copied. This empty, shape-compatible view supports function creation only; notification dispatch is not exercised as an external integration.
+-- Supabase Vault is provider-managed. The Production view's exposed nine-column interface is recreated with zero rows; no secret rows or key material are copied.
 CREATE SCHEMA IF NOT EXISTS vault;
-CREATE TABLE vault.decrypted_secrets(name text, decrypted_secret text);
+CREATE VIEW vault.decrypted_secrets AS
+SELECT NULL::uuid AS id, NULL::text AS name, NULL::text AS description,
+       NULL::text AS secret, NULL::text AS decrypted_secret, NULL::uuid AS key_id,
+       NULL::bytea AS nonce, NULL::timestamptz AS created_at,
+       NULL::timestamptz AS updated_at
+WHERE false;
 CREATE TABLE IF NOT EXISTS library_vouchers (id uuid PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS library_cake_categories (id uuid PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS paid_addon_types (id uuid PRIMARY KEY);
