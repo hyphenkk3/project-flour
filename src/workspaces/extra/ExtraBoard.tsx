@@ -1030,6 +1030,40 @@ export function ExtraBoard({
                         ? ` · prepared ${formatLongBusinessDate(unit.preparedOn)}`
                         : null}
                     </p>
+                    {unit.lifecycle === "confirmed" &&
+                    !unit.soldAt &&
+                    !unit.cutIntoSlicesAt ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {capabilities.canAssignExtraToOrder ? (
+                          <button
+                            className={btnSecondary}
+                            disabled={pending || unit.walkInHeld}
+                            onClick={() => openAssign(unit)}
+                            type="button"
+                          >
+                            Assign to order
+                          </button>
+                        ) : null}
+                        {capabilities.canCutExtraIntoSlices ? (
+                          <button
+                            className={btnSecondary}
+                            disabled={pending || unit.walkInHeld}
+                            onClick={() => {
+                              setError(null);
+                              setSlicingUnit(unit);
+                            }}
+                            type="button"
+                          >
+                            Cut into slices
+                          </button>
+                        ) : null}
+                        {unit.walkInHeld ? (
+                          <p className="text-skyline basis-full text-xs">
+                            This cake is on an active walk-in hold.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
                     {unit.lifecycle === "rejected" && unit.rejectReason ? (
                       <p className="text-ink mt-2 text-sm">
                         Reason: {unit.rejectReason}
