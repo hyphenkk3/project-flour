@@ -37,7 +37,10 @@ import {
   type CustomerComplimentaryOption,
   type CustomerPaidAddonOption,
 } from "@/engines/orders/customer-preorder-options";
-import { formatNewOrderPersonName } from "@/engines/orders/customer-name";
+import {
+  customerNameValidationError,
+  formatNewOrderPersonName,
+} from "@/engines/orders/customer-name";
 import { createClient, createPublicClient } from "@/lib/supabase/server";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import { getStorefrontCollectionForPickupDate } from "@/workspaces/storefront/catalog/queries";
@@ -265,6 +268,10 @@ async function submitGuestExtraOrderActionBody(
   }
   if (!customerName || !phone) {
     return { error: "Please fill in your name and WhatsApp phone number." };
+  }
+  const customerNameError = customerNameValidationError(customerName);
+  if (customerNameError) {
+    return { error: customerNameError };
   }
   if (includeReceipt === null) {
     return {

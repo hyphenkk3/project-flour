@@ -83,6 +83,7 @@ import {
   ITEMS_SUBTOTAL_LABEL,
   TOTAL_BEFORE_DELIVERY_FEE_LABEL,
 } from "@/engines/orders/delivery-processing-fee-ack";
+import { customerNameValidationError } from "@/engines/orders/customer-name";
 import { OPTIONAL_NOTES_CUSTOMER_WARNING } from "@/engines/orders/order-guide";
 import { DineInReservationNotesNotice } from "@/workspaces/storefront/checkout/DineInReservationNotesNotice";
 import { FulfilmentMethodChooser } from "@/workspaces/storefront/checkout/FulfilmentMethodChooser";
@@ -721,8 +722,14 @@ export function GuestExtraCheckoutForm({
       return;
     }
     const errors = collectInvalidFieldMessages(form);
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
+    const customerNameError = customerNameValidationError(
+      String(new FormData(form).get("customer_name") ?? ""),
+    );
+    const validationErrors = customerNameError
+      ? { ...errors, customer_name: customerNameError }
+      : errors;
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
       setClientError(CUSTOMER_FORM_HIGHLIGHT_SUMMARY);
       focusFirstInvalidField(form);
       return;
