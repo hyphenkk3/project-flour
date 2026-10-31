@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { FormField, FormTextarea } from "@/components/ui/form";
 import { formatLongBusinessDate } from "@/lib/dates";
+import { canRecoverExpiredStock } from "@/engines/extra/expired-stock-recovery";
 import type { ExtraWorkspaceCapabilities } from "@/engines/extra/capabilities";
 import {
   isBakeryExtraProposalActionable,
@@ -1032,7 +1033,8 @@ export function ExtraBoard({
                     </p>
                     {unit.lifecycle === "confirmed" &&
                     !unit.soldAt &&
-                    !unit.cutIntoSlicesAt ? (
+                    !unit.cutIntoSlicesAt &&
+                    canRecoverExpiredStock(unit.pickupThroughAt, todayYmd) ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {capabilities.canAssignExtraToOrder ? (
                           <button
@@ -1068,33 +1070,6 @@ export function ExtraBoard({
                       <p className="text-ink mt-2 text-sm">
                         Reason: {unit.rejectReason}
                       </p>
-                    ) : null}
-                    {unit.lifecycle === "rejected" &&
-                    capabilities.canUndoRejectExtra ? (
-                      <div className="mt-3">
-                        <button
-                          className={btnSecondary}
-                          disabled={pending}
-                          onClick={() => runUndoReject(unit)}
-                          type="button"
-                        >
-                          Undo Reject
-                        </button>
-                      </div>
-                    ) : null}
-                    {unit.lifecycle === "confirmed" &&
-                    !unit.cutIntoSlicesAt &&
-                    capabilities.canUnconfirmExtra ? (
-                      <div className="mt-3">
-                        <button
-                          className={btnSecondary}
-                          disabled={pending}
-                          onClick={() => runUnconfirm(unit)}
-                          type="button"
-                        >
-                          Undo availability
-                        </button>
-                      </div>
                     ) : null}
                   </li>
                 ))}
