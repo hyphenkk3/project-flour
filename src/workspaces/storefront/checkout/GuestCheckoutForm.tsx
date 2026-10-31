@@ -2483,10 +2483,14 @@ export function GuestCheckoutForm({
             className="border-fog border-t pt-10"
             title="Additional Information (Optional)"
           >
-            <p className="text-ink text-sm leading-relaxed" id="optional-notes-warning">
-              For collection or delivery instructions. We do not provide
-              personalised writing or messages on cakes.
-            </p>
+            <div className="space-y-1" id="optional-notes-warning">
+              <p className="text-ink text-sm leading-relaxed">
+                For collection or delivery instructions.
+              </p>
+              <p className="text-status-danger text-sm leading-relaxed font-bold">
+                We do not provide personalised writing or messages on cakes.
+              </p>
+            </div>
             {notesExpanded || Boolean(fields.notes) ? (
               <div className="space-y-2">
                 <FormTextarea
