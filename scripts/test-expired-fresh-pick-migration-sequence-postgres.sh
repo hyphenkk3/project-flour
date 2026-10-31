@@ -46,7 +46,8 @@ done
 # Build the relevant application schema using the same isolated SQL fixture as
 # the existing assignment-RPC regression, then install the already-deployed
 # assignment baseline on which the four follow-up migrations depend.
-psql_db -f "$ROOT/scripts/test-extra-assignment-rpc-fixture.sql" >/dev/null
+git -C "$ROOT" show "HEAD:scripts/test-extra-assignment-rpc-fixture.sql" >"$TMP/assignment-fixture.sql"
+psql_db -f "$TMP/assignment-fixture.sql" >/dev/null
 BASELINE="$ROOT/supabase/migrations/20261021055655_harden_extra_stock_order_assignment_eligibility.sql"
 if [[ ! -r "$BASELINE" ]]; then
   echo "FAIL: existing assignment baseline migration is missing" >&2
