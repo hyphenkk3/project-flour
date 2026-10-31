@@ -16,6 +16,9 @@ CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$ SELECT coales
 
 CREATE TABLE public.customers(id uuid PRIMARY KEY); CREATE TABLE public.collections(id uuid PRIMARY KEY);
 -- Exact schema-only tables required by the captured Production trigger/function call graph.
+-- Supabase Vault is provider-managed; no secret rows or key material are copied. This empty, shape-compatible view supports function creation only; notification dispatch is not exercised as an external integration.
+CREATE SCHEMA IF NOT EXISTS vault;
+CREATE TABLE vault.decrypted_secrets(name text, decrypted_secret text);
 CREATE TABLE IF NOT EXISTS library_vouchers (id uuid PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS library_cake_categories (id uuid PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS paid_addon_types (id uuid PRIMARY KEY);
