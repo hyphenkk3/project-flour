@@ -33,7 +33,7 @@ import {
   focusElementById,
   focusFirstInvalidField,
 } from "@/components/ui/form";
-import { OPTIONAL_NOTES_CUSTOMER_WARNING } from "@/engines/orders/order-guide";
+import { CAKE_WORDING_REQUEST_ERROR, hasCakeWordingRequest } from "@/engines/orders/cake-wording-note-guard";
 import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
 import { DineInVenuePartyFields } from "@/components/ui/DineInVenuePartyFields";
 import { derivedGuestCountDraft } from "@/engines/orders/dine-in-party";
@@ -362,6 +362,7 @@ export function GuestCheckoutForm({
   const navigatedRef = useRef(false);
   const viewState = actionState ?? state;
   const submitPending = pending || actionPending;
+  const [notesExpanded, setNotesExpanded] = useState(false);
   const pendingSubmitRef = useRef<FormData | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -1527,6 +1528,11 @@ export function GuestCheckoutForm({
   }
 
   function handleSubmit(formData: FormData) {
+    if (hasCakeWordingRequest(String(formData.get("notes") ?? ""))) {
+      setItemError(CAKE_WORDING_REQUEST_ERROR);
+      focusElementById("notes");
+      return;
+    }
     if (calendarPending || liveOfferPending || sizePricesPending) {
       return;
     }
@@ -1741,6 +1747,12 @@ export function GuestCheckoutForm({
         className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_20.5rem] lg:items-start lg:gap-x-16 lg:gap-y-0"
         noValidate
         onSubmit={(event) => {
+          if (hasCakeWordingRequest(fields.notes)) {
+            event.preventDefault();
+            setItemError(CAKE_WORDING_REQUEST_ERROR);
+            focusElementById("notes");
+            return;
+          }
           const errors = collectInvalidFieldMessages(event.currentTarget);
           if (Object.keys(errors).length === 0) {
             setFieldErrors({});
@@ -2469,24 +2481,39 @@ export function GuestCheckoutForm({
 
           <CheckoutSection
             className="border-fog border-t pt-10"
-            title="Order Notes"
+            title="Additional Information (Optional)"
           >
-            <p className="text-ink text-sm font-medium">Optional notes</p>
-            <p
-              className="text-status-danger text-sm leading-snug font-bold"
-              id="optional-notes-warning"
-            >
-              {OPTIONAL_NOTES_CUSTOMER_WARNING}
+            <p className="text-ink text-sm leading-relaxed" id="optional-notes-warning">
+              For collection or delivery instructions. We do not provide
+              personalised writing or messages on cakes.
             </p>
-            <FormTextarea
-              aria-describedby="optional-notes-warning"
-              aria-label="Optional notes"
-              id="notes"
-              name="notes"
-              onChange={(event) => patchFields({ notes: event.target.value })}
-              rows={3}
-              value={fields.notes}
-            />
+            {notesExpanded || Boolean(fields.notes) ? (
+              <div className="space-y-2">
+                <FormTextarea
+                  aria-describedby="optional-notes-warning optional-notes-wording-error"
+                  aria-label="Additional information"
+                  id="notes"
+                  name="notes"
+                  onChange={(event) => patchFields({ notes: event.target.value })}
+                  placeholder="E.g. Please call upon arrival."
+                  rows={3}
+                  value={fields.notes}
+                />
+                {hasCakeWordingRequest(fields.notes) ? (
+                  <p className="text-status-danger text-sm font-medium" id="optional-notes-wording-error" role="alert">
+                    {CAKE_WORDING_REQUEST_ERROR}
+                  </p>
+                ) : null}
+              </div>
+            ) : (
+              <button
+                className="text-ink underline underline-offset-4 text-sm font-medium"
+                onClick={() => setNotesExpanded(true)}
+                type="button"
+              >
+                Add collection or delivery instructions
+              </button>
+            )}
           </CheckoutSection>
 
           {ackRequired ? (
