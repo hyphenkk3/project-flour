@@ -1,0 +1,31 @@
+name: Fresh Pick order notes parity gate
+on:
+  push:
+    branches:
+      - codex/fresh-pick-order-notes-parity-20261101
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Shared wording scenarios
+        run: node scripts/test-cake-wording-note-guard.mjs
+      - name: Fresh Pick checkout regression checks
+        run: |
+          npx tsx scripts/test-fresh-pick-cart.ts
+          npx tsx scripts/test-fresh-pick-complimentary-regressions.ts
+      - name: Strict lint on submission actions and guard
+        run: npx eslint src/engines/orders/cake-wording-note-guard.ts src/workspaces/storefront/extra/actions.ts src/workspaces/storefront/checkout/actions.ts
+      - name: Build and TypeScript
+        run: npm run build
