@@ -87,7 +87,7 @@ apply_migration() {
   local file="$1" version="$2" name="$3"
   {
     cat "$ROOT/supabase/migrations/$file"
-    printf "\\nINSERT INTO supabase_migrations.schema_migrations(version,name) VALUES ('%s','%s');\\n" "$version" "$name"
+    printf "\nINSERT INTO supabase_migrations.schema_migrations(version,name) VALUES ('%s','%s' );\n" "$version" "$name"
   } | psql_db --single-transaction >/dev/null
   echo "applied=$version:$file"
 }
@@ -255,6 +255,54 @@ do $$ begin
  if exists(select 1 from public.extra_stock_events where extra_stock_id='83000000-0000-0000-0000-000000000021') then raise exception 'rejected boundary attempt wrote stock audit'; end if;
 end $$;
 SQL
+
+# Direct RPC callers cannot target an order collecting two days after the cutoff,
+# and a direct call after the physical recovery window leaves no assignment/audit.
+psql_db <<'SQL' >/dev/null
+insert into public.orders(id,order_number,status,pickup_date)
+values
+ ('40000000-0000-0000-0000-000000000022','TEST-RECOVERY-WRONG-PICKUP','paid','2026-11-02'),
+ ('40000000-0000-0000-0000-000000000023','TEST-RECOVERY-EXPIRED-DIRECT','paid','2026-11-01');
+insert into public.order_items(id,order_id,cake_id,cake_size_id,cake_name,size_label,quantity)
+values
+ ('50000000-0000-0000-0000-000000000022','40000000-0000-0000-0000-000000000022','60000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001','Cocoa','6 inch',1),
+ ('50000000-0000-0000-0000-000000000023','40000000-0000-0000-0000-000000000023','60000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001','Cocoa','6 inch',1);
+insert into public.extra_stock(id,library_cake_id,library_cake_size_id,cake_name,size_label,lifecycle,pickup_through_at)
+values
+ ('83000000-0000-0000-0000-000000000024','60000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001','Cocoa','6 inch','confirmed','2026-10-31 23:59:59+08'),
+ ('83000000-0000-0000-0000-000000000025','60000000-0000-0000-0000-000000000001','70000000-0000-0000-0000-000000000001','Cocoa','6 inch','confirmed','2026-10-31 23:59:59+08');
+update public.test_clock set now_at='2026-11-01 12:00:00+08';
+SQL
+set +e
+psql_db -c "select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000001',false); select set_config('request.jwt.claim.role','authenticated',false); select public.assign_extra_stock_to_order('83000000-0000-0000-0000-000000000024','40000000-0000-0000-0000-000000000022','20000000-0000-0000-0000-000000000001')" >"$TMP/wrong-pickup.log" 2>&1
+WRONG_PICKUP_STATUS=$?
+set -e
+if [[ "$WRONG_PICKUP_STATUS" -eq 0 ]] || ! grep -Fq "cutoff date or the next day" "$TMP/wrong-pickup.log"; then
+  echo "FAIL: assignment to an order two days after cutoff was not rejected" >&2
+  cat "$TMP/wrong-pickup.log" >&2
+  exit 1
+fi
+psql_db <<'SQL' >/dev/null
+update public.test_clock set now_at='2026-11-02 00:00:01+08';
+SQL
+set +e
+psql_db -c "select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000001',false); select set_config('request.jwt.claim.role','authenticated',false); select public.assign_extra_stock_to_order('83000000-0000-0000-0000-000000000025','40000000-0000-0000-0000-000000000023','20000000-0000-0000-0000-000000000001')" >"$TMP/assignment-expired.log" 2>&1
+EXPIRED_ASSIGN_STATUS=$?
+set -e
+if [[ "$EXPIRED_ASSIGN_STATUS" -eq 0 ]] || ! grep -Fq "The two-day Bakery recovery window has ended" "$TMP/assignment-expired.log"; then
+  echo "FAIL: direct post-window assignment was not rejected" >&2
+  cat "$TMP/assignment-expired.log" >&2
+  exit 1
+fi
+psql_db <<'SQL' >/dev/null
+do $ begin
+ if not exists(select 1 from public.extra_stock where id='83000000-0000-0000-0000-000000000024' and order_id is null and sold_at is null) then raise exception 'wrong-pickup rejection mutated stock'; end if;
+ if not exists(select 1 from public.extra_stock where id='83000000-0000-0000-0000-000000000025' and order_id is null and sold_at is null) then raise exception 'expired assignment rejection mutated stock'; end if;
+ if exists(select 1 from public.order_timeline_events where order_id in ('40000000-0000-0000-0000-000000000022','40000000-0000-0000-0000-000000000023')) then raise exception 'rejected direct assignment wrote timeline'; end if;
+ if exists(select 1 from public.extra_stock_events where extra_stock_id in ('83000000-0000-0000-0000-000000000024','83000000-0000-0000-0000-000000000025')) then raise exception 'rejected direct assignment wrote stock audit'; end if;
+end $;
+SQL
+echo "wrong_pickup_and_direct_expiry_rejection=PASS"
 
 # Slice RPC cutoff is also evaluated after a stock lock and remains limited to
 # the cutoff date and following day.
