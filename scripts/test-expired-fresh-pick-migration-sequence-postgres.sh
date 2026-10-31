@@ -296,7 +296,7 @@ if [[ "$EXPIRED_ASSIGN_STATUS" -eq 0 ]] || ! grep -Fq "The two-day Bakery recove
   exit 1
 fi
 psql_db <<'SQL' >/dev/null
-do $ begin
+do $$ begin
  if not exists(select 1 from public.extra_stock where id='83000000-0000-0000-0000-000000000024' and order_id is null and sold_at is null) then raise exception 'wrong-pickup rejection mutated stock'; end if;
  if not exists(select 1 from public.extra_stock where id='83000000-0000-0000-0000-000000000025' and order_id is null and sold_at is null) then raise exception 'expired assignment rejection mutated stock'; end if;
  if exists(select 1 from public.order_timeline_events where order_id in ('40000000-0000-0000-0000-000000000022','40000000-0000-0000-0000-000000000023')) then raise exception 'rejected direct assignment wrote timeline'; end if;
