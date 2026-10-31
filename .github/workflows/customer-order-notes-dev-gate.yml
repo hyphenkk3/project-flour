@@ -8,6 +8,7 @@ on:
   pull_request:
     branches:
       - codex/expired-fresh-pick-bakery-management-20261031
+      - codex/customer-order-notes-wording-guard-20261101
 permissions:
   contents: read
 jobs:
