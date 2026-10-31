@@ -18,6 +18,7 @@ import {
   type HomepageFeaturedKind,
 } from "@/engines/menu/homepage-featured-collections";
 import { businessYearMonth, toBusinessDateKey } from "@/lib/dates";
+import { createRequestScopedPriceContext } from "@/engines/menu/request-scoped-price";
 import {
   StorefrontStaffSignIn,
   storefrontKickerClass,
@@ -328,12 +329,15 @@ async function HomeMerchandisingIsland() {
 
 async function HomeMerchandisingContent() {
   const todayYmd = toBusinessDateKey();
+  const requestPriceContext = createRequestScopedPriceContext();
   const todayYm = businessYearMonth(todayYmd) ?? todayYmd.slice(0, 7);
   const [catalogueResult, specialResult, popularResult, voucherResult] =
     await Promise.all([
       settleStorefrontRead(() => listOrderableMonthlyCatalogues(todayYmd)),
       settleStorefrontRead(() => listCustomerSpecialCatalogues(todayYmd)),
-      settleStorefrontRead(() => listHomepagePopularCakes()),
+      settleStorefrontRead(() =>
+        listHomepagePopularCakes(todayYmd, requestPriceContext),
+      ),
       settleStorefrontRead(() => listPublicCatalogueVouchersStrict()),
     ]);
   const catalogues = catalogueResult.ok ? catalogueResult.value : [];
@@ -366,7 +370,11 @@ async function HomeMerchandisingContent() {
         special: special ?? undefined,
       });
       const previewResult = await settleStorefrontRead(() =>
-        listHomepageCollectionPreviewCakes(candidate.id),
+        listHomepageCollectionPreviewCakes(
+          candidate.id,
+          todayYmd,
+          requestPriceContext,
+        ),
       );
       if (!previewResult.ok) {
         return {

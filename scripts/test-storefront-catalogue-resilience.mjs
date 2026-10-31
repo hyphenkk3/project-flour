@@ -131,7 +131,7 @@ async function run() {
   );
   assert.match(
     homePage,
-    /settleStorefrontRead\(\(\) => listHomepagePopularCakes\(\)\)/,
+    /listHomepagePopularCakes\(todayYmd, requestPriceContext\)/,
   );
   assert.match(homePage, /popularResult\.ok \? \(/);
   assert.match(homePage, /featuredResults\.map\(\(result\) =>/);
