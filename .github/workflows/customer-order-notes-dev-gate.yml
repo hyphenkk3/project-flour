@@ -1,0 +1,27 @@
+name: Customer order notes DEV gate
+on:
+  push:
+    branches:
+      - codex/customer-order-notes-wording-guard-20261101
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Note wording behavior
+        run: node scripts/test-cake-wording-note-guard.mjs
+      - name: Scoped lint
+        run: npx eslint src/engines/orders/cake-wording-note-guard.ts src/workspaces/storefront/checkout/GuestCheckoutForm.tsx src/workspaces/storefront/checkout/actions.ts
+      - name: Production build and TypeScript
+        run: npm run build
