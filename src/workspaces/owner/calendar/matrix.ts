@@ -162,7 +162,7 @@ export function buildCalendarMatrix(
           needsBakeryAttention: entry.needsBakeryAttention,
           hasEffectiveRm10: entry.hasEffectiveRm10,
           readyAt: entry.readyAt,
-          derivedReadyForCollection: entry.derivedReadyForCollection,
+          derivedReadyForCollection: item.readyFreshPick || entry.derivedReadyForCollection,
           pickedUpAt: entry.pickedUpAt,
           outForDeliveryAt: entry.outForDeliveryAt,
           deliveredAt: entry.deliveredAt,

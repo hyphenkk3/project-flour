@@ -1,3 +1,4 @@
+import { canRecoverExpiredStock, canAssignExpiredStockToPickupDate } from "@/engines/extra/expired-stock-recovery";
 import {
   isExtraAvailable,
   isExtraConfirmedOnOffer,
@@ -743,15 +744,21 @@ export async function listAssignableOrdersForExtra(input: {
   if (stockError || !stock)
     throw new Error("This Fresh Pick is no longer available.");
   if (
-    !isExtraAvailable({
-      lifecycle: stock.lifecycle,
-      pickupThroughAt: stock.pickup_through_at,
-      soldAt: stock.sold_at,
-      cutIntoSlicesAt: stock.cut_into_slices_at,
-      walkInHeldUntil: stock.walk_in_held_until,
-    })
+    stock.lifecycle !== "confirmed" ||
+    stock.sold_at !== null ||
+    stock.cut_into_slices_at !== null ||
+    (stock.walk_in_held_until !== null &&
+      new Date(stock.walk_in_held_until).getTime() >= Date.now())
   ) {
     throw new Error("This Fresh Pick is no longer available for assignment.");
+  }
+
+  const recoveryToday = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+  if (!canRecoverExpiredStock(stock.pickup_through_at, recoveryToday) &&
+      Date.parse(stock.pickup_through_at ?? "") <= Date.now()) {
+    throw new Error("The two-day Bakery recovery window has ended.");
   }
 
   const page = Math.max(0, Math.min(1000, Math.trunc(input.page) || 0));
@@ -942,7 +949,8 @@ export async function listAssignableOrdersForExtra(input: {
         Boolean(assigned.cut_into_slices_at) ||
         (assigned.order_id !== null && assigned.order_id !== row.id),
     );
-    const canAssign = assessment.canAssign && !hasConflictingAllocation;
+    const withinRecoveryDate = canAssignExpiredStockToPickupDate(stock.pickup_through_at, row.pickup_date);
+    const canAssign = assessment.canAssign && !hasConflictingAllocation && withinRecoveryDate;
     return {
       id: row.id,
       orderNumber: row.order_number,

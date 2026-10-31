@@ -266,6 +266,16 @@ export function WholeCakeCalendar({
 
   useEffect(() => {
     const supabase = createClient();
+    let extrasRefreshTimeout: number | null = null;
+    const scheduleExtrasRefresh = () => {
+      if (extrasRefreshTimeout !== null) {
+        window.clearTimeout(extrasRefreshTimeout);
+      }
+      extrasRefreshTimeout = window.setTimeout(() => {
+        extrasRefreshTimeout = null;
+        void refreshExtrasOnly();
+      }, 100);
+    };
     const channel = supabase
       .channel(`whole-cake-calendar-${year}-${month}`)
       .on(
@@ -275,6 +285,7 @@ export function WholeCakeCalendar({
           const row = payload.new as OrderRowPayload;
           if (!row.id || row.customer_id != null) return;
           void handleIncoming(row.id);
+          scheduleExtrasRefresh();
         },
       )
       .on(
@@ -284,6 +295,7 @@ export function WholeCakeCalendar({
           const row = payload.new as OrderRowPayload;
           if (!row.id || row.customer_id != null) return;
           void handleIncoming(row.id);
+          scheduleExtrasRefresh();
         },
       )
       .subscribe();
@@ -294,9 +306,12 @@ export function WholeCakeCalendar({
 
     return () => {
       window.clearInterval(pollId);
+      if (extrasRefreshTimeout !== null) {
+        window.clearTimeout(extrasRefreshTimeout);
+      }
       void supabase.removeChannel(channel);
     };
-  }, [handleIncoming, reconcileFromServer, year, month]);
+  }, [handleIncoming, reconcileFromServer, refreshExtrasOnly, year, month]);
 
   const calendarReturnTo = useMemo(
     () =>
