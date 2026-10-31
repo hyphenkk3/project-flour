@@ -4,12 +4,27 @@ on:
     branches:
       - codex/customer-order-notes-wording-guard-20261101
   workflow_dispatch:
+  pull_request:
+    branches:
+      - codex/expired-fresh-pick-bakery-management-20261031
 permissions:
   contents: read
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: project_flour_regression
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: gha-regression-only
+        options: >-
+          --health-cmd "pg_isready -U postgres -d project_flour_regression"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,5 +38,9 @@ jobs:
         run: node scripts/test-cake-wording-note-guard.mjs
       - name: Scoped lint
         run: npx eslint src/engines/orders/cake-wording-note-guard.ts src/workspaces/storefront/checkout/GuestCheckoutForm.tsx src/workspaces/storefront/checkout/actions.ts
+      - name: Existing release regression suite
+        env:
+          RELEASE_TEST_POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: npm run test:release-regressions
       - name: Production build and TypeScript
         run: npm run build
