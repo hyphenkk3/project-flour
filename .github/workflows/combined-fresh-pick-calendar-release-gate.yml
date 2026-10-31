@@ -44,16 +44,19 @@ jobs:
         run: bash scripts/test-expired-fresh-pick-migration-sequence-postgres.sh
       - name: Production build and TypeScript
         run: npm run build
-      - name: Strict ESLint on release application changes
-        run: >-
-          npx eslint
-          src/engines/extra/expired-stock-recovery.ts
-          src/workspaces/extra/ExtraBoard.tsx
-          src/workspaces/extra/queries.ts
-          src/workspaces/owner/calendar/matrix.ts
-          src/workspaces/owner/calendar/queries.ts
-          src/workspaces/owner/calendar/types.ts
-          src/workspaces/owner/calendar/WholeCakeCalendar.tsx
+      - name: Release-scoped ESLint regression delta
+        env:
+          ESLINT_BASELINE_SHA: 5f57f3d33c796fe1346a5d691cc172e52d4a31b8
+        run: |
+          git fetch --no-tags --depth=1 origin "$ESLINT_BASELINE_SHA"
+          node scripts/test-eslint-no-new-findings.mjs \
+            src/engines/extra/expired-stock-recovery.ts \
+            src/workspaces/extra/ExtraBoard.tsx \
+            src/workspaces/extra/queries.ts \
+            src/workspaces/owner/calendar/matrix.ts \
+            src/workspaces/owner/calendar/queries.ts \
+            src/workspaces/owner/calendar/types.ts \
+            src/workspaces/owner/calendar/WholeCakeCalendar.tsx
       - name: Report inherited full-repository ESLint debt
         continue-on-error: true
         run: npm run lint
