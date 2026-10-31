@@ -33,7 +33,7 @@ import {
   focusElementById,
   focusFirstInvalidField,
 } from "@/components/ui/form";
-import { CAKE_WORDING_REQUEST_ERROR, hasCakeWordingRequest } from "@/engines/orders/cake-wording-note-guard";
+import { CAKE_WORDING_REQUEST_ERROR, POSSIBLE_CAKE_WORDING_MESSAGE, hasCakeWordingRequest, hasPossibleCakeWording } from "@/engines/orders/cake-wording-note-guard";
 import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
 import { DineInVenuePartyFields } from "@/components/ui/DineInVenuePartyFields";
 import { derivedGuestCountDraft } from "@/engines/orders/dine-in-party";
@@ -363,6 +363,7 @@ export function GuestCheckoutForm({
   const viewState = actionState ?? state;
   const submitPending = pending || actionPending;
   const [notesExpanded, setNotesExpanded] = useState(false);
+  const [notesNotWordingAcknowledged, setNotesNotWordingAcknowledged] = useState(false);
   const pendingSubmitRef = useRef<FormData | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -1528,6 +1529,11 @@ export function GuestCheckoutForm({
   }
 
   function handleSubmit(formData: FormData) {
+    if (hasPossibleCakeWording(String(formData.get("notes") ?? "")) && formData.get("notes_not_cake_wording_ack") !== "yes") {
+      setItemError("Please confirm that your note is not a request for writing on the cake.");
+      focusElementById("notes");
+      return;
+    }
     if (hasCakeWordingRequest(String(formData.get("notes") ?? ""))) {
       setItemError(CAKE_WORDING_REQUEST_ERROR);
       focusElementById("notes");
@@ -1747,6 +1753,12 @@ export function GuestCheckoutForm({
         className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_20.5rem] lg:items-start lg:gap-x-16 lg:gap-y-0"
         noValidate
         onSubmit={(event) => {
+          if (hasPossibleCakeWording(fields.notes) && !notesNotWordingAcknowledged) {
+            event.preventDefault();
+            setItemError("Please confirm that your note is not a request for writing on the cake.");
+            focusElementById("notes");
+            return;
+          }
           if (hasCakeWordingRequest(fields.notes)) {
             event.preventDefault();
             setItemError(CAKE_WORDING_REQUEST_ERROR);
@@ -2498,7 +2510,10 @@ export function GuestCheckoutForm({
                   aria-label="Additional information"
                   id="notes"
                   name="notes"
-                  onChange={(event) => patchFields({ notes: event.target.value })}
+                  onChange={(event) => {
+                    setNotesNotWordingAcknowledged(false);
+                    patchFields({ notes: event.target.value });
+                  }}
                   placeholder="E.g. Please call upon arrival."
                   rows={3}
                   value={fields.notes}
@@ -2507,6 +2522,22 @@ export function GuestCheckoutForm({
                   <p className="text-status-danger text-sm font-medium" id="optional-notes-wording-error" role="alert">
                     {CAKE_WORDING_REQUEST_ERROR}
                   </p>
+                ) : hasPossibleCakeWording(fields.notes) ? (
+                  <div className="space-y-2" id="optional-notes-wording-error">
+                    <p className="text-status-danger text-sm font-medium" role="alert">
+                      {POSSIBLE_CAKE_WORDING_MESSAGE}
+                    </p>
+                    <label className="text-ink flex items-start gap-2 text-sm">
+                      <input
+                        checked={notesNotWordingAcknowledged}
+                        name="notes_not_cake_wording_ack"
+                        onChange={(event) => setNotesNotWordingAcknowledged(event.target.checked)}
+                        type="checkbox"
+                        value="yes"
+                      />
+                      <span>I confirm this note is not a request for cake writing.</span>
+                    </label>
+                  </div>
                 ) : null}
               </div>
             ) : (
