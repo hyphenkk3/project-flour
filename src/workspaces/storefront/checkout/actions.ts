@@ -13,6 +13,7 @@ import {
   type DineInReservationRpcPayload,
 } from "@/engines/orders/dine-in-party";
 import { earliestPickupDateYmd } from "@/engines/business-calendar/pickup-slots";
+import { CAKE_WORDING_REQUEST_ERROR, hasCakeWordingRequest } from "@/engines/orders/cake-wording-note-guard";
 import { loadCustomerCartDateCapacity } from "@/workspaces/storefront/checkout/capacity-availability";
 import { customerSelectedDateInvalidatedMessage } from "@/engines/preorder/validate";
 import {
@@ -319,6 +320,9 @@ async function submitGuestPreorderActionBody(
     String(formData.get("fulfilment_method") ?? ""),
   );
   const notes = String(formData.get("notes") ?? "").trim();
+  if (hasCakeWordingRequest(notes)) {
+    return { error: CAKE_WORDING_REQUEST_ERROR };
+  }
   const items = consolidateItems(parseItems(formData));
   const persistOptions =
     String(formData.get("preorder_options_ready") ?? "") === "1";
