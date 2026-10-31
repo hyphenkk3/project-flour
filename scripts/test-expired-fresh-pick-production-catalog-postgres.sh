@@ -61,26 +61,45 @@ BEGIN
   IF n <> 14 THEN RAISE EXCEPTION 'Production policy count mismatch: %',n; END IF;
 
   SELECT count(*) INTO n FROM public.production_trigger_manifest;
-  IF n <> 25 THEN RAISE EXCEPTION 'Production trigger manifest count mismatch: %',n; END IF;
+  IF n <> 42 THEN RAISE EXCEPTION 'Production trigger manifest count mismatch: %',n; END IF;
+
+  SELECT count(*) INTO n FROM public.production_function_manifest;
+  IF n <> 59 THEN RAISE EXCEPTION 'Production function manifest count mismatch: %',n; END IF;
 
   IF (SELECT count(*) FROM supabase_migrations.schema_migrations) <> 175
      OR (SELECT max(version) FROM supabase_migrations.schema_migrations) <> '20261031074456' THEN
     RAISE EXCEPTION 'Production migration history fixture mismatch';
   END IF;
 
+  SELECT count(*) INTO n FROM pg_trigger t
+  JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace s ON s.oid=c.relnamespace
+  WHERE s.nspname='public' AND NOT t.tgisinternal
+    AND c.relname IN (SELECT DISTINCT table_name FROM public.production_trigger_manifest);
+  IF n <> 42 THEN RAISE EXCEPTION 'Reconstructed trigger count mismatch: %',n; END IF;
+
   IF EXISTS (
     SELECT 1 FROM public.production_trigger_manifest m
-    LEFT JOIN pg_trigger t ON t.tgname=m.trigger_name
-    LEFT JOIN pg_class c ON c.oid=t.tgrelid
-    LEFT JOIN pg_namespace s ON s.oid=c.relnamespace
-    WHERE s.nspname='public' AND c.relname=m.table_name
-      AND pg_get_triggerdef(t.oid,true) IS DISTINCT FROM m.definition
-  ) THEN
-    RAISE EXCEPTION 'Reconstructed trigger definition differs from Production catalog manifest';
-  END IF;
+    WHERE NOT EXISTS (
+      SELECT 1 FROM pg_trigger t
+      JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace s ON s.oid=c.relnamespace
+      WHERE s.nspname='public' AND c.relname=m.table_name AND t.tgname=m.trigger_name
+        AND pg_get_triggerdef(t.oid,true)=m.definition
+    )
+  ) THEN RAISE EXCEPTION 'Missing or mismatched Production trigger definition'; END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.production_function_manifest m
+    LEFT JOIN pg_proc p ON p.oid=('public.'||m.signature)::regprocedure
+    WHERE p.oid IS NULL
+       OR md5(pg_get_functiondef(p.oid)) IS DISTINCT FROM m.definition_md5
+       OR pg_get_userbyid(p.proowner) IS DISTINCT FROM m.owner
+       OR p.prosecdef IS DISTINCT FROM m.security_definer
+       OR p.proconfig IS DISTINCT FROM m.config
+       OR coalesce(p.proacl::text,'DEFAULT') IS DISTINCT FROM m.acl
+  ) THEN RAISE EXCEPTION 'Actual Production function definition or permissions differ from captured manifest'; END IF;
 END $$;
 SQL
-echo "production_catalog_fixture=PASS; tables=7 columns=112 constraints=60 indexes=29 policies=14 triggers=25 ledger_versions=175"
+echo "production_catalog_fixture=PASS; core_tables=7 columns=112 constraints=60 indexes=29 policies=14 actual_triggers=42 actual_function_definitions=59 ledger_versions=175"
 
 MIGRATIONS=(
   "20261031083000_allow_bakery_assign_expired_fresh_pick_mixed_orders.sql"
@@ -117,9 +136,11 @@ BEGIN
   IF EXISTS (SELECT 1 FROM supabase_migrations.schema_migrations WHERE version='20261031083000') THEN
     RAISE EXCEPTION 'failed transaction left a migration ledger row';
   END IF;
-  IF (SELECT btrim(p.prosrc) FROM pg_proc p WHERE p.oid='public.assign_extra_stock_to_order(uuid,uuid,uuid)'::regprocedure)
-       <> 'BEGIN RETURN NULL; END' THEN
-    RAISE EXCEPTION 'failed transaction changed the baseline function body';
+  IF (SELECT md5(pg_get_functiondef(p.oid)) FROM pg_proc p
+      WHERE p.oid='public.assign_extra_stock_to_order(uuid,uuid,uuid)'::regprocedure)
+       IS DISTINCT FROM (SELECT definition_md5 FROM public.production_function_manifest
+          WHERE signature='assign_extra_stock_to_order(uuid,uuid,uuid)') THEN
+    RAISE EXCEPTION 'failed transaction changed the actual Production baseline function body';
   END IF;
 END $$;
 SQL
@@ -194,6 +215,29 @@ BEGIN
   IF has_function_privilege('anon','public.assign_extra_stock_to_order(uuid,uuid,uuid)','EXECUTE') THEN
     RAISE EXCEPTION 'Unexpected anonymous assignment RPC permission';
   END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.production_function_manifest m
+    WHERE m.signature NOT IN ('assign_extra_stock_to_order(uuid,uuid,uuid)','cut_extra_stock_into_slices(uuid,uuid)')
+      AND NOT EXISTS (
+        SELECT 1 FROM pg_proc p WHERE p.oid=('public.'||m.signature)::regprocedure
+          AND md5(pg_get_functiondef(p.oid))=m.definition_md5
+          AND pg_get_userbyid(p.proowner)=m.owner
+          AND p.prosecdef=m.security_definer
+          AND p.proconfig IS NOT DISTINCT FROM m.config
+          AND coalesce(p.proacl::text,'DEFAULT')=m.acl
+      )
+  ) THEN RAISE EXCEPTION 'A non-target Production trigger/dependency function changed during migration'; END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM public.production_trigger_manifest m
+    WHERE NOT EXISTS (
+      SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
+      JOIN pg_namespace ns ON ns.oid=c.relnamespace
+      WHERE ns.nspname='public' AND c.relname=m.table_name AND t.tgname=m.trigger_name
+        AND pg_get_triggerdef(t.oid,true)=m.definition
+    )
+  ) THEN RAISE EXCEPTION 'A Production trigger changed during migration'; END IF;
 END $$;
 SQL
 
@@ -206,6 +250,7 @@ COUNTS="$(psql_db -Atqc "select count(*)||':'||count(distinct version) from supa
 
 echo "four_migrations_on_production_catalog_schema=PASS"
 echo "canonical_ledger_and_history_preservation=PASS"
+echo "production_trigger_definitions_and_body_fingerprints=PASS"
 echo "function_signature_owner_security_grants=PASS"
 echo "migration_source_replay=PASS"
 echo "postgres_version=$(psql_db -Atqc 'show server_version')"
