@@ -64,6 +64,7 @@ SELECT public.cut_extra_stock_into_slices(
 SET CONSTRAINTS ALL IMMEDIATE;
 
 DO $behavior$
+DECLARE v_primary uuid; v_ready_at timestamptz; v_production_started_at timestamptz;
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.extra_stock
@@ -71,12 +72,18 @@ BEGIN
       AND order_id='50000000-0000-0000-0000-000000000001'
       AND sold_at IS NOT NULL AND ready_for_collection
   ) THEN RAISE EXCEPTION 'actual-trigger assignment did not preserve sold/ready state'; END IF;
-  IF NOT EXISTS (
-    SELECT 1 FROM public.orders
-    WHERE id='50000000-0000-0000-0000-000000000001'
-      AND extra_stock_id='83000000-0000-0000-0000-000000000001'
-      AND ready_at IS NULL AND production_started_at IS NULL
-  ) THEN RAISE EXCEPTION 'mixed order readiness or legacy primary link is incorrect'; END IF;
+  SELECT extra_stock_id, ready_at, production_started_at
+    INTO v_primary, v_ready_at, v_production_started_at
+  FROM public.orders WHERE id='50000000-0000-0000-0000-000000000001';
+  IF v_primary IS DISTINCT FROM '83000000-0000-0000-0000-000000000001'::uuid THEN
+    RAISE EXCEPTION 'legacy primary pointer expected stock, got %',v_primary;
+  END IF;
+  IF v_ready_at IS NOT NULL THEN
+    RAISE EXCEPTION 'mixed order was unexpectedly marked ready at %',v_ready_at;
+  END IF;
+  IF v_production_started_at IS NOT NULL THEN
+    RAISE EXCEPTION 'mixed order received fabricated production start %',v_production_started_at;
+  END IF;
   IF (SELECT count(*) FROM public.order_timeline_events
       WHERE order_id='50000000-0000-0000-0000-000000000001' AND event_type='extra_assigned') <> 1
   THEN RAISE EXCEPTION 'assignment timeline audit was not exactly once'; END IF;
