@@ -1,4 +1,1443 @@
-YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éí×Ş9õ:-jZ.¶›­–)Ş³V–×÷'B²6÷'D6¶U6—¦W4'”çVÖW&–4Æ&VÂÒg&öÒ$öVæv–æW2öÖVçRö6¶R×6—¦RÖ÷&FW"#°¦–×÷'B²&VE&V÷&FW$F—2Òg&öÒ$öVæv–æW2÷&V÷&FW"öÆVB#°¦–×÷'B°¢6¶T6FVv÷'•&Vg4g&öÕ&–Ö'’À¢—4Ö—76–æt6¶T6FVv÷'”76–væÖVçE66†VÖÀ¢&–Ö'”6¶T6FVv÷'’À¢6÷'D6¶T6FVv÷&–W2À§Òg&öÒ$öVæv–æW2öÖVçRö6¶RÖ6FVv÷&–W2#°¦–×÷'B°¢—4Ö—76–æt6¶UFt76–væÖVçE66†VÖÀ¢6÷'D6¶UFw2À§Òg&öÒ$öVæv–æW2öÖVçRö6¶R×Fw2#°¦–×÷'B°¢'&÷w6T6¶Tf–Æ&–Æ—G”æ÷FRÀ¢6FÆöwVUfÆ–EF‡&÷Vv…–ÖBÀ¢—47W'&VçFÇ”7W7FöÖW$÷&FW&&ÆRÀ¢—47W7FöÖW$÷&FW&&ÆTÖöçF†Ç”ÖöçF‚À¢—47W7FöÖW%7DÖVçUf—6–&ÆRÀ§Òg&öÒ$öVæv–æW2öÖVçRö7W7FöÖW"Ö'&÷w6R#°¦–×÷'B²6÷'D'&÷w6UV&Æ–6F–öä6¶W2Òg&öÒ$öVæv–æW2öÖVçRö'&÷w6R×V&Æ–6F–öâÖ÷&FW"#°¦–×÷'B°¢—4'&÷w6TF—66÷fW&&ÆTÆ–'&'”6¶RÀ¢—4Æ—fTÆ–'&'”6¶U7FGW2À§Òg&öÒ$öVæv–æW2öÖVçRö'&÷w6R×f—6–&–Æ—G’#°¦–×÷'B°¢%$õu4Uô5U%$TåDÅ•õTäd”Ä$ÄUôäõDRÀ¢F¶T†öÖWvT6öÆÆV7F–öå&Wf–Wt6¶W2À¢—47W7FöÖW$f6–æt†—7F÷&–6Ä6FÆöwVRÀ§Òg&öÒ$öVæv–æW2öÖVçRö†öÖWvRÖ6öÆÆV7F–öâ×&Wf–Wr#°¦–×÷'B°¢'W6–æW75–V$ÖöçF‚À¢f÷&ÖD'W6–æW74ÖöçF…–V"À¢Fô'W6–æW74FFT¶W’À§Òg&öÒ$öÆ–"öFFW2#°¦–×÷'B²7&VFT6Æ–VçBÂ7&VFUV&Æ–46Æ–VçBÒg&öÒ$öÆ–"÷7W&6R÷6W'fW"#°¦–×÷'B²66†RÒg&öÒ'&V7B#°¦–×÷'B²Vç7F&ÆUö66†RÒg&öÒ&æW‡Bö66†R#°¦–×÷'B°¢5Dõ$Te$ôåEõT$Ä•4„TEô4´U5ô44„UõDrÀ¢7F÷&Vg&öçD6¶T66†UFrÀ§Òg&öÒ$÷v÷&·76W2÷7F÷&Vg&öçBö6FÆör÷V&Æ—6†VBÖ6¶RÖ66†R#°¦–×÷'BG—R°¢7F÷&Vg&öçD6¶RÀ¢7F÷&Vg&öçD6¶U†÷FòÀ¢7F÷&Vg&öçD6¶U6—¦RÀ¢7F÷&Vg&öçD6öÆÆV7F–öâÀ§Òg&öÒ$÷G—W2÷7F÷&Vg&öçB#°¦–×÷'B²—4Ö—76–æt6¶U†÷Fõ66†VÖÒg&öÒ$÷v÷&·76W2öÆ–'&'’ö6¶W2÷†÷Fò×7F÷&vR#°¦–×÷'B°¢Ö7F÷&Vg&öçD6¶U†÷FòÀ¢7F÷&Vg&öçDFVfVÇE†÷FòÀ¢5Dõ$Te$ôåEô4´Uõ„õDõõ4TÄT5BÀ¢5Dõ$Te$ôåEô4´Uõ„õDõõ4TÄT5EôÄTt5’À¢G—R7F÷&Vg&öçD6¶U†÷Fõ&÷rÀ§Òg&öÒ$÷v÷&·76W2÷7F÷&Vg&öçBö6FÆörö6¶R×†÷FòÖÖ#°¦–×÷'B²6ö×&U÷VÆ$6¶W4÷&FW"Òg&öÒ$öVæv–æW2öÖVçRö†öÖWvR×÷VÆ"Ö6¶W2#°¦–×÷'B°¢f÷&ÖE&ÒÀ¢7F'F–æu&–6RÀ§Òg&öÒ$÷v÷&·76W2÷7F÷&Vg&öçBö6FÆör÷&–6–ær#°¦–×÷'B°¢7&VFU&WVW7E66÷VE&–6T6öçFW‡BÀ¢&W6öÇfU&WVW7E66÷VE&–6RÀ¢G—R&WVW7E66÷VE&–6T6öçFW‡BÀ§Òg&öÒ$öVæv–æW2öÖVçR÷&WVW7B×66÷VB×&–6R#° ¦W‡÷'B²f÷&ÖE&ÒÂ7F'F–æu&–6RÓ° ¢ò¢¢6†÷'BÖW&6†æF—6–ærEDÂâæ÷BW6VBf÷"6†V6¶÷WBöffW'2Â÷&FW&&–Æ—G’Â÷"g&W6‚–6²7Fö6²â¢ğ¦6öç7B5Dõ$Te$ôåEôÔU$4„äD•4”äuõ$UdÄ”DDUõ4T4ôäE2Ò3°¦6öç7B5Dõ$Te$ôåEõ$”4UôÄôôµUô4ôä5U%$Tä5’Òc° §G—R6FVv÷'”VÖ&VBÒ°¢–C¢7G&–æs°¢æÖS¢7G&–æs°¢—5ö7F—fS¢&ööÆVã°¢6÷'Eö÷&FW#¢çVÖ&W#°§Ó° §G—RÆ–'&'”6¶TVÖ&VBÒ°¢–C¢7G&–æs°¢æÖS¢7G&–æs°¢FW67&—F–öã¢7G&–ærÂçVÆÃ°¢6FVv÷'•ö–Có¢7G&–ærÂçVÆÃ°¢7FGW3¢7G&–æs°¢6†&–æuöwV–FS¢7G&–ærÂçVÆÃ°¢ÆÆW&vVç3¢7G&–æuµÒÂçVÆÃ°¢6†÷uö–å÷÷VÆ%ö6¶W3ó¢&ööÆVâÂçVÆÃ°¢÷VÆ%ö6¶W5÷6÷'Eö÷&FW#ó¢çVÖ&W"Â7G&–ærÂçVÆÃ°¢Æ–'&'•ö6¶Uö6FVv÷&–W3ó¢6FVv÷'”VÖ&VBÂ6FVv÷'”VÖ&VEµÒÂçVÆÃ°¢Æ–'&'•ö6¶Uö6FVv÷'•ö76–væÖVçG3ó¢'&“Ç°¢6FVv÷'•ö–Có¢7G&–æs°¢6÷'Eö÷&FW#ó¢çVÖ&W#°¢Æ–'&'•ö6¶Uö6FVv÷&–W3ó¢6FVv÷'”VÖ&VBÂ6FVv÷'”VÖ&VEµÒÂçVÆÃ°¢ÓâÂçVÆÃ°¢Æ–'&'•ö6¶U÷Fuö76–væÖVçG3ó¢'&“Ç°¢Fuö–Có¢7G&–æs°¢6÷'Eö÷&FW#ó¢çVÖ&W#°¢Æ–'&'•ö6¶U÷Fw3ó¢6FVv÷'”VÖ&VBÂ6FVv÷'”VÖ&VEµÒÂçVÆÃ°¢ÓâÂçVÆÃ°¢Æ–'&'•ö6¶U÷6—¦W3¢'&“Ç°¢–C¢7G&–æs°¢6¶Uö–C¢7G&–æs°¢Æ&VÃ¢7G&–æs°¢&–6S¢çVÖ&W"Â7G&–æs°¢6÷'Eö÷&FW#¢çVÖ&W#°¢&V÷&FW%öF—3ó¢çVÖ&W"Â7G&–ærÂçVÆÃ°¢f–Æ&ÆUög&öÓó¢7G&–ærÂçVÆÃ°¢f–Æ&ÆU÷VçF–Ãó¢7G&–ærÂçVÆÃ°¢ÓâÂçVÆÃ°¢Æ–'&'•ö6¶U÷†÷F÷3ó¢7F÷&Vg&öçD6¶U†÷Fõ&÷uµÒÂçVÆÃ°§Ó° §G—R6FÆöu&÷rÒ°¢6öÆÆV7F–öåö–Có¢7G&–æs°¢6÷'Eö÷&FW#¢çVÖ&W#°¢Æ–'&'•ö6¶W3¢Æ–'&'”6¶TVÖ&VBÂÆ–'&'”6¶TVÖ&VEµÒÂçVÆÃ°§Ó° §G—R66†VE7F÷&Vg&öçD6¶TF—7Æ’Ò°¢6¶S¢7F÷&Vg&öçD6¶S°¢7FGW3¢7G&–æs°§Ó° ¦W‡÷'BG—R'&÷w6U7F÷&Vg&öçD6¶RÒ7F÷&Vg&öçD6¶Rb°¢f–Æ&–Æ—G”æ÷FS¢7G&–ærÂçVÆÃ°¢7W'&VçFÇ”öffW&VC¢&ööÆVã°§Ó° ¦W‡÷'BG—R6¶U–6·WÖVÖ&W'6†—Ò°¢6¶T–C¢7G&–æs°¢ÖöçF†Ç”ÖöçF‡3¢7G&–æuµÓ°¢7V6–Åv–æF÷w3¢'&“Ç²g&öÓ¢7G&–æs²Fó¢7G&–ærÓã°§Ó° ¦W‡÷'BG—R6¶U–6·W6FÆöwVT–æFW‚Ò°¢ÖöçF†Ç“¢&VFöæÇ”'&“Ç²–C¢7G&–æs²ÖöçFƒ¢7G&–ærÓã°¢7V6–Ç3¢&VFöæÇ”'&“Ç²–C¢7G&–æs²g&öÓ¢7G&–æs²Fó¢7G&–ærÓã°§Ó° ¢ò¢¢7W7FöÖW"Ö÷&FW&&ÆR6FÆöwVRv–æF÷w26¶R&VÆöæw2Fò†6†V6¶÷WB6ÆVæF"&÷VæG2’â¢ğ¦W‡÷'B7–æ2gVæ7F–öâvWD7W7FöÖW$6¶U–6·WÖVÖ&W'6†—2€¢6¶T–G3¢&VFöæÇ’7G&–æuµÒÀ¢÷F–öç3ó¢°¢FöF•–ÖCó¢7G&–æs°¢6FÆöwVT–æFWƒó¢6¶U–6·W6FÆöwVT–æFWƒ°¢ÒÀ¢“¢&öÖ—6SÄ6¶U–6·WÖVÖ&W'6†—µÓâ°¢6öç7B–G2Ò²ââææWr6WB†6¶T–G2æÖ‚†–B’Óâ–BçG&–Ò‚’’æf–ÇFW"„&ööÆVâ’•Ó°¢–b†–G2æÆVæwF‚ÓÓÒ’&WGW&âµÓ° ¢6öç7BFöF•–ÖBÒ÷F–öç3òçFöF•–ÖBóòFô'W6–æW74FFT¶W’‚“°¢6öç7B7W&6RÒv—B7&VFT6Æ–VçB‚“°¢6öç7BÖöçF†Ç”ÖöçF„'”–BÒæWrÖÇ7G&–ærÂ7G&–æsâ‚“°¢6öç7B7V6–Åv–æF÷t'”–BÒæWrÖÇ7G&–ærÂ²g&öÓ¢7G&–æs²Fó¢7G&–ærÓâ‚“°¢ÆWB7F—fT6FÆöwVT–G3¢7G&–æuµÒÒµÓ° ¢–b†÷F–öç3òæ6FÆöwVT–æFW‚’°¢f÷"†6öç7B&÷röb÷F–öç2æ6FÆöwVT–æFW‚æÖöçF†Ç’’°¢6öç7BÖöçF‚Ò7G&–ær‡&÷ræÖöçF‚’ç6Æ–6RƒÂ“°¢–b‚õåÆG³GÒÕÆG³'ÒÕÆG³'ÒBòçFW7B†ÖöçF‚’’6öçF–çVS°¢ÖöçF†Ç”ÖöçF„'”–Bç6WB‡&÷ræ–BÂÖöçF‚“°¢Ğ¢f÷"†6öç7B&÷röb÷F–öç2æ6FÆöwVT–æFW‚ç7V6–Ç2’°¢6öç7Bg&öÒÒ7G&–ær‡&÷ræg&öÒ’ç6Æ–6RƒÂ“°¢6öç7BFòÒ7G&–ær‡&÷rçFò’ç6Æ–6RƒÂ“°¢–b‚õåÆG³GÒÕÆG³'ÒÕÆG³'ÒBòçFW7B†g&öÒ’ÇÂõåÆG³GÒÕÆG³'ÒÕÆG³'ÒBòçFW7B‡Fò’’°¢6öçF–çVS°¢Ğ¢7V6–Åv–æF÷t'”–Bç6WB‡&÷ræ–BÂ²g&öÒÂFòÒ“°¢Ğ¢7F—fT6FÆöwVT–G2Ò°¢ââæÖöçF†Ç”ÖöçF„'”–Bæ¶W—2‚’À¢ââç7V6–Åv–æF÷t'”–Bæ¶W—2‚’À¢Ó°¢ÒVÇ6R°¢6öç7B²FF¢6FÆöwVW2ÂW'&÷#¢6FÆöwVTW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚&6öÆÆV7F–öç2"¢ç6VÆV7B€¢&–BÂÖöçF‚ÂW'÷6RÂ7FGW2Â7F'EöFFRÂVæEöFFRÂvV'6—FUö÷fW'&–FR"À¢¢æW‚'7FGW2"Â&7F—fR"“° ¢–b†6FÆöwVTW'&÷"’°¢F‡&÷ræWrW'&÷"†6FÆöwVTW'&÷"æÖW76vR“°¢Ğ ¢6öç7B7F—fT6FÆöwVW2Ò€¢†6FÆöwVW2óòµÒ’2'&“Ç°¢–C¢7G&–æs°¢ÖöçFƒ¢7G&–ærÂçVÆÃ°¢W'÷6S¢7G&–ærÂçVÆÃ°¢7FGW3¢7G&–æs°¢7F'EöFFS¢7G&–ærÂçVÆÃ°¢VæEöFFS¢7G&–ærÂçVÆÃ°¢vV'6—FUö÷fW'&–FS¢&ööÆVâÂçVÆÃ°¢Óà¢’æf–ÇFW"‚‡&÷r’Óà¢—47W'&VçFÇ”7W7FöÖW$÷&FW&&ÆR€¢°¢W'÷6S¢&÷rçW'÷6Róò&ÖöçF†Ç’"À¢7FGW3¢&÷rç7FGW2À¢ÖöçFƒ¢&÷ræÖöçF‚ò7G&–ær‡&÷ræÖöçF‚’ç6Æ–6RƒÂ’¢çVÆÂÀ¢VæDFFS¢&÷ræVæEöFFRò7G&–ær‡&÷ræVæEöFFR’ç6Æ–6RƒÂ’¢çVÆÂÀ¢vV'6—FT÷fW'&–FS¢&÷rçvV'6—FUö÷fW'&–FRÓÓÒG'VRÀ¢ÒÀ¢FöF•–ÖBÀ¢’À¢“° ¢f÷"†6öç7B&÷röb7F—fT6FÆöwVW2’°¢–b‡&÷rçW'÷6RÓÓÒ&ÖöçF†Ç’"bb&÷ræÖöçF‚’°¢ÖöçF†Ç”ÖöçF„'”–Bç6WB‡&÷ræ–BÂ7G&–ær‡&÷ræÖöçF‚’ç6Æ–6RƒÂ’“°¢6öçF–çVS°¢Ğ¢–b‡&÷rçW'÷6RÓÓÒ'7V6–Â"bb&÷rçvV'6—FUö÷fW'&–FRÓÓÒG'VR’°¢6öç7Bg&öÒÒ&÷rç7F'EöFFRò7G&–ær‡&÷rç7F'EöFFR’ç6Æ–6RƒÂ’¢"#°¢6öç7BFòÒ&÷ræVæEöFFRò7G&–ær‡&÷ræVæEöFFR’ç6Æ–6RƒÂ’¢"#°¢–b‚õåÆG³GÒÕÆG³'ÒÕÆG³'ÒBòçFW7B†g&öÒ’bbõåÆG³GÒÕÆG³'ÒÕÆG³'ÒBòçFW7B‡Fò’’°¢7V6–Åv–æF÷t'”–Bç6WB‡&÷ræ–BÂ²g&öÒÂFòÒ“°¢Ğ¢Ğ¢Ğ¢7F—fT6FÆöwVT–G2Ò7F—fT6FÆöwVW2æÖ‚‡&÷r’Óâ&÷ræ–B“°¢Ğ ¢–b†7F—fT6FÆöwVT–G2æÆVæwF‚ÓÓÒ’°¢&WGW&â–G2æÖ‚†6¶T–B’Óâ‡°¢6¶T–BÀ¢ÖöçF†Ç”ÖöçF‡3¢µÒÀ¢7V6–Åv–æF÷w3¢µÒÀ¢Ò’“°¢Ğ ¢6öç7B²FFÂW'&÷"ÒÒv—B7W&6P¢æg&öÒ‚&6öÆÆV7F–öåö6¶W2"¢ç6VÆV7B‚&6öÆÆV7F–öåö–BÂÆ–'&'•ö6¶Uö–B"¢æW‚&f–Æ&ÆR"ÂG'VR¢æ–â‚&Æ–'&'•ö6¶Uö–B"Â–G2¢æ–â‚&6öÆÆV7F–öåö–B"Â7F—fT6FÆöwVT–G2“° ¢–b†W'&÷"’°¢F‡&÷ræWrW'&÷"†W'&÷"æÖW76vR“°¢Ğ ¢6öç7BÖöçF†Ç”'”6¶RÒæWrÖÇ7G&–ærÂ7G&–æuµÓâ‚“°¢6öç7B7V6–Ä'”6¶RÒæWrÖÇ7G&–ærÂ'&“Ç²g&öÓ¢7G&–æs²Fó¢7G&–ærÓãâ‚“° ¢f÷"†6öç7B&÷röb†FFóòµÒ’2'&“Ç°¢6öÆÆV7F–öåö–C¢7G&–æs°¢Æ–'&'•ö6¶Uö–C¢7G&–æs°¢Óâ’°¢6öç7BÖöçF‚ÒÖöçF†Ç”ÖöçF„'”–BævWB‡&÷ræ6öÆÆV7F–öåö–B“°¢–b†ÖöçF‚’°¢6öç7BÖöçF‡2ÒÖöçF†Ç”'”6¶RævWB‡&÷ræÆ–'&'•ö6¶Uö–B’óòµÓ°¢–b‚ÖöçF‡2æ–æ6ÇVFW2†ÖöçF‚’’ÖöçF‡2çW6‚†ÖöçF‚“°¢ÖöçF†Ç”'”6¶Rç6WB‡&÷ræÆ–'&'•ö6¶Uö–BÂÖöçF‡2“°¢Ğ¢6öç7B7V6–ÂÒ7V6–Åv–æF÷t'”–BævWB‡&÷ræ6öÆÆV7F–öåö–B“°¢–b‡7V6–Â’°¢6öç7Bv–æF÷w2Ò7V6–Ä'”6¶RævWB‡&÷ræÆ–'&'•ö6¶Uö–B’óòµÓ°¢–b€¢v–æF÷w2ç6öÖR€¢†VçG'’’ÓâVçG'’æg&öÒÓÓÒ7V6–Âæg&öÒbbVçG'’çFòÓÓÒ7V6–ÂçFòÀ¢¢’°¢v–æF÷w2çW6‚‡7V6–Â“°¢Ğ¢7V6–Ä'”6¶Rç6WB‡&÷ræÆ–'&'•ö6¶Uö–BÂv–æF÷w2“°¢Ğ¢Ğ ¢&WGW&â–G2æÖ‚†6¶T–B’Óâ‡°¢6¶T–BÀ¢ÖöçF†Ç”ÖöçF‡3¢†ÖöçF†Ç”'”6¶RævWB†6¶T–B’óòµÒ’ç6÷'B‚’À¢7V6–Åv–æF÷w3¢7V6–Ä'”6¶RævWB†6¶T–B’óòµÒÀ¢Ò’“°§Ğ ¦gVæ7F–öâVçw&öæSÅCâ‡fÇVS¢BÂEµÒÂçVÆÂÂVæFVf–æVB“¢BÂçVÆÂ°¢–b‚fÇVR’&WGW&âçVÆÃ°¢&WGW&â'&’æ—4'&’‡fÇVR’ò‡fÇVU³ÒóòçVÆÂ’¢fÇVS°§Ğ ¦gVæ7F–öâÖ6—¦R‡&÷s¢°¢–C¢7G&–æs°¢6¶Uö–C¢7G&–æs°¢Æ&VÃ¢7G&–æs°¢&–6S¢çVÖ&W"Â7G&–æs°¢6÷'Eö÷&FW#¢çVÖ&W#°¢&V÷&FW%öF—3ó¢çVÖ&W"Â7G&–ærÂçVÆÃ°¢f–Æ&ÆUög&öÓó¢7G&–ærÂçVÆÃ°¢f–Æ&ÆU÷VçF–Ãó¢7G&–ærÂçVÆÃ°§Ò“¢7F÷&Vg&öçD6¶U6—¦R°¢&WGW&â°¢–C¢&÷ræ–BÀ¢6¶T–C¢&÷ræ6¶Uö–BÀ¢6—¦S¢&÷ræÆ&VÂÀ¢&–6S¢çVÖ&W"‡&÷rç&–6R’À¢6÷'D÷&FW#¢&÷rç6÷'Eö÷&FW"À¢&V÷&FW$F—3¢&VE&V÷&FW$F—2‡&÷rç&V÷&FW%öF—2’À¢f–Æ&ÆTg&öÓ¢&÷ræf–Æ&ÆUög&öÒóòçVÆÂÀ¢f–Æ&ÆUVçF–Ã¢&÷ræf–Æ&ÆU÷VçF–ÂóòçVÆÂÀ¢Ó°§Ğ ¦gVæ7F–öâÆ–'&'”6¶TVÖ&VE6VÆV7B€¢†÷Fõ6VÆV7C¢7G&–ærÀ¢–æ6ÇVFT76–væÖVçG2ÒG'VRÀ¢–æ6ÇVFUFw2ÒG'VRÀ¢–æ6ÇVFU6—¦W2ÒG'VRÀ¢“¢7G&–ær°¢6öç7B76–væÖVçE6VÆV7BÒ–æ6ÇVFT76–væÖVçG0¢ò ¢Æ–'&'•ö6¶Uö6FVv÷'•ö76–væÖVçG26¶Uö–B€¢6FVv÷'•ö–BÀ¢6÷'Eö÷&FW"À¢Æ–'&'•ö6¶Uö6FVv÷&–W26FVv÷'•ö–B€¢–BÀ¢æÖRÀ¢—5ö7F—fRÀ¢6÷'Eö÷&FW ¢¢’Æ ¢¢"#°¢6öç7BFu6VÆV7BÒ–æ6ÇVFUFw0¢ò ¢Æ–'&'•ö6¶U÷Fuö76–væÖVçG26¶Uö–B€¢Fuö–BÀ¢6÷'Eö÷&FW"À¢Æ–'&'•ö6¶U÷Fw2Fuö–B€¢–BÀ¢æÖRÀ¢—5ö7F—fRÀ¢6÷'Eö÷&FW ¢¢’Æ ¢¢"#°¢6öç7B6—¦U6VÆV7BÒ–æ6ÇVFU6—¦W0¢ò ¢Æ–'&'•ö6¶U÷6—¦W2€¢–BÀ¢6¶Uö–BÀ¢Æ&VÂÀ¢&–6RÀ¢6÷'Eö÷&FW"À¢&V÷&FW%öF—2À¢f–Æ&ÆUög&öÒÀ¢f–Æ&ÆU÷VçF–À¢’Æ ¢¢"#°¢&WGW&â ¢–BÀ¢æÖRÀ¢FW67&—F–öâÀ¢6FVv÷'•ö–BÀ¢7FGW2À¢6†&–æuöwV–FRÀ¢ÆÆW&vVç2À¢Æ–'&'•ö6¶Uö6FVv÷&–W2Æ–'&'•ö6¶W5ö6FVv÷'•ö–Eöf¶W’€¢–BÀ¢æÖRÀ¢—5ö7F—fRÀ¢6÷'Eö÷&FW ¢’À¢G¶76–væÖVçE6VÆV7GĞ¢G·Fu6VÆV7GĞ¢G·6—¦U6VÆV7GĞ¢Æ–'&'•ö6¶U÷†÷F÷2€¢G·†÷Fõ6VÆV7GĞ¢¢°§Ğ ¦7–æ2gVæ7F–öâv—F„6¶U†÷Fõ6VÆV7DfÆÆ&6³ÅCâ€¢'Vã¢€¢†÷Fõ6VÆV7C¢7G&–ærÀ¢–æ6ÇVFT76–væÖVçG3¢&ööÆVâÀ¢–æ6ÇVFUFw3¢&ööÆVâÀ¢’ÓâVæ¶æ÷vâÀ¢“¢&öÖ—6SÅBÂçVÆÃâ°¢6öç7BGFV×BÒ7–æ2€¢†÷Fõ6VÆV7C¢7G&–ærÀ¢–æ6ÇVFT76–væÖVçG3¢&ööÆVâÀ¢–æ6ÇVFUFw3¢&ööÆVâÀ¢’Óà¢†v—B'Vâ‡†÷Fõ6VÆV7BÂ–æ6ÇVFT76–væÖVçG2Â–æ6ÇVFUFw2’’2°¢FF¢BÂçVÆÃ°¢W'&÷#¢²ÖW76vS¢7G&–ærÒÂçVÆÃ°¢Ó° ¢6öç7B&W6öÇfU66†VÖÒ7–æ2‡†÷Fõ6VÆV7C¢7G&–ær’Óâ°¢ÆWB&W7VÇBÒv—BGFV×B‡†÷Fõ6VÆV7BÂG'VRÂG'VR“°¢–b‚&W7VÇBæW'&÷"’&WGW&â&W7VÇC° ¢–b†—4Ö—76–æt6¶UFt76–væÖVçE66†VÖ‡&W7VÇBæW'&÷"æÖW76vR’’°¢&W7VÇBÒv—BGFV×B‡†÷Fõ6VÆV7BÂG'VRÂfÇ6R“°¢–b‚&W7VÇBæW'&÷"’&WGW&â&W7VÇC°¢Ğ ¢–b†—4Ö—76–æt6¶T6FVv÷'”76–væÖVçE66†VÖ‡&W7VÇBæW'&÷"æÖW76vR’’°¢&W7VÇBÒv—BGFV×B‡†÷Fõ6VÆV7BÂfÇ6RÂG'VR“°¢–b‚&W7VÇBæW'&÷"’&WGW&â&W7VÇC°¢–b†—4Ö—76–æt6¶UFt76–væÖVçE66†VÖ‡&W7VÇBæW'&÷"æÖW76vR’’°¢&W7VÇBÒv—BGFV×B‡†÷Fõ6VÆV7BÂfÇ6RÂfÇ6R“°¢–b‚&W7VÇBæW'&÷"’&WGW&â&W7VÇC°¢Ğ¢Ğ ¢&WGW&â&W7VÇC°¢Ó° ¢ÆWB&W7VÇBÒv—B&W6öÇfU66†VÖ…5Dõ$Te$ôåEô4´Uõ„õDõõ4TÄT5B“°¢–b‚&W7VÇBæW'&÷"’&WGW&â&W7VÇBæFF° ¢–b‚—4Ö—76–æt6¶U†÷Fõ66†VÖ‡&W7VÇBæW'&÷"æÖW76vR’’°¢F‡&÷ræWrW'&÷"‡&W7VÇBæW'&÷"æÖW76vR“°¢Ğ ¢&W7VÇBÒv—B&W6öÇfU66†VÖ…5Dõ$Te$ôåEô4´Uõ„õDõõ4TÄT5EôÄTt5’“°¢–b‚&W7VÇBæW'&÷"’&WGW&â&W7VÇBæFF° ¢F‡&÷ræWrW'&÷"‡&W7VÇBæW'&÷"æÖW76vR“°§Ğ ¦W‡÷'BgVæ7F–öâÖ7F÷&Vg&öçD6¶R‡&÷s¢Æ–'&'”6¶TVÖ&VB“¢7F÷&Vg&öçD6¶R°¢6öç7B6—¦W2Ò6÷'D6¶U6—¦W4'”çVÖW&–4Æ&VÂ€¢‡&÷ræÆ–'&'•ö6¶U÷6—¦W2óòµÒ’æÖ†Ö6—¦R’À¢‡6—¦R’Óâ6—¦Rç6—¦RÀ¢“°¢6öç7B†÷F÷3¢7F÷&Vg&öçD6¶U†÷FõµÒÒ²âââ‡&÷ræÆ–'&'•ö6¶U÷†÷F÷2óòµÒ•Ğ¢ç6÷'B‚†Â"’Óâç6÷'Eö÷&FW"Ò"ç6÷'Eö÷&FW"¢æf–ÇFW"‚‡†÷Fò’Óâ&ööÆVâ‡†÷Fòæ–ÖvU÷W&Â’¢æÖ‚‡†÷FòÂ–æFW‚’ÓâÖ7F÷&Vg&öçD6¶U†÷Fò‡†÷FòÂ–æFW‚’“°¢6öç7B76–væÖVçE&÷w2Ò&÷ræÆ–'&'•ö6¶Uö6FVv÷'•ö76–væÖVçG3°¢6öç7B†476–væÖVçDVÖ&VBÒ76–væÖVçE&÷w2ÓÒVæFVf–æVC°¢6öç7B76–væVBÒ†76–væÖVçE&÷w2óòµÒ¢æÖ‚†76–væÖVçB’Óâ°¢6öç7B6FVv÷'’ÒVçw&öæR†76–væÖVçBæÆ–'&'•ö6¶Uö6FVv÷&–W2“°¢–b‚6FVv÷'’’&WGW&âçVÆÃ°¢&WGW&â°¢–C¢6FVv÷'’æ–BÀ¢æÖS¢6FVv÷'’ææÖRÀ¢—47F—fS¢6FVv÷'’æ—5ö7F—fRÀ¢6÷'D÷&FW#¢6FVv÷'’ç6÷'Eö÷&FW"À¢Ó°¢Ò¢æf–ÇFW"‚†6FVv÷'’“¢6FVv÷'’—2æöäçVÆÆ&ÆSÇG—Vöb6FVv÷'“âÓâ6FVv÷'’ÒçVÆÂ“°¢6öç7BfÆÆ&6²ÒVçw&öæR‡&÷ræÆ–'&'•ö6¶Uö6FVv÷&–W2“°¢6öç7B6FVv÷&–W2Ò†476–væÖVçDVÖ&V@¢ò6÷'D6¶T6FVv÷&–W2†76–væVB¢¢6¶T6FVv÷'•&Vg4g&öÕ&–Ö'’‡°¢6FVv÷'”–C¢fÆÆ&6³òæ–Bóò&÷ræ6FVv÷'•ö–BÀ¢6FVv÷'”æÖS¢fÆÆ&6³òææÖRÀ¢6FVv÷'”7F—fS¢fÆÆ&6³òæ—5ö7F—fRÀ¢6FVv÷'•6÷'D÷&FW#¢fÆÆ&6³òç6÷'Eö÷&FW"À¢Ò“°¢6öç7B&–Ö'’Ò&–Ö'”6¶T6FVv÷'’†6FVv÷&–W2“°¢6öç7BFt76–væÖVçE&÷w2Ò&÷ræÆ–'&'•ö6¶U÷Fuö76–væÖVçG3°¢6öç7B†5FtVÖ&VBÒFt76–væÖVçE&÷w2ÓÒVæFVf–æVC°¢6öç7B76–væVEFw2Ò‡Ft76–væÖVçE&÷w2óòµÒ¢æÖ‚†76–væÖVçB’Óâ°¢6öç7BFrÒVçw&öæR†76–væÖVçBæÆ–'&'•ö6¶U÷Fw2“°¢–b‚Fr’&WGW&âçVÆÃ°¢&WGW&â°¢–C¢Fræ–BÀ¢æÖS¢FrææÖRÀ¢—47F—fS¢Fræ—5ö7F—fRÀ¢6÷'D÷&FW#¢Frç6÷'Eö÷&FW"À¢Ó°¢Ò¢æf–ÇFW"‚‡Fr“¢Fr—2æöäçVÆÆ&ÆSÇG—VöbFsâÓâFrÒçVÆÂ“°¢6öç7BFw2Ò†5FtVÖ&VBò6÷'D6¶UFw2†76–væVEFw2’¢µÓ° ¢&WGW&â°¢–C¢&÷ræ–BÀ¢æÖS¢&÷rææÖRÀ¢FW67&—F–öã¢&÷ræFW67&—F–öâÀ¢6FVv÷'”–C¢&–Ö'“òæ–Bóò††476–væÖVçDVÖ&VBòçVÆÂ¢‡&÷ræ6FVv÷'•ö–BóòçVÆÂ’’À¢6FVv÷'”æÖS¢&–Ö'“òææÖRóòçVÆÂÀ¢6FVv÷'”7F—fS¢6FVv÷&–W2æÆVæwF‚ÓÓÒÇÂ6FVv÷&–W2æWfW'’‚†6FVv÷'’’Óâ6FVv÷'’æ—47F—fR’À¢6FVv÷'•6÷'D÷&FW#¢&–Ö'“òç6÷'D÷&FW"óòÀ¢6FVv÷&–W2À¢Fw2À¢–ÖvS¢7F÷&Vg&öçDFVfVÇE†÷Fò‡†÷F÷2“òçW&ÂóòçVÆÂÀ¢†÷F÷2À¢6†&–ætwV–FS¢&÷rç6†&–æuöwV–FRÀ¢ÆÆW&vVç3¢&÷ræÆÆW&vVç2óòµÒÀ¢6—¦W2À¢Ó°§Ğ ¦gVæ7F–öâ—4öffW&&ÆU7FGW2‡7FGW3¢7G&–ær“¢&ööÆVâ°¢&WGW&â—4Æ—fTÆ–'&'”6¶U7FGW2‡7FGW2“°§Ğ ¦W‡÷'BG—R'&÷w6UV&Æ–6F–öä6FÆöwVRÒ°¢–C¢7G&–æs°¢ÖöçFƒ¢7G&–ærÂçVÆÃ°¢W'÷6S¢7G&–ærÂçVÆÃ°¢7FGW3¢7G&–æs°¢VæEöFFS¢7G&–ærÂçVÆÃ°¢vV'6—FUö÷fW'&–FS¢&ööÆVâÂçVÆÃ°¢6†÷uö–å÷7EöÖVçSó¢&ööÆVâÂçVÆÃ¿xçÛh‘éì¶»§q«^u })
+import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
+import { readPreorderDays } from "@/engines/preorder/lead";
+import {
+  cakeCategoryRefsFromPrimary,
+  isMissingCakeCategoryAssignmentSchema,
+  primaryCakeCategory,
+  sortCakeCategories,
+} from "@/engines/menu/cake-categories";
+import {
+  isMissingCakeTagAssignmentSchema,
+  sortCakeTags,
+} from "@/engines/menu/cake-tags";
+import {
+  browseCakeAvailabilityNote,
+  catalogueValidThroughYmd,
+  isCurrentlyCustomerOrderable,
+  isCustomerOrderableMonthlyMonth,
+  isCustomerPastMenuVisible,
+} from "@/engines/menu/customer-browse";
+import { sortBrowsePublicationCakes } from "@/engines/menu/browse-publication-order";
+import {
+  isBrowseDiscoverableLibraryCake,
+  isLiveLibraryCakeStatus,
+} from "@/engines/menu/browse-visibility";
+import {
+  BROWSE_CURRENTLY_UNAVAILABLE_NOTE,
+  takeHomepageCollectionPreviewCakes,
+  isCustomerFacingHistoricalCatalogue,
+} from "@/engines/menu/homepage-collection-preview";
+import {
+  businessYearMonth,
+  formatBusinessMonthYear,
+  toBusinessDateKey,
+} from "@/lib/dates";
+import { createClient, createPublicClient } from "@/lib/supabase/server";
+import { cache } from "react";
+import { unstable_cache } from "next/cache";
+import {
+  STOREFRONT_PUBLISHED_CAKES_CACHE_TAG,
+  storefrontCakeCacheTag,
+} from "@/workspaces/storefront/catalog/published-cake-cache";
+import type {
+  StorefrontCake,
+  StorefrontCakePhoto,
+  StorefrontCakeSize,
+  StorefrontCollection,
+} from "@/types/storefront";
+import { isMissingCakePhotoSchema } from "@/workspaces/library/cakes/photo-storage";
+import {
+  mapStorefrontCakePhoto,
+  storefrontDefaultPhoto,
+  STOREFRONT_CAKE_PHOTO_SELECT,
+  STOREFRONT_CAKE_PHOTO_SELECT_LEGACY,
+  type StorefrontCakePhotoRow,
+} from "@/workspaces/storefront/catalog/cake-photo-map";
+import { comparePopularCakesOrder } from "@/engines/menu/homepage-popular-cakes";
+import {
+  formatRm,
+  startingPrice,
+} from "@/workspaces/storefront/catalog/pricing";
+import {
+  createRequestScopedPriceContext,
+  resolveRequestScopedPrice,
+  type RequestScopedPriceContext,
+} from "@/engines/menu/request-scoped-price";
+
+export { formatRm, startingPrice };
+
+/** Short merchandising TTL. Not used for checkout offers, orderability, or Fresh Pick stock. */
+const STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS = 30;
+const STOREFRONT_PRICE_LOOKUP_CONCURRENCY = 6;
+
+type CategoryEmbed = {
+  id: string;
+  name: string;
+  is_active: boolean;
+  sort_order: number;
+};
+
+type LibraryCakeEmbed = {
+  id: string;
+  name: string;
+  description: string | null;
+  category_id?: string | null;
+  status: string;
+  sharing_guide: string | null;
+  allergens: string[] | null;
+  show_in_popular_cakes?: boolean | null;
+  popular_cakes_sort_order?: number | string | null;
+  library_cake_categories?: CategoryEmbed | CategoryEmbed[] | null;
+  library_cake_category_assignments?: Array<{
+    category_id?: string;
+    sort_order?: number;
+    library_cake_categories?: CategoryEmbed | CategoryEmbed[] | null;
+  }> | null;
+  library_cake_tag_assignments?: Array<{
+    tag_id?: string;
+    sort_order?: number;
+    library_cake_tags?: CategoryEmbed | CategoryEmbed[] | null;
+  }> | null;
+  library_cake_sizes: Array<{
+    id: string;
+    cake_id: string;
+    label: string;
+    price: number | string;
+    sort_order: number;
+    preorder_days?: number | string | null;
+    available_from?: string | null;
+    available_until?: string | null;
+  }> | null;
+  library_cake_photos?: StorefrontCakePhotoRow[] | null;
+};
+
+type CatalogRow = {
+  collection_id?: string;
+  sort_order: number;
+  library_cakes: LibraryCakeEmbed | LibraryCakeEmbed[] | null;
+};
+
+type CachedStorefrontCakeDisplay = {
+  cake: StorefrontCake;
+  status: string;
+};
+
+export type BrowseStorefrontCake = StorefrontCake & {
+  availabilityNote: string | null;
+  currentlyOffered: boolean;
+};
+
+export type CakePickupMembership = {
+  cakeId: string;
+  monthlyMonths: string[];
+  specialWindows: Array<{ from: string; to: string }>;
+};
+
+export type CakePickupCatalogueIndex = {
+  monthly: ReadonlyArray<{ id: string; month: string }>;
+  specials: ReadonlyArray<{ id: string; from: string; to: string }>;
+};
+
+/** Customer-orderable catalogue windows a cake belongs to (checkout calendar bounds). */
+export async function getCustomerCakePickupMemberships(
+  cakeIds: readonly string[],
+  options?: {
+    todayYmd?: string;
+    catalogueIndex?: CakePickupCatalogueIndex;
+  },
+): Promise<CakePickupMembership[]> {
+  const ids = [...new Set(cakeIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) return [];
+
+  const todayYmd = options?.todayYmd ?? toBusinessDateKey();
+  const supabase = await createClient();
+  const monthlyMonthById = new Map<string, string>();
+  const specialWindowById = new Map<string, { from: string; to: string }>();
+  let activeCatalogueIds: string[] = [];
+
+  if (options?.catalogueIndex) {
+    for (const row of options.catalogueIndex.monthly) {
+      const month = String(row.month).slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(month)) continue;
+      monthlyMonthById.set(row.id, month);
+    }
+    for (const row of options.catalogueIndex.specials) {
+      const from = String(row.from).slice(0, 10);
+      const to = String(row.to).slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+        continue;
+      }
+      specialWindowById.set(row.id, { from, to });
+    }
+    activeCatalogueIds = [
+      ...monthlyMonthById.keys(),
+      ...specialWindowById.keys(),
+    ];
+  } else {
+    const { data: catalogues, error: catalogueError } = await supabase
+      .from("collections")
+      .select(
+        "id, month, purpose, status, start_date, end_date, website_override",
+      )
+      .eq("status", "active");
+
+    if (catalogueError) {
+      throw new Error(catalogueError.message);
+    }
+
+    const activeCatalogues = (
+      (catalogues ?? []) as Array<{
+        id: string;
+        month: string | null;
+        purpose: string | null;
+        status: string;
+        start_date: string | null;
+        end_date: string | null;
+        website_override: boolean | null;
+      }>
+    ).filter((row) =>
+      isCurrentlyCustomerOrderable(
+        {
+          purpose: row.purpose ?? "monthly",
+          status: row.status,
+          month: row.month ? String(row.month).slice(0, 10) : null,
+          endDate: row.end_date ? String(row.end_date).slice(0, 10) : null,
+          websiteOverride: row.website_override === true,
+        },
+        todayYmd,
+      ),
+    );
+
+    for (const row of activeCatalogues) {
+      if (row.purpose === "monthly" && row.month) {
+        monthlyMonthById.set(row.id, String(row.month).slice(0, 10));
+        continue;
+      }
+      if (row.purpose === "special" && row.website_override === true) {
+        const from = row.start_date ? String(row.start_date).slice(0, 10) : "";
+        const to = row.end_date ? String(row.end_date).slice(0, 10) : "";
+        if (/^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to)) {
+          specialWindowById.set(row.id, { from, to });
+        }
+      }
+    }
+    activeCatalogueIds = activeCatalogues.map((row) => row.id);
+  }
+
+  if (activeCatalogueIds.length === 0) {
+    return ids.map((cakeId) => ({
+      cakeId,
+      monthlyMonths: [],
+      specialWindows: [],
+    }));
+  }
+
+  const { data, error } = await supabase
+    .from("collection_cakes")
+    .select("collection_id, library_cake_id")
+    .eq("available", true)
+    .in("library_cake_id", ids)
+    .in("collection_id", activeCatalogueIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const monthlyByCake = new Map<string, string[]>();
+  const specialByCake = new Map<string, Array<{ from: string; to: string }>>();
+
+  for (const row of (data ?? []) as Array<{
+    collection_id: string;
+    library_cake_id: string;
+  }>) {
+    const month = monthlyMonthById.get(row.collection_id);
+    if (month) {
+      const months = monthlyByCake.get(row.library_cake_id) ?? [];
+      if (!months.includes(month)) months.push(month);
+      monthlyByCake.set(row.library_cake_id, months);
+    }
+    const special = specialWindowById.get(row.collection_id);
+    if (special) {
+      const windows = specialByCake.get(row.library_cake_id) ?? [];
+      if (
+        !windows.some(
+          (entry) => entry.from === special.from && entry.to === special.to,
+        )
+      ) {
+        windows.push(special);
+      }
+      specialByCake.set(row.library_cake_id, windows);
+    }
+  }
+
+  return ids.map((cakeId) => ({
+    cakeId,
+    monthlyMonths: (monthlyByCake.get(cakeId) ?? []).sort(),
+    specialWindows: specialByCake.get(cakeId) ?? [],
+  }));
+}
+
+function unwrapOne<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+function mapSize(row: {
+  id: string;
+  cake_id: string;
+  label: string;
+  price: number | string;
+  sort_order: number;
+  preorder_days?: number | string | null;
+  available_from?: string | null;
+  available_until?: string | null;
+}): StorefrontCakeSize {
+  return {
+    id: row.id,
+    cakeId: row.cake_id,
+    size: row.label,
+    price: Number(row.price),
+    sortOrder: row.sort_order,
+    preorderDays: readPreorderDays(row.preorder_days),
+    availableFrom: row.available_from ?? null,
+    availableUntil: row.available_until ?? null,
+  };
+}
+
+function libraryCakeEmbedSelect(
+  photoSelect: string,
+  includeAssignments = true,
+  includeTags = true,
+  includeSizes = true,
+): string {
+  const assignmentSelect = includeAssignments
+    ? `
+      library_cake_category_assignments!cake_id (
+        category_id,
+        sort_order,
+        library_cake_categories!category_id (
+          id,
+          name,
+          is_active,
+          sort_order
+        )
+      ),`
+    : "";
+  const tagSelect = includeTags
+    ? `
+      library_cake_tag_assignments!cake_id (
+        tag_id,
+        sort_order,
+        library_cake_tags!tag_id (
+          id,
+          name,
+          is_active,
+          sort_order
+        )
+      ),`
+    : "";
+  const sizeSelect = includeSizes
+    ? `
+      library_cake_sizes (
+        id,
+        cake_id,
+        label,
+        price,
+        sort_order,
+        preorder_days,
+        available_from,
+        available_until
+      ),`
+    : "";
+  return `
+      id,
+      name,
+      description,
+      category_id,
+      status,
+      sharing_guide,
+      allergens,
+      library_cake_categories!library_cakes_category_id_fkey (
+        id,
+        name,
+        is_active,
+        sort_order
+      ),
+      ${assignmentSelect}
+      ${tagSelect}
+      ${sizeSelect}
+      library_cake_photos (
+        ${photoSelect}
+      )
+  `;
+}
+
+async function withCakePhotoSelectFallback<T>(
+  run: (
+    photoSelect: string,
+    includeAssignments: boolean,
+    includeTags: boolean,
+  ) => unknown,
+): Promise<T | null> {
+  const attempt = async (
+    photoSelect: string,
+    includeAssignments: boolean,
+    includeTags: boolean,
+  ) =>
+    (await run(photoSelect, includeAssignments, includeTags)) as {
+      data: T | null;
+      error: { message: string } | null;
+    };
+
+  const resolveSchema = async (photoSelect: string) => {
+    let result = await attempt(photoSelect, true, true);
+    if (!result.error) return result;
+
+    if (isMissingCakeTagAssignmentSchema(result.error.message)) {
+      result = await attempt(photoSelect, true, false);
+      if (!result.error) return result;
+    }
+
+    if (isMissingCakeCategoryAssignmentSchema(result.error.message)) {
+      result = await attempt(photoSelect, false, true);
+      if (!result.error) return result;
+      if (isMissingCakeTagAssignmentSchema(result.error.message)) {
+        result = await attempt(photoSelect, false, false);
+        if (!result.error) return result;
+      }
+    }
+
+    return result;
+  };
+
+  let result = await resolveSchema(STOREFRONT_CAKE_PHOTO_SELECT);
+  if (!result.error) return result.data;
+
+  if (!isMissingCakePhotoSchema(result.error.message)) {
+    throw new Error(result.error.message);
+  }
+
+  result = await resolveSchema(STOREFRONT_CAKE_PHOTO_SELECT_LEGACY);
+  if (!result.error) return result.data;
+
+  throw new Error(result.error.message);
+}
+
+export function mapStorefrontCake(row: LibraryCakeEmbed): StorefrontCake {
+  const sizes = sortCakeSizesByNumericLabel(
+    (row.library_cake_sizes ?? []).map(mapSize),
+    (size) => size.size,
+  );
+  const photos: StorefrontCakePhoto[] = [...(row.library_cake_photos ?? [])]
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .filter((photo) => Boolean(photo.image_url))
+    .map((photo, index) => mapStorefrontCakePhoto(photo, index));
+  const assignmentRows = row.library_cake_category_assignments;
+  const hasAssignmentEmbed = assignmentRows !== undefined;
+  const assigned = (assignmentRows ?? [])
+    .map((assignment) => {
+      const category = unwrapOne(assignment.library_cake_categories);
+      if (!category) return null;
+      return {
+        id: category.id,
+        name: category.name,
+        isActive: category.is_active,
+        sortOrder: category.sort_order,
+      };
+    })
+    .filter((category): category is NonNullable<typeof category> => category != null);
+  const fallback = unwrapOne(row.library_cake_categories);
+  const categories = hasAssignmentEmbed
+    ? sortCakeCategories(assigned)
+    : cakeCategoryRefsFromPrimary({
+        categoryId: fallback?.id ?? row.category_id,
+        categoryName: fallback?.name,
+        categoryActive: fallback?.is_active,
+        categorySortOrder: fallback?.sort_order,
+      });
+  const primary = primaryCakeCategory(categories);
+  const tagAssignmentRows = row.library_cake_tag_assignments;
+  const hasTagEmbed = tagAssignmentRows !== undefined;
+  const assignedTags = (tagAssignmentRows ?? [])
+    .map((assignment) => {
+      const tag = unwrapOne(assignment.library_cake_tags);
+      if (!tag) return null;
+      return {
+        id: tag.id,
+        name: tag.name,
+        isActive: tag.is_active,
+        sortOrder: tag.sort_order,
+      };
+    })
+    .filter((tag): tag is NonNullable<typeof tag> => tag != null);
+  const tags = hasTagEmbed ? sortCakeTags(assignedTags) : [];
+
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    categoryId: primary?.id ?? (hasAssignmentEmbed ? null : (row.category_id ?? null)),
+    categoryName: primary?.name ?? null,
+    categoryActive: categories.length === 0 || categories.every((category) => category.isActive),
+    categorySortOrder: primary?.sortOrder ?? 0,
+    categories,
+    tags,
+    image: storefrontDefaultPhoto(photos)?.url ?? null,
+    photos,
+    sharingGuide: row.sharing_guide,
+    allergens: row.allergens ?? [],
+    sizes,
+  };
+}
+
+function isOfferableStatus(status: string): boolean {
+  return isLiveLibraryCakeStatus(status);
+}
+
+export type BrowsePublicationCatalogue = {
+  id: string;
+  month: string | null;
+  purpose: string | null;
+  status: string;
+  end_date: string | null;
+  website_override: boolean | null;
+  show_in_past_menu?: boolean | null;
+};
+
+function browseCatalogueKind(
+  row: BrowsePublicationCatalogue,
+  todayYmd: string,
+): "current" | "historical" | "none" {
+  const catalogue = {
+    purpose: row.purpose ?? "monthly",
+    status: row.status,
+    month: row.month ? String(row.month).slice(0, 10) : null,
+    endDate: row.end_date ? String(row.end_date).slice(0, 10) : null,
+    websiteOverride: row.website_override === true,
+    showInPastMenu: row.show_in_past_menu === true,
+  };
+  if (isCurrentlyCustomerOrderable(catalogue, todayYmd)) return "current";
+  if (isCustomerFacingHistoricalCatalogue(catalogue)) return "historical";
+  return "none";
+}
+
+/**
+ * Same Browse publication rules as listBrowsePublishedCakes, for one cake.
+ * Live Library cakes (active / seasonal) are discoverable without membership.
+ * Popular Cakes is merchandising only and never implies currentlyOffered.
+ */
+export function resolveBrowsePublishedCake(input: {
+  cake: StorefrontCake;
+  cakeStatus: string;
+  catalogues: readonly BrowsePublicationCatalogue[];
+  showInPopularCakes?: boolean | null;
+  todayYmd?: string;
+}): BrowseStorefrontCake | null {
+  if (input.cake.sizes.length === 0) return null;
+
+  const todayYmd = input.todayYmd ?? toBusinessDateKey();
+  const todayYm = businessYearMonth(todayYmd) ?? todayYmd.slice(0, 7);
+  let hasQualifyingCustomerFacingCatalogue = false;
+  let currentlyOffered = false;
+  const monthlyMonths: string[] = [];
+
+  for (const row of input.catalogues) {
+    const kind = browseCatalogueKind(row, todayYmd);
+    if (kind === "none") continue;
+    if (kind === "current") {
+      if (!isOfferableStatus(input.cakeStatus)) continue;
+      hasQualifyingCustomerFacingCatalogue = true;
+      currentlyOffered = true;
+      if ((row.purpose ?? "monthly") === "monthly" && row.month) {
+        monthlyMonths.push(String(row.month).slice(0, 10));
+      }
+      continue;
+    }
+    hasQualifyingCustomerFacingCatalogue = true;
+  }
+
+  if (
+    !isBrowseDiscoverableLibraryCake({
+      status: input.cakeStatus,
+      sizeCount: input.cake.sizes.length,
+      hasQualifyingCustomerFacingCatalogue,
+    })
+  ) {
+    return null;
+  }
+
+  return {
+    ...input.cake,
+    currentlyOffered,
+    availabilityNote: currentlyOffered
+      ? browseCakeAvailabilityNote(todayYm, monthlyMonths)
+      : BROWSE_CURRENTLY_UNAVAILABLE_NOTE,
+  };
+}
+
+type StorefrontSupabaseClient =
+  | Awaited<ReturnType<typeof createClient>>
+  | ReturnType<typeof createPublicClient>;
+
+async function listBrowsePublicationCataloguesByIds(
+  supabase: StorefrontSupabaseClient,
+  collectionIds: readonly string[],
+): Promise<BrowsePublicationCatalogue[]> {
+  if (collectionIds.length === 0) return [];
+
+  const withHistoryFlag = await supabase
+    .from("collections")
+    .select(
+      "id, month, purpose, status, end_date, website_override, show_in_past_menu",
+    )
+    .in("id", collectionIds);
+  const cataloguesQuery = (withHistoryFlag.error?.message ?? "").includes(
+    "show_in_past_menu",
+  )
+    ? await supabase
+        .from("collections")
+        .select("id, month, purpose, status, end_date, website_override")
+        .in("id", collectionIds)
+    : withHistoryFlag;
+
+  if (cataloguesQuery.error) {
+    throw new Error(cataloguesQuery.error.message);
+  }
+
+  return (cataloguesQuery.data ?? []) as BrowsePublicationCatalogue[];
+}
+
+type CakeMembershipCatalogueRow = {
+  collection_id?: string | null;
+  collections?:
+    | BrowsePublicationCatalogue
+    | BrowsePublicationCatalogue[]
+    | null;
+};
+
+async function listCakePublicationCatalogues(
+  supabase: StorefrontSupabaseClient,
+  cakeId: string,
+): Promise<BrowsePublicationCatalogue[]> {
+  const nestedSelect = `
+      collection_id,
+      collections (
+        id,
+        month,
+        purpose,
+        status,
+        end_date,
+        website_override,
+        show_in_past_menu
+      )
+    `;
+  const nestedSelectLegacy = `
+      collection_id,
+      collections (
+        id,
+        month,
+        purpose,
+        status,
+        end_date,
+        website_override
+      )
+    `;
+
+  const withHistory = await supabase
+    .from("collection_cakes")
+    .select(nestedSelect)
+    .eq("library_cake_id", cakeId)
+    .eq("available", true);
+
+  const memberships = (withHistory.error?.message ?? "").includes(
+    "show_in_past_menu",
+  )
+    ? await supabase
+        .from("collection_cakes")
+        .select(nestedSelectLegacy)
+        .eq("library_cake_id", cakeId)
+        .eq("available", true)
+    : withHistory;
+
+  if (!memberships.error) {
+    return ((memberships.data ?? []) as CakeMembershipCatalogueRow[])
+      .map((row) => unwrapOne(row.collections))
+      .filter((row): row is BrowsePublicationCatalogue => Boolean(row));
+  }
+
+  const { data, error } = await supabase
+    .from("collection_cakes")
+    .select("collection_id")
+    .eq("library_cake_id", cakeId)
+    .eq("available", true);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const collectionIds = [
+    ...new Set(
+      ((data ?? []) as Array<{ collection_id?: string | null }>)
+        .map((membership) => membership.collection_id)
+        .filter((collectionId): collectionId is string => Boolean(collectionId)),
+    ),
+  ];
+
+  return listBrowsePublicationCataloguesByIds(supabase, collectionIds);
+}
+
+type CurrentCollectionRpcRow = {
+  id: string;
+  name: string;
+  month: string | null;
+};
+
+function mapCollection(
+  row: CurrentCollectionRpcRow & { display_order?: number | null },
+): StorefrontCollection {
+  return {
+    id: row.id,
+    name: row.name,
+    month: row.month ? String(row.month).slice(0, 10) : null,
+    displayOrder: row.display_order == null ? null : Number(row.display_order),
+  };
+}
+
+function collectionFromRpc(data: unknown): StorefrontCollection | null {
+  if (!data) return null;
+  const row = (
+    Array.isArray(data) ? data[0] : data
+  ) as CurrentCollectionRpcRow | null;
+  if (!row?.id) return null;
+  return mapCollection(row);
+}
+
+export function unpublishedCataloguePreorderMessage(pickupYmd: string): string {
+  return `${formatBusinessMonthYear(pickupYmd)} catalogue is not yet available for preorder.`;
+}
+
+/**
+ * Singapore-today catalogue for homepage merchandising.
+ * Customer *ordering* must use getStorefrontCollectionForPickupDate.
+ */
+export async function getCurrentCollection(): Promise<StorefrontCollection | null> {
+  const supabase = createPublicClient();
+  const { data, error } = await supabase.rpc("storefront_current_collection");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  return collectionFromRpc(data);
+}
+
+/** Authoritative customer catalogue for a pickup date (SQL resolver). */
+export async function getStorefrontCollectionForPickupDate(
+  pickupYmd: string,
+): Promise<StorefrontCollection | null> {
+  const key = pickupYmd.trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
+  const supabase = createPublicClient();
+  const { data, error } = await supabase.rpc(
+    "storefront_collection_for_pickup_date",
+    { p_pickup_date: key },
+  );
+  if (error) {
+    throw new Error(error.message);
+  }
+  return collectionFromRpc(data);
+}
+
+function mapAvailableCollectionCakes(
+  data: CatalogRow[] | null,
+): StorefrontCake[] {
+  return ((data ?? []) as unknown as CatalogRow[])
+    .map((row) => unwrapOne(row.library_cakes))
+    .filter((cake): cake is LibraryCakeEmbed => Boolean(cake))
+    .filter((cake) => isOfferableStatus(cake.status))
+    .map(mapStorefrontCake)
+    .filter((cake) => cake.sizes.length > 0);
+}
+
+/** Apply authoritative effective prices for a customer-facing listing date. */
+export function applyEffectiveStorefrontPrices<T extends StorefrontCake>(
+  cakes: readonly T[],
+  pricesBySizeId: ReadonlyMap<string, number>,
+): T[] {
+  return cakes.map((cake) => ({
+    ...cake,
+    sizes: cake.sizes.map((size) => ({
+      ...size,
+      price: pricesBySizeId.get(size.id) ?? size.price,
+    })),
+  }));
+}
+
+async function withEffectiveStorefrontPrices<T extends StorefrontCake>(
+  cakes: readonly T[],
+  priceDate: string,
+  requestPriceContext: RequestScopedPriceContext =
+    createRequestScopedPriceContext(),
+): Promise<T[]> {
+  const sizes = cakes.flatMap((cake) => cake.sizes);
+  if (sizes.length === 0) return cakes.map((cake) => ({ ...cake }));
+
+  const supabase = createPublicClient();
+  const pricesBySizeId = new Map<string, number>();
+  for (
+    let offset = 0;
+    offset < sizes.length;
+    offset += STOREFRONT_PRICE_LOOKUP_CONCURRENCY
+  ) {
+    const batch = sizes.slice(
+      offset,
+      offset + STOREFRONT_PRICE_LOOKUP_CONCURRENCY,
+    );
+    const resolved = await Promise.all(
+      batch.map(async (size) => {
+        const price = await resolveRequestScopedPrice(
+          requestPriceContext,
+          size.id,
+          priceDate,
+          async () => {
+            const { data, error } = await supabase.rpc(
+              "library_cake_size_price_on",
+              { p_cake_size_id: size.id, p_pickup_date: priceDate },
+            );
+            if (error) throw new Error(error.message);
+            if (data == null || !Number.isFinite(Number(data))) {
+              throw new Error("The current cake price could not be verified.");
+            }
+            return Number(data);
+          },
+        );
+        return [size.id, price] as const;
+      }),
+    );
+    for (const [sizeId, price] of resolved) pricesBySizeId.set(sizeId, price);
+  }
+  return applyEffectiveStorefrontPrices(cakes, pricesBySizeId);
+}
+
+async function loadStorefrontCakesByIds(
+  cakeIds: readonly string[],
+): Promise<CachedStorefrontCakeDisplay[]> {
+  if (cakeIds.length === 0) return [];
+  const supabase = createPublicClient();
+  const data = await withCakePhotoSelectFallback(
+    (photoSelect, includeAssignments, includeTags) =>
+      supabase
+        .from("library_cakes")
+        .select(
+          libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags),
+        )
+        .in("id", [...cakeIds]),
+  );
+
+  return ((data ?? []) as unknown as LibraryCakeEmbed[])
+    .filter((row) => row.library_cake_sizes?.length)
+    .map((row) => ({ cake: mapStorefrontCake(row), status: row.status }));
+}
+
+const readCachedStorefrontCakesByIds = cache((cakeIdsKey: string) =>
+  unstable_cache(
+    () => loadStorefrontCakesByIds(cakeIdsKey ? cakeIdsKey.split(",") : []),
+    ["storefront-collection-cake-display-v1", cakeIdsKey],
+    {
+      revalidate: STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS,
+      tags: [STOREFRONT_PUBLISHED_CAKES_CACHE_TAG],
+    },
+  )(),
+);
+
+export async function listAvailableCakes(
+  collectionId: string,
+  options: { currentEffectivePrice?: boolean } = {},
+): Promise<StorefrontCake[]> {
+  const supabase = createPublicClient();
+  const { data, error } = await supabase
+    .from("collection_cakes")
+    .select("library_cake_id, sort_order")
+    .eq("collection_id", collectionId)
+    .eq("available", true)
+    .order("sort_order", { ascending: true });
+  if (error) throw new Error(error.message);
+
+  const memberships = (data ?? []) as Array<{
+    library_cake_id: string;
+    sort_order: number;
+  }>;
+  const cakeIds = [...new Set(memberships.map((row) => row.library_cake_id))];
+  const cachedCakes = await readCachedStorefrontCakesByIds(
+    [...cakeIds].sort().join(","),
+  );
+  const cakesById = new Map(
+    cachedCakes.map((display) => [display.cake.id, display]),
+  );
+  const cakes = memberships
+    .map((row) => cakesById.get(row.library_cake_id))
+    .filter(
+      (display): display is CachedStorefrontCakeDisplay =>
+        display !== undefined && isOfferableStatus(display.status),
+    )
+    .map((display) => display.cake);
+
+  return options.currentEffectivePrice
+    ? withEffectiveStorefrontPrices(cakes, toBusinessDateKey())
+    : cakes;
+}
+
+/**
+ * Checkout date confirmation + add-another-cake list.
+ * Identity, sizes, and preorder days only â€” no photo/tag/category embeds.
+ */
+export async function listAvailableCheckoutCakes(
+  collectionId: string,
+): Promise<StorefrontCake[]> {
+  const supabase = createPublicClient();
+  const { data, error } = await supabase
+    .from("collection_cakes")
+    .select(
+      `
+      sort_order,
+      library_cakes (
+        id,
+        name,
+        description,
+        category_id,
+        status,
+        sharing_guide,
+        allergens,
+        library_cake_sizes (
+          id,
+          cake_id,
+          label,
+          price,
+          sort_order,
+          preorder_days,
+          available_from,
+          available_until
+        )
+      )
+    `,
+    )
+    .eq("collection_id", collectionId)
+    .eq("available", true)
+    .order("sort_order", { ascending: true });
+  if (error) {
+    throw new Error(error.message);
+  }
+  return mapAvailableCollectionCakes(data as CatalogRow[] | null);
+}
+
+/** Cart cakes only â€” used on the checkout date-confirmation path. */
+export async function listCheckoutCakesForCakeIds(
+  cakeIds: readonly string[],
+): Promise<Array<{ collectionId: string; cake: StorefrontCake }>> {
+  const ids = [...new Set(cakeIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) return [];
+  const supabase = createPublicClient();
+  const { data, error } = await supabase
+    .from("collection_cakes")
+    .select(
+      `
+      collection_id,
+      sort_order,
+      library_cakes (
+        id,
+        name,
+        description,
+        category_id,
+        status,
+        sharing_guide,
+        allergens,
+        library_cake_sizes (
+          id,
+          cake_id,
+          label,
+          price,
+          sort_order,
+          preorder_days,
+          available_from,
+          available_until
+        )
+      )
+    `,
+    )
+    .eq("available", true)
+    .in("library_cake_id", ids);
+  if (error) {
+    throw new Error(error.message);
+  }
+  return ((data ?? []) as Array<CatalogRow & { collection_id: string }>)
+    .map((row) => {
+      const cake = unwrapOne(row.library_cakes);
+      if (!cake || !isOfferableStatus(cake.status)) return null;
+      const mapped = mapStorefrontCake(cake);
+      if (mapped.sizes.length === 0) return null;
+      return { collectionId: row.collection_id, cake: mapped };
+    })
+    .filter(
+      (row): row is { collectionId: string; cake: StorefrontCake } =>
+        Boolean(row),
+    );
+}
+
+/**
+ * Owner-curated homepage preview for one collection.
+ * Empty when nothing is explicitly selected â€” never infers first-N cakes.
+ */
+async function loadHomepageCollectionPreviewCakes(
+  collectionId: string,
+): Promise<StorefrontCake[]> {
+  const supabase = createPublicClient();
+  const { data, error } = await supabase
+    .from("collection_cakes")
+    .select("library_cake_id, homepage_sort_order")
+    .eq("collection_id", collectionId)
+    .eq("available", true)
+    .eq("show_on_homepage", true)
+    .order("homepage_sort_order", { ascending: true });
+  if (error) throw new Error(error.message);
+
+  const memberships = (data ?? []) as Array<{
+    library_cake_id: string;
+    homepage_sort_order: number | null;
+  }>;
+  const cakeIds = [...new Set(memberships.map((row) => row.library_cake_id))];
+  const displayCakes = await readCachedStorefrontCakesByIds(
+    [...cakeIds].sort().join(","),
+  );
+  const cakesById = new Map(
+    displayCakes.map((display) => [display.cake.id, display]),
+  );
+  return takeHomepageCollectionPreviewCakes(
+    memberships
+      .map((membership) => cakesById.get(membership.library_cake_id))
+      .filter(
+        (display): display is CachedStorefrontCakeDisplay =>
+          display !== undefined && isOfferableStatus(display.status),
+      )
+      .map((display) => display.cake),
+  );
+}
+
+const readCachedHomepageCollectionPreviewCakes = cache((collectionId: string) =>
+  unstable_cache(
+    () => loadHomepageCollectionPreviewCakes(collectionId),
+    ["homepage-collection-preview-v2", collectionId],
+    {
+      revalidate: STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS,
+      tags: [STOREFRONT_PUBLISHED_CAKES_CACHE_TAG],
+    },
+  )(),
+);
+
+export async function listHomepageCollectionPreviewCakes(
+  collectionId: string,
+  priceDate: string = toBusinessDateKey(),
+  requestPriceContext?: RequestScopedPriceContext,
+): Promise<StorefrontCake[]> {
+  if (!collectionId) return [];
+  const cakes = await readCachedHomepageCollectionPreviewCakes(collectionId);
+  return withEffectiveStorefrontPrices(cakes, priceDate, requestPriceContext);
+}
+
+/**
+ * Cake offered on the public storefront for Singapore today (homepage
+ * merchandising). Checkout ordering uses the pickup-date catalogue instead.
+ */
+export async function getStorefrontOfferedCakeById(
+  id: string,
+): Promise<StorefrontCake | null> {
+  const collection = await getCurrentCollection();
+  if (!collection) return null;
+  const cakes = await listAvailableCakes(collection.id, {
+    currentEffectivePrice: true,
+  });
+  return cakes.find((cake) => cake.id === id) ?? null;
+}
+
+/** Trim, drop empties, keep first-seen order. Cart edit and targeted loads. */
+export function requestedStorefrontCakeIds(
+  cakeIds: readonly string[],
+): string[] {
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const value of cakeIds) {
+    const id = value.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
+}
+
+/** Map loaded cakes onto the requested ID list; missing IDs are omitted. */
+export function selectStorefrontCakesByRequestedIds(
+  requestedIds: readonly string[],
+  loaded: readonly StorefrontCake[],
+): StorefrontCake[] {
+  const byId = new Map(loaded.map((cake) => [cake.id, cake]));
+  return requestedStorefrontCakeIds(requestedIds).flatMap((id) => {
+    const cake = byId.get(id);
+    return cake ? [cake] : [];
+  });
+}
+
+/**
+ * Live storefront cakes for a small ID set (cart size/photo editor).
+ * Uses the same public `library_cakes` RLS as browse; does not load the
+ * full published catalogue.
+ */
+export async function listStorefrontCakesByIds(
+  cakeIds: readonly string[],
+): Promise<StorefrontCake[]> {
+  const ids = requestedStorefrontCakeIds(cakeIds);
+  if (ids.length === 0) return [];
+
+  const supabase = await createClient();
+  const data = await withCakePhotoSelectFallback(
+    (photoSelect, includeAssignments, includeTags) =>
+      supabase
+        .from("library_cakes")
+        .select(
+          libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags),
+        )
+        .in("id", ids),
+  );
+
+  const loaded = ((data ?? []) as unknown as LibraryCakeEmbed[])
+    .map(mapStorefrontCake)
+    .filter((cake) => cake.sizes.length > 0);
+
+  return selectStorefrontCakesByRequestedIds(ids, loaded);
+}
+
+/** Live, RLS-scoped fields needed by cart-size validation only. */
+export async function listStorefrontCakeSizesForValidation(
+  cakeIds: readonly string[],
+): Promise<Array<{
+  id: string;
+  name: string;
+  sizes: Array<{
+    id: string;
+    size: string;
+    availableFrom: string | null;
+    availableUntil: string | null;
+  }>;
+}>> {
+  const ids = requestedStorefrontCakeIds(cakeIds);
+  if (ids.length === 0) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("library_cakes")
+    .select("id,name,library_cake_sizes(id,label,available_from,available_until)")
+    .in("id", ids);
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((cake) => ({
+    id: cake.id,
+    name: cake.name,
+    sizes: (cake.library_cake_sizes ?? []).map((size) => ({
+      id: size.id,
+      size: size.label,
+      availableFrom: size.available_from,
+      availableUntil: size.available_until,
+    })),
+  }));
+}
+
+/** Library cake by id when offerable (staff workspace). Not collection-gated. */
+export async function getAvailableCakeById(
+  id: string,
+): Promise<StorefrontCake | null> {
+  const supabase = await createClient();
+  const data = await withCakePhotoSelectFallback((photoSelect, includeAssignments, includeTags) =>
+    supabase
+      .from("library_cakes")
+      .select(libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags))
+      .eq("id", id)
+      .maybeSingle(),
+  );
+  if (!data) return null;
+
+  const cake = data as unknown as LibraryCakeEmbed;
+  if (!isOfferableStatus(cake.status)) return null;
+
+  return mapStorefrontCake(cake);
+}
+
+/**
+ * Owner staff order entry / workspace: Master Library cakes independent of
+ * Collection membership. Statuses: active | seasonal.
+ * Does not read or write collection_cakes.
+ */
+export async function listOfferableLibraryCakes(): Promise<StorefrontCake[]> {
+  const supabase = await createClient();
+  const data = await withCakePhotoSelectFallback((photoSelect, includeAssignments, includeTags) =>
+    supabase
+      .from("library_cakes")
+      .select(libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags))
+      .in("status", ["active", "seasonal"])
+      .order("name", { ascending: true }),
+  );
+
+  return ((data ?? []) as unknown as LibraryCakeEmbed[])
+    .filter((cake) => isOfferableStatus(cake.status))
+    .map(mapStorefrontCake)
+    .filter((cake) => cake.sizes.length > 0);
+}
+
+type ActiveCollectionRow = {
+  id: string;
+  name: string;
+  month: string | null;
+  purpose: string | null;
+  status: string;
+  display_order?: number | null;
+};
+
+/** Active monthly catalogues customers may currently preorder from. */
+async function loadOrderableMonthlyCatalogues(
+  todayYmd: string,
+): Promise<StorefrontCollection[]> {
+  const todayYm = businessYearMonth(todayYmd) ?? todayYmd.slice(0, 7);
+  const supabase = createPublicClient();
+  const withOrder = await supabase
+    .from("collections")
+    .select("id, name, month, purpose, status, display_order")
+    .eq("status", "active")
+    .eq("purpose", "monthly")
+    .order("display_order", { ascending: true })
+    .order("month", { ascending: true });
+  const { data, error } = withOrder.error?.message.includes("display_order")
+    ? await supabase
+        .from("collections")
+        .select("id, name, month, purpose, status")
+        .eq("status", "active")
+        .eq("purpose", "monthly")
+        .order("month", { ascending: true })
+    : withOrder;
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as ActiveCollectionRow[])
+    .filter((row) =>
+      isCustomerOrderableMonthlyMonth(
+        row.month ? String(row.month).slice(0, 10) : null,
+        todayYm,
+      ),
+    )
+    .map((row) => mapCollection(row));
+}
+
+const readCachedOrderableMonthlyCatalogues = cache((todayYmd: string) =>
+  unstable_cache(
+    () => loadOrderableMonthlyCatalogues(todayYmd),
+    ["orderable-monthly-catalogues", todayYmd],
+    {
+      revalidate: STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS,
+      tags: [STOREFRONT_PUBLISHED_CAKES_CACHE_TAG],
+    },
+  )(),
+);
+
+export async function listOrderableMonthlyCatalogues(
+  todayYmd: string = toBusinessDateKey(),
+): Promise<StorefrontCollection[]> {
+  return readCachedOrderableMonthlyCatalogues(todayYmd);
+}
+
+export async function getOrderableMonthlyCatalogueById(
+  id: string,
+): Promise<StorefrontCollection | null> {
+  const catalogues = await listOrderableMonthlyCatalogues();
+  return catalogues.find((catalogue) => catalogue.id === id) ?? null;
+}
+
+export type StorefrontSpecialCatalogue = {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  displayOrder: number | null;
+};
+
+type SpecialCatalogueRow = {
+  id: string;
+  name: string;
+  start_date: string | null;
+  end_date: string | null;
+  purpose: string | null;
+  status: string;
+  website_override: boolean | null;
+  display_order?: number | null;
+};
+
+function mapSpecialCatalogue(
+  row: SpecialCatalogueRow,
+): StorefrontSpecialCatalogue | null {
+  const startDate = row.start_date ? String(row.start_date).slice(0, 10) : "";
+  const endDate = row.end_date ? String(row.end_date).slice(0, 10) : "";
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(startDate) ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(endDate)
+  ) {
+    return null;
+  }
+  return {
+    id: row.id,
+    name: row.name,
+    startDate,
+    endDate,
+    displayOrder: row.display_order == null ? null : Number(row.display_order),
+  };
+}
+
+/** Active special catalogues published as the customer website override. */
+async function loadCustomerSpecialCatalogues(
+  todayYmd: string,
+): Promise<StorefrontSpecialCatalogue[]> {
+  const supabase = createPublicClient();
+  const withOrder = await supabase
+    .from("collections")
+    .select(
+      "id, name, start_date, end_date, purpose, status, website_override, display_order",
+    )
+    .eq("status", "active")
+    .eq("purpose", "special")
+    .eq("website_override", true)
+    .order("display_order", { ascending: true })
+    .order("start_date", { ascending: true });
+  const { data, error } = withOrder.error?.message.includes("display_order")
+    ? await supabase
+        .from("collections")
+        .select(
+          "id, name, start_date, end_date, purpose, status, website_override",
+        )
+        .eq("status", "active")
+        .eq("purpose", "special")
+        .eq("website_override", true)
+        .order("start_date", { ascending: true })
+    : withOrder;
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return ((data ?? []) as SpecialCatalogueRow[])
+    .map(mapSpecialCatalogue)
+    .filter((row): row is StorefrontSpecialCatalogue => Boolean(row))
+    .filter((row) =>
+      isCurrentlyCustomerOrderable(
+        {
+          purpose: "special",
+          status: "active",
+          endDate: row.endDate,
+          websiteOverride: true,
+        },
+        todayYmd,
+      ),
+    );
+}
+
+const readCachedCustomerSpecialCatalogues = cache((todayYmd: string) =>
+  unstable_cache(
+    () => loadCustomerSpecialCatalogues(todayYmd),
+    ["customer-special-catalogues", todayYmd],
+    {
+      revalidate: STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS,
+      tags: [STOREFRONT_PUBLISHED_CAKES_CACHE_TAG],
+    },
+  )(),
+);
+
+export async function listCustomerSpecialCatalogues(
+  todayYmd: string = toBusinessDateKey(),
+): Promise<StorefrontSpecialCatalogue[]> {
+  return readCachedCustomerSpecialCatalogues(todayYmd);
+}
+
+export async function getCustomerSpecialCatalogueById(
+  id: string,
+): Promise<StorefrontSpecialCatalogue | null> {
+  const catalogues = await listCustomerSpecialCatalogues();
+  return catalogues.find((catalogue) => catalogue.id === id) ?? null;
+}
+
+export type StorefrontHistoryCatalogue = {
+  id: string;
+  name: string;
+  purpose: string;
+  month: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  status: string;
+  displayOrder: number | null;
+  showInPastMenu: boolean;
+};
+
+type HistoryCatalogueRow = {
+  id: string;
+  name: string;
+  purpose: string | null;
+  month: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  status: string;
+  display_order?: number | null;
+  show_in_past_menu?: boolean | null;
+};
+
+function mapHistoryCatalogue(
+  row: HistoryCatalogueRow,
+): StorefrontHistoryCatalogue {
+  return {
+    id: row.id,
+    name: row.name,
+    purpose: row.purpose === "special" ? "special" : "monthly",
+    month: row.month ? String(row.month).slice(0, 10) : null,
+    startDate: row.start_date ? String(row.start_date).slice(0, 10) : null,
+    endDate: row.end_date ? String(row.end_date).slice(0, 10) : null,
+    status: row.status,
+    displayOrder: row.display_order == null ? null : Number(row.display_order),
+    showInPastMenu: row.show_in_past_menu === true,
+  };
+}
+
+function isMissingShowInPastMenuColumn(message: string): boolean {
+  return message.includes("show_in_past_menu");
+}
+
+/** Archived or date-expired catalogues opted into customer Browse history. */
+export async function listHistoricalCatalogues(
+  todayYmd: string = toBusinessDateKey(),
+): Promise<StorefrontHistoryCatalogue[]> {
+  const supabase = await createClient();
+  const withFlag = await supabase
+    .from("collections")
+    .select(
+      "id, name, purpose, month, start_date, end_date, status, display_order, show_in_past_menu",
+    )
+    .order("display_order", { ascending: true });
+  const withoutFlag = isMissingShowInPastMenuColumn(
+    withFlag.error?.message ?? "",
+  )
+    ? await supabase
+        .from("collections")
+        .select(
+          "id, name, purpose, month, start_date, end_date, status, display_order",
+        )
+        .order("display_order", { ascending: true })
+    : withFlag;
+  const { data, error } = withoutFlag.error?.message.includes("display_order")
+    ? await supabase
+        .from("collections")
+        .select("id, name, purpose, month, start_date, end_date, status")
+        .order("end_date", { ascending: false, nullsFirst: false })
         .order("month", { ascending: false, nullsFirst: false })
     : withoutFlag;
   if (error) {
