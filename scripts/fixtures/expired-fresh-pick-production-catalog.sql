@@ -165,8 +165,6 @@ ALTER TABLE public.roles ADD CONSTRAINT roles_pkey PRIMARY KEY (id);
 ALTER TABLE public.staff_profiles ADD CONSTRAINT staff_profiles_auth_user_id_key UNIQUE (auth_user_id);
 ALTER TABLE public.staff_profiles ADD CONSTRAINT staff_profiles_pkey PRIMARY KEY (id);
 ALTER TABLE public.staff_profiles ADD CONSTRAINT staff_profiles_username_key UNIQUE (username);
-ALTER TABLE supabase_migrations.schema_migrations ADD CONSTRAINT schema_migrations_idempotency_key_key UNIQUE (idempotency_key);
-ALTER TABLE supabase_migrations.schema_migrations ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
 ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_cake_name_nonempty CHECK (length(TRIM(BOTH FROM cake_name)) > 0);
 ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_confirmed_by_fkey FOREIGN KEY (confirmed_by) REFERENCES staff_profiles(id);
 ALTER TABLE public.extra_stock ADD CONSTRAINT extra_stock_confirmed_requires_fields CHECK (lifecycle <> 'confirmed'::extra_stock_lifecycle OR prepared_on IS NOT NULL AND pickup_through_at IS NOT NULL AND pickup_available_from_at IS NOT NULL AND confirmed_at IS NOT NULL AND confirmed_by IS NOT NULL);
@@ -529,6 +527,8 @@ INSERT INTO public.production_trigger_manifest VALUES ('orders','staff_notificat
 CREATE SCHEMA supabase_migrations;
 
 CREATE TABLE supabase_migrations.schema_migrations (version text NOT NULL, name text, statements text[], created_at timestamptz DEFAULT now() NOT NULL, created_by text, idempotency_key text, rollback text[]);
+ALTER TABLE supabase_migrations.schema_migrations ADD CONSTRAINT schema_migrations_idempotency_key_key UNIQUE (idempotency_key);
+ALTER TABLE supabase_migrations.schema_migrations ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
 
 
 
