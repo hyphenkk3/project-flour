@@ -3,6 +3,8 @@ import { hasCakeWordingRequest } from "../src/engines/orders/cake-wording-note-g
 
 const rejected = [
   "Please write Happy Birthday Sarah on the cake",
+  "happy birthday to daddy",
+  "Happy Birthday Sarah",
   "Can you put Happy Birthday on the cake?",
   "wording on cake: Happy Birthday",
   "Please add Happy Anniversary",
