@@ -1066,3 +1066,40 @@ No migration was authored or applied in this phase.
 5. Continue on the implementation branch only. Before any DEV migration, rehearse every migration individually with current exact function bodies/triggers, run checkout/date/collection/Owner-RLS/snapshot regressions, and preserve the existing DEV deployment as rollback. Roll back application code independently; do not restore old customer data or remove additive schema blindly.
 
 **Decision:** **GO** to isolated Phase 2B implementation and test with the overload correction and Owner-only policy behavior as required gates. **HOLD** for DEV migration/deployment until the complete feature and all relevant function bodies are updated and rehearsed. **HOLD** for Production; this work made no Production changes and grants no release authorization.
+
+### Issue #8 Phase 2B — implementation checkpoint — 1 November 2026
+
+**Result: implementation source prepared for isolated verification. HOLD for migration application, Preview deployment, alias changes, and Production.** No hosted database, customer/order data, deployment, environment variable, domain, or migration history was changed.
+
+**Source and environment**
+
+- Implementation branch: `codex/issue-8-addons-implementation-20261101`.
+- Starting point verified before edits: `d4b304b14e9e0e880e807acb4666d01ac242d55a`, tree `472d2989bc36cf4560fbd5045ce17f8316d972d3`.
+- Implementation checkpoint: `a8708553ecf37fd10116d86bfb23fc99fccfd7a4`, tree `51ddb62fdf5179949820a196dbac9943b2591d08`.
+- Phase 2A planning branch and Production recovery source `d98afb9733ed8285e71ba7e4a7e7a3e1116980c7` were not changed. The verified Production deployment reference remains `dpl_HE7zep8jWR1wkoKZ6w4tC8t4bAaN`; Production Supabase is `cuowwlduhxxifmpvpltt`; DEV Supabase is `tzwtpxdcggesgjaqxkqr`.
+- The Issue #8 implementation commit is local to this isolated branch and is one commit ahead of its remote tracking branch. It was not pushed or deployed.
+
+**Implemented scope**
+
+- Added an Owner-only Library page and navigation entry for separate Complimentary Items and Paid Add-ons management. The page and server action require an active, unarchived Owner; the database save RPC repeats that authorization check.
+- Added item create/edit/active state, paid price and quantity limit, per-collection availability/customer selection, sorting, complimentary default quantity, and optional inclusive seasonal start/end dates.
+- Added a date-aware customer options RPC overload and updated standard checkout and Fresh Pick to pass the selected fulfilment date. The existing UUID-only RPC remains available to old application releases and intentionally exposes only nonseasonal items.
+- Added database checks for active item, collection assignment, fulfilment date, customer-selectability for nonstaff checkout, paid quantity limits and server-owned new paid snapshots. Existing line snapshots are not rewritten by catalog edits. Service-role operations and active staff are distinguished from ordinary authenticated customers.
+- The migration sequence is intentionally ordered: first `20261101194235_fresh_pick_overload_compatibility.sql` (SHA-256 `6dda6c7ed675f4dbbb184166601fdb5189dfe60eb7c75c9d0fdaf0d69b547b8a`), then `20261101200000_issue8_addon_catalogue_schema_and_owner_management.sql` (SHA-256 `62a50a5f14bc5a31c5153eda6f0a8ccc7fa992c74f73664663b21a5e65bae476`). This order ensures the later schema/function migration applies the catalogue-aware logic after the Fresh Pick overload migration recreates its function body.
+- The implementation commit changes 14 files: the two migration files above plus the customer options engine, standard checkout and Fresh Pick action parsing, Library navigation/layout/action state, the new Library add-on page, manager, actions, queries and types, and two focused regression scripts. It does not include Phase 10 pricing deduplication.
+
+**Verification**
+
+- `npx tsc --noEmit`: **PASS**.
+- Scoped ESLint over all changed application and test files: **PASS**.
+- `node --import ./scripts/test-release-regression-alias-loader.mjs scripts/test-customer-preorder-options.ts`: **PASS**, including custom catalogue add-on mapping and migration contract assertions.
+- `node --import ./scripts/test-release-regression-alias-loader.mjs scripts/test-guest-extra-paid-addons.ts`: **PASS**, including generic paid add-on payload and existing receipt recap coverage. The stale source assertion was updated to follow the existing `SuccessReceiptRecap` component boundary; it still checks paid add-ons and notes rendering.
+- `npm run test:release-regressions`: **57 PASS, 0 FAIL, 1 BLOCKED**. The blocked disposable PostgreSQL assignment regression stopped at `shmget: Operation not permitted`; this is not reported as a pass.
+- `npm run lint`: **FAIL** with 77 errors and 24 warnings in repository-wide diagnostics outside the changed-file scoped ESLint result. No lint rules were disabled.
+- `npm run build`: **INCOMPLETE/FAIL in this environment** because Next.js could not fetch Google Fonts `Newsreader` and `Outfit` from `fonts.googleapis.com`. TypeScript passed separately. No Vercel Preview build was created.
+- No PostgreSQL rehearsal of the new Phase 2B migration was completed in this execution. The available local initialization path has previously failed at shared-memory creation (`shmget: Operation not permitted`); therefore Owner/RLS behavior, checkout trigger execution, inclusive date boundaries, transaction rollback and historical snapshot preservation remain **INCOMPLETE** pending a compatible isolated PostgreSQL 17 rehearsal. Phase 2A Fresh Pick overload rehearsal evidence remains as recorded above and is not substituted for Phase 2B SQL testing.
+
+**Recovery and next gate**
+
+- Existing recovery references were preserved; no additional bundle was created. Application rollback remains a Git/Vercel source rollback, independent from database recovery. Since neither migration has been applied, there is no hosted schema rollback to perform. Before a separately authorized DEV application, rehearse the two migrations in the order above against the captured Production-equivalent relevant schema, verify exact function signatures/ownership/ACLs, staff versus customer access, guest checkout, stale carts, inclusive dates, quantity/price snapshots, and transactional rollback. Keep migrations unapplied and deployments/aliases unchanged until that rehearsal passes.
+- Phase 2B is **not ready for owner Preview acceptance or Production release**. It is implementation source prepared for isolated verification only.
