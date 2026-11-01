@@ -35,17 +35,18 @@ const paidOptions: CustomerPaidAddonOption[] = selectCustomerPaidAddonOptions([
     sortOrder: 1,
   },
   {
-    code: "ignored",
-    name: "Not a customer add-on",
-    unitPrice: 99,
-    financialShorthand: "X",
+    code: "seasonal_cookie_box",
+    name: "Seasonal Cookie Box",
+    unitPrice: 12.5,
+    financialShorthand: "SCB",
+    maxQuantity: 2,
     sortOrder: 0,
   },
 ]);
 
 assert.deepEqual(
   paidOptions.map((row) => row.code),
-  ["birthday_card", "wishing_card"],
+  ["birthday_card", "wishing_card", "seasonal_cookie_box"],
 );
 
 assert.equal(
@@ -92,6 +93,16 @@ assert.equal(birthday[0]?.code, "birthday_card");
 assert.equal(birthday[0]?.quantity, 1);
 assert.deepEqual(birthday[0]?.messages, ["Happy birthday"]);
 
+const customAddon = customerPaidAddonMutationPayload({
+  options: paidOptions,
+  selections: {
+    ...emptyCustomerPreorderSelections(),
+    paidAddonCodes: ["seasonal_cookie_box"],
+  },
+});
+assert.equal(customAddon[0]?.code, "seasonal_cookie_box");
+assert.equal(customAddon[0]?.quantity, 1);
+
 const extraFormSrc = readSrc(
   "src/workspaces/storefront/extra/GuestExtraCheckoutForm.tsx",
 );
@@ -130,8 +141,13 @@ assert.match(checkoutFormSrc, />Paid</);
 const successSrc = readSrc(
   "src/workspaces/storefront/checkout/StorefrontSuccessPage.tsx",
 );
-assert.match(successSrc, /receipt\.paidAddons\.map/);
-assert.match(successSrc, /receipt\.notes/);
+assert.match(successSrc, /<SuccessReceiptRecap orderId=\{orderId\} receipt=\{receipt\} \/>/);
 assert.doesNotMatch(successSrc, /receipt\.complimentaryItems/);
+const successRecapSrc = readSrc(
+  "src/workspaces/storefront/checkout/SuccessReceiptRecap.tsx",
+);
+assert.match(successRecapSrc, /receipt\.paidAddons\.map/);
+assert.match(successRecapSrc, /receipt\.notes/);
+assert.doesNotMatch(successRecapSrc, /receipt\.complimentaryItems/);
 
 console.log("PASS extra paid add-ons reuse Whole Cake catalog");

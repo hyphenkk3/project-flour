@@ -29,7 +29,6 @@ import {
   customerComplimentaryMutationPayload,
   customerPaidAddonMutationPayload,
   emptyCustomerPreorderSelections,
-  isCustomerPaidAddonCode,
   selectCustomerComplimentaryOptions,
   selectCustomerPaidAddonOptions,
   type CustomerComplimentaryOption,
@@ -218,6 +217,7 @@ function parsePaidAddonOptions(rows: unknown): CustomerPaidAddonOption[] {
         name: String(item.name ?? ""),
         unitPrice: Number(item.unitPrice ?? 0),
         financialShorthand: String(item.financialShorthand ?? ""),
+        maxQuantity: Number(item.maxQuantity ?? 1),
         sortOrder: Number(item.sortOrder ?? 0),
       };
     }),
@@ -245,7 +245,8 @@ function complimentaryPayloadFromForm(
 
 function paidAddonPayloadFromForm(selections: CustomerPreorderSelections) {
   const options = selections.paidAddonCodes
-    .filter((code) => isCustomerPaidAddonCode(code))
+    .map((code) => String(code).trim())
+    .filter(Boolean)
     .map((code, index) => ({
       code,
       name: code,
@@ -629,6 +630,7 @@ type StorefrontClient = Awaited<ReturnType<typeof createClient>>;
 async function loadCustomerPreorderOptions(
   supabase: StorefrontClient,
   collectionId: string,
+  fulfilmentDate: string,
 ): Promise<{
   complimentary: CustomerComplimentaryOption[];
   paidAddons: CustomerPaidAddonOption[];
@@ -642,7 +644,7 @@ async function loadCustomerPreorderOptions(
   try {
     const { data, error } = await supabase.rpc(
       "storefront_customer_preorder_options",
-      { p_collection_id: collectionId },
+      { p_collection_id: collectionId, p_fulfilment_date: fulfilmentDate },
     );
 
     console.error("[CHECKOUT OPTION DEBUG] RPC result", {
@@ -739,7 +741,7 @@ export async function loadCheckoutPickupOffer(
         );
   const optionResult = includeOptions && supabase
     ? await timeCheckoutDateStage("options", () =>
-        loadCustomerPreorderOptions(supabase, collection.id),
+        loadCustomerPreorderOptions(supabase, collection.id, key),
       )
     : {
         complimentary: [] as CustomerComplimentaryOption[],

@@ -164,6 +164,7 @@ function parsePaidAddonOptions(rows: unknown): CustomerPaidAddonOption[] {
         name: String(item.name ?? ""),
         unitPrice: Number(item.unitPrice ?? 0),
         financialShorthand: String(item.financialShorthand ?? ""),
+        maxQuantity: Number(item.maxQuantity ?? 1),
         sortOrder: Number(item.sortOrder ?? 0),
       };
     }),
@@ -186,7 +187,7 @@ export async function loadExtraCustomerOptions(pickupDate: string): Promise<{
     const supabase = await createClient();
     const { data, error } = await supabase.rpc(
       "storefront_customer_preorder_options",
-      { p_collection_id: collection.id },
+      { p_collection_id: collection.id, p_fulfilment_date: key },
     );
     if (error || data == null) return empty;
     const payload = data as Record<string, unknown>;

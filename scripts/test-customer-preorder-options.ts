@@ -12,6 +12,7 @@ import {
   customerPaidAddonMutationPayload,
   customerPreorderCommercialTotal,
   formatCustomerPreorderOptionLabel,
+  selectCustomerPaidAddonOptions,
   type CustomerComplimentaryOption,
   type CustomerPaidAddonOption,
   type CustomerPreorderSelections,
@@ -210,6 +211,28 @@ assert.deepEqual(bothPayload.map((row) => row.code).sort(), [
   "birthday_card",
   "wishing_card",
 ]);
+
+const customPaidOption: CustomerPaidAddonOption = {
+  code: "seasonal_cookie_box",
+  name: "Seasonal Cookie Box",
+  unitPrice: 12.5,
+  financialShorthand: "SCB",
+  maxQuantity: 2,
+  sortOrder: 4,
+};
+assert.deepEqual(
+  selectCustomerPaidAddonOptions([customPaidOption]),
+  [customPaidOption],
+  "catalogue-defined paid add-ons are not filtered to built-in card codes",
+);
+assert.equal(
+  customerPaidAddonMutationPayload({
+    options: [customPaidOption],
+    selections: selections({ paidAddonCodes: [customPaidOption.code] }),
+  })[0]?.code,
+  customPaidOption.code,
+  "custom paid add-on codes are preserved in checkout payloads",
+);
 
 function confirmFromSelections(
   next: CustomerPreorderSelections,
@@ -461,4 +484,24 @@ assert.match(
 assert.match(extraActionsSrc, /customerPaidAddonMutationPayload\(/);
 assert.match(extraActionsSrc, /p_paid_addons: paidAddons/);
 
-console.log("PASS customer preorder options / confirmation mapping");
+const issue8MigrationSrc = readSrc(
+  "supabase/migrations/20261101200000_issue8_addon_catalogue_schema_and_owner_management.sql",
+);
+assert.match(issue8MigrationSrc, /add column if not exists is_active boolean not null default true/);
+assert.match(issue8MigrationSrc, /create table if not exists public\.collection_paid_addon_types/);
+assert.match(issue8MigrationSrc, /sp\.auth_user_id = \(select auth\.uid\(\)\)/);
+assert.match(issue8MigrationSrc, /sp\.is_active = true/);
+assert.match(issue8MigrationSrc, /sp\.archived_at is null/);
+assert.match(issue8MigrationSrc, /r\.code = 'owner'/);
+assert.match(issue8MigrationSrc, /create or replace function public\.issue8_is_active_staff\(\)/);
+assert.match(issue8MigrationSrc, /public\.issue8_is_active_staff\(\)/);
+assert.doesNotMatch(issue8MigrationSrc, /auth\.uid\(\) is not null or m\.customer_selectable/);
+assert.match(issue8MigrationSrc, /p_fulfilment_date >= cci\.available_from/);
+assert.match(issue8MigrationSrc, /p_fulfilment_date <= cci\.available_until/);
+assert.match(issue8MigrationSrc, /public\.submit_guest_extra_order\(text,text,text,date,time without time zone,text,uuid,boolean,boolean,jsonb,jsonb,uuid\[\],public\.fulfilment_method,jsonb,jsonb,jsonb\)'::regprocedure/);
+assert.match(issue8MigrationSrc, /public\.submit_guest_extra_order\(text,text,text,date,time without time zone,text,uuid,boolean,boolean,jsonb\)'::regprocedure/);
+assert.match(issue8MigrationSrc, /and m\.available_from is null and m\.available_until is null/);
+assert.doesNotMatch(issue8MigrationSrc, /update public\.order_paid_addons\s+set\s+(?:unit_price|name)/i);
+assert.doesNotMatch(issue8MigrationSrc, /update public\.order_complimentary_items\s+set\s+name/i);
+
+console.log("PASS customer preorder options / custom add-on mapping / Issue #8 SQL contract");

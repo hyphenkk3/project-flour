@@ -36,6 +36,7 @@ export type CustomerPaidAddonOption = {
   name: string;
   unitPrice: number;
   financialShorthand: string;
+  maxQuantity?: number;
   sortOrder: number;
 };
 
@@ -86,9 +87,11 @@ export function customerPaidAddonMessageVisible(
 
 /** Public card messages are optional even when the card is selected. */
 export function customerPaidAddonMessageRequired(
-  _code: CustomerPaidAddonCode,
-  _selectedCodes: readonly string[],
+  code: CustomerPaidAddonCode,
+  selectedCodes: readonly string[],
 ): boolean {
+  void code;
+  void selectedCodes;
   return false;
 }
 
@@ -109,7 +112,10 @@ export function selectCustomerPaidAddonOptions(
   return options
     .filter(
       (option) =>
-        isCustomerPaidAddonCode(option.code) && Number(option.unitPrice) >= 0,
+        Boolean(option.code.trim()) &&
+        Boolean(option.name.trim()) &&
+        Number.isFinite(Number(option.unitPrice)) &&
+        Number(option.unitPrice) >= 0,
     )
     .sort(
       (a, b) =>
