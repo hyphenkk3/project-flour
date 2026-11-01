@@ -84,7 +84,7 @@ import {
   TOTAL_BEFORE_DELIVERY_FEE_LABEL,
 } from "@/engines/orders/delivery-processing-fee-ack";
 import { customerNameValidationError } from "@/engines/orders/customer-name";
-import { OPTIONAL_NOTES_CUSTOMER_WARNING } from "@/engines/orders/order-guide";
+import { CAKE_WORDING_REQUEST_ERROR, POSSIBLE_CAKE_WORDING_MESSAGE, hasCakeWordingRequest, hasPossibleCakeWording } from "@/engines/orders/cake-wording-note-guard";
 import { DineInReservationNotesNotice } from "@/workspaces/storefront/checkout/DineInReservationNotesNotice";
 import { FulfilmentMethodChooser } from "@/workspaces/storefront/checkout/FulfilmentMethodChooser";
 import {
@@ -160,6 +160,17 @@ export function GuestExtraCheckoutForm({
   const navigatedRef = useRef(false);
   const viewState = actionState ?? state;
   const submitPending = pending || actionPending;
+  const [notes, setNotes] = useState(cart?.notes ?? "");
+  const [notesExpanded, setNotesExpanded] = useState(Boolean(cart?.notes));
+  const [notesNotWordingAcknowledged, setNotesNotWordingAcknowledged] = useState(false);
+  const notesHydratedRef = useRef(false);
+  useEffect(() => {
+    if (!cart || notesHydratedRef.current) return;
+    notesHydratedRef.current = true;
+    setNotes(cart.notes ?? "");
+    setNotesExpanded(Boolean(cart.notes));
+  }, [cart]);
+
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmSnapshot, setConfirmSnapshot] =
     useState<CheckoutConfirmSnapshot | null>(null);
@@ -736,6 +747,16 @@ export function GuestExtraCheckoutForm({
     }
     persistCheckoutFields(form);
     const data = new FormData(form);
+    if (hasCakeWordingRequest(String(data.get("notes") ?? ""))) {
+      setClientError(CAKE_WORDING_REQUEST_ERROR);
+      document.getElementById("notes")?.focus();
+      return;
+    }
+    if (hasPossibleCakeWording(String(data.get("notes") ?? "")) && data.get("notes_not_cake_wording_ack") !== "yes") {
+      setClientError("Please confirm that your note is not a request for writing on the cake.");
+      document.getElementById("notes")?.focus();
+      return;
+    }
     if (deliveryAckRequired && !deliveryProcessingFeeAcknowledged) {
       setFieldErrors((current) => ({
         ...current,
@@ -1446,23 +1467,60 @@ export function GuestExtraCheckoutForm({
 
         <section className="space-y-3">
           <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-            Notes
+            Additional Information (Optional)
           </h2>
-          <p className="text-ink text-sm font-medium">Optional notes</p>
-          <p
-            className="text-status-danger text-sm leading-snug font-bold"
-            id="optional-notes-warning"
-          >
-            {OPTIONAL_NOTES_CUSTOMER_WARNING}
+          <p className="text-ink text-sm leading-relaxed">
+            For collection or delivery instructions.
           </p>
-          <FormTextarea
-            aria-describedby="optional-notes-warning"
-            aria-label="Optional notes"
-            defaultValue={cart.notes}
-            id="notes"
-            name="notes"
-            rows={3}
-          />
+          <p className="text-status-danger text-sm leading-relaxed font-bold" id="optional-notes-warning">
+            We do not provide personalised writing or messages on cakes.
+          </p>
+          {notesExpanded || Boolean(notes) ? (
+            <div className="space-y-2">
+              <FormTextarea
+                aria-describedby="optional-notes-warning optional-notes-wording-error"
+                aria-label="Additional information"
+                id="notes"
+                name="notes"
+                placeholder="E.g. Please call upon arrival."
+                rows={3}
+                value={notes}
+                onChange={(event) => {
+                  setNotes(event.target.value);
+                  setNotesNotWordingAcknowledged(false);
+                }}
+              />
+              {hasCakeWordingRequest(notes) ? (
+                <p className="text-status-danger text-sm font-medium" id="optional-notes-wording-error" role="alert">
+                  {CAKE_WORDING_REQUEST_ERROR}
+                </p>
+              ) : hasPossibleCakeWording(notes) ? (
+                <div className="space-y-2" id="optional-notes-wording-error">
+                  <p className="text-status-danger text-sm font-medium" role="alert">
+                    {POSSIBLE_CAKE_WORDING_MESSAGE}
+                  </p>
+                  <label className="text-ink flex items-start gap-2 text-sm">
+                    <input
+                      checked={notesNotWordingAcknowledged}
+                      name="notes_not_cake_wording_ack"
+                      onChange={(event) => setNotesNotWordingAcknowledged(event.target.checked)}
+                      type="checkbox"
+                      value="yes"
+                    />
+                    <span>I confirm this note is not a request for cake writing.</span>
+                  </label>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <button
+              className="text-ink text-sm font-medium underline underline-offset-4"
+              onClick={() => setNotesExpanded(true)}
+              type="button"
+            >
+              Add collection or delivery instructions
+            </button>
+          )}
         </section>
 
         <FormError message={clientError ?? viewState.error} />
