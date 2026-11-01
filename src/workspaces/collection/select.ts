@@ -12,6 +12,7 @@ export const COLLECTION_ORDER_SELECT = `
   status,
   payment_status,
   customer_notes,
+  internal_notes,
   production_started_at,
   ready_at,
   picked_up_at,
