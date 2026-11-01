@@ -914,3 +914,47 @@ At the end of this investigation, append a dated outcome with root cause or rema
 - **Correctness plan:** Preserve historical order names, quantities and prices; never reprice existing orders. Enforce visibility and availability in the client and every server-side checkout/edit path (Preorder, Fresh Pick, stale cart). Test pickup-date boundaries, timezone conversion, start/end inclusion, active override, cross-collection isolation, renamed items, disabled items, order totals/confirmation, and Collection/Bakery display.
 - **Release plan after prerequisites:** Create an isolated DEV implementation branch/Preview from a reverified baseline; use synthetic fixtures; run focused availability, checkout, payment/order snapshot, Collection/Bakery, TypeScript, ESLint and build checks; obtain Owner DEV acceptance. Production remains unauthorized and untouched.
 
+
+
+### Issue #8 — Phase 1 add-on catalogue audit — 1 November 2026
+
+**Result: AUDIT COMPLETE / IMPLEMENTATION HOLD.** This was a read-only review. No application source, database rows/schema, migration history, Vercel settings, deployments, or aliases were changed.
+
+**Verified source/environment identities**
+
+- Issue branch at audit start: `codex/issue-8-addons-planning-20261101`, commit `474c83caf6cfcaead0835fc7ee60f564fa8e8a4d`, tree `2910e9bf13488504c0506145f22391e01afd9013`, parent Production source `d98afb9733ed8285e71ba7e4a7e7a3e1116980c7`. GitHub comparison showed one commit ahead, zero behind, with only this status document changed.
+- Production Supabase `cuowwlduhxxifmpvpltt`: project `project-flour-prod`, ACTIVE_HEALTHY, PostgreSQL 17.6.1.166. Read-only catalog inspection only.
+- DEV Supabase `tzwtpxdcggesgjaqxkqr`: project `project-flour-dev`, ACTIVE_HEALTHY, PostgreSQL 17.6.1.155. Read-only catalog inspection only.
+- Existing Production deployment and aliases remain as previously recorded; this audit created no Preview and did not switch `dev.whitebird.asia`.
+
+**Schema, access and historical-order findings**
+
+- Both databases contain `complimentary_item_types`, `collection_complimentary_items`, `paid_addon_types`, `order_complimentary_items`, and `order_paid_addons`, with matching inspected column contracts. Complimentary definitions currently have only code/name; the collection join already stores availability, default inclusion, default quantity, sort order and customer-selectability. Paid definitions already store active state, price, shorthand, max quantity and sort order, but paid applicability is currently global.
+- RLS is enabled. Complimentary definitions and their collection join grant authenticated users an unrestricted all-operation policy (`USING true`, `WITH CHECK true`); this is not Owner-only. Paid definitions allow authenticated SELECT and have no authenticated write policy. Customer option reads use the SECURITY DEFINER `storefront_customer_preorder_options(uuid)`, executable by anon/authenticated, rather than direct anon table reads. Existing paid-order snapshot tables have broad authenticated policies; they must remain separate from catalogue-management authorization.
+- A safe Owner-only management boundary is feasible: retain authenticated read behavior; grant catalogue mutations only to a current `auth.uid()` staff profile with `is_active=true`, `archived_at IS NULL`, and role code `owner`. The application’s existing `canManageLibrary` also permits Managers, so the new actions must use a dedicated Owner check. The self-profile RLS policy and roles read policy provide a non-recursive identity lookup; this still needs an isolated role test.
+- Historical snapshots are structurally protected from catalogue renames/deactivation: complimentary order rows store their own name, quantity and sort order, and their nullable type FK uses ON DELETE SET NULL. Paid order rows store code, name, unit_price, financial shorthand and quantity with a nullable type FK. `order_paid_addons_subtotal(uuid)` sums the order-line snapshot `unit_price * quantity`; the sync helper inserts live name/price only for new lines and retains existing line snapshots when editing. No order rows were read or changed.
+
+**Checkout and operational call graph reviewed**
+
+- Whole-cake Preorder loads options through the public option RPC, posts selected IDs/codes from the checkout action, then calls `submit_guest_preorder` or the catalogue-voucher wrapper. The database submission and paid-addon helper establish server-authoritative price snapshots.
+- Fresh Pick loads the same option RPC after resolving the pickup-date collection, then calls `submit_guest_extra_order`. The current 17-argument RPC receives the pickup date, complimentary and paid selections, and routes paid lines through the same snapshot helper.
+- Staff order creation delegates through `create_staff_guest_preorder_with_source_detail` to the private preorder creator. Existing order editing uses `save_guest_order_workspace_atomic` and `sync_guest_order_paid_addons`; retained paid lines preserve their snapshot.
+- Payment totals and settlement read `order_paid_addons` snapshots; no catalogue price is used to reprice an existing order.
+
+**Material compatibility risks found — stop before implementation**
+
+1. Current standard Preorder and Fresh Pick database submit functions still whitelist only the existing complimentary codes (`birthday_topper`, `candle`, `knife`) and paid card codes (`birthday_card`, `wishing_card`). Thus a new UI or schema alone would either reject new items or fail to enforce new date/selectability rules. The option RPC also accepts only a collection ID, not pickup date. Dynamic, date-aware server validation must be added to the option path and every submission path; paid price must continue to come from the live catalog only for new order lines.
+2. Production has a legacy SECURITY DEFINER Fresh Pick overload, `submit_guest_extra_order(text,text,text,date,time,text,uuid,boolean,boolean,jsonb)`, executable by anon/authenticated. It independently inserts complimentary snapshot lines and contains the same hard-coded codes; it has no seasonal-date contract. This overload is absent from DEV. The extended 17-argument overload exists in both databases and its inspected function-body fingerprint matches, as do the inspected shared option, preorder, paid-sync, staff-create and workspace-save functions. A future migration must preserve or safely wrap the legacy signature and test it; a DEV-only test of the extended overload is not sufficient for Production compatibility.
+3. The existing broad authenticated write policies on complimentary catalogue tables must be narrowed for Owner-only management while preserving reads, collection seeding, guest checkout SECURITY DEFINER behavior, and all order-snapshot writes. This is a security-sensitive policy change requiring non-bypass role tests.
+4. The Issue #8 planning record requires DEV parity to be stabilized before an Issue #8 Preview. The latest recorded DEV parity state remains HOLD before the `dev.whitebird.asia` switch. No Issue #8 Preview was created. This branch therefore cannot yet receive actual Preview acceptance.
+
+**Minimum additive design for a reviewed implementation**
+
+- Add a hard-gate active flag to complimentary item definitions; paid definitions already have `is_active`.
+- Add nullable date bounds and an ordered-range constraint to the existing complimentary collection join.
+- Add a separate collection-to-paid-add-on join (availability, customer-selectability, per-collection order, optional inclusive date bounds), backfilled to preserve existing globally offered paid cards for existing collections; seed future collections without changing order snapshots.
+- Use the customer’s stored pickup/delivery DATE directly for bounds (Asia/Kuching business date); no timestamp conversion is needed after the date is chosen. Treat inactive as unavailable regardless of dates; when active, enforce inclusive date bounds. Empty bounds remain open.
+- Keep existing order snapshot tables, totals and grants for guest checkout intact. Add Owner-scoped catalogue write policies/actions only. No schema or function migration has been authored or applied.
+
+**Next gate:** stabilize DEV parity and verify the isolated Preview’s DEV-only bindings/rollback path; then implement the date-aware catalogue and Owner-only manager on this separate branch, including the Production-only legacy Fresh Pick overload in an isolated PostgreSQL compatibility rehearsal. Test stale-cart rejection, all four date boundaries, cross-collection isolation, inactive/expired items, snapshot retention, payment totals, and both customer checkout flows before creating a DEV Preview. No Production release is authorized.
+
