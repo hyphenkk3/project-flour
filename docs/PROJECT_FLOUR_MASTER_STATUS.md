@@ -1018,3 +1018,11 @@ At the end of this investigation, append a dated outcome with root cause or rema
 - **Pending amendment #7:** Collection cards must prominently show bold **Internal Notes** (staff-reviewed), while clearly distinguishing original Customer Order Notes and independent Bakery Attention. DEV first; not implemented or released.
 - **Pending amendment #8:** Library must allow Owner to create/edit/deactivate Complimentary Items and Paid Add-ons, with optional inclusive seasonal start/end dates determined by pickup/delivery date, collection assignment, server-side enforcement, historical order snapshot preservation. Example Christmas Topper. DEV first; not implemented or released.
 - **Order of work:** finish DEV parity, then Collection Internal Notes #7, then catalogue manager #8. No unverified Production changes. Current Production recovery anchor `d98afb9733ed8285e71ba7e4a7e7a3e1116980c7`, deployment `dpl_HE7zep8jWR1wkoKZ6w4tC8t4bAaN`.
+
+## Owner final Preview acceptance — 2026-11-01
+
+- Owner explicitly confirmed **all five authenticated pages work** on the DEV parity Preview: Bakery, Whole Cake Calendar, Collection, Operations and Settings. Previously Owner confirmed sign-in and Library. This closes the requested staff read-path acceptance check **by Owner observation**. It is not proof of transactional payment, notification delivery or stock mutations.
+- Exact tested Preview deployment `dpl_FPF1M4NkkSXP6kKdJ4UpQxzWUbBR` remains READY. DEV domain `dev.whitebird.asia` still points to READY rollback `dpl_Ga6USTsn3PBrCLZ9WYU7WNepK3RS` at last verification.
+- Exact Preview application SHA `eaff4ce246c8655cb1fae30499058d746839074a` CI run `41271601167` PASS; prior docs CI run `41272241037` PASS. Latest master-status docs commit `585c87ff0b92ff1061150e7431d022eefac90a69` CI run `41273438852` remained IN PROGRESS on latest check. Do not call it passed or failed. No alias switch attempted during this in-progress verification.
+- Pending amendments tracked separately: #7 Collection bold Internal Notes; #8 Owner-managed Complimentary Items/Paid Add-ons with seasonal fulfilment-date windows. Neither is included in DEV parity cutover.
+- Exact Production immutable source `d98afb9733ed8285e71ba7e4a7e7a3e1116980c7`, Production deployment `dpl_HE7zep8jWR1wkoKZ6w4tC8t4bAaN`; **no Production changes**.
