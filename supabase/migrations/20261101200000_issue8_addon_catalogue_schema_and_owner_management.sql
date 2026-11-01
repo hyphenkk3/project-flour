@@ -436,37 +436,164 @@ before insert or update of complimentary_item_type_id on public.order_compliment
 for each row execute function public._issue8_validate_complimentary_order_line();
 
 -- Surgical, drift-checked patches remove the old hard-coded complimentary
--- allowlist from all supported submission overloads. Any source drift aborts.
-do $$
-declare
-  v_sig regprocedure;
-  v_proname text;
-  v_nargs smallint;
+-- allowlist from the supported order submission functions. The legacy 10-arg
+-- Fresh Pick overload is present on the Production-derived starting state and
+-- absent on current DEV. Support exactly those two states; reject other drift.
+DO $issue8_patch$
+DECLARE
+  v_preorder oid := to_regprocedure('public.submit_guest_preorder(text,text,text,date,time without time zone,text,jsonb,boolean,jsonb,jsonb,boolean,public.fulfilment_method,jsonb,jsonb,jsonb,jsonb)')::oid;
+  v_legacy oid := to_regprocedure('public.submit_guest_extra_order(text,text,text,date,time without time zone,text,uuid,boolean,boolean,jsonb)')::oid;
+  v_extended oid := to_regprocedure('public.submit_guest_extra_order(text,text,text,date,time without time zone,text,uuid,boolean,boolean,jsonb,jsonb,uuid[],public.fulfilment_method,jsonb,jsonb,jsonb)')::oid;
+  v_oid oid;
   v_def text;
   v_old text := 'cit.code in (''birthday_topper'', ''candle'', ''knife'')';
   v_old_paid text := 'v_addon_code not in (''birthday_card'', ''wishing_card'')';
   v_new text := 'cit.is_active = true';
   v_count integer;
-begin
-  foreach v_sig in array array[
-    'public.submit_guest_preorder(text,text,text,date,time without time zone,text,jsonb,boolean,jsonb,jsonb,boolean,public.fulfilment_method,jsonb,jsonb,jsonb,jsonb)'::regprocedure,
-    'public.submit_guest_extra_order(text,text,text,date,time without time zone,text,uuid,boolean,boolean,jsonb)'::regprocedure,
-    'public.submit_guest_extra_order(text,text,text,date,time without time zone,text,uuid,boolean,boolean,jsonb,jsonb,uuid[],public.fulfilment_method,jsonb,jsonb,jsonb)'::regprocedure
-  ] loop
-    v_def := pg_get_functiondef(v_sig);
-    v_count := (length(v_def) - length(replace(v_def, v_old, ''))) / length(v_old);
-    if v_count <> 1 then raise exception 'Unexpected complimentary allowlist in % (count=%)', v_sig, v_count; end if;
-    v_def := replace(v_def, v_old, v_new);
-    select p.proname, p.pronargs into v_proname, v_nargs from pg_proc p where p.oid = v_sig;
-    if v_proname = 'submit_guest_preorder' or (v_proname = 'submit_guest_extra_order' and v_nargs = 16) then
-      v_count := (length(v_def) - length(replace(v_def, v_old_paid, ''))) / length(v_old_paid);
-      if v_count <> 1 then raise exception 'Unexpected paid add-on allowlist in % (count=%)', v_sig, v_count; end if;
-      v_def := replace(v_def, v_old_paid, 'false');
-    end if;
-    execute v_def;
-  end loop;
-end;
-$$;
+  v_proname text;
+  v_nargs smallint;
+  v_legacy_body_md5 text;
+  v_owner name;
+  v_secdef boolean;
+  v_config text[];
+BEGIN
+  IF v_preorder IS NULL OR v_extended IS NULL THEN
+    RAISE EXCEPTION 'Required Preorder or extended Fresh Pick submission signature is missing';
+  END IF;
+
+  IF (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+      WHERE n.nspname='public' AND p.proname='submit_guest_extra_order')
+     <> (CASE WHEN v_legacy IS NULL THEN 1 ELSE 2 END) THEN
+    RAISE EXCEPTION 'Unexpected Fresh Pick overload set; refusing catalogue migration';
+  END IF;
+
+  -- Validate the optional legacy overload against the verified Production
+  -- definition before changing it. Current DEV intentionally has no such RPC.
+  IF v_legacy IS NOT NULL THEN
+    SELECT md5(pg_get_functiondef(p.oid)), r.rolname, p.prosecdef, p.proconfig
+      INTO v_legacy_body_md5, v_owner, v_secdef, v_config
+    FROM pg_proc p JOIN pg_roles r ON r.oid=p.proowner WHERE p.oid=v_legacy;
+    IF v_legacy_body_md5 IS DISTINCT FROM '3d68aa191b14bd4b5d1459b499f88a5c'
+       OR v_owner IS DISTINCT FROM 'postgres'
+       OR v_secdef IS DISTINCT FROM true
+       OR v_config IS DISTINCT FROM ARRAY['search_path=public']::text[]
+       OR NOT has_function_privilege('postgres',v_legacy,'EXECUTE')
+       OR NOT has_function_privilege('anon',v_legacy,'EXECUTE')
+       OR NOT has_function_privilege('authenticated',v_legacy,'EXECUTE')
+       OR NOT has_function_privilege('service_role',v_legacy,'EXECUTE')
+       OR EXISTS (
+         SELECT 1 FROM aclexplode(coalesce(
+           (SELECT proacl FROM pg_proc WHERE oid=v_legacy),
+           acldefault('f',(SELECT proowner FROM pg_proc WHERE oid=v_legacy))
+         )) a WHERE a.grantee=0 AND a.privilege_type='EXECUTE'
+       ) THEN
+      RAISE EXCEPTION 'Legacy 10-argument Fresh Pick RPC differs from the reviewed Production identity, body, security, or grants';
+    END IF;
+  END IF;
+
+  FOREACH v_oid IN ARRAY ARRAY[v_preorder,v_legacy,v_extended] LOOP
+    IF v_oid IS NULL THEN
+      CONTINUE;
+    END IF;
+    SELECT r.rolname, p.prosecdef, p.proconfig
+      INTO v_owner, v_secdef, v_config
+    FROM pg_proc p JOIN pg_roles r ON r.oid=p.proowner WHERE p.oid=v_oid;
+    IF v_owner IS DISTINCT FROM 'postgres'
+       OR v_secdef IS DISTINCT FROM true
+       OR v_config IS DISTINCT FROM ARRAY['search_path=public']::text[]
+       OR NOT has_function_privilege('postgres',v_oid,'EXECUTE')
+       OR NOT has_function_privilege('anon',v_oid,'EXECUTE')
+       OR NOT has_function_privilege('authenticated',v_oid,'EXECUTE')
+       OR NOT has_function_privilege('service_role',v_oid,'EXECUTE') THEN
+      RAISE EXCEPTION 'Submission RPC % ownership, security, search path, or grants differ from the reviewed baseline',v_oid::regprocedure;
+    END IF;
+
+    v_def := pg_get_functiondef(v_oid);
+    v_count := (length(v_def) - length(replace(v_def,v_old,''))) / length(v_old);
+    IF v_count <> 1 THEN
+      RAISE EXCEPTION 'Unexpected complimentary allowlist in % (count=%)',v_oid::regprocedure,v_count;
+    END IF;
+    v_def := replace(v_def,v_old,v_new);
+    SELECT p.proname,p.pronargs INTO v_proname,v_nargs FROM pg_proc p WHERE p.oid=v_oid;
+    IF v_proname='submit_guest_preorder' OR (v_proname='submit_guest_extra_order' AND v_nargs=16) THEN
+      v_count := (length(v_def) - length(replace(v_def,v_old_paid,''))) / length(v_old_paid);
+      IF v_count <> 1 THEN
+        RAISE EXCEPTION 'Unexpected paid add-on allowlist in % (count=%)',v_oid::regprocedure,v_count;
+      END IF;
+      v_def := replace(v_def,v_old_paid,'false');
+    END IF;
+    EXECUTE v_def;
+
+    IF (SELECT p.proowner FROM pg_proc p WHERE p.oid=v_oid) IS DISTINCT FROM (SELECT oid FROM pg_roles WHERE rolname='postgres')
+       OR NOT (SELECT prosecdef FROM pg_proc WHERE oid=v_oid)
+       OR (SELECT proconfig FROM pg_proc WHERE oid=v_oid) IS DISTINCT FROM ARRAY['search_path=public']::text[]
+       OR NOT has_function_privilege('postgres',v_oid,'EXECUTE')
+       OR NOT has_function_privilege('anon',v_oid,'EXECUTE')
+       OR NOT has_function_privilege('authenticated',v_oid,'EXECUTE')
+       OR NOT has_function_privilege('service_role',v_oid,'EXECUTE') THEN
+      RAISE EXCEPTION 'Submission RPC % metadata or grants changed while replacing its body',v_oid::regprocedure;
+    END IF;
+  END LOOP;
+END;
+$issue8_patch$;
+
+-- Current DEV restricts direct orders reads to active staff. Its deferred
+-- delivery-details invariant runs after guest SECURITY DEFINER checkout returns,
+-- so an invoker trigger cannot read the just-created order as anon. Preserve the
+-- staff-only RLS policy and make only this trigger-only, read-only validator run
+-- with its existing postgres owner privileges on that verified schema shape.
+DO $issue8_order_invariant_rls$
+DECLARE
+  v_function oid := to_regprocedure('public.assert_order_delivery_details_invariant()')::oid;
+  v_body_md5 text;
+  v_owner name;
+  v_secdef boolean;
+  v_config text[];
+  v_acl text;
+BEGIN
+  IF v_function IS NULL THEN
+    RAISE EXCEPTION 'Required delivery-details invariant trigger function is missing';
+  END IF;
+
+  IF has_table_privilege('anon','public.orders','SELECT') THEN
+    -- Production-derived baseline already permits its deferred validator read.
+    RAISE NOTICE 'Anon orders SELECT exists; preserving the existing invoker trigger function';
+    RETURN;
+  END IF;
+
+  SELECT md5(pg_get_functiondef(p.oid)),r.rolname,p.prosecdef,p.proconfig,p.proacl::text
+    INTO v_body_md5,v_owner,v_secdef,v_config,v_acl
+  FROM pg_proc p JOIN pg_roles r ON r.oid=p.proowner WHERE p.oid=v_function;
+
+  IF NOT coalesce((SELECT relrowsecurity AND NOT relforcerowsecurity
+                   FROM pg_class WHERE oid='public.orders'::regclass),false)
+     OR NOT EXISTS (
+       SELECT 1 FROM pg_policies
+       WHERE schemaname='public' AND tablename='orders'
+         AND policyname='orders_active_staff_select'
+         AND roles=ARRAY['authenticated']::name[]
+     )
+     OR v_body_md5 IS DISTINCT FROM '3ddd53a414b040c3a048bd237c449d28'
+     OR v_owner IS DISTINCT FROM 'postgres'
+     OR v_secdef IS DISTINCT FROM false
+     OR v_config IS DISTINCT FROM ARRAY['search_path=public']::text[]
+     OR (SELECT count(*) FROM pg_trigger t
+         WHERE t.tgfoid=v_function AND t.tgconstraint<>0
+           AND t.tgdeferrable AND t.tginitdeferred
+           AND t.tgname IN ('orders_delivery_details_invariant_au','order_delivery_details_invariant_aiud')) <> 2 THEN
+    RAISE EXCEPTION 'Staff-restricted DEV order policy or deferred delivery-invariant trigger differs from the reviewed baseline';
+  END IF;
+
+  EXECUTE 'ALTER FUNCTION public.assert_order_delivery_details_invariant() SECURITY DEFINER';
+  EXECUTE 'ALTER FUNCTION public.assert_order_delivery_details_invariant() SET search_path TO pg_catalog, public';
+
+  IF NOT (SELECT prosecdef FROM pg_proc WHERE oid=v_function)
+     OR (SELECT proconfig FROM pg_proc WHERE oid=v_function) IS DISTINCT FROM ARRAY['search_path=pg_catalog, public']::text[]
+     OR (SELECT proacl::text FROM pg_proc WHERE oid=v_function) IS DISTINCT FROM v_acl THEN
+    RAISE EXCEPTION 'Could not safely harden the deferred delivery-invariant trigger for the staff-restricted DEV schema';
+  END IF;
+END;
+$issue8_order_invariant_rls$;
 
 -- Extend the authoritative paid-add-on synchronizer so only new lines require
 -- an active collection/date assignment. Existing snapshots remain immutable.
