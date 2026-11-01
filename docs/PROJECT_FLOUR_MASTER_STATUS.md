@@ -1191,3 +1191,51 @@ No migration was authored or applied in this phase.
 
 - The migration has no data backfill and changes only the legacy function body. Its forced-transaction-failure rehearsal proved atomic rollback. If applied in a future environment, application rollback is independent from SQL. Reverting the function body to the captured original would reintroduce the legacy failure; prefer retaining this compatible correction and using forward database recovery. No order or stock restoration is called for.
 - No hosted DEV migration, Vercel deployment, alias switch, or Production operation occurred. Phase 2D correction and rehearsal are ready for a separately authorized hosted DEV migration/Preview verification stage. Production remains **HOLD** pending that DEV verification, separate review/authorization, and its own live release gates.
+
+
+### Issue #8 Phase 2E — read-only DEV preflight — 1 November 2026
+
+**Decision: HOLD for DEV migrations and Issue #8 Preview.** No database, deployment, environment variable, alias, customer record, or source-code change was made. This entry is documentation-only.
+
+**Source identity**
+
+- GitHub branch `codex/issue-8-addons-implementation-20261101` was verified at commit `154530961eb55201bd18f9cbf9f3557d1866b4bd`, tree `fb959c1ef06a2b938cfe3994e37189b1f9a13597`.
+- The tested application base is `ac5d13c3b79ff0b39daf740bfab0cb0e74725a64`, tree `6ebca46ed2b70c36db445120fdaa86f12fda4cca`. GitHub comparison reports two commits ahead, zero behind; the compared files are only this status document and migration 3. No application source changed.
+- The attached local checkout was detached at `f0a81f342102672bf3a74bd12415497332d17f38` and did not contain the Issue #8 migration files. It was not used as the candidate source. The GitHub branch and its exact files were inspected read-only.
+
+**Migration identity and contents**
+
+| Order | File | SHA-256 | Verified effect/dependency |
+|---|---|---|---|
+| 1 | `20261101194235_issue8_fresh_pick_overload_compatibility.sql` | `6dda6c7ed675f4dbbb184166601fdb5189dfe60eb7c75c9d0fdaf0d69b547b8a` | Replaces the 16-argument Fresh Pick function without CASCADE, keeps only argument 16 defaulted, and restores postgres ownership plus anon/authenticated/service_role execute grants. Its validation-body rewrite also resolves the 10-argument legacy RPC by regprocedure. |
+| 2 | `20261101200000_issue8_addon_catalogue_schema_and_owner_management.sql` | `62a50a5f14bc5a31c5153eda6f0a8ccc7fa992c74f73664663b21a5e65bae476` | Adds active/season fields and collection-specific paid-add-on mapping, seeds mappings for currently active add-ons, changes catalogue writes to Owner authorization, adds date-aware options and authoritative line validation. It depends on existing roles, `set_updated_at()`, collection lookup and the exact paid-add-on synchronization body. Its Fresh Pick function rewrite also resolves the 10-argument legacy RPC. |
+| 3 | `20261101200100_issue8_legacy_fresh_pick_order_stock_link.sql` | `2bb8d8755b524d23e0ed0d7ae4712df93747764c8cba120d9bef3faa9ec79dbf` | Patches only the Production-derived legacy 10-argument function body, preserving its OID/ACL/owner/security settings. The migration directly casts that signature to regprocedure and intentionally aborts if absent. |
+
+The chronological order matches the filenames and the Phase 2D rehearsal. That rehearsal used actual captured Production definitions and passed the three-migration path on a relevant, data-free PostgreSQL 17.11 reconstruction. Its evidence remains limited to the captured dependency set (not a complete Supabase platform image); TypeScript and application build passed, while full ESLint retained previously documented baseline failures. No rehearsal is evidence that the hosted DEV schema matches Production.
+
+**Current DEV database — read-only**
+
+- Supabase project `tzwtpxdcggesgjaqxkqr`, `project-flour-dev`, ACTIVE_HEALTHY, API URL `https://tzwtpxdcggesgjaqxkqr.supabase.co`, PostgreSQL 17.6.1.155.
+- The migrations table contains 183 entries, latest version `20261101100854`; one November 1 entry is recorded under generated version `20261101100854` with name `20261101120000_collection_orders_active_staff_rls`. None of the three Issue #8 target versions is present. Do not repair this version/name history or use broad `db push`.
+- DEV has the postgres-owned, SECURITY DEFINER 16-argument `submit_guest_extra_order`, `search_path=public`, with 9 default arguments and EXECUTE for anon, authenticated, service_role and postgres. It has no non-internal catalog dependents. The 10-argument legacy overload is absent. Current Production-derived capture has both 10- and 16-argument overloads. This exact overload difference is migration-relevant: migration 1 and migration 2 contain required 10-argument regprocedure casts, and migration 3 requires that function at declaration time. All three therefore fail their current DEV preconditions; migration 3 is not a harmless no-op.
+- Current DEV has `storefront_customer_preorder_options(uuid)` only, postgres-owned SECURITY DEFINER with `search_path=public` and anon/authenticated/service_role EXECUTE. Migration 2 adds the required-date overload; retain the one-argument function for old clients.
+- `complimentary_item_types.is_active`, complimentary collection `available_from/available_until`, and `collection_paid_addon_types` are absent. Existing `roles` include Owner and `set_updated_at()` exists. Current authenticated ALL policies on complimentary types and collection assignments use unrestricted true predicates; the migration replaces these writes with Owner-only policies. This is an intentional security behavior change and requires the planned active Owner/Manager/staff/non-staff tests after a safe migration rehearsal.
+- Current DEV ledger count differs from the recorded Production-derived capture (183 versus 179 entries); Production snapshot and DEV also have different PostgreSQL patch versions. The exact missing legacy overload is the demonstrated incompatibility; aggregate counts alone do not identify additional conflicts.
+
+**Vercel and DEV Preview isolation**
+
+- Vercel project `prj_3rmlAQzLSFOi15DEGczSuDYDq8xr`, team `hyphen-org`, Node.js 24.x verified.
+- `dev.whitebird.asia` still maps to READY parity Preview `dpl_FPF1M4NkkSXP6kKdJ4UpQxzWUbBR`, URL `project-flour-op7eppfqh-hyphen-org.vercel.app`, source `eaff4ce246c8655cb1fae30499058d746839074a`.
+- An earlier READY deployment exists: `dpl_AcLcevtrRLWzZA6izuZdaiN5ZNUq`, source `0449b64434158b3b58b67fa87a56ea9893dab003`. Vercel does not mark it as a rollback candidate. No Issue #8 Preview deployment exists; the Issue #8 branch has no branch-scoped Preview variables in the current project configuration.
+- On the separate DEV parity branch, Preview-only variables are present: Supabase URL points to the DEV project, the public key is stored encrypted, and `SUPABASE_SERVICE_ROLE_KEY` is a protected sensitive Preview variable. The secret was not decrypted or displayed. Runtime validity is **UNVERIFIED**: bounded runtime-log lookup returned no records for the deployment; this does not prove a successful service-role operation. A wider log query timed out. Do not infer an empty secret from a redacted value.
+
+**Exact next-stage preflight and recovery**
+
+1. Before any separately authorized DEV migration, use a clean checkout of this exact GitHub branch and verify HEAD/tree and all three hashes above. Verify database identity and PG version; confirm all three versions are absent and record current overload signatures, owners, security flags, search paths, grants, dependencies, relevant policies and trigger definitions.
+2. Stop unless the migration source is revised and rehearsed to handle a DEV database without the legacy 10-argument overload. Do not create the missing legacy RPC merely to satisfy the migration, and do not skip/mark migration 3 applied. Keep the Production-derived three-migration rehearsal as separate evidence.
+3. After revised isolated tests and separate authorization, apply only the reviewed per-file sequence, one migration at a time with bounded lock/statement timeouts and a verified transaction/ledger mechanism. The existing DEV version/name discrepancy means no broad push or automatic history repair is acceptable. If the canonical ledger mechanism cannot be proven before execution, stop.
+4. Postflight each committed file before the next: exactly one intended ledger row; expected function signatures and arguments/defaults; owner, SECURITY DEFINER, search_path and grants; both checkout-option overloads; new columns/table, constraints, trigger and RLS policies; no unrelated ledger or business-row changes. Then use synthetic DEV checkout and authorization tests for both Fresh Pick contracts, Preorder, date/collection rules, paid-price authority, rollback and historical snapshots.
+5. Before deploying a Preview, add only DEV-scoped branch Preview bindings through authorized Vercel access and validate a safe server-side DEV operation without disclosing the service key. Preserve the existing alias target. After any separately approved alias change, use the prior READY deployment as the manual recovery reference only after confirming it remains deployable; Vercel has not designated it a rollback candidate.
+6. If a migration fails before commit, stop and verify transaction/ledger/object state before any retry. If a migration committed and a later check fails, keep the existing app/alias, preserve business data, and use a reviewed forward database correction. Do not restore an old database over newer orders; an application rollback does not reverse SQL.
+
+**Result:** HOLD for DEV migration and Preview stage until the missing-overload migration assumptions are reconciled and rehearsed against the actual DEV shape, and Issue #8 branch Preview bindings/runtime validation are established. No Production action is authorized or was performed.
