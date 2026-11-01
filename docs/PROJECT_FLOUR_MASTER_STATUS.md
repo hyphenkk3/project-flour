@@ -1060,3 +1060,8 @@ At the end of this investigation, append a dated outcome with root cause or rema
 - **Deployment/domain state:** no Issue #7 deployment or alias change was made. `dev.whitebird.asia` remains on the existing DEV deployment `dpl_FPF1M4NkkSXP6kKdJ4UpQxzWUbBR` (READY, commit `eaff4ce246c8655cb1fae30499058d746839074a`); Production remains on `dpl_HE7zep8jWR1wkoKZ6w4tC8t4bAaN` (READY, commit `d98afb9733ed8285e71ba7e4a7e7a3e1116980c7`).
 
 **Next required actions:** configure Preview-only DEV Supabase bindings for this exact branch (public URL/key and protected DEV service-role key), then build/test a pinned Preview, perform authenticated staff browser checks with synthetic DEV fixtures, and only consider a DEV alias change after all gates pass. No Production change is authorized.
+
+
+### Issue #7 RLS clarification
+
+The DEV `orders` table has SELECT RLS policy `Authenticated staff can select orders` with `qual = true` for the PostgreSQL `authenticated` role; the policy itself does not check a staff role. The Collection routes independently call `requireStaff`, and the new `internal_notes` select is used in that server-only Collection path. The `anon` role has no SELECT policy, so public anonymous REST reads are blocked by RLS. Whether any customer-facing flow can obtain an `authenticated` Supabase JWT was not established in this verification; therefore direct authenticated REST access to order columns, including internal notes, remains a security question to resolve before acceptance. No RLS policy was changed.
