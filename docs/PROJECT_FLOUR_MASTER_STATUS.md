@@ -1026,3 +1026,12 @@ At the end of this investigation, append a dated outcome with root cause or rema
 - Exact Preview application SHA `eaff4ce246c8655cb1fae30499058d746839074a` CI run `41271601167` PASS; prior docs CI run `41272241037` PASS. Latest master-status docs commit `585c87ff0b92ff1061150e7431d022eefac90a69` CI run `41273438852` remained IN PROGRESS on latest check. Do not call it passed or failed. No alias switch attempted during this in-progress verification.
 - Pending amendments tracked separately: #7 Collection bold Internal Notes; #8 Owner-managed Complimentary Items/Paid Add-ons with seasonal fulfilment-date windows. Neither is included in DEV parity cutover.
 - Exact Production immutable source `d98afb9733ed8285e71ba7e4a7e7a3e1116980c7`, Production deployment `dpl_HE7zep8jWR1wkoKZ6w4tC8t4bAaN`; **no Production changes**.
+
+## DEV alias cutover — verified 2026-11-01
+
+- **FINAL CI PASS:** GitHub Actions run `41273438852` for docs/acceptance commit `585c87ff0b92ff1061150e7431d022eefac90a69` completed successfully. Existing candidate app CI runs `41271601167` and `41272241037` also passed.
+- **Owner acceptance:** owner verified authenticated sign-in, Library, Bakery, Whole Cake Calendar, Collection, Operations and Settings load on final candidate Preview. Read-path acceptance only; transactional writes and message delivery not exercised.
+- **DEV-only cutover completed:** reassigned alias `dev.whitebird.asia` from previous READY deployment `dpl_Ga6USTsn3PBrCLZ9WYU7WNepK3RS` to candidate READY deployment `dpl_FPF1M4NkkSXP6kKdJ4UpQxzWUbBR` (application SHA `eaff4ce246c8655cb1fae30499058d746839074a`). Vercel direct alias-resolution verification confirms DEV URL now targets the candidate and is READY.
+- **Rollback:** reassign `dev.whitebird.asia` to `dpl_Ga6USTsn3PBrCLZ9WYU7WNepK3RS` if DEV regression appears; preserve that deployment. No DB schema/config/data changes were included in cutover.
+- **Production check:** `whitebird.asia` still targets READY `dpl_HE7zep8jWR1wkoKZ6w4tC8t4bAaN` (immutable SHA `d98afb9733ed8285e71ba7e4a7e7a3e1116980c7`). No Production alias/deploy/db change.
+- **Post-cutover follow-up:** owner should smoke-test `https://dev.whitebird.asia` in authenticated browser; server-bound DEV Supabase config previously verified for candidate branch. Separate changes #7 (Collection Internal Notes) and #8 (seasonal complimentary/paid add-on manager) still pending; do not confuse with this completed DEV app-source parity cutover.
