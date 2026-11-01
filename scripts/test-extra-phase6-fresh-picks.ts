@@ -298,7 +298,10 @@ assert.doesNotMatch(extraCheckoutSrc, /name="email"/);
 assert.doesNotMatch(extraCheckoutSrc, /Email \(optional\)/);
 assert.doesNotMatch(extraCheckoutSrc, /Email me a copy of my order/);
 assert.doesNotMatch(extraCheckoutSrc, /name="surname"/);
-assert.match(extraCheckoutSrc, /OPTIONAL_NOTES_CUSTOMER_WARNING/);
+assert.match(extraCheckoutSrc, /We do not provide personalised writing or messages on cakes/);
+assert.match(extraCheckoutSrc, /hasCakeWordingRequest/);
+assert.match(extraCheckoutSrc, /hasPossibleCakeWording/);
+assert.match(extraCheckoutSrc, /notes_not_cake_wording_ack/);
 assert.match(
   extraActionsSrc,
   /Please fill in your name and WhatsApp phone number/,
