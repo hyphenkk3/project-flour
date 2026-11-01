@@ -1,5 +1,51 @@
 # Project Flour Master Status
 
+> **CURRENT STATUS — 1 November 2026 (Asia/Kuala_Lumpur).** This section supersedes historical 21 October statements below about unknown Production source, old deployment identity, and older release blockers. Retain the historical record as dated evidence, not the current operational truth. The status file is the **single canonical master tracker**; do not create a competing status file.
+
+## Current source of truth and recovery
+
+- **Live Production:** `whitebird.asia` and `www.whitebird.asia` both verified pointing to Vercel deployment `dpl_HE7zep8jWR1wkoKZ6w4tC8t4bAaN` (READY), Git commit `d98afb9733ed8285e71ba7e4a7e7a3e1116980c7`.
+- **Repository:** `hyphenkk3/project-flour`. The immutable commit above is the authoritative **current application source**. Never infer the running source from branch name alone.
+- **Previous Production rollback reference:** deployment `dpl_7WT4WV3gVmybEeEiThAb9SwLpYpF`, SHA `0036df5b74277c82b96f9236739bb2a2e13a53f0`. Preserve it. App rollback **does not** reverse Production SQL migrations.
+- **Production Supabase:** `cuowwlduhxxifmpvpltt`; **DEV Supabase:** `tzwtpxdcggesgjaqxkqr`. Do not run bulk migration sync, schema reset, or blind `db push`.
+- **DEV reliability branch:** `codex/catalogue-cache-reliability-audit-20261101`, created directly from the live immutable Production SHA. Its documentation changes do not change runtime behavior. The baseline commit `d98afb...` remains the recovery anchor even after new commits on this branch.
+- **Backups:** owner completed newer encrypted Production Postgres and Storage backups on 31 October 2026. Their status comes from prior backup records; not independently revalidated in this audit. The October 14 backup details below remain **historical**, not the latest backup identifiers.
+- **Source recovery rule:** if local checkout disappears, fetch exact GitHub commit `d98afb9733ed8285e71ba7e4a7e7a3e1116980c7`, not an unverified candidate, filesystem copy or old preview. Check Production SQL migration history separately.
+
+## Latest feature releases (verified deployment vs unverified live actions)
+
+| Feature | Status / evidence |
+|---|---|
+| Fresh Pick expired-stock assignment and slicing; Calendar per-cake readiness ● | Deployed in prior Production release `dpl_B3y4jgCxXDeUyj35RA2XAN3KANbd`, included in current source. Four specific guarded migrations were applied; release tested in DEV. Full authenticated Production UI smoke still pending. |
+| Preorder checkout cake-wording note guard | Deployed in `dpl_7WT4WV3gVmybEeEiThAb9SwLpYpF`, included in current Production. Shared server-side and client validation. |
+| Fresh Pick checkout cake-wording note guard | **Current Production:** `dpl_HE7zep8jWR1wkoKZ6w4tC8t4bAaN`, commit `d98afb...`. Release CI run `41254993081` passed; app and domain promotion verified; initial logs without errors. No destructive live checkout transaction tested. |
+| Fresh Pick Share Payment, Ready Override, Delivery readiness, confirmation-sent indicator | Some DEV/source work known; end-to-end coverage and exact Production parity **not yet established**. Audit before repeating or editing. |
+| PRs #2, #3, #4 | Released features still have draft PR records; reconcile without accidental merge/redeploy. Retain rollback deployments. |
+| Obsolete Order Note previews | Five earlier staging candidates identified, none current Production. Cleanup recommended through Vercel UI only after confirming no other dependencies; deletion not performed. |
+
+## Production reliability — current investigation, read-only
+
+**Historical errors:** Vercel reported recurring `TimeoutError: The operation was aborted due to timeout` and `canceling statement due to statement timeout` during cached homepage preview, popular-cake, and cake-detail queries. Observed on *older* deployments through 31 October; do not attribute them to the newest release without current evidence. A few checkout DEBUG messages appear in grouped runtime errors but are not themselves proof of failed checkout.
+
+**Current observations:** newest deployment's queried six-hour error/warning log window returned no entries. Production Supabase reported `ACTIVE_HEALTHY`, 36/60 PostgreSQL connections, 3 active, 0 idle in transaction at one snapshot. `pg_stat_statements` is installed; sampled library-cakes PostgREST query: 2,704 cumulative calls, 18.8ms mean, 1,236.6ms max. Do not treat cumulative counters as current utilization or incident-period latency.
+
+**Code-grounded hypothesis:** `src/workspaces/storefront/catalog/queries.ts` uses `unstable_cache` with **30-second** merchandising revalidation, nested cached cake-display retrieval and Supabase calls. `src/lib/supabase/fetch-timeout.ts` sets the general data fetch timeout to **8 seconds**. Concurrent cache refresh and intermittent query/network delay are plausible, **not proven**, causes. Do not change timeout, cache TTL, Supabase compute or connections without controlled evidence.
+
+**DEV read-only baseline:** 25 `library_cakes` rows, 58 `collection_cakes` rows. One sampled `library_cakes` statement had 2,075 cumulative calls, 2.9ms mean, 511.4ms max; another wider join had 1,669 calls, 10.4ms mean, 711.6ms max. DEV is small and not a representative Production load test. No synthetic Production orders or writes were created.
+
+### Next work / decision gates
+
+1. **P0: measurable DEV catalogue experiment:** compare cache hit/miss/stale-refresh and concurrent requests; separate actual DB execution from PostgREST/network delay. Preserve no-change baseline and record before/after figures **here**.
+2. **P0: incident-period correlation:** read-only comparison of Supabase query/API latency, connection spikes and Vercel cache timeout timestamps. Current snapshots alone do not justify a fix.
+3. **P1: images, auth, checkout:** separate read-only image-path checks and non-destructive staff/login/checkout diagnostics; no real Production order submission or credentials in logs.
+4. **P1: potential DEV-only fix:** only after evidence, regression tests for both preorder + Fresh Pick checkout, Bakery/Calendar, TypeScript/build, rollback plan; never merge or deploy blindly.
+5. **P2: release housekeeping:** reconcile draft PRs and old previews after determining rollback and dependency needs.
+
+**Recording discipline:** Update **this file** on the active work branch for every significant decision, evidence batch, release and rollback identity. Do not create another master status file. Historical sections below are maintained for provenance only.
+
+---
+
+
 **Last updated:** 21 October 2026 (Asia/Kuching)
 **Purpose:** Durable status for the accepted DEV release and Production compatibility work. This record consolidates existing evidence; it does not authorize a Production change.
 
