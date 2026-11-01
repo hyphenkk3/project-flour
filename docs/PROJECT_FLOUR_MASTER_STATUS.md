@@ -1014,3 +1014,55 @@ No migration was authored or applied in this phase.
 - Existing Issue #7 parity CI `41273824740`: **PASS** at `07e56bd651914f1dbe5968cf82508a59dd15fca4`. Deployed parity app source `eaff4ce246c8655cb1fae30499058d746839074a` differs only by status documentation.
 - No Issue #8 application changes exist, so TypeScript/lint/build/checkout regressions were not run. The database prototypes are targeted experiments, not the Issue #8 regression suite.
 - **GO** to begin isolated DEV implementation, with the overload routing finding treated as a required design/test constraint. **HOLD** for a DEV migration until exact function bodies/triggers and checkout behavior pass production-equivalent rehearsal. **HOLD** for Production pending a separate authorization and release-specific validation. The explicit DEV alias is reconciled; stale auto-alias configuration and protected service-role runtime validity remain tracked limitations.
+
+### Issue #8 Phase 2A — Exact Production-contract rehearsal — 1 November 2026
+
+**Result: GO to isolated Phase 2B implementation with the overload compatibility migration included; HOLD for applying any migration to DEV/Production or deploying.** This was local-only. No hosted DB, app, Vercel configuration, alias, order, stock, or migration history changed.
+
+**Source and environment identities**
+
+- Planning branch remains `codex/issue-8-addons-planning-20261101` at source `ebb2435a31b84f006ac80c0f1ed45f47377393d1`, tree `e48ba3f5dfc26ed21483f4909d7e4667dd0703a5`.
+- Separate implementation branch: `codex/issue-8-addons-implementation-20261101`, created from that exact planning commit. The worktree was clean at the start. The application source is still the Production recovery source `d98afb9733ed8285e71ba7e4a7e7a3e1116980c7`.
+- Production Vercel project `prj_3rmlAQzLSFOi15DEGczSuDYDq8xr`, team `hyphen-org`; READY deployment `dpl_HE7zep8jWR1wkoKZ6w4tC8t4bAaN`, source `d98afb9733ed8285e71ba7e4a7e7a3e1116980c7`; both `whitebird.asia` and `www.whitebird.asia` remain mapped to it.
+- Production Supabase `cuowwlduhxxifmpvpltt`: active PostgreSQL 17.6.1.166. Read-only ledger check: 179 rows, 179 unique versions, max `20261031231126`; no `20261101194235` entry. DEV Supabase `tzwtpxdcggesgjaqxkqr` remained untouched. No Issue #8 hosted deployment or alias was created.
+
+**Production-equivalent local reconstruction**
+
+- Disposable macOS PostgreSQL 17.11 cluster, local-only database `prodcompat`; PostgREST 16.4 was bound only to localhost for request-shape resolution. All fixtures were synthetic and each workflow test ran in a transaction ended by `ROLLBACK`.
+- The reconstructed public schema came from read-only Production catalogs: 67 public tables/704 columns; 408 regular constraints plus the captured constraint-trigger definitions; 235 indexes; 16 enums; 155 RLS policies; 79 actual triggers; function ownership/security/search-path/ACL metadata; and the actual transitive function-body set used by the tested paths. No customer rows were copied. No trigger was replaced with a no-op.
+- The Auth boundary used only the local `auth.uid()` behavior and synthetic `auth.users.id` rows. The Vault boundary had an empty local-only `vault.decrypted_secrets` relation to compile a dependency; no secret was copied or read. Thus this is an exact relevant public-schema/function-contract rehearsal, not a byte-for-byte Supabase platform image.
+
+**Observed Fresh Pick overload defect and proposed correction**
+
+- Production signatures are the legacy 10-argument `submit_guest_extra_order(text,text,text,date,time,text,uuid,boolean,boolean,jsonb)` with 3 defaults and the extended 16-argument overload with 9 defaults. Both are postgres-owned `SECURITY DEFINER`, `search_path=public`, and execute-granted to `anon`, `authenticated`, and `service_role`.
+- Local PostgREST 16.4 reproduced HTTP 300 `PGRST203` for the legacy 10-key named-argument request because the extended overload also defaulted those same argument names. The current 15-key Pickup/Dine-in and 16-key Delivery payloads resolved to the extended body. This proves the local routing ambiguity; Production’s PostgREST version and live HTTP behavior were not independently probed.
+- Proposed migration `supabase/migrations/20261101194235_issue8_fresh_pick_overload_compatibility.sql`, SHA-256 `6dda6c7ed675f4dbbb184166601fdb5189dfe60eb7c75c9d0fdaf0d69b547b8a`. It drops only the exact extended signature without `CASCADE`, recreates the exact Production function body, makes arguments 8–15 required, preserves the final argument default, restores postgres ownership, `SECURITY DEFINER`, `search_path=public`, the exact execute grants and Production function comment. It leaves the legacy overload and signature unchanged. This is a proposed candidate migration; no hosted copy was applied.
+- Rehearsal used `psql -1` (one transaction). A forced `1/0` failure after DDL rolled back to the baseline extended overload with 9 defaults. Successful application produced 1 default on the extended overload and retained 3 defaults on legacy, with owner/security/search-path/ACL matching the captured Production metadata. PostgREST then resolved 10-, 15-, and 16-key calls to the intended real bodies; deliberately nonexistent synthetic stock was rejected as `P0001 Extra is not available`, and the database retained zero order rows after the HTTP probes.
+
+**Actual function-body tests after applying the proposed migration locally**
+
+- **PASS** legacy 10-argument body: synthetic confirmed stock became sold, order and order-item snapshot created, and the stock/order link was correct; the outer transaction rolled back after assertions.
+- **PASS** extended 15-argument Pickup body and 16-argument body: actual captured function bodies executed with synthetic stock. Catalog-derived paid add-on prices and message snapshot were preserved. The 16-argument case exercised the final optional argument with Pickup; delivery-specific fulfillment/fee acknowledgment was not end-to-end exercised.
+- **PASS** invalid legacy complimentary selection failed after the function’s order/stock steps; exception rollback left no new order and did not sell the fixture stock.
+- **PASS** current one-argument `storefront_customer_preorder_options(uuid)` and actual standard `submit_guest_preorder(...)` body with a synthetic active collection, cake/size, complimentary item, and paid card. Catalog price was used. Editing both catalog item names and the paid price afterward did not change either order snapshot.
+- **PASS** actual `create_staff_guest_preorder_with_source_detail(...)`, its exact Production `staff_preorder_private.create_waiting_list_preorder_with_source_detail(...)` dependency, and `save_guest_order_workspace_atomic(...)` ran with a synthetic authenticated active Owner session. Repeating the same edit left exactly one paid-add-on line and one message slot.
+- **PASS — proposed policy pattern only** against the reconstructed tables: a `SECURITY DEFINER`, fixed-empty-search-path helper checking `staff_profiles.auth_user_id=auth.uid()`, active/unarchived profile and `roles.code='owner'` allowed Owner writes and denied Manager, ordinary staff, non-staff, and anonymous writes; `service_role` retained its platform bypass. The helper/policies were created only inside a local transaction and rolled back. Current Production still has broad authenticated `USING(true)` write policies on complimentary definitions and collection mappings; replacing those safely is required before an Owner-only manager can be released. `paid_addon_types` currently has an authenticated read policy and no authenticated write policy.
+
+**Existing regression checks on the unchanged Production application source**
+
+- `npm ci --ignore-scripts --no-audit --no-fund`: PASS.
+- `npx tsc --noEmit`: PASS.
+- `npm run test:release-regressions`: **57 PASS, 0 FAIL, 1 BLOCKED**. The blocked embedded disposable-PG assignment test hit `shmget: Operation not permitted` while initializing its own cluster. The isolated PostgreSQL 17.11 tests above are separate evidence and do not convert that bundled test to PASS.
+- `npm run lint`: **FAIL on the existing baseline**, 77 errors/26 warnings across unrelated files (including existing `require()` and React effect diagnostics); no application file changed in this phase.
+- `npm run build`: **INCOMPLETE/FAIL in this environment**, Next 16.2.12 could not fetch Google Fonts (`Newsreader`, `Outfit`) because network access to fonts.googleapis.com failed. No application change caused this.
+- No Issue #8 UI, server action, catalogue schema, or hosted regression has been implemented. No Issue #8 migration is applied to DEV or Production.
+
+**Phase 2B boundaries and recovery**
+
+1. Keep the overload correction as a separately reviewed first migration; preserve the legacy function and never use `CASCADE`. Apply it transactionally through the approved migration mechanism only after separate authorization and fresh identity checks.
+2. Add `complimentary_item_types.is_active` and inclusive date bounds to complimentary collection mappings. Add a separate collection-paid-addon mapping with availability/selectability/date bounds; backfill existing collection/card availability to match current behavior before switching reads.
+3. Add a required-date options overload while retaining the one-argument RPC. Add server-side eligibility/quantity/authoritative-price checks to standard preorder, both Fresh Pick overload paths, staff create/edit, and stale-cart submission. Snapshot current display name and price only for new lines; preserve order snapshot tables and totals.
+4. Replace broad complimentary authenticated write policies with active, unarchived Owner-only writes; retain existing authenticated read behavior and anon checkout RPC grants. Do not use the Owner+Manager Library capability for this narrower boundary.
+5. Continue on the implementation branch only. Before any DEV migration, rehearse every migration individually with current exact function bodies/triggers, run checkout/date/collection/Owner-RLS/snapshot regressions, and preserve the existing DEV deployment as rollback. Roll back application code independently; do not restore old customer data or remove additive schema blindly.
+
+**Decision:** **GO** to isolated Phase 2B implementation and test with the overload correction and Owner-only policy behavior as required gates. **HOLD** for DEV migration/deployment until the complete feature and all relevant function bodies are updated and rehearsed. **HOLD** for Production; this work made no Production changes and grants no release authorization.
