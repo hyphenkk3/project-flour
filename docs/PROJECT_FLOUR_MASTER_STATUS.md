@@ -41,6 +41,14 @@
 - **Limits:** this is *database-internal execution time*, not Supabase REST/fetch duration; it does not measure the nested cake/photo embed, Next.js cache hit/miss/revalidation, requests in parallel, or Production incident behavior. No claim of reliability improvement. No image/auth/checkout transaction tests have been run in this phase.
 - **Next experiment:** instrument DEV request-level timings for cache hit/miss/stale/concurrency with bounded, non-customer traffic, then correlate database and API timing. Do not modify Production based on this small SQL probe.
 
+### Phase 2 continued — DEV cake-size/photo join baseline (2026-11-01)
+
+- **Production identity rechecked:** `whitebird.asia` and `www.whitebird.asia` still mapped to `dpl_HE7zep8jWR1wkoKZ6w4tC8t4bAaN` (commit `d98afb9733ed8285e71ba7e4a7e7a3e1116980c7`). Treat this SHA as the immutable source recovery anchor; **no Production changes**.
+- Executed read-only `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` in DEV on a representative **but simplified** query of homepage-listed cake IDs joined to `library_cake_sizes` and `library_cake_photos` (counts, not image bytes and not the actual embedded PostgREST request). Four samples; last three returned **0.421, 0.483, 0.487 ms** execution, 13 cake rows, 12 shared buffer hits and zero shared reads. The first sample showed approximately 3.9 ms join/aggregation work, consistent with sampling variability.
+- **Conclusion:** this simplified DEV SQL path is currently quick. This does not measure actual HTTP request time, nested embed serialization, storage/image transfers, cache refresh concurrency or historical Production incident latency. No code fix justified yet.
+- The connected web fetcher could not access `https://dev.whitebird.asia/` or `/collection` in this run, so **cache-hit/miss/request latency remains unmeasured**. Do not invent these results. Next step is a controlled DEV-only HTTP timing probe through an authorized execution environment and comparison to Supabase query times.
+- **Changes this step:** canonical Master Status only. No new tracking files, test orders, credentials, PR merges, migrations or Production deployments.
+
 ### Next work / decision gates
 
 1. **P0: measurable DEV catalogue experiment:** compare cache hit/miss/stale-refresh and concurrent requests; separate actual DB execution from PostgREST/network delay. Preserve no-change baseline and record before/after figures **here**.
