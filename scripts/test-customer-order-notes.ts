@@ -122,7 +122,8 @@ assert.ok(
   "Customer Operations detail shows the note immediately below the order header",
 );
 assert.match(collectionDetail, /whitespace-pre-wrap/);
-assert.match(collectionCard, /Order note:/);
+assert.doesNotMatch(collectionCard, /Order note:/, "the Collection card must not present customer notes as crew instructions");
+assert.match(collectionCard, /Internal Notes/, "the Collection card labels staff instructions independently");
 assert.equal(
   mapCollectionBoardOrder({
     id: "order-empty-notes",
@@ -150,7 +151,9 @@ assert.equal(
   OPTIONAL_NOTES_CUSTOMER_WARNING,
   "Please note: wording on cakes or cake boards and customised cake decoration are not available.",
 );
-assert.match(checkoutForm, /\{OPTIONAL_NOTES_CUSTOMER_WARNING\}/);
+assert.match(checkoutForm, /id="optional-notes-warning"/);
+assert.match(checkoutForm, /For collection or delivery instructions\./);
+assert.match(checkoutForm, /We do not provide personalised writing or messages on cakes\./);
 assert.match(receiptSource, /customer_notes/);
 assert.doesNotMatch(receiptSource, /internal_notes/);
 
