@@ -33,6 +33,14 @@
 
 **DEV read-only baseline:** 25 `library_cakes` rows, 58 `collection_cakes` rows. One sampled `library_cakes` statement had 2,075 cumulative calls, 2.9ms mean, 511.4ms max; another wider join had 1,669 calls, 10.4ms mean, 711.6ms max. DEV is small and not a representative Production load test. No synthetic Production orders or writes were created.
 
+### Phase 2 measurement — 1 November 2026 (DEV, read-only)
+
+- **Source anchor reverified before work:** both public domain aliases still map to Production deployment `dpl_HE7zep8jWR1wkoKZ6w4tC8t4bAaN`, READY, immutable Git SHA `d98afb9733ed8285e71ba7e4a7e7a3e1116980c7`. No application deployment or code mutation.
+- DEV sampled homepage membership counts: 6, 5 and 5 in three collections. The relevant index `collection_cakes_homepage_preview_idx` exists (`collection_id, homepage_sort_order` partial on `show_on_homepage=true`).
+- DEV `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` for the homepage membership lookup completed in **0.126 ms execution time**, six result rows, zero shared block reads (five shared hits at sort node). The planner used a sequential scan on only 58 DEV memberships. This specific simple SQL lookup does **not** appear slow in DEV.
+- **Limits:** this is *database-internal execution time*, not Supabase REST/fetch duration; it does not measure the nested cake/photo embed, Next.js cache hit/miss/revalidation, requests in parallel, or Production incident behavior. No claim of reliability improvement. No image/auth/checkout transaction tests have been run in this phase.
+- **Next experiment:** instrument DEV request-level timings for cache hit/miss/stale/concurrency with bounded, non-customer traffic, then correlate database and API timing. Do not modify Production based on this small SQL probe.
+
 ### Next work / decision gates
 
 1. **P0: measurable DEV catalogue experiment:** compare cache hit/miss/stale-refresh and concurrent requests; separate actual DB execution from PostgREST/network delay. Preserve no-change baseline and record before/after figures **here**.
