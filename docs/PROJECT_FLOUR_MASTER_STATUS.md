@@ -958,3 +958,59 @@ At the end of this investigation, append a dated outcome with root cause or rema
 
 **Next gate:** stabilize DEV parity and verify the isolated Preview’s DEV-only bindings/rollback path; then implement the date-aware catalogue and Owner-only manager on this separate branch, including the Production-only legacy Fresh Pick overload in an isolated PostgreSQL compatibility rehearsal. Test stale-cart rejection, all four date boundaries, cross-collection isolation, inactive/expired items, snapshot retention, payment totals, and both customer checkout flows before creating a DEV Preview. No Production release is authorized.
 
+
+
+### Issue #8 Phase 1B — Compatibility and safety rehearsal — 1 November 2026
+
+**Result: GO for isolated DEV implementation planning and rehearsal; HOLD for any Production release.** This records bounded read-only hosted checks and disposable local PostgreSQL/PostgREST rehearsals. No hosted database, application source, migration, deployment, environment variable, or domain alias was changed.
+
+**Environment reconciliation**
+
+- Issue #8 branch `codex/issue-8-addons-planning-20261101`: commit `048af3cf755d4f3387f29de9b3432db64527470f`, tree `b71f10d297bf2513a0d275dbc73be0c636678ac2`; based on the declared Production application baseline `d98afb9733ed8285e71ba7e4a7e7a3e1116980c7`. Work on this branch remains documentation-only.
+- Production Vercel deployment `dpl_HE7zep8jWR1wkoKZ6w4tC8t4bAaN` is READY at source `d98afb9733ed8285e71ba7e4a7e7a3e1116980c7`; `whitebird.asia` and `www.whitebird.asia` both map to it.
+- `dev.whitebird.asia` explicitly maps to READY Preview `dpl_FPF1M4NkkSXP6kKdJ4UpQxzWUbBR` (`project-flour-op7eppfqh-hyphen-org.vercel.app`), source `eaff4ce246c8655cb1fae30499058d746839074a`. The deployed app matches the DEV parity branch's application code; only status-document commits differ. Latest parity CI run `41273824740` completed successfully.
+- Vercel project configuration still contains stale Git auto-alias branch `codex/cake-size-availability-dev`, while the explicit live alias maps to the parity Preview above. This is a latent auto-alias risk, not a current alias mismatch; no config or alias was changed.
+- Branch Preview URL binding is `https://tzwtpxdcggesgjaqxkqr.supabase.co`. Public and service-role key entries are present as protected values; their secret values were not exposed. The service-role key's runtime validity remains **UNVERIFIED**. No Production credential was used or copied.
+- Production and DEV are active Supabase projects in ap-southeast-1 on PostgreSQL 17.6; patch versions and migration ledgers differ. Neither database was modified.
+
+**Compatibility matrix**
+
+| Area | Result | Evidence and limit |
+|---|---|---|
+| Catalog and order snapshot schema | **PASS — read-only inventory** | Both DBs have the five audited catalog/snapshot tables with matching inspected columns. Complimentary definitions lack active/date fields; comp collection joins lack dates; paid definitions have active/price but are global. Collection counts differ (Production 3; DEV 6). |
+| Owner-only authorization | **PASS — isolated prototype only** | Disposable PG 17.11 with non-bypass authenticated role: active Owner allowed; Manager, ordinary staff, non-staff, inactive Owner, archived Owner denied. Authenticated reads preserved; service-role bypass and anonymous RPC access checked. Predicate used verified `staff_profiles.auth_user_id=auth.uid()`, active and unarchived Owner. This was not an exact full-schema policy restore. |
+| Seasonal, collection, inactive, quantity and price rules | **PASS — isolated prototype** | Inclusive date bounds and out-of-window cases, collection isolation, inactive rejection, paid quantity cap, server catalog price over client-supplied price, and preservation of order snapshot name/price/total after catalog edits/deactivation passed with synthetic rows. |
+| Checkout option RPC compatibility | **PASS — local PostgREST routing probe** | Existing one-argument `storefront_customer_preorder_options(uuid)` is SECURITY DEFINER and executable by anon/authenticated. New date-aware overload must require the date (no default); retain the one-argument RPC for old-app compatibility. Hosted PostgREST routing was not independently identified. |
+| Fresh Pick overloads | **INCOMPLETE — full-body compatibility** | Production has legacy 10-argument and extended 16-argument `submit_guest_extra_order`; DEV has only the 16-argument overload. Production overloads are postgres-owned SECURITY DEFINER and executable by anon/authenticated/service_role. Current extended client sends 15 args for non-delivery and 16 for delivery. |
+| Production trigger/checkout execution | **INCOMPLETE** | Definitions and metadata were read, but exact trigger dependencies and checkout transaction bodies were not reconstructed and run end-to-end. No claim of complete Production-equivalent rehearsal. |
+| Historical orders | **PASS — structural evidence only** | Order snapshot columns and subtotal helper establish that historical line values drive totals. No customer order rows were read or modified. Mutation behavior still needs implementation tests. |
+| Hosted changes | **PASS — none** | No SQL, migration, ledger, deployment, environment, alias, order, or stock changes occurred. |
+
+**Overload experiment and design constraint**
+
+- Disposable PostgREST 16.4 used marker functions with exact Production 10/16 argument names, types, and defaults. Existing defaults produced HTTP 300 `PGRST203` ambiguity for a 10-key named call; a 16-key call resolved to the extended marker. This is a local routing result, not proof of a Production customer request failure or hosted PostgREST version.
+- PostgreSQL rejected `CREATE OR REPLACE` when removing existing defaults. In a disposable transaction, dropping/recreating only the extended 16-argument function without CASCADE, restoring owner, SECURITY DEFINER, `search_path=public`, ACLs and signature, and requiring arguments 8–15 while retaining only arg16's default, preserved the 10-arg overload and resolved local PostgREST routing for 10-key legacy, 15-key current pickup/dine-in, and 16-key delivery calls. A forced transaction failure restored the prior definition. This is a candidate design only; exact audited function body/dependencies still need full isolated execution.
+- Before implementation, test real bodies and transactions for both overloads under anon/authenticated roles. Do not drop with CASCADE or change the legacy signature.
+
+**Minimum additive migration boundaries for DEV implementation**
+
+1. Add `complimentary_item_types.is_active BOOLEAN NOT NULL DEFAULT TRUE`; add nullable inclusive `available_from`/`available_until` bounds and ordered-range constraints to complimentary collection mappings.
+2. Add a separate collection-to-paid-add-on mapping for availability, customer selection, order and inclusive date bounds. Backfill existing collections with currently offered active `birthday_card` and `wishing_card`, dates open, preserving existing storefront behavior and comp mappings.
+3. Preserve authenticated catalog reads and guest SECURITY DEFINER checkout access. Replace broad authenticated catalog writes with a dedicated active, unarchived Owner check; keep order snapshot policies separate. The broader Owner+Manager library permission is not sufficient.
+4. Preserve `storefront_customer_preorder_options(uuid)`; add a required-date overload with no default, retaining the old one-argument behavior.
+5. Validate collection/date, active state, customer-selectability, quantity and authoritative catalog price at every customer and staff server/RPC path, including standard preorder, both Production Fresh Pick overloads, staff create/edit and stale-cart submission. Snapshot current name/price only for new order lines; never reprice existing snapshots/totals.
+6. Treat extended Fresh Pick overload default/routing adjustment as a separately reviewed part of the migration and preserve owner, security mode, search path, grants, idempotency and transaction behavior.
+
+No migration was authored or applied in this phase.
+
+**Rehearsal, migration sequence and recovery**
+
+- Before applying anything to DEV, recreate exact relevant Production table/function/trigger definitions, ACLs, roles, dependencies and ledger metadata in disposable PostgreSQL 17. The simplified prototype does not meet that bar. Apply each new migration separately; verify definitions, ACLs, rollback and behavior after each. Record checksum/canonical version and do not bulk-sync or repair unrelated migration history.
+- Keep the existing READY application deployment as rollback. If application rollback is needed, restore the prior compatible app while retaining additive DB schema/functions and use forward recovery unless a DB rollback is separately rehearsed. Do not delete catalog mappings or snapshots or restore an older database over live orders.
+- Before a DEV Preview, verify protected DEV runtime credentials without exposing values and preserve the current alias target. No alias change is part of this phase.
+
+**Regression evidence and decision**
+
+- Existing Issue #7 parity CI `41273824740`: **PASS** at `07e56bd651914f1dbe5968cf82508a59dd15fca4`. Deployed parity app source `eaff4ce246c8655cb1fae30499058d746839074a` differs only by status documentation.
+- No Issue #8 application changes exist, so TypeScript/lint/build/checkout regressions were not run. The database prototypes are targeted experiments, not the Issue #8 regression suite.
+- **GO** to begin isolated DEV implementation, with the overload routing finding treated as a required design/test constraint. **HOLD** for a DEV migration until exact function bodies/triggers and checkout behavior pass production-equivalent rehearsal. **HOLD** for Production pending a separate authorization and release-specific validation. The explicit DEV alias is reconciled; stale auto-alias configuration and protected service-role runtime validity remain tracked limitations.
