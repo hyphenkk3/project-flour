@@ -1810,3 +1810,52 @@ These catalog checks are compatibility evidence, not an executed migration. They
 6. After any confirmed regression, stop, preserve evidence, and restore the previous application deployment only after verifying old-app/new-database compatibility. Do not assume application rollback reverses SQL; retain additive migrations and use forward recovery unless a separately approved database restoration/reconciliation plan is necessary. A pre-migration snapshot restore may discard post-snapshot orders and must not be applied over live writes without a controlled data-reconciliation plan.
 
 **Phase 2L recommendation: HOLD for Production release preparation.** The specific blocker is the missing four-migration Production-derived rehearsal including M4. The forced pricing-failure and stale-response tests are also outstanding. No Production or DEV state was changed in this task.
+
+
+## Issue #8 Phase 2M — production-derived migration and pricing verification (2 November 2026, Asia/Kuching)
+
+**Scope and safety:** Read-only inspection of hosted Production and isolated local PostgreSQL rehearsals only. No Production/DEV writes, migrations, deployments, alias changes, credentials changes, or customer transactions were performed. The accepted application source remains frozen at `0bf6ca047b38e6786a3e856cd28e45dde7eb99b7` (tree `6a4f69adf465e21a262dbdff2ad8a3d5ce56480d`). The latest evidence branch checkpoint before this appendix was `2e0510e69140663f8353ec73745a1d3028ad68b6`; its comparison against the accepted app commit is documentation-only (four commits ahead, zero behind).
+
+### Production-derived baseline and provenance
+
+- **PASS — current read-only Production identity:** Supabase project `cuowwlduhxxifmpvpltt`, healthy, PostgreSQL 17.6.1.166, ap-southeast-1. Production ledger count is 179; none of the four Issue #8 canonical versions is present. The legacy 10-argument and current extended Fresh Pick RPCs are present; the Owner manual override RPC is absent.
+- **PASS — relevant saved schema reconstruction:** `/private/tmp/issue8-production-relevant-schema.sql`, SHA-256 `1995f4249786e322354bfe54fd57df781879af69d9d5babe9fa5924e94844f0f`. It contains a schema-only relevant capture with the 179 ledger rows and no customer/staff records: 42 public tables, 106 public functions plus 3 private-schema functions, 51 triggers, 98 policies, grants/default privileges, enums, constraints and indexes. This is not a full Supabase platform image.
+- **PASS — current-vs-capture definitions:** Read-only catalog fingerprints matched between current Production and the saved capture for the relevant order/stock functions, triggers, and constraints. Verified trigger fingerprints: `extra_stock=9966778c3f5c84d31897e5bd306103b9`, `order_items=168d6069aa8f940186c90d79f53da309`, `orders=aaf80e0569c067a9cb77ae85e608f438`. Verified constraint fingerprints: `extra_stock=2cf433808dddf46ad37ceac78e3a2556`, `order_complimentary_items=9801921e61474d2d89fdf3c37fbe504f`, `order_items=040246524508d270e032d77da0b31787`, `order_paid_addons=97d839d907670266026d06edadd307e4`, `orders=9ffa49da778796759be09e2f94bf0879`. Relevant trigger states were enabled and constraints validated. Function owner, SECURITY DEFINER, search path, ACL and body fingerprints also matched for the inspected checkout, options, add-on synchronization, and Fresh Pick overload functions.
+- **Limitation:** Auth was represented with a minimal synthetic `auth.users(id)` fixture, and local role/JWT settings simulated authorization. The rehearsal does not validate Supabase Auth token issuance, Storage, Edge Functions, Vault secrets, external notifications/payment services, or the full hosted platform.
+
+### Four-migration rehearsal — PASS
+
+Disposable local PostgreSQL 17.11 loaded the verified schema-only capture. Each migration was applied separately in chronological order using the qualified transactional runner (one transaction per file; lock timeout 3 seconds; statement timeout 5 minutes; transaction advisory lock; exact SQL stored with the canonical ledger row). No hosted migration runner or live Production connection was used.
+
+| Version | Migration | SHA-256 | Result |
+|---|---|---|---|
+| 20261101194235 | `20261101194235_issue8_fresh_pick_overload_compatibility.sql` | `6dda6c7ed675f4dbbb184166601fdb5189dfe60eb7c75c9d0fdaf0d69b547b8a` | PASS; ledger 179→180 |
+| 20261101200000 | `20261101200000_issue8_addon_catalogue_schema_and_owner_management.sql` | `18788af12a64e10676b0e6352e13776b05cd7df7808f2688c7724044e08c25ba` | PASS; ledger 180→181 |
+| 20261101200100 | `20261101200100_issue8_legacy_fresh_pick_order_stock_link.sql` | `cb5272995f6704a552bf51f965e202d7f6b950d9f3cdbbf7a012fc0fc3018b27` | PASS; ledger 181→182 |
+| 20261102040744 | `20261102040744_issue8_owner_manual_new_order_catalogue_override.sql` | `5434b572faedb9d4fde620d90d6db4271ee80150c5a048288d10b20f24acca31` | PASS; ledger 182→183 |
+
+- Each ledger row was recorded exactly once with the canonical version and SQL text matching the executed file. The 179 prior rows were unchanged.
+- A forced failure after M4 DDL and ledger insertion rolled back both: the Owner function, private schema and target ledger entry were absent afterward. **Atomic rollback PASS.**
+- M4 metadata checks passed: exact signature, postgres ownership, SECURITY DEFINER, empty search_path, execute denied to anon/service_role, and expected authenticated grant.
+- The accepted Owner integration SQL was checked against its GitHub blob and run with synthetic fixtures inside a rollback-only transaction. Active Owner use of inactive/unmapped catalogue items, server-derived names/prices/shorthand and totals, role denials, standard staff path, customer/Manager restrictions, shared-validator restrictions, quantity limits, failed-transaction rollback, and historical snapshot preservation passed. Synthetic rows/orders/auth fixtures were rolled back.
+- Combined result: `FOUR_MIGRATION_PRODUCTION_DERIVED_REHEARSAL=PASS`; disposable PostgreSQL cluster and temporary directory cleanup verified. No application/migration source was changed.
+
+### Pricing failure and stale-response verification
+
+**PASS — deterministic exact-hook behavior:** The accepted hook source was exercised in a controlled hook harness with deferred server-action responses and injected failures. Interleaved pickup-date requests proved a stale prior-date response cannot overwrite the later date's two-size prices (155/205; final verified state ready). A failed price result and a rejected request both yielded an error state with no verified prices; the Retry attempt loaded the subsequent price (165), and a late earlier attempt could not overwrite the retry result (175). Save remained unverified/disabled on failure.
+**PASS — pickup-time state:** The exact accepted Owner pickup-fields component handler was exercised with date-specific available slots. Changing to a date with different available times cleared the previous hidden time; selecting an offered time updated the value.
+**PASS — UI source safeguards:** The exact accepted manual-order forms contain visible “Price unavailable” and “Retry prices” states, the verification error text, no legacy display-price fallback, and prevent save until prices are verified.
+**Limit:** These are deterministic source/hook/component harness checks, not a live browser fault-injection run against the actual Preview or a real database RPC outage. No customer order was submitted. No failure or race bug was found in these checks.
+
+### Frozen release integrity and carried-forward verification
+
+- **PASS — unchanged accepted application:** The candidate app files remain identical to the accepted app commit. The subsequent branch commits through the latest documented checkpoint contain only `docs/PROJECT_FLOUR_MASTER_STATUS.md`; no Issue #8 migration/app source drift or Phase 10 pricing-deduplication code was found.
+- **Carried forward, not rerun in Phase 2M:** GitHub Actions run `41418840316` passed the focused Issue #8 and release regression checks, including TypeScript, scoped ESLint, isolated PostgreSQL assignment regression and exact-candidate production build. Owner acceptance was recorded for READY Preview `dpl_CB3qunPQqc5bs1HmtyNVp5RT83Ce`. These earlier checks were not repeated for this phase.
+- No new source, tests, migrations, deployment, or database records were created by Phase 2M; only this evidence append is being committed.
+
+### Production recovery readiness and decision
+
+- **HOLD — recoverable Production point not established.** The Production organization was confirmed on the Free plan. No current Production logical backup, verified physical snapshot, PITR window, or restore-tested Production recovery point was available through the inspected evidence. The preserved logical archive is a DEV archive and is not a Production recovery artifact. Supabase backup guidance indicates automatic daily backups are plan-dependent and Storage is not included in database backups; a database restore alone is not a complete platform restore.
+- Before any Production release preparation, the owner should establish a current, securely stored Production database recovery point or an eligible documented PITR/snapshot path and demonstrate restore readiness in isolation. Keep its private contents outside GitHub. Plan reconciliation of writes made after any older snapshot; application rollback does not reverse migrations.
+- If a later separately authorized release occurs, use the already recorded four-migration order and canonical checksums above, then stage/promote the exact frozen app only under separate authorization. Preserve the current Production application deployment as rollback. Do not automatically reverse additive SQL after application rollback; use forward recovery or a separately approved data-aware database restore.
+- **Phase 2M recommendation: HOLD for Production preparation.** The reconstructed schema, four-migration rehearsal, rollback probe and deterministic price failure/race behavior passed. The blocker is the absent verified Production recovery point and the remaining limitation that pricing failures were not injected through a live Preview/browser-to-database path. No Production release authorization is requested by this record.
