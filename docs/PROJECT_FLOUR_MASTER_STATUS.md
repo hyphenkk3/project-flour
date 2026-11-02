@@ -1466,3 +1466,45 @@ PostgreSQL documents that psql --single-transaction wraps the script in one tran
 For a later separately authorized DEV run: verify project tzwtpxdcggesgjaqxkqr and TLS identity; recheck each checksum and current ledger immediately before each file; use the exact one-file transaction wrapper above; verify each canonical version and dependent objects before continuing; stop on any failure. If commit acknowledgement is uncertain, inspect database state read-only before any retry. Preserve the logical backup; use forward recovery for committed additive changes rather than deleting ledger rows or undoing migration history.
 
 **Result:** HOLD for hosted DEV migration execution pending a verified secure psql credential/connection. Production remains untouched.
+
+
+## Issue #8 Phase 2G-F — secure DEV connectivity and controlled migrations (2 November 2026)
+
+**Result: the three previously approved Issue #8 migrations were applied individually and verified on hosted DEV.** No Production database, application, deployment, alias, credentials, or configuration was accessed or changed. No Issue #8 application deployment or alias change was made.
+
+### Source and connection identity
+
+- Before this documentation-only update, GitHub branch `codex/issue-8-addons-implementation-20261101` was at `2273c539a5cc9f185c083c5a1139b3d22c37e69d`, tree `d8d54d900aa8037b4ef661add60857e6b23ef0fd`; remote HEAD was independently confirmed immediately before updating this file. Migration source files were unchanged.
+- The authenticated DEV Dashboard Connect panel showed Direct PostgreSQL: host `db.tzwtpxdcggesgjaqxkqr.supabase.co`, port 5432, database `postgres`, user `postgres`; Dashboard stated direct connections use IPv6 by default. The project metadata independently identified `tzwtpxdcggesgjaqxkqr` as `project-flour-dev`, PostgreSQL 17.6. Dashboard displayed the DEV CA certificate link. Client-side SSL enforcement was `sslmode=verify-full` using the existing trusted root certificate.
+- DNS resolved the DEV host to IPv6 `2406:da18:1f5e:4101:575f:ea09:322e:c0ae`; TCP 5432 succeeded. PostgreSQL 17.11 `psql` connected as `postgres`; the read-only identity query returned database `postgres`, server 17.6, SSL active, and transaction read-only enabled. The server address was the same IPv6 address. No password or credential-file contents were logged.
+- The temporary DEV password file was mode 600 inside a mode-700 directory. After postflight, the file, its directory and the temporary execution copy were removed and their absence verified. The previously restore-tested DEV archive and private manifest were not changed.
+
+### Final preflight and runner identity
+
+- Read-only preflight returned 183 migration rows, max version `20261101100854`, and none of `20261101194235`, `20261101200000`, or `20261101200100`.
+- The historical discrepancy was unchanged: version `20261101100854` still has name `20261101120000_collection_orders_active_staff_rls`. No historical row was renamed, deleted, repaired or regenerated.
+- The expected DEV database baseline remained: only the 16-argument `submit_guest_extra_order` RPC; owner `postgres`; SECURITY DEFINER; `search_path=public`; prior body MD5 `9a62b3eacd01513fe6ca7ff138a72a08`; anon/authenticated/service_role EXECUTE. The 10-argument legacy overload was absent. The current Preorder and one-argument options RPC were present. Deferred order/stock integrity triggers and validated foreign keys remained enabled.
+- Current branch migration files matched their approved SHA-256 values. The preserved locally rehearsed generator and SQL splitter were reused unchanged: `generate-driver.mjs` SHA-256 `c6d81cc21cad8a3b4e01b98a9ae15836c5f68ccc8e7a78528d729524a2076ad9`; `legacy-sql-split-runtime.ts` SHA-256 `bbf959911d2a9737a1abb759dc6381959bd3065957dbd3d71adc900abf8732b7`. Each one-file driver used PostgreSQL 17.11 `psql -X --single-transaction -v ON_ERROR_STOP=1`, transaction advisory locking, a 3-second lock timeout, a 5-minute statement timeout, a target/prior-version guard, the exact source SQL, and the canonical version/name/statements insert in the same transaction. This is the rehearsed psql runner; no broad Supabase migration command was used.
+
+### Migration execution and checkpoints
+
+Each migration committed separately; the next file was not started until the preceding ledger/object checkpoint passed.
+
+| File / canonical version | SHA-256 | Result |
+|---|---|---|
+| `20261101194235_issue8_fresh_pick_overload_compatibility.sql` / `20261101194235` | `6dda6c7ed675f4dbbb184166601fdb5189dfe60eb7c75c9d0fdaf0d69b547b8a` | COMMITTED; ledger 184; one canonical row, six statements |
+| `20261101200000_issue8_addon_catalogue_schema_and_owner_management.sql` / `20261101200000` | `18788af12a64e10676b0e6352e13776b05cd7df7808f2688c7724044e08c25ba` | COMMITTED; ledger 185; one canonical row, 52 statements |
+| `20261101200100_issue8_legacy_fresh_pick_order_stock_link.sql` / `20261101200100` | `cb5272995f6704a552bf51f965e202d7f6b950d9f3cdbbf7a012fc0fc3018b27` | COMMITTED; ledger 186; one canonical row, one statement |
+
+M1 preserved one extended Fresh Pick RPC with 16 arguments and one default argument, SECURITY DEFINER, postgres ownership, `search_path=public`, and anon/authenticated/service_role grants. Its post-M1 body MD5 was `b73f223ae64a5a03556d0ac6d07f427e`. M2 retained the 15/16-argument caller compatibility and the Preorder RPC. Both `storefront_customer_preorder_options(uuid)` and `storefront_customer_preorder_options(uuid,date)` are present. M3 verified the extended RPC and integrity guards, found that DEV has no legacy 10-argument overload, did not create a dummy overload, and recorded its canonical version. Final extended Fresh Pick body MD5 was `ef60e2d117356bc195ace69455a7dcec`.
+
+### Postflight and business-data integrity
+
+- Final ledger is 186 rows; each target version appears exactly once with its expected filename-derived name and statement count. No extra/generated version was created.
+- The new `collection_paid_addon_types` table contains the expected 12 collection mappings. All four catalogue tables have RLS enabled. Authenticated reads remain available; catalogue insert/update policies use `issue8_is_active_owner()`. Seasonal date-order constraints are validated. The updated-at and complimentary/paid order-line validation triggers are enabled. Existing checkout RPC ownership, SECURITY DEFINER properties, search paths and grants remain present.
+- Before/after privacy-preserving row counts and fingerprints were identical: orders 90 / `3e52df6e54901c00fa81afa29a1b2ffd`; order_items 104 / `776fcc724bd913b6542ea56469a054ff`; extra_stock 68 / `c7bb0545f025931b7706829665193353`; complimentary snapshots 89 / `1dde02a834b5464d49024322b4e6f3d8`; paid-add-on snapshots 2 / `a665d23f1689b97749c3ac7842a0d7e8`. The eight known cancelled legacy stock references remained eight. No order, stock, payment or historical snapshot row changed. The 12 rows are the intended new collection mappings.
+- No migration, lock, permission, checkout-signature, or unexpected data error occurred. The existing DEV parity application and `dev.whitebird.asia` were not changed by this task; no new Preview deployment was created.
+
+### Decision
+
+**GO for Phase 2H isolated DEV Preview deployment and runtime verification**, subject to its own environment-binding and deployment preflight. This is not authorization to change the DEV alias or Production. Production remains untouched.
