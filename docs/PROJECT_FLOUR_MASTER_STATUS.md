@@ -1293,3 +1293,31 @@ Two independent disposable clusters were initialized and removed with cleanup ve
 - Preview runtime validation, branch-scoped DEV credentials and any DEV alias switch remain separate gates and were not authorized or performed here. Production remains unchanged and out of scope.
 
 **Phase 2F result:** GO for separately authorized hosted DEV migration execution only, with per-file verification above. HOLD for Issue #8 Preview/runtime acceptance until an isolated branch Preview with verified DEV-only bindings is separately prepared.
+
+### Issue #8 Phase 2G — hosted DEV migration preflight — 2 November 2026
+
+**Decision: HOLD; no Issue #8 migration was applied.** Mandatory recovery-point verification failed. No hosted database, migration ledger, function, order, stock, deployment, alias, environment variable, credential, or customer data was changed.
+
+**Source and SQL preflight**
+
+- GitHub branch `codex/issue-8-addons-implementation-20261101` remains at `e1fba3371fb7ac324d192e9975e499a59add909e`, tree `b72473b82c9fe03f67ee255fbf8e8b0eede29a65`. The three remote SQL files at that commit were independently hashed and match Phase 2F: M1 `6dda6c7ed675f4dbbb184166601fdb5189dfe60eb7c75c9d0fdaf0d69b547b8a`, M2 `18788af12a64e10676b0e6352e13776b05cd7df7808f2688c7724044e08c25ba`, M3 `cb5272995f6704a552bf51f965e202d7f6b950d9f3cdbbf7a012fc0fc3018b27`.
+- Project identity was confirmed as DEV `tzwtpxdcggesgjaqxkqr` (`project-flour-dev`), PostgreSQL 17.6, `ACTIVE_HEALTHY`. Read-only ledger query: 183 rows, latest version `20261101100854`, Issue #8 target versions present: 0. The existing version/name discrepancy remains unchanged.
+- Current RPC/security fingerprints match Phase 2F: only the postgres-owned SECURITY DEFINER 16-argument Fresh Pick overload is present (9 defaults, expected grants and `search_path=public`); legacy 10-argument overload remains absent. The one-argument options RPC, paid-add-on sync helper, deferred delivery validator, and relevant constraint triggers retain expected signatures, definitions, owners, ACLs and deferral settings. Current Owner-catalogue policies remain the previously rehearsed broad authenticated-write policies; no policy was changed.
+
+**Recovery-point gate — FAIL**
+
+- The authenticated Supabase Dashboard identifies the organization as **FREE**. The DEV scheduled-backups page states that Free Plan does not include project backups; no scheduled backup is available. The PITR page states PITR is a Pro Plan add-on and is not enabled.
+- No verified DEV logical backup or restore-tested recovery artifact was found in the canonical status record or available project interfaces. This does not meet the required usable recovery-point gate. A code recovery bundle or isolated schema rehearsal is not a restore point for hosted DEV data.
+- Required owner action before retry: provide evidence of a restorable DEV recovery point, or arrange a DEV-only logical backup covering the affected schema/data and verify that it can be restored in an isolated PostgreSQL 17 environment. No Production backup is needed or requested. Do not upgrade the project or change its settings as part of this task.
+
+**DEV application and alias observation**
+
+- `https://dev.whitebird.asia/` loaded the storefront homepage during a bounded browser check. This verifies basic availability only; it is not a staff, checkout, or database compatibility smoke test.
+- Vercel currently lists `dev.whitebird.asia` attached to branch `codex/cake-size-availability-dev`, while the previously documented READY parity deployment `dpl_FPF1M4NkkSXP6kKdJ4UpQxzWUbBR` is sourced from `codex/dev-parity-20261101`. This is a recorded mapping discrepancy; no alias was changed. The exact deployment serving the branch-mapped domain was not independently established. Reconcile this before Phase 2H Preview/application acceptance.
+
+**Outcome**
+
+- Per the mandatory stopping rule, M1, M2 and M3 were not executed. There are no per-migration outcomes or post-migration changes to report.
+- Production Supabase `cuowwlduhxxifmpvpltt` was not queried or modified in this phase.
+- Retry Phase 2G only after a restorable DEV recovery point is verified and the DEV domain/deployment mapping discrepancy is understood. Then repeat the identity, ledger, checksum and schema preflight before applying each migration separately.
+- **HOLD for hosted DEV migration execution and Phase 2H.**
