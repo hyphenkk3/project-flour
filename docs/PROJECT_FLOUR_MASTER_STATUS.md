@@ -1355,3 +1355,49 @@ Read-only DEV identity/ledger check returned database `postgres`, role `postgres
 ### Recovery decision and next gate
 
 The archive is captured and readable, but a complete restore, Auth/platform dependency restoration, object/data comparison, and critical checkout dependency verification remain **INCOMPLETE**. Do not apply the three migrations yet. The next safe step is one restore rehearsal in an isolated environment that provides compatible `pg_cron`, `pg_net`, and `supabase_vault` binaries (or the supported Supabase local stack), then compare the relevant schema, data, constraints, functions, triggers, policies, grants and migration ledger. Do not restore to hosted DEV or Production. After that succeeds, repeat the already-defined DEV preflight immediately before the separately authorized migration sequence.
+
+
+## Issue #8 Phase 2G-R2 — DEV logical restore verification (2 November 2026)
+
+**Result: GO to resume the previously authorized DEV-only migration sequence after its immediate preflight.** The existing DEV archive restored successfully into an isolated, compatible Supabase PostgreSQL environment and passed the relevant catalog, grant, ledger and data-presence comparisons. No hosted DEV migrations were applied during this recovery task. Production was not accessed.
+
+### Preserved archive and local restore environment
+
+- Rechecked the existing archive; SHA-256 remains `4c67bb6df3ad4d2fcbe7a06adb37f3781d7558fb197031b296942ec4d446d720`, size 4,950,659 bytes, mode 600. Its enclosing private directory is mode 700; the mode-600 local manifest and cleanup log are outside the repository. The archive and sensitive contents were not uploaded to GitHub.
+- Local environment: Docker Desktop 29.8.2 on Apple Silicon; Supabase CLI 2.117.0; official image `public.ecr.aws/supabase/postgres:17.6.1.167`; database reports PostgreSQL 17.6. A unique, unlinked temporary Supabase project used port 55442; only its PostgreSQL service was started. Auth, Storage, API and other services were excluded.
+- The nine DEV extensions were available and restored at matching versions: `btree_gist 1.7`, `citext 1.6`, `pg_cron 1.6.4`, `pg_net 0.20.4`, `pg_stat_statements 1.11`, `pgcrypto 1.3`, `plpgsql 1.0`, `supabase_vault 0.3.1`, and `uuid-ossp 1.1`.
+- The archive restored into a fresh database using PostgreSQL 17.11 `pg_restore --single-transaction --exit-on-error`; final exit status was 0 and the restore log had no errors. An earlier atomic attempt as local `postgres` rolled back because that role could not `SET ROLE supabase_admin`; retrying as the local Supabase superuser completed. No partial state from the first attempt remained.
+- Before restore, the disposable instance set `cron.database_name=flour_restore_r2` and `cron.launch_active_jobs=off`. This kept archived cron jobs from running. Those settings affected only the temporary local container.
+
+### Restore comparisons
+
+The restored catalog matched DEV in counts and fingerprints: 107 relations, 572 functions, 87 non-internal triggers, 557 constraints, 163 RLS policies, 370 indexes, one view, 26 enums and two sequences. Function body fingerprints matched by schema; trigger, constraint, policy, column, index, view, enum, sequence, default-ACL and migration-ledger fingerprints matched. Object owners and RLS flags matched. Normalized effective table, function and schema permissions matched after the supplemental schema-grant step below. Some raw ACL arrays serialize in a different order; their grantee/privilege/grant-option/grantor sets are identical.
+
+Exact row counts matched for 21 relevant catalogue, order, payment, stock, snapshot, staff, Auth, Vault and migration tables. Key examples: 90 orders, 104 order items, 35 payments, 35 payment allocations, 68 Fresh Pick stock rows, 297 stock events, 33 order confirmation snapshots, 377 order timeline events, 7 Auth users, 82 Auth migration rows, 183 Supabase migration rows, and 2 encrypted Vault rows. The three Issue #8 migration versions remain absent. The existing migration-ledger discrepancy remains unchanged.
+
+RPC and integrity metadata matched DEV: the current 16-argument Fresh Pick submission function remains SECURITY DEFINER under `postgres` with its existing grants; the DEV database still has no legacy 10-argument overload; the one-argument customer-options RPC remains present. Deferred stock/order constraint triggers and validated stock foreign keys match. A synthetic JWT claim returned its synthetic identity through `auth.uid()` in a transaction that was rolled back. No checkout or customer order was created.
+
+The plain restore did not reproduce effective USAGE grants on the Supabase-managed `graphql` and `graphql_public` schemas. Those exact live grants were captured read-only and replayed **only in the disposable local database**; effective schema ACLs then matched. Include this verified local platform-schema grant step when using this archive as a comparison restore.
+
+### Existing DEV data condition noted, not repaired
+
+A read-only comparison found eight `orders.extra_stock_id` references whose stock row has a different/null `extra_stock.order_id`. All eight orders are cancelled; their referenced stock is unsold and has no direct order ID. The same counts and status/lifecycle aggregates appeared in the restored copy. No identifiers or customer fields were reported, and no rows were changed. This is a pre-existing historical DEV condition, not a restore difference. The Issue #8 migrations do not repair these references; review separately before any workflow that relies on the affected rows.
+
+### Recovery limits and repeatable procedure
+
+This is a **verified logical PostgreSQL database restore**, suitable as a recovery reference for the Issue #8 database objects and data. It is not a complete Supabase platform recovery package:
+
+- The Auth database schema and seven user rows are present, and the synthetic `auth.uid()` check passed, but the GoTrue service was excluded; actual login and provider configuration were not restored or tested.
+- The Vault extension/view and encrypted rows are present, but secret plaintext was not read and Vault key material is outside this database archive. Decryption is unverified.
+- Storage database metadata may be in the dump; Storage object bytes, external credentials and other hosted service configuration are not.
+- No checkout transaction was run. Checkout function identity/definition/grants and deferred integrity definitions were compared structurally; no customer or stock mutation was performed.
+
+Repeatable isolated verification: provision a fresh, unlinked Supabase PostgreSQL 17 environment with the listed extension versions and required Supabase roles; keep cron execution disabled; create an empty restore database; set its `cron.database_name` to that database; restore with `pg_restore --single-transaction --exit-on-error` as `supabase_admin`; compare the relevant object/data fingerprints and effective grants; replay only the captured Supabase-managed GraphQL schema grants if the local image omits them. Never restore this archive into hosted DEV or Production as part of this procedure.
+
+The temporary local Supabase project was stopped with `supabase stop --no-backup`; its container, volume, network, temporary workspace and port listener were verified absent. The original archive and manifest remain intact. The temporary DEV password file was removed and its absence verified. Docker Desktop was left running because unrelated pre-existing Docker projects were present; they were not touched.
+
+### DEV alias and migration decision
+
+Read-only Vercel checks reconfirmed that `dev.whitebird.asia` aliases READY deployment `dpl_FPF1M4NkkSXP6kKdJ4UpQxzWUbBR`. Its separate project-domain record still stores `gitBranch=codex/cake-size-availability-dev`. Neither alias nor branch association changed.
+
+**GO for resuming the previously authorized DEV-only three-migration sequence**, subject to its existing immediate identity/checksum/schema/ledger preflight. This result does not authorize a Production action, DEV deployment, or alias change. No Issue #8 migration was applied in Phase 2G-R2.
