@@ -1426,3 +1426,43 @@ Supabase CLI 2.117.0 is installed, but its read-only project-list request failed
 ### Decision and continuation requirement
 
 M1, M2, and M3 were **not run**; there are no post-migration assertions to report. Do not retry with MCP `apply_migration`, broad `db push`, direct ledger insertion, or manual history repair. Resume only when a supported, authenticated version-aware runner can apply each repository migration separately and record its exact version in the same transaction. Then repeat identity/schema/ledger preflight and verify each migration before proceeding to the next.
+
+
+## Issue #8 Phase 2G-E — canonical migration runner qualification (2 November 2026)
+
+**Scope:** runner qualification only. No hosted DEV migration, deployment, alias change, environment-variable edit, customer-data write, or Production access/change occurred.
+
+**Verified source and migrations**
+
+- Branch was codex/issue-8-addons-implementation-20261101, HEAD 5bec6057982006b22722a8a3e9b871eab1593b4d, tree a2cf62e9085dfd3743a141ae18bffb9c4f1de303 at the start of this review. The source branch did not change; this entry is documentation-only.
+- The three approved migration files were checked against the staged branch files. Their SHA-256 values remain: M1 6dda6c7ed675f4dbbb184166601fdb5189dfe60eb7c75c9d0fdaf0d69b547b8a; M2 18788af12a64e10676b0e6352e13776b05cd7df7808f2688c7724044e08c25ba; M3 cb5272995f6704a552bf51f965e202d7f6b950d9f3cdbbf7a012fc0fc3018b27.
+- The existing DEV logical backup remained at its private path outside GitHub, mode 600, 4,950,659 bytes, SHA-256 4c67bb6df3ad4d2fcbe7a06adb37f3781d7558fb197031b296942ec4d446d720. The previous restore-tested manifest remains available. No new backup was created.
+
+**Supabase CLI assessment**
+
+Installed CLI: 2.117.0. Its migration up help supports a target URL or linked project, but has no single-version selector; it applies pending files from the configured migrations directory. The isolated three-file workspace was rehearsed against the restored 183-entry DEV ledger and refused before SQL execution with LegacyMigrationMissingLocalError: Remote migration versions not found in local migrations directory. This is the recorded historical mismatch, not a migration SQL failure. The --include-all and db push options were rejected because they are not one-file controls and could select unrelated pending files.
+
+**Alternative runner rehearsed**
+
+A narrowly scoped PostgreSQL runner was tested on a fresh disposable restore of the existing backup using Supabase Postgres image 17.6.1.167 (server PostgreSQL 17.6) and host PostgreSQL client tools 17.11. The restore started with 183 ledger rows, maximum version 20261101100854, and none of the three target versions. Only temporary container-local role scaffolding needed by the restore was used. The container was removed after each rehearsal; cleanup verification passed.
+
+The tested runner is a custom, one-file psql transaction, not supabase migration up: psql -X --single-transaction -v ON_ERROR_STOP=1 -f <generated-one-file-wrapper>. The wrapper sets transaction-local lock_timeout = 3s and statement_timeout = 5min, takes a transaction advisory lock, checks the target version is absent and required prior versions exist, includes the unchanged migration file, then inserts the exact version, filename-derived name, and parsed statement array into supabase_migrations.schema_migrations before commit. The parsed array used the Supabase CLI v2.117.0 legacy SQL splitter. The three migration files contain no non-transactional directive or transaction-control statement.
+
+- Forced an error after M1 DDL and before its history insert: the transaction failed, M1 remained absent, and the 16-argument Fresh Pick function definition MD5 remained 9a62b3eacd01513fe6ca7ff138a72a08. Retrying M1 then succeeded.
+- After M1: exactly one canonical 20261101194235 row with the matching name; ledger count 184; M2 and M3 absent.
+- After separately running M2: exactly one canonical 20261101200000 row; ledger count 185; M3 absent.
+- After separately running M3: exactly one canonical 20261101200100 row; ledger count 186.
+- The fingerprint of the original 183 ledger rows remained 262cea08f6dfbb19418691d85f344219; no duplicate or generated versions appeared.
+- supabase migration list --db-url exited 0 on the local restore and showed M1 as matching local and remote version 20261101194235. The other historical rows remained remote-only in the intentionally three-file workspace. This confirms canonical-version recognition; it does not clear the known full-history mismatch for broad future CLI operations.
+
+PostgreSQL documents that psql --single-transaction wraps the script in one transaction and rolls it back when ON_ERROR_STOP is enabled and any command fails ([PostgreSQL 17 psql reference](https://www.postgresql.org/docs/17/app-psql.html)). Supabase documents that migration listing compares timestamps/versions, and that remote history is stored in supabase_migrations.schema_migrations ([migration list reference](https://supabase.com/docs/reference/cli/supabase-migration-list), [database migration guide](https://supabase.com/docs/guides/deployment/database-migrations)).
+
+**Hosted DEV preflight and decision**
+
+- Supabase project metadata and authenticated read-only SQL independently reconfirmed DEV tzwtpxdcggesgjaqxkqr, PostgreSQL 17.6, database postgres, role postgres, ledger count 183, maximum 20261101100854, and zero target migration versions. The current extended 16-argument Fresh Pick function remains postgres-owned, SECURITY DEFINER, search_path=public, MD5 9a62b3eacd01513fe6ca7ff138a72a08.
+- The secure DEV password file previously used for backup is no longer present (PGPASSFILE_MISSING). No password was requested or exposed, and a direct TLS verify-full PostgreSQL identity check could not be run. The Supabase MCP read-only connection did verify project identity, but it is not the tested psql execution route.
+- Therefore the runner qualification PASSES locally, but hosted DEV execution remains HOLD until an owner-provided mode-600 DEV password file and the current Dashboard connection parameters are available for a read-only TLS identity check. Do not guess the pooler host/user or fall back to MCP apply_migration, broad db push, history repair, or manual post-commit ledger changes.
+
+For a later separately authorized DEV run: verify project tzwtpxdcggesgjaqxkqr and TLS identity; recheck each checksum and current ledger immediately before each file; use the exact one-file transaction wrapper above; verify each canonical version and dependent objects before continuing; stop on any failure. If commit acknowledgement is uncertain, inspect database state read-only before any retry. Preserve the logical backup; use forward recovery for committed additive changes rather than deleting ledger rows or undoing migration history.
+
+**Result:** HOLD for hosted DEV migration execution pending a verified secure psql credential/connection. Production remains untouched.
