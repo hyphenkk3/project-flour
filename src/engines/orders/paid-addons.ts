@@ -23,6 +23,8 @@ export type EditablePaidAddonDraft = {
   /** Length always matches quantity when selected; empty string = blank slot. */
   writtenMessages: string[];
   sortOrder: number;
+  /** Catalog state for Owner manual creation; historical rows may be inactive. */
+  isActive?: boolean;
 };
 
 /** Client → RPC mutation payload (identity + qty + per-card messages only). */
@@ -111,6 +113,7 @@ export function messagesForQuantity(
 export function buildEditablePaidAddonDrafts(input: {
   catalog: PaidAddonType[];
   existing?: StorefrontPaidAddon[] | null;
+  includeInactiveCatalog?: boolean;
 }): EditablePaidAddonDraft[] {
   const existing = [...(input.existing ?? [])].sort(
     (a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code, "en"),
@@ -120,7 +123,7 @@ export function buildEditablePaidAddonDrafts(input: {
   const seen = new Set<string>();
 
   const activeCatalog = [...input.catalog]
-    .filter((row) => row.isActive)
+    .filter((row) => input.includeInactiveCatalog || row.isActive)
     .sort(
       (a, b) => a.sortOrder - b.sortOrder || a.code.localeCompare(b.code, "en"),
     );
@@ -148,6 +151,7 @@ export function buildEditablePaidAddonDrafts(input: {
           )
         : resizeWrittenMessages([], 1),
       sortOrder: line?.sortOrder ?? type.sortOrder,
+      isActive: type.isActive,
     });
     seen.add(type.code);
   }
@@ -171,6 +175,7 @@ export function buildEditablePaidAddonDrafts(input: {
         line.writtenMessage,
       ),
       sortOrder: line.sortOrder,
+      isActive: false,
     });
   }
 

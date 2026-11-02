@@ -1,0 +1,43 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+const read = (path) => readFile(new URL(path, `file://${process.cwd()}/`), "utf8");
+const page = await read("src/app/(app)/owner/orders/new/page.tsx");
+const query = await read("src/workspaces/owner/orders/queries.ts");
+const form = await read("src/workspaces/owner/orders/StaffGuestOrderForm.tsx");
+const editor = await read("src/workspaces/owner/orders/OrderPaidAddonsEditor.tsx");
+const action = await read("src/workspaces/owner/orders/actions.ts");
+const helper = await read("src/workspaces/owner/orders/create-staff-preorder.ts");
+const drafts = await read("src/engines/orders/paid-addons.ts");
+const migration = await read("supabase/migrations/20261102040744_issue8_owner_manual_new_order_catalogue_override.sql");
+
+assert.match(page, /staff\.role\.code !== "owner"/);
+assert.match(page, /listOwnerManualComplimentaryOptions/);
+assert.match(page, /listOwnerManualPaidAddonTypes/);
+assert.match(query, /export async function listOwnerManualComplimentaryOptions/);
+assert.match(query, /export async function listOwnerManualPaidAddonTypes/);
+assert.match(query, /const supabase = createServiceClient\(\)/);
+assert.match(form, /includeInactiveCatalog: true/);
+assert.match(form, /option\.isActive && option\.isDefault \? option\.defaultQuantity : 0/);
+assert.match(form, /\$\{option\.name\} \(Inactive\)/);
+assert.match(editor, /showInactiveStatus && !draft\.isActive/);
+assert.match(drafts, /input\.includeInactiveCatalog \|\| row\.isActive/);
+assert.match(action, /ownerManualCatalogueOverride: true/);
+assert.match(helper, /create_owner_manual_guest_preorder_with_catalogue_override/);
+assert.match(helper, /create_staff_guest_preorder_with_source_detail/);
+assert.match(migration, /sp\.is_active = true/);
+assert.match(migration, /sp\.archived_at is null/);
+assert.match(migration, /r\.code = 'owner'/);
+assert.match(migration, /c\.owner_auth_user_id = \(select auth\.uid\(\)\)/);
+assert.match(migration, /o\.created_by = c\.owner_staff_id/);
+assert.match(migration, /pg_catalog\.pg_backend_pid\(\)/);
+assert.match(migration, /pg_catalog\.txid_current\(\)/);
+assert.match(migration, /grant execute on function public\.create_owner_manual_guest_preorder_with_catalogue_override[\s\S]*?to authenticated/i);
+assert.match(migration, /from public, anon, service_role/i);
+assert.match(migration, /new\.unit_price := v_type\.unit_price/);
+assert.match(migration, /new\.financial_shorthand := v_type\.financial_shorthand/);
+assert.doesNotMatch(migration, /create or replace function public\.create_staff_guest_preorder_with_source_detail/i);
+assert.doesNotMatch(migration, /create or replace function public\.submit_guest_preorder/i);
+assert.doesNotMatch(migration, /create or replace function public\.submit_guest_extra_order/i);
+
+console.log("PASS: Owner New Order loads the full catalogue behind Owner authorization, labels inactive items, preserves standard RPC routes, and uses a private transaction-bound database override.");

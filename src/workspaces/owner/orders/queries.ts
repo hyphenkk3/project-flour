@@ -1062,6 +1062,7 @@ export async function listConfirmationSnapshots(
 export type CollectionComplimentaryOption = {
   typeId: string;
   name: string;
+  isActive: boolean;
   isAvailable: boolean;
   isDefault: boolean;
   defaultQuantity: number;
@@ -1080,7 +1081,7 @@ export async function listCollectionComplimentaryOptions(
       is_default,
       default_quantity,
       sort_order,
-      complimentary_item_types ( id, name )
+      complimentary_item_types ( id, name, is_active )
     `,
     )
     .eq("collection_id", collectionId)
@@ -1093,17 +1094,58 @@ export async function listCollectionComplimentaryOptions(
   return (data ?? []).map((row) => {
     const type = relationOne(
       row.complimentary_item_types as
-        { id: string; name: string } | { id: string; name: string }[] | null,
+        { id: string; name: string; is_active: boolean } | { id: string; name: string; is_active: boolean }[] | null,
     );
     return {
       typeId: type?.id ?? "",
       name: type?.name ?? "Item",
+      isActive: type?.is_active ?? true,
       isAvailable: Boolean(row.is_available),
       isDefault: Boolean(row.is_default),
       defaultQuantity: Number(row.default_quantity ?? 1),
       sortOrder: Number(row.sort_order ?? 0),
     };
   });
+}
+
+/** Complete Owner-only manual-order catalogue, including inactive and unmapped items. */
+export async function listOwnerManualComplimentaryOptions(
+  collectionId: string | null,
+): Promise<CollectionComplimentaryOption[]> {
+  const supabase = createServiceClient();
+  const [{ data: types, error: typeError }, { data: assignments, error: assignmentError }] =
+    await Promise.all([
+      supabase
+        .from("complimentary_item_types")
+        .select("id, name, is_active")
+        .order("name", { ascending: true }),
+      collectionId
+        ? supabase
+            .from("collection_complimentary_items")
+            .select("complimentary_item_type_id, is_available, is_default, default_quantity, sort_order")
+            .eq("collection_id", collectionId)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+  if (typeError) throw new Error(typeError.message);
+  if (assignmentError) throw new Error(assignmentError.message);
+
+  const assignmentByType = new Map(
+    (assignments ?? []).map((row) => [row.complimentary_item_type_id, row]),
+  );
+  return (types ?? []).map((type, index) => {
+    const assignment = assignmentByType.get(type.id);
+    const isAvailable = Boolean(assignment?.is_available);
+    const isActive = Boolean(type.is_active);
+    return {
+      typeId: type.id,
+      name: type.name,
+      isActive,
+      isAvailable,
+      isDefault: Boolean(assignment?.is_default) && isAvailable && isActive,
+      defaultQuantity: Number(assignment?.default_quantity ?? 1),
+      sortOrder: Number(assignment?.sort_order ?? index),
+    };
+  }).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "en"));
 }
 
 /** Active paid-add-on catalog for Owner create/edit (no admin UI). */
@@ -1122,6 +1164,27 @@ export async function listActivePaidAddonTypes(): Promise<PaidAddonType[]> {
     throw new Error(error.message);
   }
 
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    code: row.code as string,
+    name: row.name as string,
+    unitPrice: Number(row.unit_price),
+    financialShorthand: row.financial_shorthand as string,
+    isActive: Boolean(row.is_active),
+    sortOrder: Number(row.sort_order ?? 0),
+    maxQuantity: Number((row as { max_quantity?: number }).max_quantity ?? 3),
+  }));
+}
+
+/** Complete Owner-only manual-order add-on catalogue, including inactive items. */
+export async function listOwnerManualPaidAddonTypes(): Promise<PaidAddonType[]> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("paid_addon_types")
+    .select("id, code, name, unit_price, financial_shorthand, is_active, sort_order, max_quantity")
+    .order("sort_order", { ascending: true })
+    .order("code", { ascending: true });
+  if (error) throw new Error(error.message);
   return (data ?? []).map((row) => ({
     id: row.id as string,
     code: row.code as string,

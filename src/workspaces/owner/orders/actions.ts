@@ -404,6 +404,7 @@ export async function createStaffGuestOrderAction(
 
   const created = await createStaffGuestPreorderRecord({
     actorStaffId: staff.id,
+    ownerManualCatalogueOverride: true,
     guestName,
     guestPhone: guestPhone || null,
     guestEmail: guestEmail || null,

@@ -42,6 +42,8 @@ export type CreateStaffGuestPreorderInput = {
     sort_order: number;
   }>;
   paidAddons?: PaidAddonMutationPayload[];
+  /** Use the database-guarded all-catalogue exception for Owner New Order only. */
+  ownerManualCatalogueOverride?: boolean;
   includeReceipt?: boolean;
   needsBakeryAttention?: boolean;
   bakeryAttentionNote?: string | null;
@@ -217,7 +219,9 @@ export async function createStaffGuestPreorderRecord(
   }
 
   const { data, error } = await supabase.rpc(
-    "create_staff_guest_preorder_with_source_detail",
+    input.ownerManualCatalogueOverride
+      ? "create_owner_manual_guest_preorder_with_catalogue_override"
+      : "create_staff_guest_preorder_with_source_detail",
     rpcArgs,
   );
 

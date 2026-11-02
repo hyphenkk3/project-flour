@@ -5,8 +5,8 @@ import { requireStaff } from "@/foundation/auth/session";
 import { StaffGuestOrderForm } from "@/workspaces/owner/orders/StaffGuestOrderForm";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import {
-  listActivePaidAddonTypes,
-  listCollectionComplimentaryOptions,
+  listOwnerManualPaidAddonTypes,
+  listOwnerManualComplimentaryOptions,
 } from "@/workspaces/owner/orders/queries";
 import {
   getCurrentCollection,
@@ -24,12 +24,12 @@ export default async function OwnerNewOrderPage() {
 
   const cakes = await listOfferableLibraryCakes();
   const collection = await getCurrentCollection();
-  const complimentaryOptions = collection
-    ? await listCollectionComplimentaryOptions(collection.id)
-    : [];
+  const complimentaryOptions = await listOwnerManualComplimentaryOptions(
+    collection?.id ?? null,
+  );
   let paidAddonCatalog: PaidAddonType[] = [];
   try {
-    paidAddonCatalog = await listActivePaidAddonTypes();
+    paidAddonCatalog = await listOwnerManualPaidAddonTypes();
   } catch {
     paidAddonCatalog = [];
   }

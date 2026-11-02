@@ -103,15 +103,20 @@ export function StaffGuestOrderForm({
     () =>
       complimentaryOptions.map((option) => ({
         typeId: option.typeId,
-        name: option.name,
-        quantity: option.isDefault ? option.defaultQuantity : 0,
+        name: option.isActive ? option.name : `${option.name} (Inactive)`,
+        quantity: option.isActive && option.isDefault ? option.defaultQuantity : 0,
         sortOrder: option.sortOrder,
       })),
   );
 
   const [paidAddonDrafts, setPaidAddonDrafts] = useState<
     EditablePaidAddonDraft[]
-  >(() => buildEditablePaidAddonDrafts({ catalog: paidAddonCatalog }));
+  >(() =>
+    buildEditablePaidAddonDrafts({
+      catalog: paidAddonCatalog,
+      includeInactiveCatalog: true,
+    }),
+  );
 
   const [needsAttention, setNeedsAttention] = useState(false);
 
@@ -360,6 +365,7 @@ export function StaffGuestOrderForm({
         <OrderPaidAddonsEditor
           drafts={paidAddonDrafts}
           onChange={setPaidAddonDrafts}
+          showInactiveStatus
         />
       </section>
 
