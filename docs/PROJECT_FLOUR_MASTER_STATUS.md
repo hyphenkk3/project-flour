@@ -1735,7 +1735,7 @@ For the Preview validation window, Vercel returned no error/fatal runtime logs f
 
 ### Release inventory
 
-GitHub comparison from Production source `d98afb9` to the Issue #8 branch reports 32 changed paths: 24 application paths, four test/workflow paths, this canonical status document, and the four migrations below. There are no Phase 10 pricing-deduplication files.
+GitHub comparison from Production source `d98afb9` to the Issue #8 branch reports 32 changed paths: 20 application paths, seven workflow/test paths, this canonical status document, and the four migrations below. There are no Phase 10 pricing-deduplication files.
 
 Application paths:
 - `src/app/(app)/library/addons/page.tsx`
