@@ -1716,3 +1716,7 @@ The application change is limited to `src/workspaces/owner/orders/StaffGuestOrde
 The `dev.whitebird.asia` alias remains on `dpl_FPF1M4NkkSXP6kKdJ4UpQxzWUbBR`. The new deployment has no customer-facing alias. No hosted database changes, migrations, Production access, Production deployment, or alias changes were made.
 
 **Status:** Ready for Owner acceptance of this isolated DEV Preview. Runtime failure was not force-injected; retry behavior is covered by source regression and retained UI branch.
+
+### Read-only log correlation supplement
+
+For the Preview validation window, Vercel returned no error/fatal runtime logs for deployment `dpl_CB3qunPQqc5bs1HmtyNVp5RT83Ce` (08:54:22Z–09:24:22Z), and the browser console had no errors. In the DEV Supabase log window beginning 09:13Z, the aggregate query counted 45 PostgREST and 56 PostgreSQL log entries, with zero timeout-text mentions and no entry containing the pricing RPC name. The PostgREST aggregate had zero error-text mentions; the PostgreSQL aggregate was not severity-classified, so its generic text matches are not treated as confirmed database errors. No request-to-database correlation was available. This supports the UI-state diagnosis but does not prove that no unrelated DEV database errors occurred.
