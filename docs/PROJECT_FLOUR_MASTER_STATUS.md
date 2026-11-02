@@ -1720,3 +1720,93 @@ The `dev.whitebird.asia` alias remains on `dpl_FPF1M4NkkSXP6kKdJ4UpQxzWUbBR`. Th
 ### Read-only log correlation supplement
 
 For the Preview validation window, Vercel returned no error/fatal runtime logs for deployment `dpl_CB3qunPQqc5bs1HmtyNVp5RT83Ce` (08:54:22Z–09:24:22Z), and the browser console had no errors. In the DEV Supabase log window beginning 09:13Z, the aggregate query counted 45 PostgREST and 56 PostgreSQL log entries, with zero timeout-text mentions and no entry containing the pricing RPC name. The PostgREST aggregate had zero error-text mentions; the PostgreSQL aggregate was not severity-classified, so its generic text matches are not treated as confirmed database errors. No request-to-database correlation was available. This supports the UI-state diagnosis but does not prove that no unrelated DEV database errors occurred.
+
+
+## Issue #8 Phase 2L — Release candidate consolidation and Production readiness (2 November 2026)
+
+**Decision: HOLD for Production release preparation.** This is a read-only evidence consolidation. No Production or DEV database writes, migrations, deployments, environment changes, customer-order changes, or alias changes occurred.
+
+### Locked source and deployment identities
+
+- The current Issue #8 GitHub branch HEAD is `452c2a754ed8d62f7e03c471e43bf93077b3cb92`. It is 45 commits ahead and zero behind Production recovery/source commit `d98afb9733ed8285e71ba7e4a7e7a3e1116980c7`. The app candidate is `0bf6ca047b38e6786a3e856cd28e45dde7eb99b7`, tree `6a4f69adf465e21a262dbdff2ad8a3d5ce56480d). GitHub comparison confirms the two commits after the app candidate change only this Master Status file; no application or migration files changed.
+- The actual live Production Vercel deployment is READY `dpl_HE7zep8jWR1wkoKZ6w4tC8t4bAaN`, source SHA `d98afb9733ed8285e71ba7e4a7e7a3e1116980c7`, project `prj_3rmlAQzLSFOi15DEGczSuDYDq8xr`, team `hyphen-org`. Read-only alias records map both `whitebird.asia` and `www.whitebird.asia` to this deployment.
+- Production Supabase `cuowwlduhxxifmpvpltt` is ACTIVE_HEALTHY, PostgreSQL 17.6.1.166. DEV `tzwtpxdcggesgjaqxkqr` is ACTIVE_HEALTHY, PostgreSQL 17.6.1.155. DEV has 187 ledger entries, with each Issue #8 migration recorded once. Production has 179 ledger entries and none of the four Issue #8 versions.
+- The accepted Preview remains READY at deployment `dpl_CB3qunPQqc5bs1HmtyNVp5RT83Ce`, source `0bf6ca047b38e6786a3e856cd28e45dde7eb99b7`. Owner acceptance of all six Preview checks is carried forward from the approved Phase 2K record.
+
+### Release inventory
+
+GitHub comparison from Production source `d98afb9` to the Issue #8 branch reports 32 changed paths: 24 application paths, four test/workflow paths, this canonical status document, and the four migrations below. There are no Phase 10 pricing-deduplication files.
+
+Application paths:
+- `src/app/(app)/library/addons/page.tsx`
+- `src/app/(app)/library/layout.tsx`
+- `src/app/(app)/owner/orders/new/page.tsx`
+- `src/engines/orders/customer-preorder-options.ts`
+- `src/engines/orders/paid-addons.ts`
+- `src/workspaces/library/LibraryNav.tsx`
+- `src/workspaces/library/action-state.ts`
+- `src/workspaces/library/addons/AddonCatalogueManager.tsx`
+- `src/workspaces/library/addons/actions.ts`
+- `src/workspaces/library/addons/collection-dates.d.mts`
+- `src/workspaces/library/addons/collection-dates.mjs`
+- `src/workspaces/library/addons/queries.ts`
+- `src/workspaces/library/addons/types.ts`
+- `src/workspaces/owner/orders/OrderPaidAddonsEditor.tsx`
+- `src/workspaces/owner/orders/StaffGuestOrderForm.tsx`
+- `src/workspaces/owner/orders/actions.ts`
+- `src/workspaces/owner/orders/create-staff-preorder.ts`
+- `src/workspaces/owner/orders/queries.ts`
+- `src/workspaces/storefront/checkout/actions.ts`
+- `src/workspaces/storefront/extra/actions.ts`
+
+Verification paths:
+- `.github/workflows/issue8-addon-manager-ux-gate.yml`
+- `.github/workflows/issue8-owner-manual-new-order-verification.yml`
+- `scripts/test-addon-collection-history.mjs`
+- `scripts/test-customer-preorder-options.ts`
+- `scripts/test-guest-extra-paid-addons.ts`
+- `scripts/test-owner-manual-catalogue-override.sql`
+- `scripts/test-owner-manual-new-order-source.mjs`
+
+Migrations, recalculated from the current GitHub branch content:
+1. `20261101194235_issue8_fresh_pick_overload_compatibility.sql` — SHA-256 `6dda6c7ed675f4dbbb184166601fdb5189dfe60eb7c75c9d0fdaf0d69b547b8a`
+2. `20261101200000_issue8_addon_catalogue_schema_and_owner_management.sql` — SHA-256 `18788af12a64e10676b0e6352e13776b05cd7df7808f2688c7724044e08c25ba`
+3. `20261101200100_issue8_legacy_fresh_pick_order_stock_link.sql` — SHA-256 `cb5272995f6704a552bf51f965e202d7f6b950d9f3cdbbf7a012fc0fc3018b27`
+4. `20261102040744_issue8_owner_manual_new_order_catalogue_override.sql` — SHA-256 `5434b572faedb9d4fde620d90d6db4271ee80150c5a048288d10b20f24acca31`
+
+The feature set is the accepted Owner catalogue manager (Complimentary Items and Paid Add-ons, item activation, collection/date eligibility and seasonal boundaries), server-side price/quantity/snapshot enforcement, and the dedicated active-Owner manual New Order override for inactive or unmapped catalogue items. The override uses a private transaction context and canonical database snapshots; normal customer checkout, other staff roles, existing order edits, Fresh Pick allocation, payment and stock rules remain on their restricted paths. The historical collection UX and price-state correction are included in the accepted source.
+
+### Production schema compatibility evidence
+
+Read-only inspection of the live Production database found:
+
+- Existing base tables and dependencies required by the migrations: `complimentary_item_types`, `collection_complimentary_items`, `paid_addon_types`, `collections`, `orders`, `order_items`, `order_paid_addons`, `extra_stock`, `staff_profiles`, and `roles`.
+- Production currently lacks `complimentary_item_types.is_active`, complimentary mapping season columns, and `collection_paid_addon_types`; these are explicit M2 migration effects. Existing paid-add-on types already have active state and quantity limits. No order snapshot columns are replaced by the Issue #8 migrations.
+- Production has `staff_profiles.auth_user_id`, `role_id`, `is_active`, and `archived_at`; `roles.code` exists for the Owner authorization check.
+- Production has the 10-argument and 16-argument `submit_guest_extra_order` overloads, the 16-argument Preorder RPC, and the legacy one-argument customer-options RPC. These submission functions are postgres-owned SECURITY DEFINER functions with `search_path=public` and existing anon/authenticated/service_role grants. The exact legacy 10-argument definition fingerprint is `3d68aa191b14bd4b5d1459b499f88a5c`, matching M2's fail-closed guard.
+- The deployed 16-argument Fresh Pick RPC body matches the body in M1; M1's intentional signature/default change leaves only the final argument defaulted so 15- and 16-argument callers remain unambiguous. No CASCADE is used.
+- M2's allowlist replacement anchors occur once in the Preorder, legacy Fresh Pick and extended Fresh Pick definitions. The existing paid-add-on synchronizer anchor occurs once. A read-only simulation of the M2 legacy-body text replacement produced fingerprint `c9164af3edd6899c6c956e71af434cf4`, exactly M3's expected post-M2 fingerprint.
+- The required deferred order/stock constraint triggers and validated foreign keys for M3 are present. Production's order table has RLS and anon SELECT privilege, so M2 follows its Production branch and leaves the existing deferred delivery-invariant function unchanged.
+- M4's required `create_staff_guest_preorder_with_source_detail` dependency exists with the exact signature used by the new wrapper. A read-only simulation confirms the M2 paid-synchronizer patch anchor that M4 expects occurs once after the M2 text transformation.
+
+These catalog checks are compatibility evidence, not an executed migration. They do not replace the production-derived PostgreSQL rehearsal.
+
+### Verification and remaining gaps
+
+- **PASS, carried forward:** GitHub Actions run `41418840316` passed for exact application commit `0bf6ca047b38e6786a3e856cd28e45dde7eb99b7`: focused Issue #8 checks, the full release regressions including isolated PostgreSQL assignment coverage, TypeScript, scoped ESLint, and exact-candidate production build. Vercel also reports the accepted Preview READY. The tested app tree is unchanged in the two later documentation-only commits.
+- **PASS, carried forward for M1–M3:** Phase 2F records independent PostgreSQL 17.11 Production-derived and DEV-derived rehearsals applying M1–M3 individually with actual relevant functions, triggers, grants, 42 public tables, 51 triggers and 98 policies. Fresh Pick 10-argument and extended 15/16-argument calls, Preorder, stock linkage, audit, authorization, seasonal rules, snapshots/totals and rollback passed.
+- **PASS, carried forward for M4 on DEV-derived schema:** the Issue #8 Owner New Order SQL rehearsal passed against the reconstructed DEV schema with synthetic identities and records, including Owner-only access, Manager/staff/customer denial, authoritative snapshots/pricing, quantity/stock rejection and rollback.
+- **INCOMPLETE:** M4 has not been applied to a disposable Production-derived database after M1–M3. Although live Production catalogs satisfy the reviewed static guards, the full four-file sequence and Owner override integration have not been rehearsed from the actual Production starting state.
+- **INCOMPLETE:** a forced pricing-action failure and a deliberately interleaved stale-response race were not injected. The Phase 2K source regression checks the idle/loading/error display and disabled submission guard, but that is not equivalent to a forced network failure/race.
+- **Build/test execution in this task:** no new tests were run because the attached local checkout is detached at older `f0a81f3`; all other available worktrees are on unrelated commits, and a single isolated GitHub clone attempt failed because `github.com` DNS was unavailable. Previously recorded exact-commit CI and Preview evidence above are carried forward rather than misreported as rerun.
+
+### Future controlled release and recovery sequence
+
+1. Freeze the reviewed application source at `0bf6ca047b38e6786a3e856cd28e45dde7eb99b7` / tree `6a4f69adf465e21a262dbdff2ad8a3d5ce56480d` and the four checksummed migration files above. Before release, verify the Production project, environment-variable scopes and DEV/Production Supabase bindings without disclosing secrets.
+2. Rehearse all four migrations, individually and in canonical order, against a current Production-derived PostgreSQL 17 restore with the live 179-entry Production ledger, actual function/trigger/RLS definitions and no customer personal data. Verify one canonical ledger row per committed migration and rollback on forced failure.
+3. Before any live migration, verify a current recoverable Production snapshot/PITR point. The historical October backup is not a current point-in-time recovery image for November orders; no new backup was made in this phase.
+4. After separately authorized migration execution, apply M1, M2, M3, then M4 one at a time with the qualified transaction/ledger runner and bounded lock/statement timeouts. Verify each migration before continuing. Do not use broad `db push` or migration-history repair.
+5. Build and stage the exact tested application commit as a no-domain Production deployment with verified Production bindings. Preserve `dpl_HE7zep8jWR1wkoKZ6w4tC8t4bAaN` as the application rollback target. Promotion requires separate authorization and alias verification for both customer domains.
+6. After any confirmed regression, stop, preserve evidence, and restore the previous application deployment only after verifying old-app/new-database compatibility. Do not assume application rollback reverses SQL; retain additive migrations and use forward recovery unless a separately approved database restoration/reconciliation plan is necessary. A pre-migration snapshot restore may discard post-snapshot orders and must not be applied over live writes without a controlled data-reconciliation plan.
+
+**Phase 2L recommendation: HOLD for Production release preparation.** The specific blocker is the missing four-migration Production-derived rehearsal including M4. The forced pricing-failure and stale-response tests are also outstanding. No Production or DEV state was changed in this task.
