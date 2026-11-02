@@ -1688,3 +1688,31 @@ M1 preserved one extended Fresh Pick RPC with 16 arguments and one default argum
 - **Role/customer restrictions:** exact-candidate CI run `41390672629` and the previously completed isolated PostgreSQL rehearsal cover Owner versus Manager/staff/customer access, authoritative snapshots/prices, standard Preorder/Fresh Pick restrictions, and rollback behavior. These were not repeated as real browser transactions; no customer order was created.
 - **Alias/deployment protection:** the new Preview has only its generated branch alias and no custom customer domain. Read-only Vercel alias lookup confirms `dev.whitebird.asia` remains on `dpl_FPF1M4NkkSXP6kKdJ4UpQxzWUbBR`; its stored branch association remains `codex/cake-size-availability-dev`. No alias, environment-variable definition, Production deployment, Production database, or customer record was changed.
 - **Decision:** Preview is available for Owner inspection, but Issue #8 New Order acceptance remains **HOLD** pending successful date-specific price resolution. Forward recovery remains the documented DEV migration forward-recovery process; do not reverse the additive migration solely to address this Preview runtime issue.
+## Issue #8 Phase 2K — Owner New Order Pricing Runtime
+
+**Date:** 2 November 2026  
+**Branch:** `codex/issue-8-addons-implementation-20261101`  
+**Tested source commit:** `0bf6ca047b38e6786a3e856cd28e45dde7eb99b7`  
+**Git tree:** `6a4f69adf465e21a262dbdff2ad8a3d5ce56480d`
+
+### Finding and correction
+
+The reported “Checking price…” state was caused by presentation of the pricing hook's `idle` state, not by an unresolved request. With no pickup date, the hook intentionally has no request key and returns `idle`; the New Order form previously rendered every non-error status as “Checking price…”. The same misleading initial copy was reproduced on the existing `dev.whitebird.asia` parity app, so the display issue predates the Issue #8 application changes. With a valid date, the existing date-specific RPC resolved normally on both applications.
+
+The Owner New Order form now distinguishes the states: idle asks the user to select a pickup date, loading says prices are being checked, and an error or missing price shows an actionable error with “Retry prices”. The price verification and submission guards are unchanged; the Create Order button remains disabled until all selected cake prices are verified. No pricing RPC, server action, customer checkout, pickup-time rule, order snapshot, total, database, migration, or Production behavior was changed.
+
+### Verification evidence
+
+- GitHub Actions run [41418840316](https://github.com/hyphenkk3/project-flour/actions/runs/41418840316) passed for the exact tested commit: focused Issue #8 source regressions, full release regressions including isolated PostgreSQL assignment coverage, TypeScript, scoped ESLint, and the exact-candidate production build.
+- The new isolated DEV Preview is [project-flour-rgn9co1en-hyphen-org.vercel.app](https://project-flour-rgn9co1en-hyphen-org.vercel.app), deployment `dpl_CB3qunPQqc5bs1HmtyNVp5RT83Ce`, READY, Vercel project `prj_3rmlAQzLSFOi15DEGczSuDYDq8xr`, source `0bf6ca047b38e6786a3e856cd28e45dde7eb99b7`.
+- Runtime environment variables are scoped to Preview and the exact Issue #8 branch. The resolved Owner New Order page loaded the DEV-only inactive catalogue smoke entries through the server-side catalogue path, confirming the effective DEV bindings and service-role read path. No Production environment values were used or changed; secrets were not displayed.
+- On the authenticated Preview, an empty pickup date showed “Select a pickup date to verify cake prices before saving”; Create Order was disabled. On 2026-11-28, the 6-inch Avocado price resolved to RM135, the pickup-time selector was enabled, and a listed 12:00 PM option could be selected without submitting. With two cake lines (Avocado and Signature Yam), changing the date to 2026-11-29 briefly showed the expected loading state, then resolved both prices (RM135 and RM125) and re-enabled Create Order. No order was submitted and no database write was performed.
+- Browser console had no errors. The existing retry UI and disabled-submit guard were asserted by the focused regression test. A forced outage was not injected into hosted DEV.
+
+### Change and release boundaries
+
+The application change is limited to `src/workspaces/owner/orders/StaffGuestOrderForm.tsx`. The regression assertion is in `scripts/test-owner-manual-new-order-source.mjs`; the Issue #8 verification workflow now runs for changes to that form/test and checks out the triggering commit. The Vercel Preview workflow is pinned to the exact Git source commit and used Preview target behavior.
+
+The `dev.whitebird.asia` alias remains on `dpl_FPF1M4NkkSXP6kKdJ4UpQxzWUbBR`. The new deployment has no customer-facing alias. No hosted database changes, migrations, Production access, Production deployment, or alias changes were made.
+
+**Status:** Ready for Owner acceptance of this isolated DEV Preview. Runtime failure was not force-injected; retry behavior is covered by source regression and retained UI branch.
