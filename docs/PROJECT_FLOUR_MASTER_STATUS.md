@@ -1898,3 +1898,47 @@ The owner must establish one of the following before Production preparation can 
 No further attempt should use guessed endpoints, unverified pooler settings, copied credentials, or a default CLI dump that omits required data/platform objects.
 
 **Phase 2N recommendation: HOLD for Production release planning.** The actual project plan is Free and no current Production backup/PITR artifact was independently verified. The available execution environment cannot resolve the Production database hostname or access the authenticated CLI home/Management API state, so a compliant backup and restore test could not be completed. No Production changes were made.
+
+
+## Issue #8 Phase 2O — Existing Production backup reconciliation (2 November 2026, Asia/Kuching)
+
+**Inventory only:** no archive was created, overwritten, decrypted, restored, or removed; no Production database, application, alias, or settings were changed. This inventory supersedes Phase 2N’s statement that no Production artifact had been verified in the available evidence: the owner’s Mac backup directory is accessible and contains older restore-tested bundles and newer Oct 31 artifacts.
+
+### Backup directory and newest artifacts
+
+Private directory: `/Users/ycwee/Library/Application Support/Project Flour/Backups/`, owner `ycwee:staff`, mode `0700`. Oct 31 artifact directories are `0700`; their files are `0600`. The inventory found no Production backup artifact newer than Oct 31.
+
+| Artifact | Capture time / scope | Integrity and contents | Restore status |
+|---|---|---|---|
+| `production-postgres-20261031T071101Z/` | 2026-10-31 07:11:01 UTC; source project matches `cuowwlduhxxifmpvpltt`; one pg_dump MVCC snapshot | `database.dump.pfbackup` 3,511,756 bytes, SHA-256 `377ba15220bd50420171f081bc727926e985cfca4e581299090aa7485222990d`; `roles.sql.pfbackup` 6,224 bytes, SHA-256 `11f139e7e86a6c09cf4c80ed5deb1befc8bfdfe7529ee0f238426b0a304c201e`. Both match manifest; both have PFBAK01 header. Capture implementation specifies AES-256-GCM with PBKDF2-HMAC-SHA256, 600,000 iterations. Roles are captured separately with `pg_dumpall --roles-only --no-role-passwords`, so they are not guaranteed to share the database snapshot. The manifest says Storage object bytes are not included; only `storage.objects` metadata is in the DB archive. | Manifest explicitly says `NOT VERIFIED: isolated restore required`. It records no ledger count or object/data fingerprints. No Oct 31 database restore record was found. This inventory did not decrypt it or test its authentication tag. |
+| `production-storage-20261031T072149Z/` | inventory 2026-10-31 07:21:37 UTC; archive captured 07:22:56 UTC; same source project | SHA-256 `6df0db1704db30bd311f104f2e3edf8f4e19733f7b5424de22e65a565a995a9a` matches manifest. Manifest records 2 buckets, 34 objects, and 35 verified archive members. The capture verifier authenticates the encrypted tar and checks every object’s size and SHA-256 before writing its manifest. | Archive-member verification is recorded. It is a separate Storage capture, not an atomic cross-service snapshot with the database. |
+
+The October 31 database manifest’s capture time is 10 minutes 36 seconds before the Storage inventory and 11 minutes 55 seconds before the Storage archive capture. Its roles export is also a separate read. The encrypted format and checksums are verified, but the database manifest explicitly does not certify isolated restoration.
+
+### Latest previously restore-tested full Production bundle
+
+The latest restore-tested combined artifact found is `project-flour-production-full-20261022T055604Z.pfbackup`, captured 2026-10-22 05:56:04 UTC. It is 70,626,958 bytes, mode `0600`, in the private mode-`0700` backup directory. SHA-256 `48146b32065b7215cd4af103881ebf6252cffe0a524feb3e15d0e8de3ea11725` matches both sidecar and manifest. The manifest records authenticated decryption, database restore, and Storage extraction as verified.
+
+Its existing validation record reports a PostgreSQL 17.11 isolated restore, 113 table fingerprints, Auth/business/Storage metadata, relationship checks, roles applied locally without password hashes, and the exact 166-entry migration ledger. It records 34 extracted Storage objects totalling 68,750,334 bytes with before/after inventory and file hashes passing. It also explicitly records limitations: `pg_cron` and `supabase_vault` were unavailable in local validation; provider-managed project settings/keys are not included; and database and Storage are not one atomic cross-service snapshot.
+
+### Comparison with current Production baseline
+
+Read-only Production query on 2 November confirmed PostgreSQL 17.6, 179 migration rows, latest version `20261031231126`, and zero Issue #8 migration rows.
+
+- The latest **restore-tested** bundle has 166 ledger entries: it is **13 migrations behind** the current 179-entry baseline, and its snapshot is 9 days, 1 hour, 14 minutes, 57 seconds older than the Oct 31 database artifact. It cannot serve as the current release recovery point.
+- The newer Oct 31 database archive may contain more recent state, but its manifest omits the capture-time migration count and says isolated restore is required. Therefore its exact ledger/data gap against 179 is **unknown until restored and inspected**; do not assume it contains all 179 entries.
+- The Oct 31 Storage set is newer than the verified Oct 22 Storage set and has authenticated member verification, but its capture is separate from the database snapshot. Counts are both 34 objects; the Oct 31 manifest reports 68,823,091 encrypted archive bytes, versus 68,750,334 object bytes in the Oct 22 validation record. The counts/byte totals alone do not establish object-by-object parity or a shared point in time.
+- Oct 31 DB and role file checksums match their manifests. The PFBAK01 header and local helper establish the container format and intended encryption algorithm, but the Oct 31 database archive was not decrypted in this inventory. No customer data or credential contents were read or displayed.
+
+### Minimum next action and controlled recovery operation
+
+Do **not** make another backup during this inventory. First reuse the Oct 31 artifacts: in the established protected Mac environment, run the existing authenticated archive verifier and isolated PostgreSQL 17 restore validator on `production-postgres-20261031T071101Z`; compare the restored ledger against 179 and inspect only aggregate counts/fingerprints. Use the existing Storage manifest/member verification and existing Oct 22 extraction evidence; do not repeat successful Storage tests unless a checksum/member discrepancy appears.
+
+The established non-overwriting operation is documented in `recovery/production-backup/README.md`:
+- `capture.py` creates a unique encrypted database/roles directory, verifies archive authentication and PostgreSQL archive structure before publishing, then labels isolated recoverability unverified until restore testing.
+- `capture_storage.py` creates a separate encrypted Storage artifact and checks the source inventory before/after plus extracted member sizes/hashes.
+- `verify_archive.py` authenticates/checks the encrypted PostgreSQL archive without writing plaintext; `restore_validation.py` restores into a disposable local PostgreSQL 17 cluster and cleans it up.
+
+If the Oct 31 restore has fewer than 179 ledger rows, fails required object checks, or cannot reconcile its snapshot with current recovery requirements, a fresh single controlled capture is necessary before a later Production change. Even if it restores, it is dated Oct 31; make the release-window capture only immediately before any separately authorized release. Keep the DB/roles and Storage timestamp separation explicit, store the encrypted artifacts in the existing private destination, retain checksums/manifests, and run the isolated restore validator before declaring the recovery point usable. Do not automatically restore an older snapshot over live Production; reconcile all later orders/payments/stock transactions first. Supabase project-level Auth provider settings and secrets, external services, and Storage object bytes are not all covered by the PostgreSQL archive; preserve their separate recovery instructions.
+
+**Phase 2O recommendation: HOLD.** Existing restore evidence is reusable and the latest checked hashes/modes pass, but the newest database archive lacks isolated-restore evidence and its ledger count is unknown. The exact minimal gate is to restore-test that existing Oct 31 archive first; create a fresh release-window capture only if it is stale/incomplete for the authorized release. No backup or other Production change was performed in this phase.
