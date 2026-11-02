@@ -1859,3 +1859,42 @@ Disposable local PostgreSQL 17.11 loaded the verified schema-only capture. Each 
 - Before any Production release preparation, the owner should establish a current, securely stored Production database recovery point or an eligible documented PITR/snapshot path and demonstrate restore readiness in isolation. Keep its private contents outside GitHub. Plan reconciliation of writes made after any older snapshot; application rollback does not reverse migrations.
 - If a later separately authorized release occurs, use the already recorded four-migration order and canonical checksums above, then stage/promote the exact frozen app only under separate authorization. Preserve the current Production application deployment as rollback. Do not automatically reverse additive SQL after application rollback; use forward recovery or a separately approved data-aware database restore.
 - **Phase 2M recommendation: HOLD for Production preparation.** The reconstructed schema, four-migration rehearsal, rollback probe and deterministic price failure/race behavior passed. The blocker is the absent verified Production recovery point and the remaining limitation that pricing failures were not injected through a live Preview/browser-to-database path. No Production release authorization is requested by this record.
+
+
+## Issue #8 Phase 2N — Production recovery assurance assessment (2 November 2026, Asia/Kuching)
+
+**Decision: HOLD. No Production backup or database modification was performed.**
+
+### Current Production recovery capabilities
+
+- **Verified identity, read-only:** Supabase project `cuowwlduhxxifmpvpltt`, organization `fpxbfwkbqumayjeiwrum`, plan `Free`, project healthy, region ap-southeast-1, PostgreSQL `17.6.1.166`. A read-only sample reported a 34 MB database, zero other active sessions and zero queries running over 30 seconds at query time.
+- **Plan-based capability:** Supabase’s current backup guidance says automatic daily backups are for Pro, Team and Enterprise plans; Free projects are advised to export regularly using the Supabase CLI and keep off-site backups. The documented PITR add-on requires Pro or higher and at least Small compute. Given the verified Free plan, no managed daily backup or PITR capability was established for this project.
+- **Backup inventory limitation:** The available Supabase project tools do not expose the Management API backup-list endpoint or the Dashboard’s Database → Backups/PITR state. No current Production artifact or restore point was verified. This is not proof that an owner-held off-site export does not exist.
+- **Existing evidence:** The previously preserved logical archive is DEV-only, not a Production recovery artifact. It cannot be used as a Production rollback point.
+
+### Backup feasibility and execution result
+
+- PostgreSQL `pg_dump 17.11` is installed in the execution environment. The Supabase CLI is also present, but invoking it for version/help failed before CLI output because the restricted process could not write its telemetry file under `/Users/ycwee/.supabase`. No linked-project command or backup operation was run.
+- The direct Production host DNS check failed in this execution environment with `getaddrinfo: nodename nor servname provided, or not known`. No authenticated PostgreSQL connection or secure Production credential is available to this process. The Management API backup inventory also requires authenticated access not available through the connected tools.
+- Consequently, the archive was **not** created. This avoided starting an incomplete or unverified export. No backup contents, customer data, or credentials were written to disk or GitHub.
+- The 34 MB observed database size suggests a single-connection logical dump would have a modest expected data volume. A point-in-time activity query is not a representative peak-load assessment. PostgreSQL documents that `pg_dump` is consistent while concurrent readers/writers continue and does not block ordinary database users; its shared table locks can still conflict with schema-exclusive operations. A safe run would use one dump connection, a bounded lock wait, monitor errors/load, and abort on lock waits or resource pressure. This assessment is not a substitute for a successful dump and restore test.
+- Supabase’s CLI dump excludes managed `auth`, `storage` and extension schemas by default, and its default output omits data and custom roles. Thus that default schema dump alone would not satisfy this recovery objective. A complete logical recovery plan must explicitly account for data, roles/grants/ownership, extensions, Auth configuration and Storage objects; some platform configuration and external services require separate recovery records. Supabase database backups do not include Storage object contents.
+- No restore test was possible because there is no Production archive. No recovery artifact path, checksum, capture timestamp or access-control evidence exists for Production.
+
+### Recovery procedure and limitations
+
+If a later authorized backup is produced, keep it in an encrypted, access-controlled, durable private destination outside the repository; record its path privately, SHA-256 and capture time; inspect archive integrity; then restore into a fresh isolated PostgreSQL 17-compatible environment and verify ledger, essential schema/functions/permissions, and representative counts. Separately document Auth settings, Storage object recovery, custom-role credential rotation, extensions and external integrations. Do not restore over the live project as a test.
+
+A Production restore to an older point can discard later orders, payments, stock changes and other writes. Recovery would require reconciling post-capture orders and payment-provider transactions before reopening workflows. Application rollback does not reverse database migrations. The restore procedure itself makes the project inaccessible during restoration; any eventual live restore requires a separately authorized outage and reconciliation plan.
+
+### Exact remaining prerequisite
+
+The owner must establish one of the following before Production preparation can pass:
+
+1. Provide evidence from the authenticated Supabase Dashboard/Management API that a current eligible managed recovery point exists, and arrange a restore test in an isolated project; or
+2. Enable an eligible paid backup/PITR plan separately if desired; or
+3. From the owner’s normal Mac Terminal, on a network that resolves/reaches the Dashboard-verified Production endpoint, create the approved private logical backup using authenticated credentials and a durable encrypted destination, then provide non-secret path/checksum/restore evidence. The backup must include or explicitly account for the components listed above.
+
+No further attempt should use guessed endpoints, unverified pooler settings, copied credentials, or a default CLI dump that omits required data/platform objects.
+
+**Phase 2N recommendation: HOLD for Production release planning.** The actual project plan is Free and no current Production backup/PITR artifact was independently verified. The available execution environment cannot resolve the Production database hostname or access the authenticated CLI home/Management API state, so a compliant backup and restore test could not be completed. No Production changes were made.
