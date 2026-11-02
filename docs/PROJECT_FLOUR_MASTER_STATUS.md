@@ -1942,3 +1942,23 @@ The established non-overwriting operation is documented in `recovery/production-
 If the Oct 31 restore has fewer than 179 ledger rows, fails required object checks, or cannot reconcile its snapshot with current recovery requirements, a fresh single controlled capture is necessary before a later Production change. Even if it restores, it is dated Oct 31; make the release-window capture only immediately before any separately authorized release. Keep the DB/roles and Storage timestamp separation explicit, store the encrypted artifacts in the existing private destination, retain checksums/manifests, and run the isolated restore validator before declaring the recovery point usable. Do not automatically restore an older snapshot over live Production; reconcile all later orders/payments/stock transactions first. Supabase project-level Auth provider settings and secrets, external services, and Storage object bytes are not all covered by the PostgreSQL archive; preserve their separate recovery instructions.
 
 **Phase 2O recommendation: HOLD.** Existing restore evidence is reusable and the latest checked hashes/modes pass, but the newest database archive lacks isolated-restore evidence and its ledger count is unknown. The exact minimal gate is to restore-test that existing Oct 31 archive first; create a fresh release-window capture only if it is stale/incomplete for the authorized release. No backup or other Production change was performed in this phase.
+
+
+## Conditional Issue #8 Production release gate — 2 November 2026
+
+**Decision: HOLD at Gate A. No Production mutation, deployment, alias change, or database write was performed.**
+
+### Read-only identity checks
+
+- Production Supabase project cuowwlduhxxifmpvpltt is active/healthy in ap-southeast-1 on PostgreSQL 17.6.1.166.
+- The live database has 179 migration rows (latest 20261031231126); none of the four Issue #8 versions are present. The reviewed Fresh Pick checkout overloads, preorder RPC, paid-add-on sync function, required constraints, and enabled triggers were present with the previously reviewed fingerprints.
+- Vercel project prj_3rmlAQzLSFOi15DEGczSuDYDq8xr is owned by hyphen-org, configured for Node.js 24.x. Current production deployment dpl_HE7zep8jWR1wkoKZ6w4tC8t4bAaN is READY and tied to source d98afb9733ed8285e71ba7e4a7e7a3e1116980c7. Both whitebird.asia and www.whitebird.asia still map to that deployment. The DEV alias was not changed.
+- The accepted application identity remains commit 0bf6ca047b38e6786a3e856cd28e45dde7eb99b7, tree 6a4f69adf465e21a262dbdff2ad8a3d5ce56480d; existing accepted Preview dpl_CB3qunPQqc5bs1HmtyNVp5RT83Ce. Prior exact-candidate tests and owner acceptance remain as previously recorded; no application files were changed in this gate.
+
+### Recovery blocker
+
+- Existing Oct 31 encrypted database and roles archives still match their recorded SHA-256 values and mode 0600. The database manifest for production-postgres-20261031T071101Z explicitly says isolated restore is required; no restore was run in this gate because its archive passphrase must be entered by the Owner in regular Mac Terminal and is not available to this execution.
+- PostgreSQL 17.11 restore tools and the established recovery/production-backup/restore_validation.py are present. The database archive is still dated Oct 31, so even a successful restore would not by itself meet the separate requirement for one current release-window recovery point.
+- The Oct 31 Storage archive retains its prior authenticated member-verification evidence, but it is a separate point-in-time capture and does not make the database archive a current atomic project backup. Storage bytes, Auth configuration, provider settings/secrets, and external services have separate recovery limitations as documented above.
+
+**Required next action:** Owner runs the existing isolated restore validator on production-postgres-20261031T071101Z in Mac Terminal and supplies the sanitized PASS/STOP summary. If its restore passes and the snapshot is adequate, the release still requires one controlled current-window encrypted database/roles capture and appropriate current Storage recovery coverage, using the established procedure, before any migration. No migration, deployment, promotion, or smoke test may proceed until that recovery gate is confirmed.
