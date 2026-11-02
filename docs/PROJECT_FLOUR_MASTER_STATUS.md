@@ -1962,3 +1962,13 @@ If the Oct 31 restore has fewer than 179 ledger rows, fails required object chec
 - The Oct 31 Storage archive retains its prior authenticated member-verification evidence, but it is a separate point-in-time capture and does not make the database archive a current atomic project backup. Storage bytes, Auth configuration, provider settings/secrets, and external services have separate recovery limitations as documented above.
 
 **Required next action:** Owner runs the existing isolated restore validator on production-postgres-20261031T071101Z in Mac Terminal and supplies the sanitized PASS/STOP summary. If its restore passes and the snapshot is adequate, the release still requires one controlled current-window encrypted database/roles capture and appropriate current Storage recovery coverage, using the established procedure, before any migration. No migration, deployment, promotion, or smoke test may proceed until that recovery gate is confirmed.
+
+
+### Supabase-image restore environment follow-up — 2 November 2026
+
+- Docker Desktop was started and confirmed at Engine 29.8.2, Linux aarch64. The official Supabase Postgres image supabase/postgres:17.6.1.136 was pulled and pinned by digest sha256:f371b5f3f2ac0a05703f33d6e6134515fb2498cab708fb948a0aeb7481467c00.
+- A disposable probe with Docker networking disabled started successfully and confirmed PostgreSQL 17.6 plus available pg_cron 1.6.4 and supabase_vault 0.3.1. A separate read-only Production query confirmed those same installed Production extension versions. The probe container was removed; no archive was mounted or restored in the probe.
+- A separate temporary runner was prepared at /private/tmp/restore_validation_supabase.py (mode 0700, SHA-256 606bda61e81059e98ad6cacc1a096e59cb541b22543a6d8ae13c341ec61b237b; Python syntax parse passed). It reuses the established archive authentication/validation helpers, pins the image digest, requires archive extensions to exist, restores the role export and applies database ownership/ACLs, verifies aggregate ledger/schema/permission results, uses network=none with no host ports, and cleans up its disposable container.
+- The new runner has NOT been executed against the encrypted Oct 31 archive. The Owner must enter its passphrase through the hidden prompt in regular Mac Terminal. The encrypted archive remains untouched and is still NOT restore-verified. The current-window Production recovery capture has not been created.
+
+**Gate A remains HOLD.** The extension environment blocker has been resolved and the matched image is ready; full restore and current recovery capture remain pending. No Production write, migration, deployment, alias change, or backup creation occurred during this follow-up.
