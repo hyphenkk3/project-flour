@@ -319,9 +319,11 @@ export function StaffGuestOrderForm({
                           {size.size} —{" "}
                           {Number.isFinite(pickupDatePrices.prices[size.id])
                             ? formatRm(pickupDatePrices.prices[size.id])
-                            : pickupDatePrices.status === "error"
-                              ? "Price unavailable"
-                              : "Checking price…"}
+                            : pickupDatePrices.status === "idle"
+                              ? "Select pickup date"
+                              : pickupDatePrices.status === "loading"
+                                ? "Checking price…"
+                                : "Price unavailable"}
                         </option>
                       ))}
                     </FormSelect>
@@ -447,7 +449,15 @@ export function StaffGuestOrderForm({
 
       {requiredPriceSizeIds.length > 0 && !cakePriceVerified ? (
         <div className="text-sm" role="status">
-          {pickupDatePrices.status === "error" ? (
+          {pickupDatePrices.status === "idle" ? (
+            <p className="text-skyline">
+              Select a pickup date to verify cake prices before saving.
+            </p>
+          ) : pickupDatePrices.status === "loading" ? (
+            <p className="text-skyline">
+              Checking price… Saving is available when prices are verified.
+            </p>
+          ) : (
             <>
               <p className="text-status-danger">
                 Cake prices could not be verified. Retry before saving.
@@ -460,10 +470,6 @@ export function StaffGuestOrderForm({
                 Retry prices
               </button>
             </>
-          ) : (
-            <p className="text-skyline">
-              Checking price… Saving is available when prices are verified.
-            </p>
           )}
         </div>
       ) : null}
