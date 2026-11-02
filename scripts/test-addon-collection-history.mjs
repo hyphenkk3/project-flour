@@ -83,5 +83,6 @@ assert.equal(action.includes("getKuchingBusinessDate"), true, "server rechecks t
 const query = source("src/workspaces/library/addons/queries.ts");
 assert.equal(query.includes("purpose, month, start_date, end_date"), true, "classification loads purpose/month and special range");
 const dateModel = source("supabase/migrations/20260816170000_catalogue_special_dates.sql");
-assert.match(dateModel, /collections\.month is the first day of the Singapore calendar month/i);
+assert.match(dateModel, /comment on column public\.collections\.month is[\s\S]*First day of the Singapore calendar month for monthly catalogues/i);
+assert.match(dateModel, /purpose = 'monthly'[\s\S]*month is not null[\s\S]*month = date_trunc\('month', month\)::date[\s\S]*start_date is null[\s\S]*end_date is null/);
 console.log("PASS: monthly month-date scheduling (September historical), Kuching and inclusive month-end boundaries, special windows, ambiguous fail-closed behavior, server-side eligibility guard, and exact historical/ambiguous assignment preservation.");
