@@ -1401,3 +1401,28 @@ The temporary local Supabase project was stopped with `supabase stop --no-backup
 Read-only Vercel checks reconfirmed that `dev.whitebird.asia` aliases READY deployment `dpl_FPF1M4NkkSXP6kKdJ4UpQxzWUbBR`. Its separate project-domain record still stores `gitBranch=codex/cake-size-availability-dev`. Neither alias nor branch association changed.
 
 **GO for resuming the previously authorized DEV-only three-migration sequence**, subject to its existing immediate identity/checksum/schema/ledger preflight. This result does not authorize a Production action, DEV deployment, or alias change. No Issue #8 migration was applied in Phase 2G-R2.
+
+
+## Issue #8 Phase 2G resume — hosted DEV migration preflight (2 November 2026, 08:45 MYT)
+
+**Outcome: HOLD — no Issue #8 migration executed.** Production was not accessed. No hosted DEV schema, data, migration history, deployments, aliases, credentials, or environment settings were changed.
+
+### Verified preflight evidence
+
+- GitHub branch `codex/issue-8-addons-implementation-20261101` remained at `8330c3f13e8fe90d124bd1a1aab6a79eadb2d457`, tree `3f1c6e3524b48bf74ca00d027513d227e2a90d80`.
+- Supabase project metadata identifies `tzwtpxdcggesgjaqxkqr` as `project-flour-dev`, region `ap-southeast-1`, status `ACTIVE_HEALTHY`, PostgreSQL engine 17; read-only SQL confirmed database `postgres`, role `postgres`, server 17.6.
+- Read-only ledger query: 183 entries, max version `20261101100854`; target versions `20261101194235`, `20261101200000`, and `20261101200100` are absent. The pre-existing version/name discrepancy remains untouched.
+- The three migration files fetched from the verified branch match the approved SHA-256 values: M1 `6dda6c7ed675f4dbbb184166601fdb5189dfe60eb7c75c9d0fdaf0d69b547b8a`; M2 `18788af12a64e10676b0e6352e13776b05cd7df7808f2688c7724044e08c25ba`; M3 `cb5272995f6704a552bf51f965e202d7f6b950d9f3cdbbf7a012fc0fc3018b27`.
+- Existing DEV recovery archive remains present, mode 600, 4,950,659 bytes, SHA-256 `4c67bb6df3ad4d2fcbe7a06adb37f3781d7558fb197031b296942ec4d446d720`; its private manifest remains mode 600. The Phase 2G-R2 isolated PostgreSQL 17 restore and relevant schema/data comparison are recorded above.
+- Read-only checks of migration-relevant objects match the previously recorded DEV starting shape: only the postgres-owned SECURITY DEFINER extended Fresh Pick overload exists (16 arguments, 9 defaults, definition MD5 `9a62b3eacd01513fe6ca7ff138a72a08`, `search_path=public`); the legacy 10-argument overload is absent; the one-argument preorder options RPC exists; deferred stock-link constraints and active-staff order RLS policies are present. The deferred delivery invariant retains its recorded DEV identity (SECURITY INVOKER, `search_path=public`, definition MD5 `3ddd53a414b040c3a048bd237c449d28`). The focused read-only checks did not establish a new drift condition.
+- Vercel read-only lookup reconfirmed `dev.whitebird.asia` maps to READY deployment `dpl_FPF1M4NkkSXP6kKdJ4UpQxzWUbBR`; its stored domain branch association remains `codex/cake-size-availability-dev`. No alias change was made.
+
+### Exact execution blocker
+
+The available Supabase MCP migration tool accepts only `name`, `project_id`, and SQL; it does not accept a canonical migration version. The Supabase MCP implementation delegates to the Management API, which generates the migration timestamp at request time. That would create a new noncanonical ledger entry instead of the three approved file versions. Supabase's own MCP issue documents this limitation and identifies version mismatch as the result ([Supabase MCP issue #241](https://github.com/supabase/mcp/issues/241)). Using that tool would also violate the recorded rule not to create more generated-version discrepancies. The standard `supabase db push` route is not safe here because the branch records 19 local-only and 19 remote-only historical versions; broad synchronization/history repair is prohibited.
+
+Supabase CLI 2.117.0 is installed, but its read-only project-list request failed with a transport error to `api.supabase.com` in this execution environment. No linked CLI migration or direct PostgreSQL migration was attempted. No alternative runner was available that both applies one selected file atomically and records its exact canonical filename version.
+
+### Decision and continuation requirement
+
+M1, M2, and M3 were **not run**; there are no post-migration assertions to report. Do not retry with MCP `apply_migration`, broad `db push`, direct ledger insertion, or manual history repair. Resume only when a supported, authenticated version-aware runner can apply each repository migration separately and record its exact version in the same transaction. Then repeat identity/schema/ledger preflight and verify each migration before proceeding to the next.
