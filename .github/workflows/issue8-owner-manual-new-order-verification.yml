@@ -5,6 +5,8 @@ on:
       - codex/issue-8-addons-implementation-20261101
     paths:
       - .github/workflows/issue8-owner-manual-new-order-verification.yml
+      - src/workspaces/owner/orders/StaffGuestOrderForm.tsx
+      - scripts/test-owner-manual-new-order-source.mjs
 permissions:
   contents: read
 jobs:
@@ -26,16 +28,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: db23f796d16975ee2e6970cbe46cf36c5668470d
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
-      - name: Confirm locked candidate commit and tree
+      - name: Confirm exact event source commit and clean checkout
         run: |
-          test "$(git rev-parse HEAD)" = "db23f796d16975ee2e6970cbe46cf36c5668470d"
-          test "$(git rev-parse HEAD^{tree})" = "a2d4842fcb040a6b0e9423f1d07cb9e07851942c"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain)"
       - name: Install exact candidate dependencies
         run: npm ci
       - name: Focused Issue 8 source regressions
