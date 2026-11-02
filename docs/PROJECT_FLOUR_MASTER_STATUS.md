@@ -1242,3 +1242,54 @@ The chronological order matches the filenames and the Phase 2D rehearsal. That r
 
 
 **Phase 2E object-presence addendum:** A second read-only DEV catalog check found the Issue #8 Owner/staff helper routines, catalogue-save RPC, order-line validation triggers/functions, required-date options overload, and collection-specific paid-add-on table absent. The current Fresh Pick 16-argument overload still has 9 defaulted arguments. Together with the absent target ledger rows and absent seasonal columns/table, this shows the proposed migrations are not partially installed under alternate object names; it also confirms migration 1’s default-argument rewrite has not run. The missing legacy 10-argument overload remains the blocking precondition for the current scripts.
+
+### Issue #8 Phase 2F — dual-schema migration compatibility — 2 November 2026
+
+**Decision: GO for a separately authorized DEV-only migration sequence; HOLD for Preview deployment/runtime acceptance.** This addendum supersedes the Phase 2E overload blocker. No hosted database was changed, no migration was applied, no deployment or alias changed, no credential was read or changed, and no customer data was written.
+
+**Verified source and migration identities**
+
+- The implementation branch was verified at `c26a4816063556d7fd694065d7063df8579ead1f` before revision (tree `1e53b823e5d35a9b766ff61c3050db1cdb81d502`). GitHub comparison confirmed the local rehearsal base `154530961eb55201bd18f9cbf9f3557d1866b4bd` is an ancestor with zero commits behind; the intervening changes before this phase were documentation and migration 3 only. The application source remained unchanged.
+- Phase 2F revised only migrations 2 and 3 and adjusted the focused source-contract test to assert safe optional overload discovery. Migration 1 was unchanged.
+- Migration SHA-256 (M1): `6dda6c7ed675f4dbbb184166601fdb5189dfe60eb7c75c9d0fdaf0d69b547b8a` (unchanged).
+- Migration SHA-256 (M2): old `62a50a5f14bc5a31c5153eda6f0a8ccc7fa992c74f73664663b21a5e65bae476`; revised `18788af12a64e10676b0e6352e13776b05cd7df7808f2688c7724044e08c25ba`.
+- Migration SHA-256 (M3): old `2bb8d8755b524d23e0ed0d7ae4712df93747764c8cba120d9bef3faa9ec79dbf`; revised `cb5272995f6704a552bf51f965e202d7f6b950d9f3cdbbf7a012fc0fc3018b27`.
+- The focused test update changes only two stale `::regprocedure` assertions to check `to_regprocedure` resolution and the optional-legacy branch. It does not reduce business-behavior coverage. The remote branch now contains commits `505851fb9b8cfd0e1f53d7207bca55db45815014` (M2), `9fa625d1ee36106543f4db444184ed5604bcf837` (M3), and `33c207c6534b0d188f93db4d506eeacf075e1fe1` (focused test). The documentation commit that follows this addendum is the final Phase 2F branch identity.
+
+**Read-only hosted schema findings**
+
+- Production Supabase `cuowwlduhxxifmpvpltt`: current database `postgres`; all three Issue #8 versions absent; `orders` RLS enabled, not forced, and anon has SELECT. The exact 10-argument and 16-argument Fresh Pick overloads are present. Their `pg_get_functiondef` MD5s are respectively `3d68aa191b14bd4b5d1459b499f88a5c` and `9a62b3eacd01513fe6ca7ff138a72a08`; both are postgres-owned SECURITY DEFINER functions, `search_path=public`, with the expected defaults (3 and 9) and anon/authenticated/service_role grants.
+- Production's deferred delivery validator is postgres-owned SECURITY INVOKER, `search_path=public`, definition MD5 `7086c286596045e95fed2194710625fb`. Production and DEV therefore have a real trigger-function security difference. The migration preserves Production's validator unchanged when the Production-style anon orders-read grant is present.
+- DEV Supabase `tzwtpxdcggesgjaqxkqr`: 183 existing ledger rows; none of the three canonical Issue #8 versions is present. The existing generated-version/name discrepancy is untouched. DEV has the extended 16-argument Fresh Pick function only; the legacy 10-argument overload is absent. DEV's deferred validator is SECURITY INVOKER, `search_path=public`, exact expected body MD5 `3ddd53a414b040c3a048bd237c449d28`, and anon lacks direct orders SELECT.
+- A DEV-shaped guest checkout against the exact read-only profile failed before the migrations because that deferred invoker trigger cannot read `orders` under DEV's active-staff-only RLS. This is an existing DEV compatibility issue, distinct from the Issue #8 add-on logic.
+
+**Reviewed migration compatibility correction**
+
+1. M1 remains unchanged and patches/replaces the required extended Fresh Pick overload without inventing a legacy RPC.
+2. M2 now resolves required Preorder/extended functions safely and treats only the exact legacy 10-argument signature as optional. It rejects unexpected overload counts and validates the expected owner, security, search path, definition and grants before changing functions. On Production-style RLS it leaves the deferred validator unchanged. On the exact DEV profile only, it validates the known trigger-only read function and changes that function to SECURITY DEFINER with pinned `search_path=pg_catalog, public`; it does not weaken orders policies or table grants. The function only reads the order/delivery invariant and returns no row data.
+3. M3 now checks the legacy function with `to_regprocedure`. If absent, it emits a notice and does not create a dummy overload; because the migration file itself executed, its canonical migration version is still recorded. If present, it validates the deferred stock-link constraints and exact function definition before applying the narrow reverse-link correction.
+
+**Isolated PostgreSQL 17.11 rehearsals**
+
+Two independent disposable clusters were initialized and removed with cleanup verified (`TEMP_CLUSTER_CLEANUP=PASS` for each).
+
+- **A — Production-derived:** actual captured relevant Production definitions and dependencies; 42 public tables, 51 triggers and 98 policies. All three migrations applied individually in canonical order. Legacy 10-argument and extended 15/16-argument checkout passed; deferred bidirectional stock linkage and audit passed; Preorder, staff create/edit, Owner-only management, date/collection boundaries, stale cart, inactive/nonselectable items, server-authoritative prices, snapshots/totals, invalid stock rejection and full transaction rollback passed. Canonical ledger recorded each executed migration once. M2/M3 function ownership, ACL, security mode and search path checks passed.
+- **B — DEV-shaped:** same verified relevant schema with the actual DEV overload absence, exact DEV orders policies/grants, and all 183 DEV ledger version/name pairs (synthetic records only). Baseline guest-checkout/RLS failure reproduced. All three migrations then applied individually. The legacy overload remained absent; current extended 15/16-argument calls passed; the deferred validator's narrowly scoped security change restored the legitimate guest path; staff/Owner authorization, seasonal and collection rules, stock allocation, paid pricing, snapshots/totals, invalid-stock rollback and canonical history passed.
+- Both rehearsals forced failures inside transactions and confirmed no partial schema/ledger state. M1 and M2 rollback checks also passed; M3 full rollback passed. No hosted migration history was repaired or changed.
+
+**Application checks**
+
+- Focused customer options contract: PASS after updating the assertion to require optional-safe lookup.
+- Focused paid-add-on reuse, Fresh Pick complimentary/Calendar, and Preorder date-engine tests: PASS.
+- Full `npm run test:release-regressions`: 57 PASS, 0 FAIL, 1 BLOCKED. The remaining assignment RPC subtest could not initialize its separate local PostgreSQL cluster because this execution environment denied shared-memory creation; its temporary directory was removed by the test harness. The two dedicated Phase 2F PostgreSQL rehearsals above passed and include assignment/rollback coverage.
+- Application TypeScript and release-regression TypeScript: PASS. Focused ESLint on the changed regression test: PASS. No application TypeScript/TSX file changed.
+- `npm run build`: INCOMPLETE due blocked outbound access to Google Fonts (`Newsreader`, `Outfit`); no source change was made to bypass it.
+- No Issue #8 branch Preview exists, and the branch-filtered Vercel Preview environment query returns no variables for this branch. Therefore a safe runtime check of the protected DEV service-role credential is **INCOMPLETE**; no secret was revealed or modified and no deployment was created.
+
+**DEV-only execution and recovery plan**
+
+- After separate explicit DEV migration authorization, verify the project identity, current ledger and all three preflight fingerprints again. Execute only M1, then verify its single canonical entry and function metadata; execute M2 and verify columns, tables, constraints, RLS, grants, required and optional overload behavior; execute M3 and verify its single canonical entry and either the absent-legacy no-op or the validated legacy patch. Never run broad `db push`, repair/rename historical versions, or manually mark an unexecuted file applied.
+- Use bounded lock/statement timeouts. On a failed transaction, inspect actual object and ledger state before any retry. If a file committed but a postflight fails, leave the existing DEV app/domain in place and use a reviewed forward fix; do not restore an old database over newer DEV records. These changes are additive except the validated trigger-only DEV security adjustment and function-body replacements; an application rollback does not reverse SQL.
+- Preview runtime validation, branch-scoped DEV credentials and any DEV alias switch remain separate gates and were not authorized or performed here. Production remains unchanged and out of scope.
+
+**Phase 2F result:** GO for separately authorized hosted DEV migration execution only, with per-file verification above. HOLD for Issue #8 Preview/runtime acceptance until an isolated branch Preview with verified DEV-only bindings is separately prepared.
