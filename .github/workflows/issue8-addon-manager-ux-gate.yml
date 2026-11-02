@@ -1,0 +1,43 @@
+name: Issue 8 add-on manager UX gate
+on:
+  push:
+    branches:
+      - codex/issue-8-addons-implementation-20261101
+    paths:
+      - .github/workflows/issue8-addon-manager-ux-gate.yml
+      - src/workspaces/library/addons/**
+      - src/app/(app)/library/addons/page.tsx
+      - scripts/test-addon-collection-history.mjs
+      - scripts/test-release-regressions.mjs
+permissions:
+  contents: read
+jobs:
+  addon-manager-ux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install exact lockfile dependencies
+        run: npm ci
+      - name: Run collection history and assignment-preservation checks
+        run: node scripts/test-addon-collection-history.mjs
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Scoped ESLint for changed manager code
+        run: >-
+          ./node_modules/.bin/eslint --no-cache
+          src/workspaces/library/addons/AddonCatalogueManager.tsx
+          src/workspaces/library/addons/actions.ts
+          src/workspaces/library/addons/collection-dates.mjs
+          src/workspaces/library/addons/collection-dates.d.mts
+          src/workspaces/library/addons/queries.ts
+          src/workspaces/library/addons/types.ts
+          'src/app/(app)/library/addons/page.tsx'
+      - name: Relevant existing release regressions
+        run: npm run test:release-regressions
