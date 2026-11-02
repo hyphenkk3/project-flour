@@ -95,14 +95,15 @@ export async function saveAddonCatalogueItemAction(
 
   if (id) {
     const complimentary = kind === "complimentary";
-    const assignmentTable = complimentary ? "collection_complimentary_items" : "collection_paid_addon_types";
-    const itemKey = complimentary ? "complimentary_item_type_id" : "paid_addon_type_id";
-    const columns = complimentary
-      ? "collection_id, is_available, customer_selectable, is_default, default_quantity, sort_order, available_from, available_until"
-      : "collection_id, is_available, customer_selectable, sort_order, available_from, available_until";
-    const { data: rows, error: assignmentsError } = await supabase.from(assignmentTable).select(columns).eq(itemKey, id);
-    if (assignmentsError) return { error: "Could not preserve existing collection settings. No changes were saved." };
-    const existing = (rows ?? []) as Array<Record<string, unknown>>;
+    const assignmentResult = complimentary
+      ? await supabase.from("collection_complimentary_items")
+          .select("collection_id, is_available, customer_selectable, is_default, default_quantity, sort_order, available_from, available_until")
+          .eq("complimentary_item_type_id", id)
+      : await supabase.from("collection_paid_addon_types")
+          .select("collection_id, is_available, customer_selectable, sort_order, available_from, available_until")
+          .eq("paid_addon_type_id", id);
+    if (assignmentResult.error) return { error: "Could not preserve existing collection settings. No changes were saved." };
+    const existing = (assignmentResult.data ?? []) as unknown as Array<Record<string, unknown>>;
     for (const row of assignmentsToPreserve(existing, editableSet, collectionsById, businessToday)) {
       assignments.push({
         collection_id: String(row.collection_id),
