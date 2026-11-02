@@ -18,6 +18,12 @@ assert.match(query, /export async function listOwnerManualComplimentaryOptions/)
 assert.match(query, /export async function listOwnerManualPaidAddonTypes/);
 assert.match(query, /const supabase = createServiceClient\(\)/);
 assert.match(form, /includeInactiveCatalog: true/);
+assert.match(form, /pickupDatePrices\.status === "idle"[\s\S]*?Select pickup date/);
+assert.match(form, /pickupDatePrices\.status === "loading"[\s\S]*?Checking price…/);
+assert.match(form, /Cake prices could not be verified\. Retry before saving\./);
+assert.match(form, /onClick={pickupDatePrices\.retry}/);
+assert.match(form, /disabled={!cakePriceVerified}/);
+assert.match(form, /if \(!cakePriceVerified\) event\.preventDefault\(\)/);
 assert.match(form, /option\.isActive && option\.isDefault \? option\.defaultQuantity : 0/);
 assert.match(form, /\$\{option\.name\} \(Inactive\)/);
 assert.match(editor, /showInactiveStatus && !draft\.isActive/);
