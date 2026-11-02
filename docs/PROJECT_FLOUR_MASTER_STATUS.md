@@ -1587,3 +1587,17 @@ M1 preserved one extended Fresh Pick RPC with 16 arguments and one default argum
 - **Execution limitation:** the current local checkout is a different detached worktree and lacks the Issue #8 candidate object; a clean GitHub clone attempt could not resolve GitHub DNS. GitHub source and read-only DEV inspection were available. Exact-candidate TypeScript, lint, regression, migration-rehearsal and Preview tests were not run.
 - **Decision:** do not expose the broader catalogue or deploy a Preview until a reviewed, disposable-PostgreSQL rehearsal proves the dedicated RPC/trigger boundary, Manager/staff/customer denial, selection/date-change behavior, canonical snapshots and existing checkout compatibility. No DEV migration was applied, no deployment or alias changed, and Production was not accessed.
 
+
+
+## Issue #8 — Owner Manual New Order implementation continuation (2026-11-02)
+
+**Status: HOLD — no implementation or rehearsal was completed in this continuation.** The earlier Owner New Order review remains the design evidence; this entry records the execution preflight and limits.
+
+- **Remote source verified:** `codex/issue-8-addons-implementation-20261101` at `c35f858d409d32cc8226176ceecdf913908d559c`, tree `a10d6413a6e8b68d0fa73ac51eef7c174ec61d61`. This continues the prior documented HOLD commit; no source files, migration files or tests were changed.
+- **DEV read-only preflight:** project `tzwtpxdcggesgjaqxkqr`, PostgreSQL 17.6. The three Issue #8 migrations `20261101194235`, `20261101200000`, and `20261101200100` remain present in the ledger exactly once. Complimentary and paid catalogue tables retain RLS, authenticated SELECT access and Owner-only INSERT/UPDATE policies.
+- **DEV function drift check:** the New Order writer, paid synchronizer and both line validators retain the prior verified SECURITY DEFINER ownership/search-path and definition fingerprints: `create_staff_guest_preorder_with_source_detail`  `640e8b827e05e9bc658330cedb0b2314`; `_sync_order_paid_addons_from_payload` `ac070f455e4669926115acd2f508c5cd`; complimentary validator `ed2bdfff6784cc5791d2cb4a7dd53dd8`; paid validator `56d0d2eaf72f84eb2055d109477a730d`.
+- **Execution boundary:** the Desktop checkout is on `debug/mobile-add-to-order-safari`, not the Issue #8 branch, and its working-tree inspection stalls. The exact Issue #8 commit is not present in that local object database. A clean clone failed because GitHub DNS could not resolve. The authenticated Terminal app access request was denied, so the suggested Mac/hotspot procedure could not be run from this session. GitHub API reads and Supabase read-only queries succeeded.
+- **Tests and changes:** no TypeScript, lint, application tests, disposable PostgreSQL migration rehearsal or build ran; no implementation or migration was authored in this continuation. No hosted database, deployment, alias, or Production state changed.
+- **Next executable prerequisite:** make the verified Issue #8 checkout available to an authorized local build/test session (or restore GitHub DNS for that session). Then implement the dedicated Owner RPC and conditional trigger/synchronizer logic, rehearse against a disposable PostgreSQL 17 copy of DEV, run the exact-branch application tests, and present the migration for review. Do not apply it to hosted DEV until that separate review occurs.
+- **Decision:** HOLD for Owner New Order implementation and Preview. Existing Issue #8 manager and historical collection behavior remain unchanged.
+
