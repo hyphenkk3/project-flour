@@ -1321,3 +1321,37 @@ Two independent disposable clusters were initialized and removed with cleanup ve
 - Production Supabase `cuowwlduhxxifmpvpltt` was not queried or modified in this phase.
 - Retry Phase 2G only after a restorable DEV recovery point is verified and the DEV domain/deployment mapping discrepancy is understood. Then repeat the identity, ledger, checksum and schema preflight before applying each migration separately.
 - **HOLD for hosted DEV migration execution and Phase 2H.**
+
+## Issue #8 Phase 2G-R — DEV recovery readiness (2 November 2026)
+
+**Result: HOLD — do not resume hosted DEV migrations until a compatible restore rehearsal succeeds.** This task made no hosted database, deployment, alias, credential, or source-code changes. Production was not accessed.
+
+### DEV recovery artifact
+
+- Read-only checks found no existing DEV logical backup with a verified restore. The older Production recovery bundle is not a DEV recovery point. The DEV project is on the Free plan; platform backups/PITR are not available on that plan.
+- Created one timestamped DEV-only custom-format logical archive on the owner Mac, outside the repository and GitHub. It is protected by a mode-700 directory and mode-600 archive; a mode-600 private local manifest records its details. The archive contains DEV database data and must be treated as confidential.
+- DEV identity was confirmed as `tzwtpxdcggesgjaqxkqr`; PostgreSQL server 17.6. PostgreSQL client tools used: 17.11. Read-only connection used TLS `verify-full` and the existing trusted certificate.
+- Archive SHA-256: `4c67bb6df3ad4d2fcbe7a06adb37f3781d7558fb197031b296942ec4d446d720`; size: 4,950,659 bytes. `pg_restore --list` read the archive successfully (2,676 TOC entries).
+- A full restore was attempted into a fresh, isolated PostgreSQL 17.11 cluster. It stopped at `CREATE EXTENSION pg_cron`: the local installation lacks `pg_cron.control`. The local host also lacks the DEV-required `pg_net` and `supabase_vault` extension binaries. The restore therefore did **not** complete and does not establish a usable equivalent recovery point. The temporary server stopped successfully, and its temporary data directory was removed. No placeholder extension or no-op object was substituted.
+- Temporary password file was removed and its absence verified. Backup archive and private manifest remain outside Git at the owner Mac’s private temporary backup location. The exact path is retained in the local-only manifest, not this shared document.
+
+### Revalidated Issue #8 migration preflight
+
+The current GitHub branch is `codex/issue-8-addons-implementation-20261101`, HEAD `30e48fe85a275f9aad7503d406dfe475e4d83282`, tree `c1ba4b52c28d593f0eb1cf9bfda0fc6d506d48a4`. All three files below were fetched from that branch and their SHA-256 values independently recalculated; they match the Phase 2F approvals:
+
+| Order | Migration | SHA-256 |
+|---|---|---|
+| 1 | `20261101194235_issue8_fresh_pick_overload_compatibility.sql` | `6dda6c7ed675f4dbbb184166601fdb5189dfe60eb7c75c9d0fdaf0d69b547b8a` |
+| 2 | `20261101200000_issue8_addon_catalogue_schema_and_owner_management.sql` | `18788af12a64e10676b0e6352e13776b05cd7df7808f2688c7724044e08c25ba` |
+| 3 | `20261101200100_issue8_legacy_fresh_pick_order_stock_link.sql` | `cb5272995f6704a552bf51f965e202d7f6b950d9f3cdbbf7a012fc0fc3018b27` |
+
+Read-only DEV identity/ledger check returned database `postgres`, role `postgres`, server 17.6, 183 migration rows, latest version `20261101100854`, and none of the three Issue #8 target versions. The existing migration filename/version discrepancy remains untouched. The extended 16-argument `submit_guest_extra_order` exists as SECURITY DEFINER owned by `postgres`, with `search_path=public`; no legacy 10-argument overload exists. The current customer-options function is the one-argument `storefront_customer_preorder_options(uuid)`. Installed database extensions include `pg_cron 1.6.4`, `pg_net 0.20.4`, and `supabase_vault 0.3.1`, which explains why plain local PostgreSQL 17.11 is not a complete platform-equivalent restore environment. No migration or history repair was run.
+
+### DEV alias facts (unchanged)
+
+- Read-only Vercel lookup confirms `dev.whitebird.asia` currently aliases READY deployment `dpl_FPF1M4NkkSXP6kKdJ4UpQxzWUbBR` (URL `project-flour-op7eppfqh-hyphen-org.vercel.app`).
+- Separately, the project-domain record retains `gitBranch=codex/cake-size-availability-dev`. This branch association is not the alias’s current deployment ID. Neither was changed.
+
+### Recovery decision and next gate
+
+The archive is captured and readable, but a complete restore, Auth/platform dependency restoration, object/data comparison, and critical checkout dependency verification remain **INCOMPLETE**. Do not apply the three migrations yet. The next safe step is one restore rehearsal in an isolated environment that provides compatible `pg_cron`, `pg_net`, and `supabase_vault` binaries (or the supported Supabase local stack), then compare the relevant schema, data, constraints, functions, triggers, policies, grants and migration ledger. Do not restore to hosted DEV or Production. After that succeeds, repeat the already-defined DEV preflight immediately before the separately authorized migration sequence.
