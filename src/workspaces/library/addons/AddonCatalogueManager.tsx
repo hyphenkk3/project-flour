@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { libraryActionInitialState } from "@/workspaces/library/action-state";
 import { createAddonCatalogueItemAction, saveAddonCatalogueItemAction } from "@/workspaces/library/addons/actions";
 import type { AddonAssignment, AddonCollection, ComplimentaryCatalogItem, PaidAddonCatalogItem } from "@/workspaces/library/addons/types";
-import { partitionAddonCollections } from "@/workspaces/library/addons/collection-dates.mjs";
+import { classifyAddonCollection, getAddonCollectionBusinessRange, partitionAddonCollections } from "@/workspaces/library/addons/collection-dates.mjs";
 
 type Item = ComplimentaryCatalogItem | PaidAddonCatalogItem;
 type CatalogueKind = "complimentary" | "paid";
@@ -18,10 +18,8 @@ function itemSummary(kind: CatalogueKind, item: Item, collections: AddonCollecti
   return available + " collection" + (available === 1 ? "" : "s") + " available · " + selectable + " customer-selectable · " + defaults + " default" + (defaults === 1 ? "" : "s");
 }
 function dateRange(collection: AddonCollection): string {
-  if (collection.startDate && collection.endDate) return collection.startDate + " – " + collection.endDate;
-  if (collection.startDate) return "From " + collection.startDate;
-  if (collection.endDate) return "Through " + collection.endDate;
-  return "No collection date range recorded";
+  const range = getAddonCollectionBusinessRange(collection);
+  return range ? range.startDate + " – " + range.endDate : "Schedule needs review";
 }
 function historicalSummary(kind: CatalogueKind, assignment: AddonAssignment): string {
   const parts = [assignment.isAvailable ? "Available" : "Unavailable", assignment.customerSelectable ? "customer-selectable" : "not customer-selectable"];
@@ -76,7 +74,27 @@ function HistoricalAssignments({kind,items,collections}:{kind:CatalogueKind;item
     {rows.map(({item,collection,assignment})=><article className="border-fog rounded-lg border bg-mist p-4" key={item.id+":"+collection.id}><h4 className="text-ink font-semibold">{item.name}</h4><p className="text-skyline mt-1 text-sm">{collection.name} · {dateRange(collection)}</p><p className="mt-2 text-sm">{historicalSummary(kind,assignment)}</p></article>)}
   </div></details>;
 }
-function CatalogueSection({kind,items,editableCollections,historicalCollections}:{kind:CatalogueKind;items:Item[];editableCollections:AddonCollection[];historicalCollections:AddonCollection[]}) {
+function UnscheduledCollections({kind,items,collections,businessToday}:{kind:CatalogueKind;items:Item[];collections:AddonCollection[];businessToday:string}) {
+  if (!collections.length) return null;
+  const rows=items.flatMap((item)=>collections.flatMap((collection)=>{
+    const assignment=assignmentFor(item,collection.id);
+    return assignment?[{item,collection,assignment}]:[];
+  }));
+  return <section aria-label="Collections needing schedule review" className="border-danger rounded-xl border bg-white p-4">
+    <h4 className="text-danger font-semibold">Collection schedule needs review</h4>
+    <p className="text-skyline mt-1 text-sm">These collections cannot be safely dated, so their settings are read-only until the schedule is resolved. Existing assignments are preserved.</p>
+    <ul className="mt-3 list-disc space-y-2 pl-5 text-sm">
+      {collections.map((collection)=>{
+        const classification=classifyAddonCollection(collection,businessToday);
+        return <li key={collection.id}><span className="font-medium">{collection.name}</span> — {classification.reason}</li>;
+      })}
+    </ul>
+    {rows.length?<div className="mt-4 space-y-3"><h5 className="font-medium">Preserved read-only settings</h5>
+      {rows.map(({item,collection,assignment})=><article className="border-fog rounded-lg border bg-mist p-4" key={item.id+":"+collection.id}><h6 className="font-semibold">{item.name}</h6><p className="text-skyline mt-1 text-sm">{collection.name} · {dateRange(collection)}</p><p className="mt-2 text-sm">{historicalSummary(kind,assignment)}</p></article>)}
+    </div>:null}
+  </section>;
+}
+function CatalogueSection({kind,items,editableCollections,historicalCollections,ambiguousCollections,businessToday}:{kind:CatalogueKind;items:Item[];editableCollections:AddonCollection[];historicalCollections:AddonCollection[];ambiguousCollections:AddonCollection[];businessToday:string}) {
   const complimentary=kind==="complimentary";
   const headingId=complimentary?"complimentary-items-heading":"paid-addons-heading";
   const title=complimentary?"Complimentary items":"Paid add-ons";
@@ -87,9 +105,10 @@ function CatalogueSection({kind,items,editableCollections,historicalCollections}
     {items.map((item)=><details className="border-fog rounded-xl border bg-white shadow-sm" key={item.id}><summary className="text-ink flex min-h-16 cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"><span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1"><span className="font-semibold">{item.name}</span><span className={item.isActive?"rounded-full bg-signal/10 px-2.5 py-1 text-xs font-semibold text-signal":"rounded-full bg-fog px-2.5 py-1 text-xs font-semibold text-skyline"}>{item.isActive?"Active":"Inactive"}</span></span><span className="text-skyline w-full text-sm sm:w-auto sm:text-right">{itemSummary(kind,item,editableCollections)}</span><span aria-hidden="true" className="text-skyline text-sm">Expand / collapse</span></summary><div className="border-fog border-t p-4"><ItemEditor collections={editableCollections} item={item} kind={kind}/></div></details>)}
     {items.length===0?<p className="text-skyline rounded-lg border border-dashed p-4 text-sm">No {complimentary?"complimentary items":"paid add-ons"} have been created.</p>:null}
     <HistoricalAssignments collections={historicalCollections} items={items} kind={kind}/>
+    <UnscheduledCollections businessToday={businessToday} collections={ambiguousCollections} items={items} kind={kind}/>
   </section>;
 }
 export function AddonCatalogueManager({collections,complimentary,paid,businessToday}:{collections:AddonCollection[];complimentary:ComplimentaryCatalogItem[];paid:PaidAddonCatalogItem[];businessToday:string}) {
   const sections=partitionAddonCollections(collections,businessToday);
-  return <div className="space-y-10"><CatalogueSection editableCollections={sections.editable} historicalCollections={sections.historical} items={complimentary} kind="complimentary"/><CatalogueSection editableCollections={sections.editable} historicalCollections={sections.historical} items={paid} kind="paid"/></div>;
+  return <div className="space-y-10"><CatalogueSection ambiguousCollections={sections.ambiguous} businessToday={businessToday} editableCollections={sections.editable} historicalCollections={sections.historical} items={complimentary} kind="complimentary"/><CatalogueSection ambiguousCollections={sections.ambiguous} businessToday={businessToday} editableCollections={sections.editable} historicalCollections={sections.historical} items={paid} kind="paid"/></div>;
 }

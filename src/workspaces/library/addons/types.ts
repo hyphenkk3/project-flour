@@ -2,6 +2,8 @@ export type AddonCollection = {
   id: string;
   name: string;
   status: string;
+  purpose: string | null;
+  month: string | null;
   startDate: string | null;
   endDate: string | null;
 };

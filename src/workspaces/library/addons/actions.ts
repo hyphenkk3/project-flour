@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { requireStaff } from "@/foundation/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type { LibraryActionState } from "@/workspaces/library/action-state";
-import { assignmentsToPreserve, getKuchingBusinessDate, isAddonCollectionPast } from "@/workspaces/library/addons/collection-dates.mjs";
+import { assignmentsToPreserve, getKuchingBusinessDate, requestedCollectionsAreEditable } from "@/workspaces/library/addons/collection-dates.mjs";
 
 async function requireActiveOwner() {
   const staff = await requireStaff();
@@ -54,22 +54,24 @@ export async function saveAddonCatalogueItemAction(
   const supabase = await createClient();
   const { data: collectionRows, error: collectionError } = await supabase
     .from("collections")
-    .select("id, name, status, start_date, end_date");
+    .select("id, name, status, purpose, month, start_date, end_date");
   if (collectionError) return { error: "Could not verify collection dates. Refresh and try again." };
   const collectionsById = new Map((collectionRows ?? []).map((row) => [String(row.id), {
     id: String(row.id), name: String(row.name), status: String(row.status),
-    startDate: row.start_date ? String(row.start_date) : null,
-    endDate: row.end_date ? String(row.end_date) : null,
+    purpose: typeof row.purpose === "string" ? row.purpose : null,
+    month: row.month ? String(row.month).slice(0, 10) : null,
+    startDate: row.start_date ? String(row.start_date).slice(0, 10) : null,
+    endDate: row.end_date ? String(row.end_date).slice(0, 10) : null,
   }]));
   const businessToday = getKuchingBusinessDate();
   const requestedIds = [...new Set(String(formData.get("collection_ids") ?? "").split(",").map((value) => value.trim()).filter(Boolean))];
   for (const collectionId of requestedIds) {
     if (!collectionsById.has(collectionId)) return { error: "A collection is no longer available. Refresh and try again." };
   }
-  const editableIds = requestedIds.filter((collectionId) => {
-    const collection = collectionsById.get(collectionId);
-    return collection !== undefined && !isAddonCollectionPast(collection, businessToday);
-  });
+  if (!requestedCollectionsAreEditable(requestedIds, collectionsById, businessToday)) {
+    return { error: "A collection is historical or its schedule needs review. Refresh; no settings were changed." };
+  }
+  const editableIds = requestedIds;
   const editableSet = new Set(editableIds);
   const assignments: Array<Record<string, unknown>> = [];
   for (const collectionId of editableIds) {

@@ -24,7 +24,7 @@ function mapAssignment(row: Row, collectionKey = "collection_id"): AddonAssignme
 export async function loadAddonCatalogue(): Promise<AddonCatalogueSnapshot> {
   const supabase = await createClient();
   const [collectionsResult, complimentaryResult, complimentaryMapResult, paidResult, paidMapResult] = await Promise.all([
-    supabase.from("collections").select("id, name, status, start_date, end_date").order("name"),
+    supabase.from("collections").select("id, name, status, purpose, month, start_date, end_date").order("name"),
     supabase.from("complimentary_item_types").select("id, code, name, is_active").order("name"),
     supabase.from("collection_complimentary_items").select("collection_id, complimentary_item_type_id, is_available, is_default, customer_selectable, default_quantity, sort_order, available_from, available_until"),
     supabase.from("paid_addon_types").select("id, code, name, unit_price, financial_shorthand, is_active, sort_order, max_quantity").order("sort_order").order("name"),
@@ -64,7 +64,9 @@ export async function loadAddonCatalogue(): Promise<AddonCatalogueSnapshot> {
       id: String(row.id),
       name: String(row.name),
       status: String(row.status),
-      startDate: row.start_date ? String(row.start_date) : null,
+      purpose: typeof row.purpose === "string" ? row.purpose : null,
+      month: row.month ? String(row.month).slice(0, 10) : null,
+      startDate: row.start_date ? String(row.start_date).slice(0, 10) : null,
       endDate: row.end_date ? String(row.end_date) : null,
     })),
     complimentary,
