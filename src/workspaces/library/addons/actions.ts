@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireStaff } from "@/foundation/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import type { LibraryActionState } from "@/workspaces/library/action-state";
+import { assignmentsToPreserve, getKuchingBusinessDate, isAddonCollectionPast } from "@/workspaces/library/addons/collection-dates.mjs";
 
 async function requireActiveOwner() {
   const staff = await requireStaff();
@@ -50,32 +51,69 @@ export async function saveAddonCatalogueItemAction(
     return { error: "Enter a non-negative price, shorthand, and quantity limit of at least one." };
   }
 
-  const collectionIds = String(formData.get("collection_ids") ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
+  const supabase = await createClient();
+  const { data: collectionRows, error: collectionError } = await supabase
+    .from("collections")
+    .select("id, name, status, start_date, end_date");
+  if (collectionError) return { error: "Could not verify collection dates. Refresh and try again." };
+  const collectionsById = new Map((collectionRows ?? []).map((row) => [String(row.id), {
+    id: String(row.id), name: String(row.name), status: String(row.status),
+    startDate: row.start_date ? String(row.start_date) : null,
+    endDate: row.end_date ? String(row.end_date) : null,
+  }]));
+  const businessToday = getKuchingBusinessDate();
+  const requestedIds = [...new Set(String(formData.get("collection_ids") ?? "").split(",").map((value) => value.trim()).filter(Boolean))];
+  for (const collectionId of requestedIds) {
+    if (!collectionsById.has(collectionId)) return { error: "A collection is no longer available. Refresh and try again." };
+  }
+  const editableIds = requestedIds.filter((collectionId) => {
+    const collection = collectionsById.get(collectionId);
+    return collection !== undefined && !isAddonCollectionPast(collection, businessToday);
+  });
+  const editableSet = new Set(editableIds);
   const assignments: Array<Record<string, unknown>> = [];
-  for (const collectionId of collectionIds) {
-    const availableFrom = parseDate(formData.get(`from_${collectionId}`));
-    const availableUntil = parseDate(formData.get(`until_${collectionId}`));
-    const defaultQuantity = parseInteger(formData.get(`quantity_${collectionId}`), 1);
-    const mappingSort = parseInteger(formData.get(`sort_${collectionId}`), sortOrder);
+  for (const collectionId of editableIds) {
+    const availableFrom = parseDate(formData.get("from_" + collectionId));
+    const availableUntil = parseDate(formData.get("until_" + collectionId));
+    const defaultQuantity = parseInteger(formData.get("quantity_" + collectionId), 1);
+    const mappingSort = parseInteger(formData.get("sort_" + collectionId), sortOrder);
     if (availableFrom === false || availableUntil === false || defaultQuantity === null || defaultQuantity < 0 || mappingSort === null) {
       return { error: "A collection assignment contains an invalid date, quantity, or sort order." };
     }
-    if (availableFrom && availableUntil && availableUntil < availableFrom) {
-      return { error: "Season end must be on or after the start date." };
-    }
+    if (availableFrom && availableUntil && availableUntil < availableFrom) return { error: "Season end must be on or after the start date." };
     assignments.push({
       collection_id: collectionId,
-      is_available: formData.get(`available_${collectionId}`) === "on",
-      customer_selectable: formData.get(`selectable_${collectionId}`) === "on",
+      is_available: formData.get("available_" + collectionId) === "on",
+      customer_selectable: formData.get("selectable_" + collectionId) === "on",
       sort_order: mappingSort,
       available_from: availableFrom,
       available_until: availableUntil,
-      is_default: formData.get(`default_${collectionId}`) === "on",
+      is_default: formData.get("default_" + collectionId) === "on",
       default_quantity: defaultQuantity,
     });
+  }
+
+  if (id) {
+    const complimentary = kind === "complimentary";
+    const assignmentTable = complimentary ? "collection_complimentary_items" : "collection_paid_addon_types";
+    const itemKey = complimentary ? "complimentary_item_type_id" : "paid_addon_type_id";
+    const columns = complimentary
+      ? "collection_id, is_available, customer_selectable, is_default, default_quantity, sort_order, available_from, available_until"
+      : "collection_id, is_available, customer_selectable, sort_order, available_from, available_until";
+    const { data: rows, error: assignmentsError } = await supabase.from(assignmentTable).select(columns).eq(itemKey, id);
+    if (assignmentsError) return { error: "Could not preserve existing collection settings. No changes were saved." };
+    const existing = (rows ?? []) as Array<Record<string, unknown>>;
+    for (const row of assignmentsToPreserve(existing, editableSet, collectionsById, businessToday)) {
+      assignments.push({
+        collection_id: String(row.collection_id),
+        is_available: Boolean(row.is_available),
+        customer_selectable: Boolean(row.customer_selectable),
+        sort_order: Number(row.sort_order ?? 0),
+        available_from: row.available_from ? String(row.available_from) : null,
+        available_until: row.available_until ? String(row.available_until) : null,
+        ...(complimentary ? { is_default: Boolean(row.is_default), default_quantity: Number(row.default_quantity ?? 1) } : {}),
+      });
+    }
   }
 
   const item: Record<string, unknown> = {
@@ -93,7 +131,6 @@ export async function saveAddonCatalogueItemAction(
     });
   }
 
-  const supabase = await createClient();
   const { error } = await supabase.rpc("owner_save_addon_catalogue_item", {
     p_kind: kind,
     p_item: item,

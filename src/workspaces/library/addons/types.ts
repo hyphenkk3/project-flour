@@ -2,6 +2,8 @@ export type AddonCollection = {
   id: string;
   name: string;
   status: string;
+  startDate: string | null;
+  endDate: string | null;
 };
 
 export type AddonAssignment = {

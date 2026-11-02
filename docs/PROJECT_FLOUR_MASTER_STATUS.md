@@ -1540,3 +1540,12 @@ M1 preserved one extended Fresh Pick RPC with 16 arguments and one default argum
 - `dev.whitebird.asia` remains on `dpl_FPF1M4NkkSXP6kKdJ4UpQxzWUbBR`; do not switch its alias or stored branch association in this phase.
 - The isolated Preview is ready for Owner visual and workflow acceptance. Before calling the full Issue #8 runtime suite complete, separately verify Manager/ordinary-staff login and any required payment/notification paths using approved non-customer DEV fixtures. No customer transaction was generated here.
 - The deployment uses application commit `c4e2e81c58b7fa62e9dcd1136f42fda00488fc4d`; this status append will create a documentation-only commit on the same Issue #8 branch. The previously preserved DEV rollback deployment and backup remain unchanged.
+
+
+## Issue #8 Owner UX refinement — 2026-11-02
+
+- Implemented a shared closed-by-default native disclosure pattern for existing Complimentary Items and Paid Add-ons. Headers show name, Active/Inactive state, and useful availability/price/quantity summaries. Create New remains a separate, prominent disclosure before the existing item list.
+- Added a separate collapsed read-only Past collection settings section for each catalogue. Past/current partition uses the authoritative inclusive collection end date: a collection is historical only when `end_date <` the Asia/Kuching business date. Status labels and creation dates do not classify collections; end date equal to today remains editable. Collections with no end date stay editable.
+- Updated the server save action to recheck collection dates at submission time and to preserve existing assignment rows that are historical, omitted or lack collection metadata. This prevents the existing save RPC's omitted-mapping deactivation behavior from changing historical configurations. No database migration or order/catalogue business rules changed.
+- Added deterministic boundary/preservation checks at `scripts/test-addon-collection-history.mjs`.
+- Source implementation is being verified on the isolated Issue #8 branch; test/build and Preview identity will be appended after CI and deployment checks. No Production changes or `dev.whitebird.asia` alias change are authorized.
