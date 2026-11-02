@@ -1972,3 +1972,45 @@ If the Oct 31 restore has fewer than 179 ledger rows, fails required object chec
 - The new runner has NOT been executed against the encrypted Oct 31 archive. The Owner must enter its passphrase through the hidden prompt in regular Mac Terminal. The encrypted archive remains untouched and is still NOT restore-verified. The current-window Production recovery capture has not been created.
 
 **Gate A remains HOLD.** The extension environment blocker has been resolved and the matched image is ready; full restore and current recovery capture remain pending. No Production write, migration, deployment, alias change, or backup creation occurred during this follow-up.
+
+
+## Issue #8 Production release — Gate C/D completion (2 November 2026, Asia/Kuching)
+
+**Status: PRODUCTION PASS.** The accepted Issue #8 application is live. No database migration was run during this application release step.
+
+### Locked source and Production deployment
+
+- Accepted application source: `0bf6ca047b38e6786a3e856cd28e45dde7eb99b7`; tree `6a4f69adf465e21a262dbdff2ad8a3d5ce56480d`. The clean detached staging checkout matched both identities. The remote Issue #8 branch head at staging time was `339f10a1f334e77ffd8cbf7a1392ce0768158def`, a descendant containing only a Master Status documentation change; the staged files came from the exact accepted application commit.
+- Vercel project `prj_3rmlAQzLSFOi15DEGczSuDYDq8xr`, team `hyphen-org`, Node.js `24.x`.
+- Production-target stage: `dpl_6tNvx66usBtRJZzUdFawYtkoji98`, `https://project-flour-jpe7zhxbl-hyphen-org.vercel.app`; READY, source SHA `0bf6ca047b38e6786a3e856cd28e45dde7eb99b7`, target Production, no aliases before promotion. Created with the documented `vercel deploy --prod --skip-domain` procedure.
+- Build: Vercel CLI 59.3.0; Vercel build completed with Next.js 16.2.12 on the configured Node.js 24.x runtime.
+- Promotion: the already-built deployment was promoted with `vercel promote dpl_6tNvx66usBtRJZzUdFawYtkoji98`; no rebuild or source substitution occurred.
+- Live aliases now both point to the new deployment: `whitebird.asia` and `www.whitebird.asia` → `dpl_6tNvx66usBtRJZzUdFawYtkoji98`. The previous Production deployment `dpl_HE7zep8jWR1wkoKZ6w4tC8t4bAaN` remains READY as the immediate application rollback target. `dev.whitebird.asia` remains on its existing deployment.
+
+### Production environment verification
+
+- Vercel's Production environment listing shows `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` scoped to Production. The service-role binding is Sensitive; its value was never printed or exported.
+- The effective public URL matched `https://cuowwlduhxxifmpvpltt.supabase.co`. The configured public key successfully served the read-only Supabase Auth settings request.
+- The protected service-role binding was verified at runtime by the signed-in Owner New Order page, whose read-only manual catalogue queries use the server-side service client and returned catalogue data. No credential value was disclosed.
+- Production ledger remained at the previously verified 183 entries with M1–M4 each applied once; no migration or SQL write was issued during Gate C/D.
+
+### Live non-mutating smoke checks
+
+- Homepage rendered on both customer domains. Cake browsing loaded 23 catalogue items with prices and availability labels.
+- November collection listing and collection page loaded; Signature Yam product detail showed RM125 and its 6-inch size.
+- Customer checkout opened with the November pickup date, available pickup times, and the three complimentary/two paid customer options. The Fresh Picks page loaded and correctly showed no current stock. No cake was added and no order was submitted.
+- Owner staff sign-in succeeded. Owner Home, Library Add-ons, Owner New Order, Bakery, Collection, and Whole Cake Calendar loaded. Add-on catalogue sections and historical settings rendered; Owner New Order displayed cake/add-on choices and kept Create Order disabled until a date and verified pricing are selected.
+- No orders, payments, notifications, stock, catalogue, or customer records were created or changed. The checkout option RPC was read-only and returned successfully.
+- The existing READY rollback deployment was rechecked and preserved.
+
+### Runtime observations and limits
+
+- One initial Signature Yam detail-page request returned the application's temporary-unavailable fallback. Vercel logged PostgreSQL `canceling statement due to statement timeout` for that request. A subsequent request to the same live route returned HTTP 200 with the cake name and price, and no later detail-route error was observed. This was a single recovered timeout; retain it as a monitoring item, not as a repeated failure.
+- Vercel also records the checkout-options RPC's success payload at error log level because the current application uses `console.error` for `[CHECKOUT OPTION DEBUG]`; the logged RPC result had `error: null` and `ready: true`. No checkout order submission occurred.
+- Live staff verification used an active Owner account. A separate Manager credential/session was not used in this smoke pass; Manager/staff authorization boundaries remain covered by the previously completed isolated regression evidence. No real guest checkout was submitted, by design.
+
+### Rollback and monitoring
+
+- If a confirmed application regression appears, immediately stop further release operations and use the verified Vercel rollback procedure to restore `dpl_HE7zep8jWR1wkoKZ6w4tC8t4bAaN` to both customer domains. Confirm both mappings after rollback.
+- Do not reverse M1–M4 as part of application rollback. The migrations are committed and were separately rehearsed as additive; if an application regression requires a database correction, preserve evidence and use the reviewed forward-recovery path. A database restore is not an application rollback and can discard later orders/payments.
+- Monitor Vercel runtime errors, especially repeated PostgreSQL statement timeouts on customer cake-detail requests, and confirm normal staff and customer operations continue. No Production environment variable, DEV alias, or database setting was changed during this release step.
