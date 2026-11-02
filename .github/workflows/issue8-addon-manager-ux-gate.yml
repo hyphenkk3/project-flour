@@ -15,6 +15,18 @@ jobs:
   addon-manager-ux:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: project_flour_regression
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: gha-regression-only
+        options: >-
+          --health-cmd "pg_isready -U postgres -d project_flour_regression"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,4 +52,6 @@ jobs:
           src/workspaces/library/addons/types.ts
           'src/app/(app)/library/addons/page.tsx'
       - name: Relevant existing release regressions
+        env:
+          RELEASE_TEST_POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
         run: npm run test:release-regressions
