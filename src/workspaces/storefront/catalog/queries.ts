@@ -940,7 +940,7 @@ export async function listAvailableCakes(
       "collection_memberships_query",
       context.requestId,
       0,
-      () => supabase
+      async () => await supabase
         .from("collection_cakes")
         .select("library_cake_id, sort_order")
         .eq("collection_id", collectionId)
