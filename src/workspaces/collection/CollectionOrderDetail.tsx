@@ -156,9 +156,9 @@ export function CollectionOrderDetail({
       </header>
 
       {order.internalNotes?.trim() ? (
-        <section className="border-fog bg-mist/50 mt-4 rounded-xl border p-4" aria-label="Internal Notes">
-          <h2 className="text-ink text-sm font-semibold">Internal Notes</h2>
-          <p className="text-ink mt-2 whitespace-pre-wrap break-words text-sm font-bold leading-relaxed">
+        <section className="border-[#EBCB77] bg-[#FFF8DF] mt-4 rounded-xl border p-4" aria-label="Internal Notes">
+          <h2 className="text-[#805513] text-sm font-semibold">Internal Notes</h2>
+          <p className="text-[#493A25] mt-2 whitespace-pre-wrap break-words text-sm font-bold leading-relaxed">
             {order.internalNotes.trim()}
           </p>
         </section>
