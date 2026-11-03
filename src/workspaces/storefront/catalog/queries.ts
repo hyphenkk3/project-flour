@@ -140,7 +140,7 @@ async function measureCatalogueStage<T>(operation: string, stage: string, reques
         : undefined;
     logCatalogueDiagnostic({
       operation, stage, requestId, durationMs: Date.now() - started, cakeCount,
-      error: queryError,
+      error: queryError ?? undefined,
     });
     return result;
   } catch (error) {
