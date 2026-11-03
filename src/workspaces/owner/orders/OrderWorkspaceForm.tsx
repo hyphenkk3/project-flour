@@ -212,6 +212,23 @@ function ViewBlock({
   );
 }
 
+function InternalOrderNoteCallout({ note }: { note: string | null }) {
+  const content = note?.trim();
+  if (!content) return null;
+
+  return (
+    <section
+      aria-label="Internal Notes"
+      className="rounded-xl border border-[#EBCB77] bg-[#FFF8DF] p-4"
+    >
+      <h2 className="text-sm font-semibold text-[#805513]">Internal Notes</h2>
+      <p className="mt-2 text-sm leading-relaxed font-bold break-words whitespace-pre-wrap text-[#493A25]">
+        {content}
+      </p>
+    </section>
+  );
+}
+
 export function OrderWorkspaceForm({
   order,
   cakes,
@@ -844,6 +861,7 @@ export function OrderWorkspaceForm({
           <p className="text-skyline text-sm">{order.orderNumber}</p>
         </div>
         <CustomerOrderNoteCallout note={order.notes} />
+        <InternalOrderNoteCallout note={order.internalNotes} />
         {order.status === "paid" &&
         (order.postPaymentCustomerChangeCount ?? 0) >= 1 ? (
           <p className="border-fog text-ink rounded-lg border bg-white px-4 py-3 text-sm">
@@ -889,7 +907,8 @@ export function OrderWorkspaceForm({
               {order.email.trim() ? order.email : "No email"}
             </p>
             <p className="text-skyline text-sm">
-              Source · {orderSourceLabelWithDetail(
+              Source ·{" "}
+              {orderSourceLabelWithDetail(
                 order.orderSource,
                 order.orderSourceOther,
               )}
@@ -1168,14 +1187,6 @@ export function OrderWorkspaceForm({
           </ViewBlock>
         ) : null}
 
-        <ViewBlock title="Internal notes">
-          <p className="text-skyline text-sm leading-relaxed whitespace-pre-wrap">
-            {order.internalNotes?.trim()
-              ? order.internalNotes
-              : "No internal notes."}
-          </p>
-        </ViewBlock>
-
         <ViewBlock title="Bakery attention">
           {order.needsBakeryAttention ? (
             <div className="space-y-1">
@@ -1388,6 +1399,7 @@ export function OrderWorkspaceForm({
       </div>
 
       <CustomerOrderNoteCallout note={order.notes} />
+      <InternalOrderNoteCallout note={order.internalNotes} />
 
       {renderApprovalPanels()}
 

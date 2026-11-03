@@ -24,6 +24,8 @@ const suites = [
   ["Collection capability UX", "test-collection-capabilities-ux.ts"],
   ["Collection Dine-in desk", "test-collection-dine-in-desk.ts"],
   ["Collection pickup role guards", "test-collection-picked-up-rpc-roles.ts"],
+  ["Customer Order Notes", "test-customer-order-notes.ts"],
+  ["Operations order Internal Notes", "test-operations-order-internal-notes.mjs"],
   ["Calendar fulfilment and markers", "test-m4-p2-slice5-calendar-fulfilment.ts"],
   ["Calendar message parity", "test-manager-calendar-messages-parity.ts"],
   ["Fresh Pick Calendar assignment", "test-extra-calendar-assign.ts"],
@@ -148,6 +150,8 @@ const eslint = path.join(root, "node_modules", ".bin", "eslint");
 run("Changed regression-test lint", eslint, [
   "scripts/test-extra-calendar-assign.ts",
   "scripts/test-extra-fresh-picks-eligibility.ts",
+  "scripts/test-operations-order-internal-notes.mjs",
+  "scripts/test-customer-order-notes.ts",
   "scripts/test-staff-notification-new-order-content.ts",
   "scripts/test-fresh-pick-assignment-readiness-contract.ts",
   "scripts/test-release-regressions.mjs",
