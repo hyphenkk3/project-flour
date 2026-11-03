@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - codex/freshpick-r3-dev-20261025
+      - codex/prod-capacity-error-20261103
   pull_request:
     branches:
       - codex/freshpick-r3-dev-20261025
@@ -48,6 +49,9 @@ jobs:
 
       - name: Install exact lockfile dependencies
         run: npm ci
+
+      - name: Capacity permission-denial fail-closed contract
+        run: node --experimental-strip-types scripts/test-capacity-error-classification.ts
 
       - name: Run permanent source and isolated PostgreSQL regressions
         env:
