@@ -111,6 +111,16 @@ const earliestMixed = draftEarliestCollectionYmd([twoDay, threeDay], at);
 assert.ok(earliestTwo && earliestThree && earliestMixed);
 assert.equal(earliestThree > earliestTwo, true);
 assert.equal(earliestMixed, earliestThree);
+const selectedLaterDraft = {
+  ...emptyPreorderDraft(),
+  pickupDate: "2026-09-20",
+  items: [twoDay],
+};
+assert.equal(
+  draftEarliestCollectionYmd(selectedLaterDraft.items, at),
+  earliestTwo,
+);
+assert.notEqual(earliestTwo, selectedLaterDraft.pickupDate);
 assert.equal(formatCartCollectionDate("2026-09-10"), "10 Sep");
 assert.equal(formatCartCollectionDate(""), null);
 assert.equal(formatCartCollectionDate("soon"), null);
@@ -210,8 +220,14 @@ assert.match(
   /bg-ink text-mist fixed right-0 bottom-0 left-0 z-40 flex min-h-\[4\.25rem\] items-center justify-between/,
 );
 assert.match(cartSrc, /Your Order/);
-assert.match(cartSrc, /Collection date/);
+assert.doesNotMatch(cartSrc, /Collection date/);
 assert.match(cartSrc, /Earliest collection/);
+assert.match(cartSrc, /onClick=\{\(\) => setOpen\(true\)\}/);
+assert.match(cartSrc, /onClick=\{\(\) => setOpen\(false\)\}/);
+assert.match(
+  cartSrc,
+  /You can select or change your collection date in the next step\./,
+);
 assert.match(cartSrc, /bg-\[#E2E1DC\]/);
 assert.doesNotMatch(cartSrc, /bg-\[#EBE6D8\]/);
 assert.doesNotMatch(cartSrc, /bg-paper\/95/);
@@ -277,7 +293,9 @@ assert.doesNotMatch(removeFn, /pickupDate:/);
 
 const addSrc = readSrc("src/workspaces/storefront/cart/AddToOrderSheet.tsx");
 assert.match(addSrc, /imageUrl/);
-assert.doesNotMatch(addSrc, /engines\/preorder/);
+assert.match(addSrc, /cakeSizeEligibleDateInPickupRange/);
+assert.match(addSrc, /scopedPreorderFloor/);
+assert.match(addSrc, /validateCartSizeAvailability/);
 assert.doesNotMatch(addSrc, /Continue to preorder/);
 
 const extraPageSrc = readSrc(

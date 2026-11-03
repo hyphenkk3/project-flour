@@ -9,6 +9,8 @@ on:
       - .github/workflows/checkout-secondary-catalogue-retry.yml
       - src/workspaces/storefront/checkout/GuestCheckoutForm.tsx
       - src/workspaces/storefront/checkout/secondary-offer-loader.mjs
+      - src/workspaces/storefront/cart/StorefrontCartShell.tsx
+      - scripts/test-storefront-cart-shell.ts
       - scripts/test-checkout-secondary-offer-retry.mjs
       - scripts/test-storefront-checkout-date-confirmation.ts
       - scripts/test-release-regressions.mjs
@@ -57,6 +59,7 @@ jobs:
       - name: Focused checkout recovery tests
         run: |
           node scripts/test-checkout-secondary-offer-retry.mjs
+          node --import ./scripts/test-release-regression-alias-loader.mjs scripts/test-storefront-cart-shell.ts
           node --import ./scripts/test-release-regression-alias-loader.mjs scripts/test-storefront-checkout-date-confirmation.ts
           node --import ./scripts/test-release-regression-alias-loader.mjs scripts/test-storefront-checkout-interactions.ts
           node --import ./scripts/test-release-regression-alias-loader.mjs scripts/test-customer-preorder-options.ts
@@ -64,7 +67,7 @@ jobs:
           node --import ./scripts/test-release-regression-alias-loader.mjs scripts/test-guest-preorder-hardening.ts
           node scripts/test-checkout-option-logging.mjs
       - name: Changed regression-test ESLint
-        run: ./node_modules/.bin/eslint scripts/test-checkout-secondary-offer-retry.mjs scripts/test-storefront-checkout-date-confirmation.ts scripts/test-release-regressions.mjs src/workspaces/storefront/checkout/secondary-offer-loader.mjs
+        run: ./node_modules/.bin/eslint scripts/test-checkout-secondary-offer-retry.mjs scripts/test-storefront-cart-shell.ts scripts/test-storefront-checkout-date-confirmation.ts scripts/test-release-regressions.mjs src/workspaces/storefront/checkout/secondary-offer-loader.mjs
       - name: Full offline release regressions
         env:
           RELEASE_TEST_POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
