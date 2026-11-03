@@ -339,6 +339,9 @@ function persistDraft(
 const checkoutPickupOfferCache = new Map<string, CheckoutPickupOffer>();
 const checkoutCakeSizePriceCache = new Map<string, Promise<number | null>>();
 
+const CAPACITY_AVAILABILITY_ERROR_MESSAGE =
+  "We couldn’t confirm availability for your selected dates. Please refresh the page or contact us before placing your order.";
+
 export function GuestCheckoutForm({
   suggestedPickupDate = null,
   minPickupDate = null,
@@ -480,6 +483,10 @@ export function GuestCheckoutForm({
     blockingCakeNamesByDate: {},
     waitingListLineKeysByDate: {},
   });
+  const [cartCapacityRequest, setCartCapacityRequest] = useState<{
+    key: string;
+    status: "ready" | "error";
+  } | null>(null);
   const [closedWaitingList, setClosedWaitingList] =
     useState<CustomerWaitingListAvailabilityData | null>(null);
   const [waitingListAvailabilityOpen, setWaitingListAvailabilityOpen] =
@@ -535,6 +542,18 @@ export function GuestCheckoutForm({
   const rejectExcludedDates = items.length === 0;
 
   const cartCapacityKey = checkoutCartCapacityKey(items);
+  const cartCapacityRequestKey = JSON.stringify([
+    cartCapacityKey,
+    collectionId,
+    effectivePickupBounds.min,
+    effectivePickupBounds.max,
+  ]);
+  const cartCapacityStatus =
+    items.length === 0
+      ? "ready"
+      : cartCapacityRequest?.key === cartCapacityRequestKey
+        ? cartCapacityRequest.status
+        : "loading";
 
   useEffect(() => {
     startCheckoutLoadClock();
@@ -547,9 +566,7 @@ export function GuestCheckoutForm({
   }, [hydrated]);
 
   useEffect(() => {
-    if (!hydrated || !calendarReady || items.length === 0) {
-      return;
-    }
+    if (!hydrated || !calendarReady || items.length === 0) return;
     markCheckoutLoadOnce(
       "capacity_availability_start",
       checkoutLoadSeen.current,
@@ -567,14 +584,35 @@ export function GuestCheckoutForm({
         cakeName: item.cakeName,
         quantity: item.quantity,
       })),
-    }).then((snapshot) => {
-      if (!cancelled) setCartCapacity(snapshot);
-    });
+    })
+      .then((result) => {
+        if (cancelled) return;
+        if (result.ok) {
+          setCartCapacity(result.snapshot);
+          setCartCapacityRequest({
+            key: cartCapacityRequestKey,
+            status: "ready",
+          });
+        } else {
+          setCartCapacityRequest({
+            key: cartCapacityRequestKey,
+            status: "error",
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCartCapacityRequest({
+            key: cartCapacityRequestKey,
+            status: "error",
+          });
+        }
+      });
     return () => {
       cancelled = true;
     };
-  // Price/name-only item updates must not refetch capacity.
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- cartCapacityKey encodes cake+size+qty
+    // Price/name-only item updates must not refetch capacity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cartCapacityKey encodes cake+size+qty
   }, [
     calendarReady,
     cartCapacityKey,
@@ -582,6 +620,7 @@ export function GuestCheckoutForm({
     effectivePickupBounds.max,
     effectivePickupBounds.min,
     hydrated,
+    cartCapacityRequestKey,
   ]);
   useEffect(() => {
     const selectedYmd = fields.pickupDate.trim().slice(0, 10);
@@ -620,7 +659,10 @@ export function GuestCheckoutForm({
     blockingCakeNamesByDate: {} as Record<string, string[]>,
     waitingListLineKeysByDate: {} as Record<string, string[]>,
   };
-  const activeCartCapacity = items.length === 0 ? emptyCapacity : cartCapacity;
+  const activeCartCapacity =
+    items.length === 0 || cartCapacityStatus !== "ready"
+      ? emptyCapacity
+      : cartCapacity;
   const waitingListPickerDates = activeCartCapacity.waitingListDates;
   const fullyBookedWithoutWaitingList =
     activeCartCapacity.fullyBookedDates.filter(
@@ -1579,6 +1621,10 @@ export function GuestCheckoutForm({
       setItemError("Please add at least one cake to your preorder.");
       return;
     }
+    if (cartCapacityStatus !== "ready") {
+      setItemError(CAPACITY_AVAILABILITY_ERROR_MESSAGE);
+      return;
+    }
     if (
       collectionDateEvaluation &&
       !collectionDateEvaluation.valid &&
@@ -1750,6 +1796,7 @@ export function GuestCheckoutForm({
   );
   const submitBlocked =
     cartValidationPending ||
+    (items.length > 0 && cartCapacityStatus !== "ready") ||
     Boolean(sizeAvailabilityError) ||
     calendarPending ||
     pickupMembershipsPending ||
@@ -1891,6 +1938,22 @@ export function GuestCheckoutForm({
                 role="status"
               >
                 {calendarError}
+              </p>
+            ) : null}
+            {items.length > 0 && cartCapacityStatus === "loading" ? (
+              <p
+                className="text-skyline mt-4 text-sm leading-relaxed"
+                role="status"
+              >
+                Confirming availability for your selected dates…
+              </p>
+            ) : null}
+            {items.length > 0 && cartCapacityStatus === "error" ? (
+              <p
+                className="text-status-danger mt-4 text-sm leading-relaxed"
+                role="alert"
+              >
+                {CAPACITY_AVAILABILITY_ERROR_MESSAGE}
               </p>
             ) : null}
             {unavailableMessage ? (

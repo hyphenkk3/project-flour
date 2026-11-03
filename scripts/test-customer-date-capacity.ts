@@ -475,7 +475,7 @@ assert.match(
 
 const snapshotType = querySrc.slice(
   querySrc.indexOf("type CustomerCartDateCapacitySnapshot"),
-  querySrc.indexOf("function isMissingRelation"),
+  querySrc.indexOf("function asId"),
 );
 assert.match(snapshotType, /fullyBookedDates: string\[\]/);
 assert.match(snapshotType, /blockingCakeNamesByDate/);
@@ -506,7 +506,14 @@ assert.match(formSrc, /unavailableDates=\{fullyBookedWithoutWaitingList\}/);
 const bakeryOverviewSrc = readSrc(
   "src/workspaces/library/order-availability/overview/AvailabilityOverviewPanel.tsx",
 );
-assert.match(bakeryOverviewSrc, /Availability overview/);
+assert.match(
+  bakeryOverviewSrc,
+  /aria-labelledby="availability-overview-heading"/,
+);
+const bakeryAvailabilityPageSrc = readSrc(
+  "src/app/(app)/bakery/availability/page.tsx",
+);
+assert.match(bakeryAvailabilityPageSrc, /title="Availability overview"/);
 
 const capacityActionsSrc = readSrc(
   "src/workspaces/library/order-availability/capacity/actions.ts",

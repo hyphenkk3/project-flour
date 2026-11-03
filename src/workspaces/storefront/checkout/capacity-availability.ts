@@ -7,6 +7,10 @@ import {
 } from "@/engines/preorder/capacity";
 import { GUEST_PREORDER_CAPACITY_ORDER_STATUSES } from "@/engines/preorder/capacity";
 import { parseBusinessDate } from "@/lib/dates";
+import {
+  isMissingRelation,
+  isMissingWaitingListColumn,
+} from "@/workspaces/storefront/checkout/capacity-errors";
 
 export type CustomerCartDateCapacitySnapshot = {
   fullyBookedDates: string[];
@@ -14,12 +18,6 @@ export type CustomerCartDateCapacitySnapshot = {
   blockingCakeNamesByDate: Record<string, string[]>;
   waitingListLineKeysByDate: Record<string, string[]>;
 };
-
-function isMissingRelation(message: string): boolean {
-  return /production_capacity|waiting_list|schema cache|does not exist/i.test(
-    message,
-  );
-}
 
 function asId(value: unknown): string {
   return String(value ?? "").trim();
@@ -69,7 +67,7 @@ export async function loadCustomerCartDateCapacity(input: {
     .lte("pickup_date", input.toYmd)
     .in("library_cake_id", cakeIds);
 
-  if (capacityError && /waiting_list_enabled/i.test(capacityError.message)) {
+  if (capacityError && isMissingWaitingListColumn(capacityError)) {
     const fallback = await supabase
       .from("production_capacity")
       .select(
@@ -83,7 +81,9 @@ export async function loadCustomerCartDateCapacity(input: {
   }
 
   if (capacityError) {
-    if (isMissingRelation(capacityError.message)) return emptySnapshot();
+    if (isMissingRelation(capacityError, "production_capacity")) {
+      return emptySnapshot();
+    }
     throw new Error(capacityError.message);
   }
 
@@ -115,7 +115,14 @@ export async function loadCustomerCartDateCapacity(input: {
       .select("waiting_list_enabled")
       .eq("id", input.collectionId)
       .maybeSingle();
-    if (!collection.error) {
+    if (collection.error) {
+      if (
+        !isMissingWaitingListColumn(collection.error) &&
+        !isMissingRelation(collection.error, "collections")
+      ) {
+        throw new Error(collection.error.message);
+      }
+    } else {
       collectionWaitingListEnabled = Boolean(
         (collection.data as { waiting_list_enabled?: boolean } | null)
           ?.waiting_list_enabled,
@@ -131,7 +138,7 @@ export async function loadCustomerCartDateCapacity(input: {
     .lte("pickup_date", input.toYmd);
 
   if (orderError) {
-    if (isMissingRelation(orderError.message)) return emptySnapshot();
+    if (isMissingRelation(orderError, "orders")) return emptySnapshot();
     throw new Error(orderError.message);
   }
 
@@ -161,7 +168,7 @@ export async function loadCustomerCartDateCapacity(input: {
       .in("order_id", [...orderById.keys()])
       .in("cake_id", cakeIds);
     if (itemError) {
-      if (isMissingRelation(itemError.message)) return emptySnapshot();
+      if (isMissingRelation(itemError, "order_items")) return emptySnapshot();
       throw new Error(itemError.message);
     }
     used = (items ?? []).flatMap((item) => {

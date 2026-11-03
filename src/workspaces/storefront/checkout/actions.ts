@@ -857,20 +857,20 @@ export async function loadCartDateCapacityAvailability(input: {
     quantity: number;
   }>;
 }): Promise<{
-  fullyBookedDates: string[];
-  waitingListDates: string[];
-  blockingCakeNamesByDate: Record<string, string[]>;
-  waitingListLineKeysByDate: Record<string, string[]>;
-}> {
+  ok: true;
+  snapshot: {
+    fullyBookedDates: string[];
+    waitingListDates: string[];
+    blockingCakeNamesByDate: Record<string, string[]>;
+    waitingListLineKeysByDate: Record<string, string[]>;
+  };
+} | { ok: false }> {
   try {
-    return await loadCustomerCartDateCapacity(input);
+    return { ok: true, snapshot: await loadCustomerCartDateCapacity(input) };
   } catch {
-    return {
-      fullyBookedDates: [],
-      waitingListDates: [],
-      blockingCakeNamesByDate: {},
-      waitingListLineKeysByDate: {},
-    };
+    // Keep database error details server-side; callers receive a stable,
+    // non-sensitive failure state instead of an empty availability result.
+    return { ok: false };
   }
 }
 
