@@ -1955,12 +1955,25 @@ export function browseCakePreviewFromDisplay(
 async function loadBrowsePublishedCakeById(
   id: string,
   todayYmd: string,
+  requestId: string | null,
 ): Promise<BrowseStorefrontCake | null> {
   const supabase = createPublicClient();
   void readCachedLibraryCakeDisplay(id).catch(() => undefined);
   const [commercial, catalogues] = await Promise.all([
-    loadLiveCakeCommercialState(supabase, id),
-    listCakePublicationCatalogues(supabase, id),
+    measureCatalogueStage(
+      "get_browse_published_cake_by_id",
+      "live_commercial_query",
+      requestId,
+      1,
+      () => loadLiveCakeCommercialState(supabase, id),
+    ),
+    measureCatalogueStage(
+      "get_browse_published_cake_by_id",
+      "publication_catalogue_query",
+      requestId,
+      1,
+      () => listCakePublicationCatalogues(supabase, id),
+    ),
   ]);
   if (!commercial) return null;
 
@@ -1983,7 +1996,13 @@ async function loadBrowsePublishedCakeById(
     todayYmd,
   });
   if (!published) return null;
-  const [priced] = await withEffectiveStorefrontPrices([published], todayYmd);
+  const [priced] = await measureCatalogueStage(
+    "get_browse_published_cake_by_id",
+    "date_sensitive_price_resolution",
+    requestId,
+    1,
+    () => withEffectiveStorefrontPrices([published], todayYmd),
+  );
   return priced
     ? {
         ...priced,
@@ -1994,7 +2013,8 @@ async function loadBrowsePublishedCakeById(
 }
 
 const readCachedBrowsePublishedCakeById = cache(
-  (id: string, todayYmd: string) => loadBrowsePublishedCakeById(id, todayYmd),
+  (id: string, todayYmd: string, requestId: string | null) =>
+    loadBrowsePublishedCakeById(id, todayYmd, requestId),
 );
 
 export async function getBrowsePublishedCakeById(
@@ -2009,7 +2029,7 @@ export async function getBrowsePublishedCakeById(
       "published_cake_detail_resolution",
       context.requestId,
       1,
-      () => readCachedBrowsePublishedCakeById(id, todayYmd),
+      () => readCachedBrowsePublishedCakeById(id, todayYmd, context.requestId),
     );
   });
 }
