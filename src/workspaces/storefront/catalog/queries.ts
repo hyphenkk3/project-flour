@@ -858,19 +858,30 @@ async function loadStorefrontCakesByIds(
 ): Promise<CachedStorefrontCakeDisplay[]> {
   if (cakeIds.length === 0) return [];
   const supabase = createPublicClient();
-  const data = await withCakePhotoSelectFallback(
-    (photoSelect, includeAssignments, includeTags) =>
-      supabase
-        .from("library_cakes")
-        .select(
-          libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags),
-        )
-        .in("id", [...cakeIds]),
-  );
-
-  return ((data ?? []) as unknown as LibraryCakeEmbed[])
-    .filter((row) => row.library_cake_sizes?.length)
-    .map((row) => ({ cake: mapStorefrontCake(row), status: row.status }));
+  activeStorefrontDisplayCacheLoads += 1;
+  try {
+    const data = await measureCatalogueStage(
+      "storefront_collection_display",
+      "library_cakes_embed_cache_fill",
+      null,
+      cakeIds.length,
+      () =>
+        withCakePhotoSelectFallback(
+          (photoSelect, includeAssignments, includeTags) =>
+            supabase
+              .from("library_cakes")
+              .select(
+                libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags),
+              )
+              .in("id", [...cakeIds]),
+        ),
+    );
+    return ((data ?? []) as unknown as LibraryCakeEmbed[])
+      .filter((row) => row.library_cake_sizes?.length)
+      .map((row) => ({ cake: mapStorefrontCake(row), status: row.status }));
+  } finally {
+    activeStorefrontDisplayCacheLoads = Math.max(0, activeStorefrontDisplayCacheLoads - 1);
+  }
 }
 
 const readCachedStorefrontCakesByIds = cache((cakeIdsKey: string) =>
