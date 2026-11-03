@@ -7,6 +7,8 @@ on:
     paths:
       - .github/workflows/prod-catalogue-reliability.yml
       - src/workspaces/storefront/checkout/actions.ts
+      - src/workspaces/storefront/catalog/queries.ts
+      - scripts/test-storefront-catalog-diagnostics.mjs
       - scripts/test-checkout-option-logging.mjs
       - scripts/test-release-regressions.mjs
       - package.json
@@ -51,10 +53,12 @@ jobs:
         run: npm ci
       - name: Checkout option logging contract
         run: node scripts/test-checkout-option-logging.mjs
+      - name: Storefront catalogue diagnostics contract
+        run: node scripts/test-storefront-catalog-diagnostics.mjs
       - name: TypeScript
         run: npx tsc --noEmit
       - name: Changed-file ESLint
-        run: ./node_modules/.bin/eslint --no-cache src/workspaces/storefront/checkout/actions.ts scripts/test-checkout-option-logging.mjs
+        run: ./node_modules/.bin/eslint --no-cache src/workspaces/storefront/checkout/actions.ts src/workspaces/storefront/catalog/queries.ts scripts/test-checkout-option-logging.mjs scripts/test-storefront-catalog-diagnostics.mjs
       - name: Existing full release regressions
         env:
           RELEASE_TEST_POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
