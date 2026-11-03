@@ -156,9 +156,9 @@ export function CollectionOrderCard({
             </p>
           ) : null}
           {internalNotes ? (
-            <div className="border-fog bg-mist/50 mt-2 rounded-lg border p-2.5">
-              <p className="text-ink text-xs font-semibold">Internal Notes</p>
-              <p className="text-ink mt-1 whitespace-pre-wrap break-words text-sm font-bold leading-snug">
+            <div className="border-[#EBCB77] bg-[#FFF8DF] mt-2 rounded-lg border p-2.5">
+              <p className="text-[#805513] text-xs font-semibold">Internal Notes</p>
+              <p className="text-[#493A25] mt-1 whitespace-pre-wrap break-words text-sm font-bold leading-snug">
                 {internalNotes}
               </p>
             </div>
