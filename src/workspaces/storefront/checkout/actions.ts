@@ -860,6 +860,7 @@ export async function loadCartDateCapacityAvailability(input: {
   ok: true;
   snapshot: {
     availabilityConfirmed: boolean;
+    showAdvisoryFailureNotice: boolean;
     fullyBookedDates: string[];
     waitingListDates: string[];
     blockingCakeNamesByDate: Record<string, string[]>;
@@ -876,6 +877,7 @@ export async function loadCartDateCapacityAvailability(input: {
       ok: true,
       snapshot: {
         availabilityConfirmed: false,
+        showAdvisoryFailureNotice: true,
         fullyBookedDates: [],
         waitingListDates: [],
         blockingCakeNamesByDate: {},

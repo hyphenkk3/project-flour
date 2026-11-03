@@ -93,6 +93,19 @@ export function isMissingWaitingListColumn(
   );
 }
 
+/** Match only the intentional anonymous denial for the advisory capacity table. */
+export function isExpectedAdvisoryPermissionDenial(
+  error: CapacityDatabaseError,
+  relation: string,
+): boolean {
+  if (error.code !== "42501") return false;
+  const message = (error.message ?? "").toLowerCase().replace(/["']/g, "");
+  const name = relation.toLowerCase();
+  return new RegExp(
+    `permission denied for (?:table|relation) (?:public\\.)?${name}\\b`,
+  ).test(message);
+}
+
 /** A failed optional advisory read must never be presented as availability. */
 export function classifyCapacityLookupError(
   error: CapacityDatabaseError,

@@ -12,10 +12,12 @@ import {
   getConfirmedZeroCapacityDates,
   isMissingRelation,
   isMissingWaitingListColumn,
+  isExpectedAdvisoryPermissionDenial,
 } from "@/workspaces/storefront/checkout/capacity-errors";
 
 export type CustomerCartDateCapacitySnapshot = {
   availabilityConfirmed: boolean;
+  showAdvisoryFailureNotice: boolean;
   fullyBookedDates: string[];
   waitingListDates: string[];
   blockingCakeNamesByDate: Record<string, string[]>;
@@ -33,9 +35,11 @@ function asOptionalId(value: unknown): string | null {
 
 function emptySnapshot(
   availabilityConfirmed = true,
+  showAdvisoryFailureNotice = false,
 ): CustomerCartDateCapacitySnapshot {
   return {
     availabilityConfirmed,
+    showAdvisoryFailureNotice,
     fullyBookedDates: [],
     waitingListDates: [],
     blockingCakeNamesByDate: {},
@@ -45,8 +49,12 @@ function emptySnapshot(
 
 function unconfirmedSnapshot(
   confirmedFullDates: string[] = [],
+  showAdvisoryFailureNotice = true,
 ): CustomerCartDateCapacitySnapshot {
-  return { ...emptySnapshot(false), fullyBookedDates: confirmedFullDates };
+  return {
+    ...emptySnapshot(false, showAdvisoryFailureNotice),
+    fullyBookedDates: confirmedFullDates,
+  };
 }
 
 /**
@@ -93,9 +101,15 @@ export async function loadCustomerCartDateCapacity(input: {
   }
 
   if (capacityError) {
-    return emptySnapshot(
+    if (
       classifyCapacityLookupError(capacityError, "production_capacity") ===
-        "missing_relation",
+      "missing_relation"
+    ) {
+      return emptySnapshot();
+    }
+    return unconfirmedSnapshot(
+      [],
+      !isExpectedAdvisoryPermissionDenial(capacityError, "production_capacity"),
     );
   }
 
@@ -247,6 +261,7 @@ export async function loadCustomerCartDateCapacity(input: {
 
   return {
     availabilityConfirmed: true,
+    showAdvisoryFailureNotice: false,
     fullyBookedDates,
     waitingListDates,
     blockingCakeNamesByDate,

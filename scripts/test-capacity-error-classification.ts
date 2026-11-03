@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import {
   classifyCapacityLookupError,
   getConfirmedZeroCapacityDates,
+  isExpectedAdvisoryPermissionDenial,
   isMissingRelation,
   isMissingWaitingListColumn,
 } from "../src/workspaces/storefront/checkout/capacity-errors.ts";
@@ -40,6 +41,24 @@ assert.equal(isMissingRelation(permissionDenied, "production_capacity"), false);
 assert.equal(
   classifyCapacityLookupError(permissionDenied, "production_capacity"),
   "unconfirmed",
+);
+assert.equal(
+  isExpectedAdvisoryPermissionDenial(permissionDenied, "production_capacity"),
+  true,
+  "the intentional anonymous table denial is identified only for the advisory relation",
+);
+assert.equal(
+  isExpectedAdvisoryPermissionDenial(permissionDenied, "orders"),
+  false,
+  "permission denials on other relations remain visible failures",
+);
+assert.equal(
+  isExpectedAdvisoryPermissionDenial(
+    { code: "57014", message: "canceling statement due to statement timeout" },
+    "production_capacity",
+  ),
+  false,
+  "timeouts remain surfaced as advisory failures",
 );
 assert.equal(
   classifyCapacityLookupError(missingCapacity, "production_capacity"),
@@ -139,6 +158,11 @@ assert.match(
 );
 assert.match(formSource, /cartCapacityStatus === "loading"/);
 assert.match(formSource, /cartCapacityStatus === "unconfirmed"/);
+assert.match(
+  formSource,
+  /cartCapacityStatus === "unconfirmed" &&\s*cartCapacity\.showAdvisoryFailureNotice/,
+  "only surfaced advisory failures render the notice; expected permission denial stays unconfirmed without a persistent warning",
+);
 assert.match(formSource, /availability will be checked securely when you submit/);
 assert.match(actionSource, /availabilityConfirmed/);
 assert.doesNotMatch(actionSource, /return \{ ok: false \};/);

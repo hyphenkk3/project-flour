@@ -474,12 +474,14 @@ export function GuestCheckoutForm({
   const [collectionId, setCollectionId] = useState<string | null>(null);
   const [cartCapacity, setCartCapacity] = useState<{
     availabilityConfirmed: boolean;
+    showAdvisoryFailureNotice: boolean;
     fullyBookedDates: string[];
     waitingListDates: string[];
     blockingCakeNamesByDate: Record<string, string[]>;
     waitingListLineKeysByDate: Record<string, string[]>;
   }>({
     availabilityConfirmed: true,
+    showAdvisoryFailureNotice: false,
     fullyBookedDates: [],
     waitingListDates: [],
     blockingCakeNamesByDate: {},
@@ -600,6 +602,7 @@ export function GuestCheckoutForm({
         } else {
           setCartCapacity({
             availabilityConfirmed: false,
+            showAdvisoryFailureNotice: true,
             fullyBookedDates: [],
             waitingListDates: [],
             blockingCakeNamesByDate: {},
@@ -615,6 +618,7 @@ export function GuestCheckoutForm({
         if (!cancelled) {
           setCartCapacity({
             availabilityConfirmed: false,
+            showAdvisoryFailureNotice: true,
             fullyBookedDates: [],
             waitingListDates: [],
             blockingCakeNamesByDate: {},
@@ -1966,7 +1970,9 @@ export function GuestCheckoutForm({
                 Confirming availability for your selected dates…
               </p>
             ) : null}
-            {items.length > 0 && cartCapacityStatus === "unconfirmed" ? (
+            {items.length > 0 &&
+            cartCapacityStatus === "unconfirmed" &&
+            cartCapacity.showAdvisoryFailureNotice ? (
               <p
                 className="text-skyline mt-4 text-sm leading-relaxed"
                 role="status"
