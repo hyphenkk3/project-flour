@@ -3,6 +3,45 @@ export type CapacityDatabaseError = {
   message?: string | null;
 };
 
+export type CapacityLookupOutcome = "missing_relation" | "unconfirmed";
+
+export function getConfirmedZeroCapacityDates(input: {
+  rows: readonly {
+    pickupDate: string;
+    cakeId: string;
+    sizeId: string | null;
+    collectionId: string | null;
+    capacityQuantity: number;
+  }[];
+  cart: readonly { cakeId: string; cakeSizeId: string }[];
+  collectionId: string | null;
+}): string[] {
+  const dates = new Set<string>();
+  for (const pickupDate of new Set(input.rows.map((row) => row.pickupDate))) {
+    for (const line of input.cart) {
+      const matching = input.rows
+        .filter(
+          (row) =>
+            row.pickupDate === pickupDate &&
+            row.cakeId === line.cakeId &&
+            (row.sizeId === null || row.sizeId === line.cakeSizeId) &&
+            (row.collectionId === null || row.collectionId === input.collectionId),
+        )
+        .sort((left, right) => {
+          const sizeSpecificity =
+            Number(right.sizeId !== null) - Number(left.sizeId !== null);
+          return (
+            sizeSpecificity ||
+            Number(right.collectionId !== null) -
+              Number(left.collectionId !== null)
+          );
+        });
+      if (matching[0]?.capacityQuantity === 0) dates.add(pickupDate);
+    }
+  }
+  return [...dates];
+}
+
 function relationIsNamed(message: string, relation: string): boolean {
   const normalized = message.toLowerCase().replace(/["']/g, "");
   return (
@@ -52,4 +91,12 @@ export function isMissingWaitingListColumn(
     /column/.test(message) &&
     /schema cache/.test(message)
   );
+}
+
+/** A failed optional advisory read must never be presented as availability. */
+export function classifyCapacityLookupError(
+  error: CapacityDatabaseError,
+  relation: string,
+): CapacityLookupOutcome {
+  return isMissingRelation(error, relation) ? "missing_relation" : "unconfirmed";
 }

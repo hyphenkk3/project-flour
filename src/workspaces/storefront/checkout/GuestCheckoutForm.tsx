@@ -339,8 +339,8 @@ function persistDraft(
 const checkoutPickupOfferCache = new Map<string, CheckoutPickupOffer>();
 const checkoutCakeSizePriceCache = new Map<string, Promise<number | null>>();
 
-const CAPACITY_AVAILABILITY_ERROR_MESSAGE =
-  "We couldn’t confirm availability for your selected dates. Please refresh the page or contact us before placing your order.";
+const CAPACITY_AVAILABILITY_UNCONFIRMED_MESSAGE =
+  "We can’t confirm capacity for every date right now. You may continue; availability will be checked securely when you submit your order.";
 
 export function GuestCheckoutForm({
   suggestedPickupDate = null,
@@ -473,11 +473,13 @@ export function GuestCheckoutForm({
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [collectionId, setCollectionId] = useState<string | null>(null);
   const [cartCapacity, setCartCapacity] = useState<{
+    availabilityConfirmed: boolean;
     fullyBookedDates: string[];
     waitingListDates: string[];
     blockingCakeNamesByDate: Record<string, string[]>;
     waitingListLineKeysByDate: Record<string, string[]>;
   }>({
+    availabilityConfirmed: true,
     fullyBookedDates: [],
     waitingListDates: [],
     blockingCakeNamesByDate: {},
@@ -485,7 +487,7 @@ export function GuestCheckoutForm({
   });
   const [cartCapacityRequest, setCartCapacityRequest] = useState<{
     key: string;
-    status: "ready" | "error";
+    status: "ready" | "unconfirmed";
   } | null>(null);
   const [closedWaitingList, setClosedWaitingList] =
     useState<CustomerWaitingListAvailabilityData | null>(null);
@@ -591,20 +593,36 @@ export function GuestCheckoutForm({
           setCartCapacity(result.snapshot);
           setCartCapacityRequest({
             key: cartCapacityRequestKey,
-            status: "ready",
+            status: result.snapshot.availabilityConfirmed
+              ? "ready"
+              : "unconfirmed",
           });
         } else {
+          setCartCapacity({
+            availabilityConfirmed: false,
+            fullyBookedDates: [],
+            waitingListDates: [],
+            blockingCakeNamesByDate: {},
+            waitingListLineKeysByDate: {},
+          });
           setCartCapacityRequest({
             key: cartCapacityRequestKey,
-            status: "error",
+            status: "unconfirmed",
           });
         }
       })
       .catch(() => {
         if (!cancelled) {
+          setCartCapacity({
+            availabilityConfirmed: false,
+            fullyBookedDates: [],
+            waitingListDates: [],
+            blockingCakeNamesByDate: {},
+            waitingListLineKeysByDate: {},
+          });
           setCartCapacityRequest({
             key: cartCapacityRequestKey,
-            status: "error",
+            status: "unconfirmed",
           });
         }
       });
@@ -660,7 +678,7 @@ export function GuestCheckoutForm({
     waitingListLineKeysByDate: {} as Record<string, string[]>,
   };
   const activeCartCapacity =
-    items.length === 0 || cartCapacityStatus !== "ready"
+    items.length === 0 || cartCapacityStatus === "loading"
       ? emptyCapacity
       : cartCapacity;
   const waitingListPickerDates = activeCartCapacity.waitingListDates;
@@ -1621,8 +1639,8 @@ export function GuestCheckoutForm({
       setItemError("Please add at least one cake to your preorder.");
       return;
     }
-    if (cartCapacityStatus !== "ready") {
-      setItemError(CAPACITY_AVAILABILITY_ERROR_MESSAGE);
+    if (cartCapacityStatus === "loading") {
+      setItemError(CAPACITY_AVAILABILITY_UNCONFIRMED_MESSAGE);
       return;
     }
     if (
@@ -1796,7 +1814,7 @@ export function GuestCheckoutForm({
   );
   const submitBlocked =
     cartValidationPending ||
-    (items.length > 0 && cartCapacityStatus !== "ready") ||
+    (items.length > 0 && cartCapacityStatus === "loading") ||
     Boolean(sizeAvailabilityError) ||
     calendarPending ||
     pickupMembershipsPending ||
@@ -1948,12 +1966,12 @@ export function GuestCheckoutForm({
                 Confirming availability for your selected dates…
               </p>
             ) : null}
-            {items.length > 0 && cartCapacityStatus === "error" ? (
+            {items.length > 0 && cartCapacityStatus === "unconfirmed" ? (
               <p
-                className="text-status-danger mt-4 text-sm leading-relaxed"
-                role="alert"
+                className="text-skyline mt-4 text-sm leading-relaxed"
+                role="status"
               >
-                {CAPACITY_AVAILABILITY_ERROR_MESSAGE}
+                {CAPACITY_AVAILABILITY_UNCONFIRMED_MESSAGE}
               </p>
             ) : null}
             {unavailableMessage ? (

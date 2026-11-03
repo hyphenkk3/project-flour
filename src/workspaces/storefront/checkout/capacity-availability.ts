@@ -8,11 +8,14 @@ import {
 import { GUEST_PREORDER_CAPACITY_ORDER_STATUSES } from "@/engines/preorder/capacity";
 import { parseBusinessDate } from "@/lib/dates";
 import {
+  classifyCapacityLookupError,
+  getConfirmedZeroCapacityDates,
   isMissingRelation,
   isMissingWaitingListColumn,
 } from "@/workspaces/storefront/checkout/capacity-errors";
 
 export type CustomerCartDateCapacitySnapshot = {
+  availabilityConfirmed: boolean;
   fullyBookedDates: string[];
   waitingListDates: string[];
   blockingCakeNamesByDate: Record<string, string[]>;
@@ -28,13 +31,22 @@ function asOptionalId(value: unknown): string | null {
   return id.length > 0 ? id : null;
 }
 
-function emptySnapshot(): CustomerCartDateCapacitySnapshot {
+function emptySnapshot(
+  availabilityConfirmed = true,
+): CustomerCartDateCapacitySnapshot {
   return {
+    availabilityConfirmed,
     fullyBookedDates: [],
     waitingListDates: [],
     blockingCakeNamesByDate: {},
     waitingListLineKeysByDate: {},
   };
+}
+
+function unconfirmedSnapshot(
+  confirmedFullDates: string[] = [],
+): CustomerCartDateCapacitySnapshot {
+  return { ...emptySnapshot(false), fullyBookedDates: confirmedFullDates };
 }
 
 /**
@@ -81,10 +93,10 @@ export async function loadCustomerCartDateCapacity(input: {
   }
 
   if (capacityError) {
-    if (isMissingRelation(capacityError, "production_capacity")) {
-      return emptySnapshot();
-    }
-    throw new Error(capacityError.message);
+    return emptySnapshot(
+      classifyCapacityLookupError(capacityError, "production_capacity") ===
+        "missing_relation",
+    );
   }
 
   const rows: GuestCapacityRow[] = (capacityData ?? []).map((row) => ({
@@ -120,7 +132,13 @@ export async function loadCustomerCartDateCapacity(input: {
         !isMissingWaitingListColumn(collection.error) &&
         !isMissingRelation(collection.error, "collections")
       ) {
-        throw new Error(collection.error.message);
+        return unconfirmedSnapshot(
+          getConfirmedZeroCapacityDates({
+            rows,
+            cart: input.cart,
+            collectionId: input.collectionId,
+          }),
+        );
       }
     } else {
       collectionWaitingListEnabled = Boolean(
@@ -138,8 +156,15 @@ export async function loadCustomerCartDateCapacity(input: {
     .lte("pickup_date", input.toYmd);
 
   if (orderError) {
-    if (isMissingRelation(orderError, "orders")) return emptySnapshot();
-    throw new Error(orderError.message);
+    // Without orders we cannot calculate occupancy, even if the relation is
+    // genuinely absent in this environment.
+    return unconfirmedSnapshot(
+      getConfirmedZeroCapacityDates({
+        rows,
+        cart: input.cart,
+        collectionId: input.collectionId,
+      }),
+    );
   }
 
   const orderById = new Map<
@@ -168,8 +193,13 @@ export async function loadCustomerCartDateCapacity(input: {
       .in("order_id", [...orderById.keys()])
       .in("cake_id", cakeIds);
     if (itemError) {
-      if (isMissingRelation(itemError, "order_items")) return emptySnapshot();
-      throw new Error(itemError.message);
+      return unconfirmedSnapshot(
+        getConfirmedZeroCapacityDates({
+          rows,
+          cart: input.cart,
+          collectionId: input.collectionId,
+        }),
+      );
     }
     used = (items ?? []).flatMap((item) => {
       const order = orderById.get(asId((item as { order_id?: string }).order_id));
@@ -216,6 +246,7 @@ export async function loadCustomerCartDateCapacity(input: {
   }
 
   return {
+    availabilityConfirmed: true,
     fullyBookedDates,
     waitingListDates,
     blockingCakeNamesByDate,

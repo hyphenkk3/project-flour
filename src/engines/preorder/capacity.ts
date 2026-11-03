@@ -5,8 +5,9 @@
  * No capacity row = unrestricted.
  * Matching row + (used + cart quantity) > capacity = Fully Booked.
  *
- * Used statuses are submit-time occupancy, not the staff confirmed-order floor.
- * Waiting-list holds are not counted. Phase 7 owns waiting lists.
+ * Used statuses are advisory submit-time occupancy, not the staff
+ * confirmed-order floor. Customer reads cannot inspect private active holds;
+ * the protected database checker includes those holds at submission time.
  */
 
 import type { Ymd } from "@/engines/preorder/types";

@@ -642,7 +642,7 @@ assert.match(sql, /set_production_capacity_waiting_list/);
 assert.doesNotMatch(sql, /create or replace function public.set_production_capacity\(/);
 
 const capacityEngine = readSrc("src/engines/preorder/capacity.ts");
-assert.match(capacityEngine, /Waiting-list holds are not counted/);
+assert.match(capacityEngine, /protected database checker includes those holds/);
 
 const convertSql = sql.slice(sql.indexOf("waiting_list_convert_item"));
 assert.match(convertSql, /create_staff_guest_preorder/);

@@ -859,6 +859,7 @@ export async function loadCartDateCapacityAvailability(input: {
 }): Promise<{
   ok: true;
   snapshot: {
+    availabilityConfirmed: boolean;
     fullyBookedDates: string[];
     waitingListDates: string[];
     blockingCakeNamesByDate: Record<string, string[]>;
@@ -868,9 +869,19 @@ export async function loadCartDateCapacityAvailability(input: {
   try {
     return { ok: true, snapshot: await loadCustomerCartDateCapacity(input) };
   } catch {
-    // Keep database error details server-side; callers receive a stable,
-    // non-sensitive failure state instead of an empty availability result.
-    return { ok: false };
+    // This read is advisory. The protected checkout RPC remains authoritative;
+    // failure is represented as unconfirmed and does not masquerade as full or
+    // available or prevent a legitimate checkout attempt.
+    return {
+      ok: true,
+      snapshot: {
+        availabilityConfirmed: false,
+        fullyBookedDates: [],
+        waitingListDates: [],
+        blockingCakeNamesByDate: {},
+        waitingListLineKeysByDate: {},
+      },
+    };
   }
 }
 

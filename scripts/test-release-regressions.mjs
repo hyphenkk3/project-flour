@@ -13,6 +13,8 @@ const aliasLoader = path.join(scriptsDir, "test-release-regression-alias-loader.
 // this direct Node runner; receipt loading/cookie acceptance remains a separate
 // Next-hosted check, while the client PNG and success-page contracts run here.
 const suites = [
+  ["Capacity advisory denial remains unconfirmed", "test-capacity-error-classification.ts"],
+  ["Capacity serialization migration contract", "test-capacity-serialization-contract.ts"],
   ["Fresh Pick assignment/readiness", "test-fresh-pick-assignment-readiness-contract.ts"],
   ["Fresh Pick readiness presentation", "test-bakery-fresh-pick-readiness.ts"],
   ["Fresh Pick readiness cutoff", "test-extra-ready-for-collection.ts"],
@@ -141,6 +143,10 @@ const postgresHarnessEnv = postgresContainerId
 
 run("Disposable PostgreSQL Fresh Pick assignment RPC", "bash", [
   path.join(scriptsDir, "test-extra-assignment-rpc-postgres.sh"),
+  ], 90_000, postgresHarnessEnv);
+
+run("Disposable PostgreSQL capacity serialization and rollback", "bash", [
+  path.join(scriptsDir, "test-capacity-concurrency-postgres.sh"),
   ], 90_000, postgresHarnessEnv);
 
 const tsc = path.join(root, "node_modules", ".bin", "tsc");
