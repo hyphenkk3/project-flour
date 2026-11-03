@@ -34,6 +34,7 @@ import {
 } from "@/lib/dates";
 import { createClient, createPublicClient } from "@/lib/supabase/server";
 import { cache } from "react";
+import { headers } from "next/headers";
 import { unstable_cache } from "next/cache";
 import {
   STOREFRONT_PUBLISHED_CAKES_CACHE_TAG,
@@ -64,6 +65,55 @@ export { formatRm, startingPrice };
 /** Short merchandising TTL. Not used for checkout offers, orderability, or Fresh Pick stock. */
 const STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS = 30;
 const STOREFRONT_PRICE_LOOKUP_CONCURRENCY = 6;
+const CATALOG_DIAGNOSTICS_ENABLED = process.env.VERCEL_ENV === "preview" && process.env.FLOUR_CATALOG_DIAGNOSTICS === "1";
+let activeStorefrontDisplayCacheLoads = 0;
+
+function safeCatalogueRequestId(value: string | null): string | null {
+  return value && value.length <= 128 && /^[A-Za-z0-9._:-]+$/.test(value) ? value : null;
+}
+
+function catalogueFailure(error: unknown): { category: string; code: string | null } {
+  const candidate = error as { code?: unknown; message?: unknown } | null;
+  const rawCode = typeof candidate?.code === "string" ? candidate.code : "";
+  const code = /^[0-9A-Z_]{1,16}$/.test(rawCode) ? rawCode : null;
+  const message = typeof candidate?.message === "string" ? candidate.message : "";
+  if (code === "57014" || /statement timeout|query canceled|query cancelled/i.test(message)) return { category: "statement_timeout", code };
+  if (/timeout|timed out|ETIMEDOUT/i.test(message)) return { category: "timeout", code };
+  if (/^08/.test(rawCode) || ["53300", "57P01", "57P02", "57P03"].includes(rawCode)) return { category: "transient", code };
+  return { category: "error", code };
+}
+
+function logCatalogueDiagnostic(input: { operation: string; stage: string; requestId: string | null; durationMs: number; cakeCount: number; error?: unknown }): void {
+  if (!CATALOG_DIAGNOSTICS_ENABLED) return;
+  const failure = input.error === undefined ? null : catalogueFailure(input.error);
+  console.info("[CATALOG_READ_DIAGNOSTIC]", JSON.stringify({
+    operation: input.operation, stage: input.stage, requestId: input.requestId,
+    durationMs: Math.max(0, Math.round(input.durationMs)),
+    cakeCount: Math.max(0, Math.trunc(input.cakeCount)),
+    status: failure ? "error" : "ok", errorCategory: failure?.category ?? null,
+    errorCode: failure?.code ?? null,
+    timeout: failure ? failure.category === "timeout" || failure.category === "statement_timeout" : false,
+    activeCacheFills: activeStorefrontDisplayCacheLoads,
+  }));
+}
+
+async function catalogueRequestId(): Promise<string | null> {
+  if (!CATALOG_DIAGNOSTICS_ENABLED) return null;
+  return safeCatalogueRequestId((await headers()).get("x-vercel-id"));
+}
+
+async function measureCatalogueStage<T>(operation: string, stage: string, requestId: string | null, cakeCount: number, task: () => Promise<T>): Promise<T> {
+  if (!CATALOG_DIAGNOSTICS_ENABLED) return task();
+  const started = Date.now();
+  try {
+    const result = await task();
+    logCatalogueDiagnostic({ operation, stage, requestId, durationMs: Date.now() - started, cakeCount });
+    return result;
+  } catch (error) {
+    logCatalogueDiagnostic({ operation, stage, requestId, durationMs: Date.now() - started, cakeCount, error });
+    throw error;
+  }
+}
 
 type CategoryEmbed = {
   id: string;
