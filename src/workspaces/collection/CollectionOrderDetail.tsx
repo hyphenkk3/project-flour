@@ -155,8 +155,17 @@ export function CollectionOrderDetail({
         </div>
       </header>
 
+      {order.internalNotes?.trim() ? (
+        <section className="border-fog bg-mist/50 mt-4 rounded-xl border p-4" aria-label="Internal Notes">
+          <h2 className="text-ink text-sm font-semibold">Internal Notes</h2>
+          <p className="text-ink mt-2 whitespace-pre-wrap break-words text-sm font-bold leading-relaxed">
+            {order.internalNotes.trim()}
+          </p>
+        </section>
+      ) : null}
+
       {order.customerNotes?.trim() ? (
-        <div className="mt-4">
+        <div className="mt-4" aria-label="Customer Order Note">
           <CustomerOrderNoteCallout note={order.customerNotes} />
         </div>
       ) : null}

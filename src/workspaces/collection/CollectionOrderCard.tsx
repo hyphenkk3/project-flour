@@ -57,7 +57,7 @@ export function CollectionOrderCard({
     readyAt: order.readyAt,
     status: order.status,
   });
-  const notes = order.customerNotes?.trim() ?? "";
+  const internalNotes = order.internalNotes?.trim() ?? "";
   const completedAt = collectionHandoffCompletedAt(order);
   const completedLabel = completedAt ? formatTimelineTime(completedAt) : null;
   const dineIn = isCollectionDineInMethod(order.fulfilmentMethod);
@@ -155,10 +155,13 @@ export function CollectionOrderCard({
                 : null}
             </p>
           ) : null}
-          {notes ? (
-            <p className="text-ink mt-0.5 line-clamp-1 text-xs font-medium">
-              <span className="text-skyline">Order note:</span> {notes}
-            </p>
+          {internalNotes ? (
+            <div className="border-fog bg-mist/50 mt-2 rounded-lg border p-2.5">
+              <p className="text-ink text-xs font-semibold">Internal Notes</p>
+              <p className="text-ink mt-1 whitespace-pre-wrap break-words text-sm font-bold leading-snug">
+                {internalNotes}
+              </p>
+            </div>
           ) : null}
 
           {hasOptions ? (

@@ -103,6 +103,7 @@ const mapped = mapCollectionBoardOrder({
   fulfilment_method: "pickup",
   status: "submitted",
   customer_notes: multilineNote,
+  internal_notes: "Crew instruction",
   production_started_at: null,
   ready_at: null,
   picked_up_at: null,
@@ -111,6 +112,7 @@ const mapped = mapCollectionBoardOrder({
   include_receipt: false,
 });
 assert.equal(mapped.customerNotes, multilineNote, "newlines and punctuation survive mapping");
+assert.equal(mapped.internalNotes, "Crew instruction", "staff-only notes map independently");
 assert.match(collectionDetail, /<CustomerOrderNoteCallout note=\{order\.customerNotes\} \/>/);
 const collectionNotePosition = collectionDetail.indexOf(
   "<CustomerOrderNoteCallout note={order.customerNotes} />",
@@ -122,7 +124,9 @@ assert.ok(
   "Customer Operations detail shows the note immediately below the order header",
 );
 assert.match(collectionDetail, /whitespace-pre-wrap/);
-assert.match(collectionCard, /Order note:/);
+assert.match(collectionCard, /Internal Notes/);
+assert.match(collectionCard, /whitespace-pre-wrap/);
+assert.doesNotMatch(collectionCard, /Order note:/);
 assert.equal(
   mapCollectionBoardOrder({
     id: "order-empty-notes",
@@ -135,6 +139,7 @@ assert.equal(
     fulfilment_method: "pickup",
     status: "submitted",
     customer_notes: null,
+    internal_notes: null,
     production_started_at: null,
     ready_at: null,
     picked_up_at: null,

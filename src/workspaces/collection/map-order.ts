@@ -30,6 +30,7 @@ export type CollectionOrderRow = {
   status: GuestOrderStatus;
   payment_status?: string | null;
   customer_notes: string | null;
+  internal_notes: string | null;
   production_started_at: string | null;
   ready_at: string | null;
   derived_ready_for_collection?: boolean;
@@ -214,6 +215,7 @@ export function mapCollectionBoardOrder(
     status: row.status,
     paymentStatus: row.payment_status ?? null,
     customerNotes: row.customer_notes,
+    internalNotes: row.internal_notes,
     readyMessageSent: null,
     productionStartedAt: row.production_started_at,
     readyAt: row.ready_at,

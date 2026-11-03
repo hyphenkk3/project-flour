@@ -76,6 +76,7 @@ export type CollectionBoardOrder = {
   status: GuestOrderStatus;
   paymentStatus?: string | null;
   customerNotes: string | null;
+  internalNotes: string | null;
   readyMessageSent?: CollectionReadyMessageSent | null;
   readyMessageOperatingHours?: CollectionReadyMessageOperatingHours;
   productionStartedAt: string | null;
