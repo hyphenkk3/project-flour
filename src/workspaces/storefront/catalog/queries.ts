@@ -102,6 +102,33 @@ async function catalogueRequestId(): Promise<string | null> {
   return safeCatalogueRequestId((await headers()).get("x-vercel-id"));
 }
 
+async function measureCatalogueRequest<T>(
+  operation: string,
+  task: (context: { requestId: string | null; setCakeCount: (count: number) => void }) => Promise<T>,
+): Promise<T> {
+  if (!CATALOG_DIAGNOSTICS_ENABLED) {
+    return task({ requestId: null, setCakeCount: () => undefined });
+  }
+  const requestId = await catalogueRequestId();
+  let cakeCount = 0;
+  const started = Date.now();
+  let failure: unknown;
+  try {
+    return await task({
+      requestId,
+      setCakeCount: (count) => { cakeCount = Math.max(0, Math.trunc(count)); },
+    });
+  } catch (error) {
+    failure = error;
+    throw error;
+  } finally {
+    logCatalogueDiagnostic({
+      operation, stage: "request", requestId,
+      durationMs: Date.now() - started, cakeCount, error: failure,
+    });
+  }
+}
+
 async function measureCatalogueStage<T>(operation: string, stage: string, requestId: string | null, cakeCount: number, task: () => Promise<T>): Promise<T> {
   if (!CATALOG_DIAGNOSTICS_ENABLED) return task();
   const started = Date.now();
@@ -899,37 +926,56 @@ export async function listAvailableCakes(
   collectionId: string,
   options: { currentEffectivePrice?: boolean } = {},
 ): Promise<StorefrontCake[]> {
-  const supabase = createPublicClient();
-  const { data, error } = await supabase
-    .from("collection_cakes")
-    .select("library_cake_id, sort_order")
-    .eq("collection_id", collectionId)
-    .eq("available", true)
-    .order("sort_order", { ascending: true });
-  if (error) throw new Error(error.message);
+  return measureCatalogueRequest("list_available_cakes", async (context) => {
+    const supabase = createPublicClient();
+    const { data, error } = await measureCatalogueStage(
+      "list_available_cakes",
+      "collection_memberships_query",
+      context.requestId,
+      0,
+      () => supabase
+        .from("collection_cakes")
+        .select("library_cake_id, sort_order")
+        .eq("collection_id", collectionId)
+        .eq("available", true)
+        .order("sort_order", { ascending: true }),
+    );
+    if (error) throw new Error(error.message);
 
-  const memberships = (data ?? []) as Array<{
-    library_cake_id: string;
-    sort_order: number;
-  }>;
-  const cakeIds = [...new Set(memberships.map((row) => row.library_cake_id))];
-  const cachedCakes = await readCachedStorefrontCakesByIds(
-    [...cakeIds].sort().join(","),
-  );
-  const cakesById = new Map(
-    cachedCakes.map((display) => [display.cake.id, display]),
-  );
-  const cakes = memberships
-    .map((row) => cakesById.get(row.library_cake_id))
-    .filter(
-      (display): display is CachedStorefrontCakeDisplay =>
-        display !== undefined && isOfferableStatus(display.status),
-    )
-    .map((display) => display.cake);
+    const memberships = (data ?? []) as Array<{
+      library_cake_id: string;
+      sort_order: number;
+    }>;
+    const cakeIds = [...new Set(memberships.map((row) => row.library_cake_id))];
+    context.setCakeCount(cakeIds.length);
+    const cachedCakes = await measureCatalogueStage(
+      "list_available_cakes",
+      "cached_cake_display_lookup",
+      context.requestId,
+      cakeIds.length,
+      () => readCachedStorefrontCakesByIds([...cakeIds].sort().join(",")),
+    );
+    const cakesById = new Map(
+      cachedCakes.map((display) => [display.cake.id, display]),
+    );
+    const cakes = memberships
+      .map((row) => cakesById.get(row.library_cake_id))
+      .filter(
+        (display): display is CachedStorefrontCakeDisplay =>
+          display !== undefined && isOfferableStatus(display.status),
+      )
+      .map((display) => display.cake);
 
-  return options.currentEffectivePrice
-    ? withEffectiveStorefrontPrices(cakes, toBusinessDateKey())
-    : cakes;
+    return options.currentEffectivePrice
+      ? measureCatalogueStage(
+          "list_available_cakes",
+          "effective_price_resolution",
+          context.requestId,
+          cakeIds.length,
+          () => withEffectiveStorefrontPrices(cakes, toBusinessDateKey()),
+        )
+      : cakes;
+  });
 }
 
 /**
