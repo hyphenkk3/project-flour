@@ -1,0 +1,76 @@
+name: Checkout secondary catalogue recovery
+
+on:
+  push:
+    branches:
+      - codex/checkout-secondary-catalogue-retry-20261103
+      - codex/checkout-secondary-catalogue-retry-integrated-20261103
+    paths:
+      - .github/workflows/checkout-secondary-catalogue-retry.yml
+      - src/workspaces/storefront/checkout/GuestCheckoutForm.tsx
+      - src/workspaces/storefront/checkout/secondary-offer-loader.mjs
+      - scripts/test-checkout-secondary-offer-retry.mjs
+      - scripts/test-storefront-checkout-date-confirmation.ts
+      - scripts/test-release-regressions.mjs
+      - package.json
+      - package-lock.json
+  pull_request:
+    branches:
+      - codex/checkout-secondary-catalogue-retry-20261103
+      - codex/checkout-secondary-catalogue-retry-integrated-20261103
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checkout-secondary-catalogue-retry-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: project_flour_regression
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: gha-regression-only
+        options: >-
+          --health-cmd "pg_isready -U postgres -d project_flour_regression"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install exact dependencies
+        run: npm ci
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Focused checkout recovery tests
+        run: |
+          node scripts/test-checkout-secondary-offer-retry.mjs
+          node --import ./scripts/test-release-regression-alias-loader.mjs scripts/test-storefront-checkout-date-confirmation.ts
+          node --import ./scripts/test-release-regression-alias-loader.mjs scripts/test-storefront-checkout-interactions.ts
+          node --import ./scripts/test-release-regression-alias-loader.mjs scripts/test-customer-preorder-options.ts
+          node --import ./scripts/test-release-regression-alias-loader.mjs scripts/test-checkout-critical-path.ts
+          node --import ./scripts/test-release-regression-alias-loader.mjs scripts/test-guest-preorder-hardening.ts
+          node scripts/test-checkout-option-logging.mjs
+      - name: Changed regression-test ESLint
+        run: ./node_modules/.bin/eslint scripts/test-checkout-secondary-offer-retry.mjs scripts/test-storefront-checkout-date-confirmation.ts scripts/test-release-regressions.mjs src/workspaces/storefront/checkout/secondary-offer-loader.mjs
+      - name: Full offline release regressions
+        env:
+          RELEASE_TEST_POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: npm run test:release-regressions
+      - name: Full-repository lint baseline (informational)
+        continue-on-error: true
+        run: npm run lint
+      - name: Production build
+        run: npm run build

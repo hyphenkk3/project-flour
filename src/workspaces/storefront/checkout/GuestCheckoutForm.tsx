@@ -167,6 +167,7 @@ import {
   type CheckoutPickupOffer,
   type CheckoutState,
 } from "@/workspaces/storefront/checkout/actions";
+import { createSecondaryOfferLoader } from "@/workspaces/storefront/checkout/secondary-offer-loader.mjs";
 import { clampCustomerPickupWindow } from "@/engines/menu/customer-browse";
 import {
   emptyPreorderFields,
@@ -416,6 +417,15 @@ export function GuestCheckoutForm({
     CustomerPaidAddonOption[]
   >([]);
   const [optionsReady, setOptionsReady] = useState(false);
+  const [resolvedOptionsDate, setResolvedOptionsDate] = useState<string | null>(
+    null,
+  );
+  const [secondaryOfferState, setSecondaryOfferState] = useState<{
+    pickupDate: string;
+    requestKey: string;
+    status: "loading" | "error" | "ready";
+  } | null>(null);
+  const retrySecondaryOfferRef = useRef<(() => void) | null>(null);
   const [resolvedOfferDate, setResolvedOfferDate] = useState<string | null>(
     null,
   );
@@ -653,6 +663,7 @@ export function GuestCheckoutForm({
         setComplimentaryOptions(offer.complimentaryOptions);
         setPaidAddonOptions(offer.paidAddonOptions);
         setOptionsReady(true);
+        setResolvedOptionsDate(offerDate);
       }
       setOfferLabel(
         offer.collection
@@ -786,14 +797,23 @@ export function GuestCheckoutForm({
           resourceFromIndex,
           perf,
         });
-        void loadCheckoutPickupOffer(pickupDate).then(
-          (fullOffer) => {
-            if (cancelled) return;
-            checkoutPickupOfferCache.set(pickupDate, fullOffer);
-            applyOffer(fullOffer, pickupDate);
+        const secondaryOfferLoader = createSecondaryOfferLoader({
+          pickupDate,
+          requestKey: `${pickupDate}|${cakeIds.join(",")}`,
+          load: loadCheckoutPickupOffer,
+          isCurrent: (requestDate) =>
+            !cancelled &&
+            fields.pickupDate.trim().slice(0, 10) === requestDate,
+          onState: setSecondaryOfferState,
+          onSuccess: (fullOffer, requestDate) => {
+            checkoutPickupOfferCache.set(requestDate, fullOffer);
+            applyOffer(fullOffer, requestDate);
           },
-          () => undefined,
-        );
+        });
+        retrySecondaryOfferRef.current = () => {
+          void secondaryOfferLoader.run();
+        };
+        void secondaryOfferLoader.run();
         void loadCheckoutVenuePhotos().then(
           (photos) => {
             if (cancelled) return;
@@ -811,6 +831,7 @@ export function GuestCheckoutForm({
     );
     return () => {
       cancelled = true;
+      retrySecondaryOfferRef.current = null;
     };
   }, [
     cakeIdsKey,
@@ -1143,6 +1164,9 @@ export function GuestCheckoutForm({
     fields.pickupDate,
     resolvedOfferDate,
   );
+  const optionsReadyForSelectedDate =
+    optionsReady &&
+    resolvedOptionsDate === fields.pickupDate.trim().slice(0, 10);
   const sizePricesPending =
     items.length > 0 &&
     Boolean(fields.pickupDate) &&
@@ -1788,7 +1812,7 @@ export function GuestCheckoutForm({
         <input
           name="preorder_options_ready"
           type="hidden"
-          value={optionsReady ? "1" : "0"}
+          value={optionsReadyForSelectedDate ? "1" : "0"}
         />
         <input
           name="catalogue_voucher_id"
@@ -2325,7 +2349,32 @@ export function GuestCheckoutForm({
             )}
           </CheckoutSection>
 
-          {optionsReady &&
+          {secondaryOfferState?.requestKey ===
+          `${fields.pickupDate.trim().slice(0, 10)}|${cakeIdsKey}` ? (
+            <div className="border-fog border-t pt-4" aria-live="polite">
+              {secondaryOfferState.status === "error" ? (
+                <div className="flex flex-wrap items-center gap-3 text-ink-muted text-sm">
+                  <p>
+                    We couldn’t load the optional cake and add-on choices. Your
+                    selected cakes and prices are still in your order.
+                  </p>
+                  <button
+                    className="text-ink underline underline-offset-2"
+                    onClick={() => retrySecondaryOfferRef.current?.()}
+                    type="button"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              ) : secondaryOfferState.status === "loading" ? (
+                <p className="text-ink-muted text-sm">
+                  Loading optional cake and add-on choices…
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {optionsReadyForSelectedDate &&
           (complimentaryOptions.length > 0 || paidAddonOptions.length > 0) ? (
             <CheckoutSection
               className="border-fog border-t pt-10"

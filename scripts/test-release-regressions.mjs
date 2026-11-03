@@ -39,6 +39,7 @@ const suites = [
   ["Delivery receipt clarity", "test-delivery-receipt-clarity.ts"],
   ["Saved order PNG and save recovery", "test-save-order-details.ts"],
   ["Complimentary and paid-add-on options", "test-customer-preorder-options.ts"],
+  ["Checkout secondary optional catalogue retry", "test-checkout-secondary-offer-retry.mjs"],
   ["Customer message templates", "test-customer-message-templates.cjs"],
   ["Customer message counter instructions", "test-customer-message-counter-instructions.cjs"],
   ["Catalogue voucher engine", "test-catalogue-voucher-engine.ts"],
