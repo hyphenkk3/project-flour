@@ -134,7 +134,14 @@ async function measureCatalogueStage<T>(operation: string, stage: string, reques
   const started = Date.now();
   try {
     const result = await task();
-    logCatalogueDiagnostic({ operation, stage, requestId, durationMs: Date.now() - started, cakeCount });
+    const queryError =
+      result && typeof result === "object" && "error" in result
+        ? (result as { error?: unknown }).error
+        : undefined;
+    logCatalogueDiagnostic({
+      operation, stage, requestId, durationMs: Date.now() - started, cakeCount,
+      error: queryError,
+    });
     return result;
   } catch (error) {
     logCatalogueDiagnostic({ operation, stage, requestId, durationMs: Date.now() - started, cakeCount, error });
