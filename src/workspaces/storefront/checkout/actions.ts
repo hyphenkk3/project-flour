@@ -647,35 +647,18 @@ async function loadCustomerPreorderOptions(
       { p_collection_id: collectionId, p_fulfilment_date: fulfilmentDate },
     );
 
-    console.error("[CHECKOUT OPTION DEBUG] RPC result", {
-      collectionId,
-      error: error
-        ? {
-            message: error.message,
-            code: error.code,
-            details: error.details,
-            hint: error.hint,
-          }
-        : null,
-      data,
-      dataType: typeof data,
-      isArray: Array.isArray(data),
-    });
-
-    if (error || data == null) return empty;
+    if (error) {
+      console.error("[CHECKOUT OPTIONS] RPC failed", {
+        code: error.code ?? null,
+        message: error.message.slice(0, 240),
+      });
+      return empty;
+    }
+    if (data == null) return empty;
 
     const payload = data as Record<string, unknown>;
     const complimentary = parseComplimentaryOptions(payload.complimentary);
     const paidAddons = parsePaidAddonOptions(payload.paidAddons);
-
-    console.error("[CHECKOUT OPTION DEBUG] Parsed result", {
-      collectionId,
-      complimentaryCount: complimentary.length,
-      complimentary,
-      paidAddonCount: paidAddons.length,
-      paidAddons,
-      ready: true,
-    });
 
     return {
       complimentary,
