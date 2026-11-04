@@ -59,6 +59,7 @@ import {
   formatRm,
   startingPrice,
 } from "@/workspaces/storefront/catalog/pricing";
+import { randomUUID } from "node:crypto";
 
 export { formatRm, startingPrice };
 
@@ -83,13 +84,16 @@ function catalogueFailure(error: unknown): { category: string; code: string | nu
   return { category: "error", code };
 }
 
-function logCatalogueDiagnostic(input: { operation: string; stage: string; requestId: string | null; durationMs: number; cakeCount: number; error?: unknown }): void {
+function logCatalogueDiagnostic(input: { operation: string; stage: string; requestId: string | null; correlationId?: string | null; durationMs: number; cakeCount: number; resultCount?: number | null; cacheEvent?: string | null; error?: unknown }): void {
   if (!CATALOG_DIAGNOSTICS_ENABLED) return;
   const failure = input.error === undefined ? null : catalogueFailure(input.error);
   console.info("[CATALOG_READ_DIAGNOSTIC]", JSON.stringify({
     operation: input.operation, stage: input.stage, requestId: input.requestId,
+    correlationId: input.correlationId ?? null,
     durationMs: Math.max(0, Math.round(input.durationMs)),
     cakeCount: Math.max(0, Math.trunc(input.cakeCount)),
+    resultCount: input.resultCount == null ? null : Math.max(0, Math.trunc(input.resultCount)),
+    cacheEvent: input.cacheEvent ?? null,
     status: failure ? "error" : "ok", errorCategory: failure?.category ?? null,
     errorCode: failure?.code ?? null,
     timeout: failure ? failure.category === "timeout" || failure.category === "statement_timeout" : false,
@@ -104,18 +108,21 @@ async function catalogueRequestId(): Promise<string | null> {
 
 async function measureCatalogueRequest<T>(
   operation: string,
-  task: (context: { requestId: string | null; setCakeCount: (count: number) => void }) => Promise<T>,
+  task: (context: { requestId: string | null; correlationId: string | null; setCakeCount: (count: number) => void }) => Promise<T>,
 ): Promise<T> {
   if (!CATALOG_DIAGNOSTICS_ENABLED) {
-    return task({ requestId: null, setCakeCount: () => undefined });
+    return task({ requestId: null, correlationId: null, setCakeCount: () => undefined });
   }
   const requestId = await catalogueRequestId();
+  const correlationId = randomUUID();
   let cakeCount = 0;
   const started = Date.now();
   let failure: unknown;
+  logCatalogueDiagnostic({ operation, stage: "request_start", requestId, correlationId, durationMs: 0, cakeCount });
   try {
     return await task({
       requestId,
+      correlationId,
       setCakeCount: (count) => { cakeCount = Math.max(0, Math.trunc(count)); },
     });
   } catch (error) {
@@ -123,13 +130,13 @@ async function measureCatalogueRequest<T>(
     throw error;
   } finally {
     logCatalogueDiagnostic({
-      operation, stage: "request", requestId,
+      operation, stage: "request_end", requestId, correlationId,
       durationMs: Date.now() - started, cakeCount, error: failure,
     });
   }
 }
 
-async function measureCatalogueStage<T>(operation: string, stage: string, requestId: string | null, cakeCount: number, task: () => Promise<T>): Promise<T> {
+async function measureCatalogueStage<T>(operation: string, stage: string, requestId: string | null, cakeCount: number, task: () => Promise<T>, diagnostic: { correlationId?: string | null; cacheEvent?: string | null } = {}): Promise<T> {
   if (!CATALOG_DIAGNOSTICS_ENABLED) return task();
   const started = Date.now();
   try {
@@ -139,12 +146,13 @@ async function measureCatalogueStage<T>(operation: string, stage: string, reques
         ? (result as { error?: unknown }).error
         : undefined;
     logCatalogueDiagnostic({
-      operation, stage, requestId, durationMs: Date.now() - started, cakeCount,
+      operation, stage, requestId, correlationId: diagnostic.correlationId, durationMs: Date.now() - started, cakeCount,
+      resultCount: Array.isArray(result) ? result.length : result && typeof result === "object" && "data" in result && Array.isArray((result as { data?: unknown }).data) ? (result as { data: unknown[] }).data.length : null, cacheEvent: diagnostic.cacheEvent,
       error: queryError ?? undefined,
     });
     return result;
   } catch (error) {
-    logCatalogueDiagnostic({ operation, stage, requestId, durationMs: Date.now() - started, cakeCount, error });
+    logCatalogueDiagnostic({ operation, stage, requestId, correlationId: diagnostic.correlationId, durationMs: Date.now() - started, cakeCount, cacheEvent: diagnostic.cacheEvent, error });
     throw error;
   }
 }
@@ -854,6 +862,7 @@ export function applyEffectiveStorefrontPrices<T extends StorefrontCake>(
 async function withEffectiveStorefrontPrices<T extends StorefrontCake>(
   cakes: readonly T[],
   priceDate: string,
+  diagnostic?: { operation: string; requestId: string | null; correlationId: string | null },
 ): Promise<T[]> {
   const sizes = cakes.flatMap((cake) => cake.sizes);
   if (sizes.length === 0) return cakes.map((cake) => ({ ...cake }));
@@ -869,7 +878,7 @@ async function withEffectiveStorefrontPrices<T extends StorefrontCake>(
       offset,
       offset + STOREFRONT_PRICE_LOOKUP_CONCURRENCY,
     );
-    const resolved = await Promise.all(
+    const resolved = await measureCatalogueStage(diagnostic?.operation ?? "storefront_pricing", "cake_size_price_rpc_batch", diagnostic?.requestId ?? null, batch.length, () => Promise.all(
       batch.map(async (size) => {
         const { data, error } = await supabase.rpc(
           "library_cake_size_price_on",
@@ -881,7 +890,7 @@ async function withEffectiveStorefrontPrices<T extends StorefrontCake>(
         }
         return [size.id, Number(data)] as const;
       }),
-    );
+    ), { correlationId: diagnostic?.correlationId, cacheEvent: `rpc_batch_${offset / STOREFRONT_PRICE_LOOKUP_CONCURRENCY + 1}` });
     for (const [sizeId, price] of resolved) pricesBySizeId.set(sizeId, price);
   }
   return applyEffectiveStorefrontPrices(cakes, pricesBySizeId);
@@ -892,6 +901,9 @@ async function loadStorefrontCakesByIds(
 ): Promise<CachedStorefrontCakeDisplay[]> {
   if (cakeIds.length === 0) return [];
   const supabase = createPublicClient();
+  const cacheFillId = CATALOG_DIAGNOSTICS_ENABLED ? randomUUID() : null;
+  if (cacheFillId) logCatalogueDiagnostic({ operation: "storefront_collection_display", stage: "cache_fill_start", requestId: null, correlationId: cacheFillId, durationMs: 0, cakeCount: cakeIds.length, cacheEvent: "cache_fill_or_revalidation" });
+  const started = Date.now();
   activeStorefrontDisplayCacheLoads += 1;
   try {
     const data = await measureCatalogueStage(
@@ -909,10 +921,16 @@ async function loadStorefrontCakesByIds(
               )
               .in("id", [...cakeIds]),
         ),
+      { correlationId: cacheFillId, cacheEvent: "cache_fill_or_revalidation" },
     );
-    return ((data ?? []) as unknown as LibraryCakeEmbed[])
+    const result = ((data ?? []) as unknown as LibraryCakeEmbed[])
       .filter((row) => row.library_cake_sizes?.length)
       .map((row) => ({ cake: mapStorefrontCake(row), status: row.status }));
+    if (cacheFillId) logCatalogueDiagnostic({ operation: "storefront_collection_display", stage: "cache_fill_end", requestId: null, correlationId: cacheFillId, durationMs: Date.now() - started, cakeCount: cakeIds.length, resultCount: result.length, cacheEvent: "cache_fill_or_revalidation" });
+    return result;
+  } catch (error) {
+    if (cacheFillId) logCatalogueDiagnostic({ operation: "storefront_collection_display", stage: "cache_fill_end", requestId: null, correlationId: cacheFillId, durationMs: Date.now() - started, cakeCount: cakeIds.length, cacheEvent: "cache_fill_or_revalidation", error });
+    throw error;
   } finally {
     activeStorefrontDisplayCacheLoads = Math.max(0, activeStorefrontDisplayCacheLoads - 1);
   }
@@ -979,7 +997,7 @@ export async function listAvailableCakes(
           "effective_price_resolution",
           context.requestId,
           cakeIds.length,
-          () => withEffectiveStorefrontPrices(cakes, toBusinessDateKey()),
+          () => withEffectiveStorefrontPrices(cakes, toBusinessDateKey(), { operation: "list_available_cakes", requestId: context.requestId, correlationId: context.correlationId }),
         )
       : cakes;
   });
@@ -1088,14 +1106,17 @@ export async function listCheckoutCakesForCakeIds(
 async function loadHomepageCollectionPreviewCakes(
   collectionId: string,
 ): Promise<StorefrontCake[]> {
+  const cacheFillId = CATALOG_DIAGNOSTICS_ENABLED ? randomUUID() : null;
+  const fillStarted = Date.now();
+  if (cacheFillId) logCatalogueDiagnostic({ operation: "homepage_collection_preview", stage: "cache_fill_start", requestId: null, correlationId: cacheFillId, durationMs: 0, cakeCount: 0, cacheEvent: "cache_fill_or_revalidation" });
   const supabase = createPublicClient();
-  const { data, error } = await supabase
+  const { data, error } = await measureCatalogueStage("homepage_collection_preview", "collection_cakes_memberships", null, 0, async () => await supabase
     .from("collection_cakes")
     .select("library_cake_id, homepage_sort_order")
     .eq("collection_id", collectionId)
     .eq("available", true)
     .eq("show_on_homepage", true)
-    .order("homepage_sort_order", { ascending: true });
+    .order("homepage_sort_order", { ascending: true }), { correlationId: cacheFillId, cacheEvent: "cache_fill_or_revalidation" });
   if (error) throw new Error(error.message);
 
   const memberships = (data ?? []) as Array<{
@@ -1103,13 +1124,11 @@ async function loadHomepageCollectionPreviewCakes(
     homepage_sort_order: number | null;
   }>;
   const cakeIds = [...new Set(memberships.map((row) => row.library_cake_id))];
-  const displayCakes = await readCachedStorefrontCakesByIds(
-    [...cakeIds].sort().join(","),
-  );
+  const displayCakes = await measureCatalogueStage("homepage_collection_preview", "cached_cake_display_lookup", null, cakeIds.length, () => readCachedStorefrontCakesByIds([...cakeIds].sort().join(",")), { correlationId: cacheFillId, cacheEvent: "nested_cached_call_outcome_unavailable" });
   const cakesById = new Map(
     displayCakes.map((display) => [display.cake.id, display]),
   );
-  return takeHomepageCollectionPreviewCakes(
+  const result = takeHomepageCollectionPreviewCakes(
     memberships
       .map((membership) => cakesById.get(membership.library_cake_id))
       .filter(
@@ -1118,6 +1137,8 @@ async function loadHomepageCollectionPreviewCakes(
       )
       .map((display) => display.cake),
   );
+  if (cacheFillId) logCatalogueDiagnostic({ operation: "homepage_collection_preview", stage: "cache_fill_end", requestId: null, correlationId: cacheFillId, durationMs: Date.now() - fillStarted, cakeCount: cakeIds.length, resultCount: result.length, cacheEvent: "cache_fill_or_revalidation" });
+  return result;
 }
 
 const readCachedHomepageCollectionPreviewCakes = cache((collectionId: string) =>
@@ -1142,6 +1163,7 @@ export async function listHomepageCollectionPreviewCakes(
       context.requestId,
       0,
       () => readCachedHomepageCollectionPreviewCakes(collectionId),
+      { correlationId: context.correlationId, cacheEvent: "cached_call_outcome_unavailable" },
     );
     context.setCakeCount(cakes.length);
     return measureCatalogueStage(
@@ -1149,7 +1171,8 @@ export async function listHomepageCollectionPreviewCakes(
       "effective_price_resolution",
       context.requestId,
       cakes.length,
-      () => withEffectiveStorefrontPrices(cakes, toBusinessDateKey()),
+      () => withEffectiveStorefrontPrices(cakes, toBusinessDateKey(), { operation: "list_homepage_collection_preview_cakes", requestId: context.requestId, correlationId: context.correlationId }),
+      { correlationId: context.correlationId },
     );
   });
 }

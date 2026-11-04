@@ -15,6 +15,8 @@ import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operati
 import { toBusinessDateKey } from "@/lib/dates";
 import { unstable_cache } from "next/cache";
 import { connection } from "next/server";
+import { randomUUID } from "node:crypto";
+import { headers } from "next/headers";
 import { createPublicClient } from "@/lib/supabase/server";
 import { isMissingCakePhotoSchema } from "@/workspaces/library/cakes/photo-storage";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
@@ -83,6 +85,58 @@ type CakeDescriptionRow = {
   description: string | null;
 };
 
+const FRESH_PICK_DIAGNOSTICS_ENABLED = process.env.VERCEL_ENV === "preview" && process.env.FLOUR_CATALOG_DIAGNOSTICS === "1";
+
+async function freshPickPlatformRequestId(): Promise<string | null> {
+  if (!FRESH_PICK_DIAGNOSTICS_ENABLED) return null;
+  const value = (await headers()).get("x-vercel-id");
+  return value && value.length <= 128 && /^[A-Za-z0-9._:-]+$/.test(value) ? value : null;
+}
+
+function extraErrorCode(error: unknown): string | null {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === "string" && /^[0-9A-Z_]{1,16}$/.test(code) ? code : null;
+}
+
+function isFreshPickTimeout(error: unknown): boolean {
+  if (extraErrorCode(error) === "57014") return true;
+  const message = (error as { message?: unknown } | null)?.message;
+  return typeof message === "string" && /timeout|timed out|query canceled|query cancelled/i.test(message);
+}
+
+function logFreshPickDiagnostic(input: { operation: string; stage: string; correlationId: string | null; requestId?: string | null; durationMs: number; inputCount?: number; resultCount?: number | null; fanout?: number; cacheEvent?: string | null; error?: unknown }): void {
+  if (!FRESH_PICK_DIAGNOSTICS_ENABLED) return;
+  console.info("[FRESH_PICK_READ_DIAGNOSTIC]", JSON.stringify({
+    operation: input.operation,
+    stage: input.stage,
+    correlationId: input.correlationId,
+    requestId: input.requestId ?? null,
+    durationMs: Math.max(0, Math.round(input.durationMs)),
+    inputCount: input.inputCount ?? null,
+    resultCount: input.resultCount == null ? null : Math.max(0, Math.trunc(input.resultCount)),
+    fanout: input.fanout ?? null,
+    cacheEvent: input.cacheEvent ?? null,
+    status: input.error === undefined ? "ok" : "error",
+    errorCode: input.error === undefined ? null : extraErrorCode(input.error),
+    timeout: input.error === undefined ? false : isFreshPickTimeout(input.error),
+  }));
+}
+
+async function measureFreshPickStage<T>(operation: string, stage: string, correlationId: string | null, inputCount: number, task: () => PromiseLike<T>, options: { cacheEvent?: string | null; fanout?: number; requestId?: string | null; countResult?: (result: T) => number | null } = {}): Promise<T> {
+  if (!FRESH_PICK_DIAGNOSTICS_ENABLED) return task();
+  const started = Date.now();
+  try {
+    const result = await task();
+    const queryError = result && typeof result === "object" && "error" in result ? (result as { error?: unknown }).error : undefined;
+    const data = result && typeof result === "object" && "data" in result ? (result as { data?: unknown }).data : undefined;
+    logFreshPickDiagnostic({ operation, stage, correlationId, requestId: options.requestId, durationMs: Date.now() - started, inputCount, resultCount: options.countResult ? options.countResult(result) : Array.isArray(data) ? data.length : Array.isArray(result) ? result.length : null, fanout: options.fanout, cacheEvent: options.cacheEvent, error: queryError ?? undefined });
+    return result;
+  } catch (error) {
+    logFreshPickDiagnostic({ operation, stage, correlationId, requestId: options.requestId, durationMs: Date.now() - started, inputCount, fanout: options.fanout, cacheEvent: options.cacheEvent, error });
+    throw error;
+  }
+}
+
 function publishedNow(row: ExtraRow, now: Date): boolean {
   return !row.order_id && isPublishedFreshPick({
     lifecycle: row.lifecycle,
@@ -117,24 +171,37 @@ function daysFromRemainingPickup(
 
 const readCachedExtraPhotoRows = unstable_cache(
   async (cakeIds: string[]): Promise<PhotoRow[]> => {
+    const cacheFillId = FRESH_PICK_DIAGNOSTICS_ENABLED ? randomUUID() : null;
+    const cacheStarted = Date.now();
+    logFreshPickDiagnostic({ operation: "fresh_pick_photos", stage: "cache_fill_start", correlationId: cacheFillId, durationMs: 0, inputCount: cakeIds.length, cacheEvent: "cache_fill_or_revalidation" });
     const supabase = createPublicClient();
     const run = (photoSelect: string) =>
-      supabase
+      measureFreshPickStage("fresh_pick_photos", "library_cake_photos_metadata", cacheFillId, cakeIds.length, () => supabase
         .from("library_cake_photos")
         .select(`cake_id, ${photoSelect}`)
         .in("cake_id", cakeIds)
-        .order("sort_order", { ascending: true });
+        .order("sort_order", { ascending: true }), { cacheEvent: "cache_fill_or_revalidation" });
 
-    let result = await run(STOREFRONT_CAKE_PHOTO_SELECT);
-    if (result.error && isMissingCakePhotoSchema(result.error.message)) {
-      result = await run(STOREFRONT_CAKE_PHOTO_SELECT_LEGACY);
+    try {
+      let result = await run(STOREFRONT_CAKE_PHOTO_SELECT);
+      if (result.error && isMissingCakePhotoSchema(result.error.message)) {
+        result = await run(STOREFRONT_CAKE_PHOTO_SELECT_LEGACY);
+      }
+      if (result.error) {
+        if (isMissingCakePhotoSchema(result.error.message)) {
+          logFreshPickDiagnostic({ operation: "fresh_pick_photos", stage: "cache_fill_end", correlationId: cacheFillId, durationMs: Date.now() - cacheStarted, inputCount: cakeIds.length, resultCount: 0, cacheEvent: "cache_fill_or_revalidation" });
+          return [];
+        }
+        // Throw so a transient read failure is never cached as "no photo".
+        throw new Error("Public cake photos are temporarily unavailable.");
+      }
+      const rows = (result.data ?? []) as unknown as PhotoRow[];
+      logFreshPickDiagnostic({ operation: "fresh_pick_photos", stage: "cache_fill_end", correlationId: cacheFillId, durationMs: Date.now() - cacheStarted, inputCount: cakeIds.length, resultCount: rows.length, cacheEvent: "cache_fill_or_revalidation" });
+      return rows;
+    } catch (error) {
+      logFreshPickDiagnostic({ operation: "fresh_pick_photos", stage: "cache_fill_end", correlationId: cacheFillId, durationMs: Date.now() - cacheStarted, inputCount: cakeIds.length, cacheEvent: "cache_fill_or_revalidation", error });
+      throw error;
     }
-    if (result.error) {
-      if (isMissingCakePhotoSchema(result.error.message)) return [];
-      // Throw so a transient read failure is never cached as "no photo".
-      throw new Error("Public cake photos are temporarily unavailable.");
-    }
-    return (result.data ?? []) as unknown as PhotoRow[];
   },
   ["storefront-extra-photos-v1"],
   {
@@ -145,6 +212,8 @@ const readCachedExtraPhotoRows = unstable_cache(
 
 async function extraPhotosByCake(
   cakeIds: string[],
+  correlationId: string | null,
+  requestId: string | null,
 ): Promise<{
   photosByCake: Map<string, ReturnType<typeof mapStorefrontCakePhoto>[]>;
   lookupFailed: boolean;
@@ -158,7 +227,7 @@ async function extraPhotosByCake(
   let rows: PhotoRow[];
   try {
     // Stable input order lets an unchanged public photo set share the cache.
-    rows = await readCachedExtraPhotoRows([...cakeIds].sort());
+    rows = await measureFreshPickStage("fresh_pick_photos", "cached_photo_metadata_lookup", correlationId, cakeIds.length, () => readCachedExtraPhotoRows([...cakeIds].sort()), { cacheEvent: "cached_call_outcome_unavailable", requestId });
   } catch {
     return { photosByCake, lookupFailed: true };
   }
@@ -169,19 +238,23 @@ async function extraPhotosByCake(
     list.push(mapStorefrontCakePhoto(photo, list.length));
     photosByCake.set(photo.cake_id, list);
   }
+  const imageUrlCount = [...photosByCake.values()].reduce((count, photos) => count + photos.length, 0);
+  logFreshPickDiagnostic({ operation: "fresh_pick_photos", stage: "photo_urls_resolved", correlationId, requestId, durationMs: 0, inputCount: cakeIds.length, resultCount: imageUrlCount });
   return { photosByCake, lookupFailed: false };
 }
 
 async function extraDescriptionsByCake(
   supabase: ReturnType<typeof createPublicClient>,
   cakeIds: string[],
+  correlationId: string | null,
+  requestId: string | null,
 ): Promise<Map<string, string | null>> {
   const descriptions = new Map<string, string | null>();
   if (cakeIds.length === 0) return descriptions;
-  const { data, error } = await supabase
+  const { data, error } = await measureFreshPickStage("fresh_pick_description", "library_cakes_description", correlationId, cakeIds.length, () => supabase
     .from("library_cakes")
     .select("id, description")
-    .in("id", cakeIds);
+    .in("id", cakeIds), { requestId });
   if (error) return descriptions;
   for (const row of (data ?? []) as CakeDescriptionRow[]) {
     descriptions.set(row.id, freshPickProductDescription(row.description));
@@ -193,12 +266,15 @@ async function extraPriceOn(
   supabase: ReturnType<typeof createPublicClient>,
   sizeId: string | null,
   pickupDate: string | null,
+  operation: string,
+  correlationId: string | null,
+  requestId: string | null,
 ): Promise<number | null> {
   if (!sizeId || !pickupDate) return null;
-  const { data, error } = await supabase.rpc("library_cake_size_price_on", {
+  const { data, error } = await measureFreshPickStage(operation, "library_cake_size_price_on", correlationId, 1, () => supabase.rpc("library_cake_size_price_on", {
     p_cake_size_id: sizeId,
     p_pickup_date: pickupDate,
-  });
+  }), { requestId });
   if (error || data == null) return null;
   const price = Number(data);
   return Number.isFinite(price) ? price : null;
@@ -207,6 +283,8 @@ async function extraPriceOn(
 async function extraListingDetails(
   supabase: ReturnType<typeof createPublicClient>,
   rows: ExtraRow[],
+  correlationId: string | null,
+  requestId: string | null,
 ): Promise<{
   photosByCake: Map<string, ReturnType<typeof mapStorefrontCakePhoto>[]>;
   photoLookupFailed: boolean;
@@ -219,10 +297,17 @@ async function extraListingDetails(
         .filter((id): id is string => Boolean(id)),
     ),
   ];
-  const [photoLookup, descriptionByCake] = await Promise.all([
-    extraPhotosByCake(cakeIds),
-    extraDescriptionsByCake(supabase, cakeIds),
-  ]);
+  const [photoLookup, descriptionByCake] = await measureFreshPickStage(
+    "fresh_pick_details",
+    "photo_and_description_fanout",
+    correlationId,
+    cakeIds.length,
+    () => Promise.all([
+      extraPhotosByCake(cakeIds, correlationId, requestId),
+      extraDescriptionsByCake(supabase, cakeIds, correlationId, requestId),
+    ]),
+    { fanout: 2, requestId, countResult: (result) => result[0].photosByCake.size },
+  );
   return {
     photosByCake: photoLookup.photosByCake,
     photoLookupFailed: photoLookup.lookupFailed,
@@ -294,19 +379,26 @@ export async function listStorefrontAvailableExtra(): Promise<
   StorefrontExtraListing
 > {
   await connection();
+  const correlationId = FRESH_PICK_DIAGNOSTICS_ENABLED ? randomUUID() : null;
+  const requestId = await freshPickPlatformRequestId();
+  const requestStarted = Date.now();
+  let resultCount = 0;
+  let requestFailure: unknown;
+  logFreshPickDiagnostic({ operation: "fresh_pick_listing", stage: "request_start", correlationId, requestId, durationMs: 0 });
   try {
     const todayYmd = toBusinessDateKey();
     const supabase = createPublicClient();
-    const { data, error } = await supabase
+    const { data, error } = await measureFreshPickStage("fresh_pick_listing", "extra_stock_query", correlationId, 0, () => supabase
       .from("extra_stock")
       .select(
         "id, lifecycle, cake_name, size_label, library_cake_id, library_cake_size_id, prepared_on, pickup_available_from_at, pickup_through_at, confirmed_at, sold_at, order_id, cut_into_slices_at, walk_in_held_until, ready_for_collection",
       )
       .eq("lifecycle", "confirmed")
       .is("sold_at", null)
-      .is("cut_into_slices_at", null);
+      .is("cut_into_slices_at", null), { requestId });
 
     if (error) {
+      requestFailure = error;
       return { picks: [], temporarilyUnavailable: true };
     }
 
@@ -315,12 +407,12 @@ export async function listStorefrontAvailableExtra(): Promise<
       publishedNow(row, now),
     );
     const [details, hoursSnapshot, config] = await Promise.all([
-      extraListingDetails(supabase, live),
-      loadOperatingHoursSnapshot(),
-      loadFreshPicksPreparationConfig(),
+      measureFreshPickStage("fresh_pick_listing", "photo_description_details", correlationId, live.length, () => extraListingDetails(supabase, live, correlationId, requestId), { fanout: 2, requestId, countResult: (result) => result.photosByCake.size }),
+      measureFreshPickStage("fresh_pick_listing", "operating_hours_snapshot", correlationId, 0, () => loadOperatingHoursSnapshot(), { requestId }),
+      measureFreshPickStage("fresh_pick_listing", "preparation_config", correlationId, 0, () => loadFreshPicksPreparationConfig(), { requestId }),
     ]);
     const priceByExtraId = new Map<string, number | null>();
-    await Promise.all(
+    await measureFreshPickStage("fresh_pick_listing", "price_rpc_fanout", correlationId, live.length, () => Promise.all(
       live.map(async (row) => {
         const pickupDate = extraCustomerVisibleFulfilmentDates({
           window: {
@@ -334,10 +426,10 @@ export async function listStorefrontAvailableExtra(): Promise<
         })[0];
         priceByExtraId.set(
           row.id,
-          await extraPriceOn(supabase, row.library_cake_size_id, pickupDate ?? null),
+          await extraPriceOn(supabase, row.library_cake_size_id, pickupDate ?? null, "fresh_pick_listing", correlationId, requestId),
         );
       }),
-    );
+    ), { fanout: live.length, requestId });
     const units = live
       .map((row) =>
         mapPick(
@@ -363,12 +455,16 @@ export async function listStorefrontAvailableExtra(): Promise<
         days: pick.days,
       }),
     }));
+    resultCount = picks.length;
     return {
       picks: sortCustomerFreshPicksByAvailabilityDay(picks),
       temporarilyUnavailable: false,
     };
-  } catch {
+  } catch (error) {
+    requestFailure = error;
     return { picks: [], temporarilyUnavailable: true };
+  } finally {
+    logFreshPickDiagnostic({ operation: "fresh_pick_listing", stage: "request_end", correlationId, requestId, durationMs: Date.now() - requestStarted, resultCount, error: requestFailure });
   }
 }
 
@@ -378,25 +474,34 @@ export async function getStorefrontExtraById(
   const id = extraId.trim();
   if (!id) return null;
   await connection();
+  const correlationId = FRESH_PICK_DIAGNOSTICS_ENABLED ? randomUUID() : null;
+  const requestId = await freshPickPlatformRequestId();
+  const requestStarted = Date.now();
+  let resultCount = 0;
+  let requestFailure: unknown;
+  logFreshPickDiagnostic({ operation: "fresh_pick_detail", stage: "request_start", correlationId, requestId, durationMs: 0 });
   try {
     const todayYmd = toBusinessDateKey();
     const supabase = createPublicClient();
-    const { data, error } = await supabase
+    const { data, error } = await measureFreshPickStage("fresh_pick_detail", "extra_stock_query", correlationId, 1, () => supabase
       .from("extra_stock")
       .select(
         "id, lifecycle, cake_name, size_label, library_cake_id, library_cake_size_id, prepared_on, pickup_available_from_at, pickup_through_at, confirmed_at, sold_at, order_id, cut_into_slices_at, walk_in_held_until, ready_for_collection",
       )
       .eq("id", id)
-      .maybeSingle();
-    if (error || !data) return null;
+      .maybeSingle(), { requestId });
+    if (error || !data) {
+      requestFailure = error;
+      return null;
+    }
     const now = new Date();
     const row = data as ExtraRow;
     if (!publishedNow(row, now)) return null;
     if (!row.pickup_available_from_at || !row.pickup_through_at) return null;
     const [hoursSnapshot, config, details] = await Promise.all([
-      loadOperatingHoursSnapshot(),
-      loadFreshPicksPreparationConfig(),
-      extraListingDetails(supabase, [row]),
+      measureFreshPickStage("fresh_pick_detail", "operating_hours_snapshot", correlationId, 0, () => loadOperatingHoursSnapshot(), { requestId }),
+      measureFreshPickStage("fresh_pick_detail", "preparation_config", correlationId, 0, () => loadFreshPicksPreparationConfig(), { requestId }),
+      measureFreshPickStage("fresh_pick_detail", "photo_description_details", correlationId, Number(Boolean(row.library_cake_id)), () => extraListingDetails(supabase, [row], correlationId, requestId), { fanout: 2, requestId, countResult: (result) => result.photosByCake.size }),
     ]);
     const pickupDates = extraCustomerVisibleFulfilmentDates({
         window: {
@@ -411,13 +516,9 @@ export async function getStorefrontExtraById(
     if (pickupDates.length === 0) {
       return null;
     }
-    const unitPrice = await extraPriceOn(
-      supabase,
-      row.library_cake_size_id,
-      pickupDates[0] ?? null,
-    );
+    const unitPrice = await extraPriceOn(supabase, row.library_cake_size_id, pickupDates[0] ?? null, "fresh_pick_detail", correlationId, requestId);
 
-    return mapPick(
+    const pick = mapPick(
       row,
       todayYmd,
       now,
@@ -430,7 +531,12 @@ export async function getStorefrontExtraById(
       hoursSnapshot,
       config,
     );
-  } catch {
+    resultCount = pick ? 1 : 0;
+    return pick;
+  } catch (error) {
+    requestFailure = error;
     return null;
+  } finally {
+    logFreshPickDiagnostic({ operation: "fresh_pick_detail", stage: "request_end", correlationId, requestId, durationMs: Date.now() - requestStarted, resultCount, error: requestFailure });
   }
 }
