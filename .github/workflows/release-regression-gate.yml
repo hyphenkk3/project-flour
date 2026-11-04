@@ -5,6 +5,7 @@ on:
     branches:
       - codex/freshpick-r3-dev-20261025
       - codex/prod-capacity-error-20261103
+      - codex/capacity-status-consistency-20261104-review
   pull_request:
     branches:
       - codex/freshpick-r3-dev-20261025
