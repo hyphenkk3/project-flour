@@ -149,6 +149,10 @@ run("Disposable PostgreSQL capacity serialization and rollback", "bash", [
   path.join(scriptsDir, "test-capacity-concurrency-postgres.sh"),
   ], 90_000, postgresHarnessEnv);
 
+run("Disposable PostgreSQL canonical migration-runner mechanics", "python3", [
+  path.join(scriptsDir, "test_capacity_status_runner.py"),
+  ], 90_000, postgresHarnessEnv);
+
 const tsc = path.join(root, "node_modules", ".bin", "tsc");
 run("Application TypeScript", tsc, ["--noEmit"], 60_000);
 run("Release regression test TypeScript", tsc, ["--noEmit", "-p", "tsconfig.release-regressions.json"], 60_000);
