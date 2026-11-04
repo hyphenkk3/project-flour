@@ -23,6 +23,7 @@ new Function("exports", "module", helperJavaScript)(
 );
 const {
   classifyStorefrontReadFailure,
+  resolveLiveReadWithDisplayFallback,
   settleStorefrontRead,
   storefrontReadFailureMessage,
 } = helperModule.exports;
@@ -63,6 +64,55 @@ async function run() {
     "database",
   );
   assert.equal(classifyStorefrontReadFailure(new Error()), "unknown");
+
+  const cachedDisplay = {
+    name: "Saved cake name",
+    photos: [{ url: "https://example.test/cake.jpg" }],
+    sizes: [{ price: 1 }],
+  };
+  const timeoutFallback = await resolveLiveReadWithDisplayFallback(
+    Promise.reject(timeout),
+    Promise.resolve(cachedDisplay),
+    (display) => ({ ...display, sizes: [] }),
+  );
+  assert.equal(timeoutFallback.source, "display_fallback");
+  assert.equal(timeoutFallback.value?.name, "Saved cake name");
+  assert.equal(
+    timeoutFallback.value?.photos[0]?.url,
+    "https://example.test/cake.jpg",
+  );
+  assert.deepEqual(
+    timeoutFallback.value?.sizes,
+    [],
+    "stale display fallback cannot carry a cached price or size offer",
+  );
+
+  let fallbackCalls = 0;
+  const liveSuccess = await resolveLiveReadWithDisplayFallback(
+    Promise.resolve({ name: "Live cake", sizes: [{ price: 155 }] }),
+    Promise.resolve(cachedDisplay),
+    () => {
+      fallbackCalls += 1;
+      return null;
+    },
+  );
+  assert.equal(liveSuccess.source, "live");
+  assert.equal(liveSuccess.value?.name, "Live cake");
+  assert.equal(fallbackCalls, 0);
+
+  const confirmedMissing = await resolveLiveReadWithDisplayFallback(
+    Promise.resolve(null),
+    Promise.resolve(cachedDisplay),
+    () => ({ name: "stale", sizes: [] }),
+  );
+  assert.deepEqual(confirmedMissing, { value: null, source: "live" });
+
+  const noCachedDisplay = await resolveLiveReadWithDisplayFallback(
+    Promise.reject(timeout),
+    Promise.reject(new Error("cold display cache also timed out")),
+    () => null,
+  );
+  assert.deepEqual(noCachedDisplay, { value: null, source: "unavailable" });
 
   let attempts = 0;
   const firstAttempt = await settleStorefrontRead(async () => {
@@ -136,15 +186,75 @@ async function run() {
   assert.match(homePage, /popularResult\.ok \? \(/);
   assert.match(homePage, /featuredResults\.map\(\(result\) =>/);
 
+  const detailPage = fs.readFileSync(
+    path.join(
+      repo,
+      "src/workspaces/storefront/catalog/StorefrontCakeDetail.tsx",
+    ),
+    "utf8",
+  );
+  assert.match(detailPage, /resolveLiveReadWithDisplayFallback/);
+  assert.match(detailPage, /browseCakePreviewFromDisplay/);
+  assert.match(detailPage, /hideAddToOrder/);
+  assert.match(detailPage, /couldn’t confirm current availability or price/);
+
+  const purchasePanel = fs.readFileSync(
+    path.join(
+      repo,
+      "src/workspaces/storefront/catalog/CakeDetailPurchasePanel.tsx",
+    ),
+    "utf8",
+  );
+  assert.match(purchasePanel, /cake\.sizes\.length > 0/);
+  assert.match(
+    purchasePanel,
+    /hideAddToOrder \? null : \([\s\S]*?<AddToOrderButton/,
+  );
+
+  const detailQueries = fs.readFileSync(
+    path.join(repo, "src/workspaces/storefront/catalog/queries.ts"),
+    "utf8",
+  );
+  const cachedPreviewStart = detailQueries.indexOf(
+    "export function browseCakePreviewFromDisplay",
+  );
+  const cachedPreviewEnd = detailQueries.indexOf(
+    "async function loadBrowsePublishedCakeById",
+    cachedPreviewStart,
+  );
+  assert.notEqual(cachedPreviewStart, -1);
+  assert.notEqual(cachedPreviewEnd, -1);
+  assert.match(
+    detailQueries.slice(cachedPreviewStart, cachedPreviewEnd),
+    /sizes:\s*\[\]/,
+    "the live-failure display preview removes cached size and price data",
+  );
+
+  const pickupPriceHook = fs.readFileSync(
+    path.join(
+      repo,
+      "src/workspaces/storefront/catalog/usePickupDatePricedCakes.ts",
+    ),
+    "utf8",
+  );
+  assert.match(
+    pickupPriceHook,
+    /sizeIds\.length === 0\)\s*\{\s*return \{ cakes: cakes\.map\(\(cake\) => \(\{ \.\.\.cake \}\)\), ready: true \};/,
+    "display-only fallback with no sizes makes no price RPC request",
+  );
+
   const voucherQueries = fs.readFileSync(
     path.join(repo, "src/workspaces/vouchers/catalogue-queries.ts"),
     "utf8",
   );
   assert.match(voucherQueries, /listPublicCatalogueVouchersStrict/);
-  assert.match(voucherQueries, /if \(error\) throw new Error\(error\.message\)/);
+  assert.match(
+    voucherQueries,
+    /if \(error\) throw new Error\(error\.message\)/,
+  );
 
   console.log(
-    "PASS: 29 catalogue resilience assertions; no automatic retry loop.",
+    "PASS: catalogue stale-display fallback, authoritative fail-closed checks, and no automatic retry loop.",
   );
 }
 

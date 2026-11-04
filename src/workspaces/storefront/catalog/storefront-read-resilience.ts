@@ -11,6 +11,37 @@ export async function settleStorefrontRead<T>(
   }
 }
 
+export type LiveReadWithDisplayFallback<T> = {
+  value: T | null;
+  source: "live" | "display_fallback" | "unavailable";
+};
+
+/**
+ * Uses cached display data only after the live, authoritative read fails.
+ * The fallback mapper must remove prices and orderability before returning a
+ * customer-facing value. A successful live `null` remains a real not-found.
+ */
+export async function resolveLiveReadWithDisplayFallback<TLive, TDisplay>(
+  liveRead: Promise<TLive | null>,
+  displayRead: Promise<TDisplay | null>,
+  toDisplayFallback: (display: TDisplay) => TLive | null,
+): Promise<LiveReadWithDisplayFallback<TLive>> {
+  try {
+    return { value: await liveRead, source: "live" };
+  } catch {
+    try {
+      const display = await displayRead;
+      const value = display == null ? null : toDisplayFallback(display);
+      return {
+        value,
+        source: value == null ? "unavailable" : "display_fallback",
+      };
+    } catch {
+      return { value: null, source: "unavailable" };
+    }
+  }
+}
+
 export type StorefrontReadFailureKind =
   "timeout" | "network" | "database" | "unknown";
 

@@ -8,7 +8,9 @@ import { StorefrontCakeDetailPerfProbe } from "@/workspaces/storefront/catalog/S
 import { StorefrontRetryNotice } from "@/workspaces/storefront/StorefrontRetryNotice";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
 import { loadCakeOfferVoucher } from "@/workspaces/storefront/offers/CakeOfferHint";
+import { resolveLiveReadWithDisplayFallback } from "@/workspaces/storefront/catalog/storefront-read-resilience";
 import {
+  browseCakePreviewFromDisplay,
   getBrowseCakeDisplayById,
   getBrowsePublishedCakeById,
   mergeBrowseCakeDisplay,
@@ -23,9 +25,7 @@ type CakeDetailProps = {
   searchParams: CakeDetailSearchParams;
 };
 
-function ymdQueryValue(
-  value: string | string[] | undefined,
-): string | null {
+function ymdQueryValue(value: string | string[] | undefined): string | null {
   const raw = Array.isArray(value) ? value[0] : value;
   const key = raw?.trim().slice(0, 10) ?? "";
   return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : null;
@@ -109,8 +109,41 @@ async function CakeDetailWithDisplay({
   )
     .then((display) => ({ display, failed: false }))
     .catch(() => ({ display: null, failed: true }));
-  const livePromise = getBrowsePublishedCakeById(cakeId);
-  const [query, cake] = await Promise.all([searchParams, livePromise]);
+  const [query, liveRead] = await Promise.all([
+    searchParams,
+    resolveLiveReadWithDisplayFallback(
+      getBrowsePublishedCakeById(cakeId),
+      displayPromise.then(({ display }) => display),
+      (display) => browseCakePreviewFromDisplay(cakeId, display),
+    ),
+  ]);
+  if (liveRead.source === "display_fallback") {
+    return (
+      <>
+        <StorefrontRetryNotice
+          title="Current ordering details are temporarily unavailable"
+          message="Saved cake details and photos are shown for reference, but we couldn’t confirm current availability or price. Please try again before ordering."
+        />
+        <CakeDetailPickupScope
+          cake={liveRead.value!}
+          hideAddToOrder
+          pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
+          urlFrom={ymdQueryValue(query.from)}
+          urlPickup={ymdQueryValue(query.pickup)}
+          urlTo={ymdQueryValue(query.to)}
+        />
+      </>
+    );
+  }
+  if (liveRead.source === "unavailable") {
+    return (
+      <StorefrontRetryNotice
+        title="Cake details are temporarily unavailable"
+        message="We couldn’t confirm the current cake details. Please try again shortly."
+      />
+    );
+  }
+  const cake = liveRead.value;
   if (!cake) {
     notFound();
   }
@@ -144,10 +177,7 @@ async function CakeDetailWithDisplay({
   );
 }
 
-async function CakeDetailResolved({
-  params,
-  searchParams,
-}: CakeDetailProps) {
+async function CakeDetailResolved({ params, searchParams }: CakeDetailProps) {
   const { id } = await params;
   return (
     <>

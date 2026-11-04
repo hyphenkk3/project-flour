@@ -452,7 +452,7 @@ assert.match(
 );
 assert.match(
   readSrc("src/workspaces/storefront/cart/AddToOrderSheet.tsx"),
-  /usePickupDatePricedCakes\(\[cake\], pickupDate\)/,
+  /usePickupDatePricedCakes\(\[cake\],\s*pricePickupDate\)/,
   "Add to Order uses the selected pickup date (including scope/date picker) before saving its price snapshot",
 );
 assert.match(
