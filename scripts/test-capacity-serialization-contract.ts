@@ -9,6 +9,9 @@ const migration = read(
 const lockConflictMigration = read(
   "supabase/migrations/20261103140631_capacity_row_lock_conflict.sql",
 );
+const statusConsistencyMigration = read(
+  "supabase/migrations/20261104001213_capacity_status_consistency.sql",
+);
 const checkout = read("supabase/migrations/20260902230000_phase3_preorder_date_engine.sql");
 const ownerCreate = read("supabase/migrations/20261011100225_staff_creation_rpc_actor_authorization.sql");
 const capacityRead = read("src/workspaces/storefront/checkout/capacity-availability.ts");
@@ -31,6 +34,7 @@ assert.match(migration, /o\.extra_stock_id is null/);
 assert.match(migration, /revoke all on function public\._lock_production_capacity_date\(date\)[\s\S]*?from public, anon, authenticated, service_role/);
 assert.match(lockConflictMigration, /pg_try_advisory_xact_lock/);
 assert.match(lockConflictMigration, /errcode = ''40001''/);
+assert.match(lockConflictMigration, /Capacity changed concurrently\. Please retry this operation\./);
 assert.match(lockConflictMigration, /md5\(pg_catalog\.pg_get_functiondef/);
 assert.match(lockConflictMigration, /public\._try_lock_production_capacity_date\(/);
 assert.match(lockConflictMigration, /position\(v_lock_call in v_definition\) > 0/);
@@ -40,5 +44,14 @@ assert.match(ownerCreate, /insert into public\.order_items\s*\(/i);
 assert.match(capacityRead, /availabilityConfirmed/);
 assert.match(capacityRead, /classifyCapacityLookupError/);
 assert.doesNotMatch(capacityRead, /grant\s+select\s+on\s+public\.production_capacity\s+to\s+anon/i);
+assert.match(statusConsistencyMigration, /'pending_confirmation'[\s\S]*?'confirmed'[\s\S]*?'awaiting_payment'/);
+assert.match(statusConsistencyMigration, /_assert_capacity_bucket/);
+assert.match(statusConsistencyMigration, /_assert_order_capacity/);
+assert.match(statusConsistencyMigration, /_lock_capacity_order_row/);
+assert.match(statusConsistencyMigration, /_lock_capacity_order_item_row/);
+assert.match(statusConsistencyMigration, /v_item\.body_md5 <> v_parts\[3\]/);
+assert.match(statusConsistencyMigration, /9527b7bab0ecaa5543a50b4a7710c8a6/);
+assert.match(statusConsistencyMigration, /8003abd4eb030e9500659142a148f9c8/);
+assert.doesNotMatch(statusConsistencyMigration, /grant\s+select\s+on\s+public\.production_capacity\s+to\s+anon/i);
 
 console.log("PASS capacity serialization migration contract");

@@ -63,6 +63,7 @@ fi
 run_psql -f - <"$ROOT/scripts/test-capacity-concurrency-fixture.sql" >/dev/null
 run_psql -1 -f - <"$ROOT/supabase/migrations/20261103140120_serialize_guest_preorder_capacity.sql" >/dev/null
 run_psql -1 -f - <"$ROOT/supabase/migrations/20261103140631_capacity_row_lock_conflict.sql" >/dev/null
+run_psql -1 -f - <"$ROOT/supabase/migrations/20261104001213_capacity_status_consistency.sql" >/dev/null
 CAPACITY_ADMIN_DEF="$(run_psql -Atqc "select pg_get_functiondef('public.set_production_capacity(uuid,date,uuid,uuid,uuid,integer,text)'::regprocedure)")"
 LOCK_LINES="$(printf '%s\n' "$CAPACITY_ADMIN_DEF" | awk '/perform public\._lock_production_capacity_date\(p_pickup_date\)/ {d=NR} /perform pg_advisory_xact_lock\(/ {b=NR} END {print d+0, b+0}')"
 read -r DATE_LOCK_LINE BUCKET_LOCK_LINE <<<"$LOCK_LINES"
@@ -183,6 +184,51 @@ if [[ "$STATUS_A" -ne 0 || "$STATUS_B" -ne 0 || "$ELAPSED" -ge 2 ]]; then
   exit 1
 fi
 echo "different_dates_independent=PASS"
+
+# A submitted reservation remains reserved when staff confirms it. Confirmation
+# cannot free the slot, and the next guest is rejected without a partial row.
+reset_data
+capacity_row 44444444-4444-4444-4444-444444444412 2026-12-20 1
+run_psql -c "select public.capacity_test_guest_reserve('50000000-0000-0000-0000-000000000020','60000000-0000-0000-0000-000000000020','2026-12-20','11111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222','33333333-3333-3333-3333-333333333333',1,0,false)" >/dev/null
+run_psql -c "update public.orders set status='confirmed' where id='50000000-0000-0000-0000-000000000020'" >/dev/null
+[[ "$(run_psql -Atqc "select public._guest_preorder_item_fully_booked('2026-12-20','33333333-3333-3333-3333-333333333333','11111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222',1)")" == "t" ]] || { echo "FAIL: confirmed order released reserved capacity" >&2; exit 1; }
+set +e
+run_psql -c "select public.capacity_test_guest_reserve('50000000-0000-0000-0000-000000000021','60000000-0000-0000-0000-000000000021','2026-12-20','11111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222','33333333-3333-3333-3333-333333333333',1,0,false)" >"$RUN_DIR/confirmed-full.log" 2>&1
+STATUS_CONFIRMED_FULL=$?
+set -e
+if [[ "$STATUS_CONFIRMED_FULL" -eq 0 || "$(run_psql -Atqc 'select count(*) from public.orders')" != "1" ]]; then
+  echo "FAIL: checkout exceeded capacity occupied by confirmed order" >&2
+  cat "$RUN_DIR/confirmed-full.log" >&2
+  exit 1
+fi
+echo "submitted_to_confirmed_preserves_capacity=PASS"
+echo "confirmed_order_blocks_over_capacity_checkout=PASS"
+
+# Capacity edits cannot reduce below confirmed commitments or temporarily
+# reserved submitted/pending orders. The separate staff confirmed-floor RPC
+# retains its historical confirmed/awaiting_payment/paid reporting contract.
+run_psql -c "update public.orders set status='submitted' where id='50000000-0000-0000-0000-000000000020'" >/dev/null
+set +e
+run_psql -c "update public.production_capacity set capacity_quantity=0 where id='44444444-4444-4444-4444-444444444412'" >"$RUN_DIR/pending-capacity-reduction.log" 2>&1
+STATUS_PENDING_CAP=$?
+set -e
+if [[ "$STATUS_PENDING_CAP" -eq 0 || "$(run_psql -Atqc "select capacity_quantity from public.production_capacity where id='44444444-4444-4444-4444-444444444412'")" != "1" ]]; then
+  echo "FAIL: capacity reduction below an active reservation was committed" >&2
+  cat "$RUN_DIR/pending-capacity-reduction.log" >&2
+  exit 1
+fi
+run_psql -c "update public.orders set status='confirmed' where id='50000000-0000-0000-0000-000000000020'" >/dev/null
+set +e
+run_psql -c "update public.production_capacity set capacity_quantity=0 where id='44444444-4444-4444-4444-444444444412'" >"$RUN_DIR/confirmed-capacity-reduction.log" 2>&1
+STATUS_CONFIRMED_CAP=$?
+set -e
+if [[ "$STATUS_CONFIRMED_CAP" -eq 0 || "$(run_psql -Atqc "select capacity_quantity from public.production_capacity where id='44444444-4444-4444-4444-444444444412'")" != "1" ]]; then
+  echo "FAIL: capacity reduction below a confirmed commitment was committed" >&2
+  cat "$RUN_DIR/confirmed-capacity-reduction.log" >&2
+  exit 1
+fi
+echo "capacity_reduction_respects_active_reservations=PASS"
+echo "capacity_reduction_respects_confirmed_commitments=PASS"
 
 # A direct capacity-table writer already holds its row before the BEFORE ROW
 # trigger fires. The trigger must fail fast instead of waiting on a date lock

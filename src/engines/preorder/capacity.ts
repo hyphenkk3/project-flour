@@ -14,9 +14,16 @@ import type { Ymd } from "@/engines/preorder/types";
 
 export const CUSTOMER_DATE_CAPACITY_SEARCH_DAYS = 14;
 
+/**
+ * Orders reserve preorder capacity from guest submission through payment.
+ * `confirmed` must remain in this set: staff confirmation is a lifecycle
+ * transition, not a release of the slot. Cancelled/completed orders release
+ * it. Fresh Pick orders are excluded separately by their stock linkage.
+ */
 export const GUEST_PREORDER_CAPACITY_ORDER_STATUSES = [
   "submitted",
   "pending_confirmation",
+  "confirmed",
   "awaiting_payment",
   "paid",
 ] as const;

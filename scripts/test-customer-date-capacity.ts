@@ -36,7 +36,7 @@ function readSrc(rel: string): string {
 assert.equal(CUSTOMER_DATE_CAPACITY_SEARCH_DAYS, 14);
 assert.deepEqual(
   [...GUEST_PREORDER_CAPACITY_ORDER_STATUSES],
-  ["submitted", "pending_confirmation", "awaiting_payment", "paid"],
+  ["submitted", "pending_confirmation", "confirmed", "awaiting_payment", "paid"],
 );
 assert.notDeepEqual(
   [...GUEST_PREORDER_CAPACITY_ORDER_STATUSES],
@@ -426,13 +426,19 @@ const none = findNextValidCollectionDate({
 });
 assert.equal(none, null);
 
-// submitted / pending_confirmation inflate customer occupancy (submit-time)
+// All active preorder lifecycle statuses reserve a slot through payment.
 assert.equal(
   usedQuantityForGuestCapacityRow(
-    [used("submitted", 4), used("pending_confirmation", 2)],
+    [
+      used("submitted", 4),
+      used("pending_confirmation", 2),
+      used("confirmed", 3),
+      used("awaiting_payment", 1),
+      used("paid", 2),
+    ],
     cakeWide,
   ),
-  6,
+  12,
 );
 assert.equal(
   usedQuantityForGuestCapacityRow([used("cancelled", 9), used("completed", 8)], cakeWide),
@@ -440,7 +446,7 @@ assert.equal(
 );
 assert.equal(
   usedQuantityForGuestCapacityRow([used("confirmed", 5)], cakeWide),
-  0,
+  5,
 );
 
 assert.equal(
