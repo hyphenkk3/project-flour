@@ -41,7 +41,7 @@ def main() -> None:
     runner = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
     spec.loader.exec_module(runner)
-    work = Path(tempfile.mkdtemp(prefix="pf-capacity-runner-test-", dir="/private/tmp"))
+    work = Path(tempfile.mkdtemp(prefix="pf-capacity-runner-test-"))
     data, sock = work / "data", work / "sock"
     sock.mkdir(mode=0o700)
     started = False
