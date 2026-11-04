@@ -46,6 +46,7 @@ def main() -> None:
     sock.mkdir(mode=0o700)
     started = False
     created_dbs: list[str] = []
+    container_files: list[str] = []
     try:
         suffix = uuid.uuid4().hex[:10]
         db = f"pf_capacity_runner_{suffix}"
@@ -58,6 +59,11 @@ def main() -> None:
                 created_dbs.append(name)
             def run_driver(command: list[str], path: Path) -> subprocess.CompletedProcess[str]:
                 return subprocess.run(command + ["--single-transaction", "-f", "-"], input=path.read_text(), text=True, capture_output=True)
+            def stage_sql(path: Path) -> Path:
+                target = f"/tmp/{path.name}-{suffix}"
+                check(["docker", "cp", str(path), f"{container}:{target}"])
+                container_files.append(target)
+                return Path(target)
         else:
             check([str(PGBIN / "initdb"), "-D", str(data), "--no-locale", "--encoding=UTF8", "--auth=trust", "-U", "postgres", "--set=shared_memory_type=mmap", "--set=dynamic_shared_memory_type=posix"])
             start = subprocess.run([str(PGBIN / "pg_ctl"), "-D", str(data), "-l", str(work / "postgres.log"), "-o", f"-F -p {PORT} -k {sock} -c listen_addresses='' -c shared_memory_type=mmap -c dynamic_shared_memory_type=posix", "-w", "start"], text=True, capture_output=True)
@@ -72,6 +78,8 @@ def main() -> None:
                 created_dbs.append(name)
             def run_driver(command: list[str], path: Path) -> subprocess.CompletedProcess[str]:
                 return subprocess.run(command + ["--single-transaction", "-f", str(path)], text=True, capture_output=True)
+            def stage_sql(path: Path) -> Path:
+                return path
         check(psql + ["-c", "create schema supabase_migrations; create table supabase_migrations.schema_migrations(version text primary key,name text not null,statements text[] not null);"])
         check(psql + ["-c", "insert into supabase_migrations.schema_migrations values ('20261103140120','serialize_guest_preorder_capacity',array['fixture']),('20261103140631','capacity_row_lock_conflict',array['fixture']);"])
 
@@ -79,7 +87,7 @@ def main() -> None:
         success_file = work / "success.sql"
         success_file.write_text(success_sql)
         success_driver = work / "success-driver.sql"
-        success_driver.write_text(runner.build_driver(success_file, success_sql, runner.split_sql(success_sql), expected_ledger_count=2))
+        success_driver.write_text(runner.build_driver(stage_sql(success_file), success_sql, runner.split_sql(success_sql), expected_ledger_count=2))
         check(psql + ["--single-transaction", "-f", str(success_driver)] if not use_container else ["docker", "exec", "-i", container, "psql", "-X", "-q", "-w", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", db, "--single-transaction", "-f", "-"], input=success_driver.read_text() if use_container else None)
         actual = check(psql + ["-Atc", "select count(*) from public.runner_effect where effect='committed'; select count(*) from supabase_migrations.schema_migrations where version='20261104001213'; select cardinality(statements) from supabase_migrations.schema_migrations where version='20261104001213';"])
         if actual.stdout.strip().splitlines() != ["1", "1", "2"]:
@@ -98,7 +106,7 @@ def main() -> None:
         failure_file = work / "failure.sql"
         failure_file.write_text(failure_sql)
         failure_driver = work / "failure-driver.sql"
-        failure_driver.write_text(runner.build_driver(failure_file, failure_sql, runner.split_sql(failure_sql), expected_ledger_count=2))
+        failure_driver.write_text(runner.build_driver(stage_sql(failure_file), failure_sql, runner.split_sql(failure_sql), expected_ledger_count=2))
         failure_db = f"pf_capacity_runner_fail_{uuid.uuid4().hex[:8]}"
         create_db(failure_db)
         psql_failure = (["docker", "exec", "-i", container, "psql", "-X", "-q", "-w", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", failure_db] if use_container else [str(PGBIN / "psql"), "-X", "-q", "-w", "-v", "ON_ERROR_STOP=1", "-h", str(sock), "-p", PORT, "-U", "postgres", "-d", failure_db])
@@ -112,6 +120,9 @@ def main() -> None:
             raise AssertionError(f"failed transaction left partial state: {actual.stdout}")
         print("runner_failure_rolls_back_ddl_and_ledger=PASS")
     finally:
+        for path in container_files:
+            if use_container:
+                subprocess.run(["docker", "exec", container, "rm", "-f", path], text=True, capture_output=True)
         for database in reversed(created_dbs):
             if use_container:
                 subprocess.run(["docker", "exec", container, "dropdb", "-U", "postgres", "--if-exists", database], text=True, capture_output=True)
