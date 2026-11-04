@@ -251,6 +251,31 @@ if [[ "$STATUS_DIRECT" -eq 0 || "$STATUS_DATE_FIRST" -ne 0 ]] || \
 fi
 echo "direct_capacity_writer_aborts_without_deadlock=PASS"
 
+# A status transition takes the same date lock as checkouts. If a checker owns
+# that lock before the row writer starts, M2's nonblocking trigger returns the
+# existing retryable 40001 instead of waiting in an inverse lock order; retry
+# after the owner commits succeeds and keeps the slot occupied.
+reset_data
+capacity_row 44444444-4444-4444-4444-444444444413 2026-12-20 1
+run_psql -c "insert into public.orders values('50000000-0000-0000-0000-000000000022','2026-12-20','33333333-3333-3333-3333-333333333333','submitted',null); insert into public.order_items values('60000000-0000-0000-0000-000000000022','50000000-0000-0000-0000-000000000022','11111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222',1)" >/dev/null
+set +e
+run_psql -c "begin; select public._lock_production_capacity_date('2026-12-20'); select pg_sleep(1.0); commit" >"$RUN_DIR/status-date-lock-owner.log" 2>&1 & PID_A=$!
+sleep 0.2
+run_psql -v VERBOSITY=verbose -c "update public.orders set status='confirmed' where id='50000000-0000-0000-0000-000000000022'" >"$RUN_DIR/status-transition-race.log" 2>&1
+STATUS_TRANSITION_RACE=$?
+wait "$PID_A"; STATUS_DATE_OWNER=$?
+set -e
+if [[ "$STATUS_DATE_OWNER" -ne 0 || "$STATUS_TRANSITION_RACE" -eq 0 ]] || \
+  ! grep -q '40001' "$RUN_DIR/status-transition-race.log" || \
+  [[ "$(run_psql -Atqc "select status from public.orders where id='50000000-0000-0000-0000-000000000022'")" != "submitted" ]]; then
+  echo "FAIL: concurrent status transition was not aborted retryably" >&2
+  cat "$RUN_DIR/status-date-lock-owner.log" "$RUN_DIR/status-transition-race.log" >&2
+  exit 1
+fi
+run_psql -c "update public.orders set status='confirmed' where id='50000000-0000-0000-0000-000000000022'" >/dev/null
+[[ "$(run_psql -Atqc "select public._guest_preorder_item_fully_booked('2026-12-20','33333333-3333-3333-3333-333333333333','11111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222',1)")" == "t" ]] || { echo "FAIL: successful transition retry released capacity" >&2; exit 1; }
+echo "concurrent_status_transition_retryable_and_capacity_safe=PASS"
+
 # Failed work and explicit rollback leave no order or payment-like residue.
 reset_data
 capacity_row 44444444-4444-4444-4444-444444444405 2026-12-20 1
