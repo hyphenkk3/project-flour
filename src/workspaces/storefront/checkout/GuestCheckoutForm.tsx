@@ -1817,6 +1817,7 @@ export function GuestCheckoutForm({
     pickupCompatibility?.dateLevelMessage,
   );
   const submitBlocked =
+    items.length === 0 ||
     cartValidationPending ||
     (items.length > 0 && cartCapacityStatus === "loading") ||
     Boolean(sizeAvailabilityError) ||

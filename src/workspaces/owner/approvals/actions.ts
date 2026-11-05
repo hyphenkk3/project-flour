@@ -28,7 +28,6 @@ import {
   financialMateriallyAffectsConfirmation,
   orderStatusAllowsConfirmationInvalidation,
 } from "@/engines/orders/confirmation-validity";
-import { reconcilePaymentLifecycleStatus } from "@/engines/orders/payment-status";
 import { createClient } from "@/lib/supabase/server";
 import { getGuestOrderById } from "@/workspaces/owner/orders/queries";
 import type { StorefrontOrder } from "@/types/storefront";
@@ -344,34 +343,15 @@ async function reconcilePaymentLifecycleAfterApproval(input: {
   before: StorefrontOrder;
   staffId: string;
 }): Promise<{ error: string | null }> {
-  const after = await getGuestOrderById(input.orderId);
-  if (!after) {
-    return { error: "Order not found after update." };
-  }
-
-  const reconciled = reconcilePaymentLifecycleStatus({
-    previousStatus: input.before.status,
-    previousNetReceived: input.before.settlement.netReceived,
-    settlement: after.settlement,
-  });
-
-  if (reconciled.statusChanged) {
-    const supabase = await createClient();
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        status: reconciled.newStatus,
-        payment_status: reconciled.newStatus === "paid" ? "paid" : "unpaid",
-        updated_by: input.staffId,
-      })
-      .eq("id", input.orderId)
-      .is("customer_id", null);
-    if (error) {
-      return { error: error.message };
-    }
-  }
-
-  return { error: null };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "reconcile_guest_order_payment_lifecycle",
+    {
+      p_order_id: input.orderId,
+      p_actor_staff_id: input.staffId,
+    },
+  );
+  return { error: error?.message ?? null };
 }
 
 async function reconcileAfterDiscountApproval(input: {

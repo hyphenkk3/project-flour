@@ -60,8 +60,24 @@ def main() -> None:
             def run_driver(command: list[str], path: Path) -> subprocess.CompletedProcess[str]:
                 return subprocess.run(command + ["--single-transaction", "-f", "-"], input=path.read_text(), text=True, capture_output=True)
             def stage_sql(path: Path) -> Path:
-                target = f"/tmp/{path.name}-{suffix}"
-                check(["docker", "cp", str(path), f"{container}:{target}"])
+                # The migration runner resolves include paths on the host
+                # before emitting psql's `\i`. On macOS, /tmp is a symlink to
+                # /private/tmp; stage at the resolved path in the container so
+                # psql sees the same path. Stream the file rather than relying
+                # on Docker Desktop's host/container path mapping.
+                target = f"/private/tmp/{path.name}-{suffix}"
+                check(["docker", "exec", container, "mkdir", "-p", "/private/tmp"])
+                staged = subprocess.run(
+                    ["docker", "exec", "-i", container, "sh", "-c", 'cat > "$1"', "sh", target],
+                    input=path.read_bytes(),
+                    capture_output=True,
+                )
+                if staged.returncode:
+                    raise AssertionError(
+                        f"could not stage disposable SQL fixture in PostgreSQL container: {staged.stderr.decode(errors='replace')}"
+                    )
+                check(["docker", "exec", container, "chmod", "0644", target])
+                check(["docker", "exec", "--user", "postgres", container, "test", "-r", target])
                 container_files.append(target)
                 return Path(target)
         else:

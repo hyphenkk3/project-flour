@@ -59,6 +59,7 @@ const suites = [
   ["Staff administration", "test-staff-admin.ts"],
   ["Staff password reset", "test-staff-password-reset.ts"],
   ["Payment details", "test-payment-details.ts"],
+  ["Payment lifecycle reconciliation and empty-cart guard", "test-payment-lifecycle-reconciliation-contract.ts"],
   ["Payment write lock", "test-payment-write-lock.ts"],
   ["Payment correction", "test-payment-correction.ts"],
   ["Payment record correction", "test-payment-record-correction.ts"],
