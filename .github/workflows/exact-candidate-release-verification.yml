@@ -70,8 +70,8 @@ jobs:
           [[ "$actual_tree" == "$EXPECTED_TREE_SHA" ]] || { echo "Checked-out tree mismatch" >&2; exit 1; }
           {
             echo "### Exact candidate identity"
-            echo "- Commit: `$actual_commit`"
-            echo "- Tree: `$actual_tree`"
+            echo "- Commit: $actual_commit"
+            echo "- Tree: $actual_tree"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up Node.js 24
