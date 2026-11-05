@@ -60,10 +60,15 @@ def main() -> None:
             def run_driver(command: list[str], path: Path) -> subprocess.CompletedProcess[str]:
                 return subprocess.run(command + ["--single-transaction", "-f", "-"], input=path.read_text(), text=True, capture_output=True)
             def stage_sql(path: Path) -> Path:
-                target = f"/tmp/{path.name}-{suffix}"
+                # build_driver resolves include paths on the host before psql
+                # runs inside the service container. Stage at that same
+                # canonical path (macOS resolves /tmp to /private/tmp).
+                target = Path(f"/tmp/{path.name}-{suffix}").resolve()
+                check(["docker", "exec", container, "mkdir", "-p", str(target.parent)])
                 check(["docker", "cp", str(path), f"{container}:{target}"])
-                container_files.append(target)
-                return Path(target)
+                check(["docker", "exec", container, "test", "-f", str(target)])
+                container_files.append(str(target))
+                return target
         else:
             check([str(PGBIN / "initdb"), "-D", str(data), "--no-locale", "--encoding=UTF8", "--auth=trust", "-U", "postgres", "--set=shared_memory_type=mmap", "--set=dynamic_shared_memory_type=posix"])
             start = subprocess.run([str(PGBIN / "pg_ctl"), "-D", str(data), "-l", str(work / "postgres.log"), "-o", f"-F -p {PORT} -k {sock} -c listen_addresses='' -c shared_memory_type=mmap -c dynamic_shared_memory_type=posix", "-w", "start"], text=True, capture_output=True)
