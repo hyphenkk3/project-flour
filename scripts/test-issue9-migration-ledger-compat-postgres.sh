@@ -153,7 +153,7 @@ set +e
 psql -c "set role authenticated; set request.jwt.claim.sub='30000000-0000-0000-0000-000000000001'; set request.jwt.claim.role='authenticated'; select public.waiting_list_convert_item('20000000-0000-0000-0000-000000000002','40000000-0000-0000-0000-000000000001',1,'12:00',true);" >"$RUN_DIR/spoof.log" 2>&1
 SPOOF_RC=$?
 set -e
-[[ "$SPOOF_RC" -ne 0 ]] && rg -qi 'Not authorized' "$RUN_DIR/spoof.log" || { echo 'FAIL: spoofed actor was not rejected' >&2; cat "$RUN_DIR/spoof.log" >&2; exit 1; }
+[[ "$SPOOF_RC" -ne 0 ]] && grep -qi 'Not authorized' "$RUN_DIR/spoof.log" || { echo 'FAIL: spoofed actor was not rejected' >&2; cat "$RUN_DIR/spoof.log" >&2; exit 1; }
 for actor_user in '20000000-0000-0000-0000-000000000002:30000000-0000-0000-0000-000000000002' '20000000-0000-0000-0000-000000000003:30000000-0000-0000-0000-000000000003'; do
   actor="${actor_user%%:*}"
   actor_uid="${actor_user##*:}"
@@ -161,28 +161,28 @@ for actor_user in '20000000-0000-0000-0000-000000000002:30000000-0000-0000-0000-
   psql -c "set role authenticated; set request.jwt.claim.sub='$actor_uid'; set request.jwt.claim.role='authenticated'; select public.waiting_list_convert_item('$actor','40000000-0000-0000-0000-000000000002',1,'12:00',true);" >"$RUN_DIR/inactive.log" 2>&1
   rc=$?
   set -e
-  [[ "$rc" -ne 0 ]] && rg -qi 'Not authorized' "$RUN_DIR/inactive.log" || { echo "FAIL: inactive/archived actor $actor was not rejected" >&2; cat "$RUN_DIR/inactive.log" >&2; exit 1; }
+  [[ "$rc" -ne 0 ]] && grep -qi 'Not authorized' "$RUN_DIR/inactive.log" || { echo "FAIL: inactive/archived actor $actor was not rejected" >&2; cat "$RUN_DIR/inactive.log" >&2; exit 1; }
 done
 set +e
 psql -c "set role authenticated; set request.jwt.claim.sub='30000000-0000-0000-0000-000000000001'; set request.jwt.claim.role='authenticated'; select public.waiting_list_convert_item('20000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000003',1,'12:00',true);" >"$RUN_DIR/active.log" 2>&1
 ACTIVE_RC=$?
 set -e
-[[ "$ACTIVE_RC" -ne 0 ]] && rg -q 'ISSUE9_FIXTURE_STOP_AFTER_ACTOR_CHECK' "$RUN_DIR/active.log" || { echo 'FAIL: active actor did not reach the existing RPC body' >&2; cat "$RUN_DIR/active.log" >&2; exit 1; }
+[[ "$ACTIVE_RC" -ne 0 ]] && grep -q 'ISSUE9_FIXTURE_STOP_AFTER_ACTOR_CHECK' "$RUN_DIR/active.log" || { echo 'FAIL: active actor did not reach the existing RPC body' >&2; cat "$RUN_DIR/active.log" >&2; exit 1; }
 set +e
 psql -c "set role authenticated; set request.jwt.claim.sub='30000000-0000-0000-0000-000000000001'; set request.jwt.claim.role='authenticated'; select public.waiting_list_convert_confirmation('20000000-0000-0000-0000-000000000002','40000000-0000-0000-0000-000000000004');" >"$RUN_DIR/spoof-confirmation.log" 2>&1
 SPOOF_CONFIRMATION_RC=$?
 set -e
-[[ "$SPOOF_CONFIRMATION_RC" -ne 0 ]] && rg -qi 'Not authorized' "$RUN_DIR/spoof-confirmation.log" || { echo 'FAIL: confirmation conversion accepted a spoofed actor' >&2; cat "$RUN_DIR/spoof-confirmation.log" >&2; exit 1; }
+[[ "$SPOOF_CONFIRMATION_RC" -ne 0 ]] && grep -qi 'Not authorized' "$RUN_DIR/spoof-confirmation.log" || { echo 'FAIL: confirmation conversion accepted a spoofed actor' >&2; cat "$RUN_DIR/spoof-confirmation.log" >&2; exit 1; }
 set +e
 psql -c "set role authenticated; set request.jwt.claim.sub='30000000-0000-0000-0000-000000000001'; set request.jwt.claim.role='authenticated'; select public.waiting_list_convert_confirmation('20000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000005');" >"$RUN_DIR/active-confirmation.log" 2>&1
 ACTIVE_CONFIRMATION_RC=$?
 set -e
-[[ "$ACTIVE_CONFIRMATION_RC" -ne 0 ]] && rg -q 'ISSUE9_FIXTURE_STOP_AFTER_ACTOR_CHECK' "$RUN_DIR/active-confirmation.log" || { echo 'FAIL: active confirmation actor did not reach the existing RPC body' >&2; cat "$RUN_DIR/active-confirmation.log" >&2; exit 1; }
+[[ "$ACTIVE_CONFIRMATION_RC" -ne 0 ]] && grep -q 'ISSUE9_FIXTURE_STOP_AFTER_ACTOR_CHECK' "$RUN_DIR/active-confirmation.log" || { echo 'FAIL: active confirmation actor did not reach the existing RPC body' >&2; cat "$RUN_DIR/active-confirmation.log" >&2; exit 1; }
 set +e
 psql -c "set role anon; select public.waiting_list_convert_item(null,gen_random_uuid(),1,'12:00',true);" >"$RUN_DIR/anon.log" 2>&1
 ANON_RC=$?
 set -e
-[[ "$ANON_RC" -ne 0 ]] && rg -qi 'permission denied|42501' "$RUN_DIR/anon.log" || { echo 'FAIL: anonymous execution was not denied' >&2; cat "$RUN_DIR/anon.log" >&2; exit 1; }
+[[ "$ANON_RC" -ne 0 ]] && grep -Eqi 'permission denied|42501' "$RUN_DIR/anon.log" || { echo 'FAIL: anonymous execution was not denied' >&2; cat "$RUN_DIR/anon.log" >&2; exit 1; }
 echo 'actor_spoof_inactive_archived_active_and_anon_matrix=PASS'
 
 # DEV already ran original M2: the compatibility migration must make no further
