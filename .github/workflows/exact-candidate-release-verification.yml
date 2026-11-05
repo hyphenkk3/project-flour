@@ -1,0 +1,112 @@
+name: Exact candidate release verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Full commit SHA to verify
+        required: true
+        type: string
+      expected_tree_sha:
+        description: Expected Git tree SHA for the candidate commit
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: exact-candidate-release-${{ inputs.candidate_sha }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify exact candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: project_flour_regression
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: gha-regression-only
+        options: >-
+          --health-cmd "pg_isready -U postgres -d project_flour_regression"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Validate requested identities
+        shell: bash
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          EXPECTED_TREE_SHA: ${{ inputs.expected_tree_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid candidate commit SHA" >&2; exit 1; }
+          [[ "$EXPECTED_TREE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid expected tree SHA" >&2; exit 1; }
+
+      - name: Check out exact candidate without retaining a write token
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          persist-credentials: false
+
+      - name: Verify checked-out commit and tree
+        shell: bash
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          EXPECTED_TREE_SHA: ${{ inputs.expected_tree_sha }}
+        run: |
+          set -euo pipefail
+          actual_commit="$(git rev-parse HEAD)"
+          actual_tree="$(git rev-parse 'HEAD^{tree}')"
+          echo "Checked-out commit: $actual_commit"
+          echo "Checked-out tree: $actual_tree"
+          [[ "$actual_commit" == "$CANDIDATE_SHA" ]] || { echo "Checked-out commit mismatch" >&2; exit 1; }
+          [[ "$actual_tree" == "$EXPECTED_TREE_SHA" ]] || { echo "Checked-out tree mismatch" >&2; exit 1; }
+          {
+            echo "### Exact candidate identity"
+            echo "- Commit: `$actual_commit`"
+            echo "- Tree: `$actual_tree`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install exact lockfile dependencies
+        run: npm ci
+
+      - name: Focused cake-detail fallback regressions
+        run: |
+          node --import ./scripts/test-release-regression-alias-loader.mjs scripts/test-storefront-cake-detail-query.ts
+          node scripts/test-storefront-catalogue-resilience.mjs
+
+      - name: Capacity permission-denial contract
+        run: node --experimental-strip-types scripts/test-capacity-error-classification.ts
+
+      - name: Full release regressions with disposable PostgreSQL 17
+        env:
+          RELEASE_TEST_POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: npm run test:release-regressions
+
+      - name: Scoped ESLint
+        run: >-
+          ./node_modules/.bin/eslint
+          scripts/test-storefront-cake-detail-query.ts
+          scripts/test-storefront-catalogue-resilience.mjs
+          src/workspaces/storefront/catalog/CakeDetailPurchasePanel.tsx
+          src/workspaces/storefront/catalog/StorefrontCakeDetail.tsx
+          src/workspaces/storefront/catalog/storefront-read-resilience.ts
+
+      - name: TypeScript
+        run: npx tsc --noEmit
+
+      - name: Production build
+        run: npm run build
