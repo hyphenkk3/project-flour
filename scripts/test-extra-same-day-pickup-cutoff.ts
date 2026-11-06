@@ -153,7 +153,8 @@ assert.match(extraPickupSrc, /slotPassesFreshPicksLead/);
 assert.match(extraPickupSrc, /isFreshPicksFulfilmentDateToday/);
 
 const extraActionsSrc = readSrc("src/workspaces/storefront/extra/actions.ts");
-assert.match(extraActionsSrc, /isValidExtraCustomerFulfilment/);
+assert.match(extraActionsSrc, /submit_guest_extra_order_idempotent_v3/);
+assert.doesNotMatch(extraActionsSrc, /isValidExtraCustomerFulfilment|loadFreshPicksPreparationConfig|getStorefrontExtraById/);
 assert.doesNotMatch(extraActionsSrc, /now:/);
 
 const extraFormSrc = readSrc(

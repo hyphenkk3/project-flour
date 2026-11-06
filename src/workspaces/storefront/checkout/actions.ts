@@ -95,10 +95,12 @@ import {
   withDevCheckoutPerf,
   type CheckoutServerPerf,
 } from "@/lib/perf/dev-only-server";
+import { isDefinitivePostgresFailure } from "@/workspaces/storefront/checkout/submit-action-outcome.mjs";
 
 export type CheckoutState = {
   error: string | null;
   orderId?: string;
+  outcomeUncertain?: boolean;
   perf?: CheckoutServerPerf;
 };
 
@@ -494,12 +496,20 @@ async function submitGuestPreorderActionBody(
     formData.get("catalogue_voucher_id") ?? "",
   ).trim();
   const clientStarted = performance.now();
-  const supabase = await createClient();
+  let supabase: Awaited<ReturnType<typeof createClient>>;
+  try {
+    supabase = await createClient();
+  } catch {
+    return {
+      error:
+        "We couldn’t verify the order details just now, so your order was not submitted. Please try again shortly.",
+    };
+  }
   logPerf("CHECKOUT_SUBMIT", "createClient", performance.now() - clientStarted);
   let usedCombinedSubmit = false;
   const rpcStarted = performance.now();
   let data: unknown;
-  let error: { message: string } | null = null;
+  let error: { message: string; code?: string } | null = null;
   if (catalogueVoucherId) {
     const combined = await supabase.rpc(
       "submit_guest_preorder_with_catalogue_voucher",
@@ -549,6 +559,13 @@ async function submitGuestPreorderActionBody(
   }
 
   if (error) {
+    if (!isDefinitivePostgresFailure(error.code)) {
+      return {
+        error:
+          "We couldn’t confirm whether your order was placed. Please don’t submit again yet. Contact Whitebird so the team can check for your order.",
+        outcomeUncertain: true,
+      };
+    }
     if (/fully booked/i.test(error.message)) {
       return {
         error: customerSelectedDateInvalidatedMessage(
@@ -571,7 +588,10 @@ async function submitGuestPreorderActionBody(
       : "";
 
   if (!orderId) {
-    return { error: "Order was created but could not be confirmed." };
+    return {
+      error: "We couldn’t confirm whether your order was placed. Please don’t submit again yet. Contact Whitebird so the team can check for your order.",
+      outcomeUncertain: true,
+    };
   }
 
   const cookieStarted = performance.now();
@@ -600,7 +620,7 @@ async function submitGuestPreorderActionBody(
       { voucherApply: "executed" },
     );
     if (applied.error) {
-      return { error: applied.error };
+      return { error: applied.error, orderId };
     }
   } else if (catalogueVoucherId) {
     logPerfSkipped("CHECKOUT_SUBMIT", "applyGuestCatalogueVoucherAction", {

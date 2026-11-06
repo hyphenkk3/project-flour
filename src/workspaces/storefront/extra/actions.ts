@@ -10,11 +10,7 @@ import {
   buildDineInReservationRpcPayload,
   validateDineInPartyFromForm,
 } from "@/engines/orders/dine-in-party";
-import {
-  extraCartItemUnavailableMessage,
-  extraSubmitCustomerError,
-} from "@/engines/extra/customer-fresh-picks";
-import { isValidExtraCustomerFulfilment } from "@/engines/extra/fresh-picks-fulfilment";
+import { extraSubmitCustomerError } from "@/engines/extra/customer-fresh-picks";
 import {
   DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE,
   deliveryProcessingFeeAckMatchesAuthority,
@@ -43,14 +39,17 @@ import {
   customerNameValidationError,
   formatNewOrderPersonName,
 } from "@/engines/orders/customer-name";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { createClient, createPublicClient } from "@/lib/supabase/server";
 import { scheduleStaffNotificationDispatch } from "@/foundation/staff/schedule-staff-notification-dispatch";
 import { getStorefrontCollectionForPickupDate } from "@/workspaces/storefront/catalog/queries";
 import { parseRequiredPhysicalReceipt } from "@/workspaces/storefront/checkout/preorder-draft";
-import { loadFreshPicksPreparationConfig } from "@/workspaces/storefront/extra/config";
-import { getStorefrontExtraById } from "@/workspaces/storefront/extra/queries";
+import { isDefinitivePostgresFailure } from "@/workspaces/storefront/checkout/submit-action-outcome.mjs";
+import { CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE } from "@/workspaces/storefront/checkout/submit-action-outcome.mjs";
+import { freshPickSubmissionPayload } from "@/workspaces/storefront/extra/fresh-pick-checkout-attempt.mjs";
 import { setGuestPreorderReceiptCookie } from "@/workspaces/storefront/checkout/receipt";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
+import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
   acceptPerfCorrelationId,
   logPerf,
@@ -63,6 +62,7 @@ import {
 export type ExtraOrderState = {
   error: string | null;
   orderId?: string;
+  outcomeUncertain?: boolean;
   perf?: CheckoutServerPerf;
 };
 
@@ -213,6 +213,44 @@ export async function submitGuestExtraOrderAction(
   );
 }
 
+/** Read-only recovery lookup; authorization is the unguessable recovery capability. */
+export async function resolveGuestExtraOrderAction(
+  _prev: ExtraOrderState,
+  formData: FormData,
+): Promise<ExtraOrderState> {
+  const requestId = String(formData.get("checkout_request_id") ?? "").trim();
+  const recoveryDigest = String(formData.get("checkout_recovery_digest") ?? "").trim();
+  if (!isValidCheckoutAttempt(requestId, recoveryDigest)) {
+    return { error: CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE, outcomeUncertain: true };
+  }
+  try {
+    const { data, error } = await createServiceClient().rpc(
+      "resolve_guest_checkout_attempt_v3",
+      {
+        p_request_id: requestId,
+        p_checkout_flow: "fresh_pick",
+        p_submission_payload: freshPickSubmissionPayload(formData),
+        p_recovery_digest: recoveryDigest,
+      },
+    );
+    if (error || typeof data !== "string" || !data) {
+      return {
+        error: "We couldn’t confirm whether your order was placed. Please don’t submit again yet. Contact Whitebird so the team can check for your order.",
+        outcomeUncertain: true,
+      };
+    }
+    await setGuestPreorderReceiptCookie(data);
+    return { error: null, orderId: data };
+  } catch {
+    return { error: CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE, outcomeUncertain: true };
+  }
+}
+
+function isValidCheckoutAttempt(requestId: string, recoveryDigest: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)
+    && /^[0-9a-f]{64}$/i.test(recoveryDigest);
+}
+
 async function submitGuestExtraOrderActionTimed(
   formData: FormData,
   correlationId: string,
@@ -236,9 +274,6 @@ async function submitGuestExtraOrderActionBody(
     .getAll("extra_stock_id")
     .map((value) => String(value).trim())
     .filter(Boolean);
-  const extraCakeNames = formData
-    .getAll("extra_cake_name")
-    .map((value) => String(value).trim());
   const customerName = String(formData.get("customer_name") ?? "").trim();
   const formattedCustomerName = formatNewOrderPersonName(customerName);
   const phone = String(formData.get("phone") ?? "").trim();
@@ -284,40 +319,44 @@ async function submitGuestExtraOrderActionBody(
     };
   }
 
-  const hoursSnapshot = await loadOperatingHoursSnapshot();
-  const preparationConfig = await loadFreshPicksPreparationConfig();
-  const extras = [];
-  for (const [index, extraStockId] of extraStockIds.entries()) {
-    const extra = await getStorefrontExtraById(extraStockId);
-    if (
-      !extra ||
-      extra.walkInHeld ||
-      !extra.pickupAvailableFromAt ||
-      !extra.pickupThroughAt
-    ) {
+  const requestId = String(formData.get("checkout_request_id") ?? "").trim();
+  const recoveryDigest = String(formData.get("checkout_recovery_digest") ?? "").trim();
+  if (!isValidCheckoutAttempt(requestId, recoveryDigest)) {
+    return { error: "We couldn’t start a secure checkout attempt. Please refresh checkout before submitting." };
+  }
+  let supabase: ReturnType<typeof createServiceClient>;
+  try {
+    supabase = createServiceClient();
+  } catch {
+    return { error: CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE, outcomeUncertain: true };
+  }
+  const submissionPayload = freshPickSubmissionPayload(formData);
+  const { data: recoveredOrderId, error: recoveryError } = await supabase.rpc(
+    "resolve_guest_checkout_attempt_v3",
+    {
+      p_request_id: requestId,
+      p_checkout_flow: "fresh_pick",
+      p_submission_payload: submissionPayload,
+      p_recovery_digest: recoveryDigest,
+    },
+  );
+  if (recoveryError) {
+    return { error: CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE, outcomeUncertain: true };
+  }
+  if (typeof recoveredOrderId === "string" && recoveredOrderId) {
+    await setGuestPreorderReceiptCookie(recoveredOrderId);
+    return { error: null, orderId: recoveredOrderId };
+  }
+
+  let hoursSnapshot: OperatingHoursSnapshot | null = null;
+  if (fulfilmentMethod === "dine_in") {
+    try {
+      hoursSnapshot = await loadOperatingHoursSnapshot();
+    } catch {
       return {
-        error: extraCartItemUnavailableMessage(
-          extra?.cakeName || extraCakeNames[index] || "",
-        ),
+        error: "We couldn’t verify current reservation hours. Please try again in a moment.",
       };
     }
-    if (
-      !pickupDate ||
-      !pickupTime ||
-      !isValidExtraCustomerFulfilment({
-        method: fulfilmentMethod,
-        fulfilmentDate: pickupDate,
-        fulfilmentTime: pickupTime,
-        pickupAvailableFromAt: extra.pickupAvailableFromAt,
-        orderCutoffAt: extra.pickupThroughAt,
-        readyForCollection: extra.readyForCollection,
-        snapshot: hoursSnapshot,
-        config: preparationConfig,
-      })
-    ) {
-      return { error: "Please choose a valid fulfilment time for that date." };
-    }
-    extras.push(extra);
   }
 
   let dineInPayload: Record<string, unknown> | null = null;
@@ -336,7 +375,7 @@ async function submitGuestExtraOrderActionBody(
         reservationTime,
         servingTime: pickupTime,
         venue,
-        snapshot: hoursSnapshot,
+        snapshot: hoursSnapshot!,
       })
     ) {
       return {
@@ -428,10 +467,7 @@ async function submitGuestExtraOrderActionBody(
       wishingCardMessage: String(formData.get("wishing_card_message") ?? ""),
     },
   });
-
-  const supabase = await createClient();
-  const rpcStarted = performance.now();
-  const { data, error } = await supabase.rpc("submit_guest_extra_order", {
+  const rpcArgs = {
     p_customer_name: formattedCustomerName,
     p_phone: phone,
     p_email: null,
@@ -450,19 +486,30 @@ async function submitGuestExtraOrderActionBody(
     ...(fulfilmentMethod === "delivery"
       ? { p_delivery_processing_fee_ack: deliveryProcessingAck }
       : {}),
-  });
+  };
+  const rpcStarted = performance.now();
+  const { data, error } = await supabase.rpc(
+    "submit_guest_extra_order_idempotent_v3",
+    {
+      p_request_id: requestId,
+      p_recovery_digest: recoveryDigest,
+      p_submission_payload: submissionPayload,
+      ...rpcArgs,
+    },
+  );
   logPerf(
     "EXTRA_SUBMIT",
-    "submit_guest_extra_order",
+    "submit_guest_extra_order_idempotent_v3",
     performance.now() - rpcStarted,
   );
 
   if (error) {
-    for (const extra of extras) {
-      const stillAvailable = await getStorefrontExtraById(extra.id);
-      if (!stillAvailable || stillAvailable.walkInHeld) {
-        return { error: extraCartItemUnavailableMessage(extra.cakeName) };
-      }
+    if (!isDefinitivePostgresFailure(error.code)) {
+      return {
+        error:
+          "We couldn’t confirm whether your order was placed. Please don’t submit again yet. Contact Whitebird so the team can check for your order.",
+        outcomeUncertain: true,
+      };
     }
     if (isDeliveryProcessingFeeAckError(error.message)) {
       return { error: DELIVERY_PROCESSING_FEE_ACK_REQUIRED_MESSAGE };
@@ -471,11 +518,16 @@ async function submitGuestExtraOrderActionBody(
   }
 
   const orderId =
-    data && typeof data === "object" && "id" in data
-      ? String((data as { id: string }).id)
-      : "";
+    typeof data === "string"
+      ? data
+      : data && typeof data === "object" && "id" in data
+        ? String((data as { id: string }).id)
+        : "";
   if (!orderId) {
-    return { error: "Order was created but could not be confirmed." };
+    return {
+      error: "We couldn’t confirm whether your order was placed. Please don’t submit again yet. Contact Whitebird so the team can check for your order.",
+      outcomeUncertain: true,
+    };
   }
 
   const cookieStarted = performance.now();
@@ -504,7 +556,7 @@ async function submitGuestExtraOrderActionBody(
       { voucherApply: "executed" },
     );
     if (applied.error) {
-      return { error: applied.error };
+      return { error: applied.error, orderId };
     }
   } else {
     logPerfSkipped("EXTRA_SUBMIT", "applyGuestCatalogueVoucherAction", {

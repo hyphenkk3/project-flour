@@ -622,7 +622,8 @@ assert.match(extraCheckoutSrc, /reservationTime:\s*resolvedMethod === "dine_in" 
 
 const extraActionsSrc = readSrc("src/workspaces/storefront/extra/actions.ts");
 assert.match(extraActionsSrc, /loadOperatingHoursSnapshot/);
-assert.match(extraActionsSrc, /isValidExtraCustomerFulfilment/);
+assert.match(extraActionsSrc, /submit_guest_extra_order_idempotent_v3/);
+assert.match(extraActionsSrc, /if \(fulfilmentMethod === "dine_in"\)/);
 assert.match(extraActionsSrc, /p_fulfilment_method/);
 assert.match(extraActionsSrc, /p_dine_in/);
 assert.doesNotMatch(extraActionsSrc, /now:/);

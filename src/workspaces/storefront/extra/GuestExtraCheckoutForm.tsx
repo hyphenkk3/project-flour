@@ -108,6 +108,7 @@ import type { PhysicalReceiptChoice } from "@/workspaces/storefront/checkout/pre
 import {
   loadFreshPickPrices,
   loadExtraCustomerOptions,
+  resolveGuestExtraOrderAction,
   submitGuestExtraOrderAction,
   type ExtraOrderState,
   type FreshPickPrice,
@@ -125,12 +126,22 @@ import {
 import { useEligibleCatalogueVoucher } from "@/workspaces/storefront/offers/useEligibleCatalogueVoucher";
 import {
   beginSuccessNavigationPerf,
+  CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE,
   CheckoutReceivedShellProbe,
   markCheckoutActionReturned,
   submitGuestOrderAndNavigate,
   useCheckoutActionReturnPerf,
 } from "@/workspaces/storefront/checkout/CheckoutDevPerf";
+import {
+  clearUncertainSubmit,
+  hasUncertainSubmit,
+  setUncertainSubmit,
+} from "@/workspaces/storefront/checkout/uncertain-submit-lock.mjs";
 import { StorefrontSuccessLoading } from "@/workspaces/storefront/checkout/StorefrontSuccessLoading";
+import {
+  clearFreshPickCheckoutAttempt,
+  getOrCreateFreshPickCheckoutAttempt,
+} from "@/workspaces/storefront/extra/fresh-pick-checkout-attempt.mjs";
 
 const initialState: ExtraOrderState = { error: null };
 
@@ -156,10 +167,17 @@ export function GuestExtraCheckoutForm({
     null,
   );
   const [actionPending, setActionPending] = useState(false);
+  const [uncertainSubmit, setUncertainSubmitState] = useState(false);
   const [receivedShell, setReceivedShell] = useState(false);
+  const [clientError, setClientError] = useState<string | null>(null);
   const navigatedRef = useRef(false);
   const viewState = actionState ?? state;
   const submitPending = pending || actionPending;
+  const submitOutcomeUncertain =
+    uncertainSubmit || viewState.outcomeUncertain === true;
+  const submitError = submitOutcomeUncertain
+    ? CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE
+    : clientError ?? viewState.error;
   const [notes, setNotes] = useState(cart?.notes ?? "");
   const [notesExpanded, setNotesExpanded] = useState(Boolean(cart?.notes));
   const [notesNotWordingAcknowledged, setNotesNotWordingAcknowledged] = useState(false);
@@ -176,6 +194,14 @@ export function GuestExtraCheckoutForm({
     useState<CheckoutConfirmSnapshot | null>(null);
   const pendingSubmitRef = useRef<FormData | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const confirmInFlightRef = useRef(false);
+
+  useEffect(() => {
+    const sync = () => setUncertainSubmitState(hasUncertainSubmit("fresh-pick"));
+    sync();
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
+  }, []);
   const [includeReceiptChoice, setIncludeReceiptChoice] =
     useState<PhysicalReceiptChoice>("");
   const [complimentaryOptions, setComplimentaryOptions] = useState<
@@ -252,7 +278,6 @@ export function GuestExtraCheckoutForm({
   });
   const [deliveryProcessingAckSnapshot, setDeliveryProcessingAckSnapshot] =
     useState("");
-  const [clientError, setClientError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -768,6 +793,13 @@ export function GuestExtraCheckoutForm({
     }
     setFieldErrors({});
     setClientError(null);
+    const checkoutAttempt = getOrCreateFreshPickCheckoutAttempt();
+    if (!checkoutAttempt) {
+      setClientError("We couldn’t start a secure checkout attempt. Please refresh checkout before submitting.");
+      return;
+    }
+    data.set("checkout_request_id", checkoutAttempt.requestId);
+    data.set("checkout_recovery_digest", checkoutAttempt.recoveryDigest);
     pendingSubmitRef.current = data;
     setConfirmSnapshot(
       buildExtraCheckoutConfirmSnapshot({
@@ -794,8 +826,14 @@ export function GuestExtraCheckoutForm({
     setConfirmOpen(true);
   }
 
-  async function confirmOrder() {
-    if (submitPending || viewState.orderId || navigatedRef.current) return;
+  async function runFreshPickSubmission() {
+    if (
+      submitPending ||
+      submitOutcomeUncertain ||
+      confirmInFlightRef.current ||
+      viewState.orderId ||
+      navigatedRef.current
+    ) return;
     if (!pricingReady || pricedItems.some((item) => item.unitPrice == null)) {
       setConfirmOpen(false);
       setClientError(pricingError || "Fresh Pick pricing is still loading.");
@@ -807,7 +845,11 @@ export function GuestExtraCheckoutForm({
       return;
     }
     const formData = pendingSubmitRef.current;
-    if (!formData) return;
+    if (!formData) {
+      setClientError(CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE);
+      return;
+    }
+    confirmInFlightRef.current = true;
     setActionPending(true);
     const result = await submitGuestOrderAndNavigate({
       formData,
@@ -821,12 +863,78 @@ export function GuestExtraCheckoutForm({
       },
       onCommitted: () => {
         setReceivedShell(true);
+        clearFreshPickCheckoutAttempt();
       },
     });
     if (result.error) {
       setActionState(result);
       setActionPending(false);
+      if (result.outcomeUncertain) {
+        setUncertainSubmitState(true);
+        setUncertainSubmit("fresh-pick");
+      } else {
+        confirmInFlightRef.current = false;
+      }
+    } else if (result.orderId) {
+      clearUncertainSubmit("fresh-pick");
     }
+  }
+
+  function confirmOrder() {
+    return runFreshPickSubmission();
+  }
+
+  async function recoverUncertainOrder() {
+    if (submitPending || confirmInFlightRef.current || !submitOutcomeUncertain) return;
+    let formData = pendingSubmitRef.current;
+    if (!formData) {
+      const form = formRef.current;
+      if (!form) return;
+      persistCheckoutFields(form);
+      formData = new FormData(form);
+      const attempt = getOrCreateFreshPickCheckoutAttempt();
+      if (!attempt) {
+        setActionState({ error: CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE, outcomeUncertain: true });
+        return;
+      }
+      formData.set("checkout_request_id", attempt.requestId);
+      formData.set("checkout_recovery_digest", attempt.recoveryDigest);
+      pendingSubmitRef.current = formData;
+    }
+    confirmInFlightRef.current = true;
+    setActionPending(true);
+    const result = await submitGuestOrderAndNavigate({
+      formData,
+      flow: "extra",
+      action: resolveGuestExtraOrderAction,
+      hrefForOrderId: (orderId) =>
+        `/order/success?order=${orderId}&flow=${FRESH_PICKS_SUCCESS_FLOW}`,
+      replace: (href) => router.replace(href),
+      markNavigated: () => {
+        navigatedRef.current = true;
+      },
+      onCommitted: () => {
+        setReceivedShell(true);
+        clearFreshPickCheckoutAttempt();
+      },
+    });
+    if (result.error) {
+      setActionState(result);
+      setActionPending(false);
+      confirmInFlightRef.current = false;
+    } else if (result.orderId) {
+      clearUncertainSubmit("fresh-pick");
+      clearFreshPickCheckoutAttempt();
+    }
+  }
+
+  function verifyNoOrderAndResume() {
+    clearUncertainSubmit("fresh-pick");
+    clearFreshPickCheckoutAttempt();
+    confirmInFlightRef.current = false;
+    setUncertainSubmitState(false);
+    setActionState(null);
+    setConfirmOpen(false);
   }
 
   function goBackFromConfirm() {
@@ -1523,12 +1631,22 @@ export function GuestExtraCheckoutForm({
           )}
         </section>
 
-        <FormError message={clientError ?? viewState.error} />
-
+        <FormError message={submitError} />
+        {submitOutcomeUncertain ? (
+          <button
+            className="text-ink min-h-11 text-left text-sm underline underline-offset-4"
+            disabled={submitPending}
+            onClick={recoverUncertainOrder}
+            type="button"
+          >
+            Check this submission safely
+          </button>
+        ) : null}
         <FormActions>
           <FormSubmitButton
             disabled={
               confirmOpen ||
+              submitOutcomeUncertain ||
               (deliveryAckRequired && !deliveryProcessingFeeAcknowledged)
             }
             pending={submitPending || Boolean(viewState.orderId)}
@@ -1549,6 +1667,10 @@ export function GuestExtraCheckoutForm({
           onGoBack={goBackFromConfirm}
           open={confirmOpen}
           pending={submitPending || Boolean(viewState.orderId)}
+          error={submitError}
+          outcomeUncertain={submitOutcomeUncertain}
+          onRecoverUncertain={recoverUncertainOrder}
+          onOutcomeVerifiedNoOrder={verifyNoOrderAndResume}
           snapshot={confirmSnapshot}
         />
       ) : null}

@@ -185,10 +185,16 @@ import {
   CheckoutReceivedShellProbe,
   CheckoutSubmitUsableProbe,
   beginSuccessNavigationPerf,
+  CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE,
   markCheckoutActionReturned,
   submitGuestOrderAndNavigate,
   useCheckoutActionReturnPerf,
 } from "@/workspaces/storefront/checkout/CheckoutDevPerf";
+import {
+  clearUncertainSubmit,
+  hasUncertainSubmit,
+  setUncertainSubmit,
+} from "@/workspaces/storefront/checkout/uncertain-submit-lock.mjs";
 import { StorefrontSuccessLoading } from "@/workspaces/storefront/checkout/StorefrontSuccessLoading";
 import {
   checkoutActionResourceMark,
@@ -362,13 +368,20 @@ export function GuestCheckoutForm({
     null,
   );
   const [actionPending, setActionPending] = useState(false);
+  const [uncertainSubmit, setUncertainSubmitState] = useState(false);
   const [receivedShell, setReceivedShell] = useState(false);
   const navigatedRef = useRef(false);
   const viewState = actionState ?? state;
   const submitPending = pending || actionPending;
+  const submitOutcomeUncertain =
+    uncertainSubmit || viewState.outcomeUncertain === true;
+  const submitError = submitOutcomeUncertain
+    ? CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE
+    : viewState.error;
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [notesNotWordingAcknowledged, setNotesNotWordingAcknowledged] = useState(false);
   const pendingSubmitRef = useRef<FormData | null>(null);
+  const confirmInFlightRef = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [resolvedPriceKey, setResolvedPriceKey] = useState<string | null>(null);
@@ -383,7 +396,6 @@ export function GuestCheckoutForm({
 
   useEffect(() => {
     if (viewState.error) {
-      setConfirmOpen(false);
       if (isCakePriceAckStaleError(viewState.error)) {
         checkoutCakeSizePriceCache.clear();
         setAcknowledgedSnapshot("");
@@ -391,6 +403,13 @@ export function GuestCheckoutForm({
       }
     }
   }, [viewState.error]);
+
+  useEffect(() => {
+    const sync = () => setUncertainSubmitState(hasUncertainSubmit("preorder"));
+    sync();
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
+  }, []);
 
   useLayoutEffect(() => {
     const orderId = viewState.orderId;
@@ -1701,7 +1720,13 @@ export function GuestCheckoutForm({
   }
 
   async function confirmOrder() {
-    if (submitPending || viewState.orderId || navigatedRef.current) return;
+    if (
+      submitPending ||
+      submitOutcomeUncertain ||
+      confirmInFlightRef.current ||
+      viewState.orderId ||
+      navigatedRef.current
+    ) return;
     if (ackRequired && !pricesAcknowledged) {
       setConfirmOpen(false);
       setItemError(CAKE_PRICE_ACK_REQUIRED_MESSAGE);
@@ -1714,6 +1739,7 @@ export function GuestCheckoutForm({
     }
     const formData = pendingSubmitRef.current;
     if (!formData) return;
+    confirmInFlightRef.current = true;
     setActionPending(true);
     const result = await submitGuestOrderAndNavigate({
       formData,
@@ -1731,11 +1757,27 @@ export function GuestCheckoutForm({
     if (result.error) {
       setActionState(result);
       setActionPending(false);
+      if (result.outcomeUncertain) {
+        setUncertainSubmitState(true);
+        setUncertainSubmit("preorder");
+      } else {
+        confirmInFlightRef.current = false;
+      }
+    } else if (result.orderId) {
+      clearUncertainSubmit("preorder");
     }
   }
 
   function goBackFromConfirm() {
     if (submitPending || viewState.orderId) return;
+    setConfirmOpen(false);
+  }
+
+  function verifyNoOrderAndResume() {
+    clearUncertainSubmit("preorder");
+    confirmInFlightRef.current = false;
+    setUncertainSubmitState(false);
+    setActionState(null);
     setConfirmOpen(false);
   }
 
@@ -2744,12 +2786,21 @@ export function GuestCheckoutForm({
               {itemError}
             </p>
           ) : null}
-          <FormError message={viewState.error} />
+          <FormError message={submitError} />
+          {submitOutcomeUncertain ? (
+            <button
+              className="text-ink min-h-11 text-left text-sm underline underline-offset-4"
+              onClick={verifyNoOrderAndResume}
+              type="button"
+            >
+              I confirmed with Whitebird that no order was created
+            </button>
+          ) : null}
 
           <FormActions className="border-fog border-t pt-8 sm:items-center">
             <FormSubmitButton
               className="w-full rounded-md sm:w-auto"
-              disabled={submitBlocked || confirmOpen}
+              disabled={submitBlocked || confirmOpen || submitOutcomeUncertain}
               pending={submitPending}
               pendingLabel="Submitting…"
             >
@@ -2814,6 +2865,9 @@ export function GuestCheckoutForm({
         onGoBack={goBackFromConfirm}
         open={confirmOpen}
         pending={submitPending || Boolean(viewState.orderId)}
+        error={submitError}
+        outcomeUncertain={submitOutcomeUncertain}
+        onOutcomeVerifiedNoOrder={verifyNoOrderAndResume}
         snapshot={confirmSnapshot}
       />
     </div>

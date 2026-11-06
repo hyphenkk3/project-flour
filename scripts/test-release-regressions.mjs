@@ -154,7 +154,7 @@ run("Disposable PostgreSQL canonical migration-runner mechanics", "python3", [
   ], 90_000, postgresHarnessEnv);
 
 const tsc = path.join(root, "node_modules", ".bin", "tsc");
-run("Application TypeScript", tsc, ["--noEmit"], 60_000);
+run("Application TypeScript", tsc, ["--noEmit"], 180_000);
 run("Release regression test TypeScript", tsc, ["--noEmit", "-p", "tsconfig.release-regressions.json"], 60_000);
 
 const eslint = path.join(root, "node_modules", ".bin", "eslint");

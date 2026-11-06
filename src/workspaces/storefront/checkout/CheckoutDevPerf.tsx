@@ -21,6 +21,10 @@ import {
   startCheckoutLoadClock,
   type CheckoutServerPerf,
 } from "@/lib/perf/dev-only-client";
+import {
+  CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE,
+  invokeGuestCheckoutAction,
+} from "@/workspaces/storefront/checkout/submit-action-outcome.mjs";
 
 export function CheckoutLoadStepProbe({
   step,
@@ -159,8 +163,12 @@ export function markCheckoutActionReturned(): void {
 type GuestSubmitResult = {
   error: string | null;
   orderId?: string;
+  /** True when the server outcome could not be confirmed; never invite resubmission. */
+  outcomeUncertain?: boolean;
   perf?: CheckoutServerPerf;
 };
+
+export { CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE };
 
 /** Await the server action, then navigate on success without a second render. */
 export async function submitGuestOrderAndNavigate<T extends GuestSubmitResult>(
@@ -175,7 +183,11 @@ export async function submitGuestOrderAndNavigate<T extends GuestSubmitResult>(
   },
 ): Promise<T> {
   beginCheckoutSubmitPerf({ formData: input.formData, flow: input.flow });
-  const result = await input.action({ error: null } as T, input.formData);
+  const result = await invokeGuestCheckoutAction(
+    input.action,
+    { error: null } as T,
+    input.formData,
+  ) as T;
   markCheckoutActionReturned();
   if (result.perf) {
     logCheckoutServerPerf(result.perf);
@@ -190,21 +202,30 @@ export async function submitGuestOrderAndNavigate<T extends GuestSubmitResult>(
     ),
     note: "server_action_promise_resolved",
   });
-  if (result.error || !result.orderId) {
+  // A returned order ID proves the transaction committed even if a later
+  // optional follow-up reported an error. Never leave the customer able to
+  // submit the same order again after that point.
+  if (result.orderId) {
+    input.markNavigated();
+    input.onCommitted?.();
+    beginSuccessNavigationPerf();
+    const afterNav = readCheckoutSubmitTiming();
+    logCheckoutClient(input.flow === "extra" ? "EXTRA_CLIENT" : "CHECKOUT_CLIENT", {
+      correlationId: afterNav?.correlationId ?? result.perf?.correlationId ?? null,
+      step: "navigation_call",
+      actionReturnToNavigationCallMs: elapsedPerfMs(
+        afterNav?.actionReturnAt,
+        afterNav?.navigationCallAt,
+      ),
+    });
+    input.replace(input.hrefForOrderId(result.orderId));
     return result;
   }
-  input.markNavigated();
-  input.onCommitted?.();
-  beginSuccessNavigationPerf();
-  const afterNav = readCheckoutSubmitTiming();
-  logCheckoutClient(input.flow === "extra" ? "EXTRA_CLIENT" : "CHECKOUT_CLIENT", {
-    correlationId: afterNav?.correlationId ?? result.perf?.correlationId ?? null,
-    step: "navigation_call",
-    actionReturnToNavigationCallMs: elapsedPerfMs(
-      afterNav?.actionReturnAt,
-      afterNav?.navigationCallAt,
-    ),
-  });
-  input.replace(input.hrefForOrderId(result.orderId));
-  return result;
+  if (result.error || result.outcomeUncertain) {
+    return result;
+  }
+  return {
+    error: CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE,
+    outcomeUncertain: true,
+  } as T;
 }

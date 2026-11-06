@@ -197,7 +197,7 @@ assert.match(extraRpcSrc, /for update/);
 assert.match(extraRpcSrc, /and e\.sold_at is null/);
 assert.match(extraRpcSrc, /This Extra cake has already been sold/);
 assert.match(extraActionsSrc, /extraSubmitCustomerError/);
-assert.match(extraActionsSrc, /getStorefrontExtraById/);
+assert.doesNotMatch(extraActionsSrc, /getStorefrontExtraById/);
 
 // Pickup-window errors stay pickup-window errors
 assert.equal(
@@ -307,11 +307,13 @@ assert.match(
   /Please fill in your name and WhatsApp phone number/,
 );
 
-// 17. Server submission revalidates availability
-assert.match(extraActionsSrc, /isValidExtraCustomerFulfilment/);
-assert.match(extraActionsSrc, /getStorefrontExtraById/);
+// 17. Authoritative database submission validates and allocates Fresh Pick stock.
+assert.match(extraActionsSrc, /submit_guest_extra_order_idempotent_v3/);
+assert.match(extraActionsSrc, /resolve_guest_checkout_attempt_v3/);
+assert.doesNotMatch(extraActionsSrc, /getStorefrontExtraById|library_cake_photos/);
 assert.match(extraCartRpcSrc, /stock_row\.lifecycle <> 'confirmed'/);
 assert.match(extraCartRpcSrc, /stock_row\.sold_at is not null/);
+assert.match(extraCartRpcSrc, /for update/);
 assert.match(extraCartRpcSrc, /p_extra_stock_ids/);
 
 // 18. Success / payment-pending state
