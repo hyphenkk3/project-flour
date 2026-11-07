@@ -10,6 +10,14 @@ const ts = require("typescript");
 
 registerHooks({
   resolve(specifier, context, nextResolve) {
+    if (specifier === "server-only") {
+      // Use Next.js's bundled server-condition marker for source-level tests.
+      const serverOnlyModule = path.join(
+        root,
+        "node_modules/next/dist/compiled/server-only/empty.js",
+      );
+      return nextResolve(pathToFileURL(serverOnlyModule).href, context);
+    }
     if (context.parentURL?.includes(`${path.sep}node_modules${path.sep}`)) {
       return nextResolve(specifier, context);
     }

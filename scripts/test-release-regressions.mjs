@@ -13,6 +13,7 @@ const aliasLoader = path.join(scriptsDir, "test-release-regression-alias-loader.
 // this direct Node runner; receipt loading/cookie acceptance remains a separate
 // Next-hosted check, while the client PNG and success-page contracts run here.
 const suites = [
+  ["Supabase new secret-key server transport", "test-supabase-service-key-transport.ts"],
   ["Capacity advisory denial remains unconfirmed", "test-capacity-error-classification.ts"],
   ["Capacity serialization migration contract", "test-capacity-serialization-contract.ts"],
   ["Fresh Pick assignment/readiness", "test-fresh-pick-assignment-readiness-contract.ts"],
