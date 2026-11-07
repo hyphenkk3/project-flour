@@ -4,6 +4,8 @@
 -- function source definitions, security metadata, and migration version/name rows.
 -- Recommended invocation: psql -X -v ON_ERROR_STOP=1 -f this-file
 -- Connection policy: use the approved Production TLS-verified connection;
+-- connect directly to db.cuowwlduhxxifmpvpltt.supabase.co with sslmode=verify-full
+-- and the approved Supabase CA certificate; verify the hostname before running.
 -- do not put credentials in command arguments, shell history, or this artifact.
 
 BEGIN READ ONLY;
@@ -18,6 +20,10 @@ SELECT current_database() AS database_name,
        current_setting('transaction_read_only') AS transaction_read_only,
        inet_server_addr() AS server_address,
        inet_server_port() AS server_port;
+
+SELECT ssl, version AS tls_version, cipher, bits
+FROM pg_stat_ssl
+WHERE pid = pg_backend_pid();
 
 -- 2. Exact definitions and metadata for every overload of the target RPC.
 -- The result intentionally includes function bodies; retain it as restricted
@@ -168,7 +174,8 @@ WHERE NOT t.tgisinternal
 ORDER BY t.tgrelid::regclass::text, t.tgname;
 
 -- 5. Migration history shape and current ledger summary, then recent
--- version/name entries. This reads metadata only; it does not alter history.
+-- version/name manifest. At the expected 190-row baseline this is a small,
+-- bounded catalog-history result and makes gaps/duplicates visible.
 SELECT column_name, data_type, udt_name, is_nullable
 FROM information_schema.columns
 WHERE table_schema='supabase_migrations'
@@ -184,7 +191,6 @@ FROM supabase_migrations.schema_migrations;
 
 SELECT version, name
 FROM supabase_migrations.schema_migrations
-ORDER BY version DESC
-LIMIT 12;
+ORDER BY version;
 
 ROLLBACK;
