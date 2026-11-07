@@ -1,6 +1,6 @@
 # Project Flour Master Status
 
-**Last updated:** 21 October 2026 (Asia/Kuching)
+**Last updated:** 7 November 2026 (Asia/Kuching)
 **Purpose:** Durable status for the accepted DEV release and Production compatibility work. This record consolidates existing evidence; it does not authorize a Production change.
 
 ## Safety boundary
@@ -901,3 +901,43 @@ At the end of this investigation, append a dated outcome with root cause or rema
 - Recovery for an application-only regression is a compatible Vercel application rollback or a focused forward fix; no database restore or migration rollback is required.
 - Remaining work: broader WOS cross-device synchronization and measurable latency outside Collection; EXTRA stock polling/Realtime privacy review; monitor the isolated Bakery cache-refresh timeout; Financial Reports desktop month selector; Fresh Pick Share Payment delivery verification; Staff Administration V1; WhatsApp Business missing plus signs on iPhone; Complimentary item persistence remains explicitly on hold.
 - Follow-up note: this release record is a documentation-only commit after the application promotion. The connected Vercel project may create another Production deployment from that commit; verify its READY status and ensure it serves the same application tree before considering the release record complete.
+
+## Fresh Pick idempotency Production baseline recovery — 7 November 2026
+
+**Status: HOLD — the target migration is not qualified for Production execution.** This entry records a read-only artifact review and a prepared metadata-only SQL capture. No Production or DEV connection was made during this investigation; no migration, database, deployment, alias, credential, or business record was changed.
+
+**Review identity and target**
+
+- Reviewed candidate worktree: `codex/fresh-pick-prod-compat-20261106`, HEAD `07ae0e3e47b5efc7d0591f1ae8034a0e979c2f32`, tree `f709106146c3491e2f8085aa0ec861c7c04a92c4`. This was the evidence-review baseline, not a new Production observation.
+- Target: `supabase/migrations/20261106104602_fresh_pick_checkout_idempotency_v3.sql`, SHA-256 `88448d6d17ab7f0c78ca6b872329453b6344732288f80f75384f9a9d7815b7d3` (recomputed locally on 2026-11-07; matches the approved checksum).
+- The previously reported current Production baseline is ledger 190, latest `20261106091446`, target absent. These are prior recorded read-only findings, not values rechecked in this task. The historical pre-Issue-8 Production snapshot was ledger 179. They are distinct states and must not be conflated.
+
+**Retained evidence and provenance**
+
+- October 31 retained fixture: `scripts/fixtures/expired-fresh-pick-production-catalog.sql`, SHA-256 `b724e179fa27e43068e2b9491ed5da91247a0eb4c73d934477a3cbbcdef480b7`. It is a sanitized schema-only reconstruction recorded as Production-derived, PostgreSQL 17.6, ledger 175/latest `20261031074456`; it is not a full database archive. It does not contain either `submit_guest_extra_order` definition or a `complimentary_item_types` definition/manifest entry.
+- Historical relevant schema capture `/private/tmp/issue8-production-relevant-schema.sql`, SHA-256 `1995f4249786e322354bfe54fd57df781879af69d9d5babe9fa5924e94844f0f`, is referenced in prior status records but is no longer locally available. Its documented scope included Production schema/function/trigger/policy/grant metadata and 179 migration version/name rows. The absent file cannot be independently inspected or used as a replay source.
+- The documented November 2 archive `/private/tmp/project-flour-dev-logical-backup-20261102T081506+0800/dev-postgres.pgdump`, SHA-256 `4c67bb6df3ad4d2fcbe7a06adb37f3781d7558fb197031b296942ec4d446d720`, was a DEV backup at ledger 183, not Production; its referenced file is absent locally. It is not a Production baseline substitute.
+- Tracked historical source reviewed: `20260818150000_guest_extra_include_receipt_complimentary.sql`, `20261101194235_issue8_fresh_pick_overload_compatibility.sql`, `20261101200000_issue8_addon_catalogue_schema_and_owner_management.sql`, and `20261101200100_issue8_legacy_fresh_pick_order_stock_link.sql`. These establish intended historical SQL and migration preconditions, not the missing later Production catalog capture.
+
+**Function fingerprint sequence and compatibility evidence**
+
+- Prior recorded Production metadata at ledger 179: legacy 10-argument overload MD5 `3d68aa191b14bd4b5d1459b499f88a5c`; extended 16-argument overload MD5 `9a62b3eacd01513fe6ca7ff138a72a08`. Both were recorded as owner `postgres`, SECURITY DEFINER, `search_path=public`, executable by `anon`, `authenticated`, and `service_role`; legacy had 3 defaults and extended had 9.
+- Issue #8 migration 2 checks the legacy definition begins at `3d68aa191b14bd4b5d1459b499f88a5c`, then rewrites the complimentary allowlist. Migration 3 expects the post-catalogue-patch legacy definition MD5 `c9164af3edd6899c6c956e71af434cf4`, and changes its stock-link logic to yield `0046749a0cfacff63de706567519438c`.
+- The target migration checks the final legacy fingerprint `0046749a0cfacff63de706567519438c` and extended fingerprint `ef60e2d117356bc195ace69455a7dcec`. These sequence points are consistent with the tracked migration guards. The exact post-M2 `pg_get_functiondef` body and the ledger-190 catalog state were not independently recovered from a retained capture, so sequence consistency is not a substitute for current Production verification.
+
+**Missing baseline elements / runner decision**
+
+- The exact historical `c9164af3edd6899c6c956e71af434cf4` function body is not in a currently accessible retained Production capture. The migration contains the expected fingerprint guard, but does not itself preserve that body as a baseline artifact.
+- `complimentary_item_types` and other Issue #8 prerequisites are defined/used by tracked migrations, but their actual Production columns, constraints, policies, grants, ownership and dependencies at the required replay point cannot be verified from the surviving October 31 fixture.
+- The canonical migration version/name history needed to replay ledger 179 through 190 is not preserved in a currently available Production manifest. The DEV backup is not applicable.
+- Therefore the replacement PostgreSQL 17.6 runner/rehearsal remains **UNQUALIFIED / HOLD**. Do not generate or execute a Production runner based only on these summaries or reconstructed function bodies.
+
+**Prepared read-only capture artifact and registry**
+
+- SQL procedure: `docs/evidence/20261107-production-fresh-pick-baseline-readonly.sql`, SHA-256 `1b77f8bbabde9626d1b91b92a33321d410bc03d23f0cec5cc983a4069e550c44` at preparation on 2026-11-07. It uses `BEGIN READ ONLY`, bounded local timeouts, reads identity/catalog metadata, exact overload definitions and security/ACL metadata, Issue #8 relation structure/constraints/indexes/policies/dependencies/triggers, and migration-history columns/count/recent version-name entries. It reads no business-table rows and ends with `ROLLBACK`.
+- Artifact status: **prepared, not executed**. No captured Production output exists from this task. Once separately authorized and run, preserve the exact output in an access-controlled evidence archive (not Git if it contains full function bodies), record its SHA-256, Production project reference, capture timestamp, PostgreSQL version, approved candidate/migration identities, ledger results, and retrieval location. Independently verify the archive checksum before using it for rehearsal. Never include credentials or customer/operational data.
+- The file is committed alongside this status record so the inspection procedure is durable. Its local evidence artifact is source SQL only, not evidence that Production was queried.
+
+**Minimum next action**
+
+Obtain separate authorization to execute the prepared read-only capture against Production using the approved TLS-verified connection. Compare the actual current catalog and ledger to the target guards; only then decide whether a complete disposable ledger-179-to-190 replay can be built. Production migration execution remains separately gated and unauthorized here.
