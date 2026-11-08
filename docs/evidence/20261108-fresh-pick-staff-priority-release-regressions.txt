@@ -1,0 +1,213 @@
+
+> project-flour@0.1.0 test:release-regressions
+> node scripts/test-release-regressions.mjs
+
+
+=== Supabase new secret-key server transport ===
+Supabase new secret-key server transport: PASS — postgrest_read=compatible; request_method_body_content_type=preserved; secret_output=none
+
+=== Capacity advisory denial remains unconfirmed ===
+Capacity advisory denial remains unconfirmed: PASS — PASS capacity error classification, advisory warning and known-full preservation
+
+=== Capacity serialization migration contract ===
+Capacity serialization migration contract: PASS — PASS capacity serialization migration contract
+
+=== Fresh Pick assignment/readiness ===
+Fresh Pick assignment/readiness: PASS — PASS Fresh Pick assignment readiness contract: pre-ready, not-ready, Bakery Ready/Undo, Calendar, Collection, message and payment gates
+
+=== Fresh Pick readiness presentation ===
+Fresh Pick readiness presentation: PASS — PASS Bakery Fresh Pick readiness presentation and role gates
+
+=== Fresh Pick staff identification and fulfilment priority ===
+Fresh Pick staff identification and fulfilment priority: PASS — Fresh Pick staff presentation, urgency, date boundaries, and filtering: PASS
+
+=== Fresh Pick readiness cutoff ===
+Fresh Pick readiness cutoff: PASS — Fresh Pick Ready availability tests passed.
+
+=== Fresh Pick complimentary/calendar/messages ===
+Fresh Pick complimentary/calendar/messages: PASS — PASS: Calendar allocation lookup uses two bounded requests and retains pointer validation
+
+=== Bakery board eligibility ===
+Bakery board eligibility: PASS — PASS M5-P1 bakery board eligibility / read-model helpers
+
+=== Bakery capability UX ===
+Bakery capability UX: PASS — PASS M5-P1 bakery capabilities / nav
+
+=== Collection eligibility and unpaid handoff ===
+Collection eligibility and unpaid handoff: PASS — PASS Collection eligibility / surface helpers
+
+=== Collection Ready/Thank You templates ===
+Collection Ready/Thank You templates: PASS — PASS Collection Ready Message and state-aware WhatsApp contract
+
+=== Collection capability UX ===
+Collection capability UX: PASS — PASS Collection capabilities / nav
+
+=== Collection Dine-in desk ===
+Collection Dine-in desk: PASS — PASS Collection dine-in desk
+
+=== Collection pickup role guards ===
+Collection pickup role guards: PASS — PASS Collection Picked Up RPC roles (source)
+
+=== Customer Order Notes ===
+Customer Order Notes: PASS — PASS Customer Order Notes
+
+=== Operations order Internal Notes ===
+Operations order Internal Notes: PASS — PASS Operations Order Workspace Internal Notes source checks
+
+=== Operations date/type filter return links ===
+Operations date/type filter return links: PASS — PASS operations board selected-date return
+
+=== Calendar fulfilment and markers ===
+Calendar fulfilment and markers: PASS — M4-P2 Slice 5 calendar-fulfilment tests: PASSED
+
+=== Calendar message parity ===
+Calendar message parity: PASS — Manager calendar messages parity: PASS
+
+=== Fresh Pick Calendar assignment ===
+Fresh Pick Calendar assignment: PASS — PASS extra calendar assign-from-calendar
+
+=== Fresh Pick phase 6 ===
+Fresh Pick phase 6: PASS — PASS Phase 6 Fresh Picks isolation / inventory / success
+
+=== Fresh Pick eligibility ===
+Fresh Pick eligibility: PASS — Fresh Picks eligibility / pickup / cutoff: PASS
+
+=== Fresh Pick cart ===
+Fresh Pick cart: PASS — PASS Fresh Pick cart
+
+=== Fresh Pick product-detail venue ===
+Fresh Pick product-detail venue: PASS — PASS Fresh Pick Dine-in sequence, shared venue availability, and separate reservation/serving persistence
+
+=== Fresh Pick preparation cutoff ===
+Fresh Pick preparation cutoff: PASS — PASS Fresh Picks same-day preparation
+
+=== Dine-in reservation/serving window ===
+Dine-in reservation/serving window: PASS — PASS dine-in reservation serving window
+
+=== Whole-cake customer fulfilment ===
+Whole-cake customer fulfilment: PASS — PASS whole-cake customer fulfilment
+
+=== Delivery receipt clarity ===
+Delivery receipt clarity: PASS — PASS: Delivery receipt wording states; totals and checkout contracts unchanged.
+
+=== Saved order PNG and save recovery ===
+Saved order PNG and save recovery: PASS — PASS save order details
+
+=== Complimentary and paid-add-on options ===
+Complimentary and paid-add-on options: PASS — PASS customer preorder options / custom add-on mapping / Issue #8 SQL contract
+
+=== Checkout secondary optional catalogue retry ===
+Checkout secondary optional catalogue retry: PASS — PASS: secondary checkout offer success, empty result, timeout/retry, deduplication, stale-date and cancellation checks
+
+=== Customer message templates ===
+Customer message templates: PASS — Customer template compatibility passed (19 original fixtures unchanged; counter instruction setting validates, previews and falls back safely).
+
+=== Customer message counter instructions ===
+Customer message counter instructions: PASS — Counter instruction integration passed: custom wording reaches Order, Collection and WhatsApp preparation; missing/invalid settings preserve prior output.
+
+=== Catalogue voucher engine ===
+Catalogue voucher engine: PASS — catalogue voucher engine tests passed
+
+=== Catalogue voucher redemption ===
+Catalogue voucher redemption: PASS — PASS catalogue voucher redemption controls
+
+=== Voucher RM10 rules ===
+Voucher RM10 rules: PASS — test-voucher-library-rm10: ok
+
+=== Waiting-list workflow ===
+Waiting-list workflow: PASS — PASS waiting list
+
+=== Waiting-list link/token state ===
+Waiting-list link/token state: PASS — }
+
+=== Waiting-list review ===
+Waiting-list review: PASS — waiting-list confirmation review tests passed
+
+=== Waiting-list conversion ===
+Waiting-list conversion: PASS — waiting-list confirmation convert tests passed
+
+=== Waiting-list customer confirmation ===
+Waiting-list customer confirmation: PASS — waiting-list customer confirmation tests passed
+
+=== Waiting-list conversion state ===
+Waiting-list conversion state: PASS — waiting-list confirmation conversion state tests passed
+
+=== Waiting-list closed date ===
+Waiting-list closed date: PASS — waiting-list confirmation closed-date tests passed
+
+=== Staff passkeys ===
+Staff passkeys: PASS — test-staff-passkeys: PASS
+
+=== Staff credentials ===
+Staff credentials: PASS — test-staff-credentials: PASS
+
+=== Staff administration ===
+Staff administration: PASS — test-staff-admin: PASS
+
+=== Staff password reset ===
+Staff password reset: PASS — test-staff-password-reset: PASS
+
+=== Payment details ===
+Payment details: PASS — PASS payment details (wholecake preorder instructions)
+
+=== Payment write lock ===
+Payment write lock: PASS — PASS payment write lock (source)
+
+=== Payment correction ===
+Payment correction: PASS — test-payment-correction: ok
+
+=== Payment record correction ===
+Payment record correction: PASS — test-payment-record-correction: ok
+
+=== Guest-order cancellation safeguards ===
+Guest-order cancellation safeguards: PASS — PASS cancel guest order rpc contract
+
+=== Share Payment messaging ===
+Share Payment messaging: PASS — PASS share payment message with QR
+
+=== Bakery early-pickup attention ===
+Bakery early-pickup attention: PASS — PASS bakery early-pickup attention / Start waiting UX helpers
+
+=== Collection delivery detail ===
+Collection delivery detail: PASS — PASS Collection Delivery detail data and action wiring
+
+=== Collection pickup overdue ===
+Collection pickup overdue: PASS — PASS Collection pickup overdue derivation
+
+=== Waiting-list staff notification content ===
+Waiting-list staff notification content: PASS — PASS waiting list staff notification
+
+=== New-order notification content ===
+New-order notification content: PASS — PASS staff notification new-order content (static)
+
+=== Fresh Pick receipt complimentary persistence contract ===
+Fresh Pick receipt complimentary persistence contract: PASS — PASS extra preorder receipt / complimentary
+
+=== Storefront success receipt loading ===
+Storefront success receipt loading: PASS — PASS storefront success loading shell
+
+=== Disposable PostgreSQL Fresh Pick assignment RPC ===
+Disposable PostgreSQL Fresh Pick assignment RPC: PASS — mode=isolated_synthetic_only
+
+=== Disposable PostgreSQL capacity serialization and rollback ===
+Disposable PostgreSQL capacity serialization and rollback: PASS — mode=isolated_synthetic_independent_sessions
+
+=== Disposable PostgreSQL canonical migration-runner mechanics ===
+Disposable PostgreSQL canonical migration-runner mechanics: PASS — runner_disposable_postgres_cleanup=PASS
+
+=== Application TypeScript ===
+Application TypeScript: PASS
+
+=== Release regression test TypeScript ===
+Release regression test TypeScript: PASS
+
+=== Changed regression-test lint ===
+Changed regression-test lint: PASS
+
+=== Tracked diff hygiene ===
+Tracked diff hygiene: PASS
+
+Offline checks: 68 PASS, 0 FAIL, 0 BLOCKED.
+Hosted Production/DEV integration is NOT RUN by this offline gate; hosted acceptance remains a separate release gate.
+
+Release regression gate: PASS (source/local checks only; hosted checks remain separate)
