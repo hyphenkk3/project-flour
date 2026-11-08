@@ -36,6 +36,8 @@ import { deriveCollectionPackingReminders } from "@/workspaces/collection/packin
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
 import { CustomerOrderNoteCallout } from "@/components/orders/CustomerOrderNoteCallout";
 import { CollectionReadyMessage } from "@/workspaces/collection/CollectionReadyMessage";
+import { orderFulfilmentDate } from "@/engines/orders/staff-presentation";
+import { OrderStaffIndicators } from "@/workspaces/owner/orders/OrderStaffIndicators";
 
 type CollectionOrderDetailProps = {
   order: CollectionBoardOrder;
@@ -77,6 +79,11 @@ export function CollectionOrderDetail({
     status: order.status,
   });
   const packing = deriveCollectionPackingReminders(order);
+  const fulfilmentDate = orderFulfilmentDate({
+    fulfilmentMethod: order.fulfilmentMethod,
+    pickupDate: order.pickupDate,
+    dineInReservationDate: order.dineIn?.reservationDate,
+  });
   const dineIn = isCollectionDineInMethod(order.fulfilmentMethod);
   const isDelivery = order.fulfilmentMethod === "delivery";
   const markCollectedEligible =
@@ -125,6 +132,15 @@ export function CollectionOrderDetail({
       </Link>
 
       <header className="mt-3 space-y-2">
+        <OrderStaffIndicators
+          extraStockId={order.extraStockId}
+          fulfilmentDate={fulfilmentDate}
+          terminal={Boolean(
+            order.pickedUpAt ||
+              order.deliveredAt ||
+              order.status === "cancelled",
+          )}
+        />
         <div className="flex flex-wrap gap-2">
           <StatusBadge label={desk.label} tone={desk.tone} />
           <StatusBadge

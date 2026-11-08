@@ -41,6 +41,10 @@ import {
 } from "@/workspaces/owner/orders/guest-orders-live";
 import { isNewOrderNotificationEligible } from "@/workspaces/owner/orders/new-order-notifications";
 import { scrollWorkspaceSectionIntoView } from "@/workspaces/owner/orders/scroll-workspace-section";
+import {
+  isFreshPickActionDueToday,
+  orderFulfilmentDate,
+} from "@/engines/orders/staff-presentation";
 
 const POLL_INTERVAL_MS = GUEST_ORDERS_LIVE_POLL_MS;
 const HIGHLIGHT_MS = 4500;
@@ -228,11 +232,42 @@ export function OperationsLiveBoard({
 
   const todayBuckets = useMemo(() => {
     if (!isTodayView) return null;
-    return appendPrepareConfirmationInbox(
+    const base = appendPrepareConfirmationInbox(
       partitionOwnerOperationsTodayOrders(visibleOrders),
       operationsSearchAndStatusMatches(orders, query),
       operationsTodayYmd(),
     );
+    const actionTodayOrders =
+      visibleOrders
+        .filter((order) =>
+          isFreshPickActionDueToday({
+            extraStockId: order.extraStockId,
+            fulfilmentDate: orderFulfilmentDate({
+              fulfilmentMethod: order.fulfilmentMethod,
+              pickupDate: order.pickupDate,
+              dineInReservationDate: order.dineInReservationDate,
+            }),
+            actionRequired:
+              order.status === "paid" && order.needsBakeryAttention === true,
+            terminal: Boolean(
+              order.status === "cancelled" ||
+                order.readyAt ||
+                order.pickedUpAt ||
+                order.deliveredAt ||
+                order.outForDeliveryAt,
+            ),
+          }),
+        );
+    const actionTodayIds = new Set(actionTodayOrders.map((order) => order.id));
+    if (actionTodayIds.size === 0) return base;
+    return {
+      ...base,
+      needsAttention: [
+        ...base.needsAttention.filter((order) => !actionTodayIds.has(order.id)),
+        ...actionTodayOrders,
+      ],
+      allClear: base.allClear.filter((order) => !actionTodayIds.has(order.id)),
+    };
   }, [isTodayView, visibleOrders, orders, query]);
 
   const todayGroupCounts = useMemo(() => {

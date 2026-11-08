@@ -27,6 +27,7 @@ export type CollectionOrderRow = {
   pickup_date: string;
   pickup_time: string;
   fulfilment_method: string | null;
+  extra_stock_id?: string | null;
   status: GuestOrderStatus;
   payment_status?: string | null;
   customer_notes: string | null;
@@ -212,6 +213,7 @@ export function mapCollectionBoardOrder(
     pickupDate: row.pickup_date,
     pickupTime: row.pickup_time,
     fulfilmentMethod: normalizeFulfilmentMethod(row.fulfilment_method),
+    extraStockId: row.extra_stock_id ?? null,
     status: row.status,
     paymentStatus: row.payment_status ?? null,
     customerNotes: row.customer_notes,

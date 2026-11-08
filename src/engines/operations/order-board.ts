@@ -9,6 +9,7 @@ import {
   deriveOrderLifecycleStage,
   type OrderLifecycleStage,
 } from "@/engines/orders/lifecycle";
+import { orderFulfilmentDate } from "@/engines/orders/staff-presentation";
 
 export type OperationsBoardOrder = {
   id: string;
@@ -17,6 +18,9 @@ export type OperationsBoardOrder = {
   phone: string;
   pickupDate: string;
   pickupTime: string;
+  extraStockId?: string | null;
+  fulfilmentMethod?: string | null;
+  dineInReservationDate?: string | null;
   status: GuestOrderStatus;
   createdAt: string;
   productionStartedAt?: string | null;
@@ -33,6 +37,8 @@ export type OperationsPickupFilter =
   | "custom";
 
 export type OperationsStatusFilter = "all" | GuestOrderStatus;
+
+export type OperationsOrderTypeFilter = "all" | "fresh_pick" | "normal_preorder";
 
 export type OperationsLifecycleFilter = "all" | OrderLifecycleStage;
 
@@ -63,6 +69,7 @@ export type OperationsBoardQuery = {
   pickupFilter: OperationsPickupFilter;
   customPickupDate: string | null;
   statusFilter: OperationsStatusFilter;
+  orderTypeFilter: OperationsOrderTypeFilter;
   lifecycleFilter: OperationsLifecycleFilter;
   sort: OperationsSortOption;
 };
@@ -72,6 +79,7 @@ export const DEFAULT_OPERATIONS_QUERY: OperationsBoardQuery = {
   pickupFilter: "today",
   customPickupDate: null,
   statusFilter: "all",
+  orderTypeFilter: "all",
   lifecycleFilter: "all",
   sort: DEFAULT_OPERATIONS_SORT,
 };
@@ -146,17 +154,22 @@ export function matchesOperationsPickupFilter(
 ): boolean {
   if (pickupFilter === "all") return true;
   const today = operationsTodayYmd(now);
-  if (pickupFilter === "today") return order.pickupDate === today;
+  const fulfilmentDate = orderFulfilmentDate({
+    fulfilmentMethod: order.fulfilmentMethod,
+    pickupDate: order.pickupDate,
+    dineInReservationDate: order.dineInReservationDate,
+  });
+  if (pickupFilter === "today") return fulfilmentDate === today;
   if (pickupFilter === "tomorrow") {
-    return order.pickupDate === operationsTomorrowYmd(now);
+    return fulfilmentDate === operationsTomorrowYmd(now);
   }
   if (pickupFilter === "this_week") {
     const { start, end } = singaporeWeekRange(today);
-    return order.pickupDate >= start && order.pickupDate <= end;
+    return fulfilmentDate >= start && fulfilmentDate <= end;
   }
   if (pickupFilter === "custom") {
     if (!customPickupDate) return false;
-    return order.pickupDate === customPickupDate;
+    return fulfilmentDate === customPickupDate;
   }
   return true;
 }
@@ -167,6 +180,15 @@ export function matchesOperationsStatusFilter(
 ): boolean {
   if (statusFilter === "all") return true;
   return order.status === statusFilter;
+}
+
+export function matchesOperationsOrderTypeFilter(
+  order: Pick<OperationsBoardOrder, "extraStockId">,
+  filter: OperationsOrderTypeFilter,
+): boolean {
+  if (filter === "all") return true;
+  const freshPick = Boolean(order.extraStockId?.trim());
+  return filter === "fresh_pick" ? freshPick : !freshPick;
 }
 
 export function matchesOperationsLifecycleFilter(
@@ -204,7 +226,18 @@ function comparePickup(
   b: OperationsBoardOrder,
   direction: 1 | -1,
 ): number {
-  const dateCmp = a.pickupDate.localeCompare(b.pickupDate);
+  const dateCmp =
+    orderFulfilmentDate({
+      fulfilmentMethod: a.fulfilmentMethod,
+      pickupDate: a.pickupDate,
+      dineInReservationDate: a.dineInReservationDate,
+    }).localeCompare(
+      orderFulfilmentDate({
+        fulfilmentMethod: b.fulfilmentMethod,
+        pickupDate: b.pickupDate,
+        dineInReservationDate: b.dineInReservationDate,
+      }),
+    );
   if (dateCmp !== 0) return dateCmp * direction;
   const timeCmp = a.pickupTime.localeCompare(b.pickupTime);
   if (timeCmp !== 0) return timeCmp * direction;
@@ -262,6 +295,7 @@ export function filterAndSortOperationsOrders<T extends OperationsBoardOrder>(
           now,
         )) &&
       matchesOperationsStatusFilter(order, query.statusFilter) &&
+      matchesOperationsOrderTypeFilter(order, query.orderTypeFilter) &&
       matchesOperationsLifecycleFilter(order, query.lifecycleFilter),
   );
   return sortOperationsOrders(filtered, query.sort);
@@ -270,12 +304,13 @@ export function filterAndSortOperationsOrders<T extends OperationsBoardOrder>(
 /** Search + status only — used to surface confirmation-not-prepared inbox beyond Today. */
 export function operationsSearchAndStatusMatches<T extends OperationsBoardOrder>(
   orders: T[],
-  query: Pick<OperationsBoardQuery, "search" | "statusFilter">,
+  query: Pick<OperationsBoardQuery, "search" | "statusFilter" | "orderTypeFilter">,
 ): T[] {
   return orders.filter(
     (order) =>
       matchesOperationsSearch(order, query.search) &&
-      matchesOperationsStatusFilter(order, query.statusFilter),
+      matchesOperationsStatusFilter(order, query.statusFilter) &&
+      matchesOperationsOrderTypeFilter(order, query.orderTypeFilter),
   );
 }
 
@@ -285,6 +320,7 @@ export function isOperationsQueryDefault(query: OperationsBoardQuery): boolean {
     query.pickupFilter === "today" &&
     !query.customPickupDate &&
     query.statusFilter === "all" &&
+    query.orderTypeFilter === "all" &&
     query.lifecycleFilter === "all" &&
     query.sort === DEFAULT_OPERATIONS_SORT
   );
@@ -312,6 +348,15 @@ export const OPERATIONS_STATUS_FILTERS: Array<{
   { value: "awaiting_payment", label: "Payment Pending" },
   { value: "paid", label: "Paid / Confirmed" },
   { value: "cancelled", label: "Cancelled" },
+];
+
+export const OPERATIONS_ORDER_TYPE_FILTERS: Array<{
+  value: OperationsOrderTypeFilter;
+  label: string;
+}> = [
+  { value: "all", label: "All order types" },
+  { value: "fresh_pick", label: "Fresh Pick" },
+  { value: "normal_preorder", label: "Normal Preorder" },
 ];
 
 export const OPERATIONS_LIFECYCLE_FILTERS: Array<{
@@ -387,6 +432,12 @@ export function isOperationsStatusFilter(
   return OPERATIONS_STATUS_FILTERS.some((option) => option.value === value);
 }
 
+export function isOperationsOrderTypeFilter(
+  value: string,
+): value is OperationsOrderTypeFilter {
+  return OPERATIONS_ORDER_TYPE_FILTERS.some((option) => option.value === value);
+}
+
 export function isOperationsSortOption(
   value: string,
 ): value is OperationsSortOption {
@@ -403,6 +454,7 @@ export type OperationsBoardSearchParams = {
   pickup?: string;
   date?: string;
   status?: string;
+  type?: string;
   lifecycle?: string;
   sort?: string;
   search?: string;
@@ -422,6 +474,7 @@ export function parseOperationsBoardSearchParams(
   const dateRaw = input.date?.trim() ?? "";
   const date = isOperationsBoardDate(dateRaw) ? dateRaw : null;
   const statusRaw = input.status?.trim() ?? "";
+  const typeRaw = input.type?.trim() ?? "";
   const lifecycleRaw = input.lifecycle?.trim() ?? "";
   const sortRaw = input.sort?.trim() ?? "";
   const search = input.search?.trim() ?? "";
@@ -429,6 +482,9 @@ export function parseOperationsBoardSearchParams(
   const statusFilter = isOperationsStatusFilter(statusRaw)
     ? statusRaw
     : DEFAULT_OPERATIONS_QUERY.statusFilter;
+  const orderTypeFilter = isOperationsOrderTypeFilter(typeRaw)
+    ? typeRaw
+    : DEFAULT_OPERATIONS_QUERY.orderTypeFilter;
   const lifecycleFilter = isOperationsLifecycleFilter(lifecycleRaw)
     ? lifecycleRaw
     : DEFAULT_OPERATIONS_QUERY.lifecycleFilter;
@@ -442,6 +498,7 @@ export function parseOperationsBoardSearchParams(
       pickupFilter: "custom",
       customPickupDate: date,
       statusFilter,
+      orderTypeFilter,
       lifecycleFilter,
       sort,
     };
@@ -453,6 +510,7 @@ export function parseOperationsBoardSearchParams(
       pickupFilter: "custom",
       customPickupDate: date,
       statusFilter,
+      orderTypeFilter,
       lifecycleFilter,
       sort,
     };
@@ -464,6 +522,7 @@ export function parseOperationsBoardSearchParams(
       pickupFilter: pickup,
       customPickupDate: null,
       statusFilter,
+      orderTypeFilter,
       lifecycleFilter,
       sort,
     };
@@ -473,6 +532,7 @@ export function parseOperationsBoardSearchParams(
     ...DEFAULT_OPERATIONS_QUERY,
     search,
     statusFilter,
+    orderTypeFilter,
     lifecycleFilter,
     sort,
   };
@@ -494,6 +554,9 @@ export function buildOperationsBoardPath(query: OperationsBoardQuery): string {
   }
   if (query.statusFilter !== "all") {
     params.set("status", query.statusFilter);
+  }
+  if (query.orderTypeFilter !== "all") {
+    params.set("type", query.orderTypeFilter);
   }
   if (query.lifecycleFilter !== "all") {
     params.set("lifecycle", query.lifecycleFilter);

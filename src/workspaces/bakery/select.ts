@@ -20,6 +20,7 @@ export const BAKERY_ORDER_SELECT = `
   delivered_at,
   include_receipt,
   extra_stock_id,
+  order_dine_in_reservations ( reservation_date ),
   order_items (
     id,
     cake_id,

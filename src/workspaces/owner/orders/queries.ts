@@ -529,6 +529,8 @@ function mapListItem(row: OrderRow): StorefrontOrderListItem {
     crewOrder: order.crewOrder,
     extraStockId: row.extra_stock_id ?? null,
     fulfilmentMethod: order.fulfilmentMethod,
+    dineInReservationDate: order.dineInReservation?.reservationDate ?? null,
+    needsBakeryAttention: order.needsBakeryAttention,
     productionStartedAt: order.productionStartedAt,
     readyAt: order.readyAt,
     pickedUpAt: order.pickedUpAt,

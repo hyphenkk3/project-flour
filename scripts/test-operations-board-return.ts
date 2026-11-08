@@ -91,7 +91,14 @@ assert.equal(resolveOwnerReturnTo(null).href, "/owner");
 assert.equal(resolveOwnerReturnTo("/owner/orders/abc").href, "/owner");
 assert.equal(
   resolveOwnerReturnTo("/customer-operations/orders").href,
-  "/owner",
+  "/customer-operations/orders",
+);
+
+const freshPickReturn = resolveOwnerReturnTo("/owner?type=fresh_pick");
+assert.equal(freshPickReturn.href, "/owner?type=fresh_pick");
+assert.equal(
+  ownerOrderWorkspaceHref("ord-fp", freshPickReturn.href),
+  `/owner/orders/ord-fp?returnTo=${encodeURIComponent("/owner?type=fresh_pick")}`,
 );
 assert.equal(resolveOwnerReturnTo("/owner/approvals").href, "/owner/approvals");
 assert.equal(resolveOwnerReturnTo("/owner/approvals").label, "Approvals");

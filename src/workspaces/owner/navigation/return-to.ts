@@ -121,6 +121,7 @@ export function resolveOwnerReturnTo(
       pickup: params.get("pickup") ?? undefined,
       date: params.get("date") ?? undefined,
       status: params.get("status") ?? undefined,
+      type: params.get("type") ?? undefined,
       lifecycle: params.get("lifecycle") ?? undefined,
       sort: params.get("sort") ?? undefined,
       search: params.get("search") ?? undefined,

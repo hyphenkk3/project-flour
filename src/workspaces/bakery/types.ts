@@ -63,6 +63,8 @@ export type BakeryBoardOrder = {
   pickupDate: string;
   pickupTime: string;
   fulfilmentMethod: StorefrontOrderFulfilmentMethod;
+  extraStockId: string | null;
+  dineInReservationDate: string | null;
   status: GuestOrderStatus;
   customerNotes: string | null;
   needsBakeryAttention: boolean;

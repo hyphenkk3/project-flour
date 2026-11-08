@@ -29,6 +29,11 @@ import type { BakeryBoardOrder } from "@/workspaces/bakery/types";
 import { BakeryAllocationBreakdown } from "@/workspaces/bakery/BakeryAllocationBreakdown";
 import { BakeryFreshPickReadinessActions } from "@/workspaces/bakery/BakeryFreshPickReadinessActions";
 import { isDeliveryFulfilment } from "@/engines/orders/operational-state";
+import {
+  isFreshPickBakeryActionRequired,
+  orderFulfilmentDate,
+} from "@/engines/orders/staff-presentation";
+import { OrderStaffIndicators } from "@/workspaces/owner/orders/OrderStaffIndicators";
 
 type BakeryOrderDetailProps = {
   order: BakeryBoardOrder;
@@ -105,6 +110,40 @@ export function BakeryOrderDetail({
       order.freshPickAllocation.totalAssignedQuantity ||
       order.assignedFreshPickStocks.some((stock) => !stock.readyForCollection)) &&
     !isDeliveryFulfilment(order.fulfilmentMethod);
+  const fulfilmentDate = orderFulfilmentDate({
+    fulfilmentMethod: order.fulfilmentMethod,
+    pickupDate: order.pickupDate,
+    dineInReservationDate: order.dineInReservationDate,
+  });
+  const bakeryActionRequired = isFreshPickBakeryActionRequired({
+    extraStockId: order.extraStockId,
+    status: order.status,
+    needsBakeryAttention: order.needsBakeryAttention,
+    readyAt: order.readyAt,
+    pickedUpAt: order.pickedUpAt,
+    outForDeliveryAt: order.outForDeliveryAt,
+    deliveredAt: order.deliveredAt,
+    allocationStatus: order.freshPickAllocation.status,
+    fullyCovered: order.freshPickAllocation.fullyCovered,
+    totalRemainingQuantity: order.freshPickAllocation.totalRemainingQuantity,
+    totalAssignedQuantity: order.freshPickAllocation.totalAssignedQuantity,
+    assignedStockCount: order.assignedFreshPickStocks.length,
+    allAssignedStocksReady: order.assignedFreshPickStocks.every(
+      (stock) =>
+        stock.lifecycle === "confirmed" &&
+        stock.soldAt !== null &&
+        stock.readyForCollection &&
+        !stock.legacyLinkConflict &&
+        stock.cutIntoSlicesAt === null,
+    ),
+  });
+  const terminal = Boolean(
+    order.status === "cancelled" ||
+      order.readyAt ||
+      order.pickedUpAt ||
+      order.deliveredAt ||
+      order.outForDeliveryAt,
+  );
 
   return (
     <>
@@ -117,6 +156,12 @@ export function BakeryOrderDetail({
         </Link>
 
         <header className="mt-5 space-y-3">
+          <OrderStaffIndicators
+            actionRequired={bakeryActionRequired}
+            extraStockId={order.extraStockId}
+            fulfilmentDate={fulfilmentDate}
+            terminal={terminal}
+          />
           <div className="flex flex-wrap gap-2">
             <StatusBadge
               label={bakeryProductionLabel(presentation)}
@@ -180,7 +225,7 @@ export function BakeryOrderDetail({
                 <div>
                   <dt className="text-skyline">Date</dt>
                   <dd className="text-ink mt-1 font-medium">
-                    {formatLongBusinessDate(order.pickupDate)}
+                    {formatLongBusinessDate(fulfilmentDate)}
                   </dd>
                 </div>
                 <div>

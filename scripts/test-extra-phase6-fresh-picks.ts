@@ -75,6 +75,9 @@ const draftSrc = readSrc(
 );
 const extraBoardSrc = readSrc("src/workspaces/extra/ExtraBoard.tsx");
 const ownerCardSrc = readSrc("src/workspaces/owner/orders/OwnerOrderCard.tsx");
+const staffIndicatorsSrc = readSrc(
+  "src/workspaces/owner/orders/OrderStaffIndicators.tsx",
+);
 const extraRpcSrc = readSrc(
   "supabase/migrations/20260818150000_guest_extra_include_receipt_complimentary.sql",
 );
@@ -364,7 +367,9 @@ assert.match(extraBoardSrc, /EXTRA stock/);
 assert.match(extraBoardSrc, /classifySoldExtra\(soldOrderSnapshot\(unit\)\) !== "history"/);
 assert.match(extraBoardSrc, /Sold physical stock remains here while its linked order still needs/);
 assert.match(extraBoardSrc, /Completed sales and collections are kept in Sold/);
-assert.match(ownerCardSrc, /extraStockId \? " · Fresh Picks"/);
+assert.match(ownerCardSrc, /<OrderStaffIndicators/);
+assert.match(ownerCardSrc, /extraStockId=\{order\.extraStockId\}/);
+assert.match(staffIndicatorsSrc, /label=\{freshPick \? "Fresh Pick" : "Normal Preorder"\}/);
 assert.doesNotMatch(extraBoardSrc, /production_capacity/);
 assert.doesNotMatch(extraBoardSrc, /AvailabilityOverview/);
 

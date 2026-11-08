@@ -20,6 +20,11 @@ import {
 } from "@/workspaces/bakery/eligibility";
 import type { BakeryBoardOrder } from "@/workspaces/bakery/types";
 import { BakeryAllocationBreakdown } from "@/workspaces/bakery/BakeryAllocationBreakdown";
+import {
+  isFreshPickBakeryActionRequired,
+  orderFulfilmentDate,
+} from "@/engines/orders/staff-presentation";
+import { OrderStaffIndicators } from "@/workspaces/owner/orders/OrderStaffIndicators";
 
 type BakeryOrderCardProps = {
   order: BakeryBoardOrder;
@@ -42,6 +47,41 @@ export function BakeryOrderCard({ order, boardDate }: BakeryOrderCardProps) {
     needsBakeryAttention: order.needsBakeryAttention,
     pickupDate: order.pickupDate,
     pickupTime: order.pickupTime,
+  });
+  const fulfilmentDate = orderFulfilmentDate({
+    fulfilmentMethod: order.fulfilmentMethod,
+    pickupDate: order.pickupDate,
+    dineInReservationDate: order.dineInReservationDate,
+  });
+  const assignedFreshPickStocksReady = order.assignedFreshPickStocks.every(
+    (stock) =>
+      stock.lifecycle === "confirmed" &&
+      stock.soldAt !== null &&
+      stock.cutIntoSlicesAt === null &&
+      stock.readyForCollection &&
+      !stock.legacyLinkConflict,
+  );
+  const terminal = Boolean(
+    order.status === "cancelled" ||
+      order.readyAt ||
+      order.pickedUpAt ||
+      order.deliveredAt ||
+      order.outForDeliveryAt,
+  );
+  const actionRequired = isFreshPickBakeryActionRequired({
+    extraStockId: order.extraStockId,
+    status: order.status,
+    needsBakeryAttention: order.needsBakeryAttention,
+    readyAt: order.readyAt,
+    pickedUpAt: order.pickedUpAt,
+    outForDeliveryAt: order.outForDeliveryAt,
+    deliveredAt: order.deliveredAt,
+    allocationStatus: order.freshPickAllocation.status,
+    fullyCovered: order.freshPickAllocation.fullyCovered,
+    totalRemainingQuantity: order.freshPickAllocation.totalRemainingQuantity,
+    totalAssignedQuantity: order.freshPickAllocation.totalAssignedQuantity,
+    assignedStockCount: order.assignedFreshPickStocks.length,
+    allAssignedStocksReady: assignedFreshPickStocksReady,
   });
 
   return (
@@ -85,6 +125,14 @@ export function BakeryOrderCard({ order, boardDate }: BakeryOrderCardProps) {
         {paymentAttention ? (
           <StatusBadge label="Payment Attention" tone="danger" />
         ) : null}
+      </div>
+      <div className="mt-2">
+        <OrderStaffIndicators
+          actionRequired={actionRequired}
+          extraStockId={order.extraStockId}
+          fulfilmentDate={fulfilmentDate}
+          terminal={terminal}
+        />
       </div>
       <div className="mt-3">
         <BakeryAllocationBreakdown

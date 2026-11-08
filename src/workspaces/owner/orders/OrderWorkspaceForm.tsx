@@ -155,6 +155,8 @@ import {
 } from "@/workspaces/owner/orders/pickup-date-cake-size-prices";
 import { usePickupDateCakeSizePrices } from "@/workspaces/owner/orders/use-pickup-date-cake-size-prices";
 import { preserveOrderEditorStateOnReset } from "@/workspaces/owner/orders/preserve-action-form-state.mjs";
+import { orderFulfilmentDate } from "@/engines/orders/staff-presentation";
+import { OrderStaffIndicators } from "@/workspaces/owner/orders/OrderStaffIndicators";
 
 const initialSaveState: OrderWorkspaceSaveState = {
   error: null,
@@ -830,6 +832,21 @@ export function OrderWorkspaceForm({
     (item) => item.quantity > 0,
   );
   const orderPaidAddons = order.paidAddons ?? [];
+  const orderFulfilmentDay = orderFulfilmentDate({
+    fulfilmentMethod: order.fulfilmentMethod,
+    pickupDate: order.pickupDate,
+    dineInReservationDate: order.dineInReservation?.reservationDate,
+  });
+  const orderActionRequired =
+    order.status === "submitted" ||
+    order.status === "awaiting_payment" ||
+    (order.status === "pending_confirmation" &&
+      order.confirmationNeedsResend) ||
+    order.needsBakeryAttention;
+  const orderIsTerminal =
+    order.status === "cancelled" ||
+    order.readyAt !== null ||
+    Boolean(order.pickedUpAt || order.deliveredAt || order.outForDeliveryAt);
 
   if (mode === "view") {
     return (
@@ -860,6 +877,12 @@ export function OrderWorkspaceForm({
           />
           <p className="text-skyline text-sm">{order.orderNumber}</p>
         </div>
+        <OrderStaffIndicators
+          actionRequired={orderActionRequired}
+          extraStockId={order.extraStockId}
+          fulfilmentDate={orderFulfilmentDay}
+          terminal={orderIsTerminal}
+        />
         <CustomerOrderNoteCallout note={order.notes} />
         <InternalOrderNoteCallout note={order.internalNotes} />
         {order.status === "paid" &&
@@ -1397,6 +1420,12 @@ export function OrderWorkspaceForm({
         />
         <p className="text-skyline text-sm">{order.orderNumber}</p>
       </div>
+      <OrderStaffIndicators
+        actionRequired={orderActionRequired}
+        extraStockId={order.extraStockId}
+        fulfilmentDate={orderFulfilmentDay}
+        terminal={orderIsTerminal}
+      />
 
       <CustomerOrderNoteCallout note={order.notes} />
       <InternalOrderNoteCallout note={order.internalNotes} />

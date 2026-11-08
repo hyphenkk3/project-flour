@@ -9,6 +9,7 @@ export const COLLECTION_ORDER_SELECT = `
   pickup_date,
   pickup_time,
   fulfilment_method,
+  extra_stock_id,
   status,
   payment_status,
   customer_notes,

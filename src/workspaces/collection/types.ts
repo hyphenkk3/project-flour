@@ -73,6 +73,7 @@ export type CollectionBoardOrder = {
   pickupDate: string;
   pickupTime: string;
   fulfilmentMethod: StorefrontOrderFulfilmentMethod;
+  extraStockId: string | null;
   status: GuestOrderStatus;
   paymentStatus?: string | null;
   customerNotes: string | null;

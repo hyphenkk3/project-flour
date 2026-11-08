@@ -409,6 +409,8 @@ export type StorefrontOrderListItem = {
   crewOrder: boolean;
   extraStockId: string | null;
   fulfilmentMethod: StorefrontOrderFulfilmentMethod;
+  dineInReservationDate?: string | null;
+  needsBakeryAttention?: boolean;
   productionStartedAt: string | null;
   readyAt: string | null;
   pickedUpAt: string | null;

@@ -20,6 +20,8 @@ import {
 import type { StorefrontOrderListItem } from "@/types/storefront";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ownerOrderWorkspaceHref } from "@/workspaces/owner/navigation/return-to";
+import { orderFulfilmentDate } from "@/engines/orders/staff-presentation";
+import { OrderStaffIndicators } from "@/workspaces/owner/orders/OrderStaffIndicators";
 
 type OwnerOrderCardProps = {
   order: StorefrontOrderListItem;
@@ -65,9 +67,22 @@ export function OwnerOrderCard({
     deliveredAt: order.deliveredAt,
     fulfilmentMethod: order.fulfilmentMethod,
   });
+  const terminal =
+    completed || order.status === "cancelled" || order.readyAt !== null;
   const reasons: OwnerAttentionReason[] = completed
     ? []
     : deriveOwnerAttention(attentionInput(order));
+  const actionRequired =
+    (reasons.some(
+      (reason) => reason.key !== "awaiting_customer_confirmation",
+    ) ||
+      order.needsBakeryAttention === true) &&
+    !terminal;
+  const fulfilmentDate = orderFulfilmentDate({
+    fulfilmentMethod: order.fulfilmentMethod,
+    pickupDate: order.pickupDate,
+    dineInReservationDate: order.dineInReservationDate,
+  });
 
   return (
     <Link
@@ -97,13 +112,18 @@ export function OwnerOrderCard({
               order.orderSource,
               order.orderSourceOther,
             )}
-            {order.extraStockId ? " · Fresh Picks" : ""}
           </p>
+          <OrderStaffIndicators
+            actionRequired={actionRequired}
+            extraStockId={order.extraStockId}
+            fulfilmentDate={fulfilmentDate}
+            terminal={terminal}
+          />
           <p className={completed ? "text-skyline break-words text-sm" : "text-ink break-words text-sm"}>
             {cakeLine}
           </p>
           <p className="text-skyline text-sm">
-            {formatDdMmYyyy(order.pickupDate)} ·{" "}
+            {formatDdMmYyyy(fulfilmentDate)} ·{" "}
             {formatPickupTime(order.pickupTime)}
           </p>
           {reasons.length > 0 ? (

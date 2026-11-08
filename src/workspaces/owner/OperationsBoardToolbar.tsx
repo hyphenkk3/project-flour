@@ -5,6 +5,7 @@ import {
   OPERATIONS_PICKUP_FILTERS,
   OPERATIONS_SORT_OPTIONS,
   OPERATIONS_STATUS_FILTERS,
+  OPERATIONS_ORDER_TYPE_FILTERS,
   OPERATIONS_LIFECYCLE_FILTERS,
   OPERATIONS_SEARCH_ALL_DATES_CUE,
   isOperationsQueryDefault,
@@ -15,6 +16,7 @@ import {
   type OperationsPickupFilter,
   type OperationsSortOption,
   type OperationsStatusFilter,
+  type OperationsOrderTypeFilter,
   type OperationsLifecycleFilter,
 } from "@/engines/operations/order-board";
 import { formStyles } from "@/components/ui/form/FormControls";
@@ -219,6 +221,27 @@ export function OperationsBoardToolbar({
             value={query.pickupFilter}
           >
             {OPERATIONS_PICKUP_FILTERS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+
+          <label className="sr-only" htmlFor="operations-order-type">
+            Order type
+          </label>
+          <select
+            aria-label="Order type"
+            className={`${compactSelectClass} sm:w-44`}
+            id="operations-order-type"
+            onChange={(event) =>
+              patch({
+                orderTypeFilter: event.target.value as OperationsOrderTypeFilter,
+              })
+            }
+            value={query.orderTypeFilter}
+          >
+            {OPERATIONS_ORDER_TYPE_FILTERS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

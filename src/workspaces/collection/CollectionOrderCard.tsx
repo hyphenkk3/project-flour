@@ -25,6 +25,8 @@ import {
   type CollectionBoardTab,
 } from "@/workspaces/collection/eligibility";
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
+import { orderFulfilmentDate } from "@/engines/orders/staff-presentation";
+import { OrderStaffIndicators } from "@/workspaces/owner/orders/OrderStaffIndicators";
 
 type CollectionOrderCardProps = {
   order: CollectionBoardOrder;
@@ -71,6 +73,11 @@ export function CollectionOrderCard({
   const complimentaryItems = order.complimentaryItems ?? [];
   const paidAddons = order.paidAddons ?? [];
   const hasOptions = complimentaryItems.length > 0 || paidAddons.length > 0;
+  const fulfilmentDate = orderFulfilmentDate({
+    fulfilmentMethod: order.fulfilmentMethod,
+    pickupDate: order.pickupDate,
+    dineInReservationDate: order.dineIn?.reservationDate,
+  });
 
   return (
     <article
@@ -147,6 +154,15 @@ export function CollectionOrderCard({
               +{additionalCakeCount} more
             </p>
           ) : null}
+          <OrderStaffIndicators
+            extraStockId={order.extraStockId}
+            fulfilmentDate={fulfilmentDate}
+            terminal={Boolean(
+              order.pickedUpAt ||
+                order.deliveredAt ||
+                order.status === "cancelled",
+            )}
+          />
           {showCompletedMeta ? (
             <p className="text-skyline mt-0.5 text-xs leading-snug">
               {methodLabel}
