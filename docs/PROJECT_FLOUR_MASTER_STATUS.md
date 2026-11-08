@@ -2229,3 +2229,50 @@ At 10:07 UTC, the Vercel build-event log for `dpl_8WhacCS7JGJZy1NVRQ4E3cfAdT7u` 
 - **Filters:** Operations All showed the new synthetic order under All Clear after readiness. Fresh Pick filter (`?type=fresh_pick`) retained it and the other Fresh Pick fixtures; Normal Preorder filter (`?type=normal_preorder`) displayed the synthetic future normal preorder `8b7d09e7-1443-4715-a8f7-6dcb0a9f10d3`. This confirms the two filter choices retain their intended synthetic order types. Full sort/search behavior after lifecycle transitions remains unverified.
 - **Existing fixtures retained:** synthetic tomorrow Fresh Pick pickup `8d08e228-04fc-4eb2-af38-78014fa7f430`, delivery `60450e65-0572-4b13-8ab6-566258867da4`, dine-in `ae0b8a0e-6fde-4893-ae81-a14958b244d8`, future normal preorder `8b7d09e7-1443-4715-a8f7-6dcb0a9f10d3`, cancelled today order `81497331-d90d-4996-b286-87f6cbf4ce24`, and all related synthetic stock remain in DEV. No cleanup was performed. No external payment, refund, customer notification, email, WhatsApp message, Production change, migration, deployment, alias, environment, or schema change occurred.
 - **Decision: HOLD — DEV ACCEPTANCE INCOMPLETE.** Verified: separate type/day indicators and TODAY cue progression through confirmation/payment/readiness; synthetic payment state and allocation; Fresh Pick and Normal Preorder filters. Not verified: successful pickup/handoff, Collection queue after a valid allocation, tomorrow delivery/dine-in handoffs, or all remaining operational transitions and sorting. The smallest next step is a separately authorized DEV-only reproduction with a clean unique synthetic stock allocation (without reusing the stock referenced by the cancelled fixture), followed by read-only verification of pickup/Collection and any delivery/dine-in actions permitted by their normal time windows. Do not directly rewrite the stale pointer or bypass allocation validation. Production release remains **HOLD**.
+
+
+## 8 November 2026 — Fresh Pick priority strict non-regression review and DEV acceptance continuation
+
+**Review time:** 2026-11-08 12:43 UTC (20:43 Asia/Kuching). This is an additive review record; all prior Master Status history is retained.
+
+### Identity and scope
+
+- Production-source baseline: application commit `d82e14ec28fe12d79d6ec7ba4e895103093b358d`, previously released and designated as live baseline.
+- Staff-priority candidate: branch `codex/fresh-pick-staff-priority-20261108`, commit `096ae0deae864ee050210b33e4f8aa99ae7e10f5`, tree `0722a10e0e1602deacee40d751e6a974ae596ddd`.
+- Candidate remains unchanged. DEV Preview: `dpl_8WhacCS7JGJZy1NVRQ4E3cfAdT7u`, `https://project-flour-ah89mq1o0-hyphen-org.vercel.app`; DEV Supabase project `tzwtpxdcggesgjaqxkqr`. No Production database, deployment, environment, alias, or business record was accessed or changed in this review.
+
+### Production-source to candidate comparison
+
+GitHub comparison from `d82e14ec28fe12d79d6ec7ba4e895103093b358d` to `096ae0deae864ee050210b33e4f8aa99ae7e10f5` reports one commit ahead, zero behind, and 24 changed paths. The complete changed-path inventory and impact classification:
+
+| Changed paths | Reviewed impact |
+|---|---|
+| `src/engines/operations/order-board.ts`, new `src/engines/orders/staff-presentation.ts`, `src/types/storefront.ts` | Derived order-type/date/action-attention fields; staff-board sorting/filter projection. No database writes, RPC changes, or workflow-eligibility decision was added. The order-type controls change which rows are displayed; default remains All. |
+| `src/workspaces/bakery/BakeryOrderCard.tsx`, `BakeryOrderDetail.tsx`, `map-order.ts`, `select.ts`, `types.ts` | Adds Fresh Pick/date/readiness context to Bakery presentation and mapping. Existing preparation/readiness actions and their server-side rules are unchanged. |
+| `src/workspaces/collection/CollectionOrderCard.tsx`, `CollectionOrderDetail.tsx`, `map-order.ts`, `select.ts`, `types.ts` | Adds order-type/date context to Collection presentation and mapping. Handoff actions, their eligibility checks, and RPCs are unchanged. |
+| `src/workspaces/owner/OperationsBoardToolbar.tsx`, `OperationsLiveBoard.tsx`, `navigation/return-to.ts`, `orders/OrderStaffIndicators.tsx`, `orders/OrderWorkspaceForm.tsx`, `orders/OwnerOrderCard.tsx`, `orders/queries.ts` | Adds visual indicators, order-type filter state, derived prioritization, and presentation fields to staff views. No authorization, payment, cancellation, stock, readiness, collection, delivery, or dine-in write path changed. |
+| `scripts/test-extra-phase6-fresh-picks.ts`, new `scripts/test-fresh-pick-staff-presentation.ts`, `scripts/test-operations-board-return.ts`, `scripts/test-release-regressions.mjs` | Regression and presentation assertions/runner inclusion only. |
+| Database migrations/RPC definitions, checkout/cancellation/payment/allocation server-action files, auth/RLS/security definitions | No changed paths in this comparison. |
+
+**Conclusion:** The reviewed changes are additive staff presentation and display filtering. The shared order-board engine is the highest-impact changed execution path: it derives labels/priority and controls the visible board projection. It does not write records or change operational RPC/action eligibility. Staff can return to All, and the observed type-filter counts partitioned rather than lost records. No evidence was found that the candidate modifies checkout, order creation, stock validation/allocation, cancellation, payment or payment allocation, Bakery readiness, pickup/collection handoff, delivery/dine-in fulfillment, staff authorization, or security controls. This is source comparison, not a substitute for exercising each live operational transition.
+
+### Synthetic stock conflict — separate from candidate acceptance
+
+- Affected DEV-only fixtures: cancelled order `81497331-d90d-4996-b286-87f6cbf4ce24`; reused stock `55ed0ef1-d260-4822-9ca2-87aadfefe535`; blocked synthetic order `d941e25e-83dc-43ce-8543-e76940a6ee31`.
+- Existing read-only DEV evidence showed the cancelled order retained `orders.extra_stock_id` pointing at that stock while the stock was later reused by the second synthetic order. The allocation validator then rejected the second order as invalid and its handoff failed closed (“Assigned Fresh Pick stock is not valid for this order”). No pointer, validator, cancellation path, constraint, or data was changed.
+- Classification: **C — synthetic DEV fixture/test sequencing conflict interacting with the unchanged fail-closed Production-source allocation safeguards.** The stale reference after cancellation may warrant separate investigation, but the candidate did not introduce or modify this behavior. It is not evidence of a Production data issue and was not checked against Production records.
+
+### Continued DEV presentation checks
+
+- In authenticated DEV Owner Operations, the default was All order types and the Today board contained 38 rows. Fresh Pick filter showed 17; Normal Preorder showed 21; 17 + 21 = 38. Each filter displayed its intended type. This supports that the filter is a visual partition and that the normal-preorder rows remain available under their own filter and All.
+- Retained synthetic Fresh Pick pickup, delivery and dine-in fixtures due tomorrow displayed TOMORROW without automatic TODAY urgency; retained future Normal Preorder showed its actual future fulfilment date. Earlier recorded DEV observations cover Malaysia-local date selection, dine-in reservation date, and the TODAY cue clearing when the synthetic order progressed through confirmation/payment/readiness. The 68/68 candidate release regression result and detailed prior fixture state transitions remain preserved in the prior entries and test evidence; they were not rerun because source is unchanged.
+- A new uniquely identified synthetic DEV physical stock fixture was created through the Bakery workflow: stock `2d284123-f0af-4755-ac64-57fed098d2ba`, test cake `7a818864-4c19-4ce4-a706-aedd6e25333e`, with note `SYNTHETIC QA ONLY — TEST STOCK; NOT CUSTOMER ORDER`. It is not linked to an order. The normal availability display reported same-day ordering closed and next availability 9 November 2026 (pickup 12:00 PM, cutoff 11:30 AM). It was not used to bypass the closed window or create another order.
+- Collection view loaded successfully. Today displayed 0 ready orders; tomorrow also displayed 0 ready orders. These synthetic tomorrow orders remain submitted/unpaid and are not ready, so this is an expected empty ready queue, **not** proof of successful pickup, delivery, or dine-in handoff. No handoff or other operational transition was forced.
+- No real payment provider, customer notification, email, WhatsApp, or external fulfilment action was triggered in this continuation. No Production business records were queried or changed.
+
+### Remaining limits and decision
+
+- The earlier synthetic stock reuse conflict still prevents a valid pickup/handoff test for `d941e25e-83dc-43ce-8543-e76940a6ee31`; fail-closed behavior was preserved.
+- The fresh stock created in this session cannot support a new same-day checkout because the valid window is closed. No safe clean active TODAY order was available for a new end-to-end urgency-resolution cycle.
+- Successful Collection pickup, delivery, and dine-in handoffs; Bakery production transitions; and order-search/sort behavior after lifecycle transitions remain unverified in the live Preview. The previous 68 automated regressions passed for the unchanged candidate, but they do not close these hosted workflow gaps.
+- **Decision: HOLD — DEV ACCEPTANCE INCOMPLETE.** No candidate-introduced business-logic regression was established. Minimum safe next step is a DEV-only session during an open synthetic checkout/fulfilment window, using uniquely allocated stock that has no prior order reference, to complete active TODAY action resolution and the normal payment/readiness/handoff transitions. Do not repair or reuse the conflicted fixture. Production behavior, records, deployment and aliases remain untouched.
