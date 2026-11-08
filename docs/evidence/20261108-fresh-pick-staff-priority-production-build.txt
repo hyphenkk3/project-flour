@@ -1,0 +1,134 @@
+
+> project-flour@0.1.0 build
+> next build
+
+▲ Next.js 16.2.12 (Turbopack)
+- Experiments (use with caution):
+  · serverActions
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+✓ Compiled successfully in 21.6s
+  Running TypeScript ...
+  Finished TypeScript in 29.6s ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/47) ...
+  Generating static pages using 7 workers (11/47) 
+  Generating static pages using 7 workers (23/47) 
+  Generating static pages using 7 workers (35/47) 
+✓ Generating static pages using 7 workers (47/47) in 264ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /api/owner/management/reports/export/excel
+├ ƒ /api/owner/management/reports/export/pdf
+├ ƒ /api/staff/notifications/dispatch
+├ ƒ /api/staff/notifications/email
+├ ○ /apple-icon.png
+├ ƒ /auth/callback
+├ ƒ /bakery
+├ ƒ /bakery/availability
+├ ƒ /bakery/extra
+├ ƒ /bakery/orders/[id]
+├ ƒ /browse
+├ ƒ /browse/[id]
+├ ƒ /browse/menu/[id]
+├ ƒ /cakes/[id]
+├ ƒ /collection
+├ ƒ /collection/orders/[id]
+├ ƒ /customer-operations
+├ ƒ /customer-operations/customers
+├ ƒ /customer-operations/customers/[id]
+├ ƒ /customer-operations/customers/[id]/addresses/[addressId]/edit
+├ ƒ /customer-operations/customers/[id]/addresses/new
+├ ƒ /customer-operations/customers/[id]/edit
+├ ƒ /customer-operations/customers/new
+├ ƒ /customer-operations/fresh-picks
+├ ƒ /customer-operations/orders
+├ ƒ /customer-operations/orders/[id]
+├ ƒ /customer-operations/orders/[id]/edit
+├ ƒ /customer-operations/orders/new
+├ ƒ /extra
+├ ƒ /extra/[id]
+├ ƒ /extra/checkout
+├ ƒ /faq
+├ ƒ /home
+├ ○ /icon.png
+├ ƒ /library
+├ ƒ /library/addons
+├ ƒ /library/assets
+├ ƒ /library/assets/[id]
+├ ƒ /library/assets/[id]/edit
+├ ƒ /library/assets/new
+├ ƒ /library/cakes
+├ ƒ /library/cakes/[id]
+├ ƒ /library/cakes/[id]/edit
+├ ƒ /library/cakes/categories
+├ ƒ /library/cakes/new
+├ ƒ /library/cakes/tags
+├ ƒ /library/collections
+├ ƒ /library/collections/[id]
+├ ƒ /library/collections/[id]/edit
+├ ƒ /library/collections/new
+├ ƒ /library/customer-qa
+├ ƒ /library/operating-hours
+├ ƒ /library/order-availability
+├ ƒ /library/promotions
+├ ƒ /library/promotions/[id]
+├ ƒ /library/promotions/[id]/edit
+├ ƒ /library/promotions/new
+├ ƒ /library/vouchers
+├ ƒ /library/vouchers/[id]
+├ ƒ /library/vouchers/[id]/edit
+├ ƒ /library/vouchers/new
+├ ƒ /library/vouchers/rm10
+├ ƒ /library/vouchers/rm10/[voucherNumber]
+├ ƒ /library/vouchers/rm10/new
+├ ƒ /login
+├ ○ /manifest.webmanifest
+├ ƒ /offers
+├ ƒ /order
+├ ○ /order/add-cake
+├ ƒ /order/checkout
+├ ƒ /order/collection/[id]
+├ ƒ /order/success
+├ ○ /order/thank-you
+├ ƒ /order/waiting-list
+├ ƒ /order/waiting-list/confirm/[token]
+├ ƒ /owner
+├ ƒ /owner/approvals
+├ ƒ /owner/approvals/history
+├ ƒ /owner/calendar
+├ ƒ /owner/management
+├ ƒ /owner/management/reports
+├ ƒ /owner/orders/[id]
+├ ƒ /owner/orders/[id]/confirmation
+├ ƒ /owner/orders/[id]/payment
+├ ƒ /owner/orders/new
+├ ○ /preview
+├ ƒ /preview/bakery
+├ ƒ /preview/bakery/orders/[id]
+├ ƒ /preview/collection
+├ ƒ /preview/collection/orders/[id]
+├ ƒ /preview/collection/orders/[id]/verify
+├ ○ /preview/counter
+├ ƒ /preview/counter/orders/[id]
+├ ƒ /preview/counter/orders/[id]/verify
+├ ƒ /preview/customer-operations
+├ ƒ /preview/customer-operations/orders/[id]
+├ ƒ /preview/customer-operations/orders/[id]/confirm
+├ ƒ /preview/customer-operations/orders/[id]/payment
+├ ƒ /preview/customer-operations/orders/[id]/receipt
+├ ƒ /settings
+├ ƒ /settings/customer-message-templates
+├ ƒ /settings/staff
+└ ƒ /staff/complete-password-change
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
