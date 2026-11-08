@@ -2276,3 +2276,27 @@ GitHub comparison from `d82e14ec28fe12d79d6ec7ba4e895103093b358d` to `096ae0deae
 - The fresh stock created in this session cannot support a new same-day checkout because the valid window is closed. No safe clean active TODAY order was available for a new end-to-end urgency-resolution cycle.
 - Successful Collection pickup, delivery, and dine-in handoffs; Bakery production transitions; and order-search/sort behavior after lifecycle transitions remain unverified in the live Preview. The previous 68 automated regressions passed for the unchanged candidate, but they do not close these hosted workflow gaps.
 - **Decision: HOLD — DEV ACCEPTANCE INCOMPLETE.** No candidate-introduced business-logic regression was established. Minimum safe next step is a DEV-only session during an open synthetic checkout/fulfilment window, using uniquely allocated stock that has no prior order reference, to complete active TODAY action resolution and the normal payment/readiness/handoff transitions. Do not repair or reuse the conflicted fixture. Production behavior, records, deployment and aliases remain untouched.
+
+
+## 8 November 2026 — Final additive Fresh Pick priority acceptance attempt: HOLD
+
+**Review time:** 2026-11-08 12:48 UTC (20:48 Asia/Kuching). This entry continues the prior non-regression review and preserves all earlier status history.
+
+### Identity and boundary recheck
+
+- Vercel read-only metadata identified project `project-flour` / `prj_3rmlAQzLSFOi15DEGczSuDYDq8xr`, team `hyphen-org` / `team_ykveCukHiHDuiJjWXkx8zefI`.
+- DEV Preview `dpl_8WhacCS7JGJZy1NVRQ4E3cfAdT7u` remains READY at `https://project-flour-ah89mq1o0-hyphen-org.vercel.app`, with Git source branch `codex/fresh-pick-staff-priority-20261108` and commit `096ae0deae864ee050210b33e4f8aa99ae7e10f5`. Project SSO protection remains enabled; no custom Whitebird domain was assigned by this task. The configured DEV project binding remains the previously verified DEV Supabase project `tzwtpxdcggesgjaqxkqr`. No environment variable was decrypted or changed.
+- The application candidate remains unchanged. No Production/DEV schema, migration, source code, deployment, environment, domain, or alias was changed. No Production business data was accessed.
+
+### Final acceptance checks and outcome
+
+1. **Fresh Pick TODAY checkout and urgency-to-pickup:** **UNVERIFIED.** The Preview showed same-day ordering closed; the fresh synthetic stock created in the preceding session is available starting 9 November with a cutoff of 11:30 AM. I did not bypass the window or reuse stock with a prior order reference. No new order, payment, readiness action, or pickup was attempted in this check.
+2. **Collection appearance and clearing after handoff:** **UNVERIFIED.** Collection showed zero ready orders for 9 November. The retained synthetic orders are submitted/unpaid, and the prior pickup attempt failed closed due the separate reused-stock reference conflict recorded above. No handoff was attempted.
+3. **Bakery supplied-versus-production distinction:** the earlier recorded DEV observation remains that the Fresh Pick pickup order is shown as physically supplied by Fresh Pick with zero Bakery units to produce, while the normal preorder is shown as Bakery production work. No new Bakery transition was performed in this final attempt.
+4. **Tomorrow delivery and dine-in:** **UNVERIFIED for operational transitions.** The retained synthetic orders `60450e65-0572-4b13-8ab6-566258867da4` (delivery) and `ae0b8a0e-6fde-4893-ae81-a14958b244d8` (dine-in) are for 9 November, remain submitted/unpaid, and were not due for handoff during this review. No payment, readiness, delivery, or dine-in completion action was taken.
+5. **Operations filters:** previously observed All = 38, Fresh Pick = 17, Normal Preorder = 21, with the two type-specific counts summing to All. No new lifecycle transition was performed, so sort/search after status changes remains **UNVERIFIED**.
+6. **Stock ownership and unrelated records:** no order, payment, allocation, readiness, or handoff write occurred in this final acceptance attempt. The new stock `2d284123-f0af-4755-ac64-57fed098d2ba` remained unlinked in the observed UI and was not used. The earlier synthetic conflict remains isolated to the cancelled/reused stock and blocked synthetic order already named in the prior entry. No unrelated record change was made by this attempt.
+
+The previously completed 68/68 regression suite remains applicable to this unchanged candidate and was not rerun. The source-level comparison remains PASS for additive presentation-only scope; hosted operational acceptance is not complete.
+
+**Decision: HOLD — DEV ACCEPTANCE INCOMPLETE.** No candidate-introduced business logic regression is established, but the required clean TODAY lifecycle and post-handoff Collection behavior, plus eligible delivery/dine-in transitions and post-lifecycle sorting, have not been demonstrated. Minimum next step: continue in an open, normal DEV checkout window with uniquely allocated synthetic stock that has never been referenced by another order; then use normal payment/readiness/handoff eligibility and verify the same order across Operations, Bakery, and Collection. If the order is not yet due or an action is not eligible, record it as unverified. Do not repair or reuse the conflicted fixture. Production promotion remains unauthorized.
