@@ -2098,3 +2098,41 @@ Minimum next action: separately authorize a narrowly scoped read-only Production
 - **Monitoring:** Candidate-scoped function error/fatal logs and runtime-error aggregation were checked over `2026-11-07T13:45:00Z`–`2026-11-07T14:00:30Z`. Both returned no errors. The prior deployment's known catalogue/cache timeout history remains documented; no matching candidate error arose during this observation window. Safari did not expose per-request HTTP status or Vercel request IDs, so these are not claimed. No confirmed critical 5xx, failed render, authentication/RPC/checkout error, or repeated customer-visible detail failure occurred in the bounded pass.
 - **Final aliases and deployment identity:** Read-only Vercel checks after monitoring confirmed candidate `dpl_3aASuiDWT9LZbggx6XT419nAtEdc` remains READY at the approved source and lists exactly `whitebird.asia`, `www.whitebird.asia`. Rollback `dpl_32gYKJALPhFt5EparxoQHtagxQQN` remains READY and lists neither Whitebird domain.
 - **Result:** **PROMOTION PASS.** No application rebuild, database/migration operation, environment change, customer order, stock allocation, payment, or business-record modification occurred. The previously applied migration was not rerun. This record covers the single authorized attempt; no repeat promotion is implied.
+
+
+## 8 November 2026 — Fresh Pick staff identification and fulfilment-day priority
+
+- **Scope and preservation:** Implemented the staff-facing Fresh Pick identification and fulfilment-day presentation in an isolated clone. Starting source branch was `codex/fresh-pick-secret-key-transport-20261107` at `d82e14ec28fe12d79d6ec7ba4e895103093b358d`, tree `59875e7d3a673423aa08c6822fa973385cfa69bd`. New branch: `codex/fresh-pick-staff-priority-20261108`. Commit: `096ae0deae864ee050210b33e4f8aa99ae7e10f5`; tree: `0722a10e0e1602deacee40d751e6a974ae596ddd`. The original candidate and other worktrees were not modified. The branch was pushed to the verified repository and GitHub returned the exact commit.
+- **Source of truth and presentation:** Fresh Pick identity comes from the existing `orders.extra_stock_id` link. Pickup and delivery timing use the existing fulfilment date; dine-in timing uses the linked reservation date when present, with the existing pickup date as fallback. Calendar-day comparison uses the application’s Malaysia (UTC+8) calendar helper, not UTC date boundaries or order creation time. Views now show independent order-type (Fresh Pick / Normal Preorder) and fulfilment timing (TODAY / TOMORROW / actual later date) indicators.
+- **Action priority:** The “Action today”/Owner Needs Attention cue is limited to nonterminal Fresh Pick orders due today with an outstanding staff action. Bakery urgency additionally requires paid status and a genuinely outstanding Bakery action (for example, unresolved Bakery attention or incomplete/unready physical allocation). Fully allocated and ready stock does not acquire preparation urgency. Tomorrow orders remain visible without automatic urgency. Cancelled, completed, picked-up, delivered, or otherwise non-actionable orders are not marked urgent. Payment, allocation, preparation, readiness, handoff, and completion remain distinct states.
+- **Queue behaviour:** Owner Operations has an additive Fresh Pick / Normal Preorder filter with “All” as the default, so ordinary preorders are not hidden by default. Existing filters and ordering are preserved; dine-in queue date filtering/sorting follows its reservation date. Collection, Bakery, Owner order cards, and order details show the shared identity/date indicators while retaining their existing payment, preparation, collection, and delivery controls.
+- **Changed files (24):**
+  - `scripts/test-extra-phase6-fresh-picks.ts`
+  - `scripts/test-fresh-pick-staff-presentation.ts` (new)
+  - `scripts/test-operations-board-return.ts`
+  - `scripts/test-release-regressions.mjs`
+  - `src/engines/operations/order-board.ts`
+  - `src/engines/orders/staff-presentation.ts` (new)
+  - `src/types/storefront.ts`
+  - `src/workspaces/bakery/BakeryOrderCard.tsx`
+  - `src/workspaces/bakery/BakeryOrderDetail.tsx`
+  - `src/workspaces/bakery/map-order.ts`
+  - `src/workspaces/bakery/select.ts`
+  - `src/workspaces/bakery/types.ts`
+  - `src/workspaces/collection/CollectionOrderCard.tsx`
+  - `src/workspaces/collection/CollectionOrderDetail.tsx`
+  - `src/workspaces/collection/map-order.ts`
+  - `src/workspaces/collection/select.ts`
+  - `src/workspaces/collection/types.ts`
+  - `src/workspaces/owner/OperationsBoardToolbar.tsx`
+  - `src/workspaces/owner/OperationsLiveBoard.tsx`
+  - `src/workspaces/owner/navigation/return-to.ts`
+  - `src/workspaces/owner/orders/OrderStaffIndicators.tsx` (new)
+  - `src/workspaces/owner/orders/OrderWorkspaceForm.tsx`
+  - `src/workspaces/owner/orders/OwnerOrderCard.tsx`
+  - `src/workspaces/owner/orders/queries.ts`
+- **Database and release impact:** No migration, schema, database function, payment, allocation, order, stock, catalogue, or customer-data changes. Fresh Pick v3 idempotency and security code was not changed. No hosted DEV or Production database was accessed; no deployment, environment, alias, or domain was changed. Production release remains **HOLD** pending DEV Preview acceptance and normal release authorization.
+- **Focused test results:** PASS — `scripts/test-fresh-pick-staff-presentation.ts` (including pickup/delivery/dine-in today and tomorrow, Malaysia midnight boundary, ready versus incomplete allocation, paid/unpaid, terminal states, urgency clearing, filter/sort preservation, and Collection/Bakery source-field mapping); `scripts/test-operations-board-return.ts`; `scripts/test-extra-phase6-fresh-picks.ts`; `scripts/test-bakery-fresh-pick-readiness.ts`; `scripts/test-collection-eligibility.ts`; `scripts/test-collection-dine-in-desk.ts`; `scripts/test-collection-delivery-detail.ts`. TypeScript checks passed, including `tsc --noEmit` and `tsc --noEmit -p tsconfig.release-regressions.json`. `git diff --check` passed.
+- **Complete regression run:** `npm run test:release-regressions` completed twice. Final count: **65 PASS, 3 FAIL, 0 BLOCKED**. The three failures were infrastructure startup failures before application assertions: disposable PostgreSQL tests for Fresh Pick assignment RPC, capacity serialization/rollback, and canonical migration-runner mechanics stopped at PostgreSQL `shmget` / “No space left on device” while initializing/starting the local container. These are not reported as passing or as application assertion failures; the database integration gates remain incomplete.
+- **Lint and build limitations:** Scoped lint for the changed functional paths and changed scripts passed. Full lint of the two affected React files reports the same existing `react-hooks/set-state-in-effect` violations on the parent commit; baseline comparison showed no newly introduced rule violations (plus existing warning-level dependency/unused-import findings). Production build did not complete in the offline environment because the build could not fetch the repository’s existing Newsreader and Outfit fonts from Google Fonts. This is not recorded as a build pass.
+- **Verification boundary and next step:** No hosted staff/browser DEV acceptance has been performed. Review the committed branch, then deploy it only to the isolated DEV Preview with verified DEV-only bindings under separate deployment authorization. Use synthetic/owner-approved fixtures for the case matrix; verify Owner Operations, Bakery, Collection, status separation, filter counts/sorting, and urgency removal after action completion. Do not create test orders, allocate stock, or trigger payments without separate approval. Resolve or provision a suitable bounded local PostgreSQL shared-memory environment for the three incomplete integration checks and provide font access for the production build before treating all release gates as complete. The application candidate is not authorized for Production promotion.
