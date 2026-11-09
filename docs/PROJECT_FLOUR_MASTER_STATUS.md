@@ -2489,3 +2489,38 @@ Preparation for the Owner-authorized unaliased Production-target staging of staf
 - No DEV or Production database/schema/business data, environment variable, application source, or custom-domain alias was modified. The prior live deployment remains the rollback target. Delivery workflow acceptance remains **UNVERIFIED** as previously recorded.
 
 **Result: STAGING PASS.** The exact candidate is staged as a protected, unaliased Production-target deployment, and the live website remains on its existing deployment. This does not establish full operational acceptance, resolve the delivery-test limitation, or authorize promotion. Any Production promotion requires separate explicit Owner authorization.
+
+
+## 9 November 2026 — Owner-authorized Fresh Pick staff-priority Production promotion: PASS
+
+**Owner authorization:** This promotion was authorized for only `whitebird.asia` and `www.whitebird.asia` to the previously staged exact candidate. No source, database, environment, or business-logic change was made.
+
+### Final pre-promotion checks
+
+- Staged deployment `dpl_7LdWc8fcRT4vmbPksrJUvDqrB1iE` remained **READY**, Production target, project `prj_3rmlAQzLSFOi15DEGczSuDYDq8xr`, source `096ae0deae864ee050210b33e4f8aa99ae7e10f5` (tree `0722a10e0e1602deacee40d751e6a974ae596ddd`).
+- Rollback deployment `dpl_3aASuiDWT9LZbggx6XT419nAtEdc` remained **READY**, source `d82e14ec28fe12d79d6ec7ba4e895103093b358d`.
+- Before promotion both live aliases were still on the rollback deployment. The staging deployment had passed SSO protection and bounded read-only homepage, Browse, and Fresh Picks listing checks. Source comparison remained one commit ahead / zero behind the live source; the candidate adds no migration, RPC, schema, environment-variable, checkout, stock, payment, readiness, cancellation, handoff, or security change. Existing 68/68 regression/build evidence remains unchanged.
+- Vercel CLI `vercel alias set <deployment> <domain> --scope hyphen-org` was verified as a single-alias assignment operation. This avoided project-wide promotion or assigning other domains. Rollback procedure is to invoke the same explicit single-alias command for each of the two approved domains using rollback deployment `dpl_3aASuiDWT9LZbggx6XT419nAtEdc`, then verify each mapping independently.
+
+### Promotion and mapping evidence
+
+- `whitebird.asia` assigned to `dpl_7LdWc8fcRT4vmbPksrJUvDqrB1iE` at 2026-11-09 05:14:44.390 UTC.
+- `www.whitebird.asia` assigned to `dpl_7LdWc8fcRT4vmbPksrJUvDqrB1iE` at 2026-11-09 05:15:05.403 UTC.
+- Each mapping was independently read after assignment. Final read-only checks confirmed both domains still point to the candidate. No other alias was assigned by the two single-alias commands. Candidate deployment remains READY; original rollback deployment remains READY and available.
+
+### Post-promotion checks and bounded monitoring
+
+- Final unauthenticated GET checks, with response bodies discarded: `whitebird.asia/` 200; `www.whitebird.asia/` 200; `/browse` 200; `/extra` Fresh Picks listing 200; `/login` 200. One published cake detail, `/cakes/99f2e88a-50cb-4a88-b40d-e64a317cd611`, returned 200. No order, checkout submission, payment, stock, fulfilment, or customer-account workflow was invoked.
+- Unauthenticated requests to `/owner`, `/bakery`, and `/collection` returned 307 to `/login`, preserving the staff authentication gate. An authenticated staff workspace session was not used, so authenticated staff interaction is not claimed as verified in this post-promotion pass.
+- A bounded observation window ran from the first alias switch at 05:14:44 UTC through the final checks after 05:31:18 UTC, exceeding 15 minutes after both aliases had moved. Vercel runtime-errors query for the window reported no runtime error clusters. Candidate and rollback deployment runtime log groups contained no error, warning, or fatal entries.
+- The Vercel Observability schema endpoint returned 404 `not_found` (“Observability Data not found”), so a project-wide aggregate HTTP 5xx metric was unavailable. The bounded live endpoint checks all succeeded; the runtime logs showed no observed exception signal. Do not interpret this as a complete customer-traffic error-rate measurement.
+- Catalogue detail route returned 200. No separate image-asset request was verified; this is a remaining visual-check limitation. No customer-facing image failure was observed in the bounded status checks.
+
+### Result and remaining limitations
+
+**PRODUCTION RELEASE PASS** — both approved aliases are on the exact candidate, the rollback deployment remains READY, post-promotion bounded route checks passed, and the 15-minute observation window produced no runtime error clusters or error/warning/fatal log entries. No application/database behavior was exercised through write workflows.
+
+- Delivery handoff remains **UNVERIFIED** from DEV, as recorded in earlier entries; this presentation-only change does not alter delivery eligibility or handoff code.
+- Authenticated staff workspace UI was not exercised after promotion; staff routes without a session correctly redirected to login.
+- Aggregate site-wide HTTP 5xx telemetry was unavailable, and image asset loading was not separately measured. These limits are recorded rather than inferred as passes.
+- No Production/DEV database schema or business data, environment variable, source code, checkout/payment/stock/fulfilment behavior, or non-approved domain was changed. No migration or deployment rebuild occurred. No rollback was necessary. Future rollback, if separately incident-authorized or required by the existing release authorization, is the two exact alias assignments back to `dpl_3aASuiDWT9LZbggx6XT419nAtEdc` followed by independent mapping verification.
