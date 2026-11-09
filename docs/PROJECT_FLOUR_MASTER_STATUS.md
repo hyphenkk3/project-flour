@@ -2372,3 +2372,30 @@ After both lifecycle transitions, Operations showed All = 37 orders, Fresh Pick 
 - The previous 68/68 release suite and source comparison remain valid. This continuation verifies pickup and dine-in handoff as additive staff workflows. Delivery handoff remains unverified because its only retained fixture was scheduled for noon today, was not ready/paid, and had no delivery fee set. No candidate-introduced business-logic defect was demonstrated.
 
 **Acceptance decision: HOLD — one operational delivery transition remains unverified.** Core presentation, TODAY urgency progression, normal Fresh Pick physical-stock readiness, successful pickup and dine-in completion, queue movement, unique stock ownership, and Operations filters/sorting are verified. Minimum safe next action: in a future valid DEV delivery slot, use a clean synthetic delivery fixture with its normal fee set through the standard workflow, then complete payment/readiness and handoff only while eligible. Keep Production promotion unauthorized. Preserve all synthetic records as-is; no cleanup or repair was performed.
+
+## 9 November 2026 — Fresh Pick staff-priority final delivery acceptance: UNVERIFIED
+
+**Review time:** 2026-11-09 04:39 UTC (12:39 Asia/Kuching). This entry appends to the existing history without replacing earlier evidence.
+
+### Identity and isolation
+
+- The Owner-authenticated DEV Preview was deployment dpl_8WhacCS7JGJZy1NVRQ4E3cfAdT7u, source commit 096ae0deae864ee050210b33e4f8aa99ae7e10f5, URL https://project-flour-ah89mq1o0-hyphen-org.vercel.app/; DEV Supabase project tzwtpxdcggesgjaqxkqr, PostgreSQL 17.6.1.
+- A targeted read-only DEV check confirmed the delivery order and stock link. The order is synthetic. No real provider payment, message, email, WhatsApp contact or external delivery was initiated.
+- **Disclosure:** During Safari tab navigation, a Production Whitebird staff page was inadvertently rendered once in read-only mode. I immediately left it and returned to the exact DEV Preview. No Production control was used, no database query was made against Production, and no Production change occurred. No Production customer details were copied into this record.
+
+### Synthetic DEV delivery fixture
+
+- Cake/stock: synthetic QA cake “QA Staff Priority DEV 20261108 QA Unit”, stock 4a4eba32-1066-40a4-aaa8-1f6e58a7265a. Before checkout, a targeted read-only check showed the stock unlinked and no order pointing to it.
+- Order: 37619674-0b3c-4a26-8869-d51b983ffa50, ORD-20261109-0002, synthetic guest “QA Fresh Pick Delivery DEV”; delivery address explicitly marked “DEV SYNTHETIC QA DELIVERY - DO NOT DISPATCH”; slot 10 November 2026 at 12:00 Malaysia time.
+- Checkout via the ordinary DEV Preview workflow succeeded. It displayed Fresh Pick and TOMORROW. Product subtotal RM1 and existing processing fee RM5 were shown. Per Owner instruction for this dummy DEV fixture, the existing RM5 delivery-fee preset was selected and saved as a synthetic QA amount; this is not asserted to be a real route-priced delivery quote. The UI showed RM11 amount due after both fees.
+- The DEV order workspace recorded “Delivery fee quoted” and “Confirmation prepared”. Confirmation preview contained the synthetic address and amount. No “Mark as Sent”, WhatsApp, or other send action was used.
+- Final targeted read-only DEV order state: submitted, unpaid, delivery, date 2026-11-10, 12:00, linked stock ID above; ready_at, out_for_delivery_at, and delivered_at are NULL. The corresponding stock has order_id equal to this order, lifecycle confirmed, and ready_for_collection=false. No conflicting ownership was observed.
+
+### Result
+
+- **STAFF PRIORITY FUNCTIONAL ACCEPTANCE: PASS** — prior 68/68 regression evidence and previously recorded presentation, date-indicator, urgency, pickup/dine-in, Bakery and Operations-filter checks remain applicable to the unchanged candidate. This delivery order visibly showed Fresh Pick · TOMORROW. No source was changed.
+- **DELIVERY WORKFLOW ACCEPTANCE: UNVERIFIED** — a clean delivery checkout and synthetic QA fee recording are verified, but payment, readiness, queue entry and delivery handoff are not. The scheduled slot is tomorrow at noon, so handoff is not currently eligible. Confirmation is prepared but was not sent; the detail view still showed “Confirmation not prepared” in its attention panel despite the prepared timeline entry, so confirmation state needs a fresh review before advancing. No delivery action was attempted.
+- **OWNER VISUAL APPROVAL: PENDING.** Review the protected Preview at the URL above: (1) Owner Operations shows Fresh Pick vs Normal Preorder, TODAY/TOMORROW and filters; (2) Bakery separates physically supplied stock from production work; (3) Collection shows active eligible orders and removes completed handoffs without changing eligibility. Do not use this synthetic delivery address for actual dispatch.
+- **Production release remains HOLD.** No Production deployment, alias change, database write, migration, environment change or business-data modification occurred. The one accidental read-only Production page render is disclosed above; all intentional testing and database verification for this entry were DEV-only.
+
+**Minimum next action:** on or after the synthetic slot’s normal eligibility time on 10 November, resume with this same DEV fixture only if the order remains valid and the Owner confirms it is still safe to retain. Review the confirmation state, use only the ordinary internal synthetic payment/readiness workflow, then complete delivery handoff only when the application permits it. If the confirmation workflow requires actually contacting a recipient, leave it unadvanced and keep delivery acceptance UNVERIFIED.
