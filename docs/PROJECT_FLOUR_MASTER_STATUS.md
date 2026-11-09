@@ -2673,3 +2673,87 @@ A read-only attempt to query views returned no matches. Two metadata-query const
 - Issue #9 security closure: **HOLD / VULNERABILITY CONFIRMED (limited aggregate disclosure)**. Keep Issue #9 open pending DEV-first remediation/acceptance and completion of the unverified path tests.
 
 Production isolation is confirmed for this task: no Production writes, business-row reads, migrations, deployments, configuration changes, alias changes, or live access probes occurred. DEV received no writes or adversarial tests. The live Production application and aliases remain as recorded above.
+
+
+## 9 November 2026 — Issue #9 targeted DEV reproduction and remediation design
+
+### Identity and constraints
+
+- Evidence base: prior Issue #9 audit commit `f6b11f974e9f8004af59c330781939bbfab7eabe`.
+- Application source reviewed: Production candidate `096ae0deae864ee050210b33e4f8aa99ae7e10f5`, tree `0722a10e0e1602deacee40d751e6a974ae596ddd`; local source checkout was clean.
+- Production Supabase `cuowwlduhxxifmpvpltt`, PostgreSQL `17.6.1.166`; DEV Supabase `tzwtpxdcggesgjaqxkqr`, PostgreSQL `17.6.1.155`. Supabase project metadata confirmed distinct IDs and ACTIVE_HEALTHY status. The live Vercel deployment and aliases were not changed.
+- Current Production metadata was limited to catalog/security definitions, grants, policies and function definitions. No Production order/customer rows or authentication identities were read. No Production or DEV schema, role, grant, policy, record, deployment, environment or alias was changed.
+
+### Capacity RPC: DEV role-level reproduction
+
+Production and DEV have the same current capacity RPC definition fingerprint: `e94c5c00a9761f8fd4e07ff0e547004a`. Both report postgres ownership, STABLE SECURITY DEFINER, `search_path=public`, EXECUTE false for `anon`, EXECUTE true for `authenticated`, and no active-staff/role helper in the body.
+
+Exact signature:
+
+`public.production_capacity_committed_quantity(p_pickup_date date, p_library_cake_id uuid, p_library_cake_size_id uuid DEFAULT NULL::uuid, p_collection_id uuid DEFAULT NULL::uuid) RETURNS integer`
+
+The SQL body sums matching `order_items.quantity` after joining `orders` and filtering confirmed, awaiting-payment, or paid orders. It returns one aggregate integer; it does not return an order ID or customer fields.
+
+A DEV-only read-only role simulation ran the RPC as database role `authenticated` with a synthetic nonexistent subject and deliberately nonmatching date/UUID arguments; it returned scalar `0`. The same call as `anon` was denied with SQLSTATE `42501` (permission denied for function). This reproduced the authenticated-role execute path without creating an Auth account or reading individual order data. It is not a full PostgREST login test. Separate active-staff and inactive/archived Auth sessions were not exercised. Because the current function contains no identity/role check, its database grant is not conditional on those account states.
+
+**Result: CAPACITY RPC EXPOSURE CONFIRMED.** Any signed-in non-staff account using the `authenticated` database role can invoke the function. A matching filter could reveal aggregate committed demand for that date/cake/size/collection. No matching real or synthetic order aggregate was requested, and no evidence establishes that a non-staff account has used it.
+
+### Caller and compatibility inventory
+
+A repository-wide search of the exact Production source found one direct application call to `production_capacity_committed_quantity`: `src/workspaces/library/order-availability/capacity/queries.ts` (`listProductionCapacityForDate`). It uses `createClient()`, the server Supabase client carrying the current user session, not the service client. The shared `loadProductionCapacityWorkspace` loader is consumed by:
+
+- `ProductionCapacitySection`
+- `WaitingListAvailabilitySection`
+- `ProductionCapacityHistorySection`
+
+These sections are rendered on `/bakery/availability`. That page calls `requireStaff()` and then `canViewOrderAvailability()`; the allowed roles in source are Owner, Manager, Bakery, and Customer Operations. Thus the application caller has an active staff session and uses the aggregate for capacity/Waiting List presentation. No direct Operations workspace call or customer-facing call to this RPC was found. Public catalogue/availability code uses other functions and does not call this aggregate RPC.
+
+Compatibility implication: a role guard allowing those four roles preserves the discovered application caller contract. Revoking EXECUTE from `authenticated` wholesale would break this server-side staff path. A role guard still needs DEV acceptance for each allowed role, unauthenticated/non-staff, and inactive/archived staff before release.
+
+### Stock-linked order ID exposure
+
+Current DEV and Production `public.extra_stock` metadata agrees:
+
+- RLS enabled (not FORCE); anonymous table SELECT and column SELECT on `order_id` are granted.
+- Anonymous public SELECT policy requires confirmed lifecycle, `sold_at IS NULL`, confirmation/pickup-window fields present, and current time within the window. It does **not** require `order_id IS NULL`.
+- The authenticated SELECT policy also has a public-availability branch in addition to its active-staff branch; that public branch likewise lacks an `order_id IS NULL` condition.
+- The `order_id` foreign key points to `orders(id)`; the check constraints do not require `order_id IS NULL` whenever `sold_at IS NULL`. Existing triggers concern assignment/readiness/disposition but do not establish that cross-column invariant.
+
+Therefore, if a row meets the public availability policy while carrying a non-null `order_id` and null `sold_at`, its order UUID is selectable by anon and by the public branch for authenticated users. This is a **confirmed conditional policy exposure**; whether any such row currently exists is unknown because no stock or order rows were read.
+
+Current function metadata and source review found known allocation/checkout paths pair or sequence the fields within a database function transaction: `assign_extra_stock_to_order` sets both together; the 10- and 16-argument `submit_guest_extra_order` bodies set sale time and then link the order in the same checkout transaction; paid Fresh Pick cancellation clears both together. The 10-argument and 16-argument checkout fingerprints match the recorded Production values (`0046749a0cfacff63de706567519438c` and `ef60e2d117356bc195ace69455a7dcec`). Walk-in completion paths also mark the stock sold before linking its created order within their function. The inspected core paths do not show a normal committed `order_id NOT NULL / sold_at NULL` result. A catalog scan found 22 functions with extra-stock UPDATE/INSERT references; a complete semantic review of every writer and every exception boundary is not complete, so no global guarantee is claimed.
+
+A RLS policy simulation with an artificial inconsistent stock row was not performed: hosted DEV must not receive such a fixture, and no disposable schema reproducing the exact current table/policy/triggers was prepared. No invalid DEV fixture was created, and no stock rows were inspected.
+
+### Guest receipt and cross-order capability path
+
+Source review of `src/workspaces/storefront/checkout/receipt.ts` shows the guest receipt loader requires the cookie value to equal the requested order UUID, then uses the server-only service client to load the guest order and receipt details. Checkout sets a one-hour, httpOnly, SameSite cookie. The comparison is equality with the UUID; the cookie is not cryptographically signed and the server check does not independently prove who received it. Possession or disclosure of the order UUID is therefore the effective capability. The receipt contains guest/order details, so an exposed UUID could permit cross-order access if a caller supplies a matching cookie. The conditional `extra_stock.order_id` path above could supply such an ID if an inconsistent row exists.
+
+No guest Auth account, receipt capability, expired token, unrelated order, or cross-customer request was exercised. No customer notification was triggered and no order data was retrieved. This path is **HOLD / runtime-unverified**, with a credible conditional chaining risk; the evidence does not establish that a qualifying stock row or exploit has occurred.
+
+### Test coverage and remaining limits
+
+- DEV project identity: verified.
+- Capacity RPC: role-level DEV simulation reproduced `authenticated` execution; anon was denied. No real/synthetic Auth accounts were created.
+- Active authorized staff, inactive/archived staff, actual PostgREST session behavior, and end-to-end staff page rendering: not runtime-tested.
+- Stock RLS: exact policy/grants/constraints compared between DEV and Production; conditional behavior follows from the policy predicate. No hosted inconsistent fixture or row inspection.
+- Guest valid/invalid/expired/cross-order/cross-customer cases and all nested reader call paths: not runtime-tested.
+- The current user-authenticated Safari session was at the live Production staff login, not DEV. No Production access probe was made.
+
+### Minimal DEV-first remediation proposal (not implemented)
+
+1. **Capacity aggregate:** keep the existing function signature, return type, and authenticated grant for compatibility with the staff server caller; add a fail-closed active-staff role check permitting exactly Owner, Manager, Bakery, and Customer Operations, matching `canViewOrderAvailability`. Do not blanket-revoke `authenticated`. If changing the SQL function language/body is necessary to raise an authorization error, qualify that migration and preserve existing aggregate semantics.
+2. **Public stock policy:** require `order_id IS NULL` in both the anon public-availability policy and the public-availability disjunct of the authenticated policy, while retaining the active-staff visibility branch. This prevents UUID exposure without hiding legitimately unsold stock. Consider a cross-column database constraint only after checking historical rows in a separately authorized DEV rehearsal; it may require a data-cleanup decision and is not the minimal first fix.
+3. **Guest capability:** before changing the receipt contract, test valid, wrong-order, expired, and forged-cookie behavior with synthetic DEV orders. If order UUID possession is not an accepted capability, design an opaque, expiring, integrity-protected receipt token and preserve checkout/receipt compatibility. No such design was implemented.
+
+Regression risks and acceptance needs: capacity/waiting-list views must remain available to all four allowed staff roles; unauthorized roles must fail closed; customer-facing stock listing must still show available stock but never order-linked stock; guest checkout and its own receipt must continue; invalid/cross-order capabilities must fail; no real notifications or payment integrations may run. Any policy/function change needs a separately authorized, DEV-first schema migration and then distinct Production authorization.
+
+### Results and disposition
+
+- **CAPACITY RPC EXPOSURE: CONFIRMED** (limited aggregate disclosure to any authenticated role; DEV role-level execution reproduced).
+- **STOCK-LINK EXPOSURE: CONFIRMED CONDITIONALLY** (policy/column grant permit disclosure if a linked, unsold public-window row exists; no such row was inspected or created).
+- **GUEST CROSS-ORDER ACCESS: HOLD** (UUID-equality capability design reviewed; no runtime adversarial test; possible conditional chain from stock UUID exposure).
+- **LEGITIMATE CALLER COMPATIBILITY: INCOMPLETE** (application caller and allowed role contract identified, but no authenticated DEV role matrix or workflow acceptance run).
+- **Production impact: None from this task.** Production has the same metadata-level exposure findings, but no Production write, business-row read, authentication probe, migration, deployment, configuration change, or alias change occurred. DEV also received no writes.
+
+Issue #9 remains open. Do not close or describe it as accepted until the DEV role matrix, stock policy behavior, guest capability tests, and any approved remediation regressions are completed.
