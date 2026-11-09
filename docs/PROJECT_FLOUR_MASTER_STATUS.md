@@ -2336,7 +2336,7 @@ The previously completed 68/68 regression suite remains applicable to this uncha
 
 ## 9 November 2026 — DEV handoff continuation
 
-**Review timestamp:** 2026-11-09 04:13:58 UTC UTC (09/11/2026, 12:13:58 Asia/Kuching). Source and deployment were unchanged from the accepted candidate. Current DEV runtime identity was rechecked through the DEV-only SQL tool: database `postgres`, PostgreSQL 17.6; project `tzwtpxdcggesgjaqxkqr`. The protected Preview remained `dpl_8WhacCS7JGJZy1NVRQ4E3cfAdT7u`, commit `096ae0deae864ee050210b33e4f8aa99ae7e10f5`, URL `https://project-flour-ah89mq1o0-hyphen-org.vercel.app/`. All order actions below were performed only in the Owner-authenticated Preview. No Production system or data was accessed or changed.
+**Review timestamp:** 2026-11-09 04:13:58 UTC (09/11/2026, 12:13:58 Asia/Kuching). Source and deployment were unchanged from the accepted candidate. Current DEV runtime identity was rechecked through the DEV-only SQL tool: database `postgres`, PostgreSQL 17.6; project `tzwtpxdcggesgjaqxkqr`. The protected Preview remained `dpl_8WhacCS7JGJZy1NVRQ4E3cfAdT7u`, commit `096ae0deae864ee050210b33e4f8aa99ae7e10f5`, URL `https://project-flour-ah89mq1o0-hyphen-org.vercel.app/`. All order actions below were performed only in the Owner-authenticated Preview. No Production system or data was accessed or changed.
 
 ### Pickup completion — PASS
 
