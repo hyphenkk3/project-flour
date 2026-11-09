@@ -2399,3 +2399,51 @@ After both lifecycle transitions, Operations showed All = 37 orders, Fresh Pick 
 - **Production release remains HOLD.** No Production deployment, alias change, database write, migration, environment change or business-data modification occurred. The one accidental read-only Production page render is disclosed above; all intentional testing and database verification for this entry were DEV-only.
 
 **Minimum next action:** on or after the synthetic slot’s normal eligibility time on 10 November, resume with this same DEV fixture only if the order remains valid and the Owner confirms it is still safe to retain. Review the confirmation state, use only the ordinary internal synthetic payment/readiness workflow, then complete delivery handoff only when the application permits it. If the confirmation workflow requires actually contacting a recipient, leave it unadvanced and keep delivery acceptance UNVERIFIED.
+
+## 9 November 2026 — Fresh Pick staff-priority Production release preparation
+
+**Review time:** 2026-11-09 04:50 UTC (12:50 Asia/Kuching). Preparation only; no deployment, alias change, environment change, or database operation was performed.
+
+### Source and live Production identity
+
+- Vercel project project-flour / prj_3rmlAQzLSFOi15DEGczSuDYDq8xr, team hyphen-org / team_ykveCukHiHDuiJjWXkx8zefI.
+- Current Production deployment: dpl_3aASuiDWT9LZbggx6XT419nAtEdc, READY, target production; GitHub source d82e14ec28fe12d79d6ec7ba4e895103093b358d, tree 59875e7d3a673423aa08c6822fa973385cfa69bd.
+- Read-only alias checks independently returned whitebird.asia -> dpl_3aASuiDWT9LZbggx6XT419nAtEdc and www.whitebird.asia -> dpl_3aASuiDWT9LZbggx6XT419nAtEdc.
+- The immediate rollback candidate for this release is that current deployment dpl_3aASuiDWT9LZbggx6XT419nAtEdc. Do not use historical dpl_32gYKJALPhFt5EparxoQHtagxQQN as the first rollback target because it predates the current d82 service-key transport fix.
+- GitHub confirms candidate 096ae0deae864ee050210b33e4f8aa99ae7e10f5 is exactly one commit ahead of d82e14ec28fe12d79d6ec7ba4e895103093b358d, zero behind, with d82 as parent. Candidate tree: 0722a10e0e1602deacee40d751e6a974ae596ddd. This carries the current Production source forward and does not omit the Fresh Pick v3 reliability fix.
+- The current local worktree is detached and at f0a81f342102672bf3a74bd12415497332d17f38. It is not a deployment checkout and must not be used for a future Vercel deployment. A release execution must first use a clean checkout verified at the exact candidate SHA and tree.
+
+### Candidate change review
+
+GitHub comparison reports 24 changed paths and only the staff-priority commit. The exact inventory is:
+
+- Tests/scripts: scripts/test-extra-phase6-fresh-picks.ts; scripts/test-fresh-pick-staff-presentation.ts; scripts/test-operations-board-return.ts; scripts/test-release-regressions.mjs.
+- Derived presentation and types: src/engines/operations/order-board.ts; src/engines/orders/staff-presentation.ts; src/types/storefront.ts.
+- Bakery: src/workspaces/bakery/BakeryOrderCard.tsx; src/workspaces/bakery/BakeryOrderDetail.tsx; src/workspaces/bakery/map-order.ts; src/workspaces/bakery/select.ts; src/workspaces/bakery/types.ts.
+- Collection: src/workspaces/collection/CollectionOrderCard.tsx; src/workspaces/collection/CollectionOrderDetail.tsx; src/workspaces/collection/map-order.ts; src/workspaces/collection/select.ts; src/workspaces/collection/types.ts.
+- Owner workspace: src/workspaces/owner/OperationsBoardToolbar.tsx; src/workspaces/owner/OperationsLiveBoard.tsx; src/workspaces/owner/navigation/return-to.ts; src/workspaces/owner/orders/OrderStaffIndicators.tsx; src/workspaces/owner/orders/OrderWorkspaceForm.tsx; src/workspaces/owner/orders/OwnerOrderCard.tsx; src/workspaces/owner/orders/queries.ts.
+
+The operations engine changes the displayed fulfillment date/filter/sort basis (including dine-in reservation date), adds an order-type display filter defaulting to All, and derives an attention grouping for the staff board. These affect the displayed projection only. The added status/allocation/readiness checks supply visual cues; existing action handlers remain separate. No migration, database schema, RPC, checkout/order creation, cancellation, stock allocation/ownership, payment, readiness eligibility, handoff, authentication, authorization, RLS, or security file is changed. No new environment variable is required by the candidate. The source delta therefore needs no database migration or environment-variable change.
+
+### Exact-candidate qualification evidence
+
+- The regression log was retrieved from GitHub and SHA-256 recomputed: docs/evidence/20261108-fresh-pick-staff-priority-release-regressions.txt, 96d8b9d9efb3fcb589e11ebee640f7bab267e1ae648345ec46c2f81e8ba228f4 (GitHub blob bd20b8e22a9ff56b85a7ec3e343264dc3c164b6c). Result: 68 PASS, 0 FAIL, 0 BLOCKED; includes isolated PostgreSQL and relevant Fresh Pick/Bakery/Collection checks. Log states hosted Production/DEV integration is outside this offline suite.
+- The Production build log was retrieved from GitHub and SHA-256 recomputed: docs/evidence/20261108-fresh-pick-staff-priority-production-build.txt, 4d72d8f7649ee1f63bf7af98a3e487aee4da8ae191a9ac99ba8c0b074ddce714 (GitHub blob b96c76d252bb60ec2bcdffeb5fc9b10af0c14d1e). Next.js 16.2.12 build passed, TypeScript completed, and 47 static pages generated.
+- The exact candidate DEV Preview remains READY: dpl_8WhacCS7JGJZy1NVRQ4E3cfAdT7u, generated Vercel hostname project-flour-ah89mq1o0-hyphen-org.vercel.app, source SHA 096ae0deae864ee050210b33e4f8aa99ae7e10f5. Project SSO protection is enabled; its only deployment alias is the generated Vercel hostname, not a Whitebird custom domain.
+- GitHub check-run inspection for 096ae0deae864ee050210b33e4f8aa99ae7e10f5 returned only Vercel Preview Comments success, not a GitHub Actions run. The 68-test and Production-build evidence above are the exact-candidate retained qualification artifacts; no Actions CI pass is claimed.
+- Staff-priority functional acceptance is PASS; pickup and dine-in handoffs are PASS. Delivery handoff remains UNVERIFIED on the retained synthetic DEV order 37619674-0b3c-4a26-8869-d51b983ffa50, due 10 November 2026 at 12:00 Asia/Kuching. This is a known hosted-test limitation, not a candidate delivery-logic change; delivery actions are not changed by this commit. Owner visual approval is recorded as APPROVED in the source evidence. This does not assert Production delivery workflow testing.
+- Production configuration metadata was not modified. The Vercel environment metadata endpoint returned a truncated first page containing Preview records only, so it is not a complete Production-variable inventory. Existing Production runtime authentication had previously been verified against the intended Supabase project; the candidate adds no environment requirements. Before a real deployment, recheck required Production variable names/scopes by read-only metadata without decrypting values.
+
+### Proposed controlled release and recovery sequence
+
+1. **Fresh execution preflight:** use a clean isolated checkout at commit 096ae0deae864ee050210b33e4f8aa99ae7e10f5 and verify tree 0722a10e0e1602deacee40d751e6a974ae596ddd. Verify Vercel project/team IDs, Production Supabase binding names, exact current production deployment and both current alias mappings. Stop on any mismatch. Do not run migrations or edit environment variables.
+2. **Unaliased staging only, under separate authorization:** build/deploy the exact commit to Production target using the explicit Project Flour project/team and automatic domain assignment disabled (vercel deploy --prod --skip-domain). Do not push a new source commit merely to initiate deployment. Verify READY, source SHA/tree, Production target, SSO protection, no Whitebird custom aliases, and current aliases still on dpl_3aASuiDWT9LZbggx6XT419nAtEdc. Use only the generated protected hostname for bounded non-mutating checks.
+3. **Promotion requires separate explicit authorization:** assign only whitebird.asia and www.whitebird.asia to the exact staged deployment. Do not change dev.whitebird.asia or any other alias. Verify each mapping independently.
+4. **Post-promotion checks:** bounded read-only homepage, Browse, one published cake-detail page (allow the documented eight-second application read timeout plus render margin), Fresh Picks listing/detail, and checkout rendering without submission. Verify staff authentication/workspace reachability without browsing customer order contents. Confirm both aliases point to the candidate. Observe candidate-scoped 5xx, failed renders, authentication/RPC/checkout errors, and customer-visible Fresh Pick presentation errors for 15 minutes against the known baseline. Do not create orders, payments, stock allocations, notifications, or external fulfillment.
+5. **Rollback:** on confirmed candidate-only critical 5xx, failed page renders, staff authentication failure, Fresh Pick RPC/checkout failure, or repeated customer-visible indicator/render failures, restore both Whitebird aliases to dpl_3aASuiDWT9LZbggx6XT419nAtEdc and verify independently. Do not modify or reverse database state; this release contains no migration. An isolated historical catalogue/cache timeout without user-visible failure is monitored under the existing threshold and is not alone an automatic rollback trigger.
+
+### Recommendation and release boundary
+
+**GO — the exact application candidate is suitable for a separately authorized, unaliased Production-target staging step.** Its parent is the current Production source, exact-candidate 68/68 regression and production-build artifacts are verified, and its source delta is limited to staff-facing labels, derived dates/urgency, and visual filters/sorting. Delivery handoff remains unverified but is outside the changed operational paths and should remain explicitly documented.
+
+**No deployment or promotion is authorized by this preparation record.** The next action is Owner authorization for one unaliased Production-target staging deployment. Promotion of the two Whitebird aliases must be separately authorized after staged checks. Production and DEV databases, environment variables, aliases, deployments, orders, catalogue, collections, inventory, and payments were not modified in this preparation.
