@@ -2612,3 +2612,64 @@ Future remediation should be reproduced on DEV with synthetic records, compared 
 - **WEBSITE RELIABILITY: STABLE IN CHECKED WINDOW** — no current-deployment error records/timeouts in inspected interval; earlier DEV/rollback errors and missing public DNS/aggregate 5xx checks remain limitations.
 - **MASTER BACKLOG: INCOMPLETE** — reconciled major tracked work; several untracked items and unknown states require Owner prioritization.
 - No Production/DEV writes, migrations, deployments, configuration/alias changes, source edits, customer-data access, checkout/payment transactions, messages, stock modifications, repair, or rollback occurred. Both live domains remain on `dpl_7LdWc8fcRT4vmbPksrJUvDqrB1iE`.
+
+
+## 9 November 2026 — Issue #9 current order-access review (read-only)
+
+### Scope and identity
+
+This review continues the current-state audit at `c1ada6082028d034be90abeaf4d842665dddfa1e`. GitHub Issue #9 was read and remains OPEN. Its November 3 unconditional-policy evidence is historical; it is not treated as current without rechecking.
+
+- Live application: `096ae0deae864ee050210b33e4f8aa99ae7e10f5`, deployment `dpl_7LdWc8fcRT4vmbPksrJUvDqrB1iE`.
+- Production Supabase: `cuowwlduhxxifmpvpltt`; DEV: `tzwtpxdcggesgjaqxkqr`. Project metadata reconfirmed the two distinct references.
+- Production metadata work was limited to catalogs, policies, grants, function definitions and view definitions. No business-table rows, customer records, auth identities, or secret values were retrieved.
+- No database, application, deployment, environment, alias, or business-data changes were made.
+
+### Current direct table authorization
+
+Current Production metadata shows `public.orders` has RLS enabled. Its restrictive authenticated policy `issue9_active_staff_only` applies an active-staff predicate to both row visibility and checks; this restrictive policy intersects with permissive policies. The predicate requires the caller to map to an active, unarchived staff profile with an allowed role. `anon` has no orders table SELECT/INSERT/UPDATE/DELETE privilege. `authenticated` has SELECT and UPDATE table privileges but no INSERT/DELETE; effective row access remains constrained by the restrictive policy. Relevant order-detail tables inspected also have RLS and active-staff restrictive policies, with no anonymous SELECT grant. This supports the current finding that ordinary direct non-staff orders access is restricted; it does not prove every function path is safe.
+
+The helper/actor binding design was reviewed: `issue9_private.is_active_staff()`, `_current_staff_role_code()`, and `_bind_rpc_actor(uuid)` are postgres-owned SECURITY DEFINER helpers with pinned search paths; anonymous callers cannot execute the staff-role helpers, and actor binding rejects anonymous callers and mismatched actor IDs. The previously documented 47 actor-bound staff mutation RPCs are not counted as proof that all order readers are authorized.
+
+### Order-reading RPC inventory and findings
+
+Two currently callable, read-oriented Production RPCs that expose order-related information were individually reviewed from current catalogs and full definitions. This is the confirmed directly identified read-RPC count, not a claim that the entire nested/dynamic call graph is complete.
+
+| Function | Effective EXECUTE / design | Finding |
+| --- | --- | --- |
+| `public.production_capacity_committed_quantity(date, uuid, uuid, uuid)` | `authenticated` EXECUTE; `anon` denied. postgres-owned, STABLE SECURITY DEFINER, `search_path=public`. Reads matching `orders`/`order_items` and returns only a committed-quantity aggregate. No caller identity or staff-role check is present in the function. | **Confirmed limited authorization gap.** Any authenticated account able to invoke the RPC can request aggregate committed quantities. This does not return an order ID, customer identity, or individual order. The Bakery availability page is itself behind `requireStaff()` and `canViewOrderAvailability`, but that UI gate does not constrain direct Data API RPC calls. |
+| `public.list_catalogue_voucher_redemption_events(uuid, text, integer, integer)` | `authenticated` EXECUTE; `anon` denied. postgres-owned, STABLE SECURITY DEFINER, `search_path=public`. | **No authorization flaw found in reviewed definition.** It checks the current staff role and permits only Owner/Manager before returning redemption/order metadata. Not runtime-tested in DEV. |
+
+A catalog scan found 37 callable public functions whose source directly mentions `public.orders` (35 RPC-callable functions plus two trigger-only functions); this is a candidate set, not a reader count. The source/metadata review separated order readers from staff mutation functions and guest submission functions. Guest checkout RPCs exposed to anon are submit/create paths, not general lookups by an arbitrary existing order ID in the reviewed source. Several anonymous-executable staff-action wrappers delegate to `_bind_rpc_actor`, which rejects anonymous callers. Trigger-only routines are not PostgREST-callable. A broader keyword scan had 82 candidates and many false positives; it is not presented as 82 readers or as fully reviewed. The 47 previously reviewed staff mutation RPCs remain a separate inventory.
+
+The current Production view/materialized-view catalog scan found no non-system view whose definition directly references orders, order IDs/numbers, or payments. This is a bounded definition scan; it cannot rule out indirect access through every nested routine, dynamic SQL, or external service.
+
+### Indirect and capability-based paths
+
+- `public.extra_stock` is RLS-protected but has an anonymous SELECT policy and anon column SELECT includes `order_id`. The policy selects confirmed, currently available stock where `sold_at IS NULL`; normal allocation/guest checkout code sets `order_id` together with `sold_at`. The catalog contains no coupling constraint requiring `order_id IS NULL` whenever `sold_at IS NULL`. No Production rows were read, so the existence of an inconsistent row and any actual order-ID disclosure are **unverified**, not confirmed. Defense-in-depth proposal: in DEV, test and then require `order_id IS NULL` in the public availability policy, with regression checks that available stock remains visible and allocated stock is hidden. Any policy change requires separate authorization.
+- Guest receipt source uses a one-hour, httpOnly, SameSite cookie bound to the just-submitted order ID; receipt loading checks equality before using the server-side service client. The order UUID is also part of the receipt URL. This is a capability-style check whose practical safety depends on UUID secrecy and the checkout-set cookie. No adversarial request or customer record was used. Cross-order resistance is **source-reviewed but not runtime-tested**; testability and exposure through any other route remain unverified.
+- Application staff order readers use authenticated clients and rely on RLS. The reviewed Bakery availability RPC call is reachable only after staff page authorization in the UI, but the RPC itself lacks that guard as noted above.
+
+### DEV adversarial verification
+
+DEV project identity was confirmed as `tzwtpxdcggesgjaqxkqr`, distinct from Production. No DEV adversarial tests were executed: the available Safari session was at the live Production staff login, not an authenticated DEV Preview. No synthetic accounts or orders were created and no Production browser session was used for probes. Therefore anonymous/non-staff/active-staff/inactive-staff/archived-staff, guest capability expiry, unrelated capability, cross-order and cross-customer behavior, and legitimate checkout/payment/staff workflow compatibility remain **unverified at runtime**.
+
+A read-only attempt to query views returned no matches. Two metadata-query constructions used during the review returned SQL errors (SQLSTATE 0A000 and 2201B); they made no changes and returned no business rows. Subsequent bounded catalog queries succeeded. No query was retried against business data.
+
+### Classification, impact, and minimum next steps
+
+- **Confirmed:** `production_capacity_committed_quantity(date, uuid, uuid, uuid)` allows any authenticated role to invoke a SECURITY DEFINER aggregate over order quantities without an active-staff check. Impact is limited to aggregate demand/capacity information for supplied filters; no individual order or customer details are returned by this function. The evidence does not establish that a non-staff user actually invoked it.
+- **Not confirmed:** a direct orders-row disclosure to non-staff; current RLS metadata supports restriction.
+- **Unverified conditional path:** anonymous `extra_stock.order_id` disclosure if a row violates the normal `sold_at`/allocation pairing; no rows were inspected.
+- **Not proven vulnerable:** the reviewed voucher redemption reader; it has an explicit Owner/Manager check.
+- **Minimum DEV-first remediation proposal:** add the same active-staff/role authorization expected by the protected Bakery availability workflow to `production_capacity_committed_quantity` (or remove direct authenticated EXECUTE and route through an equivalently authorized server boundary, after caller compatibility review). Test denial for anon, authenticated non-staff, inactive/archived staff, and allow the intended active staff roles; verify Bakery capacity, waiting-list availability, guest checkout, and staff operations remain functional. Separately test the `extra_stock` invariant and guest receipt cross-order boundary. No correction was implemented.
+
+### Counts and disposition
+
+- Direct order-reading RPCs identified and individually reviewed: **2**.
+- Fully reviewed for definition, owner, security mode, search path and effective grants: **2**.
+- DEV-adversarial-tested: **0**.
+- Additional candidate functions/capability paths fully resolved: **No**; nested/dynamic call graph and runtime identities remain unverified.
+- Issue #9 security closure: **HOLD / VULNERABILITY CONFIRMED (limited aggregate disclosure)**. Keep Issue #9 open pending DEV-first remediation/acceptance and completion of the unverified path tests.
+
+Production isolation is confirmed for this task: no Production writes, business-row reads, migrations, deployments, configuration changes, alias changes, or live access probes occurred. DEV received no writes or adversarial tests. The live Production application and aliases remain as recorded above.
