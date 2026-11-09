@@ -2524,3 +2524,91 @@ Preparation for the Owner-authorized unaliased Production-target staging of staf
 - Authenticated staff workspace UI was not exercised after promotion; staff routes without a session correctly redirected to login.
 - Aggregate site-wide HTTP 5xx telemetry was unavailable, and image asset loading was not separately measured. These limits are recorded rather than inferred as passes.
 - No Production/DEV database schema or business data, environment variable, source code, checkout/payment/stock/fulfilment behavior, or non-approved domain was changed. No migration or deployment rebuild occurred. No rollback was necessary. Future rollback, if separately incident-authorized or required by the existing release authorization, is the two exact alias assignments back to `dpl_3aASuiDWT9LZbggx6XT419nAtEdc` followed by independent mapping verification.
+
+
+## 9 November 2026 — Live Production safety and backlog audit
+
+### Scope and evidence boundary
+READ-ONLY audit. No source, database object or record, migration, deployment, environment variable, Vercel setting, alias, customer/business data, payment, stock, or notification was changed or accessed. No customer/operational rows were queried; no identity or unauthorized probe was created. Two catalog SQL attempts failed with SQLSTATE 42703 due to incorrect metadata-column names; they performed no changes. Subsequent bounded metadata queries succeeded.
+
+Source inspected in isolated clean clone `/private/tmp/project-flour-prod-staff-priority-stage-20261109`: branch `codex/fresh-pick-staff-priority-20261108`, commit `096ae0deae864ee050210b33e4f8aa99ae7e10f5`, tree `0722a10e0e1602deacee40d751e6a974ae596ddd`, origin `https://github.com/hyphenkk3/project-flour.git`.
+
+### Current live identity
+- Vercel project `project-flour`, ID `prj_3rmlAQzLSFOi15DEGczSuDYDq8xr`, team `hyphen-org`.
+- Production deployment `dpl_7LdWc8fcRT4vmbPksrJUvDqrB1iE` is READY, source commit `096ae0deae864ee050210b33e4f8aa99ae7e10f5`, tree `0722a10e0e1602deacee40d751e6a974ae596ddd`.
+- Both `whitebird.asia` and `www.whitebird.asia` map to that deployment. This agrees with the approved current baseline. Rollback deployment `dpl_3aASuiDWT9LZbggx6XT419nAtEdc` remains READY, source `d82e14ec28fe12d79d6ec7ba4e895103093b358d`.
+- Supabase metadata: Production `cuowwlduhxxifmpvpltt`, ACTIVE_HEALTHY, PostgreSQL `17.6.1.166`; DEV `tzwtpxdcggesgjaqxkqr`, ACTIVE_HEALTHY, PostgreSQL `17.6.1.155`. DEV business data was not inspected.
+
+### Issue #9 — order-access security
+**Direct-table exposure appears corrected; overall Issue #9 remains UNVERIFIED** because the broader callable SECURITY DEFINER response surface was not exhaustively reviewed and no hostile live probe was authorized.
+
+Current Production catalog evidence:
+- `public.orders` has RLS enabled (FORCE RLS is false). Restrictive policy `issue9_active_staff_only` applies to authenticated commands with both USING and WITH CHECK calling `issue9_private.is_active_staff()`. This restrictive policy ANDs with permissive policies.
+- `anon` has no SELECT/INSERT/UPDATE/DELETE table privilege. `authenticated` has SELECT and UPDATE, but not INSERT or DELETE; it has column visibility to notes, so the row policy is essential.
+- `issue9_private.is_active_staff()`: postgres owner, SECURITY DEFINER, SQL STABLE, empty pinned search_path; verifies auth.uid matches an active, unarchived staff profile and one of owner, manager, customer_operations, collection, bakery. PUBLIC/anon lack private-schema access; authenticated has required helper access.
+- The Issue #9 migration family is recorded in Production. All 47 targeted staff mutator SECURITY DEFINER RPCs inspected are present and actor-bound; none missing/unbound. All 47 are postgres-owned SECURITY DEFINER functions with authenticated EXECUTE. The actor binder checks active/unarchived staff and prevents an authenticated caller claiming another actor. Guest order-creation RPCs remain intentionally available and are distinct from arbitrary row-read access.
+- No non-staff test identity or live unauthorized probe was used. Other order-reading SECURITY DEFINER functions and their capability semantics were not exhaustively inspected; Issue #9 remains open.
+
+**DEV-first next step:** Inventory all callable SECURITY DEFINER functions that read/return order-linked information. Classify staff-only versus intended guest-capability access. Test synthetic guest/non-staff and active-staff paths, checkout compatibility, and Owner/Collection/Bakery operations. Do not broadly revoke privileges. Any Production change needs separate review and authorization.
+
+### Backup and recovery
+**BACKUP READINESS: PARTIAL.** Latest documented full encrypted archive: `project-flour-production-full-20261020T034849Z.pfbackup`, SHA-256 `1c5df28031d7f63199bd73061f64b1a9ad7b9fbfa96214d338e43643d8c1c181`, 70,578,883 bytes; prior status reports Drive re-download checksum verification. It includes a PostgreSQL export/global role and grant metadata, Auth/business metadata, Storage metadata, and 34 Storage object files. It is dated Oct 20, not current; DB/Storage capture was not atomic. Prior restore could not reproduce Supabase-managed pg_cron/supabase_vault behavior and exact managed ownership/ACLs.
+
+Current project-specific PITR capability, retention and latest recovery point were not exposed by metadata available in this audit. Historical Free-plan/no-PITR notes are not treated as current verification. Current Storage bytes, Auth identities/passkey recovery, provider/secrets config, scheduled jobs, Vercel settings and managed services lack a demonstrated end-to-end recovery. No restore/settings change occurred.
+
+Next: read-only check current Supabase backup/PITR/retention/recovery point; inventory Auth/Storage/provider/secrets/schedules without exporting secrets; then separately authorize an isolated restore rehearsal. Do not claim complete recovery before that succeeds.
+
+### Reliability
+**WEBSITE RELIABILITY: STABLE IN CHECKED WINDOW, WITH LIMITATIONS.**
+- Latest promotion evidence (Nov 9 05:14–05:31 UTC): homepage, apex/www root, /browse, /extra, /login and one published cake detail returned 200; unauthenticated staff routes redirected to login. More than 15 minutes of observation reported no runtime error clusters. Aggregate 5xx telemetry, image asset fetches, and authenticated staff interactions were not verified.
+- Current deployment runtime logs through approximately 07:22 UTC: no error/fatal/warning records and no TimeoutError/statement-timeout matches. Six warning-level entries existed in a level aggregation but were not individually inspected.
+- A 24-hour error view included two homepage-collection-preview timeouts on DEV Preview and a small number of older photo/cache/cake-detail timeout events on the rollback deployment. These do not establish a current candidate-specific Production defect. No matching Production Postgres statement-timeout was found in the bounded interval. PgBouncer idle-timeout cleanup events do not establish saturation.
+- This audit could not resolve the public domain in its execution environment (DNS failed before HTTP); that is not evidence that the live site is down. No repeat probing/traffic was performed.
+- The two SQLSTATE 42703 errors were this audit's failed metadata statements, not application incidents or data changes.
+
+Next: lightweight trusted external route/5xx check, inspect the six warnings if available, correlate request IDs across Vercel/Supabase; avoid load testing.
+
+### Reconciled backlog
+Statuses reconcile current evidence with later releases. Historical HOLDs are not treated as proof of current failure.
+
+| Item | Latest verified state | Next action / dependency | Priority |
+|---|---|---|---|
+| #7 Internal Notes | Issue open. Current source has internal_notes select/map/display path; authenticated live staff acceptance and issue closure not verified. | Verify staff-only Collection card/detail and customer-note separation on DEV; preserve Bakery Attention distinction. | High |
+| #8 Add-on Catalogue | Open planning issue; current implementation/acceptance not established. | DEV-first seasonal/date/checkout validation, snapshots, totals and collection isolation; separately authorize implementation/schema if needed. | High |
+| #9 Order Security | Direct-table exposure appears blocked; 47 targeted staff RPCs actor-bound; wider RPC semantics unverified; issue open. | Complete DEV-only RPC surface and guest-capability tests. | Critical |
+| Website/Supabase reliability | Recent bounded promotion checks passed; older DEV/rollback cache/detail/photo timeouts persist in history; no current live error cluster in checked window. | Monitor by deployment/request ID; obtain trusted public check and 5xx view. | High |
+| Backups/DR | Partial; Oct 20 archive verified historically, stale and incomplete for current whole-service restore. | Confirm current PITR/retention/recovery point; isolated restore rehearsal, separately authorized. | Critical |
+| Capacity consistency | Live ledger includes serialization, row-lock conflict and status-consistency migrations; no current failure established here. | Monitor concrete consistency signals; preserve existing lock regressions for future changes. | High |
+| Refund/payment integrity | Live ledger includes payment correction, atomic overpayment refund, Refund V1, refund ACL and actor-bound lifecycle migrations. Ledger presence is not end-to-end behavior proof. | Maintain DEV synthetic atomicity/authorization regression; no real refund. | High |
+| Fresh Pick remaining acceptance | V3 and staff-priority release are live. DEV delivery handoff remains UNVERIFIED in prior status. | Complete with eligible synthetic DEV fixture and normal workflow; never test with live order. | Medium |
+| Share Payment delivery | Historical DEV acceptance exists; current Production customer-message flow not verified. | Synthetic DEV flow without provider transaction or real message. | Medium |
+| Staff sound notifications | No current verified issue/acceptance located. | Owner to confirm scope; create scoped backlog item if wanted. | Low/unprioritized |
+| iPhone/Android push | No current completion evidence; old WhatsApp plus-sign note is separate. | Clarify platform, opt-in, permission and delivery requirements. | Low/unprioritized |
+| Staff notification preferences | No current verified completion evidence. | Define role/channel preferences and safe defaults. | Low/unprioritized |
+| WOS synchronization | Collection Realtime correction historically released; broader latency and EXTRA-stock Realtime privacy review not closed. | Targeted DEV event/latency and RLS review. | Medium |
+| Waiting List | Issue #9 includes actor-binding compatibility; lifecycle/capacity acceptance not established by that alone. | Verify existing DEV synthetic lifecycle and authorization. | Medium |
+| Staff Administration | V1 historically deferred; no later completion record found. | Confirm current need and scope before planning. | Medium |
+| Passkeys | Prior implementation evidence exists; current enrollment/recovery readiness unknown. | Read-only configuration and recovery procedure review. | High |
+| Financial Reports | Historical DEV acceptance exists; current Production behavior and desktop month-selector status unknown. | Verify current source/release; synthetic or aggregate-only DEV checks. | Medium |
+| Collection/Bakery tasks | Staff-priority release is live; Collection notes/WOS/cache items tracked; authenticated live operations not exercised here. | DEV-first staff workflow acceptance. | High |
+| Fresh Pick cutoff | Historically deferred/excluded; later completion not evidenced. | Keep deferred unless Owner reprioritizes; timezone/cutoff tests required. | Low/deferred |
+| Customer communications | Manual templates and Collection counter instructions historically released; not automated sends. Old iPhone “+” formatting issue has no current closure evidence. | Synthetic DEV formatting check; verify no automatic-send behavior. | Medium |
+| Hyphen × Whitebird reservation | No recent status/acceptance located. | Owner to confirm scope and priority. | Unprioritized |
+| Deferred roadmap | Fresh Pick cutoff, Ready-for-Collection override, Staff Administration V1 and complimentary-item persistence have defer/HOLD history; no later closure located except described above. | Preserve deferred status until explicit reprioritization and evidence. | Low/deferred |
+
+### Top five next actions
+1. Verify current PITR/retention/recovery point and plan separately authorized isolated full-service restore rehearsal.
+2. Finish DEV-only semantic audit of order-reading SECURITY DEFINER RPCs and test guest/staff compatibility.
+3. Perform bounded trusted route/5xx monitoring; inspect warning entries and correlate cache/database timeouts.
+4. Verify Issue #7 Internal Notes and Collection/Bakery workflows in DEV using synthetic records.
+5. Close DEV Fresh Pick delivery acceptance; separately validate refund/payment and Share Payment paths without real financial transactions.
+
+Future remediation should be reproduced on DEV with synthetic records, compared to current Production source, and covered by relevant checkout, payment-state, stock ownership, staff-auth and fulfilment regressions. No fix is authorized by this audit.
+
+### Executive outcome
+- **LIVE PRODUCTION SAFETY: PASS** — deployment and both aliases match approved baseline; no state-changing action occurred.
+- **ISSUE #9 SECURITY: UNVERIFIED** — direct non-staff access appears blocked by restrictive active-staff RLS, anon has no table grants, and the 47 targeted staff RPC actor-binding checks pass; wider callable RPC response semantics remain unreviewed.
+- **BACKUP READINESS: PARTIAL** — documented Oct 20 archive is stale and incomplete as full-service recovery proof; current PITR/retention unknown.
+- **WEBSITE RELIABILITY: STABLE IN CHECKED WINDOW** — no current-deployment error records/timeouts in inspected interval; earlier DEV/rollback errors and missing public DNS/aggregate 5xx checks remain limitations.
+- **MASTER BACKLOG: INCOMPLETE** — reconciled major tracked work; several untracked items and unknown states require Owner prioritization.
+- No Production/DEV writes, migrations, deployments, configuration/alias changes, source edits, customer-data access, checkout/payment transactions, messages, stock modifications, repair, or rollback occurred. Both live domains remain on `dpl_7LdWc8fcRT4vmbPksrJUvDqrB1iE`.
