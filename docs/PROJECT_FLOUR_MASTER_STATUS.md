@@ -2332,3 +2332,43 @@ The previously completed 68/68 regression suite remains applicable to this uncha
 **Result: HOLD — DEV acceptance is not complete.** Presentation, clean same-day checkout, confirmation/payment/readiness state progression, Bakery’s zero-production classification, Operations filters, and Collection ready-queue entry are verified. The physical pickup transition and queue removal cannot yet be honestly claimed: the noon fulfilment window had not opened at capture time. Noon delivery and dine-in operational transitions are likewise unverified; search was not retested. No candidate-introduced operational regression was identified.
 
 **Minimum next action.** At or after 12:00 MYT on 9 November, continue with the already-created order in the authenticated DEV Preview: perform the normal Collection “Mark Collected” action only if it is eligible, then verify completed state, stock ownership and Collection queue removal. Separately exercise the retained delivery/dine-in orders only if their standard staff actions are then eligible and can be completed without external notification or service. If unavailable, retain those as unverified. Do not recreate or reuse the old conflicting stock. Production release remains HOLD; no Production deployment, database write, migration, or alias change was made.
+
+
+## 9 November 2026 — DEV handoff continuation
+
+**Review timestamp:** 2026-11-09 04:13:58 UTC UTC (09/11/2026, 12:13:58 Asia/Kuching). Source and deployment were unchanged from the accepted candidate. Current DEV runtime identity was rechecked through the DEV-only SQL tool: database `postgres`, PostgreSQL 17.6; project `tzwtpxdcggesgjaqxkqr`. The protected Preview remained `dpl_8WhacCS7JGJZy1NVRQ4E3cfAdT7u`, commit `096ae0deae864ee050210b33e4f8aa99ae7e10f5`, URL `https://project-flour-ah89mq1o0-hyphen-org.vercel.app/`. All order actions below were performed only in the Owner-authenticated Preview. No Production system or data was accessed or changed.
+
+### Pickup completion — PASS
+
+- Synthetic order `06c98e7b-0c9b-4cad-b91e-989af6b50997` (`ORD-20261109-0001`) used its unique stock `2d284123-f0af-4755-ac64-57fed098d2ba`. It was paid and ready for collection before handoff. The normal Collection **Mark Collected** action completed successfully after the noon pickup window opened.
+- Collection showed the order as **Picked Up**, then the active Ready for Collection queue showed **0 ready orders**. The Completed tab showed it as Fresh Pick · TODAY and Picked Up.
+- A targeted read-only DEV check after the action confirmed order status/payment status paid, the order points to that same stock, the stock points back to the same order, stock readiness is true, and exactly one stock row is owned by that order. No conflicting ownership was found. The earlier cancelled/reused stock conflict fixtures were not touched.
+
+### Dine-in completion — PASS
+
+- Retained synthetic order `ae0b8a0e-6fde-4893-ae81-a14958b244d8` (`ORD-20261108-0005`) is Fresh Pick dine-in scheduled for 9 November 2026 at noon. Its UI showed the actual reservation date and time, not order-created date.
+- Normal Owner confirmation and synthetic DEV payment steps were completed. The confirmation “sent” state was recorded internally only; no WhatsApp, email, notification or customer contact was sent. Payment was a synthetic RM1 “Others” entry explicitly marked as QA/no funds; no payment provider was used.
+- An attempted order-level ready action was correctly rejected because the assigned stock was not yet ready. Bakery’s normal per-stock Fresh Pick readiness control then marked the assigned synthetic stock ready with a QA-only reason. Bakery continued to show 1 supplied by Fresh Pick / 0 to produce.
+- The normal Collection **Complete Dine-in** action succeeded. The Completed tab showed **2 completed handoffs** for the day: this dine-in and the pickup above; the active Ready for Collection queue was empty. A targeted read-only query confirmed the order remains paid, its assigned stock is ready, the stock points back to the order, and exactly one owned stock row exists.
+- Before readiness, Bakery presented Fresh Pick · TODAY with Action today; after the stock readiness step it showed Ready for Collection without Action today. Completed Operations presentation retained Fresh Pick and TODAY without an active urgency cue.
+
+### Operations filters and sorting — PASS
+
+After both lifecycle transitions, Operations showed All = 37 orders, Fresh Pick = 16, Normal Preorder = 21 (16 + 21 = 37). The completed group showed both test orders under Fresh Pick, while the Normal Preorder filter retained all 21 normal orders and no Fresh Pick order. Pickup Date — Earliest First kept the Normal Preorder count at 21 and displayed the future synthetic preorder at the top; Clear filters restored All order types and the default latest-first sort. No order disappeared from the tested view because of the type filter or sort. Search was not newly retested.
+
+### Delivery fixture — HOLD / safely left unchanged
+
+- Retained synthetic delivery `60450e65-0572-4b13-8ab6-566258867da4` (`ORD-20261108-0004`) is scheduled for 9 November 2026 at 12:00 PM. At the final check, current Malaysia time was about 12:09 PM; the scheduled time had passed. It remained submitted and unpaid, its assigned stock was not ready, and Collection showed **0 deliveries**. The Owner order page showed RM6 due (including RM5 processing fee) while the delivery fee was still **Not set**.
+- No confirmation, payment, fee selection, stock readiness, or delivery handoff was performed for this order. The slot time had passed and a delivery charge had not been established; selecting a fee or representing delivery as completed would require guessing or testing outside the stated window. No external fulfilment was triggered.
+- Therefore the delivery operational transition remains **UNVERIFIED**, not a candidate failure. There was no clean retained tomorrow delivery fixture available in the reviewed records; the retained delivery and dine-in fixtures were due today. No new order was created to replace the expired slot.
+
+### Evidence and limits
+
+- Final read-only DEV result for the three relevant records:
+  - Pickup `06c98e7b-0c9b-4cad-b91e-989af6b50997`: paid; pickup 9 Nov 12:00; stock `2d284123-f0af-4755-ac64-57fed098d2ba` owned by the same order; ready true; owned stock count 1.
+  - Delivery `60450e65-0572-4b13-8ab6-566258867da4`: submitted/unpaid; delivery slot 9 Nov 12:00; stock `3e93408d-fb9f-4783-863f-7b87db9b680b` still assigned only to this order; ready false; owned stock count 1.
+  - Dine-in `ae0b8a0e-6fde-4893-ae81-a14958b244d8`: paid; reservation 9 Nov 12:00; stock `f14ce393-32d1-41f0-9b39-40775054e64e` owned by the same order; ready true; owned stock count 1; Collection UI status Completed.
+- The candidate and 68/68 prior automated regressions are unchanged; the suite was not rerun. No source, schema, migration, deployment, environment, alias or Production data changed. Synthetic payment/status events were DEV-only and no real funds or external messages were involved.
+- The previous 68/68 release suite and source comparison remain valid. This continuation verifies pickup and dine-in handoff as additive staff workflows. Delivery handoff remains unverified because its only retained fixture was scheduled for noon today, was not ready/paid, and had no delivery fee set. No candidate-introduced business-logic defect was demonstrated.
+
+**Acceptance decision: HOLD — one operational delivery transition remains unverified.** Core presentation, TODAY urgency progression, normal Fresh Pick physical-stock readiness, successful pickup and dine-in completion, queue movement, unique stock ownership, and Operations filters/sorting are verified. Minimum safe next action: in a future valid DEV delivery slot, use a clean synthetic delivery fixture with its normal fee set through the standard workflow, then complete payment/readiness and handoff only while eligible. Keep Production promotion unauthorized. Preserve all synthetic records as-is; no cleanup or repair was performed.
