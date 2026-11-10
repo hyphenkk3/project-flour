@@ -244,6 +244,8 @@ async function main() {
   const pushBlockStart = "\n\n  // Push is independent of email pause state";
   assert.notEqual(schedule.indexOf(emailBlockStart), -1);
   assert.notEqual(originalSchedule.indexOf(emailBlockStart), -1);
+  assert.notEqual(schedule.indexOf(pushBlockStart), -1);
+  assert.notEqual(originalSchedule.indexOf(pushBlockStart), -1);
   assert.equal(
     schedule
       .slice(
@@ -252,9 +254,11 @@ async function main() {
       )
       .trim(),
     originalSchedule
-      .slice(originalSchedule.indexOf(emailBlockStart))
-      .trim()
-      .replace(/\n\}$/, ""),
+      .slice(
+        originalSchedule.indexOf(emailBlockStart),
+        originalSchedule.indexOf(pushBlockStart),
+      )
+      .trim(),
   );
   assert.match(
     schedule,
