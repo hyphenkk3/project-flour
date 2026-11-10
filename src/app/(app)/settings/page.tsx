@@ -62,9 +62,12 @@ export default async function SettingsPage() {
         <section className="border-fog rounded-xl border bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h3 className="text-ink text-sm font-semibold">Customer Message Templates</h3>
+              <h3 className="text-ink text-sm font-semibold">
+                Customer Message Templates
+              </h3>
               <p className="text-skyline mt-1 text-sm">
-                Update customer-facing wording used by existing staff message workflows.
+                Update customer-facing wording used by existing staff message
+                workflows.
               </p>
             </div>
             <Link
@@ -93,6 +96,9 @@ export default async function SettingsPage() {
           definitions={definitions}
           emailNotificationsPaused={LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED}
           initialPreferences={preferences}
+          pushApplicationServerKey={
+            process.env.NEXT_PUBLIC_STAFF_PUSH_VAPID_PUBLIC_KEY ?? ""
+          }
         />
       </section>
     </main>

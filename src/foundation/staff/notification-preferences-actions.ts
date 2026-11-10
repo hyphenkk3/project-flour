@@ -9,17 +9,13 @@ import {
 } from "@/foundation/staff/notification-preferences";
 import { createClient } from "@/lib/supabase/server";
 
-function isNotificationCode(
-  value: string,
-): value is StaffNotificationCode {
+function isNotificationCode(value: string): value is StaffNotificationCode {
   return STAFF_NOTIFICATION_DEFINITIONS.some(
     (definition) => definition.code === value,
   );
 }
 
-function isWebMode(
-  value: string,
-): value is StaffNotificationWebMode {
+function isWebMode(value: string): value is StaffNotificationWebMode {
   return value === "transient" || value === "persistent";
 }
 
@@ -34,15 +30,16 @@ export async function saveStaffNotificationPreferenceAction(
     return { error: "Choose a valid notification." };
   }
 
-  const webEnabled =
-    String(formData.get("web_enabled") ?? "") === "true";
+  const webEnabled = String(formData.get("web_enabled") ?? "") === "true";
 
-  const emailEnabled =
-    String(formData.get("email_enabled") ?? "") === "true";
+  const emailEnabled = String(formData.get("email_enabled") ?? "") === "true";
 
-  const webModeValue = String(
-    formData.get("web_mode") ?? "transient",
-  );
+  const soundEnabled =
+    code === "new_order" &&
+    String(formData.get("sound_enabled") ?? "") === "true";
+  const pushEnabled = String(formData.get("push_enabled") ?? "") === "true";
+
+  const webModeValue = String(formData.get("web_mode") ?? "transient");
 
   if (!isWebMode(webModeValue)) {
     return { error: "Choose a valid web notification mode." };
@@ -61,6 +58,8 @@ export async function saveStaffNotificationPreferenceAction(
         ...(!LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED
           ? { email_enabled: emailEnabled }
           : {}),
+        ...(code === "new_order" ? { sound_enabled: soundEnabled } : {}),
+        push_enabled: pushEnabled,
       },
       {
         onConflict: "staff_id,notification_code",

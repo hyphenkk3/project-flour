@@ -10,7 +10,9 @@ import { resolve } from "node:path";
 import {
   STAFF_NOTIFICATION_DEFINITIONS,
   STAFF_NOTIFICATION_DEFAULT_ENABLED,
+  STAFF_NOTIFICATION_DEFAULT_SOUND_ENABLED,
 } from "../src/foundation/staff/notification-preferences";
+import { shouldPlayStaffNotificationSound } from "../src/foundation/staff/staff-notification-sound";
 import {
   STAFF_NOTIFICATION_AUTHORITATIVE_SOURCES,
   classifyApprovalInsert,
@@ -481,6 +483,19 @@ const defaultOn = selectStaffEmailRecipients({
   preferencesByStaffId: new Map(),
 });
 assert.equal(STAFF_NOTIFICATION_DEFAULT_ENABLED, true);
+assert.equal(STAFF_NOTIFICATION_DEFAULT_SOUND_ENABLED, false);
+assert.equal(
+  shouldPlayStaffNotificationSound({ code: "new_order", soundEnabled: true }),
+  true,
+);
+assert.equal(
+  shouldPlayStaffNotificationSound({ code: "new_order", soundEnabled: false }),
+  false,
+);
+assert.equal(
+  shouldPlayStaffNotificationSound({ code: "order_paid", soundEnabled: true }),
+  false,
+);
 assert.equal(defaultOn.length, 1);
 
 const now = new Date("2026-09-03T14:00:00.000Z");
@@ -955,6 +970,35 @@ async function testEmailDelivery() {
   assert.match(settingsSrc, /web_enabled/);
   assert.match(settingsSrc, /email_enabled/);
   assert.match(settingsSrc, /notification_code/);
+  assert.match(settingsSrc, /sound_enabled/);
+
+  const soundListenerSrc = read(
+    "src/components/shell/StaffNotificationListener.tsx",
+  );
+  assert.match(soundListenerSrc, /shouldPlayStaffNotificationSound/);
+  assert.match(soundListenerSrc, /tryClaimStaffNotification\(event\.id\)/);
+  assert.match(soundListenerSrc, /playStaffNotificationSound/);
+
+  const soundPreferenceMigration = read(
+    "supabase/migrations/20261109110501_staff_notification_sound_preference.sql",
+  );
+  assert.match(
+    soundPreferenceMigration,
+    /sound_enabled boolean not null default false/,
+  );
+  const soundPreferenceSql = soundPreferenceMigration.replace(/^--.*$/gm, "");
+  assert.match(
+    soundPreferenceSql,
+    /alter table public\.staff_notification_preferences/i,
+  );
+  assert.doesNotMatch(
+    soundPreferenceSql,
+    /\b(insert|update|delete|truncate)\b/i,
+  );
+  assert.doesNotMatch(
+    soundPreferenceSql,
+    /public\.(orders|extra_stock|payments)\b/i,
+  );
 
   const settingsPageSrc = read("src/app/(app)/settings/page.tsx");
   assert.match(settingsPageSrc, /NotificationPreferences/);

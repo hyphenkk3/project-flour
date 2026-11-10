@@ -7,6 +7,10 @@ import { createClient } from "@/lib/supabase/client";
 import type { StaffNotificationPreference } from "@/foundation/staff/notification-preferences";
 import { STAFF_NOTIFICATION_DEFINITIONS } from "@/foundation/staff/notification-preferences";
 import {
+  playStaffNotificationSound,
+  shouldPlayStaffNotificationSound,
+} from "@/foundation/staff/staff-notification-sound";
+import {
   buildStaffNotificationToast,
   tryClaimStaffNotification,
   type StaffNotificationEvent,
@@ -65,23 +69,39 @@ export function StaffNotificationListener({
     [notificationPreferences],
   );
 
-  const anyWebEnabled = notificationPreferences.some(
-    (preference) => preference.webEnabled,
+  const anyNotificationChannelEnabled = notificationPreferences.some(
+    (preference) =>
+      preference.webEnabled ||
+      shouldPlayStaffNotificationSound({
+        code: preference.code,
+        soundEnabled: preference.soundEnabled,
+      }),
   );
 
   const showEvent = useCallback(
     (event: StaffNotificationEvent) => {
       const preference = getPreference(event.code);
-      if (!preference?.webEnabled) return;
+      if (!preference) return;
+      const showWeb = preference.webEnabled;
+      const playSound = shouldPlayStaffNotificationSound({
+        code: event.code,
+        soundEnabled: preference.soundEnabled,
+      });
+      if (!showWeb && !playSound) return;
       if (!tryClaimStaffNotification(event.id)) return;
 
-      toast(buildStaffNotificationToast(event, preference.webMode));
+      if (showWeb) {
+        toast(buildStaffNotificationToast(event, preference.webMode));
+      }
+      if (playSound) {
+        void playStaffNotificationSound();
+      }
     },
     [getPreference, toast],
   );
 
   useEffect(() => {
-    if (!anyWebEnabled) return;
+    if (!anyNotificationChannelEnabled) return;
 
     const supabase = createClient();
     const channel = supabase
@@ -126,7 +146,7 @@ export function StaffNotificationListener({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [anyWebEnabled, showEvent]);
+  }, [anyNotificationChannelEnabled, showEvent]);
 
   return null;
 }

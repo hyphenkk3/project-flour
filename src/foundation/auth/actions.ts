@@ -13,6 +13,7 @@ import {
   getAuthEmailForUserId,
 } from "@/foundation/staff/queries";
 import { createClient } from "@/lib/supabase/server";
+import { revokeAllStaffPushEndpoints } from "@/foundation/staff/staff-notification-push-storage";
 import type { RoleCode } from "@/types/staff";
 
 export type LoginState = {
@@ -20,8 +21,7 @@ export type LoginState = {
 };
 
 export type PasskeyLoginCompletion =
-  | { ok: true; destination: string }
-  | { ok: false; error: string };
+  { ok: true; destination: string } | { ok: false; error: string };
 
 const genericLoginError = "Invalid username or password.";
 
@@ -81,6 +81,10 @@ export async function loginAction(
 }
 
 export async function logoutAction() {
+  const staff = await getSessionStaff();
+  if (staff) {
+    await revokeAllStaffPushEndpoints(staff.id);
+  }
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect("/login");

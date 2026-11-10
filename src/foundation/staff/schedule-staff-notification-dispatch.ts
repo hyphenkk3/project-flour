@@ -1,6 +1,7 @@
 import { after } from "next/server";
 
 import { deliverPendingStaffNotificationEmails } from "@/foundation/staff/staff-notification-dispatch";
+import { deliverPendingStaffPushNotifications } from "@/foundation/staff/staff-notification-push-dispatch";
 import { runUnlessLegacyStaffNotificationEmailIsPaused } from "@/foundation/staff/legacy-staff-notification-email-pause";
 
 /**
@@ -25,4 +26,23 @@ export function scheduleStaffNotificationDispatch(eventId?: string): void {
       run();
     }
   });
+
+  // Push is independent of email pause state and runs only after the business
+  // action has completed; provider errors cannot be thrown into that action.
+  try {
+    after(async () => {
+      try {
+        await deliverPendingStaffPushNotifications({ eventId });
+      } catch (error) {
+        console.error(
+          "[staff-push] Scheduled dispatch failed:",
+          error instanceof Error ? error.name : "unknown",
+        );
+      }
+    });
+  } catch {
+    console.warn(
+      "[staff-push] Post-response dispatch unavailable; push will wait for a later sweep.",
+    );
+  }
 }
