@@ -12,6 +12,10 @@ import {
   deliverClaimedStaffPushNotifications,
   type ClaimedStaffPushDelivery,
 } from "../src/foundation/staff/staff-notification-push-delivery-core";
+import {
+  dispatchSpecificFreshPickReminderEvents,
+  isFreshPickReminderEventId,
+} from "../src/foundation/staff/fresh-pick-push-handoff";
 import { STAFF_NOTIFICATION_DEFINITIONS } from "../src/foundation/staff/notification-preferences";
 
 function read(path: string) {
@@ -276,6 +280,43 @@ const claimed: ClaimedStaffPushDelivery[] = [
 
 async function main() {
   await serviceWorkerNavigationTests();
+  const freshPickEventId = "8e5b25a5-f302-48ba-aa60-a6f2857b1d35";
+  assert.equal(isFreshPickReminderEventId(freshPickEventId), true);
+  assert.equal(isFreshPickReminderEventId(undefined), false);
+  assert.equal(isFreshPickReminderEventId(""), false);
+  assert.equal(isFreshPickReminderEventId("not-a-uuid"), false);
+
+  const scopedDispatches: string[] = [];
+  const handoff = await dispatchSpecificFreshPickReminderEvents({
+    eventIds: [
+      { event_id: freshPickEventId },
+      { event_id: "invalid" },
+      { event_id: freshPickEventId },
+    ],
+    async dispatch(eventId) {
+      scopedDispatches.push(eventId);
+      return eventId;
+    },
+  });
+  assert.deepEqual(handoff, {
+    attempted: 1,
+    rejected: 2,
+    results: [freshPickEventId],
+  });
+  const missingHandoff = await dispatchSpecificFreshPickReminderEvents({
+    eventIds: undefined,
+    async dispatch(eventId) {
+      scopedDispatches.push(eventId);
+      return eventId;
+    },
+  });
+  assert.deepEqual(missingHandoff, {
+    attempted: 0,
+    rejected: 1,
+    results: [],
+  });
+  assert.deepEqual(scopedDispatches, [freshPickEventId]);
+
   const sent: Array<{ payload: string; urgency: string }> = [];
   const completed: Array<{
     deliveryId: string;
@@ -299,7 +340,13 @@ async function main() {
     },
   });
 
-  assert.deepEqual(result, { sent: 2, failed: 0, revoked: 0 });
+  assert.deepEqual(result, {
+    sent: 2,
+    failed: 0,
+    revoked: 0,
+    suppressed: 0,
+    completionFailures: 0,
+  });
   assert.equal(sent.length, 2);
   assert.equal(sent[0].urgency, "normal");
   assert.deepEqual(JSON.parse(sent[0].payload), {
@@ -324,7 +371,13 @@ async function main() {
       return true;
     },
   });
-  assert.deepEqual(expired, { sent: 0, failed: 1, revoked: 1 });
+  assert.deepEqual(expired, {
+    sent: 0,
+    failed: 1,
+    revoked: 1,
+    suppressed: 0,
+    completionFailures: 0,
+  });
   assert.equal(revoked, true);
 
   let transientFailure: { status: string; revoke: boolean } | null = null;
@@ -344,6 +397,71 @@ async function main() {
     },
   });
   assert.deepEqual(transientFailure, { status: "failed", revoke: false });
+
+  let providerCalled = false;
+  let staleCompletion: { status: string; errorCode?: string } | null = null;
+  const staleResult = await deliverClaimedStaffPushNotifications({
+    claimed: [claimed[0]],
+    beforeSend: async () => "suppress",
+    sender: {
+      async send() {
+        providerCalled = true;
+      },
+    },
+    async complete(input) {
+      staleCompletion = { status: input.status, errorCode: input.errorCode };
+      return true;
+    },
+  });
+  assert.deepEqual(staleResult, {
+    sent: 0,
+    failed: 0,
+    revoked: 0,
+    suppressed: 1,
+    completionFailures: 0,
+  });
+  assert.equal(providerCalled, false);
+  assert.deepEqual(staleCompletion, {
+    status: "suppressed",
+    errorCode: "stale_hold",
+  });
+
+  let retrySenderCalled = false;
+  let preflightFailure: { status: string; errorCode?: string } | null = null;
+  const retryPreflightResult = await deliverClaimedStaffPushNotifications({
+    claimed: [claimed[0]],
+    beforeSend: async () => "retry",
+    sender: {
+      async send() {
+        retrySenderCalled = true;
+      },
+    },
+    async complete(input) {
+      preflightFailure = { status: input.status, errorCode: input.errorCode };
+      return true;
+    },
+  });
+  assert.deepEqual(retryPreflightResult, {
+    sent: 0,
+    failed: 1,
+    revoked: 0,
+    suppressed: 0,
+    completionFailures: 0,
+  });
+  assert.equal(retrySenderCalled, false);
+  assert.deepEqual(preflightFailure, {
+    status: "failed",
+    errorCode: "hold_preflight_failed",
+  });
+
+  const completionFailure = await deliverClaimedStaffPushNotifications({
+    claimed: [claimed[0]],
+    sender: { async send() {} },
+    async complete() {
+      return false;
+    },
+  });
+  assert.equal(completionFailure.completionFailures, 1);
 
   const migration = read(
     "supabase/migrations/20261109193000_staff_notification_push.sql",
@@ -549,8 +667,118 @@ async function main() {
     ),
   );
 
+  const handoffMigration = read(
+    "supabase/migrations/20261111120000_staff_notification_fresh_pick_push_handoff.sql",
+  );
+  assert.match(
+    handoffMigration,
+    /list_due_fresh_pick_hold_reminder_push_event_ids/i,
+  );
+  assert.match(
+    handoffMigration,
+    /grant execute on function public\.list_due_fresh_pick_hold_reminder_push_event_ids\(integer\)\s+to service_role/i,
+  );
+  assert.match(
+    handoffMigration,
+    /staff_notification_fresh_pick_hold_reminder_is_current\(e\.payload\)/i,
+  );
+  assert.match(
+    handoffMigration,
+    /status in \('pending', 'claimed', 'sent', 'failed', 'suppressed'\)/i,
+  );
+  assert.match(
+    handoffMigration,
+    /p_status = 'suppressed' and p_error_code is distinct from 'stale_hold'/i,
+  );
+  assert.match(
+    handoffMigration,
+    /status = 'suppressed'[\s\S]*error_code = 'stale_hold'/i,
+  );
+  assert.match(handoffMigration, /interval '1 minute'/i);
+  assert.match(handoffMigration, /interval '5 minutes'/i);
+  assert.doesNotMatch(handoffMigration, /email|resend/i);
+
+  const holdLifecycleMigration = read(
+    "supabase/migrations/20260917140000_extra_walk_in_hold.sql",
+  );
+  const staleHoldMigration = read(
+    "supabase/migrations/20261007120000_staff_notification_fresh_pick_hold_stale_suppression.sql",
+  );
+  assert.match(
+    holdLifecycleMigration,
+    /create or replace function public\.extra_walk_in_hold_minutes\(\)[\s\S]*?select 15/i,
+  );
+  assert.match(
+    holdLifecycleMigration,
+    /create or replace function public\.extra_walk_in_hold_reminder_lead_minutes\(\)[\s\S]*?select 3/i,
+  );
+  assert.match(
+    holdLifecycleMigration,
+    /'\* \* \* \* \*'[\s\S]*sweep_extra_walk_in_hold_reminders\(\)/i,
+  );
+  assert.match(staleHoldMigration, /walk_in_held_by = v_held_by/i);
+  assert.match(staleHoldMigration, /walk_in_held_at = v_held_at/i);
+  assert.match(staleHoldMigration, /walk_in_held_until = v_held_until/i);
+  assert.match(staleHoldMigration, /sold_at is null/i);
+  assert.match(staleHoldMigration, /cut_into_slices_at is null/i);
+  assert.match(
+    staleHoldMigration,
+    /extra_walk_in_hold_is_active\([\s\S]*clock_timestamp\(\)/i,
+  );
+
+  const handoffRoute = read(
+    "src/app/api/staff/notifications/fresh-pick-reminder-dispatch/route.ts",
+  );
+  assert.match(handoffRoute, /process\.env\.VERCEL_ENV !== "preview"/);
+  assert.match(handoffRoute, /export const maxDuration = 60/);
+  assert.match(handoffRoute, /const MAX_EVENT_IDS_PER_RUN = 5/);
+  assert.match(
+    handoffRoute,
+    /process\.env\.VERCEL_GIT_COMMIT_REF !== NOTIFICATION_BRANCH/,
+  );
+  assert.match(handoffRoute, /tzwtpxdcggesgjaqxkqr\.supabase\.co/);
+  assert.match(handoffRoute, /process\.env\.CRON_SECRET/);
+  assert.match(handoffRoute, /export async function HEAD[\s\S]*?status: 405/);
+  assert.doesNotMatch(handoffRoute, /deliverPendingStaffPushNotifications/);
+  assert.match(handoffRoute, /dispatchSpecificFreshPickReminderEvents/);
+  assert.match(handoffRoute, /Cache-Control/);
+  const vercelConfig = JSON.parse(read("vercel.json")) as {
+    schedules: Record<
+      string,
+      { path: string; requestMethod: string; schedule: string }
+    >;
+  };
+  assert.deepEqual(vercelConfig.schedules["staff-fresh-pick-reminder-push"], {
+    schedule: "* * * * *",
+    path: "/api/staff/notifications/fresh-pick-reminder-dispatch",
+    requestMethod: "GET",
+  });
+  assert.equal("crons" in vercelConfig, false);
+  assert.match(handoffRoute, /timingSafeEqual/);
+  assert.doesNotMatch(
+    handoffRoute,
+    /STAFF_PUSH_VAPID_PRIVATE_KEY|SUPABASE_SERVICE_ROLE_KEY/,
+  );
+  const pushDispatch = read(
+    "src/foundation/staff/staff-notification-push-dispatch.ts",
+  );
+  assert.match(pushDispatch, /failClosed: true/);
+  assert.match(
+    pushDispatch,
+    /if \(input\?\.failClosed\) throw new Error\("push_queue_unavailable"\)/,
+  );
+  assert.match(
+    pushDispatch,
+    /if \(input\?\.failClosed\) throw new Error\("push_claim_unavailable"\)/,
+  );
+  assert.match(pushDispatch, /result\.completionFailures > 0/);
+  assert.match(
+    handoffRoute,
+    /console\.info\("\[staff-fresh-pick-push\] Run complete:", result\)/,
+  );
+
   console.log(
-    "Staff push routes, open/closed click navigation, isolation, Email freeze, subscription privacy, delivery and retry contracts: PASS",
+    "Staff Push handoff IDs, click navigation, isolation, Email freeze, subscription privacy, delivery and retry contracts: PASS",
   );
 }
 

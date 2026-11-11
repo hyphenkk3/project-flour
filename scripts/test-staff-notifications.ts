@@ -1026,8 +1026,14 @@ async function testEmailDelivery() {
   assert.doesNotMatch(read(".env.example"), /NEXT_PUBLIC_RESEND/);
   const vercelJson = read("vercel.json");
   assert.doesNotMatch(vercelJson, /"crons"/);
-  assert.doesNotMatch(vercelJson, /\* \* \* \* \*/);
   assert.doesNotMatch(vercelJson, /\/api\/staff\/notifications\/dispatch/);
+  const schedules = JSON.parse(vercelJson).schedules;
+  assert.deepEqual(Object.keys(schedules), ["staff-fresh-pick-reminder-push"]);
+  assert.deepEqual(schedules["staff-fresh-pick-reminder-push"], {
+    schedule: "* * * * *",
+    path: "/api/staff/notifications/fresh-pick-reminder-dispatch",
+    requestMethod: "GET",
+  });
 
   const cronSql = read(
     "supabase/migrations/20260904120000_staff_notification_pg_cron_sweep.sql",
