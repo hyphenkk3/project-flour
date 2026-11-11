@@ -81,7 +81,7 @@ export function NotificationPreferences({
       }
     }
 
-    if (definition.code === "new_order" && patch.soundEnabled === true) {
+    if (patch.soundEnabled === true) {
       primeStaffNotificationSound();
     }
 
@@ -112,9 +112,7 @@ export function NotificationPreferences({
     if (!emailNotificationsPaused) {
       formData.set("email_enabled", String(next.emailEnabled));
     }
-    if (definition.code === "new_order") {
-      formData.set("sound_enabled", String(next.soundEnabled));
-    }
+    formData.set("sound_enabled", String(next.soundEnabled));
 
     const result = await saveStaffNotificationPreferenceAction(formData);
 
@@ -222,38 +220,34 @@ export function NotificationPreferences({
 
               <span className="text-ink text-xs font-medium">Web</span>
 
-              {definition.code === "new_order" ? (
-                <>
-                  <span className="text-fog mx-1">|</span>
-                  <button
-                    aria-checked={soundEnabled}
-                    aria-label={`${soundEnabled ? "Disable" : "Enable"} ${definition.label} sound alerts`}
-                    className={[
-                      "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition",
-                      soundEnabled
-                        ? "border-signal bg-signal"
-                        : "border-fog bg-white",
-                      isSaving ? "cursor-wait opacity-60" : "cursor-pointer",
-                    ].join(" ")}
-                    disabled={isSaving}
-                    onClick={() =>
-                      void savePreference(definition, {
-                        soundEnabled: !soundEnabled,
-                      })
-                    }
-                    role="switch"
-                    type="button"
-                  >
-                    <span
-                      className={[
-                        "inline-block h-4 w-4 rounded-full bg-white shadow-sm transition",
-                        soundEnabled ? "translate-x-6" : "translate-x-1",
-                      ].join(" ")}
-                    />
-                  </button>
-                  <span className="text-ink text-xs font-medium">Sound</span>
-                </>
-              ) : null}
+              <span className="text-fog mx-1">|</span>
+              <button
+                aria-checked={soundEnabled}
+                aria-label={`${soundEnabled ? "Disable" : "Enable"} ${definition.label} sound alerts`}
+                className={[
+                  "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition",
+                  soundEnabled
+                    ? "border-signal bg-signal"
+                    : "border-fog bg-white",
+                  isSaving ? "cursor-wait opacity-60" : "cursor-pointer",
+                ].join(" ")}
+                disabled={isSaving}
+                onClick={() =>
+                  void savePreference(definition, {
+                    soundEnabled: !soundEnabled,
+                  })
+                }
+                role="switch"
+                type="button"
+              >
+                <span
+                  className={[
+                    "inline-block h-4 w-4 rounded-full bg-white shadow-sm transition",
+                    soundEnabled ? "translate-x-6" : "translate-x-1",
+                  ].join(" ")}
+                />
+              </button>
+              <span className="text-ink text-xs font-medium">Sound</span>
 
               <span className="text-fog mx-1">|</span>
               {pushApplicationServerKey ? (

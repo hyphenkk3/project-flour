@@ -1,12 +1,17 @@
-import type { StaffNotificationCode } from "@/foundation/staff/notification-preferences";
+import { STAFF_NOTIFICATION_DEFINITIONS } from "@/foundation/staff/notification-preferences";
 
 let soundContext: AudioContext | null = null;
 
 export function shouldPlayStaffNotificationSound(input: {
-  code: StaffNotificationCode;
-  soundEnabled: boolean;
+  code: string;
+  soundEnabled?: boolean | null;
 }): boolean {
-  return input.code === "new_order" && input.soundEnabled;
+  return (
+    input.soundEnabled === true &&
+    STAFF_NOTIFICATION_DEFINITIONS.some(
+      (definition) => definition.code === input.code,
+    )
+  );
 }
 
 /** Call only from an explicit staff gesture to satisfy browser audio policies. */

@@ -34,9 +34,13 @@ export async function saveStaffNotificationPreferenceAction(
 
   const emailEnabled = String(formData.get("email_enabled") ?? "") === "true";
 
-  const soundEnabled =
-    code === "new_order" &&
-    String(formData.get("sound_enabled") ?? "") === "true";
+  const soundEnabledValue = String(formData.get("sound_enabled") ?? "");
+
+  if (soundEnabledValue !== "true" && soundEnabledValue !== "false") {
+    return { error: "Choose a valid sound notification preference." };
+  }
+
+  const soundEnabled = soundEnabledValue === "true";
   const pushEnabled = String(formData.get("push_enabled") ?? "") === "true";
 
   const webModeValue = String(formData.get("web_mode") ?? "transient");
@@ -58,7 +62,7 @@ export async function saveStaffNotificationPreferenceAction(
         ...(!LEGACY_STAFF_NOTIFICATION_EMAIL_PAUSED
           ? { email_enabled: emailEnabled }
           : {}),
-        ...(code === "new_order" ? { sound_enabled: soundEnabled } : {}),
+        sound_enabled: soundEnabled,
         push_enabled: pushEnabled,
       },
       {

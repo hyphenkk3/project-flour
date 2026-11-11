@@ -7,7 +7,11 @@ import {
   primeStaffNotificationSound,
   shouldPlayStaffNotificationSound,
 } from "../src/foundation/staff/staff-notification-sound";
-import { STAFF_NOTIFICATION_DEFAULT_SOUND_ENABLED } from "../src/foundation/staff/notification-preferences";
+import {
+  STAFF_NOTIFICATION_DEFINITIONS,
+  STAFF_NOTIFICATION_DEFAULT_SOUND_ENABLED,
+} from "../src/foundation/staff/notification-preferences";
+import { resolveStaffNotificationPreference } from "../src/foundation/staff/notification-event-identity";
 
 assert.equal(STAFF_NOTIFICATION_DEFAULT_SOUND_ENABLED, false);
 
@@ -21,6 +25,79 @@ assert.equal(
 );
 assert.equal(
   shouldPlayStaffNotificationSound({ code: "order_paid", soundEnabled: true }),
+  true,
+);
+
+assert.equal(STAFF_NOTIFICATION_DEFINITIONS.length, 9);
+for (const { code } of STAFF_NOTIFICATION_DEFINITIONS) {
+  assert.equal(
+    shouldPlayStaffNotificationSound({ code, soundEnabled: true }),
+    true,
+  );
+  assert.equal(
+    shouldPlayStaffNotificationSound({ code, soundEnabled: false }),
+    false,
+  );
+}
+
+const individualSoundPreferences = new Map(
+  STAFF_NOTIFICATION_DEFINITIONS.map(({ code }) => [code, false]),
+);
+individualSoundPreferences.set("order_edited", true);
+assert.equal(
+  shouldPlayStaffNotificationSound({
+    code: "order_edited",
+    soundEnabled: individualSoundPreferences.get("order_edited"),
+  }),
+  true,
+);
+assert.equal(
+  shouldPlayStaffNotificationSound({
+    code: "order_cancelled",
+    soundEnabled: individualSoundPreferences.get("order_cancelled"),
+  }),
+  false,
+);
+const staffAPreferences = new Map([
+  [
+    "order_edited",
+    resolveStaffNotificationPreference("order_edited", { soundEnabled: true }),
+  ],
+  [
+    "order_cancelled",
+    resolveStaffNotificationPreference("order_cancelled", {
+      soundEnabled: false,
+    }),
+  ],
+]);
+const staffBPreferences = new Map([
+  [
+    "order_edited",
+    resolveStaffNotificationPreference("order_edited", {
+      soundEnabled: false,
+    }),
+  ],
+]);
+assert.equal(staffAPreferences.get("order_edited")?.soundEnabled, true);
+assert.equal(staffAPreferences.get("order_cancelled")?.soundEnabled, false);
+assert.equal(staffBPreferences.get("order_edited")?.soundEnabled, false);
+assert.equal(
+  resolveStaffNotificationPreference("waiting_list_new_request").soundEnabled,
+  false,
+);
+assert.equal(
+  shouldPlayStaffNotificationSound({
+    code: "unknown_category",
+    soundEnabled: true,
+  }),
+  false,
+);
+assert.equal(shouldPlayStaffNotificationSound({ code: "new_order" }), false);
+assert.equal(
+  shouldPlayStaffNotificationSound({
+    code: "new_order",
+    soundEnabled: "true" as unknown as boolean,
+  }),
   false,
 );
 
@@ -78,6 +155,25 @@ async function main() {
   );
   assert.match(notificationEngine, /new BroadcastChannel\(/);
   assert.match(notificationEngine, /claimedWebEventIds\.has\(eventId\)/);
+  const preferencesAction = readFileSync(
+    resolve("src/foundation/staff/notification-preferences-actions.ts"),
+    "utf8",
+  );
+  assert.match(preferencesAction, /sound_enabled: soundEnabled/);
+  assert.doesNotMatch(preferencesAction, /code === "new_order"/);
+  assert.match(preferencesAction, /staff_id: staff\.id/);
+  assert.match(preferencesAction, /soundEnabledValue !== "true"/);
+  assert.match(preferencesAction, /soundEnabledValue !== "false"/);
+  const preferencesSettings = readFileSync(
+    resolve("src/components/settings/NotificationPreferences.tsx"),
+    "utf8",
+  );
+  assert.match(
+    preferencesSettings,
+    /formData\.set\("sound_enabled", String\(next\.soundEnabled\)\)/,
+  );
+  assert.doesNotMatch(preferencesSettings, /definition\.code === "new_order"/);
+  assert.match(preferencesSettings, /definitions\.map\(\(definition\) =>/);
 
   Object.defineProperty(globalThis, "window", {
     configurable: true,
@@ -98,7 +194,7 @@ async function main() {
   await playStaffNotificationSound();
 
   console.log(
-    "Staff new-order sound preference and browser-failure fallback: PASS",
+    "Staff category sound preferences and browser-failure fallback: PASS",
   );
 }
 

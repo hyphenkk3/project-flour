@@ -494,7 +494,7 @@ assert.equal(
 );
 assert.equal(
   shouldPlayStaffNotificationSound({ code: "order_paid", soundEnabled: true }),
-  false,
+  true,
 );
 assert.equal(defaultOn.length, 1);
 
