@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { runInNewContext } from "node:vm";
 import {
   buildStaffPushMessage,
   isTrustedStaffPushEndpoint,
@@ -11,6 +12,7 @@ import {
   deliverClaimedStaffPushNotifications,
   type ClaimedStaffPushDelivery,
 } from "../src/foundation/staff/staff-notification-push-delivery-core";
+import { STAFF_NOTIFICATION_DEFINITIONS } from "../src/foundation/staff/notification-preferences";
 
 function read(path: string) {
   return readFileSync(resolve(process.cwd(), path), "utf8");
@@ -55,12 +57,198 @@ const message = buildStaffPushMessage({
   code: "new_order",
 });
 assert.equal(message.title, "New order received");
-assert.equal(message.data.href, "/owner/orders");
+assert.equal(message.data.href, "/owner");
 assert.equal(message.renotify, false);
 assert.doesNotMatch(
   JSON.stringify(message),
   /customer|cake|orderNumber|guestName/i,
 );
+
+const pushDestinations = {
+  new_order: "/owner",
+  order_paid: "/owner",
+  order_confirmed: "/owner",
+  order_cancelled: "/owner",
+  order_edited: "/owner",
+  approval_required: "/owner/approvals",
+  last_minute: "/owner",
+  fresh_pick_walk_in_hold_reminder: "/customer-operations/fresh-picks",
+  waiting_list_new_request: "/bakery/availability#waiting-list-heading",
+} as const;
+
+assert.equal(STAFF_NOTIFICATION_DEFINITIONS.length, 9);
+assert.deepEqual(
+  STAFF_NOTIFICATION_DEFINITIONS.map(({ code }) => code).sort(),
+  Object.keys(pushDestinations).sort(),
+);
+
+const appRoot = "src/app/(app)";
+const destinationPages = {
+  "/owner": "owner/page.tsx",
+  "/owner/approvals": "owner/approvals/page.tsx",
+  "/customer-operations/fresh-picks":
+    "customer-operations/fresh-picks/page.tsx",
+  "/bakery/availability": "bakery/availability/page.tsx",
+} as const;
+const authenticatedLayout = read(`${appRoot}/layout.tsx`);
+assert.match(authenticatedLayout, /requireStaff\(\)/);
+for (const [route, page] of Object.entries(destinationPages)) {
+  assert.ok(
+    readFileSync(resolve(appRoot, page), "utf8"),
+    `${route} page exists`,
+  );
+}
+assert.match(read(`${appRoot}/owner/page.tsx`), /canAccessOperationsBoard/);
+assert.match(
+  read(`${appRoot}/owner/approvals/page.tsx`),
+  /canAccessOperationsApprovalsInbox/,
+);
+assert.match(
+  read(`${appRoot}/customer-operations/fresh-picks/page.tsx`),
+  /canViewWalkInHold/,
+);
+assert.match(
+  read(`${appRoot}/bakery/availability/page.tsx`),
+  /canViewOrderAvailability/,
+);
+
+const devPreviewOrigin =
+  "https://project-flour-44iu5dxpf-hyphen-org.vercel.app";
+type WorkerTestEvent = {
+  data?: { json(): unknown };
+  notification?: { data?: { href?: unknown }; close(): void };
+  waitUntil(promise: Promise<unknown>): void;
+};
+const workerListeners = new Map<string, (event: WorkerTestEvent) => void>();
+const workerState: {
+  clients: Array<{
+    url: string;
+    navigatedTo?: string;
+    focusCount: number;
+    navigate(target: string): Promise<unknown>;
+    focus(): Promise<unknown>;
+  }>;
+  opened: string[];
+  shown: Array<{ title: string; options: { data: { href: string } } }>;
+} = { clients: [], opened: [], shown: [] };
+const workerSelf = {
+  location: { origin: devPreviewOrigin },
+  addEventListener(type: string, listener: (event: WorkerTestEvent) => void) {
+    workerListeners.set(type, listener);
+  },
+  clients: {
+    async matchAll() {
+      return workerState.clients;
+    },
+    async openWindow(target: string) {
+      workerState.opened.push(target);
+      return null;
+    },
+  },
+  registration: {
+    async showNotification(title: string, options: { data: { href: string } }) {
+      workerState.shown.push({ title, options });
+    },
+  },
+};
+runInNewContext(read("public/sw.js"), { self: workerSelf, URL, Object });
+
+function makeWindowClient(url: string) {
+  return {
+    url,
+    focusCount: 0,
+    navigatedTo: undefined as string | undefined,
+    async navigate(target: string) {
+      this.navigatedTo = target;
+      return this;
+    },
+    async focus() {
+      this.focusCount += 1;
+      return this;
+    },
+  };
+}
+
+async function serviceWorkerNavigationTests() {
+  const clickHandler = workerListeners.get("notificationclick");
+  const pushHandler = workerListeners.get("push");
+  assert.ok(clickHandler);
+  assert.ok(pushHandler);
+
+  for (const [code, href] of Object.entries(pushDestinations)) {
+    workerState.opened = [];
+    const expectedMessage = buildStaffPushMessage({
+      eventId: "test-event-id",
+      code: code as keyof typeof pushDestinations,
+    });
+    let pushWait: Promise<void> | undefined;
+    pushHandler({
+      data: { json: () => ({ version: 1, eventId: "test-event-id", code }) },
+      waitUntil(promise: Promise<void>) {
+        pushWait = promise;
+      },
+    });
+    await pushWait;
+    const shown = workerState.shown.at(-1);
+    assert.equal(shown?.options.data.href, href);
+    assert.equal(expectedMessage.data.href, href);
+    const pageRoute = href.split("#")[0].split("?")[0];
+    assert.ok(destinationPages[pageRoute as keyof typeof destinationPages]);
+
+    const openClient = makeWindowClient(`${devPreviewOrigin}/settings`);
+    workerState.clients = [openClient];
+    let openWait: Promise<unknown> | undefined;
+    clickHandler({
+      notification: {
+        data: { href: shown?.options.data.href },
+        close() {},
+      },
+      waitUntil(promise: Promise<unknown>) {
+        openWait = promise;
+      },
+    });
+    await openWait;
+    assert.equal(openClient.navigatedTo, `${devPreviewOrigin}${href}`);
+    assert.equal(openClient.focusCount, 1);
+    assert.equal(workerState.opened.length, 0);
+
+    workerState.clients = [];
+    let closedWait: Promise<unknown> | undefined;
+    clickHandler({
+      notification: {
+        data: { href: shown?.options.data.href },
+        close() {},
+      },
+      waitUntil(promise: Promise<unknown>) {
+        closedWait = promise;
+      },
+    });
+    await closedWait;
+    assert.equal(workerState.opened.at(-1), `${devPreviewOrigin}${href}`);
+  }
+
+  workerState.clients = [];
+  const openedBeforeExternalHref = workerState.opened.length;
+  let unsafeWait: Promise<unknown> | undefined;
+  clickHandler({
+    notification: {
+      data: { href: "//outside.example/path" },
+      close() {},
+    },
+    waitUntil(promise: Promise<unknown>) {
+      unsafeWait = promise;
+    },
+  });
+  await unsafeWait;
+  assert.equal(workerState.opened.length, openedBeforeExternalHref);
+
+  const pushClient = read(
+    "src/foundation/staff/staff-notification-push-client.ts",
+  );
+  assert.match(pushClient, /register\("\/sw\.js",\s*\{\s*scope: "\/"/);
+  assert.match(pushClient, /updateViaCache: "none"/);
+  assert.doesNotMatch(read("public/sw.js"), /pushManager|unsubscribe\(/);
+}
 
 const claimed: ClaimedStaffPushDelivery[] = [
   {
@@ -87,6 +275,7 @@ const claimed: ClaimedStaffPushDelivery[] = [
 ];
 
 async function main() {
+  await serviceWorkerNavigationTests();
   const sent: Array<{ payload: string; urgency: string }> = [];
   const completed: Array<{
     deliveryId: string;
@@ -195,6 +384,7 @@ async function main() {
 
   const worker = read("public/sw.js");
   assert.match(worker, /addEventListener\("push"/);
+  assert.match(worker, /addEventListener\("notificationclick"/);
   assert.match(worker, /renotify: false/);
   assert.doesNotMatch(worker, /addEventListener\("fetch"/);
 
@@ -360,7 +550,7 @@ async function main() {
   );
 
   console.log(
-    "Staff push isolation, Email freeze, subscription privacy, delivery and retry contracts: PASS",
+    "Staff push routes, open/closed click navigation, isolation, Email freeze, subscription privacy, delivery and retry contracts: PASS",
   );
 }
 
