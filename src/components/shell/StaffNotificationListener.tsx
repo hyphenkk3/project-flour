@@ -34,10 +34,15 @@ import {
   toSafeRealtimeSubscriptionStatus,
   type SafeRealtimeSubscriptionStatus,
 } from "@/foundation/staff/staff-notification-live-fallback";
+import {
+  appendStaffNotificationRecoveryTrace,
+  type RecoveryDiagnosticSource,
+} from "@/foundation/staff/staff-notification-recovery-diagnostics";
 
 type StaffNotificationListenerProps = {
   staffId: string;
   notificationPreferences: StaffNotificationPreference[];
+  diagnosticsEnabled?: boolean;
 };
 
 type NotificationEventRow = RecoverableStaffNotificationEvent & {
@@ -65,6 +70,7 @@ type AutomaticFallbackDiagnostic = {
 export function StaffNotificationListener({
   staffId,
   notificationPreferences,
+  diagnosticsEnabled = false,
 }: StaffNotificationListenerProps) {
   const { toast } = useToast();
   const listenerStartedAtRef = useRef<number | null>(null);
@@ -74,7 +80,9 @@ export function StaffNotificationListener({
   const [recoveryPending, setRecoveryPending] = useState(false);
   const [recoveryRunning, setRecoveryRunning] = useState(false);
   const recoveryPendingRef = useRef(false);
-  const retryRecoveryRef = useRef<(() => void) | null>(null);
+  const retryRecoveryRef = useRef<
+    ((source?: RecoveryDiagnosticSource) => void) | null
+  >(null);
   const recoveryInProgressRef = useRef(false);
   const recoveryRequestedRef = useRef(false);
   const recoveredSoundPriorityInBatchRef = useRef(0);
@@ -88,6 +96,24 @@ export function StaffNotificationListener({
   const automaticFallbackDiagnosticRef =
     useRef<AutomaticFallbackDiagnostic | null>(null);
   const lastSuppressedMalformedDiagnosticAtRef = useRef(0);
+  const everSubscribedRef = useRef(false);
+  const recoveryRunSequenceRef = useRef(0);
+  const queuedRecoverySourceRef = useRef<RecoveryDiagnosticSource | null>(null);
+  const lastRetryVisibilityRef = useRef<string | null>(null);
+  const diagnosticsEnabledRef = useRef(diagnosticsEnabled);
+
+  useEffect(() => {
+    diagnosticsEnabledRef.current = diagnosticsEnabled;
+  }, [diagnosticsEnabled]);
+
+  const trace = useCallback(
+    (record: Parameters<typeof appendStaffNotificationRecoveryTrace>[0]) => {
+      if (diagnosticsEnabledRef.current) {
+        appendStaffNotificationRecoveryTrace(record);
+      }
+    },
+    [],
+  );
 
   const getPreference = useCallback(
     (code: StaffNotificationPreference["code"]) =>
@@ -105,8 +131,14 @@ export function StaffNotificationListener({
       } else {
         clearStaffNotificationRecoveryPending(staffId);
       }
+      const persistedPending = hasStaffNotificationRecoveryPending(staffId);
+      trace({
+        kind: "pending_marker",
+        pending: persistedPending,
+        outcome: persistedPending === pending ? "saved" : "not_saved",
+      });
     },
-    [staffId],
+    [staffId, trace],
   );
 
   const anyNotificationChannelEnabled = notificationPreferences.some(
@@ -119,9 +151,31 @@ export function StaffNotificationListener({
   );
 
   const presentEvent = useCallback(
-    async (event: StaffNotificationEvent, recovered: boolean) => {
+    async (
+      event: StaffNotificationEvent,
+      recovered: boolean,
+      context: { source: RecoveryDiagnosticSource; runId?: string },
+    ) => {
       const preference = getPreference(event.code);
-      if (!preference) return;
+      if (!preference) {
+        trace({
+          kind: "event_eligible",
+          eventId: event.id,
+          source: context.source,
+          runId: context.runId,
+          eligible: false,
+          reason: "preference_missing",
+        });
+        trace({
+          kind: "event_processing",
+          eventId: event.id,
+          source: context.source,
+          runId: context.runId,
+          outcome: "rejected",
+          reason: "preference_missing",
+        });
+        return;
+      }
       const showWeb = preference.webEnabled;
       const soundEnabled = shouldPlayStaffNotificationSound({
         code: event.code,
@@ -134,166 +188,408 @@ export function StaffNotificationListener({
           })
         : 0;
       const playSound = recovered ? recoveredSoundPriority > 0 : soundEnabled;
-      if (!showWeb && !playSound) return;
-
-      const claim = await claimStaffNotificationForStaff(
-        staffId,
-        event.id,
-        () => {
-          if (showWeb) {
-            toast(buildStaffNotificationToast(event, preference.webMode));
-          }
-          if (playSound) {
-            if (recovered) {
-              recoveredSoundPriorityInBatchRef.current = Math.max(
-                recoveredSoundPriorityInBatchRef.current,
-                recoveredSoundPriority,
-              );
-            } else {
-              void playStaffNotificationSound();
-            }
-          }
-        },
-      );
-      if (claim.presentationFailed) {
-        throw new Error("Notification presentation failed");
+      if (!showWeb && !playSound) {
+        trace({
+          kind: "event_eligible",
+          eventId: event.id,
+          source: context.source,
+          runId: context.runId,
+          eligible: false,
+          reason: "category_disabled",
+        });
+        trace({
+          kind: "event_processing",
+          eventId: event.id,
+          source: context.source,
+          runId: context.runId,
+          outcome: "rejected",
+          reason: "category_disabled",
+        });
+        return;
       }
-      if (!claim.claimed) return;
-      if (!claim.crossTabProtected) {
-        console.warn(
-          "[staff-notifications] Cross-tab deduplication unavailable",
-        );
-      }
-    },
-    [getPreference, staffId, toast],
-  );
-
-  const runRecovery = useCallback(async () => {
-    if (recoveryInProgressRef.current) {
-      recoveryRequestedRef.current = true;
-      return;
-    }
-    recoveryInProgressRef.current = true;
-    setRecoveryRunning(true);
-    const automaticFallbackDiagnostic = automaticFallbackDiagnosticRef.current;
-    automaticFallbackDiagnosticRef.current = null;
-    let automaticRecoverySucceeded = false;
-    recoveredSoundPriorityInBatchRef.current = 0;
-    recoverySkippedOlderEventsRef.current =
-      recoverySkippedOlderEventsRef.current ||
-      hasRecentStaffNotificationRecoverySkipNotice(staffId);
-    try {
-      const supabase = createClient();
-      setListenerState("recovering");
-      if (!recoverySkippedOlderEventsRef.current) setRecoveryMessage(null);
-
-      const result = await recoverStaffNotificationEvents({
-        staffId,
-        cursor: loadStaffNotificationRecoveryCursor(staffId),
-        startedAt: listenerStartedAtRef.current ?? Date.now(),
-        fetchPage: async ({ after, since, until, limit }) => {
-          let query = supabase
-            .from("staff_notification_events")
-            .select("id, created_at, code, order_id, title, description, href")
-            .gte("created_at", since)
-            .lte("created_at", until)
-            .order("created_at", { ascending: true })
-            .order("id", { ascending: true })
-            .limit(limit);
-
-          if (Date.parse(after.createdAt) >= Date.parse(since)) {
-            query = query.or(
-              `created_at.gt.${after.createdAt},and(created_at.eq.${after.createdAt},id.gt.${after.id})`,
-            );
-          }
-
-          const { data, error } = await query;
-          return {
-            events: data as NotificationEventRow[] | null,
-            error,
-          };
-        },
-        deliver: async (row) => {
-          const event = normalizeLiveNotificationEvent(row);
-          if (!event) throw new Error("Unsupported notification event row");
-          await presentEvent(event, true);
-        },
-        saveCursor: saveStaffNotificationRecoveryCursor,
+      trace({
+        kind: "event_eligible",
+        eventId: event.id,
+        source: context.source,
+        runId: context.runId,
+        eligible: true,
+        reason: "preferences_enabled",
       });
 
-      if (result.olderEventsSkipped) {
-        recoverySkippedOlderEventsRef.current = true;
-        markStaffNotificationRecoverySkipNotice(staffId);
+      try {
+        const claim = await claimStaffNotificationForStaff(
+          staffId,
+          event.id,
+          () => {
+            if (showWeb) {
+              toast({
+                ...buildStaffNotificationToast(event, preference.webMode),
+                notificationEventId: diagnosticsEnabledRef.current
+                  ? event.id
+                  : undefined,
+              });
+            }
+            if (playSound) {
+              if (recovered) {
+                recoveredSoundPriorityInBatchRef.current = Math.max(
+                  recoveredSoundPriorityInBatchRef.current,
+                  recoveredSoundPriority,
+                );
+              } else {
+                void playStaffNotificationSound();
+              }
+            }
+          },
+        );
+        if (claim.presentationFailed) {
+          trace({
+            kind: "dedupe_claim",
+            eventId: event.id,
+            source: context.source,
+            runId: context.runId,
+            outcome: "failure",
+            reason: "present_failed",
+          });
+          throw new Error("Notification presentation failed");
+        }
+        trace({
+          kind: "dedupe_claim",
+          eventId: event.id,
+          source: context.source,
+          runId: context.runId,
+          outcome: claim.claimed ? "claimed" : "duplicate_suppressed",
+        });
+        trace({
+          kind: "event_processing",
+          eventId: event.id,
+          source: context.source,
+          runId: context.runId,
+          outcome: "success",
+          reason: claim.claimed ? undefined : "duplicate_suppressed",
+        });
+        if (!claim.claimed) return;
+        if (!claim.crossTabProtected) {
+          console.warn(
+            "[staff-notifications] Cross-tab deduplication unavailable",
+          );
+        }
+      } catch (error) {
+        trace({
+          kind: "event_processing",
+          eventId: event.id,
+          source: context.source,
+          runId: context.runId,
+          outcome: "failure",
+          reason: "present_failed",
+        });
+        throw error;
       }
+    },
+    [getPreference, staffId, toast, trace],
+  );
 
-      if (result.status === "failed") {
+  const runRecovery = useCallback(
+    async (source: RecoveryDiagnosticSource) => {
+      if (recoveryInProgressRef.current) {
+        recoveryRequestedRef.current = true;
+        queuedRecoverySourceRef.current = source;
+        return;
+      }
+      recoveryInProgressRef.current = true;
+      setRecoveryRunning(true);
+      recoveryRunSequenceRef.current += 1;
+      const runId =
+        typeof window !== "undefined" &&
+        typeof window.crypto?.randomUUID === "function"
+          ? window.crypto.randomUUID()
+          : `run-${Date.now()}-${recoveryRunSequenceRef.current}`;
+      trace({
+        kind: "recovery_started",
+        runId,
+        source,
+        outcome: "started",
+        cursorId: loadStaffNotificationRecoveryCursor(staffId)?.id,
+        cursorAt: loadStaffNotificationRecoveryCursor(staffId)?.createdAt,
+      });
+      const automaticFallbackDiagnostic =
+        automaticFallbackDiagnosticRef.current;
+      automaticFallbackDiagnosticRef.current = null;
+      let automaticRecoverySucceeded = false;
+      recoveredSoundPriorityInBatchRef.current = 0;
+      recoverySkippedOlderEventsRef.current =
+        recoverySkippedOlderEventsRef.current ||
+        hasRecentStaffNotificationRecoverySkipNotice(staffId);
+      try {
+        const supabase = createClient();
+        setListenerState("recovering");
+        if (!recoverySkippedOlderEventsRef.current) setRecoveryMessage(null);
+        const recoveryCursor = loadStaffNotificationRecoveryCursor(staffId);
+        let failureReason:
+          "fetch_failed" | "present_failed" | "cursor_save_failed" | null =
+          null;
+        trace({
+          kind: "recovery_window",
+          runId,
+          source,
+          cursorId: recoveryCursor?.id,
+          cursorAt: recoveryCursor?.createdAt,
+        });
+
+        const result = await recoverStaffNotificationEvents({
+          staffId,
+          cursor: recoveryCursor,
+          startedAt: listenerStartedAtRef.current ?? Date.now(),
+          fetchPage: async ({ after, since, until, limit }) => {
+            let query = supabase
+              .from("staff_notification_events")
+              .select(
+                "id, created_at, code, order_id, title, description, href",
+              )
+              .gte("created_at", since)
+              .lte("created_at", until)
+              .order("created_at", { ascending: true })
+              .order("id", { ascending: true })
+              .limit(limit);
+
+            if (Date.parse(after.createdAt) >= Date.parse(since)) {
+              query = query.or(
+                `created_at.gt.${after.createdAt},and(created_at.eq.${after.createdAt},id.gt.${after.id})`,
+              );
+            }
+
+            let data: NotificationEventRow[] | null;
+            let error: unknown | null;
+            try {
+              const result = await query;
+              data = result.data as NotificationEventRow[] | null;
+              error = result.error;
+            } catch (queryError) {
+              failureReason = "fetch_failed";
+              trace({
+                kind: "recovery_page",
+                runId,
+                source,
+                outcome: "failure",
+                reason: "fetch_failed",
+                cursorId: after.id,
+                cursorAt: after.createdAt,
+                limit,
+              });
+              throw queryError;
+            }
+            if (error || !data) failureReason = "fetch_failed";
+            trace({
+              kind: "recovery_page",
+              runId,
+              source,
+              outcome: error || !data ? "failure" : "success",
+              reason: error || !data ? "fetch_failed" : undefined,
+              cursorId: after.id,
+              cursorAt: after.createdAt,
+              count: data?.length ?? 0,
+              limit,
+            });
+            for (const row of data ?? []) {
+              trace({
+                kind: "event_eligible",
+                eventId: row.id,
+                runId,
+                source,
+                eligible: true,
+                reason: "page_query",
+              });
+            }
+            return {
+              events: data,
+              error,
+            };
+          },
+          deliver: async (row) => {
+            const event = normalizeLiveNotificationEvent(row);
+            if (!event) {
+              const shape = getLiveNotificationShape(row);
+              failureReason = "present_failed";
+              trace({
+                kind: "normalization",
+                eventId: shape.idPresent ? row.id : undefined,
+                runId,
+                source,
+                outcome: "rejected",
+                reason: !shape.idPresent
+                  ? "missing_id"
+                  : !shape.supportedCodePresent
+                    ? "unsupported_code"
+                    : "invalid_shape",
+              });
+              throw new Error("Unsupported notification event row");
+            }
+            trace({
+              kind: "normalization",
+              eventId: event.id,
+              runId,
+              source,
+              outcome: "accepted",
+            });
+            try {
+              await presentEvent(event, true, { source, runId });
+            } catch (error) {
+              failureReason = "present_failed";
+              throw error;
+            }
+          },
+          saveCursor: async (targetStaffId, cursor, options) => {
+            let saved = false;
+            try {
+              saved = await saveStaffNotificationRecoveryCursor(
+                targetStaffId,
+                cursor,
+                options,
+              );
+            } catch {
+              saved = false;
+            }
+            if (!saved) failureReason = "cursor_save_failed";
+            trace({
+              kind: "cursor_saved",
+              runId,
+              source,
+              eventId:
+                cursor.id === STAFF_NOTIFICATION_RECOVERY_START_ID
+                  ? undefined
+                  : cursor.id,
+              cursorId: cursor.id,
+              cursorAt: cursor.createdAt,
+              outcome: saved ? "saved" : "not_saved",
+              reason: saved ? undefined : "cursor_save_failed",
+            });
+            return saved;
+          },
+        });
+
+        if (result.olderEventsSkipped) {
+          recoverySkippedOlderEventsRef.current = true;
+          markStaffNotificationRecoverySkipNotice(staffId);
+          trace({
+            kind: "recovery_window",
+            runId,
+            source,
+            reason: "expired",
+          });
+        }
+
+        if (result.status === "failed") {
+          updateRecoveryPending(true);
+          setListenerState("recovery-failed");
+          setRecoveryMessage(
+            recoverySkippedOlderEventsRef.current
+              ? "Notifications older than the 15-minute recovery window were skipped. Some recent notifications may not have loaded; try recovery again."
+              : "Some staff notifications may not have loaded. Try recovery again.",
+          );
+          console.error(
+            "[staff-notifications] Recovery failed; cursor retained",
+          );
+          trace({
+            kind: "recovery_finished",
+            runId,
+            source,
+            outcome: "failure",
+            reason: failureReason ?? "unknown_failure",
+            count: result.recovered,
+            cursorId: result.cursor.id,
+            cursorAt: result.cursor.createdAt,
+          });
+          return;
+        }
+        if (result.status === "incomplete") {
+          updateRecoveryPending(true);
+          setListenerState("recovery-incomplete");
+          setRecoveryMessage(
+            recoverySkippedOlderEventsRef.current
+              ? "Notifications older than the 15-minute recovery window were skipped. More recent notifications are available; continue recovery."
+              : "More recent staff notifications are available. Continue recovery.",
+          );
+          trace({
+            kind: "recovery_finished",
+            runId,
+            source,
+            outcome: "incomplete",
+            reason: "more_due",
+            count: result.recovered,
+            cursorId: result.cursor.id,
+            cursorAt: result.cursor.createdAt,
+          });
+          return;
+        }
+
+        setListenerState("ready");
+        updateRecoveryPending(false);
+        if (recoverySkippedOlderEventsRef.current) {
+          setRecoveryMessage(
+            "Notifications older than the 15-minute recovery window were skipped.",
+          );
+        } else if (result.futureCursorReset) {
+          setRecoveryMessage(
+            "The notification recovery position was ahead of current time; recent events were rechecked.",
+          );
+        }
+        automaticRecoverySucceeded = true;
+        trace({
+          kind: "recovery_finished",
+          runId,
+          source,
+          outcome: "success",
+          reason: result.olderEventsSkipped ? "expired" : "complete",
+          count: result.recovered,
+          cursorId: result.cursor.id,
+          cursorAt: result.cursor.createdAt,
+        });
+      } catch {
         updateRecoveryPending(true);
         setListenerState("recovery-failed");
         setRecoveryMessage(
-          recoverySkippedOlderEventsRef.current
-            ? "Notifications older than the 15-minute recovery window were skipped. Some recent notifications may not have loaded; try recovery again."
-            : "Some staff notifications may not have loaded. Try recovery again.",
+          "Some staff notifications may not have loaded. Try recovery again.",
         );
-        console.error("[staff-notifications] Recovery failed; cursor retained");
-        return;
-      }
-      if (result.status === "incomplete") {
-        updateRecoveryPending(true);
-        setListenerState("recovery-incomplete");
-        setRecoveryMessage(
-          recoverySkippedOlderEventsRef.current
-            ? "Notifications older than the 15-minute recovery window were skipped. More recent notifications are available; continue recovery."
-            : "More recent staff notifications are available. Continue recovery.",
+        console.error(
+          "[staff-notifications] Recovery failed before reading events",
         );
-        return;
-      }
-
-      setListenerState("ready");
-      updateRecoveryPending(false);
-      if (recoverySkippedOlderEventsRef.current) {
-        setRecoveryMessage(
-          "Notifications older than the 15-minute recovery window were skipped.",
-        );
-      } else if (result.futureCursorReset) {
-        setRecoveryMessage(
-          "The notification recovery position was ahead of current time; recent events were rechecked.",
-        );
-      }
-      automaticRecoverySucceeded = true;
-    } catch {
-      updateRecoveryPending(true);
-      setListenerState("recovery-failed");
-      setRecoveryMessage(
-        "Some staff notifications may not have loaded. Try recovery again.",
-      );
-      console.error(
-        "[staff-notifications] Recovery failed before reading events",
-      );
-    } finally {
-      if (automaticFallbackDiagnostic) {
-        const log = automaticRecoverySucceeded ? console.info : console.warn;
-        log("[staff-notifications] Malformed live event fallback", {
-          ...automaticFallbackDiagnostic,
-          automaticRecoveryAttempted: true,
-          automaticRecoverySucceeded,
+        trace({
+          kind: "recovery_finished",
+          runId,
+          source,
+          outcome: "failure",
+          reason: "unknown_failure",
         });
-        malformedRecoveryGateRef.current?.finish();
+      } finally {
+        if (automaticFallbackDiagnostic) {
+          const log = automaticRecoverySucceeded ? console.info : console.warn;
+          log("[staff-notifications] Malformed live event fallback", {
+            ...automaticFallbackDiagnostic,
+            automaticRecoveryAttempted: true,
+            automaticRecoverySucceeded,
+          });
+          malformedRecoveryGateRef.current?.finish();
+        }
+        if (recoveredSoundPriorityInBatchRef.current > 0) {
+          void playStaffNotificationSound();
+          recoveredSoundPriorityInBatchRef.current = 0;
+        }
+        recoveryInProgressRef.current = false;
+        setRecoveryRunning(false);
+        if (recoveryRequestedRef.current) {
+          recoveryRequestedRef.current = false;
+          const queuedSource =
+            queuedRecoverySourceRef.current ?? "automatic_continue";
+          queuedRecoverySourceRef.current = null;
+          window.setTimeout(() => retryRecoveryRef.current?.(queuedSource), 0);
+        }
       }
-      if (recoveredSoundPriorityInBatchRef.current > 0) {
-        void playStaffNotificationSound();
-        recoveredSoundPriorityInBatchRef.current = 0;
-      }
-      recoveryInProgressRef.current = false;
-      setRecoveryRunning(false);
-      if (recoveryRequestedRef.current) {
-        recoveryRequestedRef.current = false;
-        window.setTimeout(() => retryRecoveryRef.current?.(), 0);
-      }
-    }
-  }, [presentEvent, staffId, updateRecoveryPending]);
+    },
+    [presentEvent, staffId, trace, updateRecoveryPending],
+  );
 
   useEffect(() => {
-    retryRecoveryRef.current = () => void runRecovery();
+    retryRecoveryRef.current = (source = "manual_retry") =>
+      void runRecovery(source);
   }, [runRecovery]);
 
   useEffect(() => {
@@ -309,14 +605,28 @@ export function StaffNotificationListener({
     const persistedRecoveryPending =
       hasStaffNotificationRecoveryPending(staffId);
     recoveryPendingRef.current = persistedRecoveryPending;
+    trace({
+      kind: "pending_marker",
+      pending: persistedRecoveryPending,
+      outcome: "success",
+    });
 
     const supabase = createClient();
     let disposed = false;
     let restoredPendingState = false;
     if (!loadStaffNotificationRecoveryCursor(staffId)) {
-      saveStaffNotificationRecoveryCursor(staffId, {
+      const initialCursor = {
         createdAt: new Date(listenerStartedAtRef.current - 5_000).toISOString(),
         id: STAFF_NOTIFICATION_RECOVERY_START_ID,
+      };
+      const saved = saveStaffNotificationRecoveryCursor(staffId, initialCursor);
+      trace({
+        kind: "cursor_saved",
+        source: "page_load",
+        cursorId: initialCursor.id,
+        cursorAt: initialCursor.createdAt,
+        outcome: saved ? "saved" : "not_saved",
+        reason: saved ? undefined : "cursor_save_failed",
       });
     }
     const channel = supabase
@@ -335,16 +645,29 @@ export function StaffNotificationListener({
             setRecoveryMessage(
               "A staff notification could not be displayed. Try recovery again.",
             );
-            const shape = getLiveNotificationShape(payload.new);
             const automaticRecoveryAttempted =
               malformedRecoveryGateRef.current?.tryStart(Date.now()) ?? false;
+            const shape = getLiveNotificationShape(payload.new);
+            trace({
+              kind: "normalization",
+              eventId: shape.idPresent
+                ? (payload.new as { id: string }).id
+                : undefined,
+              source: "live",
+              outcome: "rejected",
+              reason: !shape.idPresent
+                ? "missing_id"
+                : !shape.supportedCodePresent
+                  ? "unsupported_code"
+                  : "invalid_shape",
+            });
             if (automaticRecoveryAttempted) {
               automaticFallbackDiagnosticRef.current = {
                 ...shape,
                 realtimeSubscriptionStatus:
                   realtimeSubscriptionStatusRef.current,
               };
-              void runRecovery();
+              void runRecovery("live_fallback");
             } else if (
               Date.now() - lastSuppressedMalformedDiagnosticAtRef.current >=
               30_000
@@ -363,11 +686,17 @@ export function StaffNotificationListener({
             }
             return;
           }
-          void presentEvent(event, false).catch(() => {
+          trace({
+            kind: "normalization",
+            eventId: event.id,
+            source: "live",
+            outcome: "accepted",
+          });
+          void presentEvent(event, false, { source: "live" }).catch(() => {
             console.error(
               "[staff-notifications] Live notification presentation failed; starting recovery",
             );
-            void runRecovery();
+            void runRecovery("live_presentation_failure");
           });
         },
       )
@@ -379,12 +708,18 @@ export function StaffNotificationListener({
         }
         const safeStatus = toSafeRealtimeSubscriptionStatus(status);
         realtimeSubscriptionStatusRef.current = safeStatus;
+        trace({
+          kind: "realtime_status",
+          status: safeStatus,
+        });
         console.info("[staff-notifications] Realtime subscription status", {
           status: safeStatus,
         });
         if (status === "SUBSCRIBED") {
           setListenerState("connected");
-          void runRecovery();
+          const source = everSubscribedRef.current ? "reconnect" : "page_load";
+          everSubscribedRef.current = true;
+          void runRecovery(source);
           return;
         }
         if (
@@ -416,6 +751,7 @@ export function StaffNotificationListener({
     presentEvent,
     runRecovery,
     staffId,
+    trace,
     updateRecoveryPending,
   ]);
 
@@ -442,6 +778,47 @@ export function StaffNotificationListener({
       break;
   }
 
+  const retryVisible =
+    (recoveryPending ||
+      listenerState === "recovery-failed" ||
+      listenerState === "recovery-incomplete") &&
+    listenerState !== "recovering" &&
+    !recoveryRunning;
+  const retryVisibilityReason = !retryVisible
+    ? recoveryRunning || listenerState === "recovering"
+      ? "recovering"
+      : undefined
+    : listenerState === "recovery-incomplete"
+      ? "recovery_incomplete"
+      : listenerState === "recovery-failed"
+        ? "recovery_failed"
+        : listenerState === "disconnected"
+          ? "disconnected"
+          : "pending_backlog";
+  const retryVisibilityKey = `${retryVisible}:${retryVisibilityReason ?? "none"}`;
+
+  useEffect(() => {
+    if (
+      !diagnosticsEnabled ||
+      lastRetryVisibilityRef.current === retryVisibilityKey
+    ) {
+      return;
+    }
+    lastRetryVisibilityRef.current = retryVisibilityKey;
+    trace({
+      kind: "retry_visibility",
+      visible: retryVisible,
+      outcome: retryVisible ? "visible" : "hidden",
+      reason: retryVisibilityReason,
+    });
+  }, [
+    diagnosticsEnabled,
+    retryVisibilityKey,
+    retryVisibilityReason,
+    retryVisible,
+    trace,
+  ]);
+
   if (!anyNotificationChannelEnabled) return null;
   if (!stateLabel && !recoveryMessage) return null;
 
@@ -452,19 +829,15 @@ export function StaffNotificationListener({
       role="status"
     >
       <p>{recoveryMessage ?? stateLabel}</p>
-      {(recoveryPending ||
-        listenerState === "recovery-failed" ||
-        listenerState === "recovery-incomplete") &&
-        listenerState !== "recovering" &&
-        !recoveryRunning && (
-          <button
-            className="mt-1 font-semibold underline"
-            onClick={() => retryRecoveryRef.current?.()}
-            type="button"
-          >
-            Retry recovery
-          </button>
-        )}
+      {retryVisible && (
+        <button
+          className="mt-1 font-semibold underline"
+          onClick={() => retryRecoveryRef.current?.("manual_retry")}
+          type="button"
+        >
+          Retry recovery
+        </button>
+      )}
     </div>
   );
 }

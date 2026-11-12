@@ -91,7 +91,7 @@ const malformedBranch = listenerSource.slice(
     "const event = normalizeLiveNotificationEvent(payload.new)",
   ),
   listenerSource.indexOf(
-    "void presentEvent(event, false)",
+    "void presentEvent(event, false,",
     listenerSource.indexOf(
       "const event = normalizeLiveNotificationEvent(payload.new)",
     ),
@@ -101,7 +101,7 @@ assert.match(malformedBranch, /if \(!event\)/);
 assert.match(malformedBranch, /getLiveNotificationShape\(payload\.new\)/);
 assert.match(malformedBranch, /tryStart\(Date\.now\(\)\)/);
 assert.match(malformedBranch, /automaticFallbackDiagnosticRef\.current/);
-assert.match(malformedBranch, /void runRecovery\(\)/);
+assert.match(malformedBranch, /void runRecovery\("live_fallback"\)/);
 const suppressedDiagnostic = malformedBranch.slice(
   malformedBranch.indexOf(
     'console.warn(\n                "[staff-notifications] Malformed live event fallback"',
