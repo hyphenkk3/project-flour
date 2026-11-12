@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { createClient } from "@/lib/supabase/client";
 import type { StaffNotificationPreference } from "@/foundation/staff/notification-preferences";
-import { STAFF_NOTIFICATION_DEFINITIONS } from "@/foundation/staff/notification-preferences";
 import {
   loadStaffNotificationRecoveryCursor,
   hasRecentStaffNotificationRecoverySkipNotice,
@@ -25,6 +24,13 @@ import {
   recoveredStaffNotificationSoundPriority,
   shouldPlayStaffNotificationSound,
 } from "@/foundation/staff/staff-notification-sound";
+import {
+  createMalformedLiveRecoveryGate,
+  getLiveNotificationShape,
+  normalizeLiveNotificationEvent,
+  toSafeRealtimeSubscriptionStatus,
+  type SafeRealtimeSubscriptionStatus,
+} from "@/foundation/staff/staff-notification-live-fallback";
 
 type StaffNotificationListenerProps = {
   staffId: string;
@@ -47,51 +53,11 @@ type ListenerState =
   | "recovery-incomplete"
   | "ready";
 
-function isNotificationCode(
-  value: string | null | undefined,
-): value is StaffNotificationEvent["code"] {
-  return STAFF_NOTIFICATION_DEFINITIONS.some(
-    (definition) => definition.code === value,
-  );
-}
-
-function toneFromCode(
-  code: StaffNotificationEvent["code"],
-): StaffNotificationEvent["tone"] {
-  switch (code) {
-    case "order_paid":
-    case "order_confirmed":
-      return "success";
-    case "order_cancelled":
-    case "approval_required":
-    case "last_minute":
-    case "fresh_pick_walk_in_hold_reminder":
-      return "warning";
-    default:
-      return "info";
-  }
-}
-
-function toNotificationEvent(
-  row: NotificationEventRow,
-): StaffNotificationEvent | null {
-  if (!row.id || !isNotificationCode(row.code)) return null;
-  return {
-    id: row.id,
-    code: row.code,
-    orderId: row.order_id ?? null,
-    title: row.title?.trim() || "Staff notification",
-    description: row.description?.trim() || "",
-    href: row.href ?? undefined,
-    actionLabel:
-      row.code === "waiting_list_new_request"
-        ? "View"
-        : row.code === "approval_required" && !row.order_id
-          ? "View approvals"
-          : "View order",
-    tone: toneFromCode(row.code),
-  };
-}
+type AutomaticFallbackDiagnostic = {
+  idPresent: boolean;
+  supportedCodePresent: boolean;
+  realtimeSubscriptionStatus: SafeRealtimeSubscriptionStatus;
+};
 
 export function StaffNotificationListener({
   staffId,
@@ -107,6 +73,15 @@ export function StaffNotificationListener({
   const recoveryRequestedRef = useRef(false);
   const recoveredSoundPriorityInBatchRef = useRef(0);
   const recoverySkippedOlderEventsRef = useRef(false);
+  const realtimeSubscriptionStatusRef =
+    useRef<SafeRealtimeSubscriptionStatus>("CONNECTING");
+  const malformedRecoveryGateRef = useRef<ReturnType<
+    typeof createMalformedLiveRecoveryGate
+  > | null>(null);
+  malformedRecoveryGateRef.current ??= createMalformedLiveRecoveryGate();
+  const automaticFallbackDiagnosticRef =
+    useRef<AutomaticFallbackDiagnostic | null>(null);
+  const lastSuppressedMalformedDiagnosticAtRef = useRef(0);
 
   const getPreference = useCallback(
     (code: StaffNotificationPreference["code"]) =>
@@ -180,6 +155,9 @@ export function StaffNotificationListener({
       return;
     }
     recoveryInProgressRef.current = true;
+    const automaticFallbackDiagnostic = automaticFallbackDiagnosticRef.current;
+    automaticFallbackDiagnosticRef.current = null;
+    let automaticRecoverySucceeded = false;
     recoveredSoundPriorityInBatchRef.current = 0;
     recoverySkippedOlderEventsRef.current =
       recoverySkippedOlderEventsRef.current ||
@@ -216,7 +194,7 @@ export function StaffNotificationListener({
           };
         },
         deliver: async (row) => {
-          const event = toNotificationEvent(row as NotificationEventRow);
+          const event = normalizeLiveNotificationEvent(row);
           if (!event) throw new Error("Unsupported notification event row");
           await presentEvent(event, true);
         },
@@ -258,6 +236,7 @@ export function StaffNotificationListener({
           "The notification recovery position was ahead of current time; recent events were rechecked.",
         );
       }
+      automaticRecoverySucceeded = true;
     } catch {
       setListenerState("recovery-failed");
       setRecoveryMessage(
@@ -267,6 +246,15 @@ export function StaffNotificationListener({
         "[staff-notifications] Recovery failed before reading events",
       );
     } finally {
+      if (automaticFallbackDiagnostic) {
+        const log = automaticRecoverySucceeded ? console.info : console.warn;
+        log("[staff-notifications] Malformed live event fallback", {
+          ...automaticFallbackDiagnostic,
+          automaticRecoveryAttempted: true,
+          automaticRecoverySucceeded,
+        });
+        malformedRecoveryGateRef.current?.finish();
+      }
       if (recoveredSoundPriorityInBatchRef.current > 0) {
         void playStaffNotificationSound();
         recoveredSoundPriorityInBatchRef.current = 0;
@@ -312,17 +300,38 @@ export function StaffNotificationListener({
           table: "staff_notification_events",
         },
         (payload) => {
-          const event = toNotificationEvent(
-            payload.new as NotificationEventRow,
-          );
+          const event = normalizeLiveNotificationEvent(payload.new);
           if (!event) {
             setListenerState("recovery-failed");
             setRecoveryMessage(
               "A staff notification could not be displayed. Try recovery again.",
             );
-            console.error(
-              "[staff-notifications] Live notification row was unsupported",
-            );
+            const shape = getLiveNotificationShape(payload.new);
+            const automaticRecoveryAttempted =
+              malformedRecoveryGateRef.current?.tryStart(Date.now()) ?? false;
+            if (automaticRecoveryAttempted) {
+              automaticFallbackDiagnosticRef.current = {
+                ...shape,
+                realtimeSubscriptionStatus:
+                  realtimeSubscriptionStatusRef.current,
+              };
+              void runRecovery();
+            } else if (
+              Date.now() - lastSuppressedMalformedDiagnosticAtRef.current >=
+              30_000
+            ) {
+              lastSuppressedMalformedDiagnosticAtRef.current = Date.now();
+              console.warn(
+                "[staff-notifications] Malformed live event fallback",
+                {
+                  ...shape,
+                  realtimeSubscriptionStatus:
+                    realtimeSubscriptionStatusRef.current,
+                  automaticRecoveryAttempted: false,
+                  automaticRecoverySucceeded: false,
+                },
+              );
+            }
             return;
           }
           void presentEvent(event, false).catch(() => {
@@ -335,6 +344,11 @@ export function StaffNotificationListener({
       )
       .subscribe((status, err) => {
         if (disposed) return;
+        const safeStatus = toSafeRealtimeSubscriptionStatus(status);
+        realtimeSubscriptionStatusRef.current = safeStatus;
+        console.info("[staff-notifications] Realtime subscription status", {
+          status: safeStatus,
+        });
         if (status === "SUBSCRIBED") {
           setListenerState("connected");
           void runRecovery();
@@ -348,7 +362,7 @@ export function StaffNotificationListener({
           setListenerState("disconnected");
           setRecoveryMessage("Live notifications disconnected. Reconnecting…");
           console.error("[staff-notifications] Realtime subscription failed:", {
-            status,
+            status: safeStatus,
             errorPresent: Boolean(err),
           });
         }

@@ -183,8 +183,12 @@ assert.doesNotMatch(staffAction, /waiting_list_new_request/);
 const listenerSrc = readSrc(
   "src/components/shell/StaffNotificationListener.tsx",
 );
-assert.match(listenerSrc, /waiting_list_new_request/);
-assert.match(listenerSrc, /View/);
+assert.match(listenerSrc, /normalizeLiveNotificationEvent/);
+const listenerNormalizationSrc = readSrc(
+  "src/foundation/staff/staff-notification-live-fallback.ts",
+);
+assert.match(listenerNormalizationSrc, /waiting_list_new_request/);
+assert.match(listenerNormalizationSrc, /"View"/);
 
 const engineSql = readSrc(
   "supabase/migrations/20260903120000_waiting_list_engine.sql",
