@@ -930,12 +930,16 @@ async function testEmailDelivery() {
   assert.match(middlewareSrc, /isMachineDispatchPath/);
   assert.match(
     middlewareSrc,
-    /pathname === "\/api\/staff\/notifications\/dispatch"/,
+    /pathname === "\/api\/staff\/notifications\/dispatch"\s*\|\|\s*pathname === "\/api\/staff\/notifications\/fresh-pick-reminder-dispatch"/,
   );
+  const machineDispatchPredicate =
+    middlewareSrc.split("function isMachineDispatchPath")[1]?.split("\n}")[0] ??
+    "";
+  assert.doesNotMatch(machineDispatchPredicate, /startsWith|includes|match\(/);
   assert.doesNotMatch(
     middlewareSrc.split("function isPublicPath")[1]?.split("function ")[0] ??
       "",
-    /\/api\/staff\/notifications\/dispatch/,
+    /\/api\/staff\/notifications\/(?:dispatch|fresh-pick-reminder-dispatch)/,
   );
 
   const engineSrc = read("src/foundation/staff/staff-notification-engine.ts");

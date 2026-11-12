@@ -3,6 +3,9 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
+import { NextRequest } from "next/server";
+import { middleware } from "../src/middleware";
+import { GET as freshPickReminderDispatch } from "../src/app/api/staff/notifications/fresh-pick-reminder-dispatch/route";
 import {
   buildStaffPushMessage,
   isTrustedStaffPushEndpoint,
@@ -20,6 +23,86 @@ import { STAFF_NOTIFICATION_DEFINITIONS } from "../src/foundation/staff/notifica
 
 function read(path: string) {
   return readFileSync(resolve(process.cwd(), path), "utf8");
+}
+
+async function middlewareAndSchedulerBoundaryTests() {
+  const paths = [
+    "/api/staff/notifications/dispatch",
+    "/api/staff/notifications/fresh-pick-reminder-dispatch",
+  ];
+  const originalEnv = new Map(
+    [
+      "NEXT_PUBLIC_SUPABASE_URL",
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "CRON_SECRET",
+      "VERCEL_ENV",
+      "VERCEL_GIT_COMMIT_REF",
+    ].map((key) => [key, process.env[key]]),
+  );
+
+  try {
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    for (const pathname of paths) {
+      const response = await middleware(
+        new NextRequest(`https://preview.example${pathname}`),
+      );
+      assert.equal(response.headers.get("x-middleware-next"), "1");
+    }
+
+    for (const pathname of [
+      "/owner",
+      "/api/staff/notifications/push-dispatch",
+    ]) {
+      const response = await middleware(
+        new NextRequest(`https://preview.example${pathname}`),
+      );
+      assert.equal(response.status, 307);
+      assert.equal(
+        new URL(response.headers.get("location")!).pathname,
+        "/login",
+      );
+    }
+
+    const request = (authorization?: string) =>
+      new Request(
+        "https://preview.example/api/staff/notifications/fresh-pick-reminder-dispatch",
+        { headers: authorization ? { authorization } : undefined },
+      );
+    process.env.VERCEL_ENV = "preview";
+    process.env.VERCEL_GIT_COMMIT_REF =
+      "codex/staff-notifications-dev-20261109";
+    delete process.env.CRON_SECRET;
+    assert.equal((await freshPickReminderDispatch(request())).status, 401);
+
+    process.env.CRON_SECRET = "synthetic-cron-secret";
+    assert.equal(
+      (await freshPickReminderDispatch(request("Bearer incorrect-secret")))
+        .status,
+      401,
+    );
+
+    process.env.VERCEL_GIT_COMMIT_REF = "codex/unapproved-test-branch";
+    assert.equal(
+      (await freshPickReminderDispatch(request("Bearer synthetic-cron-secret")))
+        .status,
+      404,
+    );
+
+    process.env.VERCEL_ENV = "production";
+    process.env.VERCEL_GIT_COMMIT_REF = "main";
+    assert.equal(
+      (await freshPickReminderDispatch(request("Bearer synthetic-cron-secret")))
+        .status,
+      404,
+    );
+  } finally {
+    for (const [key, value] of originalEnv) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
 }
 
 const key = "A".repeat(87);
@@ -279,6 +362,7 @@ const claimed: ClaimedStaffPushDelivery[] = [
 ];
 
 async function main() {
+  await middlewareAndSchedulerBoundaryTests();
   await serviceWorkerNavigationTests();
   const freshPickEventId = "8e5b25a5-f302-48ba-aa60-a6f2857b1d35";
   assert.equal(isFreshPickReminderEventId(freshPickEventId), true);
@@ -668,7 +752,7 @@ async function main() {
   );
 
   const handoffMigration = read(
-    "supabase/migrations/20261111120000_staff_notification_fresh_pick_push_handoff.sql",
+    "supabase/migrations/20261111110823_staff_notification_fresh_pick_push_handoff.sql",
   );
   assert.match(
     handoffMigration,
@@ -729,6 +813,14 @@ async function main() {
   const handoffRoute = read(
     "src/app/api/staff/notifications/fresh-pick-reminder-dispatch/route.ts",
   );
+  assert.match(
+    handoffRoute,
+    /if \(!safeBearerMatch\(request\)\)\s*\{\s*return json\(\{ ok: false, outcome: "unauthorized" \}, 401\)/,
+  );
+  assert.match(
+    handoffRoute,
+    /if \(!isExactDevPreview\(\)\)\s*\{\s*return json\(\{ ok: false, outcome: "preview_scope_mismatch" \}, 404\)/,
+  );
   assert.match(handoffRoute, /process\.env\.VERCEL_ENV !== "preview"/);
   assert.match(handoffRoute, /export const maxDuration = 60/);
   assert.match(handoffRoute, /const MAX_EVENT_IDS_PER_RUN = 5/);
@@ -741,6 +833,10 @@ async function main() {
   assert.match(handoffRoute, /export async function HEAD[\s\S]*?status: 405/);
   assert.doesNotMatch(handoffRoute, /deliverPendingStaffPushNotifications/);
   assert.match(handoffRoute, /dispatchSpecificFreshPickReminderEvents/);
+  assert.match(
+    handoffRoute,
+    /dispatchSpecificFreshPickReminderEvents\(\{\s*eventIds: data,\s*dispatch: dispatchFreshPickReminderPush/,
+  );
   assert.match(handoffRoute, /Cache-Control/);
   const vercelConfig = JSON.parse(read("vercel.json")) as {
     schedules: Record<
@@ -758,6 +854,10 @@ async function main() {
   assert.doesNotMatch(
     handoffRoute,
     /STAFF_PUSH_VAPID_PRIVATE_KEY|SUPABASE_SERVICE_ROLE_KEY/,
+  );
+  assert.doesNotMatch(
+    handoffRoute,
+    /deliverPendingStaffPushNotifications|deliverPendingStaffNotificationEmails/,
   );
   const pushDispatch = read(
     "src/foundation/staff/staff-notification-push-dispatch.ts",
