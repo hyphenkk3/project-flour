@@ -8,6 +8,9 @@ import type { StaffNotificationPreference } from "@/foundation/staff/notificatio
 import {
   loadStaffNotificationRecoveryCursor,
   hasRecentStaffNotificationRecoverySkipNotice,
+  hasStaffNotificationRecoveryPending,
+  clearStaffNotificationRecoveryPending,
+  markStaffNotificationRecoveryPending,
   markStaffNotificationRecoverySkipNotice,
   recoverStaffNotificationEvents,
   saveStaffNotificationRecoveryCursor,
@@ -68,6 +71,9 @@ export function StaffNotificationListener({
   const [listenerState, setListenerState] =
     useState<ListenerState>("connecting");
   const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
+  const [recoveryPending, setRecoveryPending] = useState(false);
+  const [recoveryRunning, setRecoveryRunning] = useState(false);
+  const recoveryPendingRef = useRef(false);
   const retryRecoveryRef = useRef<(() => void) | null>(null);
   const recoveryInProgressRef = useRef(false);
   const recoveryRequestedRef = useRef(false);
@@ -88,6 +94,19 @@ export function StaffNotificationListener({
       notificationPreferences.find((preference) => preference.code === code) ??
       null,
     [notificationPreferences],
+  );
+
+  const updateRecoveryPending = useCallback(
+    (pending: boolean) => {
+      recoveryPendingRef.current = pending;
+      setRecoveryPending(pending);
+      if (pending) {
+        markStaffNotificationRecoveryPending(staffId);
+      } else {
+        clearStaffNotificationRecoveryPending(staffId);
+      }
+    },
+    [staffId],
   );
 
   const anyNotificationChannelEnabled = notificationPreferences.some(
@@ -155,6 +174,7 @@ export function StaffNotificationListener({
       return;
     }
     recoveryInProgressRef.current = true;
+    setRecoveryRunning(true);
     const automaticFallbackDiagnostic = automaticFallbackDiagnosticRef.current;
     automaticFallbackDiagnosticRef.current = null;
     let automaticRecoverySucceeded = false;
@@ -207,6 +227,7 @@ export function StaffNotificationListener({
       }
 
       if (result.status === "failed") {
+        updateRecoveryPending(true);
         setListenerState("recovery-failed");
         setRecoveryMessage(
           recoverySkippedOlderEventsRef.current
@@ -217,6 +238,7 @@ export function StaffNotificationListener({
         return;
       }
       if (result.status === "incomplete") {
+        updateRecoveryPending(true);
         setListenerState("recovery-incomplete");
         setRecoveryMessage(
           recoverySkippedOlderEventsRef.current
@@ -227,6 +249,7 @@ export function StaffNotificationListener({
       }
 
       setListenerState("ready");
+      updateRecoveryPending(false);
       if (recoverySkippedOlderEventsRef.current) {
         setRecoveryMessage(
           "Notifications older than the 15-minute recovery window were skipped.",
@@ -238,6 +261,7 @@ export function StaffNotificationListener({
       }
       automaticRecoverySucceeded = true;
     } catch {
+      updateRecoveryPending(true);
       setListenerState("recovery-failed");
       setRecoveryMessage(
         "Some staff notifications may not have loaded. Try recovery again.",
@@ -260,12 +284,13 @@ export function StaffNotificationListener({
         recoveredSoundPriorityInBatchRef.current = 0;
       }
       recoveryInProgressRef.current = false;
+      setRecoveryRunning(false);
       if (recoveryRequestedRef.current) {
         recoveryRequestedRef.current = false;
         window.setTimeout(() => retryRecoveryRef.current?.(), 0);
       }
     }
-  }, [presentEvent, staffId]);
+  }, [presentEvent, staffId, updateRecoveryPending]);
 
   useEffect(() => {
     retryRecoveryRef.current = () => void runRecovery();
@@ -281,9 +306,13 @@ export function StaffNotificationListener({
     }
 
     listenerStartedAtRef.current ??= Date.now();
+    const persistedRecoveryPending =
+      hasStaffNotificationRecoveryPending(staffId);
+    recoveryPendingRef.current = persistedRecoveryPending;
 
     const supabase = createClient();
     let disposed = false;
+    let restoredPendingState = false;
     if (!loadStaffNotificationRecoveryCursor(staffId)) {
       saveStaffNotificationRecoveryCursor(staffId, {
         createdAt: new Date(listenerStartedAtRef.current - 5_000).toISOString(),
@@ -344,6 +373,10 @@ export function StaffNotificationListener({
       )
       .subscribe((status, err) => {
         if (disposed) return;
+        if (!restoredPendingState) {
+          restoredPendingState = true;
+          setRecoveryPending(persistedRecoveryPending);
+        }
         const safeStatus = toSafeRealtimeSubscriptionStatus(status);
         realtimeSubscriptionStatusRef.current = safeStatus;
         console.info("[staff-notifications] Realtime subscription status", {
@@ -360,7 +393,13 @@ export function StaffNotificationListener({
           status === "CLOSED"
         ) {
           setListenerState("disconnected");
-          setRecoveryMessage("Live notifications disconnected. Reconnecting…");
+          setRecoveryMessage(
+            recoveryPendingRef.current
+              ? recoverySkippedOlderEventsRef.current
+                ? "Notifications older than the 15-minute recovery window were skipped. Remaining notifications may still need recovery; retry when the connection is available."
+                : "Live notifications are reconnecting. Notification recovery is still pending; retry when the connection is available."
+              : "Live notifications disconnected. Reconnecting…",
+          );
           console.error("[staff-notifications] Realtime subscription failed:", {
             status: safeStatus,
             errorPresent: Boolean(err),
@@ -372,7 +411,13 @@ export function StaffNotificationListener({
       disposed = true;
       void supabase.removeChannel(channel);
     };
-  }, [anyNotificationChannelEnabled, presentEvent, runRecovery, staffId]);
+  }, [
+    anyNotificationChannelEnabled,
+    presentEvent,
+    runRecovery,
+    staffId,
+    updateRecoveryPending,
+  ]);
 
   let stateLabel: string | null;
   switch (listenerState) {
@@ -407,16 +452,19 @@ export function StaffNotificationListener({
       role="status"
     >
       <p>{recoveryMessage ?? stateLabel}</p>
-      {(listenerState === "recovery-failed" ||
-        listenerState === "recovery-incomplete") && (
-        <button
-          className="mt-1 font-semibold underline"
-          onClick={() => retryRecoveryRef.current?.()}
-          type="button"
-        >
-          Retry recovery
-        </button>
-      )}
+      {(recoveryPending ||
+        listenerState === "recovery-failed" ||
+        listenerState === "recovery-incomplete") &&
+        listenerState !== "recovering" &&
+        !recoveryRunning && (
+          <button
+            className="mt-1 font-semibold underline"
+            onClick={() => retryRecoveryRef.current?.()}
+            type="button"
+          >
+            Retry recovery
+          </button>
+        )}
     </div>
   );
 }

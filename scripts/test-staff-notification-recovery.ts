@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
+  clearStaffNotificationRecoveryPending,
+  hasStaffNotificationRecoveryPending,
   hasRecentStaffNotificationRecoverySkipNotice,
+  markStaffNotificationRecoveryPending,
   markStaffNotificationRecoverySkipNotice,
   recoverStaffNotificationEvents,
   STAFF_NOTIFICATION_RECOVERY_MAX_DELIVERED_PER_RUN,
@@ -98,6 +101,26 @@ assert.equal(
 
 const exactBatch = await recoverAll(
   makeEvents(STAFF_NOTIFICATION_RECOVERY_MAX_DELIVERED_PER_RUN),
+);
+
+const sixEventBacklog = makeEvents(6);
+const sixEventFirstPass = await recoverAll(sixEventBacklog);
+assert.equal(sixEventFirstPass.result.status, "incomplete");
+assert.equal(sixEventFirstPass.delivered.length, 5);
+assert.equal(
+  sixEventFirstPass.cursor?.id,
+  sixEventBacklog[4]?.id,
+  "six-item backlog leaves its cursor at the fifth delivered event",
+);
+const sixEventContinuation = await recoverAll(
+  sixEventBacklog,
+  sixEventFirstPass.cursor,
+);
+assert.equal(sixEventContinuation.result.status, "complete");
+assert.deepEqual(
+  sixEventContinuation.delivered,
+  [sixEventBacklog[5]?.id],
+  "continuation delivers only the remaining sixth event",
 );
 assert.equal(
   exactBatch.result.status,
@@ -321,6 +344,72 @@ assert.equal(
   false,
   "skip warning expires after one day",
 );
+
+const interruptionBacklog = makeEvents(6);
+const interruptionFirstPass = await recoverAll(interruptionBacklog);
+let interruptionCursor = interruptionFirstPass.cursor;
+markStaffNotificationRecoveryPending(staffId);
+assert.equal(
+  hasStaffNotificationRecoveryPending("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+  false,
+  "pending recovery marker is isolated per staff member",
+);
+const offlineRetry = await recoverStaffNotificationEvents({
+  staffId,
+  cursor: interruptionCursor,
+  startedAt,
+  now,
+  fetchPage: async () => ({ events: null, error: new Error("offline") }),
+  deliver: async () => assert.fail("offline retry must not deliver"),
+  saveCursor: async (_id, next) => {
+    interruptionCursor = next;
+    return true;
+  },
+});
+assert.equal(offlineRetry.status, "failed");
+assert.equal(
+  interruptionCursor?.id,
+  interruptionBacklog[4]?.id,
+  "failed continuation preserves the cursor before the sixth event",
+);
+assert.equal(
+  hasStaffNotificationRecoveryPending(staffId),
+  true,
+  "pending recovery survives an offline failure and page refresh",
+);
+const afterRefreshContinuation = await recoverAll(
+  interruptionBacklog,
+  interruptionCursor,
+);
+assert.deepEqual(
+  afterRefreshContinuation.delivered,
+  [interruptionBacklog[5]?.id],
+  "retry after reconnect delivers the sixth event only",
+);
+clearStaffNotificationRecoveryPending(staffId);
+assert.equal(
+  hasStaffNotificationRecoveryPending(staffId),
+  false,
+  "successful completion clears the persisted continuation marker",
+);
+markStaffNotificationRecoveryPending(staffId);
+const expiredPendingRecovery = await recoverStaffNotificationEvents({
+  staffId,
+  cursor: interruptionCursor,
+  startedAt,
+  now: now + STAFF_NOTIFICATION_RECOVERY_WINDOW_MS + 1,
+  fetchPage: async () => ({ events: [], error: null }),
+  deliver: async () => assert.fail("expired events must not be presented"),
+  saveCursor: async () => true,
+});
+assert.equal(expiredPendingRecovery.status, "complete");
+assert.equal(expiredPendingRecovery.olderEventsSkipped, true);
+clearStaffNotificationRecoveryPending(staffId);
+assert.equal(
+  hasStaffNotificationRecoveryPending(staffId),
+  false,
+  "expired backlog is reported and does not leave a stale retry marker",
+);
 Object.defineProperty(globalThis, "window", {
   configurable: true,
   value: undefined,
@@ -410,6 +499,12 @@ assert.match(listenerSource, /\.limit\(limit\)/);
 assert.match(listenerSource, /status === "SUBSCRIBED"/);
 assert.match(listenerSource, /CHANNEL_ERROR/);
 assert.match(listenerSource, /Retry recovery/);
+assert.match(listenerSource, /hasStaffNotificationRecoveryPending\(staffId\)/);
+assert.match(listenerSource, /recoveryPendingRef\.current/);
+assert.match(listenerSource, /listenerState !== "recovering"/);
+assert.match(listenerSource, /!recoveryRunning/);
+assert.match(listenerSource, /updateRecoveryPending\(true\)/);
+assert.match(listenerSource, /updateRecoveryPending\(false\)/);
 assert.match(listenerSource, /preference\.webMode/);
 assert.match(listenerSource, /recoveredStaffNotificationSoundPriority/);
 assert.doesNotMatch(

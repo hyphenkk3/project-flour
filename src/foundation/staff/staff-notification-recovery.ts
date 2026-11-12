@@ -69,6 +69,39 @@ function recoverySkipNoticeStorageKey(staffId: string): string {
   return `wos-staff-notification-recovery-skip:${staffId}`;
 }
 
+function recoveryPendingStorageKey(staffId: string): string {
+  return `wos-staff-notification-recovery-pending:${staffId}`;
+}
+
+export function markStaffNotificationRecoveryPending(staffId: string): void {
+  if (typeof window === "undefined" || !staffId) return;
+  try {
+    window.localStorage.setItem(recoveryPendingStorageKey(staffId), "1");
+  } catch {
+    // The current listener still exposes retry state in memory.
+  }
+}
+
+export function clearStaffNotificationRecoveryPending(staffId: string): void {
+  if (typeof window === "undefined" || !staffId) return;
+  try {
+    window.localStorage.removeItem(recoveryPendingStorageKey(staffId));
+  } catch {
+    // The current listener still clears retry state in memory.
+  }
+}
+
+export function hasStaffNotificationRecoveryPending(staffId: string): boolean {
+  if (typeof window === "undefined" || !staffId) return false;
+  try {
+    return (
+      window.localStorage.getItem(recoveryPendingStorageKey(staffId)) === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function markStaffNotificationRecoverySkipNotice(
   staffId: string,
   at = Date.now(),
