@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import {
   playStaffNotificationSound,
   primeStaffNotificationSound,
+  recoveredStaffNotificationSoundPriority,
   shouldPlayStaffNotificationSound,
 } from "../src/foundation/staff/staff-notification-sound";
 import {
@@ -26,6 +27,29 @@ assert.equal(
 assert.equal(
   shouldPlayStaffNotificationSound({ code: "order_paid", soundEnabled: true }),
   true,
+);
+assert.equal(
+  recoveredStaffNotificationSoundPriority({
+    code: "new_order",
+    soundEnabled: true,
+  }),
+  1,
+);
+assert.equal(
+  recoveredStaffNotificationSoundPriority({
+    code: "order_cancelled",
+    soundEnabled: true,
+  }),
+  2,
+  "warning categories take precedence within the single recovered-batch cue",
+);
+assert.equal(
+  recoveredStaffNotificationSoundPriority({
+    code: "new_order",
+    soundEnabled: false,
+  }),
+  0,
+  "recovery still honors the category Sound preference",
 );
 
 assert.equal(STAFF_NOTIFICATION_DEFINITIONS.length, 9);
@@ -147,7 +171,11 @@ async function main() {
     resolve("src/components/shell/StaffNotificationListener.tsx"),
     "utf8",
   );
-  assert.match(listener, /tryClaimStaffNotification\(event\.id\)/);
+  assert.match(
+    listener,
+    /claimStaffNotificationForStaff\(\s*staffId,\s*event\.id,/,
+  );
+  assert.match(listener, /recoveredStaffNotificationSoundPriority/);
   assert.match(listener, /playStaffNotificationSound\(\)/);
   const notificationEngine = readFileSync(
     resolve("src/foundation/staff/staff-notification-engine.ts"),
@@ -155,6 +183,7 @@ async function main() {
   );
   assert.match(notificationEngine, /new BroadcastChannel\(/);
   assert.match(notificationEngine, /claimedWebEventIds\.has\(eventId\)/);
+  assert.match(notificationEngine, /navigator\.locks/);
   const preferencesAction = readFileSync(
     resolve("src/foundation/staff/notification-preferences-actions.ts"),
     "utf8",

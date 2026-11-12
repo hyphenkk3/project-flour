@@ -14,6 +14,26 @@ export function shouldPlayStaffNotificationSound(input: {
   );
 }
 
+/**
+ * Recovered events are coalesced into at most one cue per pass. If a warning
+ * category is present, prefer it over earlier informational events so the
+ * bounded sound policy does not let an earlier routine event mask it.
+ */
+export function recoveredStaffNotificationSoundPriority(input: {
+  code: string;
+  soundEnabled?: boolean | null;
+}): number {
+  if (!shouldPlayStaffNotificationSound(input)) return 0;
+  return [
+    "order_cancelled",
+    "approval_required",
+    "last_minute",
+    "fresh_pick_walk_in_hold_reminder",
+  ].includes(input.code)
+    ? 2
+    : 1;
+}
+
 /** Call only from an explicit staff gesture to satisfy browser audio policies. */
 export function primeStaffNotificationSound(): void {
   if (typeof window === "undefined" || !window.AudioContext) return;

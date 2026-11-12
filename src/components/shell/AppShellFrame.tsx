@@ -36,6 +36,7 @@ export function AppShellFrame({
   return (
     <ToastProvider>
       <StaffNotificationListener
+        staffId={staff.id}
         notificationPreferences={notificationPreferences}
       />
 

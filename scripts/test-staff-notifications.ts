@@ -882,7 +882,7 @@ async function testEmailDelivery() {
   );
   assert.match(listenerSrc, /staff_notification_events/);
   assert.doesNotMatch(listenerSrc, /\/api\/staff\/notifications\/email/);
-  assert.doesNotMatch(listenerSrc, /localStorage/);
+  assert.match(listenerSrc, /loadStaffNotificationRecoveryCursor/);
   assert.doesNotMatch(listenerSrc, /order_timeline_events/);
   assert.doesNotMatch(listenerSrc, /operations_approval_requests/);
 
@@ -943,7 +943,7 @@ async function testEmailDelivery() {
   );
 
   const engineSrc = read("src/foundation/staff/staff-notification-engine.ts");
-  assert.doesNotMatch(engineSrc, /localStorage/);
+  assert.match(engineSrc, /localStorage/);
   assert.match(engineSrc, /BroadcastChannel/);
 
   const operationsSrc = read("src/workspaces/owner/OperationsLiveBoard.tsx");
@@ -980,7 +980,11 @@ async function testEmailDelivery() {
     "src/components/shell/StaffNotificationListener.tsx",
   );
   assert.match(soundListenerSrc, /shouldPlayStaffNotificationSound/);
-  assert.match(soundListenerSrc, /tryClaimStaffNotification\(event\.id\)/);
+  assert.match(
+    soundListenerSrc,
+    /claimStaffNotificationForStaff\(\s*staffId,\s*event\.id,/,
+  );
+  assert.match(soundListenerSrc, /recoverStaffNotificationEvents\(/);
   assert.match(soundListenerSrc, /playStaffNotificationSound/);
 
   const soundPreferenceMigration = read(
