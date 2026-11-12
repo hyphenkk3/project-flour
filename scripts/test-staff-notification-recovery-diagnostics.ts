@@ -5,8 +5,13 @@ import { resolve } from "node:path";
 import {
   appendStaffNotificationRecoveryTrace,
   clearStaffNotificationRecoveryTrace,
+  getPendingStaffNotificationChannelRemoval,
   isRecoveryDiagnosticsEnabled,
+  isStaffNotificationRealtimeCallbackCurrent,
+  isStaffNotificationTestControlOperationCurrent,
   pruneRecoveryDiagnosticRecords,
+  mayUseStaffNotificationRealtimeTestControls,
+  removeStaffNotificationChannelForTest,
   readStaffNotificationRecoveryTrace,
   STAFF_NOTIFICATION_RECOVERY_TRACE_KEY,
   STAFF_NOTIFICATION_RECOVERY_TRACE_LIMIT,
@@ -59,6 +64,107 @@ assert.equal(
 );
 assert.equal(
   isRecoveryDiagnosticsEnabled({ ...exactScope, isMasterOwner: false }),
+  false,
+);
+
+assert.equal(
+  mayUseStaffNotificationRealtimeTestControls({
+    diagnosticsEnabled: true,
+    isMasterOwner: true,
+    hostname: exactScope.vercelUrl,
+    expectedHostname: exactScope.vercelUrl,
+  }),
+  true,
+);
+for (const invalidScope of [
+  {
+    diagnosticsEnabled: false,
+    isMasterOwner: true,
+    hostname: exactScope.vercelUrl,
+  },
+  {
+    diagnosticsEnabled: true,
+    isMasterOwner: false,
+    hostname: exactScope.vercelUrl,
+  },
+  {
+    diagnosticsEnabled: true,
+    isMasterOwner: true,
+    hostname: "dev.whitebird.asia",
+  },
+  { diagnosticsEnabled: true, isMasterOwner: true, hostname: "whitebird.asia" },
+  { diagnosticsEnabled: true, isMasterOwner: true, hostname: undefined },
+]) {
+  assert.equal(
+    mayUseStaffNotificationRealtimeTestControls({
+      ...invalidScope,
+      expectedHostname: exactScope.vercelUrl,
+    }),
+    false,
+  );
+}
+
+const callbackScope = {
+  disposed: false,
+  intentionallyPaused: false,
+  channelGeneration: 4,
+  currentGeneration: 4,
+  isCurrentChannel: true,
+};
+assert.equal(isStaffNotificationRealtimeCallbackCurrent(callbackScope), true);
+assert.equal(
+  isStaffNotificationRealtimeCallbackCurrent({
+    ...callbackScope,
+    intentionallyPaused: true,
+  }),
+  false,
+);
+assert.equal(
+  isStaffNotificationTestControlOperationCurrent({
+    operationGeneration: 3,
+    currentGeneration: 3,
+    operationStaffId: "staff-a",
+    currentStaffId: "staff-a",
+  }),
+  true,
+);
+assert.equal(
+  isStaffNotificationTestControlOperationCurrent({
+    operationGeneration: 3,
+    currentGeneration: 4,
+    operationStaffId: "staff-a",
+    currentStaffId: "staff-a",
+  }),
+  false,
+);
+assert.equal(
+  isStaffNotificationTestControlOperationCurrent({
+    operationGeneration: 3,
+    currentGeneration: 3,
+    operationStaffId: "staff-a",
+    currentStaffId: "staff-b",
+  }),
+  false,
+);
+assert.equal(
+  isStaffNotificationRealtimeCallbackCurrent({
+    ...callbackScope,
+    disposed: true,
+  }),
+  false,
+);
+assert.equal(
+  isStaffNotificationRealtimeCallbackCurrent({
+    ...callbackScope,
+    currentGeneration: 5,
+  }),
+  false,
+);
+assert.equal(
+  isStaffNotificationRealtimeCallbackCurrent({
+    ...callbackScope,
+    isCurrentChannel: false,
+  }),
   false,
 );
 
@@ -191,6 +297,79 @@ assert.match(listener, /kind: "retry_visibility"/);
 assert.match(listener, /kind: "recovery_finished"/);
 assert.match(listener, /retryRecoveryRef\.current\?\.\("manual_retry"\)/);
 assert.match(listener, /runRecovery\(source\)/);
+assert.match(listener, /removeStaffNotificationChannelForTest/);
+assert.match(listener, /supabase\.getChannels\(\)\.includes\(target\)/);
+assert.match(listener, /getPendingStaffNotificationChannelRemoval\(supabase\)/);
+assert.match(
+  listener,
+  /candidate\.topic === "realtime:staff-notification-events"/,
+);
+assert.match(listener, /Resume listening to try again/);
+assert.match(listener, /testPauseRequestedRef\.current/);
+assert.match(listener, /subscribeRealtimeRef\.current\?\.\(\)/);
+assert.match(listener, /auth\.getUser\(\)/);
+assert.match(listener, /mayUseStaffNotificationRealtimeTestControls/);
+assert.match(listener, /runRecoveryRef\.current\(source\)/);
+assert.equal(
+  (listener.match(/\.channel\("staff-notification-events"\)/g) ?? []).length,
+  1,
+);
+assert.match(
+  listener,
+  /if \(disposed \|\| testPauseRequestedRef\.current\) return false/,
+);
+assert.match(listener, /if \(testPauseRequestedRef\.current\) return/);
+assert.match(
+  listener,
+  /source = everSubscribedRef\.current \? "reconnect" : "page_load"/,
+);
+assert.match(listener, /listenerLifecycleGenerationRef\.current \+= 1/);
+assert.match(listener, /realtimeControlOperationGenerationRef\.current \+= 1/);
+const pauseControl = listener.slice(
+  listener.indexOf("const pauseRealtimeForTest"),
+  listener.indexOf("const resumeRealtimeForTest"),
+);
+const resumeControl = listener.slice(
+  listener.indexOf("const resumeRealtimeForTest"),
+  listener.indexOf("const realtimeTestControls"),
+);
+assert.ok(
+  pauseControl.indexOf("realtimeControlOperationRef.current = true") <
+    pauseControl.indexOf("await verifyTestControlSession()"),
+);
+assert.ok(
+  pauseControl.indexOf("await verifyTestControlSession()") <
+    pauseControl.indexOf(
+      "recoveryInProgressRef.current ||",
+      pauseControl.indexOf("await verifyTestControlSession()"),
+    ) &&
+    pauseControl.indexOf(
+      "recoveryRequestedRef.current",
+      pauseControl.indexOf("await verifyTestControlSession()"),
+    ) < pauseControl.indexOf("testPauseRequestedRef.current = true"),
+  "Pause must recheck for recovery work after asynchronous session verification",
+);
+assert.ok(
+  resumeControl.indexOf("realtimeControlOperationRef.current = true") <
+    resumeControl.indexOf("await verifyTestControlSession()"),
+);
+assert.match(
+  listener.slice(listener.indexOf("const runRecovery = useCallback")),
+  /async \(source: RecoveryDiagnosticSource\) => \{\s*if \(testPauseRequestedRef\.current\) return;/,
+);
+assert.match(
+  listener.slice(listener.lastIndexOf("return () => {")),
+  /testPauseRequestedRef\.current = false/,
+);
+assert.doesNotMatch(
+  `${pauseControl}\n${resumeControl}`,
+  /saveStaffNotificationRecoveryCursor|markStaffNotificationRecoveryPending|clearStaffNotificationRecoveryPending|\.from\(|\.insert\(|push-dispatch/,
+);
+assert.doesNotMatch(listener, /setInterval\(/);
+assert.doesNotMatch(
+  listener,
+  /sessionStorage.*testPause|localStorage.*testPause/s,
+);
 assert.match(toast, /kind: "toast_retained"/);
 assert.match(toast, /kind: "toast_mounted"/);
 assert.match(toast, /reason: "toast_limit"/);
@@ -201,9 +380,91 @@ assert.match(
   shellFrame,
   /window\.location\.hostname === recoveryDiagnosticsHostname/,
 );
+const diagnosticsPanel = readFileSync(
+  resolve("src/components/shell/StaffNotificationRecoveryDiagnostics.tsx"),
+  "utf8",
+);
+assert.match(diagnosticsPanel, /Pause Realtime/);
+assert.match(diagnosticsPanel, /Resume Realtime/);
+assert.match(diagnosticsPanel, /realtimeStatus === "SUBSCRIBED"/);
 assert.doesNotMatch(listener, /SUPABASE_SERVICE_ROLE_KEY|push-dispatch/);
 assert.doesNotMatch(toast, /SUPABASE_SERVICE_ROLE_KEY|push-dispatch/);
 
-console.log(
-  "PASS recovery diagnostics: strict DEV scope, local bounded retention, sanitizer, trace coverage, no privileged dispatch",
-);
+void (async () => {
+  const channel = { id: "only-the-notification-channel" };
+  let registered = true;
+  assert.equal(
+    await removeStaffNotificationChannelForTest({
+      channel,
+      removeChannel: async (target) => {
+        assert.equal(target, channel);
+        registered = false;
+        return "ok";
+      },
+      isRegistered: (target) => target === channel && registered,
+    }),
+    true,
+  );
+  assert.equal(
+    await removeStaffNotificationChannelForTest({
+      channel,
+      removeChannel: async () => "ok",
+      isRegistered: () => true,
+    }),
+    false,
+  );
+  const client = {};
+  let removalCalls = 0;
+  let channelRegistered = true;
+  let acknowledgeRemoval: ((value: unknown) => void) | undefined;
+  const delayedRemoval = new Promise<unknown>((resolve) => {
+    acknowledgeRemoval = resolve;
+  });
+  const coalescedInput = {
+    channel,
+    removeChannel: async () => {
+      removalCalls += 1;
+      return delayedRemoval;
+    },
+    isRegistered: () => channelRegistered,
+    coalesceBy: client,
+  };
+  const firstRemoval = removeStaffNotificationChannelForTest(coalescedInput);
+  const secondRemoval = removeStaffNotificationChannelForTest(coalescedInput);
+  assert.equal(removalCalls, 1);
+  assert.ok(getPendingStaffNotificationChannelRemoval(client));
+  channelRegistered = false;
+  acknowledgeRemoval?.("ok");
+  assert.deepEqual(await Promise.all([firstRemoval, secondRemoval]), [
+    true,
+    true,
+  ]);
+  await Promise.resolve();
+  assert.equal(getPendingStaffNotificationChannelRemoval(client), undefined);
+  for (const response of ["timed out", "error", undefined]) {
+    assert.equal(
+      await removeStaffNotificationChannelForTest({
+        channel,
+        removeChannel: async () => response,
+        isRegistered: () => false,
+      }),
+      false,
+    );
+  }
+  assert.equal(
+    await removeStaffNotificationChannelForTest({
+      channel,
+      removeChannel: async () => {
+        throw new Error("synthetic removal failure");
+      },
+      isRegistered: () => false,
+    }),
+    false,
+  );
+  console.log(
+    "PASS recovery diagnostics and DEV listener controls: strict scope, paused/stale callback suppression, acknowledged single-channel removal, retry-safe failure, bounded local trace, no privileged dispatch",
+  );
+})().catch((error: unknown) => {
+  console.error(error);
+  process.exitCode = 1;
+});

@@ -5,12 +5,18 @@ import { useEffect, useState } from "react";
 import {
   clearStaffNotificationRecoveryTrace,
   readStaffNotificationRecoveryTrace,
+  type RealtimeTestControlState,
   type RecoveryDiagnosticRecord,
+  type StaffNotificationRealtimeTestControls,
 } from "@/foundation/staff/staff-notification-recovery-diagnostics";
+import type { SafeRealtimeSubscriptionStatus } from "@/foundation/staff/staff-notification-live-fallback";
 
 type Props = {
   enabled: boolean;
   expectedHostname: string;
+  realtimeStatus: SafeRealtimeSubscriptionStatus;
+  testControlState: RealtimeTestControlState;
+  testControls: StaffNotificationRealtimeTestControls | null;
 };
 
 function recordSummary(record: RecoveryDiagnosticRecord): string {
@@ -34,9 +40,30 @@ function recordSummary(record: RecoveryDiagnosticRecord): string {
 export function StaffNotificationRecoveryDiagnostics({
   enabled,
   expectedHostname,
+  realtimeStatus,
+  testControlState,
+  testControls,
 }: Props) {
   const [records, setRecords] = useState<RecoveryDiagnosticRecord[]>([]);
   const [open, setOpen] = useState(false);
+  const controlBusy =
+    testControlState === "pausing" || testControlState === "resuming";
+  const pauseEnabled =
+    testControls !== null &&
+    realtimeStatus === "SUBSCRIBED" &&
+    !controlBusy &&
+    testControlState !== "paused";
+  const resumeEnabled =
+    testControls !== null &&
+    !controlBusy &&
+    (testControlState === "paused" ||
+      testControlState === "resume_failed" ||
+      testControlState === "pause_failed");
+
+  const runControl = (action: "pause" | "resume") => {
+    const control = testControls?.[action];
+    if (control) void control();
+  };
 
   useEffect(() => {
     if (!enabled || window.location.hostname !== expectedHostname) return;
@@ -80,6 +107,54 @@ export function StaffNotificationRecoveryDiagnostics({
           Clear trace
         </button>
       </div>
+      <section
+        aria-label="DEV Realtime listener test controls"
+        className="mt-2 border-t border-slate-200 pt-2"
+      >
+        <p aria-live="polite">
+          Realtime: <strong>{realtimeStatus}</strong> · Test control:{" "}
+          {testControlState.replaceAll("_", " ")}
+        </p>
+        {testControlState === "pause_failed" ? (
+          <p role="status" className="mt-1 text-amber-800">
+            Pause was not confirmed; the listener may still be active. Retry
+            Pause only after the channel is SUBSCRIBED, or restore normal
+            listening.
+          </p>
+        ) : null}
+        {testControlState === "resume_failed" ? (
+          <p role="status" className="mt-1 text-amber-800">
+            Resume is not confirmed yet. The listener may reconnect
+            automatically; retry Resume to wait for SUBSCRIBED again.
+          </p>
+        ) : null}
+        <div className="mt-2 flex gap-2">
+          <button
+            className="rounded border border-slate-400 px-2 py-1 disabled:opacity-50"
+            disabled={!pauseEnabled}
+            onClick={() => runControl("pause")}
+            type="button"
+          >
+            {testControlState === "pause_failed"
+              ? "Retry Pause"
+              : "Pause Realtime"}
+          </button>
+          <button
+            className="rounded border border-slate-400 px-2 py-1 disabled:opacity-50"
+            disabled={!resumeEnabled}
+            onClick={() => runControl("resume")}
+            type="button"
+          >
+            {testControlState === "resume_failed"
+              ? "Retry Resume"
+              : "Resume Realtime"}
+          </button>
+        </div>
+        <p className="mt-1 text-slate-600">
+          These controls remove or restore only this tab’s staff notification
+          channel. They do not change preferences or create events.
+        </p>
+      </section>
       {open ? (
         <div className="mt-2 max-h-72 overflow-auto border-t border-slate-200 pt-2">
           <p className="mb-2 text-slate-600">

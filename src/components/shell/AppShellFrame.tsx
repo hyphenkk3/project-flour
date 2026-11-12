@@ -2,7 +2,12 @@
 
 import { usePathname } from "next/navigation";
 
-import { useSyncExternalStore, type ReactNode } from "react";
+import {
+  useCallback,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 
 import {
   getWorkspaceTitleForPathname,
@@ -14,6 +19,11 @@ import { AppShell } from "@/components/shell/AppShell";
 import { StaffNotificationListener } from "@/components/shell/StaffNotificationListener";
 import { ToastProvider } from "@/components/ui/Toast";
 import { StaffNotificationRecoveryDiagnostics } from "@/components/shell/StaffNotificationRecoveryDiagnostics";
+import type {
+  RealtimeTestControlState,
+  StaffNotificationRealtimeTestControls,
+} from "@/foundation/staff/staff-notification-recovery-diagnostics";
+import type { SafeRealtimeSubscriptionStatus } from "@/foundation/staff/staff-notification-live-fallback";
 
 import type { StaffNotificationPreference } from "@/foundation/staff/notification-preferences";
 
@@ -52,6 +62,25 @@ export function AppShellFrame({
   );
   const activeDiagnostics =
     recoveryDiagnosticsEnabled && expectedHostnameIsActive;
+  const [realtimeTestControls, setRealtimeTestControls] =
+    useState<StaffNotificationRealtimeTestControls | null>(null);
+  const [realtimeTestControlState, setRealtimeTestControlState] =
+    useState<RealtimeTestControlState>("starting");
+  const [realtimeStatus, setRealtimeStatus] =
+    useState<SafeRealtimeSubscriptionStatus>("CONNECTING");
+  const handleTestControlsChange = useCallback(
+    (controls: StaffNotificationRealtimeTestControls | null) =>
+      setRealtimeTestControls(controls),
+    [],
+  );
+  const handleTestControlStateChange = useCallback(
+    (state: RealtimeTestControlState) => setRealtimeTestControlState(state),
+    [],
+  );
+  const handleRealtimeStatusChange = useCallback(
+    (status: SafeRealtimeSubscriptionStatus) => setRealtimeStatus(status),
+    [],
+  );
 
   return (
     <ToastProvider diagnosticsEnabled={activeDiagnostics}>
@@ -59,11 +88,20 @@ export function AppShellFrame({
         staffId={staff.id}
         notificationPreferences={notificationPreferences}
         diagnosticsEnabled={activeDiagnostics}
+        isMasterOwner={staff.isMasterOwner}
+        expectedDiagnosticsHostname={recoveryDiagnosticsHostname}
+        authUserId={staff.authUserId}
+        onRealtimeStatusChange={handleRealtimeStatusChange}
+        onTestControlStateChange={handleTestControlStateChange}
+        onTestControlsChange={handleTestControlsChange}
       />
       {staff.isMasterOwner ? (
         <StaffNotificationRecoveryDiagnostics
           enabled={activeDiagnostics}
           expectedHostname={recoveryDiagnosticsHostname}
+          realtimeStatus={realtimeStatus}
+          testControlState={realtimeTestControlState}
+          testControls={realtimeTestControls}
         />
       ) : null}
 

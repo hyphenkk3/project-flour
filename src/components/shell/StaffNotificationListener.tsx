@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useToast } from "@/components/ui/Toast";
 import { createClient } from "@/lib/supabase/client";
@@ -36,13 +36,31 @@ import {
 } from "@/foundation/staff/staff-notification-live-fallback";
 import {
   appendStaffNotificationRecoveryTrace,
+  getPendingStaffNotificationChannelRemoval,
+  isStaffNotificationRealtimeCallbackCurrent,
+  isStaffNotificationTestControlOperationCurrent,
+  mayUseStaffNotificationRealtimeTestControls,
+  removeStaffNotificationChannelForTest,
+  type RealtimeTestControlState,
   type RecoveryDiagnosticSource,
+  type StaffNotificationRealtimeTestControls,
 } from "@/foundation/staff/staff-notification-recovery-diagnostics";
+
+type SupabaseBrowserClient = ReturnType<typeof createClient>;
+type StaffNotificationChannel = ReturnType<SupabaseBrowserClient["channel"]>;
 
 type StaffNotificationListenerProps = {
   staffId: string;
   notificationPreferences: StaffNotificationPreference[];
   diagnosticsEnabled?: boolean;
+  isMasterOwner?: boolean;
+  expectedDiagnosticsHostname?: string;
+  authUserId?: string;
+  onRealtimeStatusChange?: (status: SafeRealtimeSubscriptionStatus) => void;
+  onTestControlStateChange?: (state: RealtimeTestControlState) => void;
+  onTestControlsChange?: (
+    controls: StaffNotificationRealtimeTestControls | null,
+  ) => void;
 };
 
 type NotificationEventRow = RecoverableStaffNotificationEvent & {
@@ -59,6 +77,7 @@ type ListenerState =
   | "recovering"
   | "recovery-failed"
   | "recovery-incomplete"
+  | "test-paused"
   | "ready";
 
 type AutomaticFallbackDiagnostic = {
@@ -71,6 +90,12 @@ export function StaffNotificationListener({
   staffId,
   notificationPreferences,
   diagnosticsEnabled = false,
+  isMasterOwner = false,
+  expectedDiagnosticsHostname = "",
+  authUserId = "",
+  onRealtimeStatusChange,
+  onTestControlStateChange,
+  onTestControlsChange,
 }: StaffNotificationListenerProps) {
   const { toast } = useToast();
   const listenerStartedAtRef = useRef<number | null>(null);
@@ -101,10 +126,30 @@ export function StaffNotificationListener({
   const queuedRecoverySourceRef = useRef<RecoveryDiagnosticSource | null>(null);
   const lastRetryVisibilityRef = useRef<string | null>(null);
   const diagnosticsEnabledRef = useRef(diagnosticsEnabled);
+  const supabaseClientRef = useRef<SupabaseBrowserClient | null>(null);
+  const realtimeChannelRef = useRef<StaffNotificationChannel | null>(null);
+  const channelGenerationRef = useRef(0);
+  const subscribeRealtimeRef = useRef<(() => boolean) | null>(null);
+  const testPauseRequestedRef = useRef(false);
+  const testPausedForStaffIdRef = useRef<string | null>(null);
+  const realtimeControlOperationRef = useRef(false);
+  const realtimeControlOperationGenerationRef = useRef(0);
+  const listenerLifecycleGenerationRef = useRef(0);
+  const resumeWaiterRef = useRef<{
+    resolve: () => void;
+    reject: (reason: "resume_timeout" | "control_unavailable") => void;
+    timeoutId: number;
+  } | null>(null);
+  const listenerStaffIdRef = useRef(staffId);
 
   useEffect(() => {
     diagnosticsEnabledRef.current = diagnosticsEnabled;
   }, [diagnosticsEnabled]);
+
+  const reportTestControlState = useCallback(
+    (state: RealtimeTestControlState) => onTestControlStateChange?.(state),
+    [onTestControlStateChange],
+  );
 
   const trace = useCallback(
     (record: Parameters<typeof appendStaffNotificationRecoveryTrace>[0]) => {
@@ -113,6 +158,345 @@ export function StaffNotificationListener({
       }
     },
     [],
+  );
+
+  const isTestControlAuthorized = useCallback(
+    () =>
+      typeof window !== "undefined" &&
+      mayUseStaffNotificationRealtimeTestControls({
+        diagnosticsEnabled: diagnosticsEnabledRef.current,
+        isMasterOwner,
+        hostname: window.location.hostname,
+        expectedHostname: expectedDiagnosticsHostname,
+      }),
+    [expectedDiagnosticsHostname, isMasterOwner],
+  );
+
+  const verifyTestControlSession = useCallback(async () => {
+    const supabase = supabaseClientRef.current;
+    if (!supabase || !authUserId) return false;
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      return !error && data.user?.id === authUserId;
+    } catch {
+      return false;
+    }
+  }, [authUserId]);
+
+  const pauseRealtimeForTest = useCallback(async () => {
+    if (realtimeControlOperationRef.current) return;
+    if (!isTestControlAuthorized()) {
+      reportTestControlState("unavailable");
+      return;
+    }
+
+    const supabase = supabaseClientRef.current;
+    const channel = realtimeChannelRef.current;
+    if (
+      recoveryInProgressRef.current ||
+      recoveryRequestedRef.current ||
+      queuedRecoverySourceRef.current !== null
+    ) {
+      reportTestControlState("pause_failed");
+      trace({
+        kind: "test_listener_control",
+        outcome: "failure",
+        reason: "recovery_running",
+        status: realtimeSubscriptionStatusRef.current,
+      });
+      return;
+    }
+    if (
+      !supabase ||
+      !channel ||
+      realtimeSubscriptionStatusRef.current !== "SUBSCRIBED" ||
+      !supabase.getChannels().includes(channel)
+    ) {
+      reportTestControlState("pause_failed");
+      trace({
+        kind: "test_listener_control",
+        outcome: "failure",
+        reason: "not_subscribed",
+        status: realtimeSubscriptionStatusRef.current,
+      });
+      return;
+    }
+
+    realtimeControlOperationRef.current = true;
+    const operationGeneration = ++realtimeControlOperationGenerationRef.current;
+    const lifecycleGeneration = listenerLifecycleGenerationRef.current;
+    reportTestControlState("pausing");
+    trace({
+      kind: "test_listener_control",
+      outcome: "started",
+      reason: "test_pause",
+      status: realtimeSubscriptionStatusRef.current,
+    });
+
+    try {
+      if (!(await verifyTestControlSession())) {
+        if (
+          !isStaffNotificationTestControlOperationCurrent({
+            operationGeneration: lifecycleGeneration,
+            currentGeneration: listenerLifecycleGenerationRef.current,
+            operationStaffId: staffId,
+            currentStaffId: listenerStaffIdRef.current,
+          })
+        ) {
+          return;
+        }
+        reportTestControlState("pause_failed");
+        trace({
+          kind: "test_listener_control",
+          outcome: "failure",
+          reason: "auth_changed",
+          status: realtimeSubscriptionStatusRef.current,
+        });
+        return;
+      }
+
+      if (
+        !isStaffNotificationTestControlOperationCurrent({
+          operationGeneration: lifecycleGeneration,
+          currentGeneration: listenerLifecycleGenerationRef.current,
+          operationStaffId: staffId,
+          currentStaffId: listenerStaffIdRef.current,
+        })
+      ) {
+        return;
+      }
+
+      // Session verification is asynchronous. A recovery can start while it is
+      // pending, so recheck immediately before entering the paused state.
+      if (
+        recoveryInProgressRef.current ||
+        recoveryRequestedRef.current ||
+        queuedRecoverySourceRef.current !== null
+      ) {
+        reportTestControlState("pause_failed");
+        trace({
+          kind: "test_listener_control",
+          outcome: "failure",
+          reason: "recovery_running",
+          status: realtimeSubscriptionStatusRef.current,
+        });
+        return;
+      }
+
+      testPauseRequestedRef.current = true;
+      testPausedForStaffIdRef.current = staffId;
+      const removalConfirmed = await removeStaffNotificationChannelForTest({
+        channel,
+        removeChannel: (target) => supabase.removeChannel(target),
+        isRegistered: (target) => supabase.getChannels().includes(target),
+        coalesceBy: supabase,
+      });
+      if (
+        !isStaffNotificationTestControlOperationCurrent({
+          operationGeneration: lifecycleGeneration,
+          currentGeneration: listenerLifecycleGenerationRef.current,
+          operationStaffId: staffId,
+          currentStaffId: listenerStaffIdRef.current,
+        })
+      ) {
+        return;
+      }
+      if (!removalConfirmed) {
+        testPauseRequestedRef.current = false;
+        testPausedForStaffIdRef.current = null;
+        reportTestControlState("pause_failed");
+        trace({
+          kind: "test_listener_control",
+          outcome: "failure",
+          reason: "channel_removal_unconfirmed",
+          status: realtimeSubscriptionStatusRef.current,
+        });
+        if (realtimeSubscriptionStatusRef.current === "SUBSCRIBED") {
+          retryRecoveryRef.current?.("reconnect");
+        }
+        return;
+      }
+
+      if (realtimeChannelRef.current === channel) {
+        realtimeChannelRef.current = null;
+      }
+      realtimeSubscriptionStatusRef.current = "CLOSED";
+      onRealtimeStatusChange?.("CLOSED");
+      setListenerState("test-paused");
+      setRecoveryMessage(null);
+      trace({
+        kind: "realtime_status",
+        status: "CLOSED",
+        reason: "test_pause",
+      });
+      trace({
+        kind: "test_listener_control",
+        outcome: "success",
+        reason: "test_pause",
+        status: "CLOSED",
+      });
+      reportTestControlState("paused");
+    } finally {
+      if (
+        realtimeControlOperationGenerationRef.current === operationGeneration
+      ) {
+        realtimeControlOperationRef.current = false;
+      }
+    }
+  }, [
+    isTestControlAuthorized,
+    onRealtimeStatusChange,
+    reportTestControlState,
+    staffId,
+    trace,
+    verifyTestControlSession,
+  ]);
+
+  const resumeRealtimeForTest = useCallback(async () => {
+    if (realtimeControlOperationRef.current) return;
+    if (!isTestControlAuthorized()) {
+      reportTestControlState("unavailable");
+      return;
+    }
+    const lifecycleGeneration = listenerLifecycleGenerationRef.current;
+    const operationGeneration = ++realtimeControlOperationGenerationRef.current;
+    realtimeControlOperationRef.current = true;
+    reportTestControlState("resuming");
+    const supabase = supabaseClientRef.current;
+    let timeoutId: number | null = null;
+    try {
+      if (!supabase) throw "control_unavailable";
+      if (
+        testPausedForStaffIdRef.current &&
+        testPausedForStaffIdRef.current !== staffId
+      ) {
+        throw "account_changed";
+      }
+      if (!(await verifyTestControlSession())) throw "auth_changed";
+      if (
+        !isStaffNotificationTestControlOperationCurrent({
+          operationGeneration: lifecycleGeneration,
+          currentGeneration: listenerLifecycleGenerationRef.current,
+          operationStaffId: staffId,
+          currentStaffId: listenerStaffIdRef.current,
+        })
+      ) {
+        return;
+      }
+
+      if (
+        realtimeSubscriptionStatusRef.current === "SUBSCRIBED" &&
+        realtimeChannelRef.current &&
+        supabase.getChannels().includes(realtimeChannelRef.current)
+      ) {
+        testPauseRequestedRef.current = false;
+        testPausedForStaffIdRef.current = null;
+        setListenerState("connected");
+        reportTestControlState("ready");
+        return;
+      }
+
+      testPauseRequestedRef.current = false;
+      testPausedForStaffIdRef.current = null;
+      setListenerState("connecting");
+      trace({
+        kind: "test_listener_control",
+        outcome: "started",
+        reason: "test_resume",
+        status: realtimeSubscriptionStatusRef.current,
+      });
+
+      const subscriptionReady = new Promise<void>((resolve, reject) => {
+        timeoutId = window.setTimeout(() => {
+          if (resumeWaiterRef.current?.timeoutId === timeoutId) {
+            resumeWaiterRef.current = null;
+          }
+          reject("resume_timeout");
+        }, 12_000);
+        resumeWaiterRef.current = {
+          resolve,
+          reject,
+          timeoutId,
+        };
+      });
+
+      const subscribed = subscribeRealtimeRef.current?.() ?? false;
+      if (!subscribed) {
+        if (timeoutId !== null) window.clearTimeout(timeoutId);
+        if (resumeWaiterRef.current?.timeoutId === timeoutId) {
+          resumeWaiterRef.current = null;
+        }
+        throw "control_unavailable";
+      }
+      await subscriptionReady;
+      if (
+        !isStaffNotificationTestControlOperationCurrent({
+          operationGeneration: lifecycleGeneration,
+          currentGeneration: listenerLifecycleGenerationRef.current,
+          operationStaffId: staffId,
+          currentStaffId: listenerStaffIdRef.current,
+        })
+      ) {
+        return;
+      }
+      trace({
+        kind: "test_listener_control",
+        outcome: "success",
+        reason: "test_resume",
+        status: "SUBSCRIBED",
+      });
+      reportTestControlState("ready");
+    } catch (error) {
+      if (
+        !isStaffNotificationTestControlOperationCurrent({
+          operationGeneration: lifecycleGeneration,
+          currentGeneration: listenerLifecycleGenerationRef.current,
+          operationStaffId: staffId,
+          currentStaffId: listenerStaffIdRef.current,
+        })
+      ) {
+        return;
+      }
+      const reason =
+        error === "resume_timeout" ||
+        error === "auth_changed" ||
+        error === "account_changed"
+          ? error
+          : "control_unavailable";
+      reportTestControlState("resume_failed");
+      trace({
+        kind: "test_listener_control",
+        outcome: "failure",
+        reason:
+          reason === "resume_timeout" ||
+          reason === "auth_changed" ||
+          reason === "account_changed"
+            ? reason
+            : "test_resume_failed",
+        status: realtimeSubscriptionStatusRef.current,
+      });
+    } finally {
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+      if (resumeWaiterRef.current?.timeoutId === timeoutId) {
+        resumeWaiterRef.current = null;
+      }
+      if (
+        realtimeControlOperationGenerationRef.current === operationGeneration
+      ) {
+        realtimeControlOperationRef.current = false;
+      }
+    }
+  }, [
+    isTestControlAuthorized,
+    reportTestControlState,
+    staffId,
+    trace,
+    verifyTestControlSession,
+  ]);
+
+  const realtimeTestControls = useMemo(
+    () => ({ pause: pauseRealtimeForTest, resume: resumeRealtimeForTest }),
+    [pauseRealtimeForTest, resumeRealtimeForTest],
   );
 
   const getPreference = useCallback(
@@ -287,9 +671,14 @@ export function StaffNotificationListener({
     },
     [getPreference, staffId, toast, trace],
   );
+  const presentEventRef = useRef(presentEvent);
+  useEffect(() => {
+    presentEventRef.current = presentEvent;
+  }, [presentEvent]);
 
   const runRecovery = useCallback(
     async (source: RecoveryDiagnosticSource) => {
+      if (testPauseRequestedRef.current) return;
       if (recoveryInProgressRef.current) {
         recoveryRequestedRef.current = true;
         queuedRecoverySourceRef.current = source;
@@ -586,18 +975,57 @@ export function StaffNotificationListener({
     },
     [presentEvent, staffId, trace, updateRecoveryPending],
   );
-
+  const runRecoveryRef = useRef(runRecovery);
   useEffect(() => {
-    retryRecoveryRef.current = (source = "manual_retry") =>
-      void runRecovery(source);
+    runRecoveryRef.current = runRecovery;
   }, [runRecovery]);
 
   useEffect(() => {
+    retryRecoveryRef.current = (source = "manual_retry") =>
+      testPauseRequestedRef.current ? undefined : void runRecovery(source);
+  }, [runRecovery]);
+
+  const isTestControlUiEnabled =
+    typeof window !== "undefined" &&
+    mayUseStaffNotificationRealtimeTestControls({
+      diagnosticsEnabled,
+      isMasterOwner,
+      hostname: window.location.hostname,
+      expectedHostname: expectedDiagnosticsHostname,
+    });
+
+  useEffect(() => {
+    if (!isTestControlUiEnabled) {
+      onTestControlsChange?.(null);
+      reportTestControlState("unavailable");
+      return;
+    }
+    onTestControlsChange?.(realtimeTestControls);
+    return () => onTestControlsChange?.(null);
+  }, [
+    isTestControlUiEnabled,
+    onTestControlsChange,
+    realtimeTestControls,
+    reportTestControlState,
+  ]);
+
+  useEffect(() => {
+    if (listenerStaffIdRef.current !== staffId) {
+      listenerLifecycleGenerationRef.current += 1;
+      listenerStaffIdRef.current = staffId;
+      testPauseRequestedRef.current = false;
+      testPausedForStaffIdRef.current = null;
+      reportTestControlState("starting");
+    }
+
     if (!anyNotificationChannelEnabled) {
+      testPauseRequestedRef.current = false;
+      testPausedForStaffIdRef.current = null;
       saveStaffNotificationRecoveryCursor(staffId, {
         createdAt: new Date().toISOString(),
         id: STAFF_NOTIFICATION_RECOVERY_START_ID,
       });
+      reportTestControlState("unavailable");
       return;
     }
 
@@ -612,6 +1040,7 @@ export function StaffNotificationListener({
     });
 
     const supabase = createClient();
+    supabaseClientRef.current = supabase;
     let disposed = false;
     let restoredPendingState = false;
     if (!loadStaffNotificationRecoveryCursor(staffId)) {
@@ -629,9 +1058,68 @@ export function StaffNotificationListener({
         reason: saved ? undefined : "cursor_save_failed",
       });
     }
-    const channel = supabase
-      .channel("staff-notification-events")
-      .on(
+
+    const subscribeToStaffNotificationEvents = (): boolean => {
+      if (disposed || testPauseRequestedRef.current) return false;
+      const existing = realtimeChannelRef.current;
+      if (existing && supabase.getChannels().includes(existing)) return true;
+
+      // A preceding effect cleanup may still be awaiting removeChannel. Do not
+      // create a replacement topic until that exact channel is confirmed gone.
+      let waitingForRemoval = false;
+      const deferSubscriptionUntilRemoval = (
+        removal: Promise<boolean>,
+      ): boolean => {
+        if (waitingForRemoval) return true;
+        waitingForRemoval = true;
+        setListenerState("connecting");
+        void removal.then((confirmed) => {
+          if (disposed || testPauseRequestedRef.current) return;
+          if (!confirmed) {
+            realtimeSubscriptionStatusRef.current = "CHANNEL_ERROR";
+            onRealtimeStatusChange?.("CHANNEL_ERROR");
+            setListenerState("disconnected");
+            setRecoveryMessage(
+              "The notification connection could not be restored. Resume listening to try again.",
+            );
+            reportTestControlState("resume_failed");
+            trace({
+              kind: "realtime_status",
+              status: "CHANNEL_ERROR",
+              reason: "channel_removal_unconfirmed",
+            });
+            return;
+          }
+          if (subscribeRealtimeRef.current) {
+            subscribeRealtimeRef.current();
+          }
+        });
+        return true;
+      };
+
+      const pendingRemoval =
+        getPendingStaffNotificationChannelRemoval(supabase);
+      if (pendingRemoval) return deferSubscriptionUntilRemoval(pendingRemoval);
+
+      const staleChannel = supabase
+        .getChannels()
+        .find(
+          (candidate) =>
+            candidate.topic === "realtime:staff-notification-events",
+        );
+      if (staleChannel) {
+        return deferSubscriptionUntilRemoval(
+          removeStaffNotificationChannelForTest({
+            channel: staleChannel,
+            removeChannel: (target) => supabase.removeChannel(target),
+            isRegistered: (target) => supabase.getChannels().includes(target),
+            coalesceBy: supabase,
+          }),
+        );
+      }
+
+      const generation = ++channelGenerationRef.current;
+      const channel = supabase.channel("staff-notification-events").on(
         "postgres_changes",
         {
           event: "INSERT",
@@ -639,6 +1127,17 @@ export function StaffNotificationListener({
           table: "staff_notification_events",
         },
         (payload) => {
+          if (
+            !isStaffNotificationRealtimeCallbackCurrent({
+              disposed,
+              intentionallyPaused: testPauseRequestedRef.current,
+              channelGeneration: generation,
+              currentGeneration: channelGenerationRef.current,
+              isCurrentChannel: realtimeChannelRef.current === channel,
+            })
+          ) {
+            return;
+          }
           const event = normalizeLiveNotificationEvent(payload.new);
           if (!event) {
             setListenerState("recovery-failed");
@@ -667,7 +1166,7 @@ export function StaffNotificationListener({
                 realtimeSubscriptionStatus:
                   realtimeSubscriptionStatusRef.current,
               };
-              void runRecovery("live_fallback");
+              runRecoveryRef.current("live_fallback");
             } else if (
               Date.now() - lastSuppressedMalformedDiagnosticAtRef.current >=
               30_000
@@ -692,34 +1191,55 @@ export function StaffNotificationListener({
             source: "live",
             outcome: "accepted",
           });
-          void presentEvent(event, false, { source: "live" }).catch(() => {
-            console.error(
-              "[staff-notifications] Live notification presentation failed; starting recovery",
-            );
-            void runRecovery("live_presentation_failure");
-          });
+          void presentEventRef
+            .current(event, false, { source: "live" })
+            .catch(() => {
+              console.error(
+                "[staff-notifications] Live notification presentation failed; starting recovery",
+              );
+              runRecoveryRef.current("live_presentation_failure");
+            });
         },
-      )
-      .subscribe((status, err) => {
-        if (disposed) return;
+      );
+      realtimeChannelRef.current = channel;
+      channel.subscribe((status, err) => {
+        if (
+          disposed ||
+          generation !== channelGenerationRef.current ||
+          realtimeChannelRef.current !== channel
+        ) {
+          return;
+        }
         if (!restoredPendingState) {
           restoredPendingState = true;
           setRecoveryPending(persistedRecoveryPending);
         }
         const safeStatus = toSafeRealtimeSubscriptionStatus(status);
         realtimeSubscriptionStatusRef.current = safeStatus;
+        onRealtimeStatusChange?.(safeStatus);
         trace({
           kind: "realtime_status",
           status: safeStatus,
+          reason: testPauseRequestedRef.current ? "test_pause" : undefined,
         });
         console.info("[staff-notifications] Realtime subscription status", {
           status: safeStatus,
         });
+
+        if (testPauseRequestedRef.current) return;
+
         if (status === "SUBSCRIBED") {
           setListenerState("connected");
+          reportTestControlState("ready");
+          const waiter = resumeWaiterRef.current;
+          if (waiter) {
+            window.clearTimeout(waiter.timeoutId);
+            resumeWaiterRef.current = null;
+            waiter.resolve();
+          }
           const source = everSubscribedRef.current ? "reconnect" : "page_load";
           everSubscribedRef.current = true;
-          void runRecovery(source);
+          runRecoveryRef.current(source);
           return;
         }
         if (
@@ -727,6 +1247,12 @@ export function StaffNotificationListener({
           status === "TIMED_OUT" ||
           status === "CLOSED"
         ) {
+          const waiter = resumeWaiterRef.current;
+          if (waiter) {
+            window.clearTimeout(waiter.timeoutId);
+            resumeWaiterRef.current = null;
+            waiter.reject("control_unavailable");
+          }
           setListenerState("disconnected");
           setRecoveryMessage(
             recoveryPendingRef.current
@@ -741,18 +1267,58 @@ export function StaffNotificationListener({
           });
         }
       });
+      return true;
+    };
+
+    subscribeRealtimeRef.current = subscribeToStaffNotificationEvents;
+    if (
+      testPauseRequestedRef.current &&
+      testPausedForStaffIdRef.current === staffId
+    ) {
+      realtimeSubscriptionStatusRef.current = "CLOSED";
+      onRealtimeStatusChange?.("CLOSED");
+      setListenerState("test-paused");
+      reportTestControlState("paused");
+    } else {
+      subscribeToStaffNotificationEvents();
+    }
 
     return () => {
       disposed = true;
-      void supabase.removeChannel(channel);
+      listenerLifecycleGenerationRef.current += 1;
+      realtimeControlOperationGenerationRef.current += 1;
+      realtimeControlOperationRef.current = false;
+      testPauseRequestedRef.current = false;
+      testPausedForStaffIdRef.current = null;
+      if (subscribeRealtimeRef.current === subscribeToStaffNotificationEvents) {
+        subscribeRealtimeRef.current = null;
+      }
+      const channel = realtimeChannelRef.current;
+      if (channel && supabase.getChannels().includes(channel)) {
+        realtimeChannelRef.current = null;
+        void removeStaffNotificationChannelForTest({
+          channel,
+          removeChannel: (target) => supabase.removeChannel(target),
+          isRegistered: (target) => supabase.getChannels().includes(target),
+          coalesceBy: supabase,
+        });
+      }
+      if (resumeWaiterRef.current) {
+        window.clearTimeout(resumeWaiterRef.current.timeoutId);
+        resumeWaiterRef.current.reject("control_unavailable");
+        resumeWaiterRef.current = null;
+      }
+      if (supabaseClientRef.current === supabase) {
+        supabaseClientRef.current = null;
+      }
     };
   }, [
     anyNotificationChannelEnabled,
-    presentEvent,
-    runRecovery,
+    authUserId,
+    onRealtimeStatusChange,
+    reportTestControlState,
     staffId,
     trace,
-    updateRecoveryPending,
   ]);
 
   let stateLabel: string | null;
@@ -773,6 +1339,9 @@ export function StaffNotificationListener({
     case "recovery-incomplete":
       stateLabel = "Recent staff notifications need another recovery pass.";
       break;
+    case "test-paused":
+      stateLabel = "Realtime paused for a DEV recovery test.";
+      break;
     case "ready":
       stateLabel = null;
       break;
@@ -782,6 +1351,7 @@ export function StaffNotificationListener({
     (recoveryPending ||
       listenerState === "recovery-failed" ||
       listenerState === "recovery-incomplete") &&
+    listenerState !== "test-paused" &&
     listenerState !== "recovering" &&
     !recoveryRunning;
   const retryVisibilityReason = !retryVisible

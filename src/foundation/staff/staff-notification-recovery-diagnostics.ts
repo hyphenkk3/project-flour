@@ -30,7 +30,28 @@ export type RecoveryDiagnosticKind =
   | "cursor_saved"
   | "pending_marker"
   | "retry_visibility"
+  | "test_listener_control"
   | "recovery_finished";
+
+export type RealtimeTestControlState =
+  | "starting"
+  | "ready"
+  | "pausing"
+  | "paused"
+  | "resuming"
+  | "pause_failed"
+  | "resume_failed"
+  | "unavailable";
+
+export type StaffNotificationRealtimeTestControls = {
+  pause: () => Promise<void>;
+  resume: () => Promise<void>;
+};
+
+const pendingStaffNotificationChannelRemovals = new WeakMap<
+  object,
+  Promise<boolean>
+>();
 
 export type RecoveryDiagnosticRecord = {
   at: number;
@@ -79,7 +100,18 @@ export type RecoveryDiagnosticRecord = {
     | "pending_backlog"
     | "recovery_failed"
     | "recovery_incomplete"
-    | "unknown_failure";
+    | "unknown_failure"
+    | "test_pause"
+    | "test_resume"
+    | "test_pause_failed"
+    | "test_resume_failed"
+    | "auth_changed"
+    | "not_subscribed"
+    | "channel_removal_unconfirmed"
+    | "resume_timeout"
+    | "recovery_running"
+    | "control_unavailable"
+    | "account_changed";
   status?:
     | "CONNECTING"
     | "SUBSCRIBED"
@@ -125,6 +157,7 @@ const DIAGNOSTIC_KINDS: readonly string[] = [
   "cursor_saved",
   "pending_marker",
   "retry_visibility",
+  "test_listener_control",
   "recovery_finished",
 ];
 const DIAGNOSTIC_SOURCES: readonly string[] = [
@@ -179,6 +212,17 @@ const DIAGNOSTIC_REASONS: readonly string[] = [
   "recovery_failed",
   "recovery_incomplete",
   "unknown_failure",
+  "test_pause",
+  "test_resume",
+  "test_pause_failed",
+  "test_resume_failed",
+  "auth_changed",
+  "not_subscribed",
+  "channel_removal_unconfirmed",
+  "resume_timeout",
+  "recovery_running",
+  "control_unavailable",
+  "account_changed",
 ];
 const DIAGNOSTIC_STATUSES: readonly string[] = [
   "CONNECTING",
@@ -205,6 +249,109 @@ export function isRecoveryDiagnosticsEnabled(
     Boolean(deploymentHost) &&
     /^[a-z0-9-]+\.vercel\.app$/.test(deploymentHost ?? "")
   );
+}
+
+export function isStaffNotificationChannelRemovalConfirmed(
+  response: unknown,
+  channelStillRegistered: boolean,
+): boolean {
+  return response === "ok" && !channelStillRegistered;
+}
+
+export function mayUseStaffNotificationRealtimeTestControls(input: {
+  diagnosticsEnabled: boolean;
+  isMasterOwner: boolean;
+  hostname: string | undefined;
+  expectedHostname: string;
+}): boolean {
+  return (
+    input.diagnosticsEnabled &&
+    input.isMasterOwner &&
+    Boolean(input.hostname) &&
+    input.hostname === input.expectedHostname &&
+    /^[a-z0-9-]+\.vercel\.app$/.test(input.hostname ?? "")
+  );
+}
+
+export function isStaffNotificationRealtimeCallbackCurrent(input: {
+  disposed: boolean;
+  intentionallyPaused: boolean;
+  channelGeneration: number;
+  currentGeneration: number;
+  isCurrentChannel: boolean;
+}): boolean {
+  return (
+    !input.disposed &&
+    !input.intentionallyPaused &&
+    input.channelGeneration === input.currentGeneration &&
+    input.isCurrentChannel
+  );
+}
+
+export function isStaffNotificationTestControlOperationCurrent(input: {
+  operationGeneration: number;
+  currentGeneration: number;
+  operationStaffId: string;
+  currentStaffId: string;
+}): boolean {
+  return (
+    input.operationGeneration === input.currentGeneration &&
+    input.operationStaffId === input.currentStaffId
+  );
+}
+
+export async function removeStaffNotificationChannelForTest<TChannel>(input: {
+  channel: TChannel;
+  removeChannel: (channel: TChannel) => Promise<unknown>;
+  isRegistered: (channel: TChannel) => boolean;
+  coalesceBy?: object;
+}): Promise<boolean> {
+  const existing = input.coalesceBy
+    ? pendingStaffNotificationChannelRemovals.get(input.coalesceBy)
+    : undefined;
+  if (existing) return existing;
+
+  const removal = (async () => {
+    let response: unknown;
+    try {
+      response = await input.removeChannel(input.channel);
+      return isStaffNotificationChannelRemovalConfirmed(
+        response,
+        input.isRegistered(input.channel),
+      );
+    } catch {
+      return false;
+    }
+  })();
+
+  if (input.coalesceBy) {
+    pendingStaffNotificationChannelRemovals.set(input.coalesceBy, removal);
+    void removal.then(
+      () => {
+        if (
+          pendingStaffNotificationChannelRemovals.get(input.coalesceBy!) ===
+          removal
+        ) {
+          pendingStaffNotificationChannelRemovals.delete(input.coalesceBy!);
+        }
+      },
+      () => {
+        if (
+          pendingStaffNotificationChannelRemovals.get(input.coalesceBy!) ===
+          removal
+        ) {
+          pendingStaffNotificationChannelRemovals.delete(input.coalesceBy!);
+        }
+      },
+    );
+  }
+  return removal;
+}
+
+export function getPendingStaffNotificationChannelRemoval(
+  client: object,
+): Promise<boolean> | undefined {
+  return pendingStaffNotificationChannelRemovals.get(client);
 }
 
 export function pruneRecoveryDiagnosticRecords(

@@ -101,11 +101,15 @@ assert.match(malformedBranch, /if \(!event\)/);
 assert.match(malformedBranch, /getLiveNotificationShape\(payload\.new\)/);
 assert.match(malformedBranch, /tryStart\(Date\.now\(\)\)/);
 assert.match(malformedBranch, /automaticFallbackDiagnosticRef\.current/);
-assert.match(malformedBranch, /void runRecovery\("live_fallback"\)/);
+assert.match(malformedBranch, /runRecoveryRef\.current\("live_fallback"\)/);
+const suppressedDiagnosticStart = malformedBranch.indexOf("console.warn(");
+const suppressedDiagnosticEnd = malformedBranch.indexOf(
+  "automaticRecoverySucceeded: false,",
+  suppressedDiagnosticStart,
+);
 const suppressedDiagnostic = malformedBranch.slice(
-  malformedBranch.indexOf(
-    'console.warn(\n                "[staff-notifications] Malformed live event fallback"',
-  ),
+  suppressedDiagnosticStart,
+  suppressedDiagnosticEnd,
 );
 assert.doesNotMatch(
   suppressedDiagnostic,
