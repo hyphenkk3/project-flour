@@ -128,14 +128,24 @@ assert.equal(
 const scheduledFrequencies: number[] = [];
 const scheduledStarts: number[] = [];
 let resumeCalls = 0;
+let contextCreations = 0;
+let resumeShouldFail = false;
+let schedulingShouldFail = false;
 
 class FakeAudioContext {
+  static lastCreated: FakeAudioContext | null = null;
   state: AudioContextState = "suspended";
   currentTime = 12;
   destination = {} as AudioDestinationNode;
 
+  constructor() {
+    contextCreations += 1;
+    FakeAudioContext.lastCreated = this;
+  }
+
   async resume() {
     resumeCalls += 1;
+    if (resumeShouldFail) throw new Error("synthetic resume failure");
     this.state = "running";
   }
 
@@ -149,9 +159,13 @@ class FakeAudioContext {
       },
       connect() {},
       start(time: number) {
+        if (schedulingShouldFail) {
+          throw new Error("synthetic scheduling failure");
+        }
         scheduledStarts.push(time);
       },
       stop() {},
+      disconnect() {},
     } as unknown as OscillatorNode;
   }
 
@@ -162,6 +176,7 @@ class FakeAudioContext {
         exponentialRampToValueAtTime() {},
       },
       connect() {},
+      disconnect() {},
     } as unknown as GainNode;
   }
 }
@@ -203,27 +218,81 @@ async function main() {
   );
   assert.doesNotMatch(preferencesSettings, /definition\.code === "new_order"/);
   assert.match(preferencesSettings, /definitions\.map\(\(definition\) =>/);
+  assert.match(
+    preferencesSettings,
+    /onClick=\{\(\) => void testNotificationSound\(\)\}/,
+  );
+  assert.match(preferencesSettings, /Test Sound/);
+  assert.match(preferencesSettings, /without changing preferences/);
+  assert.match(
+    preferencesSettings,
+    /Automatic sounds still follow each category/,
+  );
+
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {},
+  });
+  const unsupported = await playStaffNotificationSound();
+  assert.equal(unsupported.restriction, "unsupported");
+  assert.equal(unsupported.playbackStatus, "not-attempted");
 
   Object.defineProperty(globalThis, "window", {
     configurable: true,
     value: { AudioContext: FakeAudioContext },
   });
 
-  primeStaffNotificationSound();
-  await playStaffNotificationSound();
+  const firstPlayback = await playStaffNotificationSound();
 
+  assert.equal(firstPlayback.contextState, "running");
+  assert.equal(firstPlayback.resumeStatus, "succeeded");
+  assert.equal(firstPlayback.playbackStatus, "scheduled");
+  assert.equal(firstPlayback.restriction, "none");
   assert.equal(resumeCalls, 1);
+  assert.equal(contextCreations, 1);
   assert.deepEqual(scheduledFrequencies, [880, 660]);
   assert.deepEqual(scheduledStarts, [12, 12.14]);
+
+  primeStaffNotificationSound();
+  assert.equal(
+    resumeCalls,
+    1,
+    "priming a running context does not resume it again",
+  );
+  await playStaffNotificationSound();
+  assert.equal(contextCreations, 1, "playback reuses the initialized context");
+  assert.equal(resumeCalls, 1, "a running context is not resumed repeatedly");
+
+  // The shared fake context can be suspended again to model Safari backgrounding.
+  // A rejected resume is reported safely and does not throw into the caller.
+  assert.ok(FakeAudioContext.lastCreated);
+  FakeAudioContext.lastCreated.state = "suspended";
+  resumeShouldFail = true;
+  const rejectedResume = await playStaffNotificationSound();
+  assert.equal(rejectedResume.contextState, "suspended");
+  assert.equal(rejectedResume.resumeStatus, "failed");
+  assert.equal(rejectedResume.playbackStatus, "not-attempted");
+  assert.equal(rejectedResume.restriction, "resume-rejected");
+
+  resumeShouldFail = false;
+  await playStaffNotificationSound();
+  assert.equal(FakeAudioContext.lastCreated.state, "running");
+  schedulingShouldFail = true;
+  const schedulingFailure = await playStaffNotificationSound();
+  assert.equal(schedulingFailure.playbackStatus, "failed");
+  assert.equal(schedulingFailure.restriction, "schedule-failed");
+  schedulingShouldFail = false;
 
   Object.defineProperty(globalThis, "window", {
     configurable: true,
     value: undefined,
   });
-  await playStaffNotificationSound();
+  const noWindowPlayback = await playStaffNotificationSound();
+  assert.equal(noWindowPlayback.restriction, "unsupported");
+  assert.equal(noWindowPlayback.playbackStatus, "not-attempted");
 
   console.log(
-    "Staff category sound preferences and browser-failure fallback: PASS",
+    "Staff sound gesture, shared AudioContext, diagnostics and preference regressions: PASS",
   );
 }
 

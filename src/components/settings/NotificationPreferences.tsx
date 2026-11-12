@@ -14,7 +14,11 @@ import type {
   StaffNotificationPreference,
   StaffNotificationWebMode,
 } from "@/foundation/staff/notification-preferences";
-import { primeStaffNotificationSound } from "@/foundation/staff/staff-notification-sound";
+import {
+  playStaffNotificationSound,
+  primeStaffNotificationSound,
+  type StaffNotificationSoundResult,
+} from "@/foundation/staff/staff-notification-sound";
 import {
   currentStaffDeviceEndpoint,
   currentStaffDeviceSubscription,
@@ -39,7 +43,17 @@ export function NotificationPreferences({
     useState<StaffNotificationPreference[]>(initialPreferences);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [soundTestMessage, setSoundTestMessage] = useState<string | null>(null);
+  const [soundTestInProgress, setSoundTestInProgress] = useState(false);
   const didSyncExistingPushSubscription = useRef(false);
+
+  async function testNotificationSound() {
+    setSoundTestInProgress(true);
+    setSoundTestMessage(null);
+    const result = await playStaffNotificationSound();
+    setSoundTestMessage(describeSoundTestResult(result));
+    setSoundTestInProgress(false);
+  }
 
   useEffect(() => {
     if (
@@ -156,6 +170,35 @@ export function NotificationPreferences({
 
   return (
     <div className="mt-4 space-y-3">
+      <div className="border-fog rounded-lg border bg-white px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-ink text-sm font-medium">Sound check</p>
+            <p className="text-skyline mt-0.5 text-xs">
+              Play one manual cue without changing preferences or sending a
+              notification. Automatic sounds still follow each category setting.
+            </p>
+          </div>
+          <button
+            className="bg-ink rounded-md px-3 py-2 text-xs font-medium text-white disabled:cursor-wait disabled:opacity-60"
+            disabled={soundTestInProgress}
+            onClick={() => void testNotificationSound()}
+            type="button"
+          >
+            {soundTestInProgress ? "Testing…" : "Test Sound"}
+          </button>
+        </div>
+        {soundTestMessage ? (
+          <p
+            aria-live="polite"
+            className="text-skyline mt-2 text-xs"
+            role="status"
+          >
+            {soundTestMessage}
+          </p>
+        ) : null}
+      </div>
+
       {definitions.map((definition) => {
         const preference = preferences.find(
           (item) => item.code === definition.code,
@@ -370,4 +413,21 @@ export function NotificationPreferences({
       ) : null}
     </div>
   );
+}
+
+function describeSoundTestResult(result: StaffNotificationSoundResult): string {
+  const contextState = [
+    "running",
+    "suspended",
+    "interrupted",
+    "closed",
+  ].includes(result.contextState)
+    ? result.contextState
+    : "unavailable";
+
+  if (result.playbackStatus === "scheduled") {
+    return `Audio check: context ${contextState}; resume ${result.resumeStatus}; playback ${result.playbackStatus}; restriction ${result.restriction}. Listen to confirm it was audible.`;
+  }
+
+  return `Audio check: context ${contextState}; resume ${result.resumeStatus}; playback ${result.playbackStatus}; restriction ${result.restriction}. Keep this page active and try again.`;
 }
