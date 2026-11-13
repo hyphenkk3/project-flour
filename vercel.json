@@ -1,6 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["sin1"],
+  "git": {
+    "deploymentEnabled": {
+      "codex/notification-settings-ui-20261113": false
+    }
+  },
   "schedules": {
     "staff-fresh-pick-reminder-push": {
       "schedule": "* * * * *",
