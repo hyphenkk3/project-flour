@@ -33,6 +33,30 @@ function recordSummary(record: RecoveryDiagnosticRecord): string {
     record.eligible !== undefined ? `eligible=${record.eligible}` : null,
     record.pending !== undefined ? `pending=${record.pending}` : null,
     record.visible !== undefined ? `retry=${record.visible}` : null,
+    record.tabId ? `tab=${record.tabId}` : null,
+    record.visibilityState ? `visibility=${record.visibilityState}` : null,
+    record.soundStage ? `sound_stage=${record.soundStage}` : null,
+    record.soundOwnership ? `ownership=${record.soundOwnership}` : null,
+    record.soundPreferenceEnabled !== undefined
+      ? `sound_preference=${record.soundPreferenceEnabled}`
+      : null,
+    record.soundEligible !== undefined
+      ? `sound_eligible=${record.soundEligible}`
+      : null,
+    record.audioContextBefore
+      ? `context_before=${record.audioContextBefore}`
+      : null,
+    record.soundResumeAttempted !== undefined
+      ? `resume_attempted=${record.soundResumeAttempted}`
+      : null,
+    record.soundResumeOutcome ? `resume=${record.soundResumeOutcome}` : null,
+    record.audioContextAfter
+      ? `context_after=${record.audioContextAfter}`
+      : null,
+    record.soundPlaybackOutcome
+      ? `playback=${record.soundPlaybackOutcome}`
+      : null,
+    record.soundRestriction ? `restriction=${record.soundRestriction}` : null,
   ].filter(Boolean);
   return details.join(" · ");
 }

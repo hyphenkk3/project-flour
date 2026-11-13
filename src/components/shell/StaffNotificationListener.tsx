@@ -24,8 +24,10 @@ import {
 } from "@/foundation/staff/staff-notification-engine";
 import {
   playStaffNotificationSound,
+  recordStaffNotificationSoundOwnership,
   recoveredStaffNotificationSoundPriority,
   shouldPlayStaffNotificationSound,
+  type StaffNotificationSoundDiagnosticContext,
 } from "@/foundation/staff/staff-notification-sound";
 import {
   createMalformedLiveRecoveryGate,
@@ -111,6 +113,8 @@ export function StaffNotificationListener({
   const recoveryInProgressRef = useRef(false);
   const recoveryRequestedRef = useRef(false);
   const recoveredSoundPriorityInBatchRef = useRef(0);
+  const recoveredSoundDiagnosticContextRef =
+    useRef<StaffNotificationSoundDiagnosticContext | null>(null);
   const recoverySkippedOlderEventsRef = useRef(false);
   const realtimeSubscriptionStatusRef =
     useRef<SafeRealtimeSubscriptionStatus>("CONNECTING");
@@ -615,13 +619,44 @@ export function StaffNotificationListener({
             }
             if (playSound) {
               if (recovered) {
-                recoveredSoundPriorityInBatchRef.current = Math.max(
-                  recoveredSoundPriorityInBatchRef.current,
-                  recoveredSoundPriority,
-                );
+                if (
+                  recoveredSoundPriority >
+                  recoveredSoundPriorityInBatchRef.current
+                ) {
+                  recoveredSoundPriorityInBatchRef.current =
+                    recoveredSoundPriority;
+                  recoveredSoundDiagnosticContextRef.current =
+                    diagnosticsEnabledRef.current
+                      ? {
+                          eventId: event.id,
+                          source: context.source,
+                          soundPreferenceEnabled:
+                            preference.soundEnabled === true,
+                          soundEligible: true,
+                        }
+                      : null;
+                }
               } else {
-                void playStaffNotificationSound();
+                void playStaffNotificationSound(
+                  diagnosticsEnabledRef.current
+                    ? {
+                        eventId: event.id,
+                        source: context.source,
+                        soundPreferenceEnabled:
+                          preference.soundEnabled === true,
+                        soundEligible: true,
+                      }
+                    : undefined,
+                );
               }
+            } else if (diagnosticsEnabledRef.current) {
+              recordStaffNotificationSoundOwnership({
+                eventId: event.id,
+                source: context.source,
+                ownership: "winner",
+                soundPreferenceEnabled: preference.soundEnabled === true,
+                soundEligible: false,
+              });
             }
           },
         );
@@ -651,6 +686,15 @@ export function StaffNotificationListener({
           outcome: "success",
           reason: claim.claimed ? undefined : "duplicate_suppressed",
         });
+        if (!claim.claimed && diagnosticsEnabledRef.current) {
+          recordStaffNotificationSoundOwnership({
+            eventId: event.id,
+            source: context.source,
+            ownership: "duplicate_suppressed",
+            soundPreferenceEnabled: preference.soundEnabled === true,
+            soundEligible: soundEnabled,
+          });
+        }
         if (!claim.claimed) return;
         if (!claim.crossTabProtected) {
           console.warn(
@@ -705,6 +749,7 @@ export function StaffNotificationListener({
       automaticFallbackDiagnosticRef.current = null;
       let automaticRecoverySucceeded = false;
       recoveredSoundPriorityInBatchRef.current = 0;
+      recoveredSoundDiagnosticContextRef.current = null;
       recoverySkippedOlderEventsRef.current =
         recoverySkippedOlderEventsRef.current ||
         hasRecentStaffNotificationRecoverySkipNotice(staffId);
@@ -959,8 +1004,11 @@ export function StaffNotificationListener({
           malformedRecoveryGateRef.current?.finish();
         }
         if (recoveredSoundPriorityInBatchRef.current > 0) {
-          void playStaffNotificationSound();
+          void playStaffNotificationSound(
+            recoveredSoundDiagnosticContextRef.current ?? undefined,
+          );
           recoveredSoundPriorityInBatchRef.current = 0;
+          recoveredSoundDiagnosticContextRef.current = null;
         }
         recoveryInProgressRef.current = false;
         setRecoveryRunning(false);

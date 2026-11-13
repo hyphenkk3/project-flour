@@ -256,6 +256,35 @@ assert.equal(values.has(STAFF_NOTIFICATION_RECOVERY_TRACE_KEY), false);
 scheduledTasks.shift()?.();
 assert.equal(values.has(STAFF_NOTIFICATION_RECOVERY_TRACE_KEY), true);
 
+appendStaffNotificationRecoveryTrace({
+  kind: "sound_diagnostic",
+  eventId: "00000000-0000-4000-8000-000000000125",
+  source: "live",
+  tabId: "00000000-0000-4000-8000-000000000126",
+  visibilityState: "hidden",
+  soundStage: "result",
+  soundOwnership: "winner",
+  soundPreferenceEnabled: true,
+  soundEligible: true,
+  audioContextBefore: "suspended",
+  audioContextAfter: "running",
+  soundResumeAttempted: true,
+  soundResumeOutcome: "succeeded",
+  soundPlaybackOutcome: "scheduled",
+  soundRestriction: "none",
+  outcome: "success",
+});
+const soundRecord = readStaffNotificationRecoveryTrace().at(-1);
+assert.equal(soundRecord?.kind, "sound_diagnostic");
+assert.equal(soundRecord?.eventId, "00000000-0000-4000-8000-000000000125");
+assert.equal(soundRecord?.tabId, "00000000-0000-4000-8000-000000000126");
+assert.equal(soundRecord?.visibilityState, "hidden");
+assert.equal(soundRecord?.audioContextBefore, "suspended");
+assert.equal(soundRecord?.audioContextAfter, "running");
+assert.equal(soundRecord?.soundResumeOutcome, "succeeded");
+assert.equal(soundRecord?.soundPlaybackOutcome, "scheduled");
+scheduledTasks.shift()?.();
+
 values.set(
   STAFF_NOTIFICATION_RECOVERY_TRACE_KEY,
   JSON.stringify([
@@ -294,6 +323,9 @@ assert.match(listener, /kind: "dedupe_claim"/);
 assert.match(listener, /kind: "cursor_saved"/);
 assert.match(listener, /kind: "pending_marker"/);
 assert.match(listener, /kind: "retry_visibility"/);
+assert.match(listener, /recordStaffNotificationSoundOwnership/);
+assert.match(listener, /ownership: "duplicate_suppressed"/);
+assert.match(listener, /playStaffNotificationSound\(/);
 assert.match(listener, /kind: "recovery_finished"/);
 assert.match(listener, /retryRecoveryRef\.current\?\.\("manual_retry"\)/);
 assert.match(listener, /runRecovery\(source\)/);

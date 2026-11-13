@@ -5,9 +5,14 @@ import { resolve } from "node:path";
 import {
   playStaffNotificationSound,
   primeStaffNotificationSound,
+  recordStaffNotificationSoundOwnership,
   recoveredStaffNotificationSoundPriority,
   shouldPlayStaffNotificationSound,
 } from "../src/foundation/staff/staff-notification-sound";
+import {
+  readStaffNotificationRecoveryTrace,
+  STAFF_NOTIFICATION_RECOVERY_TRACE_KEY,
+} from "../src/foundation/staff/staff-notification-recovery-diagnostics";
 import {
   STAFF_NOTIFICATION_DEFINITIONS,
   STAFF_NOTIFICATION_DEFAULT_SOUND_ENABLED,
@@ -191,7 +196,7 @@ async function main() {
     /claimStaffNotificationForStaff\(\s*staffId,\s*event\.id,/,
   );
   assert.match(listener, /recoveredStaffNotificationSoundPriority/);
-  assert.match(listener, /playStaffNotificationSound\(\)/);
+  assert.match(listener, /playStaffNotificationSound\(/);
   const notificationEngine = readFileSync(
     resolve("src/foundation/staff/staff-notification-engine.ts"),
     "utf8",
@@ -283,6 +288,89 @@ async function main() {
   assert.equal(schedulingFailure.restriction, "schedule-failed");
   schedulingShouldFail = false;
 
+  const diagnosticStorage = new Map<string, string>();
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {
+      AudioContext: FakeAudioContext,
+      crypto: { randomUUID: () => "00000000-0000-4000-8000-000000000222" },
+      sessionStorage: {
+        getItem: (key: string) => diagnosticStorage.get(key) ?? null,
+        setItem: (key: string, value: string) =>
+          diagnosticStorage.set(key, value),
+        removeItem: (key: string) => diagnosticStorage.delete(key),
+      },
+      dispatchEvent: () => true,
+      setTimeout: globalThis.setTimeout.bind(globalThis),
+      clearTimeout: globalThis.clearTimeout.bind(globalThis),
+    },
+  });
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    value: { visibilityState: "hidden" },
+  });
+  const diagnosticContext = {
+    eventId: "00000000-0000-4000-8000-000000000223",
+    source: "live" as const,
+    soundPreferenceEnabled: true,
+    soundEligible: true,
+  };
+  assert.ok(FakeAudioContext.lastCreated);
+  FakeAudioContext.lastCreated.state = "suspended";
+  resumeShouldFail = false;
+  const diagnosticPlayback =
+    await playStaffNotificationSound(diagnosticContext);
+  assert.equal(diagnosticPlayback.playbackStatus, "scheduled");
+  await new Promise((resolve) => globalThis.setTimeout(resolve, 0));
+  const soundTrace = readStaffNotificationRecoveryTrace().filter(
+    (record) => record.eventId === diagnosticContext.eventId,
+  );
+  assert.deepEqual(
+    soundTrace.map((record) => record.soundStage),
+    ["attempt", "result"],
+  );
+  assert.equal(soundTrace[0]?.tabId, "00000000-0000-4000-8000-000000000222");
+  assert.equal(soundTrace[0]?.visibilityState, "hidden");
+  assert.equal(soundTrace[0]?.soundOwnership, "winner");
+  assert.equal(soundTrace[0]?.soundPreferenceEnabled, true);
+  assert.equal(soundTrace[0]?.soundEligible, true);
+  assert.equal(soundTrace[0]?.audioContextBefore, "suspended");
+  assert.equal(soundTrace[0]?.soundResumeAttempted, true);
+  assert.equal(soundTrace[1]?.soundResumeOutcome, "succeeded");
+  assert.equal(soundTrace[1]?.audioContextAfter, "running");
+  assert.equal(soundTrace[1]?.soundPlaybackOutcome, "scheduled");
+
+  const startsBeforeSuppressed = scheduledStarts.length;
+  recordStaffNotificationSoundOwnership({
+    ...diagnosticContext,
+    eventId: "00000000-0000-4000-8000-000000000224",
+    ownership: "duplicate_suppressed",
+  });
+  await new Promise((resolve) => globalThis.setTimeout(resolve, 0));
+  const duplicateSoundTrace = readStaffNotificationRecoveryTrace().find(
+    (record) => record.eventId === "00000000-0000-4000-8000-000000000224",
+  );
+  assert.equal(duplicateSoundTrace?.soundOwnership, "duplicate_suppressed");
+  assert.equal(duplicateSoundTrace?.soundPlaybackOutcome, "not_attempted");
+  assert.equal(scheduledStarts.length, startsBeforeSuppressed);
+
+  FakeAudioContext.lastCreated.state = "suspended";
+  resumeShouldFail = true;
+  const failedDiagnosticPlayback = await playStaffNotificationSound({
+    ...diagnosticContext,
+    eventId: "00000000-0000-4000-8000-000000000225",
+  });
+  assert.equal(failedDiagnosticPlayback.playbackStatus, "not-attempted");
+  await new Promise((resolve) => globalThis.setTimeout(resolve, 0));
+  const failedSoundTrace = readStaffNotificationRecoveryTrace().filter(
+    (record) => record.eventId === "00000000-0000-4000-8000-000000000225",
+  );
+  assert.equal(failedSoundTrace.at(-1)?.soundResumeOutcome, "rejected");
+  assert.equal(failedSoundTrace.at(-1)?.soundPlaybackOutcome, "not_attempted");
+  assert.equal(failedSoundTrace.at(-1)?.audioContextAfter, "suspended");
+  assert.ok(diagnosticStorage.has(STAFF_NOTIFICATION_RECOVERY_TRACE_KEY));
+  resumeShouldFail = false;
+
   Object.defineProperty(globalThis, "window", {
     configurable: true,
     value: undefined,
@@ -292,7 +380,7 @@ async function main() {
   assert.equal(noWindowPlayback.playbackStatus, "not-attempted");
 
   console.log(
-    "Staff sound gesture, shared AudioContext, diagnostics and preference regressions: PASS",
+    "Staff sound winner correlation, audio lifecycle diagnostics, dedupe, gesture, shared context and preference regressions: PASS",
   );
 }
 

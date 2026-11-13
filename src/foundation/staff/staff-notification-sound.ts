@@ -1,4 +1,8 @@
 import { STAFF_NOTIFICATION_DEFINITIONS } from "@/foundation/staff/notification-preferences";
+import {
+  appendStaffNotificationRecoveryTrace,
+  type RecoveryDiagnosticSource,
+} from "@/foundation/staff/staff-notification-recovery-diagnostics";
 
 export type StaffNotificationSoundResult = {
   contextState: string;
@@ -14,7 +18,138 @@ export type StaffNotificationSoundResult = {
 };
 
 let soundContext: AudioContext | null = null;
-let resumeInProgress: Promise<void> | null = null;
+type AudioResumeOutcome =
+  "not-needed" | "succeeded" | "rejected" | "not-running";
+let resumeInProgress: Promise<
+  Exclude<AudioResumeOutcome, "not-needed">
+> | null = null;
+let diagnosticTabId: string | null = null;
+
+export type StaffNotificationSoundDiagnosticContext = {
+  eventId: string;
+  source: RecoveryDiagnosticSource;
+  soundPreferenceEnabled: boolean;
+  soundEligible: boolean;
+};
+
+function getDiagnosticTabId(): string {
+  if (diagnosticTabId) return diagnosticTabId;
+  try {
+    diagnosticTabId = window.crypto.randomUUID();
+  } catch {
+    diagnosticTabId = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+      /[xy]/g,
+      (character) => {
+        const value = Math.floor(Math.random() * 16);
+        return (character === "x" ? value : (value & 0x3) | 0x8).toString(16);
+      },
+    );
+  }
+  return diagnosticTabId;
+}
+
+function safeAudioContextState(
+  state: string | undefined,
+): "running" | "suspended" | "closed" | "unavailable" {
+  return state === "running" || state === "suspended" || state === "closed"
+    ? state
+    : "unavailable";
+}
+
+function recordSoundDiagnostic(
+  context: StaffNotificationSoundDiagnosticContext,
+  input: {
+    stage: "ownership" | "attempt" | "resume_timeout" | "result";
+    ownership: "winner" | "duplicate_suppressed";
+    audioContextBefore?: string;
+    audioContextAfter?: string;
+    resumeAttempted?: boolean;
+    resumeOutcome?:
+      | "not_attempted"
+      | "not_needed"
+      | "pending"
+      | "succeeded"
+      | "rejected"
+      | "not_running"
+      | "timeout";
+    playbackOutcome?: "not_attempted" | "scheduled" | "failed";
+    restriction?: StaffNotificationSoundResult["restriction"];
+  },
+): void {
+  if (typeof window === "undefined") return;
+  let visibilityState: "visible" | "hidden" | "unknown" = "unknown";
+  try {
+    visibilityState =
+      document.visibilityState === "visible" ? "visible" : "hidden";
+  } catch {
+    // Diagnostics remain best-effort when document state is unavailable.
+  }
+  appendStaffNotificationRecoveryTrace({
+    kind: "sound_diagnostic",
+    eventId: context.eventId,
+    source: context.source,
+    tabId: getDiagnosticTabId(),
+    visibilityState,
+    soundStage: input.stage,
+    soundOwnership: input.ownership,
+    soundPreferenceEnabled: context.soundPreferenceEnabled,
+    soundEligible: context.soundEligible,
+    audioContextBefore:
+      input.audioContextBefore === undefined
+        ? undefined
+        : safeAudioContextState(input.audioContextBefore),
+    audioContextAfter:
+      input.audioContextAfter === undefined
+        ? undefined
+        : safeAudioContextState(input.audioContextAfter),
+    soundResumeAttempted: input.resumeAttempted,
+    soundResumeOutcome: input.resumeOutcome,
+    soundPlaybackOutcome: input.playbackOutcome,
+    soundRestriction: input.restriction?.replaceAll("-", "_") as
+      | "none"
+      | "unsupported"
+      | "context_create_failed"
+      | "resume_rejected"
+      | "context_not_running"
+      | "schedule_failed"
+      | undefined,
+    outcome:
+      input.stage === "resume_timeout"
+        ? "incomplete"
+        : input.stage === "result"
+          ? input.playbackOutcome === "scheduled"
+            ? "success"
+            : input.playbackOutcome === "failed"
+              ? "failure"
+              : "rejected"
+          : "started",
+    reason:
+      input.resumeOutcome === "timeout"
+        ? "audio_resume_timeout"
+        : input.resumeOutcome === "rejected"
+          ? "audio_resume_rejected"
+          : input.resumeOutcome === "not_running"
+            ? "audio_resume_not_running"
+            : input.restriction === "schedule-failed"
+              ? "audio_schedule_failed"
+              : undefined,
+  });
+}
+
+export function recordStaffNotificationSoundOwnership(input: {
+  eventId: string;
+  source: RecoveryDiagnosticSource;
+  ownership: "winner" | "duplicate_suppressed";
+  soundPreferenceEnabled: boolean;
+  soundEligible: boolean;
+}): void {
+  recordSoundDiagnostic(input, {
+    stage: "ownership",
+    ownership: input.ownership,
+    playbackOutcome: "not_attempted",
+    resumeOutcome: "not_attempted",
+  });
+}
 
 export function shouldPlayStaffNotificationSound(input: {
   code: string;
@@ -79,29 +214,27 @@ function getAudioContext(): {
 
 async function resumeAudioContext(
   context: AudioContext,
-): Promise<"not-needed" | "succeeded" | "failed"> {
+): Promise<AudioResumeOutcome> {
   if (context.state === "running") return "not-needed";
 
   if (!resumeInProgress) {
     try {
       resumeInProgress = Promise.resolve(context.resume()).then(
-        () => undefined,
-        () => {
-          throw new Error("audio-resume-failed");
-        },
+        () =>
+          readAudioContextState(context) === "running"
+            ? "succeeded"
+            : "not-running",
+        () => "rejected",
       );
     } catch {
-      return "failed";
+      return "rejected";
     }
   }
 
   try {
-    await resumeInProgress;
-    return readAudioContextState(context) === "running"
-      ? "succeeded"
-      : "failed";
+    return await resumeInProgress;
   } catch {
-    return "failed";
+    return "rejected";
   } finally {
     resumeInProgress = null;
   }
@@ -146,11 +279,11 @@ export function primeStaffNotificationSound(): void {
   }
 
   if (context.state === "running") return;
-  void resumeAudioContext(context).then((resumeStatus) => {
-    if (resumeStatus !== "succeeded") {
+  void resumeAudioContext(context).then((resumeOutcome) => {
+    if (resumeOutcome !== "succeeded" && resumeOutcome !== "not-needed") {
       reportPlaybackFailure({
         contextState: context.state,
-        resumeStatus,
+        resumeStatus: "failed",
         playbackStatus: "not-attempted",
         restriction:
           context.state === "running" ? "none" : "context-not-running",
@@ -160,8 +293,30 @@ export function primeStaffNotificationSound(): void {
 }
 
 /** Plays the configured cue and reports scheduling status, never audibility. */
-export async function playStaffNotificationSound(): Promise<StaffNotificationSoundResult> {
+export async function playStaffNotificationSound(
+  diagnostic?: StaffNotificationSoundDiagnosticContext,
+): Promise<StaffNotificationSoundResult> {
   const { context, restriction } = getAudioContext();
+  const audioContextBefore = context
+    ? safeAudioContextState(context.state)
+    : "unavailable";
+  const resumeAttempted = Boolean(context && context.state !== "running");
+  if (diagnostic) {
+    recordSoundDiagnostic(diagnostic, {
+      stage: "attempt",
+      ownership: "winner",
+      audioContextBefore,
+      audioContextAfter: audioContextBefore,
+      resumeAttempted,
+      resumeOutcome: context
+        ? resumeAttempted
+          ? "pending"
+          : "not_needed"
+        : "not_attempted",
+      playbackOutcome: "not_attempted",
+      restriction: context ? "none" : restriction,
+    });
+  }
   if (!context) {
     const result: StaffNotificationSoundResult = {
       contextState: "unavailable",
@@ -169,20 +324,76 @@ export async function playStaffNotificationSound(): Promise<StaffNotificationSou
       playbackStatus: "not-attempted",
       restriction,
     };
+    if (diagnostic) {
+      recordSoundDiagnostic(diagnostic, {
+        stage: "result",
+        ownership: "winner",
+        audioContextBefore,
+        audioContextAfter: "unavailable",
+        resumeAttempted: false,
+        resumeOutcome: "not_attempted",
+        playbackOutcome: "not_attempted",
+        restriction,
+      });
+    }
     reportPlaybackFailure(result);
     return result;
   }
 
-  const resumeStatus = await resumeAudioContext(context);
+  let resumeTimedOut = false;
+  const timeoutId =
+    diagnostic && resumeAttempted
+      ? window.setTimeout(() => {
+          resumeTimedOut = true;
+          recordSoundDiagnostic(diagnostic, {
+            stage: "resume_timeout",
+            ownership: "winner",
+            audioContextBefore,
+            audioContextAfter: safeAudioContextState(context.state),
+            resumeAttempted: true,
+            resumeOutcome: "timeout",
+            playbackOutcome: "not_attempted",
+          });
+        }, 5000)
+      : null;
+  const resumeOutcome = await resumeAudioContext(context);
+  if (timeoutId !== null) window.clearTimeout(timeoutId);
+  const resumeStatus =
+    resumeOutcome === "not-needed" || resumeOutcome === "succeeded"
+      ? resumeOutcome
+      : "failed";
   const contextState: string = context.state;
+  const diagnosticResumeOutcome = resumeTimedOut
+    ? "timeout"
+    : resumeOutcome === "rejected"
+      ? "rejected"
+      : resumeOutcome === "not-running"
+        ? "not_running"
+        : resumeOutcome === "not-needed"
+          ? "not_needed"
+          : resumeOutcome;
   if (contextState !== "running") {
     const result: StaffNotificationSoundResult = {
       contextState,
       resumeStatus,
       playbackStatus: "not-attempted",
       restriction:
-        resumeStatus === "failed" ? "resume-rejected" : "context-not-running",
+        resumeOutcome === "rejected"
+          ? "resume-rejected"
+          : "context-not-running",
     };
+    if (diagnostic) {
+      recordSoundDiagnostic(diagnostic, {
+        stage: "result",
+        ownership: "winner",
+        audioContextBefore,
+        audioContextAfter: safeAudioContextState(context.state),
+        resumeAttempted,
+        resumeOutcome: diagnosticResumeOutcome,
+        playbackOutcome: "not_attempted",
+        restriction: result.restriction,
+      });
+    }
     reportPlaybackFailure(result);
     return result;
   }
@@ -222,6 +433,18 @@ export async function playStaffNotificationSound(): Promise<StaffNotificationSou
       playbackStatus: "scheduled",
       restriction: "none",
     };
+    if (diagnostic) {
+      recordSoundDiagnostic(diagnostic, {
+        stage: "result",
+        ownership: "winner",
+        audioContextBefore,
+        audioContextAfter: safeAudioContextState(context.state),
+        resumeAttempted,
+        resumeOutcome: diagnosticResumeOutcome,
+        playbackOutcome: "scheduled",
+        restriction: "none",
+      });
+    }
     reportPlaybackScheduled(result);
     return result;
   } catch {
@@ -240,6 +463,18 @@ export async function playStaffNotificationSound(): Promise<StaffNotificationSou
       playbackStatus: "failed",
       restriction: "schedule-failed",
     };
+    if (diagnostic) {
+      recordSoundDiagnostic(diagnostic, {
+        stage: "result",
+        ownership: "winner",
+        audioContextBefore,
+        audioContextAfter: safeAudioContextState(context.state),
+        resumeAttempted,
+        resumeOutcome: diagnosticResumeOutcome,
+        playbackOutcome: "failed",
+        restriction: "schedule-failed",
+      });
+    }
     reportPlaybackFailure(result);
     return result;
   }

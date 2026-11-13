@@ -30,6 +30,7 @@ export type RecoveryDiagnosticKind =
   | "cursor_saved"
   | "pending_marker"
   | "retry_visibility"
+  | "sound_diagnostic"
   | "test_listener_control"
   | "recovery_finished";
 
@@ -111,7 +112,12 @@ export type RecoveryDiagnosticRecord = {
     | "resume_timeout"
     | "recovery_running"
     | "control_unavailable"
-    | "account_changed";
+    | "account_changed"
+    | "audio_resume_rejected"
+    | "audio_resume_not_running"
+    | "audio_resume_timeout"
+    | "audio_schedule_failed";
+
   status?:
     | "CONNECTING"
     | "SUBSCRIBED"
@@ -126,6 +132,31 @@ export type RecoveryDiagnosticRecord = {
   eligible?: boolean;
   pending?: boolean;
   visible?: boolean;
+  tabId?: string;
+  visibilityState?: "visible" | "hidden" | "unknown";
+  soundStage?: "ownership" | "attempt" | "resume_timeout" | "result";
+  soundOwnership?: "winner" | "duplicate_suppressed";
+  soundPreferenceEnabled?: boolean;
+  soundEligible?: boolean;
+  audioContextBefore?: "running" | "suspended" | "closed" | "unavailable";
+  audioContextAfter?: "running" | "suspended" | "closed" | "unavailable";
+  soundResumeAttempted?: boolean;
+  soundResumeOutcome?:
+    | "not_attempted"
+    | "not_needed"
+    | "pending"
+    | "succeeded"
+    | "rejected"
+    | "not_running"
+    | "timeout";
+  soundPlaybackOutcome?: "not_attempted" | "scheduled" | "failed";
+  soundRestriction?:
+    | "none"
+    | "unsupported"
+    | "context_create_failed"
+    | "resume_rejected"
+    | "context_not_running"
+    | "schedule_failed";
 };
 
 export type RecoveryDiagnosticsScope = {
@@ -157,6 +188,7 @@ const DIAGNOSTIC_KINDS: readonly string[] = [
   "cursor_saved",
   "pending_marker",
   "retry_visibility",
+  "sound_diagnostic",
   "test_listener_control",
   "recovery_finished",
 ];
@@ -223,6 +255,10 @@ const DIAGNOSTIC_REASONS: readonly string[] = [
   "recovery_running",
   "control_unavailable",
   "account_changed",
+  "audio_resume_rejected",
+  "audio_resume_not_running",
+  "audio_resume_timeout",
+  "audio_schedule_failed",
 ];
 const DIAGNOSTIC_STATUSES: readonly string[] = [
   "CONNECTING",
@@ -405,6 +441,71 @@ function sanitizeRecord(
   if (typeof input.eligible === "boolean") safe.eligible = input.eligible;
   if (typeof input.pending === "boolean") safe.pending = input.pending;
   if (typeof input.visible === "boolean") safe.visible = input.visible;
+  if (input.tabId && UUID_PATTERN.test(input.tabId)) safe.tabId = input.tabId;
+  if (
+    input.visibilityState === "visible" ||
+    input.visibilityState === "hidden" ||
+    input.visibilityState === "unknown"
+  ) {
+    safe.visibilityState = input.visibilityState;
+  }
+  if (
+    input.soundStage === "ownership" ||
+    input.soundStage === "attempt" ||
+    input.soundStage === "resume_timeout" ||
+    input.soundStage === "result"
+  ) {
+    safe.soundStage = input.soundStage;
+  }
+  if (
+    input.soundOwnership === "winner" ||
+    input.soundOwnership === "duplicate_suppressed"
+  ) {
+    safe.soundOwnership = input.soundOwnership;
+  }
+  if (typeof input.soundPreferenceEnabled === "boolean") {
+    safe.soundPreferenceEnabled = input.soundPreferenceEnabled;
+  }
+  if (typeof input.soundEligible === "boolean") {
+    safe.soundEligible = input.soundEligible;
+  }
+  const audioContextStates = ["running", "suspended", "closed", "unavailable"];
+  if (audioContextStates.includes(input.audioContextBefore ?? "")) {
+    safe.audioContextBefore = input.audioContextBefore;
+  }
+  if (audioContextStates.includes(input.audioContextAfter ?? "")) {
+    safe.audioContextAfter = input.audioContextAfter;
+  }
+  if (typeof input.soundResumeAttempted === "boolean") {
+    safe.soundResumeAttempted = input.soundResumeAttempted;
+  }
+  const resumeOutcomes = [
+    "not_attempted",
+    "not_needed",
+    "pending",
+    "succeeded",
+    "rejected",
+    "not_running",
+    "timeout",
+  ];
+  if (resumeOutcomes.includes(input.soundResumeOutcome ?? "")) {
+    safe.soundResumeOutcome = input.soundResumeOutcome;
+  }
+  const playbackOutcomes = ["not_attempted", "scheduled", "failed"];
+  if (playbackOutcomes.includes(input.soundPlaybackOutcome ?? "")) {
+    safe.soundPlaybackOutcome = input.soundPlaybackOutcome;
+  }
+  const soundRestrictions = [
+    "none",
+    "unsupported",
+    "context_create_failed",
+    "resume_rejected",
+    "context_not_running",
+    "schedule_failed",
+  ];
+  if (soundRestrictions.includes(input.soundRestriction ?? "")) {
+    safe.soundRestriction = input.soundRestriction;
+  }
   return safe;
 }
 
