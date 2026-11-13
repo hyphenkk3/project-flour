@@ -3046,3 +3046,9 @@ This completes preparation of the scoped secret, but not scheduler readiness: ac
 - **B. Home Screen App Login Persistence:** fix the reported behavior where the installed mobile Home Screen app asks staff to sign in again after the app is closed and reopened. Verify session persistence on the actual installed mobile app without weakening authentication or session validation. **Status: newly recorded separate backlog item; not investigated, implemented or verified in this task.**
 
 - **Task boundaries:** No hosted record/event, migration, deployment, preference/subscription/schedule change, external dispatch or customer communication occurred. Fresh Pick schedule remains Disabled; Fresh Pick Push remains OFF for synthetic tests; Email remains disabled, hidden and HTTP 503 paused. Production and `dev.whitebird.asia` were not accessed or changed.
+
+### Local artifact commit and committed-byte verification — 2026-11-13
+
+- The focused local commit is `580941de4a07bee706050eab22d6d3480b0e8a0a` (`Qualify local notification producer triggers`) on `codex/staff-notifications-dev-20261109`, based on `a69ac65464de1f0c07dfa39c4fef396446cfeea7`. It contains exactly `scripts/test-staff-notification-producers-db.py` and this append-only `docs/PROJECT_FLOUR_MASTER_STATUS.md` update.
+- Hashes recomputed from the committed tree with `git show <commit>:<path> | shasum -a 256`: producer harness `03a1009b5dd5e563ccdb44d031acb49b4c2d9fcb7a1bc23d47a1b2eac4a07b63`; Master Status at this source/test commit `119891797105f2574137c8504f52173bdc631e4ac8d6dc0c01416b8b4619d88f`.
+- This hash record is the documentation-only follow-up to the source/test commit; it does not alter producer code or test outcomes. Nothing was pushed or deployed.
