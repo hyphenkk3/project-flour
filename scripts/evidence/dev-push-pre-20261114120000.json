@@ -1,0 +1,246 @@
+{
+  "capturedAtUtc": "2026-11-14T11:46:34Z",
+  "projectRef": "tzwtpxdcggesgjaqxkqr",
+  "migrationVersion": "20261114120000",
+  "migrationSha256": "4b8ba1f3cef80b355edc047d7bc52789854320e904bff3edb8016eec67a1943c",
+  "server_version": "17.6",
+  "server_version_num": "170006",
+  "row_counts": {
+    "events": 250,
+    "preferences": 55,
+    "push_deliveries": 3,
+    "push_subscriptions": 4
+  },
+  "table_security": [
+    {
+      "rls": true,
+      "table": "staff_notification_events",
+      "force_rls": false,
+      "anon_truncate": false,
+      "service_role_truncate": true,
+      "authenticated_truncate": false
+    },
+    {
+      "rls": true,
+      "table": "staff_notification_preferences",
+      "force_rls": false,
+      "anon_truncate": false,
+      "service_role_truncate": true,
+      "authenticated_truncate": false
+    },
+    {
+      "rls": true,
+      "table": "staff_notification_push_deliveries",
+      "force_rls": false,
+      "anon_truncate": false,
+      "service_role_truncate": true,
+      "authenticated_truncate": false
+    },
+    {
+      "rls": true,
+      "table": "staff_notification_push_subscriptions",
+      "force_rls": false,
+      "anon_truncate": false,
+      "service_role_truncate": true,
+      "authenticated_truncate": false
+    }
+  ],
+  "event_triggers": [
+    {
+      "table": "staff_notification_events",
+      "enabled": "O",
+      "trigger": "staff_notification_event_created_at_immutable",
+      "function": "reject_staff_notification_event_created_at_update()"
+    },
+    {
+      "table": "staff_notification_preferences",
+      "enabled": "O",
+      "trigger": "staff_notification_preferences_push_enabled_at",
+      "function": "staff_notification_set_push_enabled_at()"
+    },
+    {
+      "table": "staff_notification_preferences",
+      "enabled": "O",
+      "trigger": "staff_notification_preferences_set_updated_at",
+      "function": "set_updated_at()"
+    },
+    {
+      "table": "staff_notification_events",
+      "enabled": "O",
+      "trigger": "staff_notification_request_dispatch",
+      "function": "staff_notification_request_dispatch()"
+    },
+    {
+      "table": "staff_profiles",
+      "enabled": "O",
+      "trigger": "staff_notification_revoke_inactive_push",
+      "function": "staff_notification_revoke_inactive_push()"
+    },
+    {
+      "table": "staff_profiles",
+      "enabled": "O",
+      "trigger": "staff_profiles_enforce_master_owner",
+      "function": "staff_profiles_enforce_master_owner()"
+    },
+    {
+      "table": "staff_profiles",
+      "enabled": "O",
+      "trigger": "staff_profiles_set_updated_at",
+      "function": "set_updated_at()"
+    }
+  ],
+  "scheduled_objects": [
+    {
+      "schema": "cron",
+      "relation": "job"
+    }
+  ],
+  "function_metadata": [
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "owner": "postgres",
+      "config": [
+        "search_path=public"
+      ],
+      "language": "plpgsql",
+      "signature": "claim_staff_notification_push_deliveries(integer,uuid,integer)",
+      "definition": "CREATE OR REPLACE FUNCTION public.claim_staff_notification_push_deliveries(p_limit integer DEFAULT 50, p_event_id uuid DEFAULT NULL::uuid, p_lease_seconds integer DEFAULT 120)\n RETURNS TABLE(delivery_id uuid, event_id uuid, staff_id uuid, subscription_id uuid, claimed_until timestamp with time zone, code text, endpoint text, p256dh text, auth_secret text)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  v_limit integer := greatest(1, least(coalesce(p_limit, 50), 100));\n  v_lease interval := make_interval(secs => greatest(30, least(coalesce(p_lease_seconds, 120), 600)));\n  v_now timestamptz := now();\nbegin\n  update public.staff_notification_push_deliveries d\n  set status = 'suppressed',\n      next_attempt_at = null,\n      claimed_until = null,\n      error_code = 'stale_hold',\n      updated_at = v_now\n  from public.staff_notification_events e\n  where e.id = d.event_id\n    and e.code = 'fresh_pick_walk_in_hold_reminder'\n    and d.status in ('pending', 'failed', 'claimed')\n    and (d.status <> 'claimed' or d.claimed_until <= v_now)\n    and not public.staff_notification_fresh_pick_hold_reminder_is_current(e.payload);\n\n  return query\n  with candidates as materialized (\n    select d.id\n    from public.staff_notification_push_deliveries d\n    join public.staff_notification_events e on e.id = d.event_id\n    join public.staff_profiles sp\n      on sp.id = d.staff_id and sp.is_active = true and sp.archived_at is null\n    join public.staff_notification_preferences pref\n      on pref.staff_id = sp.id and pref.notification_code = e.code\n     and pref.push_enabled = true and pref.push_enabled_at is not null\n     and e.created_at >= pref.push_enabled_at\n    join public.staff_notification_push_subscriptions sub\n      on sub.id = d.subscription_id and sub.staff_id = sp.id\n     and sub.revoked_at is null\n     and (sub.expiration_time is null or sub.expiration_time > v_now)\n     and e.created_at >= sub.created_at\n    where (p_event_id is null or d.event_id = p_event_id)\n      and (\n        e.code is distinct from 'fresh_pick_walk_in_hold_reminder'\n        or public.staff_notification_fresh_pick_hold_reminder_is_current(e.payload)\n      )\n      and d.attempt_count < 5\n      and (\n        d.status = 'pending'\n        or (d.status = 'failed' and d.next_attempt_at <= v_now)\n        or (d.status = 'claimed' and d.claimed_until <= v_now)\n      )\n    order by d.created_at asc\n    limit v_limit\n    for update of d skip locked\n  ), claimed as (\n    update public.staff_notification_push_deliveries d\n    set status = 'claimed', claimed_until = v_now + v_lease, updated_at = v_now\n    from candidates c\n    where d.id = c.id\n    returning d.id, d.event_id, d.staff_id, d.subscription_id, d.claimed_until\n  )\n  select c.id, c.event_id, c.staff_id, c.subscription_id, c.claimed_until,\n    e.code, sub.endpoint, sub.p256dh, sub.auth_secret\n  from claimed c\n  join public.staff_notification_events e on e.id = c.event_id\n  join public.staff_notification_push_subscriptions sub on sub.id = c.subscription_id;\nend;\n$function$\n",
+      "security_definer": true
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "owner": "postgres",
+      "config": [
+        "search_path=public"
+      ],
+      "language": "plpgsql",
+      "signature": "complete_staff_notification_push_delivery(uuid,timestamp with time zone,text,text,boolean)",
+      "definition": "CREATE OR REPLACE FUNCTION public.complete_staff_notification_push_delivery(p_delivery_id uuid, p_claimed_until timestamp with time zone, p_status text, p_error_code text DEFAULT NULL::text, p_revoke_subscription boolean DEFAULT false)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  v_updated boolean;\nbegin\n  if p_status is null or p_status not in ('sent', 'failed', 'suppressed') then\n    return false;\n  end if;\n  if p_status = 'suppressed' and p_error_code is distinct from 'stale_hold' then\n    return false;\n  end if;\n\n  update public.staff_notification_push_deliveries d\n  set\n    status = case when p_revoke_subscription then 'failed' else p_status end,\n    attempt_count = case\n      when p_status = 'suppressed' then d.attempt_count\n      else least(d.attempt_count + 1, 5)\n    end,\n    next_attempt_at = case\n      when p_status in ('sent', 'suppressed') or p_revoke_subscription or d.attempt_count + 1 >= 5 then null\n      when d.attempt_count + 1 = 1 then now() + interval '1 minute'\n      when d.attempt_count + 1 = 2 then now() + interval '5 minutes'\n      when d.attempt_count + 1 = 3 then now() + interval '15 minutes'\n      else now() + interval '1 hour'\n    end,\n    claimed_until = null,\n    error_code = left(p_error_code, 100),\n    updated_at = now()\n  where d.id = p_delivery_id\n    and d.status = 'claimed'\n    and d.claimed_until = p_claimed_until\n  returning true into v_updated;\n\n  if not found then\n    return false;\n  end if;\n\n  if p_revoke_subscription then\n    update public.staff_notification_push_subscriptions sub\n    set revoked_at = coalesce(sub.revoked_at, now())\n    where sub.id = (\n      select d.subscription_id\n      from public.staff_notification_push_deliveries d\n      where d.id = p_delivery_id\n    );\n  end if;\n\n  return true;\nend;\n$function$\n",
+      "security_definer": true
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "owner": "postgres",
+      "config": [
+        "search_path=public"
+      ],
+      "language": "sql",
+      "signature": "list_due_fresh_pick_hold_reminder_push_event_ids(integer)",
+      "definition": "CREATE OR REPLACE FUNCTION public.list_due_fresh_pick_hold_reminder_push_event_ids(p_limit integer DEFAULT 10)\n RETURNS TABLE(event_id uuid)\n LANGUAGE sql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\n  select e.id\n  from public.staff_notification_events e\n  where e.code = 'fresh_pick_walk_in_hold_reminder'\n    and public.staff_notification_fresh_pick_hold_reminder_is_current(e.payload)\n    and exists (\n      select 1\n      from public.staff_notification_preferences pref\n      join public.staff_profiles sp\n        on sp.id = pref.staff_id\n       and sp.is_active = true\n       and sp.archived_at is null\n      join public.staff_notification_push_subscriptions sub\n        on sub.staff_id = sp.id\n       and sub.revoked_at is null\n       and (sub.expiration_time is null or sub.expiration_time > clock_timestamp())\n       and e.created_at >= sub.created_at\n      where pref.notification_code = e.code\n        and pref.push_enabled = true\n        and pref.push_enabled_at is not null\n        and e.created_at >= pref.push_enabled_at\n    )\n    and (\n      not exists (\n        select 1\n        from public.staff_notification_push_deliveries d\n        where d.event_id = e.id\n      )\n      or exists (\n        select 1\n        from public.staff_notification_push_deliveries d\n        where d.event_id = e.id\n          and d.attempt_count < 5\n          and (\n            d.status = 'pending'\n            or (d.status = 'failed' and d.next_attempt_at <= clock_timestamp())\n            or (d.status = 'claimed' and d.claimed_until <= clock_timestamp())\n          )\n      )\n    )\n  order by e.created_at asc\n  limit greatest(1, least(coalesce(p_limit, 10), 20));\n$function$\n",
+      "security_definer": true
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "owner": "postgres",
+      "config": [
+        "search_path=public"
+      ],
+      "language": "plpgsql",
+      "signature": "queue_staff_notification_push_deliveries(uuid,integer)",
+      "definition": "CREATE OR REPLACE FUNCTION public.queue_staff_notification_push_deliveries(p_event_id uuid DEFAULT NULL::uuid, p_event_limit integer DEFAULT 50)\n RETURNS integer\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  v_inserted integer := 0;\n  v_limit integer := greatest(1, least(coalesce(p_event_limit, 50), 100));\nbegin\n  update public.staff_notification_push_subscriptions sub\n  set revoked_at = now()\n  where sub.revoked_at is null\n    and sub.expiration_time is not null\n    and sub.expiration_time <= now();\n\n  with eligible_pairs as materialized (\n    select e.id as event_id, sp.id as staff_id, sub.id as subscription_id\n    from public.staff_notification_events e\n    join public.staff_notification_preferences pref\n      on pref.notification_code = e.code\n     and pref.push_enabled = true\n     and pref.push_enabled_at is not null\n     and e.created_at >= pref.push_enabled_at\n    join public.staff_profiles sp\n      on sp.id = pref.staff_id\n     and sp.is_active = true\n     and sp.archived_at is null\n    join public.staff_notification_push_subscriptions sub\n      on sub.staff_id = sp.id\n     and sub.revoked_at is null\n     and (sub.expiration_time is null or sub.expiration_time > now())\n     and e.created_at >= sub.created_at\n    where (p_event_id is null or e.id = p_event_id)\n      and (\n        e.code is distinct from 'fresh_pick_walk_in_hold_reminder'\n        or public.staff_notification_fresh_pick_hold_reminder_is_current(e.payload)\n      )\n      and not exists (\n        select 1\n        from public.staff_notification_push_deliveries existing\n        where existing.event_id = e.id\n          and existing.subscription_id = sub.id\n      )\n    order by e.created_at asc\n    limit v_limit\n  ), inserted as (\n    insert into public.staff_notification_push_deliveries (\n      event_id, staff_id, subscription_id, status\n    )\n    select event_id, staff_id, subscription_id, 'pending'\n    from eligible_pairs\n    on conflict (event_id, subscription_id) do nothing\n    returning id\n  )\n  select count(*)::integer into v_inserted from inserted;\n\n  return v_inserted;\nend;\n$function$\n",
+      "security_definer": true
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "owner": "postgres",
+      "config": [
+        "search_path=public"
+      ],
+      "language": "plpgsql",
+      "signature": "staff_notification_fresh_pick_hold_reminder_is_current(jsonb)",
+      "definition": "CREATE OR REPLACE FUNCTION public.staff_notification_fresh_pick_hold_reminder_is_current(p_payload jsonb)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  v_stock_id uuid;\n  v_held_by uuid;\n  v_held_until timestamptz;\n  v_held_at timestamptz;\n  v_stock public.extra_stock;\nbegin\n  if jsonb_typeof(p_payload) is distinct from 'object'\n    or coalesce(p_payload ->> 'extra_stock_id', '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'\n    or coalesce(p_payload ->> 'walk_in_held_by', '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'\n    or nullif(p_payload ->> 'walk_in_held_at', '') is null\n    or nullif(p_payload ->> 'walk_in_held_until', '') is null\n  then\n    return false;\n  end if;\n\n  v_stock_id := (p_payload ->> 'extra_stock_id')::uuid;\n  v_held_by := (p_payload ->> 'walk_in_held_by')::uuid;\n  begin\n    v_held_at := (p_payload ->> 'walk_in_held_at')::timestamptz;\n    v_held_until := (p_payload ->> 'walk_in_held_until')::timestamptz;\n  exception\n    when invalid_datetime_format or datetime_field_overflow then\n      return false;\n  end;\n\n  select e.*\n    into v_stock\n  from public.extra_stock e\n  where e.id = v_stock_id\n  for update;\n\n  if not found then\n    return false;\n  end if;\n\n  return v_stock.lifecycle = 'confirmed'\n    and v_stock.sold_at is null\n    and v_stock.cut_into_slices_at is null\n    and v_stock.walk_in_held_by = v_held_by\n    and v_stock.walk_in_held_at = v_held_at\n    and v_stock.walk_in_held_until = v_held_until\n    and public.extra_walk_in_hold_is_active(\n      v_stock.walk_in_held_until,\n      clock_timestamp()\n    );\nend;\n$function$\n",
+      "security_definer": true
+    },
+    {
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "owner": "postgres",
+      "config": [
+        "search_path=public"
+      ],
+      "language": "plpgsql",
+      "signature": "suppress_stale_fresh_pick_hold_reminder_push_deliveries()",
+      "definition": "CREATE OR REPLACE FUNCTION public.suppress_stale_fresh_pick_hold_reminder_push_deliveries()\n RETURNS integer\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  v_suppressed integer := 0;\nbegin\n  update public.staff_notification_push_deliveries d\n  set status = 'suppressed',\n      next_attempt_at = null,\n      claimed_until = null,\n      error_code = 'stale_hold',\n      updated_at = clock_timestamp()\n  from public.staff_notification_events e\n  where e.id = d.event_id\n    and e.code = 'fresh_pick_walk_in_hold_reminder'\n    and d.status in ('pending', 'failed', 'claimed')\n    and (d.status <> 'claimed' or d.claimed_until <= clock_timestamp())\n    and not public.staff_notification_fresh_pick_hold_reminder_is_current(e.payload);\n\n  get diagnostics v_suppressed = row_count;\n  return v_suppressed;\nend;\n$function$\n",
+      "security_definer": true
+    }
+  ],
+  "function_definitions": [
+    {
+      "signature": "claim_staff_notification_push_deliveries(integer,uuid,integer)",
+      "owner": "postgres",
+      "security_definer": true,
+      "config": [
+        "search_path=public"
+      ],
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "definition": "CREATE OR REPLACE FUNCTION public.claim_staff_notification_push_deliveries(p_limit integer DEFAULT 50, p_event_id uuid DEFAULT NULL::uuid, p_lease_seconds integer DEFAULT 120)\n RETURNS TABLE(delivery_id uuid, event_id uuid, staff_id uuid, subscription_id uuid, claimed_until timestamp with time zone, code text, endpoint text, p256dh text, auth_secret text)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  v_limit integer := greatest(1, least(coalesce(p_limit, 50), 100));\n  v_lease interval := make_interval(secs => greatest(30, least(coalesce(p_lease_seconds, 120), 600)));\n  v_now timestamptz := now();\nbegin\n  update public.staff_notification_push_deliveries d\n  set status = 'suppressed',\n      next_attempt_at = null,\n      claimed_until = null,\n      error_code = 'stale_hold',\n      updated_at = v_now\n  from public.staff_notification_events e\n  where e.id = d.event_id\n    and e.code = 'fresh_pick_walk_in_hold_reminder'\n    and d.status in ('pending', 'failed', 'claimed')\n    and (d.status <> 'claimed' or d.claimed_until <= v_now)\n    and not public.staff_notification_fresh_pick_hold_reminder_is_current(e.payload);\n\n  return query\n  with candidates as materialized (\n    select d.id\n    from public.staff_notification_push_deliveries d\n    join public.staff_notification_events e on e.id = d.event_id\n    join public.staff_profiles sp\n      on sp.id = d.staff_id and sp.is_active = true and sp.archived_at is null\n    join public.staff_notification_preferences pref\n      on pref.staff_id = sp.id and pref.notification_code = e.code\n     and pref.push_enabled = true and pref.push_enabled_at is not null\n     and e.created_at >= pref.push_enabled_at\n    join public.staff_notification_push_subscriptions sub\n      on sub.id = d.subscription_id and sub.staff_id = sp.id\n     and sub.revoked_at is null\n     and (sub.expiration_time is null or sub.expiration_time > v_now)\n     and e.created_at >= sub.created_at\n    where (p_event_id is null or d.event_id = p_event_id)\n      and (\n        e.code is distinct from 'fresh_pick_walk_in_hold_reminder'\n        or public.staff_notification_fresh_pick_hold_reminder_is_current(e.payload)\n      )\n      and d.attempt_count < 5\n      and (\n        d.status = 'pending'\n        or (d.status = 'failed' and d.next_attempt_at <= v_now)\n        or (d.status = 'claimed' and d.claimed_until <= v_now)\n      )\n    order by d.created_at asc\n    limit v_limit\n    for update of d skip locked\n  ), claimed as (\n    update public.staff_notification_push_deliveries d\n    set status = 'claimed', claimed_until = v_now + v_lease, updated_at = v_now\n    from candidates c\n    where d.id = c.id\n    returning d.id, d.event_id, d.staff_id, d.subscription_id, d.claimed_until\n  )\n  select c.id, c.event_id, c.staff_id, c.subscription_id, c.claimed_until,\n    e.code, sub.endpoint, sub.p256dh, sub.auth_secret\n  from claimed c\n  join public.staff_notification_events e on e.id = c.event_id\n  join public.staff_notification_push_subscriptions sub on sub.id = c.subscription_id;\nend;\n$function$\n"
+    },
+    {
+      "signature": "complete_staff_notification_push_delivery(uuid,timestamp with time zone,text,text,boolean)",
+      "owner": "postgres",
+      "security_definer": true,
+      "config": [
+        "search_path=public"
+      ],
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "definition": "CREATE OR REPLACE FUNCTION public.complete_staff_notification_push_delivery(p_delivery_id uuid, p_claimed_until timestamp with time zone, p_status text, p_error_code text DEFAULT NULL::text, p_revoke_subscription boolean DEFAULT false)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  v_updated boolean;\nbegin\n  if p_status is null or p_status not in ('sent', 'failed', 'suppressed') then\n    return false;\n  end if;\n  if p_status = 'suppressed' and p_error_code is distinct from 'stale_hold' then\n    return false;\n  end if;\n\n  update public.staff_notification_push_deliveries d\n  set\n    status = case when p_revoke_subscription then 'failed' else p_status end,\n    attempt_count = case\n      when p_status = 'suppressed' then d.attempt_count\n      else least(d.attempt_count + 1, 5)\n    end,\n    next_attempt_at = case\n      when p_status in ('sent', 'suppressed') or p_revoke_subscription or d.attempt_count + 1 >= 5 then null\n      when d.attempt_count + 1 = 1 then now() + interval '1 minute'\n      when d.attempt_count + 1 = 2 then now() + interval '5 minutes'\n      when d.attempt_count + 1 = 3 then now() + interval '15 minutes'\n      else now() + interval '1 hour'\n    end,\n    claimed_until = null,\n    error_code = left(p_error_code, 100),\n    updated_at = now()\n  where d.id = p_delivery_id\n    and d.status = 'claimed'\n    and d.claimed_until = p_claimed_until\n  returning true into v_updated;\n\n  if not found then\n    return false;\n  end if;\n\n  if p_revoke_subscription then\n    update public.staff_notification_push_subscriptions sub\n    set revoked_at = coalesce(sub.revoked_at, now())\n    where sub.id = (\n      select d.subscription_id\n      from public.staff_notification_push_deliveries d\n      where d.id = p_delivery_id\n    );\n  end if;\n\n  return true;\nend;\n$function$\n"
+    },
+    {
+      "signature": "queue_staff_notification_push_deliveries(uuid,integer)",
+      "owner": "postgres",
+      "security_definer": true,
+      "config": [
+        "search_path=public"
+      ],
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "definition": "CREATE OR REPLACE FUNCTION public.queue_staff_notification_push_deliveries(p_event_id uuid DEFAULT NULL::uuid, p_event_limit integer DEFAULT 50)\n RETURNS integer\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  v_inserted integer := 0;\n  v_limit integer := greatest(1, least(coalesce(p_event_limit, 50), 100));\nbegin\n  update public.staff_notification_push_subscriptions sub\n  set revoked_at = now()\n  where sub.revoked_at is null\n    and sub.expiration_time is not null\n    and sub.expiration_time <= now();\n\n  with eligible_pairs as materialized (\n    select e.id as event_id, sp.id as staff_id, sub.id as subscription_id\n    from public.staff_notification_events e\n    join public.staff_notification_preferences pref\n      on pref.notification_code = e.code\n     and pref.push_enabled = true\n     and pref.push_enabled_at is not null\n     and e.created_at >= pref.push_enabled_at\n    join public.staff_profiles sp\n      on sp.id = pref.staff_id\n     and sp.is_active = true\n     and sp.archived_at is null\n    join public.staff_notification_push_subscriptions sub\n      on sub.staff_id = sp.id\n     and sub.revoked_at is null\n     and (sub.expiration_time is null or sub.expiration_time > now())\n     and e.created_at >= sub.created_at\n    where (p_event_id is null or e.id = p_event_id)\n      and (\n        e.code is distinct from 'fresh_pick_walk_in_hold_reminder'\n        or public.staff_notification_fresh_pick_hold_reminder_is_current(e.payload)\n      )\n      and not exists (\n        select 1\n        from public.staff_notification_push_deliveries existing\n        where existing.event_id = e.id\n          and existing.subscription_id = sub.id\n      )\n    order by e.created_at asc\n    limit v_limit\n  ), inserted as (\n    insert into public.staff_notification_push_deliveries (\n      event_id, staff_id, subscription_id, status\n    )\n    select event_id, staff_id, subscription_id, 'pending'\n    from eligible_pairs\n    on conflict (event_id, subscription_id) do nothing\n    returning id\n  )\n  select count(*)::integer into v_inserted from inserted;\n\n  return v_inserted;\nend;\n$function$\n"
+    },
+    {
+      "signature": "staff_notification_fresh_pick_hold_reminder_is_current(jsonb)",
+      "owner": "postgres",
+      "security_definer": true,
+      "config": [
+        "search_path=public"
+      ],
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "definition": "CREATE OR REPLACE FUNCTION public.staff_notification_fresh_pick_hold_reminder_is_current(p_payload jsonb)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  v_stock_id uuid;\n  v_held_by uuid;\n  v_held_until timestamptz;\n  v_held_at timestamptz;\n  v_stock public.extra_stock;\nbegin\n  if jsonb_typeof(p_payload) is distinct from 'object'\n    or coalesce(p_payload ->> 'extra_stock_id', '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'\n    or coalesce(p_payload ->> 'walk_in_held_by', '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'\n    or nullif(p_payload ->> 'walk_in_held_at', '') is null\n    or nullif(p_payload ->> 'walk_in_held_until', '') is null\n  then\n    return false;\n  end if;\n\n  v_stock_id := (p_payload ->> 'extra_stock_id')::uuid;\n  v_held_by := (p_payload ->> 'walk_in_held_by')::uuid;\n  begin\n    v_held_at := (p_payload ->> 'walk_in_held_at')::timestamptz;\n    v_held_until := (p_payload ->> 'walk_in_held_until')::timestamptz;\n  exception\n    when invalid_datetime_format or datetime_field_overflow then\n      return false;\n  end;\n\n  select e.*\n    into v_stock\n  from public.extra_stock e\n  where e.id = v_stock_id\n  for update;\n\n  if not found then\n    return false;\n  end if;\n\n  return v_stock.lifecycle = 'confirmed'\n    and v_stock.sold_at is null\n    and v_stock.cut_into_slices_at is null\n    and v_stock.walk_in_held_by = v_held_by\n    and v_stock.walk_in_held_at = v_held_at\n    and v_stock.walk_in_held_until = v_held_until\n    and public.extra_walk_in_hold_is_active(\n      v_stock.walk_in_held_until,\n      clock_timestamp()\n    );\nend;\n$function$\n"
+    }
+  ],
+  "refreshedAtUtc": "2026-11-14T12:08:24Z",
+  "preMigrationDataFingerprints": {
+    "staff_notification_events": {
+      "rows": 250,
+      "md5": "6a5d433ef84b8c440b773c35c3ac87bc"
+    },
+    "staff_notification_preferences": {
+      "rows": 55,
+      "md5": "7958125040bc7a8c7dd642b0b4beae5f"
+    },
+    "staff_notification_push_subscriptions": {
+      "rows": 4,
+      "md5": "771dc941f847c7f96bc9f32ac4b86b07"
+    },
+    "staff_notification_push_deliveries": {
+      "rows": 3,
+      "md5": "f32700ca7f4d91d22d1257ca578a67bb"
+    },
+    "orders": {
+      "rows": 107,
+      "md5": "619bf65330a9e80614820e2dcd9050a6"
+    },
+    "extra_stock": {
+      "rows": 79,
+      "md5": "2b1f58d09e9c02fdf3245a56b2569d4c"
+    }
+  },
+  "schedulerPreflight": {
+    "activeJobs": 3,
+    "matchingNotificationPushOrFreshPickJobs": 1,
+    "matchingJobName": "staff-notification-email-dispatch-sweep",
+    "calledFunction": "public.staff_notification_cron_sweep",
+    "functionMentionsPush": false,
+    "functionMentionsEmail": true,
+    "functionPerformsHttp": false,
+    "emailPauseGuardMentionedInFunction": false,
+    "note": "No Push scheduler was found. Existing email sweep is unrelated to this migration and is not invoked or modified."
+  }
+}

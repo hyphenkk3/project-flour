@@ -71,6 +71,7 @@ const suites = [
   ["Collection delivery detail", "test-collection-delivery-detail.ts"],
   ["Collection pickup overdue", "test-collection-pickup-overdue.ts"],
   ["Waiting-list staff notification content", "test-waiting-list-staff-notification.ts"],
+  ["Staff notification legacy email-pause bridge", "test-staff-notification-legacy-pause-bridge-v1.ts"],
   ["New-order notification content", "test-staff-notification-new-order-content.ts", ["--source-only"]],
   ["Fresh Pick receipt complimentary persistence contract", "test-guest-extra-receipt-complimentary.ts"],
   ["Storefront success receipt loading", "test-storefront-success-loading.ts"],
@@ -137,6 +138,11 @@ for (const [label, file, extraArgs = []] of suites) {
     : [testPath, ...extraArgs]);
 }
 
+run("Staff Push dispatch, subscription and service-worker contracts", process.execPath, [
+  "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON",
+  path.join(scriptsDir, "test-staff-push-notifications.ts"),
+]);
+
 // Isolated SQL regression for the actual assignment RPC. It creates a private
 // loopback-free PostgreSQL cluster and removes only its own temporary directory.
 const postgresContainerId = process.env.RELEASE_TEST_POSTGRES_CONTAINER_ID;
@@ -156,6 +162,10 @@ run("Disposable PostgreSQL canonical migration-runner mechanics", "python3", [
   path.join(scriptsDir, "test_capacity_status_runner.py"),
   ], 90_000, postgresHarnessEnv);
 
+run("Disposable PostgreSQL Staff Push migrations and event-scoped queue", "bash", [
+  path.join(scriptsDir, "test-staff-notification-push-postgres.sh"),
+], 90_000, postgresHarnessEnv);
+
 const tsc = path.join(root, "node_modules", ".bin", "tsc");
 run("Application TypeScript", tsc, ["--noEmit"], 180_000);
 run("Release regression test TypeScript", tsc, ["--noEmit", "-p", "tsconfig.release-regressions.json"], 60_000);
@@ -168,6 +178,8 @@ run("Changed regression-test lint", eslint, [
   "scripts/test-operations-board-return.ts",
   "scripts/test-customer-order-notes.ts",
   "scripts/test-staff-notification-new-order-content.ts",
+  "scripts/test-staff-notification-legacy-pause-bridge-v1.ts",
+  "scripts/test-staff-push-notifications.ts",
   "scripts/test-fresh-pick-assignment-readiness-contract.ts",
   "scripts/test-fresh-pick-staff-presentation.ts",
   "scripts/test-release-regressions.mjs",

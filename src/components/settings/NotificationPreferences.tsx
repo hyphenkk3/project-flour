@@ -3,7 +3,16 @@
 import { useState } from "react";
 
 import { saveStaffNotificationPreferenceAction } from "@/foundation/staff/notification-preferences-actions";
+import {
+  registerStaffPushSubscriptionAction,
+  revokeStaffPushSubscriptionAction,
+} from "@/foundation/staff/staff-notification-push-actions";
 import { playStaffNotificationSound } from "@/foundation/staff/staff-notification-sound";
+import {
+  currentStaffDeviceEndpoint,
+  subscribeCurrentStaffDevice,
+  unsubscribeCurrentStaffDevice,
+} from "@/foundation/staff/staff-notification-push-client";
 
 import type {
   StaffNotificationDefinition,
@@ -15,12 +24,14 @@ type NotificationPreferencesProps = {
   definitions: readonly StaffNotificationDefinition[];
   initialPreferences: StaffNotificationPreference[];
   emailNotificationsPaused: boolean;
+  pushApplicationServerKey: string;
 };
 
 export function NotificationPreferences({
   definitions,
   initialPreferences,
   emailNotificationsPaused,
+  pushApplicationServerKey,
 }: NotificationPreferencesProps) {
   const [preferences, setPreferences] =
     useState<StaffNotificationPreference[]>(initialPreferences);
@@ -54,11 +65,42 @@ export function NotificationPreferences({
       return;
     }
 
+    let registeredPushEndpoint: string | null = null;
+    const previouslyPushEnabled = previous.some(
+      (preference) => preference.pushEnabled,
+    );
+    if (patch.pushEnabled === true) {
+      const subscribed = await subscribeCurrentStaffDevice({
+        applicationServerKey: pushApplicationServerKey,
+      });
+      if (!subscribed.subscription) {
+        setPreferences(previous);
+        setError(subscribed.error);
+        setSaving(null);
+        return;
+      }
+
+      const registered = await registerStaffPushSubscriptionAction(
+        subscribed.subscription,
+      );
+      if (registered.error) {
+        setPreferences(previous);
+        setError(registered.error);
+        if (!previouslyPushEnabled) {
+          await unsubscribeCurrentStaffDevice();
+        }
+        setSaving(null);
+        return;
+      }
+      registeredPushEndpoint = subscribed.subscription.endpoint;
+    }
+
     const formData = new FormData();
     formData.set("notification_code", definition.code);
     formData.set("web_enabled", String(next.webEnabled));
     formData.set("web_mode", next.webMode);
     formData.set("sound_enabled", String(next.soundEnabled));
+    formData.set("push_enabled", String(next.pushEnabled));
     if (!emailNotificationsPaused) {
       formData.set("email_enabled", String(next.emailEnabled));
     }
@@ -68,6 +110,23 @@ export function NotificationPreferences({
     if (result.error) {
       setPreferences(previous);
       setError(result.error);
+      if (registeredPushEndpoint && !previouslyPushEnabled) {
+        await revokeStaffPushSubscriptionAction(registeredPushEndpoint);
+        await unsubscribeCurrentStaffDevice();
+      }
+    } else if (
+      patch.pushEnabled === false &&
+      !nextPreferences.some((preference) => preference.pushEnabled)
+    ) {
+      const endpoint = await currentStaffDeviceEndpoint();
+      if (endpoint) {
+        const revoked = await revokeStaffPushSubscriptionAction(endpoint);
+        if (revoked.error) {
+          setError(revoked.error);
+        } else {
+          await unsubscribeCurrentStaffDevice();
+        }
+      }
     }
 
     setSaving(null);
@@ -122,6 +181,7 @@ export function NotificationPreferences({
         const webMode = preference?.webMode ?? "transient";
         const emailEnabled = preference?.emailEnabled ?? true;
         const soundEnabled = preference?.soundEnabled ?? false;
+        const pushEnabled = preference?.pushEnabled ?? false;
         const isSaving = saving === definition.code;
 
         return (
@@ -246,6 +306,42 @@ export function NotificationPreferences({
               </button>
 
               <span className="text-ink text-xs font-medium">Sound</span>
+
+              <span className="text-fog mx-1">|</span>
+
+              {pushApplicationServerKey ? (
+                <>
+                  <button
+                    aria-checked={pushEnabled}
+                    aria-label={`${pushEnabled ? "Disable" : "Enable"} ${definition.label} push notifications`}
+                    className={[
+                      "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition",
+                      pushEnabled
+                        ? "border-signal bg-signal"
+                        : "border-fog bg-white",
+                      isSaving ? "cursor-wait opacity-60" : "cursor-pointer",
+                    ].join(" ")}
+                    disabled={isSaving}
+                    onClick={() =>
+                      void savePreference(definition, {
+                        pushEnabled: !pushEnabled,
+                      })
+                    }
+                    role="switch"
+                    type="button"
+                  >
+                    <span
+                      className={[
+                        "inline-block h-4 w-4 rounded-full bg-white shadow-sm transition",
+                        pushEnabled ? "translate-x-6" : "translate-x-1",
+                      ].join(" ")}
+                    />
+                  </button>
+                  <span className="text-ink text-xs font-medium">Push</span>
+                </>
+              ) : (
+                <span className="text-skyline text-xs">Push setup needed</span>
+              )}
 
               {!emailNotificationsPaused ? (
                 <>

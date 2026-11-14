@@ -43,6 +43,15 @@ export async function saveStaffNotificationPreferenceAction(
     return { error: "Choose a valid sound notification preference." };
   }
 
+  const pushEnabledValue = String(formData.get("push_enabled") ?? "");
+  if (
+    pushEnabledValue !== "" &&
+    pushEnabledValue !== "true" &&
+    pushEnabledValue !== "false"
+  ) {
+    return { error: "Choose a valid push notification preference." };
+  }
+
   const webModeValue = String(formData.get("web_mode") ?? "transient");
 
   if (!isWebMode(webModeValue)) {
@@ -64,6 +73,9 @@ export async function saveStaffNotificationPreferenceAction(
           : {}),
         ...(soundEnabledValue
           ? { sound_enabled: soundEnabledValue === "true" }
+          : {}),
+        ...(pushEnabledValue
+          ? { push_enabled: pushEnabledValue === "true" }
           : {}),
       },
       {

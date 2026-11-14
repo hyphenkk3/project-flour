@@ -145,7 +145,11 @@ async function main(): Promise<void> {
         method,
         headers: { "content-type": "application/json" },
         ...(method === "POST"
-          ? { body: JSON.stringify({ eventId: "synthetic-event" }) }
+          ? {
+              body: JSON.stringify({
+                eventId: "11111111-1111-4111-8111-111111111111",
+              }),
+            }
           : {}),
       },
     );
@@ -164,16 +168,45 @@ async function main(): Promise<void> {
           "content-type": "application/json",
         },
         ...(method === "POST"
-          ? { body: JSON.stringify({ eventId: "synthetic-event" }) }
+          ? {
+              body: JSON.stringify({
+                eventId: "11111111-1111-4111-8111-111111111111",
+              }),
+            }
           : {}),
       },
     );
     const response = await handler(request);
     assert.equal(response.status, 503, `${method} must return paused status`);
-    assert.deepEqual(await response.json(), {
-      error: "Staff email dispatch is paused.",
-    });
+    const body = await response.json();
+    assert.equal(body.error, "Staff email dispatch is paused.");
+    if (method === "GET") {
+      assert.deepEqual(body, { error: "Staff email dispatch is paused." });
+    } else {
+      assert.deepEqual(body.push, {
+        queued: 0,
+        attempted: 0,
+        sent: 0,
+        failed: 0,
+        revoked: 0,
+        suppressed: 0,
+        completionUnrecorded: 0,
+        skipped: "not_configured",
+      });
+    }
   }
+
+  const invalidScopedRequest = await POST(
+    new Request("https://local.invalid/api/staff/notifications/dispatch", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer synthetic-local-test-secret",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ eventId: "synthetic-event" }),
+    }),
+  );
+  assert.equal(invalidScopedRequest.status, 400);
 
   assert.equal(claimCalls, 0);
   assert.equal(sendCalls, 0);

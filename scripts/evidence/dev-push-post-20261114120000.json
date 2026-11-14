@@ -1,0 +1,142 @@
+{
+  "capturedAtUtc": "2026-11-14T12:12:00Z",
+  "projectRef": "tzwtpxdcggesgjaqxkqr",
+  "database": "postgres",
+  "role": "postgres",
+  "postgresVersion": "17.6",
+  "tlsVerifyFull": true,
+  "migration": {
+    "version": "20261114120000",
+    "name": "staff_notification_push_dispatch_scope",
+    "rows": 1,
+    "statementCount": 12,
+    "sha256": "4b8ba1f3cef80b355edc047d7bc52789854320e904bff3edb8016eec67a1943c"
+  },
+  "pushFunctions": {
+    "queue_staff_notification_push_deliveries(uuid,integer)": {
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": "public",
+      "acl": [
+        "postgres:EXECUTE",
+        "service_role:EXECUTE"
+      ],
+      "anonymousExecute": false,
+      "requiresEventId": true,
+      "eventScoped": true,
+      "nullIdFallback": false,
+      "freshPickCurrentHoldGuard": true
+    },
+    "claim_staff_notification_push_deliveries(integer,uuid,integer)": {
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": "public",
+      "acl": [
+        "postgres:EXECUTE",
+        "service_role:EXECUTE"
+      ],
+      "requiresEventId": true,
+      "staleSuppressionScopedToEvent": true,
+      "freshPickStaleSuppressionPreserved": true
+    },
+    "complete_staff_notification_push_delivery(uuid,timestamptz,text,text,boolean)": {
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": "public",
+      "acl": [
+        "postgres:EXECUTE",
+        "service_role:EXECUTE"
+      ]
+    },
+    "list_staff_notification_push_batch_event_ids(integer)": {
+      "owner": "postgres",
+      "securityDefiner": true,
+      "searchPath": "public",
+      "acl": [
+        "postgres:EXECUTE",
+        "service_role:EXECUTE"
+      ],
+      "anonymousExecute": false,
+      "authenticatedExecute": false,
+      "serviceRoleExecute": true,
+      "maxEventIds": 50,
+      "freshPickCurrentHoldGuard": true
+    }
+  },
+  "rlsAndAcl": {
+    "staff_notification_events": {
+      "rls": true,
+      "anonTruncate": false,
+      "authenticatedTruncate": false
+    },
+    "staff_notification_preferences": {
+      "rls": true,
+      "anonTruncate": false,
+      "authenticatedTruncate": false
+    },
+    "staff_notification_push_subscriptions": {
+      "rls": true,
+      "anonTruncate": false,
+      "authenticatedTruncate": false
+    },
+    "staff_notification_push_deliveries": {
+      "rls": true,
+      "anonTruncate": false,
+      "authenticatedTruncate": false
+    }
+  },
+  "prePostFingerprintsUnchanged": {
+    "staff_notification_events": {
+      "rows": 250,
+      "md5": "6a5d433ef84b8c440b773c35c3ac87bc"
+    },
+    "staff_notification_preferences": {
+      "rows": 55,
+      "md5": "7958125040bc7a8c7dd642b0b4beae5f"
+    },
+    "staff_notification_push_subscriptions": {
+      "rows": 4,
+      "md5": "771dc941f847c7f96bc9f32ac4b86b07"
+    },
+    "staff_notification_push_deliveries": {
+      "rows": 3,
+      "md5": "f32700ca7f4d91d22d1257ca578a67bb"
+    },
+    "orders": {
+      "rows": 107,
+      "md5": "619bf65330a9e80614820e2dcd9050a6"
+    },
+    "extra_stock": {
+      "rows": 79,
+      "md5": "2b1f58d09e9c02fdf3245a56b2569d4c"
+    }
+  },
+  "operations": {
+    "pushDispatchInvoked": false,
+    "notificationEventGenerated": false,
+    "emailDispatchTriggeredByMigration": false,
+    "preferenceOrSubscriptionChanged": false,
+    "scheduleChangedOrActivated": false,
+    "productionAccessed": false
+  },
+  "scheduler": {
+    "activeJobsBefore": 3,
+    "activeJobsAfter": 3,
+    "pushOrFreshPickJobFound": false,
+    "preexistingEmailSweep": "staff-notification-email-dispatch-sweep",
+    "emailSweepChanged": false
+  },
+  "preMigrationSnapshot": "scripts/evidence/dev-push-pre-20261114120000.json",
+  "migrationRunner": {
+    "kind": "single-file psql transaction",
+    "psqlFlags": [
+      "-X",
+      "-w",
+      "-1",
+      "-v ON_ERROR_STOP=1"
+    ],
+    "wrapperSha256": "e15a5d84b4a62605919f2d17201820517b58a1a49d3691dd834ee9be08a0b8f6",
+    "wrapperRemoved": true,
+    "passwordFileRemoved": true
+  }
+}
