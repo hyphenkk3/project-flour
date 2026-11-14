@@ -27,10 +27,7 @@ function isPublicPath(pathname: string) {
 
 function isMachineDispatchPath(pathname: string) {
   // Skip staff-session middleware only. Bearer auth is enforced by the route.
-  return (
-    pathname === "/api/staff/notifications/dispatch" ||
-    pathname === "/api/staff/notifications/fresh-pick-reminder-dispatch"
-  );
+  return pathname === "/api/staff/notifications/dispatch";
 }
 
 function staffLoginRedirect(request: NextRequest): NextResponse {

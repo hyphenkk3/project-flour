@@ -3,9 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import {
   STAFF_NOTIFICATION_DEFINITIONS,
   STAFF_NOTIFICATION_DEFAULT_ENABLED,
-  STAFF_NOTIFICATION_DEFAULT_PUSH_ENABLED,
-  STAFF_NOTIFICATION_DEFAULT_SOUND_ENABLED,
   STAFF_NOTIFICATION_DEFAULT_WEB_MODE,
+  STAFF_NOTIFICATION_DEFAULT_SOUND_ENABLED,
   type StaffNotificationCode,
   type StaffNotificationPreference,
   type StaffNotificationWebMode,
@@ -17,7 +16,6 @@ type NotificationPreferenceRow = {
   web_mode: string;
   email_enabled: boolean;
   sound_enabled: boolean;
-  push_enabled: boolean;
 };
 
 function isNotificationCode(value: string): value is StaffNotificationCode {
@@ -38,7 +36,7 @@ export async function loadStaffNotificationPreferences(
   const { data, error } = await supabase
     .from("staff_notification_preferences")
     .select(
-      "notification_code, web_enabled, web_mode, email_enabled, sound_enabled, push_enabled",
+      "notification_code, web_enabled, web_mode, email_enabled, sound_enabled",
     )
     .eq("staff_id", staffId);
 
@@ -53,7 +51,6 @@ export async function loadStaffNotificationPreferences(
       webMode: StaffNotificationWebMode;
       emailEnabled: boolean;
       soundEnabled: boolean;
-      pushEnabled: boolean;
     }
   >();
 
@@ -67,7 +64,6 @@ export async function loadStaffNotificationPreferences(
         : STAFF_NOTIFICATION_DEFAULT_WEB_MODE,
       emailEnabled: Boolean(row.email_enabled),
       soundEnabled: Boolean(row.sound_enabled),
-      pushEnabled: Boolean(row.push_enabled),
     });
   }
 
@@ -84,8 +80,6 @@ export async function loadStaffNotificationPreferences(
       soundEnabled:
         savedPreference?.soundEnabled ??
         STAFF_NOTIFICATION_DEFAULT_SOUND_ENABLED,
-      pushEnabled:
-        savedPreference?.pushEnabled ?? STAFF_NOTIFICATION_DEFAULT_PUSH_ENABLED,
     };
   });
 }

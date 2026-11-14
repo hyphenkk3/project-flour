@@ -1,5 +1,6 @@
 import {
   STAFF_NOTIFICATION_DEFAULT_ENABLED,
+  STAFF_NOTIFICATION_DEFAULT_SOUND_ENABLED,
   STAFF_NOTIFICATION_DEFAULT_WEB_MODE,
   type StaffNotificationCode,
   type StaffNotificationPreference,
@@ -259,7 +260,6 @@ export function resolveStaffNotificationPreference(
     webMode?: StaffNotificationWebMode;
     emailEnabled?: boolean;
     soundEnabled?: boolean;
-    pushEnabled?: boolean;
   } | null,
 ): StaffNotificationPreference {
   return {
@@ -267,8 +267,8 @@ export function resolveStaffNotificationPreference(
     webEnabled: saved?.webEnabled ?? STAFF_NOTIFICATION_DEFAULT_ENABLED,
     webMode: saved?.webMode ?? STAFF_NOTIFICATION_DEFAULT_WEB_MODE,
     emailEnabled: saved?.emailEnabled ?? STAFF_NOTIFICATION_DEFAULT_ENABLED,
-    soundEnabled: saved?.soundEnabled ?? false,
-    pushEnabled: saved?.pushEnabled ?? false,
+    soundEnabled:
+      saved?.soundEnabled ?? STAFF_NOTIFICATION_DEFAULT_SOUND_ENABLED,
   };
 }
 

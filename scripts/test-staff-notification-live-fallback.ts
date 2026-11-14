@@ -91,47 +91,23 @@ const malformedBranch = listenerSource.slice(
     "const event = normalizeLiveNotificationEvent(payload.new)",
   ),
   listenerSource.indexOf(
-    "void presentEvent(event, false,",
+    ".subscribe((status, error)",
     listenerSource.indexOf(
       "const event = normalizeLiveNotificationEvent(payload.new)",
     ),
   ),
 );
-assert.match(malformedBranch, /if \(!event\)/);
-assert.match(malformedBranch, /getLiveNotificationShape\(payload\.new\)/);
-assert.match(malformedBranch, /tryStart\(Date\.now\(\)\)/);
-assert.match(malformedBranch, /automaticFallbackDiagnosticRef\.current/);
-assert.match(malformedBranch, /runRecoveryRef\.current\("live_fallback"\)/);
-const suppressedDiagnosticStart = malformedBranch.indexOf("console.warn(");
-const suppressedDiagnosticEnd = malformedBranch.indexOf(
-  "automaticRecoverySucceeded: false,",
-  suppressedDiagnosticStart,
-);
-const suppressedDiagnostic = malformedBranch.slice(
-  suppressedDiagnosticStart,
-  suppressedDiagnosticEnd,
-);
-assert.doesNotMatch(
-  suppressedDiagnostic,
-  /payload\.new|staffId|order_id|title|description|href|token|cookie/i,
-);
-assert.match(listenerSource, /automaticRecoveryAttempted: true/);
-assert.match(listenerSource, /automaticRecoverySucceeded,/);
-const completedDiagnostic = listenerSource.slice(
-  listenerSource.indexOf("if (automaticFallbackDiagnostic)"),
-  listenerSource.indexOf("if (recoveredSoundPriorityInBatchRef.current > 0)"),
-);
-assert.doesNotMatch(
-  completedDiagnostic,
-  /staffId|order_id|title|description|href|token|cookie/i,
-);
+assert.match(malformedBranch, /if \(event\)/);
+assert.match(malformedBranch, /30_000/);
+assert.match(malformedBranch, /malformedRecoveryAtRef\.current/);
+assert.match(malformedBranch, /runRecoveryRef\.current\?\.\("reconnect"\)/);
 assert.match(
-  listenerSource,
-  /\[staff-notifications\] Realtime subscription status/,
+  malformedBranch,
+  /markStaffNotificationRecoveryPending\(staffId\)/,
 );
-assert.match(listenerSource, /Retry recovery/);
+assert.doesNotMatch(malformedBranch, /console\.(info|warn).*payload/i);
 assert.match(listenerSource, /claimStaffNotificationForStaff/);
-assert.match(listenerSource, /if \(recoveryRequestedRef\.current\)/);
+assert.match(listenerSource, /recoveryAgainRef\.current/);
 assert.doesNotMatch(
   listenerSource,
   /SUPABASE_SERVICE_ROLE_KEY|service_role|push-dispatch|email-dispatch/,

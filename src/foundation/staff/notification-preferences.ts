@@ -19,7 +19,6 @@ export type StaffNotificationPreference = {
   webMode: StaffNotificationWebMode;
   emailEnabled: boolean;
   soundEnabled: boolean;
-  pushEnabled: boolean;
 };
 
 export type StaffNotificationDefinition = {
@@ -83,8 +82,6 @@ export const STAFF_NOTIFICATION_DEFAULT_WEB_MODE: StaffNotificationWebMode =
   "transient";
 
 export const STAFF_NOTIFICATION_DEFAULT_SOUND_ENABLED = false;
-
-export const STAFF_NOTIFICATION_DEFAULT_PUSH_ENABLED = false;
 
 export function getNotificationDefinitionsForRole(
   _role: RoleCode,

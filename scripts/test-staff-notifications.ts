@@ -10,9 +10,7 @@ import { resolve } from "node:path";
 import {
   STAFF_NOTIFICATION_DEFINITIONS,
   STAFF_NOTIFICATION_DEFAULT_ENABLED,
-  STAFF_NOTIFICATION_DEFAULT_SOUND_ENABLED,
 } from "../src/foundation/staff/notification-preferences";
-import { shouldPlayStaffNotificationSound } from "../src/foundation/staff/staff-notification-sound";
 import {
   STAFF_NOTIFICATION_AUTHORITATIVE_SOURCES,
   classifyApprovalInsert,
@@ -483,19 +481,6 @@ const defaultOn = selectStaffEmailRecipients({
   preferencesByStaffId: new Map(),
 });
 assert.equal(STAFF_NOTIFICATION_DEFAULT_ENABLED, true);
-assert.equal(STAFF_NOTIFICATION_DEFAULT_SOUND_ENABLED, false);
-assert.equal(
-  shouldPlayStaffNotificationSound({ code: "new_order", soundEnabled: true }),
-  true,
-);
-assert.equal(
-  shouldPlayStaffNotificationSound({ code: "new_order", soundEnabled: false }),
-  false,
-);
-assert.equal(
-  shouldPlayStaffNotificationSound({ code: "order_paid", soundEnabled: true }),
-  true,
-);
 assert.equal(defaultOn.length, 1);
 
 const now = new Date("2026-09-03T14:00:00.000Z");
@@ -882,7 +867,7 @@ async function testEmailDelivery() {
   );
   assert.match(listenerSrc, /staff_notification_events/);
   assert.doesNotMatch(listenerSrc, /\/api\/staff\/notifications\/email/);
-  assert.match(listenerSrc, /loadStaffNotificationRecoveryCursor/);
+  assert.doesNotMatch(listenerSrc, /localStorage/);
   assert.doesNotMatch(listenerSrc, /order_timeline_events/);
   assert.doesNotMatch(listenerSrc, /operations_approval_requests/);
 
@@ -930,20 +915,19 @@ async function testEmailDelivery() {
   assert.match(middlewareSrc, /isMachineDispatchPath/);
   assert.match(
     middlewareSrc,
-    /pathname === "\/api\/staff\/notifications\/dispatch"\s*\|\|\s*pathname === "\/api\/staff\/notifications\/fresh-pick-reminder-dispatch"/,
+    /pathname === "\/api\/staff\/notifications\/dispatch"/,
   );
-  const machineDispatchPredicate =
-    middlewareSrc.split("function isMachineDispatchPath")[1]?.split("\n}")[0] ??
-    "";
-  assert.doesNotMatch(machineDispatchPredicate, /startsWith|includes|match\(/);
   assert.doesNotMatch(
     middlewareSrc.split("function isPublicPath")[1]?.split("function ")[0] ??
       "",
-    /\/api\/staff\/notifications\/(?:dispatch|fresh-pick-reminder-dispatch)/,
+    /\/api\/staff\/notifications\/dispatch/,
   );
 
   const engineSrc = read("src/foundation/staff/staff-notification-engine.ts");
-  assert.match(engineSrc, /localStorage/);
+  assert.match(engineSrc, /CLAIM_TTL_MS = 24 \* 60 \* 60 \* 1000/);
+  assert.match(engineSrc, /const claimId = `\$\{staffId\}:\$\{eventId\}`/);
+  assert.match(engineSrc, /navigator\.locks/);
+  assert.match(engineSrc, /indexedDB\.open/);
   assert.match(engineSrc, /BroadcastChannel/);
 
   const operationsSrc = read("src/workspaces/owner/OperationsLiveBoard.tsx");
@@ -974,39 +958,6 @@ async function testEmailDelivery() {
   assert.match(settingsSrc, /web_enabled/);
   assert.match(settingsSrc, /email_enabled/);
   assert.match(settingsSrc, /notification_code/);
-  assert.match(settingsSrc, /sound_enabled/);
-
-  const soundListenerSrc = read(
-    "src/components/shell/StaffNotificationListener.tsx",
-  );
-  assert.match(soundListenerSrc, /shouldPlayStaffNotificationSound/);
-  assert.match(
-    soundListenerSrc,
-    /claimStaffNotificationForStaff\(\s*staffId,\s*event\.id,/,
-  );
-  assert.match(soundListenerSrc, /recoverStaffNotificationEvents\(/);
-  assert.match(soundListenerSrc, /playStaffNotificationSound/);
-
-  const soundPreferenceMigration = read(
-    "supabase/migrations/20261109110501_staff_notification_sound_preference.sql",
-  );
-  assert.match(
-    soundPreferenceMigration,
-    /sound_enabled boolean not null default false/,
-  );
-  const soundPreferenceSql = soundPreferenceMigration.replace(/^--.*$/gm, "");
-  assert.match(
-    soundPreferenceSql,
-    /alter table public\.staff_notification_preferences/i,
-  );
-  assert.doesNotMatch(
-    soundPreferenceSql,
-    /\b(insert|update|delete|truncate)\b/i,
-  );
-  assert.doesNotMatch(
-    soundPreferenceSql,
-    /public\.(orders|extra_stock|payments)\b/i,
-  );
 
   const settingsPageSrc = read("src/app/(app)/settings/page.tsx");
   assert.match(settingsPageSrc, /NotificationPreferences/);
@@ -1034,14 +985,8 @@ async function testEmailDelivery() {
   assert.doesNotMatch(read(".env.example"), /NEXT_PUBLIC_RESEND/);
   const vercelJson = read("vercel.json");
   assert.doesNotMatch(vercelJson, /"crons"/);
+  assert.doesNotMatch(vercelJson, /\* \* \* \* \*/);
   assert.doesNotMatch(vercelJson, /\/api\/staff\/notifications\/dispatch/);
-  const schedules = JSON.parse(vercelJson).schedules;
-  assert.deepEqual(Object.keys(schedules), ["staff-fresh-pick-reminder-push"]);
-  assert.deepEqual(schedules["staff-fresh-pick-reminder-push"], {
-    schedule: "* * * * *",
-    path: "/api/staff/notifications/fresh-pick-reminder-dispatch",
-    requestMethod: "GET",
-  });
 
   const cronSql = read(
     "supabase/migrations/20260904120000_staff_notification_pg_cron_sweep.sql",

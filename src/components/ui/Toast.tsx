@@ -5,15 +5,11 @@ import {
   useCallback,
   useContext,
   useMemo,
-  useEffect,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
 import Link from "next/link";
 import type { ToastTone } from "@/lib/design-tokens";
-import { appendStaffNotificationRecoveryTrace } from "@/foundation/staff/staff-notification-recovery-diagnostics";
-import { retainLatestToastItems } from "@/foundation/ui/toast-retention";
 
 export type ToastInput = {
   title: string;
@@ -23,8 +19,6 @@ export type ToastInput = {
   durationMs?: number | null;
   actionHref?: string;
   actionLabel?: string;
-  /** Internal opaque id used only by DEV recovery diagnostics. */
-  notificationEventId?: string;
 };
 
 type ToastItem = ToastInput & {
@@ -71,115 +65,43 @@ function toneAccent(tone: ToastTone): string {
   }
 }
 
-export function ToastProvider({
-  children,
-  diagnosticsEnabled = false,
-}: {
-  children: ReactNode;
-  diagnosticsEnabled?: boolean;
-}) {
+export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
-  const itemsRef = useRef(items);
-  const mountedDiagnosticToastsRef = useRef(new Set<string>());
-  const diagnosticsEnabledRef = useRef(diagnosticsEnabled);
 
-  useEffect(() => {
-    diagnosticsEnabledRef.current = diagnosticsEnabled;
-  }, [diagnosticsEnabled]);
-
-  useEffect(() => {
-    itemsRef.current = items;
-    if (!diagnosticsEnabled) return;
-    for (const item of items) {
-      if (
-        item.notificationEventId &&
-        !mountedDiagnosticToastsRef.current.has(item.id)
-      ) {
-        mountedDiagnosticToastsRef.current.add(item.id);
-        appendStaffNotificationRecoveryTrace({
-          kind: "toast_mounted",
-          eventId: item.notificationEventId,
-          outcome: "mounted",
-        });
-      }
-    }
-  }, [diagnosticsEnabled, items]);
-
-  const dismiss = useCallback(
-    (
-      id: string,
-      reason: "transient_timeout" | "user_dismissed" = "user_dismissed",
-    ) => {
-      const existing = itemsRef.current.find((item) => item.id === id);
-      const next = itemsRef.current.filter((item) => item.id !== id);
-      itemsRef.current = next;
-      setItems(next);
-      if (diagnosticsEnabledRef.current && existing?.notificationEventId) {
-        appendStaffNotificationRecoveryTrace({
-          kind:
-            reason === "transient_timeout"
-              ? "toast_expired"
-              : "toast_dismissed",
-          eventId: existing.notificationEventId,
-          outcome: reason === "transient_timeout" ? "expired" : "dismissed",
-          reason,
-        });
-      }
-    },
-    [],
-  );
+  const dismiss = useCallback((id: string) => {
+    setItems((current) => current.filter((item) => item.id !== id));
+  }, []);
 
   const toast = useCallback(
     (input: ToastInput) => {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const tone = input.tone ?? "info";
       const durationMs =
-        input.durationMs === undefined ? DEFAULT_DURATION_MS : input.durationMs;
+        input.durationMs === undefined
+          ? DEFAULT_DURATION_MS
+          : input.durationMs;
 
-      const nextItem = {
-        id,
-        title: input.title,
-        description: input.description,
-        tone,
-        durationMs,
-        actionHref: input.actionHref,
-        actionLabel: input.actionLabel,
-        notificationEventId: input.notificationEventId,
-      };
-      const { retained: next, evicted } = retainLatestToastItems(
-        itemsRef.current,
-        nextItem,
-        MAX_VISIBLE_TOASTS,
-      );
-      itemsRef.current = next;
-      setItems(next);
-      if (diagnosticsEnabledRef.current && input.notificationEventId) {
-        appendStaffNotificationRecoveryTrace({
-          kind: "toast_queued",
-          eventId: input.notificationEventId,
-          outcome: "success",
-        });
-        appendStaffNotificationRecoveryTrace({
-          kind: "toast_retained",
-          eventId: input.notificationEventId,
-          outcome: "retained",
-        });
-      }
-      if (diagnosticsEnabledRef.current) {
-        for (const item of evicted) {
-          if (!item.notificationEventId) continue;
-          appendStaffNotificationRecoveryTrace({
-            kind: "toast_evicted",
-            eventId: item.notificationEventId,
-            outcome: "evicted",
-            reason: "toast_limit",
-          });
-        }
-      }
+      setItems((current) => {
+        const next = [
+          ...current,
+          {
+            id,
+            title: input.title,
+            description: input.description,
+            tone,
+            durationMs,
+            actionHref: input.actionHref,
+            actionLabel: input.actionLabel,
+          },
+        ];
+        return next.length > MAX_VISIBLE_TOASTS
+          ? next.slice(next.length - MAX_VISIBLE_TOASTS)
+          : next;
+      });
 
       if (durationMs != null) {
         window.setTimeout(() => {
-          dismiss(id, "transient_timeout");
+          dismiss(id);
         }, durationMs);
       }
     },

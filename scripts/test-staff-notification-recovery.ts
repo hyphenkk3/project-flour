@@ -498,15 +498,16 @@ assert.match(listenerSource, /\.order\("id", \{ ascending: true \}\)/);
 assert.match(listenerSource, /\.limit\(limit\)/);
 assert.match(listenerSource, /status === "SUBSCRIBED"/);
 assert.match(listenerSource, /CHANNEL_ERROR/);
-assert.match(listenerSource, /Retry recovery/);
+assert.match(listenerSource, /Retry/);
 assert.match(listenerSource, /hasStaffNotificationRecoveryPending\(staffId\)/);
-assert.match(listenerSource, /recoveryPendingRef\.current/);
-assert.match(listenerSource, /listenerState !== "recovering"/);
-assert.match(listenerSource, /!recoveryRunning/);
-assert.match(listenerSource, /updateRecoveryPending\(true\)/);
-assert.match(listenerSource, /updateRecoveryPending\(false\)/);
+assert.match(listenerSource, /recoveryRunning/);
+assert.match(listenerSource, /markStaffNotificationRecoveryPending\(staffId\)/);
+assert.match(
+  listenerSource,
+  /clearStaffNotificationRecoveryPending\(staffId\)/,
+);
 assert.match(listenerSource, /preference\.webMode/);
-assert.match(listenerSource, /recoveredStaffNotificationSoundPriority/);
+assert.match(listenerSource, /recoveredSoundRef/);
 assert.doesNotMatch(
   listenerSource,
   /service_role|SUPABASE_SERVICE_ROLE_KEY|push-dispatch/,
@@ -557,7 +558,7 @@ const listener = await readFileSync(
   "utf8",
 );
 assert.match(listener, /claimStaffNotificationForStaff/);
-assert.match(listener, /listenerStartedAtRef/);
+assert.match(listener, /startedAtRef/);
 console.log(
   "PASS staff notification recovery: bounded cursor, pagination, overlap, retry visibility, preferences, RLS source policy, transient/persistent semantics",
 );

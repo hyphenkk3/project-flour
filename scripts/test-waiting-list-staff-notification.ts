@@ -180,15 +180,11 @@ const staffAction = readSrc("src/workspaces/waiting-list/actions.ts");
 assert.match(staffAction, /create_staff_waiting_list_request/);
 assert.doesNotMatch(staffAction, /waiting_list_new_request/);
 
-const listenerSrc = readSrc(
-  "src/components/shell/StaffNotificationListener.tsx",
-);
-assert.match(listenerSrc, /normalizeLiveNotificationEvent/);
-const listenerNormalizationSrc = readSrc(
+const liveNormalizerSrc = readSrc(
   "src/foundation/staff/staff-notification-live-fallback.ts",
 );
-assert.match(listenerNormalizationSrc, /waiting_list_new_request/);
-assert.match(listenerNormalizationSrc, /"View"/);
+assert.match(liveNormalizerSrc, /code === "waiting_list_new_request"/);
+assert.match(liveNormalizerSrc, /\?\s*"View"/);
 
 const engineSql = readSrc(
   "supabase/migrations/20260903120000_waiting_list_engine.sql",
