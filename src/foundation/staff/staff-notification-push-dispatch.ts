@@ -127,13 +127,19 @@ async function validateFreshPickReminderBeforeSend(
   return current ? "send" : "suppress";
 }
 
+async function rejectInvalidSubscription(row: PushClaimRow) {
+  await completeDelivery({
+    deliveryId: row.delivery_id,
+    claimedUntil: row.claimed_until,
+    status: "failed",
+    errorCode: "invalid_subscription",
+    revokeSubscription: true,
+  });
+}
+
 export async function deliverPendingStaffPushNotifications(input: {
   eventId: string;
   limit?: number;
-  /** Throw a sanitized error instead of returning an ambiguous empty result. */
-  failClosed?: boolean;
-  /** Do not revoke any subscription as a side effect of an acceptance attempt. */
-  preserveSubscriptions?: boolean;
 }): Promise<{
   queued: number;
   attempted: number;
@@ -154,7 +160,6 @@ export async function deliverPendingStaffPushNotifications(input: {
   );
   const configuration = environmentConfiguration();
   if (!configuration) {
-    if (input.failClosed) throw new Error("push_not_configured");
     return {
       queued: 0,
       attempted: 0,
@@ -180,7 +185,6 @@ export async function deliverPendingStaffPushNotifications(input: {
       console.error("[staff-push] Queue preparation failed:", {
         code: queueError.code ?? "unknown",
       });
-      if (input.failClosed) throw new Error("push_queue_unavailable");
       return {
         queued: 0,
         attempted: 0,
@@ -205,7 +209,6 @@ export async function deliverPendingStaffPushNotifications(input: {
       console.error("[staff-push] Claim failed:", {
         code: error.code ?? "unknown",
       });
-      if (input.failClosed) throw new Error("push_claim_unavailable");
       return {
         queued: Number(queued ?? 0),
         attempted: 0,
@@ -229,17 +232,8 @@ export async function deliverPendingStaffPushNotifications(input: {
         keys: { p256dh: row.p256dh, auth: row.auth_secret },
       });
       if (!code || !subscription) {
-        const completed = await completeDelivery({
-          deliveryId: row.delivery_id,
-          claimedUntil: row.claimed_until,
-          status: "failed",
-          errorCode: "invalid_subscription",
-          revokeSubscription: !input.preserveSubscriptions,
-        });
-        if (!completed && input.failClosed) {
-          throw new Error("push_invalid_subscription_completion_unavailable");
-        }
-        if (!input.preserveSubscriptions) revoked += 1;
+        await rejectInvalidSubscription(row);
+        revoked += 1;
         continue;
       }
       claimed.push({
@@ -259,11 +253,7 @@ export async function deliverPendingStaffPushNotifications(input: {
       complete: completeDelivery,
       beforeSend: (delivery) =>
         validateFreshPickReminderBeforeSend(admin, delivery),
-      revokeInvalidSubscriptions: !input.preserveSubscriptions,
     });
-    if (input.failClosed && result.completionUnrecorded > 0) {
-      throw new Error("push_completion_unavailable");
-    }
     return {
       queued: Number(queued ?? 0),
       attempted: claimed.length,
@@ -278,7 +268,6 @@ export async function deliverPendingStaffPushNotifications(input: {
     console.error("[staff-push] Dispatch failed:", {
       errorType: error instanceof Error ? error.name : "unknown",
     });
-    if (input.failClosed) throw new Error("push_dispatch_unavailable");
     return {
       queued: 0,
       attempted: 0,
