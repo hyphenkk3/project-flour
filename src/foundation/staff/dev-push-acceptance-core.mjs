@@ -15,10 +15,11 @@ export const DEV_PUSH_ACCEPTANCE_EVENT_KEY =
   "staff-push-acceptance:tranche2:iphone-one-shot-v1";
 export const DEV_PUSH_ACCEPTANCE_CORRELATION =
   "staff-push-acceptance:tranche2:iphone-one-shot-v1";
+export const DEV_PUSH_ACCEPTANCE_MAX_OWNER_SUBSCRIPTIONS = 10;
 
 const CONFIRMATION_KEYS = Object.freeze([
   "devWebAudienceAccepted",
-  "threeOwnerSubscriptionsAccountedFor",
+  "ownerSubscriptionsAccountedFor",
   "iphonePermissionAndForceCloseReady",
   "freshPickScheduleVerifiedDisabled",
   "freshPickPushVerifiedOff",
@@ -30,6 +31,44 @@ const EVENT_UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DEPLOYMENT_ID_PATTERN = /^dpl_[A-Za-z0-9]+$/;
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/i;
+
+/**
+ * Validate the bounded subscription audience without exposing endpoint data.
+ * @param {unknown} subscriptions
+ * @param {string} ownerStaffId
+ * @param {number} [now]
+ * @returns {{ok: false, code: string} | {ok: true, count: number}}
+ */
+export function inspectOwnerPushSubscriptionAudience(
+  subscriptions,
+  ownerStaffId,
+  now = Date.now(),
+) {
+  if (!Array.isArray(subscriptions))
+    return { ok: false, code: "push_subscriptions_unavailable" };
+  if (
+    subscriptions.length < 1 ||
+    subscriptions.length > DEV_PUSH_ACCEPTANCE_MAX_OWNER_SUBSCRIPTIONS
+  ) {
+    return { ok: false, code: "push_subscription_audience_out_of_bounds" };
+  }
+  const current = subscriptions.every((subscription) => {
+    if (
+      !subscription ||
+      typeof subscription !== "object" ||
+      subscription.staff_id !== ownerStaffId ||
+      subscription.revoked_at !== null
+    ) {
+      return false;
+    }
+    if (subscription.expiration_time === null) return true;
+    const expiry = Date.parse(subscription.expiration_time);
+    return Number.isFinite(expiry) && expiry > now + 5 * 60 * 1000;
+  });
+  return current
+    ? { ok: true, count: subscriptions.length }
+    : { ok: false, code: "push_subscription_audience_changed" };
+}
 
 /** @param {unknown} value */
 function isNonNegativeSafeInteger(value) {
@@ -108,14 +147,20 @@ export function authorizeMasterOwner(actor) {
 
 /**
  * @param {unknown} body
- * @returns {{ok: false, code: string} | {ok: true, action: "arm" | "execute", deploymentId: string, commitSha: string, confirmations: Record<string, true>}}
+ * @returns {{ok: false, code: string} | {ok: true, action: "arm" | "execute", deploymentId: string, commitSha: string, ownerSubscriptionCount: number, confirmations: Record<string, true>}}
  */
 export function validateActionBody(body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return { ok: false, code: "invalid_request" };
   }
   const value = /** @type {Record<string, unknown>} */ (body);
-  const allowed = ["action", "deploymentId", "commitSha", "confirmations"];
+  const allowed = [
+    "action",
+    "deploymentId",
+    "commitSha",
+    "ownerSubscriptionCount",
+    "confirmations",
+  ];
   if (Object.keys(value).sort().join("|") !== allowed.sort().join("|")) {
     return { ok: false, code: "invalid_request" };
   }
@@ -127,6 +172,14 @@ export function validateActionBody(body) {
     !DEPLOYMENT_ID_PATTERN.test(value.deploymentId) ||
     typeof value.commitSha !== "string" ||
     !COMMIT_SHA_PATTERN.test(value.commitSha)
+  ) {
+    return { ok: false, code: "invalid_request" };
+  }
+  if (
+    !Number.isInteger(value.ownerSubscriptionCount) ||
+    Number(value.ownerSubscriptionCount) < 1 ||
+    Number(value.ownerSubscriptionCount) >
+      DEV_PUSH_ACCEPTANCE_MAX_OWNER_SUBSCRIPTIONS
   ) {
     return { ok: false, code: "invalid_request" };
   }
@@ -152,6 +205,7 @@ export function validateActionBody(body) {
     action: value.action,
     deploymentId: value.deploymentId,
     commitSha: value.commitSha.toLowerCase(),
+    ownerSubscriptionCount: Number(value.ownerSubscriptionCount),
     confirmations: /** @type {Record<string, true>} */ (confirmations),
   };
 }
@@ -342,8 +396,8 @@ function safeLog(logger, record) {
   }
 }
 
-/** @param {unknown} snapshot */
-export function validatePreflightSnapshot(snapshot) {
+/** @param {unknown} snapshot @param {number} expectedSubscriptionCount */
+export function validatePreflightSnapshot(snapshot, expectedSubscriptionCount) {
   if (!snapshot || typeof snapshot !== "object")
     return { ok: false, code: "preflight_unavailable" };
   const value = /** @type {Record<string, unknown>} */ (snapshot);
@@ -361,6 +415,15 @@ export function validatePreflightSnapshot(snapshot) {
   ];
   if (requiredTrue.some((key) => value[key] !== true)) {
     return { ok: false, code: "preflight_safety_gate_failed" };
+  }
+  if (
+    !Number.isInteger(value.ownerSubscriptionCount) ||
+    value.ownerSubscriptionCount !== expectedSubscriptionCount ||
+    Number(value.ownerSubscriptionCount) < 1 ||
+    Number(value.ownerSubscriptionCount) >
+      DEV_PUSH_ACCEPTANCE_MAX_OWNER_SUBSCRIPTIONS
+  ) {
+    return { ok: false, code: "push_subscription_audience_changed" };
   }
   return { ok: true };
 }

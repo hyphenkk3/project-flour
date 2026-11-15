@@ -4148,3 +4148,62 @@ The Owner explicitly confirmed that all seven DEV staff accounts are Owner-contr
 The corrected source has passed its local security, type, lint, formatting and production-build gates. It is prepared for one normal fast-forward source-equivalent integration commit onto the existing DEV-configured branch, only after rechecking remote HEAD. After deployment, verify READY status, exact source commit/tree, Preview target, DEV binding, SSO, unchanged domains and server-side runtime identity. The old branch alias should remain the exact approved hostname; verify rather than assume. No live arm, event, Push, retry, schedule, preference, subscription, migration, Production operation or domain assignment is authorized by this correction request. The new deployment requires a fresh explicit Owner GO before any one-event execution.
 
 The temporary acceptance page/action must be removed from source after a separately authorized live test or cancellation decision; requalify and deploy the clean Tranche 2 source, then verify the route and arming capability are absent. Do not use rollback to remove valid Tranche 2 functionality. Preserve the original action deployment and the corrected READY Preview as recovery evidence.
+
+## 2026-11-15 — Corrected checklist DEV Preview deployed
+
+### Published source and deployment
+
+- Qualified local correction commit: `418a9e7b78665e13bbc515e0077b8bb0f5c9bafc`; tree `95e9a800985de486d3935cbed0c4cd5631c72ac5`.
+- Source-equivalent integration commit: `af2d13c7fa31642d90bb6dcc265905b9f90a4fc0`; direct parent `40ee299c1b4d4da352f119df9cd5ef9d9e360858`; complete tree matches the qualified candidate (`95e9a800985de486d3935cbed0c4cd5631c72ac5`). Relative to the parent, the only changed paths are the canonical Master Status plus the four checklist/core/test files listed above.
+- Final remote-head check confirmed the DEV branch was still exactly at parent `40ee299...`. The integration commit was pushed normally, without force, to `codex/staff-notifications-dev-20261109`.
+- The push's automatic deployment `dpl_DcKrX39ACtuMZfzeMLYpmsBCpLK1` was canceled because the existing Ignore Build Step returned exit code 0. Its build log confirms the exact target branch and commit. No project-wide setting was changed.
+- From that canceled deployment, the Vercel Redeploy form was set to Preview, with “Use existing Build Cache” unchecked and “Use project's Ignore Build Step” unchecked for that deployment only. Vercel then requested fresh identity verification; the Owner completed it directly in Vercel. The single resulting build reached READY:
+  - Deployment: `dpl_AfFECexdew3mABRjBcJbaRe8Ygb4`.
+  - Generated URL: `https://project-flour-b07feibg0-hyphen-org.vercel.app`.
+  - Source commit: `af2d13c7fa31642d90bb6dcc265905b9f90a4fc0`.
+  - Environment: Preview (`target: null`), branch `codex/staff-notifications-dev-20261109`.
+  - Stable branch alias: `https://project-flour-git-codex-staff-notifications-d-b89c48-hyphen-org.vercel.app`.
+- Build logs show cache skipped, Ignore Build Step explicitly skipped for this deployment, optimized build compilation PASS, TypeScript PASS, static page generation PASS, and READY. Vercel reported four non-blocking build warnings (npm/install notices and the existing Next middleware deprecation); no source or font change was made to address them.
+
+### Runtime and environment verification
+
+- The authenticated Owner action page was opened on the stable branch alias after deployment. Its server-rendered identity reported deployment `dpl_AfFEC...` and commit `af2d13c...`; the page exposed the corrected audience wording, the `DEV TEST — NOT A REAL ORDER` marker, and the Owner action controls. This demonstrates the runtime checks accepted the current Vercel Preview deployment, branch alias and configured DEV Supabase URL `https://tzwtpxdcggesgjaqxkqr.supabase.co`.
+- The exact branch alias did not change, so the previously verified exact DEV Supabase Auth callback remains the correct callback; no Auth setting was changed or broadened. Preview SSO protection remains enabled for non-custom domains. The action page loaded in the authenticated DEV Owner session.
+- A presence/scope-only Vercel configuration check confirmed the same eight approved variables remain Preview-scoped to `codex/staff-notifications-dev-20261109`; values were not read or recorded. No variable scopes, values, Production configuration or project-wide Ignore Build Step settings changed.
+- Vercel's post-build deployment detail says custom-domain assignment was skipped. The current domain listing remains unchanged: `dev.whitebird.asia` is still bound to `codex/cake-size-availability-dev`; `whitebird.asia` and `www.whitebird.asia` remain attached as before. The latest Production deployment remains READY as `dpl_7LdWc8fcRT4vmbPksrJUvDqrB1iE` from `096ae0deae864ee050210b33e4f8aa99ae7e10f5`.
+- Existing READY recovery references remain available: prior temporary-action Preview `dpl_2AUB22XbEnCtGzRv4i2oUk48GTdB`, and Tranche 2 Preview `dpl_5i2fCAJhxQ8zc4zjrgQ6e4An6J6y`. The corrected deployment has its own generated URL and is the current branch-alias target.
+
+### Deployed checklist and no-send verification
+
+- Live page text now acknowledges the actual seven-account Owner-controlled DEV Web audience and all three Owner iPhone subscriptions; it clearly excludes Production staff/customers as intended recipients and accepts possible multiple displays. The false six-listeners-inactive and unmapped-subscription claims are absent.
+- The two updated acknowledgements and all other safety acknowledgements were visibly unchecked on first render; the Arm button was disabled. The page GET did not arm the control. No POST, arm or execute action was submitted.
+- Read-only DEV SQL after deployment returned: fixed acceptance event count `0`; associated delivery count `0`; notification events created since the corrected deployment `0`; Push delivery rows created since the corrected deployment `0`. No notification, Push or Email was sent; no preference, subscription or database state was changed by the deployment or verification.
+- Fresh Pick scheduling remains Disabled, Fresh Pick Push remains OFF, and Email remains frozen. No migration, scheduler, customer communication or Production operation occurred.
+
+### Owner gate and recovery
+
+**Corrected temporary DEV Push action is READY for Owner acceptance preparation; live test remains NOT AUTHORIZED by this deployment request.** The prior one-event GO was for the superseded deployment. Obtain a fresh explicit Owner GO tied to `dpl_AfFEC...` before any arming, event creation or dispatch. Keep all checkboxes unchecked until the Owner prepares and confirms the test. Preserve no-retry behavior and record provider acceptance separately from actual iPhone display.
+
+After a separately authorized live test (or Owner cancellation decision), remove the temporary page, route, arming state and test capability from source; retain the event/delivery evidence; requalify and deploy the clean Tranche 2 source; verify the temporary route and capability are absent. Do not use rollback to remove valid Tranche 2 functionality. Keep both prior READY Previews listed above as recovery references.
+
+### Browser scope note
+
+During browser verification, an already-open Safari tab showing `whitebird.asia` was selected inadvertently; it displayed the Production Home page. No control was used and the tab was immediately navigated to the DEV Preview. No Production database query, deployment, configuration change or other write occurred. No Production business details were copied into this record. This was an accidental read-only UI view and is recorded for scope transparency.
+
+## 2026-11-15 — Final one-shot DEV Push preflight stopped after Owner toggle
+
+Owner reported turning New Order Push OFF and ON; the requested immediate read-only recheck was run against DEV `tzwtpxdcggesgjaqxkqr` only. No action-page arm or execute request was submitted.
+
+Authorized candidate remained deployment `dpl_AfFECexdew3mABRjBcJbaRe8Ygb4`, source `af2d13c7fa31642d90bb6dcc265905b9f90a4fc0`, tree `95e9a800985de486d3935cbed0c4cd5631c72ac5`, on the exact approved branch alias. The action's server preflight is read-only until execution and enforces an expected active-subscription count of exactly three.
+
+Fresh read-only database results after the Owner toggle:
+- Active staff 7; New Order Web eligible 7; Sound eligible 1; Push-eligible staff 1; Fresh Pick Push-eligible 0.
+- Active, unexpired Push subscriptions: **4**, while the approved action expects exactly 3.
+- Actionable delivery queue (pending/claimed/failed): 0.
+- Fixed one-shot event key exists: 0 rows; recent events and Push delivery rows: 0.
+- Persistent per-event dispatch remains disabled and dispatch URL remains empty.
+- DEV PostgreSQL reports 17.6.
+
+**Disposition: HOLD before arming.** The Owner's toggle changed the active subscription count from the previously recorded three to four. The server-side gate will reject the action (`push_subscription_audience_changed`) at four; it is not safe to bypass that gate or alter/revoke a subscription under this authorization. No event was created, no Push was dispatched, no preference or subscription was modified by Codex, and no retry occurred.
+
+Smallest next step: read-only identify the fourth active subscription by sanitized metadata (staff ownership and creation/expiry timestamps only), then have the Owner explicitly confirm the intended four-subscription audience or request a separately authorized device-specific cleanup. Any code adjustment to the exact-count gate requires a narrowly reviewed, redeployed candidate and renewed one-event authorization; do not change the gate at runtime. Once the expected subscription state is safely reconciled, repeat the full server preflight immediately before any newly authorized one-shot execution.

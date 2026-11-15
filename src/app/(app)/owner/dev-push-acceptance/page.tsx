@@ -1,8 +1,12 @@
 import { notFound } from "next/navigation";
 
 import { requireStaff } from "@/foundation/auth/session";
-import { inspectDeploymentIdentity } from "@/foundation/staff/dev-push-acceptance-core.mjs";
+import {
+  inspectDeploymentIdentity,
+  inspectOwnerPushSubscriptionAudience,
+} from "@/foundation/staff/dev-push-acceptance-core.mjs";
 import { DevPushAcceptancePanel } from "@/components/staff/DevPushAcceptancePanel";
+import { createServiceClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +21,18 @@ export default async function DevPushAcceptancePage() {
   const deployment = inspectDeploymentIdentity(process.env);
 
   if (!authorization || !deployment.ok) notFound();
+
+  const admin = createServiceClient();
+  const { data: subscriptions, error: subscriptionsError } = await admin
+    .from("staff_notification_push_subscriptions")
+    .select("id,staff_id,expiration_time,revoked_at")
+    .is("revoked_at", null);
+  if (subscriptionsError || !subscriptions) notFound();
+  const subscriptionAudience = inspectOwnerPushSubscriptionAudience(
+    subscriptions,
+    staff.id,
+  );
+  if (!subscriptionAudience.ok) notFound();
 
   return (
     <main className="mx-auto w-full max-w-3xl space-y-6 p-4 sm:p-6">
@@ -44,9 +60,11 @@ export default async function DevPushAcceptancePage() {
         <p className="mt-2">
           This DEV test notification may appear in any of the seven Web-eligible
           DEV staff accounts, all of which the Owner controls. No Production
-          staff account or customer is an intended recipient. One Owner account
-          is Push-eligible and has three active subscriptions, all belonging to
-          the Owner&apos;s iPhone; multiple notification displays are possible.
+          staff account or customer is an intended recipient. The current active
+          Push subscription count is shown in the confirmation panel; only the
+          Owner account may own these subscriptions. The table does not identify
+          physical devices, so confirm every listed subscription belongs to your
+          iPhone. Multiple notification displays are possible.
         </p>
         <p className="mt-2">
           The one-minute extra walk-in hold reminder and expiry jobs were
@@ -68,6 +86,7 @@ export default async function DevPushAcceptancePage() {
       <DevPushAcceptancePanel
         deploymentId={deployment.deploymentId}
         commitSha={deployment.commitSha}
+        ownerSubscriptionCount={subscriptionAudience.count}
       />
     </main>
   );

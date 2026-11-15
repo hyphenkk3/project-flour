@@ -8,8 +8,8 @@ const CONFIRMATIONS = [
     text: "I understand that this DEV test notification may appear in any of the seven Web-eligible DEV staff accounts, all of which I control. No Production staff account or customer is an intended recipient.",
   },
   {
-    key: "threeOwnerSubscriptionsAccountedFor",
-    text: "I confirm that all three active DEV Push subscriptions belong to my iPhone, and I accept that this single test event may produce multiple notification displays.",
+    key: "ownerSubscriptionsAccountedFor",
+    text: "",
   },
   {
     key: "iphonePermissionAndForceCloseReady",
@@ -41,6 +41,7 @@ type ApiResult = {
   deploymentId?: string;
   commitSha?: string;
   audience?: Record<string, number>;
+  ownerSubscriptionCount?: number;
   result?: string;
   code?: string | null;
   eventId?: string | null;
@@ -50,9 +51,11 @@ type ApiResult = {
 export function DevPushAcceptancePanel({
   deploymentId,
   commitSha,
+  ownerSubscriptionCount,
 }: {
   deploymentId: string;
   commitSha: string;
+  ownerSubscriptionCount: number;
 }) {
   const [typedDeploymentId, setTypedDeploymentId] = useState("");
   const [acknowledged, setAcknowledged] = useState<Record<string, boolean>>({});
@@ -78,6 +81,7 @@ export function DevPushAcceptancePanel({
           action,
           deploymentId: typedDeploymentId,
           commitSha,
+          ownerSubscriptionCount,
           confirmations: Object.fromEntries(
             CONFIRMATIONS.map(({ key }) => [key, acknowledged[key] === true]),
           ),
@@ -115,6 +119,13 @@ export function DevPushAcceptancePanel({
           <span className="font-semibold text-slate-950">Source commit:</span>{" "}
           <code className="break-all">{commitSha}</code>
         </p>
+        <p>
+          <span className="font-semibold text-slate-950">
+            Active DEV Push subscriptions:
+          </span>{" "}
+          {ownerSubscriptionCount} (maximum accepted: 10). The count is checked
+          again before arming and immediately before execution.
+        </p>
       </div>
 
       <label className="block space-y-2 text-sm font-medium text-slate-900">
@@ -149,7 +160,11 @@ export function DevPushAcceptancePanel({
               }
               className="mt-1 size-4 shrink-0"
             />
-            <span>{text}</span>
+            <span>
+              {key === "ownerSubscriptionsAccountedFor"
+                ? `I confirm all ${ownerSubscriptionCount} active DEV Push subscriptions belong to my iPhone, and I accept that this single test event may produce multiple notification displays.`
+                : text}
+            </span>
           </label>
         ))}
       </fieldset>

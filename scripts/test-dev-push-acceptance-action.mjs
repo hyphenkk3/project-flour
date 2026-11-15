@@ -5,10 +5,12 @@ import { test } from "node:test";
 import {
   DEV_PUSH_ACCEPTANCE_COOKIE,
   DEV_PUSH_ACCEPTANCE_EVENT_KEY,
+  DEV_PUSH_ACCEPTANCE_MAX_OWNER_SUBSCRIPTIONS,
   DEV_PUSH_ACCEPTANCE_TARGET,
   authorizeMasterOwner,
   deploymentArmValue,
   inspectDeploymentIdentity,
+  inspectOwnerPushSubscriptionAudience,
   isDeploymentArmed,
   makeFixedSyntheticEvent,
   runOneShotAcceptance,
@@ -37,7 +39,7 @@ const goodActor = {
 };
 const goodConfirmations = {
   devWebAudienceAccepted: true,
-  threeOwnerSubscriptionsAccountedFor: true,
+  ownerSubscriptionsAccountedFor: true,
   iphonePermissionAndForceCloseReady: true,
   freshPickScheduleVerifiedDisabled: true,
   freshPickPushVerifiedOff: true,
@@ -56,6 +58,7 @@ const safeSnapshot = {
   deliveryQueueEmpty: true,
   fixedEventKeyAbsent: true,
   vapidConfigurationPresent: true,
+  ownerSubscriptionCount: 4,
 };
 
 function validBody(action = "arm") {
@@ -63,6 +66,7 @@ function validBody(action = "arm") {
     action,
     deploymentId: environment.VERCEL_DEPLOYMENT_ID,
     commitSha: environment.VERCEL_GIT_COMMIT_SHA,
+    ownerSubscriptionCount: 4,
     confirmations: { ...goodConfirmations },
   };
 }
@@ -208,6 +212,20 @@ test("rejects anonymous, inactive, archived, non-owner, and forced-password-chan
 test("accepts only the fixed arm/execute request and exact safety confirmations", () => {
   assert.equal(validateActionBody(validBody("arm")).ok, true);
   assert.equal(validateActionBody(validBody("execute")).ok, true);
+  assert.equal(
+    validateActionBody({ ...validBody(), ownerSubscriptionCount: 3 }).ok,
+    true,
+  );
+  assert.equal(
+    validateActionBody({ ...validBody(), ownerSubscriptionCount: 10 }).ok,
+    true,
+  );
+  for (const ownerSubscriptionCount of [0, 11, 4.5, "4"]) {
+    assert.equal(
+      validateActionBody({ ...validBody(), ownerSubscriptionCount }).ok,
+      false,
+    );
+  }
   const withEvent = { ...validBody(), eventId };
   assert.equal(validateActionBody(withEvent).ok, false);
   const withContent = { ...validBody(), title: "caller content" };
@@ -302,15 +320,78 @@ test("requires confirmation of the exact deployed ID and source commit", () => {
 });
 
 test("fails closed on each preflight invariant", () => {
-  assert.equal(validatePreflightSnapshot(safeSnapshot).ok, true);
+  assert.equal(validatePreflightSnapshot(safeSnapshot, 4).ok, true);
   for (const key of Object.keys(safeSnapshot)) {
     assert.equal(
-      validatePreflightSnapshot({ ...safeSnapshot, [key]: false }).ok,
+      validatePreflightSnapshot({ ...safeSnapshot, [key]: false }, 4).ok,
       false,
       key,
     );
   }
-  assert.equal(validatePreflightSnapshot(null).ok, false);
+  assert.equal(validatePreflightSnapshot(null, 4).ok, false);
+  assert.equal(
+    validatePreflightSnapshot({ ...safeSnapshot, ownerSubscriptionCount: 3 }, 4)
+      .ok,
+    false,
+  );
+});
+
+test("accepts bounded owner subscription audiences of three and four", () => {
+  const subscription = (staff_id, expiration_time = null) => ({
+    staff_id,
+    revoked_at: null,
+    expiration_time,
+  });
+  for (const count of [3, 4]) {
+    const result = inspectOwnerPushSubscriptionAudience(
+      Array.from({ length: count }, () => subscription("owner")),
+      "owner",
+      Date.parse("2026-11-15T04:00:00Z"),
+    );
+    assert.deepEqual(result, { ok: true, count });
+  }
+  assert.equal(DEV_PUSH_ACCEPTANCE_MAX_OWNER_SUBSCRIPTIONS, 10);
+  assert.equal(
+    inspectOwnerPushSubscriptionAudience(
+      Array.from({ length: 10 }, () => subscription("owner")),
+      "owner",
+    ).ok,
+    true,
+  );
+  assert.equal(inspectOwnerPushSubscriptionAudience([], "owner").ok, false);
+  assert.equal(
+    inspectOwnerPushSubscriptionAudience(
+      Array.from({ length: 11 }, () => subscription("owner")),
+      "owner",
+    ).ok,
+    false,
+  );
+});
+
+test("rejects non-owner, revoked, and near-expiry subscriptions", () => {
+  const valid = { staff_id: "owner", revoked_at: null, expiration_time: null };
+  assert.equal(
+    inspectOwnerPushSubscriptionAudience(
+      [valid, { ...valid, staff_id: "other" }],
+      "owner",
+    ).ok,
+    false,
+  );
+  assert.equal(
+    inspectOwnerPushSubscriptionAudience(
+      [{ ...valid, revoked_at: "2026-11-15T04:00:00Z" }],
+      "owner",
+    ).ok,
+    false,
+  );
+  assert.equal(
+    inspectOwnerPushSubscriptionAudience(
+      [{ ...valid, expiration_time: "2026-11-15T04:04:59Z" }],
+      "owner",
+      Date.parse("2026-11-15T04:00:00Z"),
+    ).ok,
+    false,
+  );
 });
 
 test("fixed synthetic event has no business references or caller-controlled fields", () => {
@@ -325,7 +406,7 @@ test("fixed synthetic event has no business references or caller-controlled fiel
   assert.equal(Object.keys(payload).includes("eventId"), false);
 });
 
-test("action disclosure matches the accepted Owner-controlled DEV audience", () => {
+test("action disclosure matches the bounded live Owner-controlled DEV audience", () => {
   const panel = readFileSync(
     resolve("src/components/staff/DevPushAcceptancePanel.tsx"),
     "utf8",
@@ -341,7 +422,7 @@ test("action disclosure matches the accepted Owner-controlled DEV audience", () 
   );
   assert.match(
     panel,
-    /all three active DEV Push subscriptions belong to my iPhone/,
+    /I confirm all \$\{ownerSubscriptionCount\} active DEV Push subscriptions belong to my iPhone/,
   );
   assert.match(
     panel,
@@ -370,8 +451,39 @@ test("action disclosure matches the accepted Owner-controlled DEV audience", () 
   );
   assert.match(
     route,
-    /activeStaff: 7,[\s\S]*?newOrderWeb: 7,[\s\S]*?newOrderSound: 1,[\s\S]*?newOrderPushStaff: 1,[\s\S]*?ownerSubscriptions: 3/,
+    /activeStaff: 7,[\s\S]*?newOrderWeb: 7,[\s\S]*?newOrderSound: 1,[\s\S]*?newOrderPushStaff: 1/,
   );
+  assert.match(
+    route,
+    /readOnlyPreflight\(\s*session!\.id,\s*body\.ownerSubscriptionCount,?\s*\)/,
+  );
+  assert.match(route, /inspectOwnerPushSubscriptionAudience/);
+  assert.match(
+    readFileSync(
+      resolve("src/foundation/staff/dev-push-acceptance-core.mjs"),
+      "utf8",
+    ),
+    /DEV_PUSH_ACCEPTANCE_MAX_OWNER_SUBSCRIPTIONS = 10/,
+  );
+});
+
+test("rechecks the acknowledged subscription count before event creation", async () => {
+  let creates = 0;
+  const result = await runOneShotAcceptance(
+    await successDependencies({
+      preflight: async () => ({
+        ok: false,
+        code: "push_subscription_audience_changed",
+      }),
+      createEvent: async () => {
+        creates += 1;
+        return eventId;
+      },
+    }),
+  );
+  assert.equal(result.result, "stopped");
+  assert.equal(result.code, "push_subscription_audience_changed");
+  assert.equal(creates, 0);
 });
 
 test("dispatches exactly the UUID returned by one creation call", async () => {

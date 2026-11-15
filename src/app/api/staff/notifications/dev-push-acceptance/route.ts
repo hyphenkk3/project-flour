@@ -13,6 +13,7 @@ import {
   authorizeMasterOwner,
   deploymentArmValue,
   inspectDeploymentIdentity,
+  inspectOwnerPushSubscriptionAudience,
   isDeploymentArmed,
   runOneShotAcceptance,
   validateActionBody,
@@ -29,7 +30,6 @@ const EXPECTED_AUDIENCE = Object.freeze({
   newOrderWeb: 7,
   newOrderSound: 1,
   newOrderPushStaff: 1,
-  ownerSubscriptions: 3,
 });
 const FRESH_PICK_REMINDER_CODE = "fresh_pick_walk_in_hold_reminder";
 
@@ -54,7 +54,10 @@ function vapidConfigurationPresent() {
   );
 }
 
-async function readOnlyPreflight(ownerStaffId: string) {
+async function readOnlyPreflight(
+  ownerStaffId: string,
+  acknowledgedSubscriptionCount: number,
+) {
   const configuredUrl = getSupabaseEnv().url.replace(/\/$/, "");
   if (configuredUrl !== DEV_PUSH_ACCEPTANCE_TARGET.supabaseUrl) {
     return { ok: false as const, code: "wrong_dev_supabase" };
@@ -141,22 +144,12 @@ async function readOnlyPreflight(ownerStaffId: string) {
   if (subscriptionsError || !subscriptions) {
     return { ok: false as const, code: "push_subscriptions_unavailable" };
   }
-  const now = Date.now();
-  const subscriptionsCurrent = subscriptions.every((subscription) => {
-    if (
-      subscription.staff_id !== ownerStaffId ||
-      subscription.revoked_at !== null
-    ) {
-      return false;
-    }
-    if (subscription.expiration_time === null) return true;
-    const expiry = Date.parse(subscription.expiration_time);
-    return Number.isFinite(expiry) && expiry > now + 5 * 60 * 1000;
-  });
-  if (
-    subscriptions.length !== EXPECTED_AUDIENCE.ownerSubscriptions ||
-    !subscriptionsCurrent
-  ) {
+  const subscriptionAudience = inspectOwnerPushSubscriptionAudience(
+    subscriptions,
+    ownerStaffId,
+  );
+  if (!subscriptionAudience.ok) return subscriptionAudience;
+  if (subscriptionAudience.count !== acknowledgedSubscriptionCount) {
     return { ok: false as const, code: "push_subscription_audience_changed" };
   }
 
@@ -214,6 +207,7 @@ async function readOnlyPreflight(ownerStaffId: string) {
       audienceMatches: true,
       ownerSubscriptionsOnly: true,
       subscriptionsCurrent: true,
+      ownerSubscriptionCount: subscriptionAudience.count,
       deliveryQueueEmpty: true,
       fixedEventKeyAbsent: true,
       vapidConfigurationPresent: true,
@@ -252,12 +246,18 @@ export async function POST(request: Request) {
     return jsonError("deployment_confirmation_mismatch", 409);
   }
 
-  const preflight = await readOnlyPreflight(session!.id).catch(() => ({
+  const preflight = await readOnlyPreflight(
+    session!.id,
+    body.ownerSubscriptionCount,
+  ).catch(() => ({
     ok: false as const,
     code: "preflight_unavailable",
   }));
   if (!preflight.ok) return jsonError(preflight.code, 409);
-  if (!validatePreflightSnapshot(preflight.snapshot).ok) {
+  if (
+    !validatePreflightSnapshot(preflight.snapshot, body.ownerSubscriptionCount)
+      .ok
+  ) {
     return jsonError("preflight_safety_gate_failed", 409);
   }
 
@@ -268,6 +268,7 @@ export async function POST(request: Request) {
       deploymentId: identity.deploymentId,
       commitSha: identity.commitSha,
       audience: EXPECTED_AUDIENCE,
+      ownerSubscriptionCount: body.ownerSubscriptionCount,
       ...(body.action === "execute" ? { eventId: null } : {}),
     },
     { headers: { "cache-control": "no-store" } },
@@ -308,9 +309,15 @@ export async function POST(request: Request) {
 
   const result = await runOneShotAcceptance({
     preflight: async () => {
-      const current = await readOnlyPreflight(session!.id);
+      const current = await readOnlyPreflight(
+        session!.id,
+        body.ownerSubscriptionCount,
+      );
       if (!current.ok) return current;
-      return validatePreflightSnapshot(current.snapshot);
+      return validatePreflightSnapshot(
+        current.snapshot,
+        body.ownerSubscriptionCount,
+      );
     },
     createEvent: async (payload) => {
       const admin = createServiceClient();
