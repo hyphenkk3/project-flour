@@ -4207,3 +4207,100 @@ Fresh read-only database results after the Owner toggle:
 **Disposition: HOLD before arming.** The Owner's toggle changed the active subscription count from the previously recorded three to four. The server-side gate will reject the action (`push_subscription_audience_changed`) at four; it is not safe to bypass that gate or alter/revoke a subscription under this authorization. No event was created, no Push was dispatched, no preference or subscription was modified by Codex, and no retry occurred.
 
 Smallest next step: read-only identify the fourth active subscription by sanitized metadata (staff ownership and creation/expiry timestamps only), then have the Owner explicitly confirm the intended four-subscription audience or request a separately authorized device-specific cleanup. Any code adjustment to the exact-count gate requires a narrowly reviewed, redeployed candidate and renewed one-event authorization; do not change the gate at runtime. Once the expected subscription state is safely reconciled, repeat the full server preflight immediately before any newly authorized one-shot execution.
+
+## 2026-11-15 — Owner subscription audience correction prepared (not deployed)
+
+### Read-only DEV subscription findings
+
+DEV project `tzwtpxdcggesgjaqxkqr` was inspected read-only after the Owner's New Order Push OFF→ON action. Four active, unexpired records were found; all four map to the same Master Owner staff account. The Owner's New Order Push preference is the only Push-eligible staff preference (1); New Order Web eligibility is 7 and Sound eligibility is 1. Fresh Pick Push eligibility is 0. There is no user-agent, app-origin, browser, or physical-device column in `staff_notification_push_subscriptions`.
+
+Sanitized records (ID prefix; `md5(endpoint)` prefix; creation time UTC; expiry):
+- `ca0c3a09c310`; `21ef5ac2c948`; `2026-11-15 03:49:29.826185+00`; no expiry.
+- `f894723b5eb9`; `7499ba50d743`; `2026-11-14 13:45:08.123157+00`; no expiry.
+- `2ee533b65a2c`; `fe1bbd705bc9`; `2026-11-12 03:24:43.440534+00`; no expiry.
+- `402e324255d4`; `e731a6366600`; `2026-11-12 00:48:17.750030+00`; no expiry.
+
+The newest record is temporally consistent with the Owner's toggle. The registration RPC has a unique endpoint constraint and, on a conflict for the same endpoint, updates the existing row's `created_at`; the rise from three to four records therefore indicates a distinct endpoint was inserted. Without a pre-toggle endpoint-fingerprint snapshot or device metadata, it cannot be proven which physical iPhone/browser context owns that endpoint. No endpoint, key material, or staff UUID was output or recorded. No subscription was changed or revoked.
+
+### Minimal correction and safeguards
+
+The temporary action no longer assumes exactly three subscriptions. The Owner-only page reads sanitized subscription metadata server-side and displays the current count. Its unchecked acknowledgement names that exact count and requires the Owner to attest that all current active subscriptions belong to the iPhone and that multiple displays are acceptable. The server accepts 1–10 subscriptions only (10 is the existing registration RPC's per-staff cap), verifies every row belongs to the authenticated Master Owner, is active, and is unexpired by at least five minutes, then compares the live count with the acknowledged count. A changed count is rejected at arm and rechecked immediately before event creation/dispatch; a different staff owner, invalid/expired record, zero records, or more than ten fails closed. The count is never treated as proof of physical device identity; the checkbox is an explicit Owner assertion and is unchecked by default.
+
+The fixed event key, fixed synthetic `new_order` payload, DEV project/branch/deployment checks, active Master Owner and same-origin checks, five-minute deployment-bound arm, unique-key one-insert behavior, event-ID-only dispatch, no batch path, no retry, disabled persistent dispatch, paused Email, and Fresh Pick safeguards are unchanged. No event or Push dispatch was performed.
+
+### Candidate and qualification
+
+- Isolated branch: `codex/dev-push-one-shot-action-20261114`.
+- Source correction commit: `67db9ec2f362c3f67fb489891a05364374a86f48`.
+- Source tree: `88ff70cf9ed2e361de79f37222596d50b592e4c7`.
+- Changed source/test files: the owner acceptance page, its action API route, the acceptance panel, its core validation module, and focused acceptance tests.
+- `node --test scripts/test-dev-push-acceptance-action.mjs`: **27 PASS / 0 FAIL / 0 skipped**, including 3/4/10 accepted bounds; 0/11, fractional and string counts rejected; non-owner, revoked and near-expiry rows rejected; count mismatch between checks rejected before creation; Owner/account checks; one-shot/idempotency/concurrency; exact event-ID dispatch; and no retries/batch dispatch.
+- TypeScript `tsc --noEmit`: PASS.
+- Focused ESLint: PASS.
+- Prettier check: PASS.
+- `git diff --check`: PASS.
+- `npm run build`: PASS in the network-enabled execution after fetching the existing Newsreader and Outfit fonts. The first restricted-network attempt failed only at those font fetches; no font implementation was changed.
+- Existing Tranche 2 release suite remains the previously recorded 71 PASS; it was not rerun because the changes are isolated to the temporary action and its focused tests.
+
+### Deployment and authorization boundary
+
+This candidate remains local on the isolated branch; no push, deployment, database write, preference/subscription change, event, or dispatch occurred. The prior one-event GO is bound to the previous deployment and does not authorize executing this corrected source. A separate deployment authorization and a fresh one-event GO tied to the resulting deployment are required. The next gate is source review plus one controlled DEV Preview integration/deployment, followed by read-only confirmation of its exact source and DEV binding. After deployment, the Owner must review the live count and explicitly affirm the unchecked audience/device acknowledgement before any separately authorized arm/execute sequence.
+
+# 2026-11-15 — Corrected four-subscription DEV Push action deployed (not armed)
+
+**Deployment-only authorization:** The Owner authorized one controlled DEV Preview deployment of the corrected temporary action and non-mutating verification. This does not authorize arming, event creation, Push dispatch, subscription/preference changes, migrations, or Production operations. No action request that arms or executes was made.
+
+## Source and deployment identity
+
+- Qualified isolated candidate: commit `67db9ec2f362c3f67fb489891a05364374a86f48`, tree `88ff70cf9ed2e361de79f37222596d50b592e4c7`; the recorded 27 focused safety tests and TypeScript, ESLint, Prettier, diff, and network-enabled production-build checks remain applicable to this exact source.
+- Source-equivalent integration commit: `587761cc6c32d4f4127f80f90e2cc82347b43399`, parent `af2d13c7fa31642d90bb6dcc265905b9f90a4fc0`, tree `88ff70cf9ed2e361de79f37222596d50b592e4c7`. The tree exactly matches the qualified candidate; the integration preserved the existing DEV branch history and did not import unrelated DEV source.
+- The target branch was rechecked at the expected parent immediately before publication; a normal fast-forward push succeeded to `codex/staff-notifications-dev-20261109`. No force-push was used.
+- One automatic deployment was canceled because the project Ignore Build Step skipped it. The single follow-up redeploy was made from that deployment record with Ignore Build Step skipped for that deployment only and build cache disabled. No project-wide setting was changed.
+- Final deployment: `dpl_ArSfNz2My5L2HryknZTLDRf2DVr7`, READY, Preview target, branch `codex/staff-notifications-dev-20261109`, source commit `587761cc6c32d4f4127f80f90e2cc82347b43399`. Vercel build metadata confirms cache was skipped and the Ignore Build Step was explicitly skipped for this deployment.
+- Generated Preview: [https://project-flour-f3esox5zs-hyphen-org.vercel.app](https://project-flour-f3esox5zs-hyphen-org.vercel.app). The existing Owner action branch alias [https://project-flour-git-codex-staff-notifications-d-b89c48-hyphen-org.vercel.app/owner/dev-push-acceptance](https://project-flour-git-codex-staff-notifications-d-b89c48-hyphen-org.vercel.app/owner/dev-push-acceptance) resolves to this deployment. The deployed runtime identity checks bind the route to the approved Vercel project, Preview environment, branch, generated deployment ID, source commit, branch alias, and DEV Supabase URL; these checks were preserved in the exact qualified tree.
+- Vercel project SSO protection remains enabled (`all_except_custom_domains`). Deployment target is Preview (`target: null`); custom-domain assignment was skipped. `whitebird.asia`, `www.whitebird.asia`, and `dev.whitebird.asia` remain assigned as previously verified. No Vercel environment-variable scope or value was changed; the eight approved Preview variables remain branch-scoped to the existing notification branch.
+- Previous Tranche 1 rollback reference `dpl_5i2fCAJhxQ8zc4zjrgQ6e4An6J6y` remains READY at its generated deployment URL. The earlier temporary action deployment `dpl_AfFECexdew3mABRjBcJbaRe8Ygb4` remains a separate historical deployment; it is not the active branch alias.
+
+## Read-only DEV verification after deployment
+
+Supabase project identity was explicitly queried as DEV `tzwtpxdcggesgjaqxkqr`. The aggregate query returned: fixed one-shot event-key count **0**; pending/claimed/failed Push delivery count **0**; active unexpired subscriptions **4**, all associated with one staff account; New Order Push-eligible staff **1**; New Order Web-eligible staff **7**; New Order Sound-eligible staff **1**; Fresh Pick Push-eligible staff **0**; persistent event dispatch **false**; dispatch URL unset; and matching Push/Fresh Pick cron job count **0**. No subscription endpoint or key material was selected. No database write, notification, event, delivery, Push dispatch, email, or schedule activation occurred.
+
+The Owner has confirmed that all seven DEV staff accounts are Owner-controlled and accepts Web notices across them; all active Push subscriptions belong to the Owner's iPhone and multiple displays are acceptable. The live UI requires the current displayed subscription count to be acknowledged unchecked-by-default before arming. The count is rechecked server-side at arming and execution.
+
+## Verification limit and next gate
+
+The protected Owner page was opened in a browser session without a Project Flour staff session and redirected to the staff login page. Therefore deployment identity, alias routing, SSO protection, source/build identity, and database safety state are verified, but the current rendered page's live subscription-count text and unchecked checkbox were **not independently observed in an authenticated Owner session** during this deployment check. The Owner may inspect the action URL while signed in to confirm the corrected count acknowledgement is displayed and unchecked; inspection must not submit Arm or Execute. This is an observation step only; it does not require repeating setup or deploying again.
+
+**Status: FOUR-SUBSCRIPTION DEV PUSH ACTION DEPLOYED — AWAITING RENEWED OWNER GO.** The prior one-event authorization was specific to the earlier deployment and does not transfer. No live action was taken. Before a future, separately authorized one-event test, the Owner must review the current count acknowledgement, confirm iPhone permission/readiness, verify all current fail-closed checks, and issue a fresh explicit GO naming this deployment. Never retry an ambiguous/503 result. After the test, remove the temporary action and arming capability through a separate source-level cleanup, local qualification, and clean DEV deployment while preserving the event/delivery evidence and valid Tranche 2 functionality.
+
+# 2026-11-15 — DEV Push pre-arm preference failure diagnosed and corrected locally
+
+## Captured failure and exact cause
+
+The Owner reported that one Arm attempt on deployment `dpl_ArSfNz2My5L2HryknZTLDRf2DVr7` (source `587761cc6c32d4f4127f80f90e2cc82347b43399`, DEV `tzwtpxdcggesgjaqxkqr`) returned exactly `{"ok":false,"code":"notification_preferences_incomplete"}`. No Execute action followed. The route returns on failed preflight before constructing the response that sets the arm cookie, so this failed attempt did not arm the action. No repeat Arm, event, Push dispatch, preference/subscription change, or deployment was performed for this investigation.
+
+The deployed route's `readOnlyPreflight` fetched New Order and Fresh Pick hold-reminder preference rows for the seven active staff profiles. It returned `notification_preferences_incomplete` unless **both** category result sets contained exactly seven rows. Read-only aggregate evidence from DEV shows:
+
+- Active staff: 7.
+- `new_order`: 7 preference rows for all 7 active staff; 7 Web-enabled, 1 Sound-enabled, 1 Push-enabled.
+- `fresh_pick_walk_in_hold_reminder`: 3 preference rows for 3 active staff; 3 Web-enabled, 1 Sound-enabled, 0 Push-enabled; 4 active staff have no row for this category.
+
+Thus the exact failing invariant is the completeness check for the Fresh Pick preference category: 3 rows were required to equal 7. The New Order preference set was complete. The failure was **missing category rows**, not a disabled New Order preference, extra recipient, or wrong Owner. The route returned this error before later eligibility validation.
+
+## Safety assessment and minimal correction
+
+The Fresh Pick row-count requirement was unnecessarily restrictive for this New Order-only acceptance action. Source inspection of the already-applied DEV dispatch-scope migration confirms Push eligibility is formed by joining a notification event to a preference with matching category and `push_enabled = true`, then to an active staff profile and eligible subscription. The dispatch queue is scoped to the supplied event UUID. An absent Fresh Pick preference row cannot make a `new_order` event Push-eligible and cannot be selected by this one-event action. Existing Fresh Pick safeguards remain: the action checks that no present Fresh Pick preference row is Push-enabled; New Order still requires all seven rows and the expected Web/Sound/Push counts and Owner identity. Queue emptiness, disabled persistent dispatch, fixed event key, exact DEV/deployment identity, Owner authorization, one-shot behavior, event-scoped dispatch, and no-retry/no-batch rules are unchanged.
+
+The smallest correction in `src/app/api/staff/notifications/dev-push-acceptance/route.ts` is to require complete coverage only for `new_order`, while retaining the zero-`push_enabled` Fresh Pick guard. A focused test in `scripts/test-dev-push-acceptance-action.mjs` ensures that missing Fresh Pick rows do not trigger the incomplete-preferences response and that any present Fresh Pick Push-enabled row remains rejected.
+
+## Qualification and status
+
+- Focused action tests: `node --test scripts/test-dev-push-acceptance-action.mjs` — **28 PASS / 0 FAIL / 0 skipped**.
+- TypeScript: `npx tsc --noEmit` — PASS.
+- Focused ESLint for the changed route and test — PASS.
+- Prettier check for the changed route and test — PASS.
+- `git diff --check` — PASS.
+- `npm run build` initially could not fetch existing Newsreader/Outfit Google Fonts in the restricted network. Re-running the unchanged build with authorized network access succeeded; production build PASS. No font code or build checks were changed.
+- The previous full Tranche 2 suite (71 PASS) was not rerun; only the focused pre-arm route behavior changed. No DEV preference row was created or modified, and no migration was needed.
+
+**Status: PRE-ARM PREFERENCE FAILURE ROOT CAUSE IDENTIFIED; MINIMAL CORRECTION LOCALLY QUALIFIED, NOT DEPLOYED.** Candidate changes are limited to the DEV acceptance route, its focused tests, and this append-only status evidence. The corrected action has not been deployed, armed, or used. The previous one-event authorization does not transfer. Any deployment or later live event/dispatch requires separate Owner authorization. Automatic two-tab Sound remains unresolved; Production remains untouched.

@@ -108,10 +108,7 @@ async function readOnlyPreflight(
   const freshPickPreferences = preferences.filter(
     (row) => row.notification_code === FRESH_PICK_REMINDER_CODE,
   );
-  if (
-    newOrderPreferences.length !== EXPECTED_AUDIENCE.activeStaff ||
-    freshPickPreferences.length !== EXPECTED_AUDIENCE.activeStaff
-  ) {
+  if (newOrderPreferences.length !== EXPECTED_AUDIENCE.activeStaff) {
     return { ok: false as const, code: "notification_preferences_incomplete" };
   }
   const ownerPreference = newOrderPreferences.find(
@@ -123,6 +120,9 @@ async function readOnlyPreflight(
   const freshPickPushEligible = freshPickPreferences.filter(
     (row) => row.push_enabled === true,
   );
+  // Missing Fresh Pick rows are ineligible by construction: the event-scoped
+  // dispatch RPC joins preferences and requires push_enabled = true. Fail only
+  // if a present Fresh Pick row would actually make someone Push-eligible.
   if (
     !ownerPreference ||
     ownerPreference.web_enabled !== true ||

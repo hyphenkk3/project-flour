@@ -467,6 +467,27 @@ test("action disclosure matches the bounded live Owner-controlled DEV audience",
   );
 });
 
+test("missing Fresh Pick preference rows do not block New Order preflight", () => {
+  const route = readFileSync(
+    resolve("src/app/api/staff/notifications/dev-push-acceptance/route.ts"),
+    "utf8",
+  );
+  const incompleteGuard = route.match(
+    /if\s*\(\s*newOrderPreferences\.length !== EXPECTED_AUDIENCE\.activeStaff\s*\)\s*\{\s*return \{ ok: false as const, code: "notification_preferences_incomplete" \};\s*\}/,
+  );
+  assert.ok(incompleteGuard, "New Order rows must remain complete");
+  assert.doesNotMatch(incompleteGuard[0], /freshPickPreferences/);
+  assert.match(
+    route,
+    /const freshPickPushEligible = freshPickPreferences\.filter\([\s\S]*?row\.push_enabled === true/,
+  );
+  assert.match(route, /freshPickPushEligible\.length !== 0/);
+  assert.match(
+    route,
+    /Missing Fresh Pick rows are ineligible by construction[\s\S]*?dispatch RPC joins preferences/,
+  );
+});
+
 test("rechecks the acknowledged subscription count before event creation", async () => {
   let creates = 0;
   const result = await runOneShotAcceptance(
