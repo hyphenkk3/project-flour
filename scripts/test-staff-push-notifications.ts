@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { runInNewContext } from "node:vm";
 import {
   buildStaffPushMessage,
   isStaffNotificationEventId,
+  isStaffPushOrderNotificationCode,
   isTrustedStaffPushEndpoint,
   parseStaffPushEventScope,
   parseStaffPushSubscription,
+  resolveStaffPushHref,
 } from "../src/foundation/staff/staff-notification-push-protocol.ts";
 import {
   deliverClaimedStaffPushNotifications,
@@ -19,6 +22,7 @@ function read(path: string) {
 }
 
 const eventId = "8e5b25a5-f302-48ba-aa60-a6f2857b1d35";
+const orderId = "5b4ed7dd-7de8-4cf0-8a37-197998987d42";
 const key = "A".repeat(87);
 const auth = "B".repeat(22);
 const subscription = {
@@ -63,7 +67,36 @@ assert.equal(
 
 const message = buildStaffPushMessage({ eventId, code: "new_order" });
 assert.equal(message.title, "New order received");
-assert.equal(message.data.href, "/owner/orders");
+assert.equal(message.data.href, "/owner");
+assert.equal(
+  resolveStaffPushHref({ code: "new_order", orderId }),
+  `/owner/orders/${orderId}`,
+);
+assert.equal(
+  resolveStaffPushHref({ code: "new_order", orderId: "//evil.example" }),
+  "/owner",
+);
+assert.equal(
+  resolveStaffPushHref({ code: "new_order", orderId: null }),
+  "/owner",
+);
+assert.equal(isStaffPushOrderNotificationCode("order_paid"), true);
+assert.equal(isStaffPushOrderNotificationCode("approval_required"), false);
+assert.equal(
+  resolveStaffPushHref({ code: "approval_required", orderId }),
+  "/owner/approvals",
+);
+assert.equal(
+  resolveStaffPushHref({
+    code: "fresh_pick_walk_in_hold_reminder",
+    orderId,
+  }),
+  "/customer-operations/fresh-picks",
+);
+assert.equal(
+  resolveStaffPushHref({ code: "waiting_list_new_request", orderId }),
+  "/bakery/availability#waiting-list-heading",
+);
 assert.equal(message.renotify, false);
 assert.doesNotMatch(
   JSON.stringify(message),
@@ -78,11 +111,175 @@ const claimed: ClaimedStaffPushDelivery[] = [
     subscriptionId: "sub-a",
     claimedUntil: "2026-11-09T12:00:00Z",
     code: "new_order",
+    orderId,
     subscription,
   },
 ];
 
+type MockServiceWorkerEvent = {
+  data?: { json: () => unknown };
+  notification?: { data?: { href?: string }; close: () => void };
+  waitUntil: (value: Promise<unknown>) => void;
+};
+
+async function serviceWorkerPush(code: string, pushOrderId?: string | null) {
+  const listeners: Record<string, (event: MockServiceWorkerEvent) => void> = {};
+  const displayed: Array<{
+    title: string;
+    options: { data?: { href?: string } };
+  }> = [];
+  const self = {
+    location: { origin: "https://preview.example" },
+    registration: {
+      async showNotification(
+        title: string,
+        options: { data?: { href?: string } },
+      ) {
+        displayed.push({ title, options });
+      },
+    },
+    addEventListener(
+      type: string,
+      listener: (event: MockServiceWorkerEvent) => void,
+    ) {
+      listeners[type] = listener;
+    },
+    clients: {
+      async matchAll() {
+        return [];
+      },
+      async openWindow(url: string) {
+        return url;
+      },
+    },
+  };
+  runInNewContext(read("public/sw.js"), { self, URL, Object, Set, Promise });
+  let pending: Promise<unknown> | undefined;
+  listeners.push({
+    data: {
+      json: () => ({ version: 1, eventId, code, orderId: pushOrderId }),
+    },
+    waitUntil(value: Promise<unknown>) {
+      pending = value;
+    },
+  });
+  await pending;
+  return { listeners, displayed };
+}
+
+async function testServiceWorkerNavigation() {
+  const workerOrder = await serviceWorkerPush("new_order", orderId);
+  assert.equal(
+    workerOrder.displayed[0].options.data?.href,
+    `/owner/orders/${orderId}`,
+  );
+  const workerSynthetic = await serviceWorkerPush("new_order", null);
+  assert.equal(workerSynthetic.displayed[0].options.data?.href, "/owner");
+  const workerInvalid = await serviceWorkerPush("new_order", "//evil.example");
+  assert.equal(workerInvalid.displayed[0].options.data?.href, "/owner");
+  const workerApproval = await serviceWorkerPush("approval_required");
+  assert.equal(
+    workerApproval.displayed[0].options.data?.href,
+    "/owner/approvals",
+  );
+  const workerFreshPick = await serviceWorkerPush(
+    "fresh_pick_walk_in_hold_reminder",
+  );
+  assert.equal(
+    workerFreshPick.displayed[0].options.data?.href,
+    "/customer-operations/fresh-picks",
+  );
+  const workerWaitingList = await serviceWorkerPush("waiting_list_new_request");
+  assert.equal(
+    workerWaitingList.displayed[0].options.data?.href,
+    "/bakery/availability#waiting-list-heading",
+  );
+
+  let clickPending: Promise<unknown> | undefined;
+  let openedTarget = "";
+  let notificationClosed = false;
+  let clickListener: (event: MockServiceWorkerEvent) => void = () => {};
+  const clickSelf = {
+    location: { origin: "https://preview.example" },
+    addEventListener(
+      type: string,
+      listener: (event: MockServiceWorkerEvent) => void,
+    ) {
+      if (type === "notificationclick") clickListener = listener;
+    },
+    clients: {
+      async matchAll() {
+        return [];
+      },
+      async openWindow(url: string) {
+        openedTarget = url;
+        return url;
+      },
+    },
+  };
+  runInNewContext(read("public/sw.js"), {
+    self: clickSelf,
+    URL,
+    Object,
+    Set,
+    Promise,
+  });
+  clickListener({
+    notification: {
+      data: { href: `/owner/orders/${orderId}` },
+      close() {
+        notificationClosed = true;
+      },
+    },
+    waitUntil(value: Promise<unknown>) {
+      clickPending = value;
+    },
+  });
+  await clickPending;
+  assert.equal(notificationClosed, true);
+  assert.equal(openedTarget, `https://preview.example/owner/orders/${orderId}`);
+  const beforeExternalTarget = openedTarget;
+  clickListener({
+    notification: { data: { href: "//evil.example/" }, close() {} },
+    waitUntil() {
+      assert.fail("External notification target must not be opened.");
+    },
+  });
+  assert.equal(openedTarget, beforeExternalTarget);
+}
+
 async function main() {
+  await testServiceWorkerNavigation();
+  for (const routeFile of [
+    "src/app/(app)/owner/page.tsx",
+    "src/app/(app)/owner/orders/[id]/page.tsx",
+    "src/app/(app)/owner/approvals/page.tsx",
+    "src/app/(app)/customer-operations/fresh-picks/page.tsx",
+    "src/app/(app)/bakery/availability/page.tsx",
+  ]) {
+    assert.equal(
+      existsSync(resolve(process.cwd(), routeFile)),
+      true,
+      routeFile,
+    );
+  }
+  assert.match(read("src/app/(app)/owner/page.tsx"), /requireStaff\(\)/);
+  assert.match(
+    read("src/workspaces/owner/OwnerOrderDetail.tsx"),
+    /requireStaff\(\)/,
+  );
+  assert.match(
+    read("src/app/(app)/owner/approvals/page.tsx"),
+    /requireStaff\(\)/,
+  );
+  assert.match(
+    read("src/app/(app)/customer-operations/fresh-picks/page.tsx"),
+    /requireStaff\(\)/,
+  );
+  assert.match(
+    read("src/app/(app)/bakery/availability/page.tsx"),
+    /requireStaff\(\)/,
+  );
   const sent: Array<{ payload: string; urgency: string }> = [];
   const completed: Array<{ status: string; revoke: boolean }> = [];
   const delivered = await deliverClaimedStaffPushNotifications({
@@ -111,6 +308,7 @@ async function main() {
     version: 1,
     eventId,
     code: "new_order",
+    orderId,
   });
   assert.equal(sent[0].urgency, "normal");
   assert.doesNotMatch(sent[0].payload, /endpoint|p256dh|auth|customer|cake/i);
@@ -298,6 +496,12 @@ async function main() {
   assert.doesNotMatch(dispatcher, /input\?\.eventId \?\? null/);
   assert.match(dispatcher, /PUSH_DELIVERY_LIMIT = 10/);
   assert.match(dispatcher, /PUSH_BATCH_EVENT_LIMIT = 10/);
+  assert.match(dispatcher, /\.select\("id, order_id"\)/);
+  assert.match(dispatcher, /\.in\("id", orderEventIds\)/);
+  assert.match(
+    dispatcher,
+    /isStaffPushOrderNotificationCode\(delivery\.code\)[\s\S]*?delivery\.orderId = orderIdByEventId\.get\(delivery\.eventId\) \?\? null/,
+  );
   assert.match(dispatcher, /list_staff_notification_push_batch_event_ids/);
   assert.match(dispatcher, /validateFreshPickReminderBeforeSend/);
   assert.match(
@@ -343,6 +547,10 @@ async function main() {
   const worker = read("public/sw.js");
   assert.match(worker, /addEventListener\("push"/);
   assert.match(worker, /renotify: false/);
+  assert.match(worker, /STAFF_ORDER_ID\.test\(orderId\)/);
+  assert.match(worker, /targetUrl\.origin !== self\.location\.origin/);
+  assert.doesNotMatch(worker, /href: "\/owner\/orders"/);
+  assert.doesNotMatch(worker, /href: "\/owner\/waiting-list"/);
   assert.doesNotMatch(worker, /addEventListener\("fetch"/);
 
   const pushActions = read(

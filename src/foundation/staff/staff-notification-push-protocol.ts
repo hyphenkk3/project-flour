@@ -89,27 +89,27 @@ const PUSH_COPY: Record<
   new_order: {
     title: "New order received",
     body: "A new preorder needs attention.",
-    href: "/owner/orders",
+    href: "/owner",
   },
   order_paid: {
     title: "Order paid",
     body: "An order payment was recorded.",
-    href: "/owner/orders",
+    href: "/owner",
   },
   order_confirmed: {
     title: "Order confirmed",
     body: "An order was confirmed.",
-    href: "/owner/orders",
+    href: "/owner",
   },
   order_cancelled: {
     title: "Order cancelled",
     body: "An order was cancelled.",
-    href: "/owner/orders",
+    href: "/owner",
   },
   order_edited: {
     title: "Order updated",
     body: "An order was updated.",
-    href: "/owner/orders",
+    href: "/owner",
   },
   approval_required: {
     title: "Approval required",
@@ -119,23 +119,51 @@ const PUSH_COPY: Record<
   last_minute: {
     title: "Last-minute order",
     body: "Urgent order activity needs attention.",
-    href: "/owner/orders",
+    href: "/owner",
   },
   fresh_pick_walk_in_hold_reminder: {
     title: "Fresh Pick hold reminder",
     body: "A Fresh Pick hold needs attention.",
-    href: "/owner/orders",
+    href: "/customer-operations/fresh-picks",
   },
   waiting_list_new_request: {
     title: "New waiting list request",
     body: "A customer joined the waiting list.",
-    href: "/owner/waiting-list",
+    href: "/bakery/availability#waiting-list-heading",
   },
 };
+
+const ORDER_NOTIFICATION_CODES = new Set<StaffNotificationCode>([
+  "new_order",
+  "order_paid",
+  "order_confirmed",
+  "order_cancelled",
+  "order_edited",
+  "last_minute",
+]);
+
+export function isStaffPushOrderNotificationCode(
+  code: StaffNotificationCode,
+): boolean {
+  return ORDER_NOTIFICATION_CODES.has(code);
+}
+
+export function resolveStaffPushHref(input: {
+  code: StaffNotificationCode;
+  orderId?: string | null;
+}): string {
+  if (isStaffPushOrderNotificationCode(input.code)) {
+    return input.orderId && isStaffNotificationEventId(input.orderId)
+      ? `/owner/orders/${input.orderId}`
+      : "/owner";
+  }
+  return PUSH_COPY[input.code].href;
+}
 
 export function buildStaffPushMessage(input: {
   eventId: string;
   code: StaffNotificationCode;
+  orderId?: string | null;
 }) {
   const copy = PUSH_COPY[input.code];
   return {
@@ -143,6 +171,6 @@ export function buildStaffPushMessage(input: {
     body: copy.body,
     tag: `whitebird-staff-${input.eventId}`,
     renotify: false as const,
-    data: { href: copy.href },
+    data: { href: resolveStaffPushHref(input) },
   };
 }

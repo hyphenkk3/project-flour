@@ -12,6 +12,7 @@ import {
   type StaffPushSender,
 } from "@/foundation/staff/staff-notification-push-delivery-core";
 import {
+  isStaffPushOrderNotificationCode,
   isStaffNotificationEventId,
   parseStaffPushSubscription,
 } from "@/foundation/staff/staff-notification-push-protocol";
@@ -243,8 +244,45 @@ export async function deliverPendingStaffPushNotifications(input: {
         subscriptionId: row.subscription_id,
         claimedUntil: row.claimed_until,
         code,
+        orderId: null,
         subscription,
       });
+    }
+
+    const orderEventIds = [
+      ...new Set(
+        claimed
+          .filter((delivery) => isStaffPushOrderNotificationCode(delivery.code))
+          .map((delivery) => delivery.eventId)
+          .filter(isStaffNotificationEventId),
+      ),
+    ];
+    if (orderEventIds.length > 0) {
+      const { data: events, error: eventError } = await admin
+        .from("staff_notification_events")
+        .select("id, order_id")
+        .in("id", orderEventIds);
+      if (eventError) {
+        console.error("[staff-push] Order destination lookup failed:", {
+          code: eventError.code ?? "unknown",
+        });
+      } else {
+        const orderIdByEventId = new Map<string, string | null>();
+        for (const event of events ?? []) {
+          orderIdByEventId.set(
+            event.id,
+            typeof event.order_id === "string" &&
+              isStaffNotificationEventId(event.order_id)
+              ? event.order_id
+              : null,
+          );
+        }
+        for (const delivery of claimed) {
+          if (isStaffPushOrderNotificationCode(delivery.code)) {
+            delivery.orderId = orderIdByEventId.get(delivery.eventId) ?? null;
+          }
+        }
+      }
     }
 
     const result = await deliverClaimedStaffPushNotifications({

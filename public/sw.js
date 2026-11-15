@@ -2,27 +2,27 @@ const STAFF_PUSH_COPY = {
   new_order: {
     title: "New order received",
     body: "A new preorder needs attention.",
-    href: "/owner/orders",
+    href: "/owner",
   },
   order_paid: {
     title: "Order paid",
     body: "An order payment was recorded.",
-    href: "/owner/orders",
+    href: "/owner",
   },
   order_confirmed: {
     title: "Order confirmed",
     body: "An order was confirmed.",
-    href: "/owner/orders",
+    href: "/owner",
   },
   order_cancelled: {
     title: "Order cancelled",
     body: "An order was cancelled.",
-    href: "/owner/orders",
+    href: "/owner",
   },
   order_edited: {
     title: "Order updated",
     body: "An order was updated.",
-    href: "/owner/orders",
+    href: "/owner",
   },
   approval_required: {
     title: "Approval required",
@@ -32,19 +32,37 @@ const STAFF_PUSH_COPY = {
   last_minute: {
     title: "Last-minute order",
     body: "Urgent order activity needs attention.",
-    href: "/owner/orders",
+    href: "/owner",
   },
   fresh_pick_walk_in_hold_reminder: {
     title: "Fresh Pick hold reminder",
     body: "A Fresh Pick hold needs attention.",
-    href: "/owner/orders",
+    href: "/customer-operations/fresh-picks",
   },
   waiting_list_new_request: {
     title: "New waiting list request",
     body: "A customer joined the waiting list.",
-    href: "/owner/waiting-list",
+    href: "/bakery/availability#waiting-list-heading",
   },
 };
+
+const STAFF_ORDER_CODES = new Set([
+  "new_order",
+  "order_paid",
+  "order_confirmed",
+  "order_cancelled",
+  "order_edited",
+  "last_minute",
+]);
+const STAFF_ORDER_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function staffNotificationHref(code, orderId) {
+  if (!STAFF_ORDER_CODES.has(code)) return STAFF_PUSH_COPY[code].href;
+  return typeof orderId === "string" && STAFF_ORDER_ID.test(orderId)
+    ? `/owner/orders/${orderId}`
+    : "/owner";
+}
 
 self.addEventListener("push", (event) => {
   let message;
@@ -69,7 +87,7 @@ self.addEventListener("push", (event) => {
       badge: "/icons/whitebird-w-bird-icon-192.png",
       tag: `whitebird-staff-${message.eventId}`,
       renotify: false,
-      data: { href: copy.href },
+      data: { href: staffNotificationHref(message.code, message.orderId) },
     }),
   );
 });
@@ -79,11 +97,19 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   if (typeof href !== "string" || !href.startsWith("/")) return;
 
+  let target;
+  try {
+    const targetUrl = new URL(href, self.location.origin);
+    if (targetUrl.origin !== self.location.origin) return;
+    target = targetUrl.href;
+  } catch {
+    return;
+  }
+
   event.waitUntil(
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
       .then((clients) => {
-        const target = new URL(href, self.location.origin).href;
         const existing = clients.find((client) => {
           try {
             return new URL(client.url).origin === self.location.origin;

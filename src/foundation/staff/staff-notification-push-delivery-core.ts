@@ -8,6 +8,7 @@ export type ClaimedStaffPushDelivery = {
   subscriptionId: string;
   claimedUntil: string;
   code: StaffNotificationCode;
+  orderId: string | null;
   subscription: StaffPushSubscriptionInput;
 };
 
@@ -71,6 +72,7 @@ export async function deliverClaimedStaffPushNotifications(input: {
               version: 1,
               eventId: delivery.eventId,
               code: delivery.code,
+              orderId: delivery.orderId,
             }),
             urgency: delivery.code === "last_minute" ? "high" : "normal",
           });
