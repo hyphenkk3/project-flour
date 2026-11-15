@@ -195,57 +195,85 @@ async function testServiceWorkerNavigation() {
     "/bakery/availability#waiting-list-heading",
   );
 
-  let clickPending: Promise<unknown> | undefined;
-  let openedTarget = "";
-  let notificationClosed = false;
-  let clickListener: (event: MockServiceWorkerEvent) => void = () => {};
-  const clickSelf = {
-    location: { origin: "https://preview.example" },
-    addEventListener(
-      type: string,
-      listener: (event: MockServiceWorkerEvent) => void,
-    ) {
-      if (type === "notificationclick") clickListener = listener;
-    },
-    clients: {
-      async matchAll() {
-        return [];
+  async function clickTarget(origin: string, href: string) {
+    let clickPending: Promise<unknown> | undefined;
+    let openedTarget = "";
+    let notificationClosed = false;
+    let clickListener: (event: MockServiceWorkerEvent) => void = () => {};
+    const clickSelf = {
+      location: { origin },
+      addEventListener(
+        type: string,
+        listener: (event: MockServiceWorkerEvent) => void,
+      ) {
+        if (type === "notificationclick") clickListener = listener;
       },
-      async openWindow(url: string) {
-        openedTarget = url;
-        return url;
+      clients: {
+        async matchAll() {
+          return [];
+        },
+        async openWindow(url: string) {
+          openedTarget = url;
+          return url;
+        },
       },
-    },
-  };
-  runInNewContext(read("public/sw.js"), {
-    self: clickSelf,
-    URL,
-    Object,
-    Set,
-    Promise,
-  });
-  clickListener({
+    };
+    runInNewContext(read("public/sw.js"), {
+      self: clickSelf,
+      URL,
+      Object,
+      Set,
+      Promise,
+    });
+    clickListener({
+      notification: {
+        data: { href },
+        close() {
+          notificationClosed = true;
+        },
+      },
+      waitUntil(value: Promise<unknown>) {
+        clickPending = value;
+      },
+    });
+    await clickPending;
+    return { notificationClosed, openedTarget, clickListener };
+  }
+
+  const devTarget = await clickTarget(
+    "https://project-flour-dev.example",
+    `/owner/orders/${orderId}`,
+  );
+  assert.equal(devTarget.notificationClosed, true);
+  assert.equal(
+    devTarget.openedTarget,
+    `https://project-flour-dev.example/owner/orders/${orderId}`,
+  );
+  const productionTarget = await clickTarget(
+    "https://whitebird.asia",
+    `/owner/orders/${orderId}`,
+  );
+  assert.equal(
+    productionTarget.openedTarget,
+    `https://whitebird.asia/owner/orders/${orderId}`,
+  );
+  productionTarget.clickListener({
     notification: {
-      data: { href: `/owner/orders/${orderId}` },
-      close() {
-        notificationClosed = true;
-      },
+      data: { href: "//project-flour-dev.example/owner" },
+      close() {},
     },
-    waitUntil(value: Promise<unknown>) {
-      clickPending = value;
-    },
-  });
-  await clickPending;
-  assert.equal(notificationClosed, true);
-  assert.equal(openedTarget, `https://preview.example/owner/orders/${orderId}`);
-  const beforeExternalTarget = openedTarget;
-  clickListener({
-    notification: { data: { href: "//evil.example/" }, close() {} },
     waitUntil() {
-      assert.fail("External notification target must not be opened.");
+      assert.fail("A production worker must not open the DEV origin.");
     },
   });
-  assert.equal(openedTarget, beforeExternalTarget);
+  const beforeExternalTarget = devTarget.openedTarget;
+  devTarget.clickListener({
+    notification: { data: { href: "//whitebird.asia/owner" }, close() {} },
+    waitUntil() {
+      assert.fail("A DEV worker must not open the Production origin.");
+    },
+  });
+  assert.equal(devTarget.openedTarget, beforeExternalTarget);
 }
 
 async function main() {
@@ -279,6 +307,26 @@ async function main() {
   assert.match(
     read("src/app/(app)/bakery/availability/page.tsx"),
     /requireStaff\(\)/,
+  );
+  assert.match(
+    read("src/workspaces/owner/OwnerOrderDetail.tsx"),
+    /canAccessGuestOrderWorkspace/,
+  );
+  assert.match(
+    read("src/app/(app)/owner/approvals/page.tsx"),
+    /canAccessOperationsApprovalsInbox/,
+  );
+  assert.match(
+    read("src/app/(app)/customer-operations/fresh-picks/page.tsx"),
+    /canViewWalkInHold/,
+  );
+  assert.match(
+    read("src/app/(app)/bakery/availability/page.tsx"),
+    /canViewOrderAvailability/,
+  );
+  assert.match(
+    read("src/foundation/staff/staff-notification-push-client.ts"),
+    /navigator\.serviceWorker\.register\("\/sw\.js",\s*\{\s*scope: "\/",\s*updateViaCache: "none"/,
   );
   const sent: Array<{ payload: string; urgency: string }> = [];
   const completed: Array<{ status: string; revoke: boolean }> = [];
