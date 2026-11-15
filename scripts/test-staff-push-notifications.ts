@@ -138,6 +138,29 @@ async function main() {
   });
   assert.equal(revoked, true);
 
+  let acceptanceRevoke = true;
+  const acceptanceExpired = await deliverClaimedStaffPushNotifications({
+    claimed,
+    revokeInvalidSubscriptions: false,
+    sender: {
+      async send() {
+        throw Object.assign(new Error("expired"), { statusCode: 410 });
+      },
+    },
+    async complete(input) {
+      acceptanceRevoke = Boolean(input.revokeSubscription);
+      return true;
+    },
+  });
+  assert.deepEqual(acceptanceExpired, {
+    sent: 0,
+    failed: 1,
+    revoked: 0,
+    suppressed: 0,
+    completionUnrecorded: 0,
+  });
+  assert.equal(acceptanceRevoke, false);
+
   const transient = await deliverClaimedStaffPushNotifications({
     claimed,
     sender: {
@@ -304,6 +327,36 @@ async function main() {
     dispatcher,
     /staff_notification_fresh_pick_hold_reminder_is_current/,
   );
+  assert.match(dispatcher, /failClosed\?: boolean/);
+  assert.match(dispatcher, /preserveSubscriptions\?: boolean/);
+  assert.match(
+    dispatcher,
+    /input\.failClosed && result\.completionUnrecorded > 0/,
+  );
+
+  const acceptanceRoute = read(
+    "src/app/api/staff/notifications/dev-push-acceptance/route.ts",
+  );
+  assert.match(acceptanceRoute, /authorizeMasterOwner\(session\)/);
+  assert.match(acceptanceRoute, /validateRequestOrigin/);
+  assert.match(acceptanceRoute, /runOneShotAcceptance/);
+  assert.match(acceptanceRoute, /emit_staff_notification_event/);
+  assert.match(acceptanceRoute, /failClosed: true/);
+  assert.match(acceptanceRoute, /preserveSubscriptions: true/);
+  assert.doesNotMatch(
+    acceptanceRoute,
+    /retryPendingStaffPushNotifications|push-retry|deliverPendingStaffNotificationEmails/,
+  );
+  assert.match(acceptanceRoute, /dispatchConfigDisabled/);
+  assert.match(acceptanceRoute, /deliveryQueueEmpty/);
+  assert.match(acceptanceRoute, /fixedEventKeyAbsent/);
+  const acceptanceCore = read(
+    "src/foundation/staff/dev-push-acceptance-core.mjs",
+  );
+  assert.match(acceptanceCore, /DEV_PUSH_ACCEPTANCE_EVENT_KEY/);
+  assert.match(acceptanceCore, /p_order_id: null/);
+  assert.match(acceptanceCore, /p_approval_id: null/);
+  assert.match(acceptanceCore, /dispatch_ambiguous_503/);
 
   const handoffFixture = read(
     "scripts/fixtures/20261111110823_staff_notification_fresh_pick_push_handoff.sql",

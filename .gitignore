@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+/scripts/.one-shot-dev-push-acceptance/
 
 # next.js
 /.next/

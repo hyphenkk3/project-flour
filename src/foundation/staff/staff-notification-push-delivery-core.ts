@@ -42,6 +42,8 @@ export async function deliverClaimedStaffPushNotifications(input: {
   beforeSend?: (
     delivery: ClaimedStaffPushDelivery,
   ) => Promise<StaffPushPreSendResult>;
+  /** Preserve subscription records for explicitly controlled acceptance attempts. */
+  revokeInvalidSubscriptions?: boolean;
 }): Promise<{
   sent: number;
   failed: number;
@@ -79,7 +81,9 @@ export async function deliverClaimedStaffPushNotifications(input: {
       } catch (error) {
         const statusCode = pushStatusCode(error);
         errorCode = statusCode ? `http_${statusCode}` : "transport_error";
-        revokeSubscription = statusCode === 404 || statusCode === 410;
+        revokeSubscription =
+          input.revokeInvalidSubscriptions !== false &&
+          (statusCode === 404 || statusCode === 410);
         if (revokeSubscription) revoked = 1;
       }
 
