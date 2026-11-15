@@ -4,16 +4,12 @@ import { useState } from "react";
 
 const CONFIRMATIONS = [
   {
-    key: "sevenWebEligibleStaffAcknowledged",
-    text: "I accept that seven staff are Web-eligible for New Order.",
-  },
-  {
-    key: "sixOtherListenersCoordinated",
-    text: "I coordinated the six other Web-eligible listeners and they are inactive for this test.",
+    key: "devWebAudienceAccepted",
+    text: "I understand that this DEV test notification may appear in any of the seven Web-eligible DEV staff accounts, all of which I control. No Production staff account or customer is an intended recipient.",
   },
   {
     key: "threeOwnerSubscriptionsAccountedFor",
-    text: "I account for all three Owner Push subscriptions; either older unmapped device may also receive this one Push.",
+    text: "I confirm that all three active DEV Push subscriptions belong to my iPhone, and I accept that this single test event may produce multiple notification displays.",
   },
   {
     key: "iphonePermissionAndForceCloseReady",
@@ -106,6 +102,9 @@ export function DevPushAcceptancePanel({
   return (
     <div className="space-y-5 rounded-lg border border-slate-300 bg-white p-4 shadow-sm sm:p-6">
       <div className="space-y-1 text-sm text-slate-700">
+        <p className="font-bold tracking-wide text-amber-800">
+          DEV TEST — NOT A REAL ORDER
+        </p>
         <p>
           <span className="font-semibold text-slate-950">
             Preview deployment:

@@ -36,8 +36,7 @@ const goodActor = {
   role: { code: "owner" },
 };
 const goodConfirmations = {
-  sevenWebEligibleStaffAcknowledged: true,
-  sixOtherListenersCoordinated: true,
+  devWebAudienceAccepted: true,
   threeOwnerSubscriptionsAccountedFor: true,
   iphonePermissionAndForceCloseReady: true,
   freshPickScheduleVerifiedDisabled: true,
@@ -233,6 +232,30 @@ test("accepts only the fixed arm/execute request and exact safety confirmations"
   );
 });
 
+test("requires every acknowledgement, including both accepted audience statements", () => {
+  for (const key of Object.keys(goodConfirmations)) {
+    assert.equal(
+      validateActionBody({
+        ...validBody(),
+        confirmations: { ...goodConfirmations, [key]: false },
+      }).ok,
+      false,
+      key,
+    );
+  }
+  assert.equal(
+    validateActionBody({
+      ...validBody(),
+      confirmations: {
+        ...goodConfirmations,
+        sixOtherListenersCoordinated: true,
+        devWebAudienceAccepted: undefined,
+      },
+    }).ok,
+    false,
+  );
+});
+
 test("arms only the exact deployment ID and source SHA", () => {
   const identity = inspectDeploymentIdentity(environment);
   const arm = deploymentArmValue(identity);
@@ -296,9 +319,59 @@ test("fixed synthetic event has no business references or caller-controlled fiel
   assert.equal(payload.p_code, "new_order");
   assert.equal(payload.p_order_id, null);
   assert.equal(payload.p_approval_id, null);
-  assert.match(payload.p_title, /SYNTHETIC/);
+  assert.equal(payload.p_title, "DEV TEST — NOT A REAL ORDER");
+  assert.match(payload.p_description, /Synthetic DEV/);
   assert.equal(payload.p_payload.synthetic, true);
   assert.equal(Object.keys(payload).includes("eventId"), false);
+});
+
+test("action disclosure matches the accepted Owner-controlled DEV audience", () => {
+  const panel = readFileSync(
+    resolve("src/components/staff/DevPushAcceptancePanel.tsx"),
+    "utf8",
+  );
+  const page = readFileSync(
+    resolve("src/app/(app)/owner/dev-push-acceptance/page.tsx"),
+    "utf8",
+  );
+  assert.match(panel, /key: "devWebAudienceAccepted"/);
+  assert.match(
+    panel,
+    /may appear in any of the seven Web-eligible DEV staff accounts, all of which I control/,
+  );
+  assert.match(
+    panel,
+    /all three active DEV Push subscriptions belong to my iPhone/,
+  );
+  assert.match(
+    panel,
+    /I accept that this single test event may produce multiple notification displays/,
+  );
+  assert.match(panel, /checked=\{acknowledged\[key\] === true\}/);
+  assert.match(panel, /useState<Record<string, boolean>>\(\{\}\)/);
+  assert.match(panel, /!allConfirmed/);
+  assert.doesNotMatch(
+    `${panel}\n${page}`,
+    /sixOtherListenersCoordinated|listeners and they are inactive|older subscriptions have not been mapped/,
+  );
+  assert.match(page, /DEV TEST — NOT A REAL ORDER/);
+  assert.match(
+    page.replace(/\s+/g, " "),
+    /No Production staff account or customer is an intended recipient/,
+  );
+  assert.doesNotMatch(
+    page,
+    /runOneShotAcceptance|emit_staff_notification_event|deliverPendingStaffPushNotifications/,
+  );
+  assert.doesNotMatch(page, /fetch\(/);
+  const route = readFileSync(
+    resolve("src/app/api/staff/notifications/dev-push-acceptance/route.ts"),
+    "utf8",
+  );
+  assert.match(
+    route,
+    /activeStaff: 7,[\s\S]*?newOrderWeb: 7,[\s\S]*?newOrderSound: 1,[\s\S]*?newOrderPushStaff: 1,[\s\S]*?ownerSubscriptions: 3/,
+  );
 });
 
 test("dispatches exactly the UUID returned by one creation call", async () => {

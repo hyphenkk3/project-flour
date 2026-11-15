@@ -17,8 +17,7 @@ export const DEV_PUSH_ACCEPTANCE_CORRELATION =
   "staff-push-acceptance:tranche2:iphone-one-shot-v1";
 
 const CONFIRMATION_KEYS = Object.freeze([
-  "sevenWebEligibleStaffAcknowledged",
-  "sixOtherListenersCoordinated",
+  "devWebAudienceAccepted",
   "threeOwnerSubscriptionsAccountedFor",
   "iphonePermissionAndForceCloseReady",
   "freshPickScheduleVerifiedDisabled",
@@ -190,8 +189,9 @@ export function makeFixedSyntheticEvent() {
     p_code: "new_order",
     p_order_id: null,
     p_approval_id: null,
-    p_title: "[DEV SYNTHETIC PUSH ACCEPTANCE]",
-    p_description: "Synthetic DEV staff notification test; no customer order.",
+    p_title: "DEV TEST — NOT A REAL ORDER",
+    p_description:
+      "Synthetic DEV New Order notification for Push acceptance; no real order.",
     p_href: "/owner/orders",
     p_payload: {
       synthetic: true,

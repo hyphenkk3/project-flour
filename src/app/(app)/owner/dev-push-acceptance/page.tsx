@@ -27,6 +27,9 @@ export default async function DevPushAcceptancePage() {
         <h1 className="text-2xl font-bold text-slate-950">
           One-shot iPhone Push acceptance
         </h1>
+        <p className="text-sm font-bold tracking-wide text-amber-700">
+          DEV TEST — NOT A REAL ORDER
+        </p>
         <p className="text-sm leading-6 text-slate-700">
           This action is available only on the approved protected DEV Preview.
           Arming is read-only. The second confirmation creates one fixed
@@ -39,11 +42,11 @@ export default async function DevPushAcceptancePage() {
       <section className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
         <h2 className="font-semibold">Before continuing</h2>
         <p className="mt-2">
-          The expected audience is seven Web-eligible staff, one Sound-eligible
-          staff member, and one Push-eligible staff account with three Owner
-          subscriptions. Any of those three devices may display the Push; two
-          older subscriptions have not been mapped to physical devices. Six
-          non-Owner Web listeners must already be coordinated inactive.
+          This DEV test notification may appear in any of the seven Web-eligible
+          DEV staff accounts, all of which the Owner controls. No Production
+          staff account or customer is an intended recipient. One Owner account
+          is Push-eligible and has three active subscriptions, all belonging to
+          the Owner&apos;s iPhone; multiple notification displays are possible.
         </p>
         <p className="mt-2">
           The one-minute extra walk-in hold reminder and expiry jobs were
