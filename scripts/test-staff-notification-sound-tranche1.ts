@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 import {
   playStaffNotificationSound,
+  scheduleStaffNotificationSoundIfReady,
   shouldPlayStaffNotificationSound,
 } from "../src/foundation/staff/staff-notification-sound";
 import { STAFF_NOTIFICATION_DEFAULT_SOUND_ENABLED } from "../src/foundation/staff/notification-preferences";
@@ -158,6 +159,8 @@ assert.match(preferenceAction, /sound_enabled/);
 assert.match(preferenceAction, /soundEnabledValue\s*\?/);
 assert.match(listener, /preference\.soundEnabled === true/);
 assert.match(listener, /claimStaffNotificationForStaff/);
+assert.match(listener, /scheduleStaffNotificationSoundIfReady/);
+assert.match(listener, /`sound:\$\{event\.id\}`/);
 assert.match(listener, /ownership: "duplicate_suppressed"/);
 assert.match(
   soundMigration,
@@ -215,6 +218,16 @@ assert.equal(
 contexts[0].state = "suspended";
 resumeMode = "reject";
 const scheduledBeforeRejectedResume = createdNodes.length;
+const eventWithoutGesture = scheduleStaffNotificationSoundIfReady({
+  eventId: "10000000-0000-4000-8000-000000000003a",
+  ownership: "winner",
+  soundEnabled: true,
+  eligible: true,
+});
+assert.equal(eventWithoutGesture.playback, "not-attempted");
+assert.equal(eventWithoutGesture.restriction, "activation-required");
+assert.equal(createdNodes.length, scheduledBeforeRejectedResume);
+
 const rejectedResume = await playStaffNotificationSound({
   eventId: "10000000-0000-4000-8000-000000000003",
   ownership: "winner",

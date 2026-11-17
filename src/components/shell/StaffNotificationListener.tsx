@@ -21,8 +21,8 @@ import {
 } from "@/foundation/staff/staff-notification-recovery";
 import { normalizeLiveNotificationEvent } from "@/foundation/staff/staff-notification-live-fallback";
 import {
-  playStaffNotificationSound,
   recordStaffNotificationSoundOwnership,
+  scheduleStaffNotificationSoundIfReady,
 } from "@/foundation/staff/staff-notification-sound";
 
 type NotificationRow = RecoverableStaffNotificationEvent & {
@@ -96,14 +96,7 @@ export function StaffNotificationListener({
           if (webEligible) {
             toast(buildStaffNotificationToast(event, preference.webMode));
           }
-          if (soundEligible && !recovered) {
-            void playStaffNotificationSound({
-              eventId: event.id,
-              ownership: "winner",
-              soundEnabled: true,
-              eligible: true,
-            });
-          } else if (!soundEligible) {
+          if (!soundEligible) {
             recordStaffNotificationSoundOwnership({
               eventId: event.id,
               ownership: "winner",
@@ -126,22 +119,6 @@ export function StaffNotificationListener({
           soundAttempted: soundEligible && !recovered,
           recovered,
         });
-        if (soundEligible && recovered) {
-          const priority = [
-            "order_cancelled",
-            "approval_required",
-            "last_minute",
-            "fresh_pick_walk_in_hold_reminder",
-          ].includes(event.code)
-            ? 2
-            : 1;
-          if (
-            !recoveredSoundRef.current ||
-            priority > recoveredSoundRef.current.priority
-          ) {
-            recoveredSoundRef.current = { eventId: event.id, priority };
-          }
-        }
       } else {
         recordStaffNotificationSoundOwnership({
           eventId: event.id,
@@ -157,6 +134,70 @@ export function StaffNotificationListener({
           soundAttempted: false,
           recovered,
         });
+      }
+
+      if (soundEligible && recovered) {
+        const priority = [
+          "order_cancelled",
+          "approval_required",
+          "last_minute",
+          "fresh_pick_walk_in_hold_reminder",
+        ].includes(event.code)
+          ? 2
+          : 1;
+        if (
+          !recoveredSoundRef.current ||
+          priority > recoveredSoundRef.current.priority
+        ) {
+          recoveredSoundRef.current = { eventId: event.id, priority };
+        }
+      }
+
+      if (soundEligible && !recovered) {
+        const soundResultRef: {
+          current: ReturnType<
+            typeof scheduleStaffNotificationSoundIfReady
+          > | null;
+        } = { current: null };
+        const soundClaim = await claimStaffNotificationForStaff(
+          staffId,
+          `sound:${event.id}`,
+          () => {
+            soundResultRef.current = scheduleStaffNotificationSoundIfReady({
+              eventId: event.id,
+              ownership: "winner",
+              soundEnabled: true,
+              eligible: true,
+            });
+            const result = soundResultRef.current;
+            if (result.playback !== "scheduled") {
+              // Do not persist a claim when autoplay or background suspension
+              // prevents this tab from scheduling audio. Another tab can try.
+              throw new Error("sound_not_ready");
+            }
+          },
+        );
+        if (soundClaim.claimed) {
+          console.info("[staff-notifications] sound claim", {
+            eventId: event.id,
+            ownership: "winner",
+            playback: soundResultRef.current?.playback ?? "scheduled",
+          });
+        } else if (soundClaim.presentationFailed) {
+          console.info("[staff-notifications] sound claim", {
+            eventId: event.id,
+            ownership: "audio_not_ready",
+            playback: soundResultRef.current?.playback ?? "not-attempted",
+            restriction: soundResultRef.current?.restriction ?? "resume-failed",
+          });
+        } else {
+          recordStaffNotificationSoundOwnership({
+            eventId: event.id,
+            ownership: "duplicate_suppressed",
+            soundEnabled: true,
+            eligible: true,
+          });
+        }
       }
     },
     [preferenceFor, staffId, toast],
@@ -232,11 +273,36 @@ export function StaffNotificationListener({
         setRecoveryRunning(false);
         const recoveredSound = takeRecoveredSoundCandidate(recoveredSoundRef);
         if (recoveredSound) {
-          void playStaffNotificationSound({
-            eventId: recoveredSound.eventId,
-            ownership: "winner",
-            soundEnabled: true,
-            eligible: true,
+          const soundResultRef: {
+            current: ReturnType<
+              typeof scheduleStaffNotificationSoundIfReady
+            > | null;
+          } = { current: null };
+          void claimStaffNotificationForStaff(
+            staffId,
+            `sound:${recoveredSound.eventId}`,
+            () => {
+              soundResultRef.current = scheduleStaffNotificationSoundIfReady({
+                eventId: recoveredSound.eventId,
+                ownership: "winner",
+                soundEnabled: true,
+                eligible: true,
+              });
+              if (soundResultRef.current.playback !== "scheduled") {
+                throw new Error("sound_not_ready");
+              }
+            },
+          ).then((claim) => {
+            if (claim.presentationFailed) {
+              console.info(
+                "[staff-notifications] recovered sound not scheduled",
+                {
+                  eventId: recoveredSound.eventId,
+                  restriction:
+                    soundResultRef.current?.restriction ?? "resume-failed",
+                },
+              );
+            }
           });
         }
         if (recoveryAgainRef.current) {

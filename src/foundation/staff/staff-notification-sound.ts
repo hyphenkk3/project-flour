@@ -31,7 +31,12 @@ export type StaffNotificationSoundResult = {
   contextState: "running" | "suspended" | "closed" | "unavailable";
   resume: "not-needed" | "succeeded" | "failed" | "timeout";
   playback: "scheduled" | "failed" | "not-attempted";
-  restriction: "none" | "unsupported" | "resume-failed" | "schedule-failed";
+  restriction:
+    | "none"
+    | "unsupported"
+    | "activation-required"
+    | "resume-failed"
+    | "schedule-failed";
 };
 
 export function shouldPlayStaffNotificationSound(input: {
@@ -113,6 +118,133 @@ function getAudioContext(): AudioContext | null {
   }
 }
 
+function scheduleCue(
+  audio: AudioContext,
+  eventId: string,
+  ownership: StaffNotificationSoundDiagnostic["ownership"],
+  soundEnabled: boolean,
+  eligible: boolean,
+  before: StaffNotificationSoundResult["contextState"],
+  resume: StaffNotificationSoundResult["resume"],
+): StaffNotificationSoundResult {
+  const scheduled: AudioNode[] = [];
+  try {
+    const startAt = audio.currentTime;
+    for (const [offset, frequency] of [
+      [0, 880],
+      [0.14, 660],
+    ] as const) {
+      const oscillator = audio.createOscillator();
+      const gain = audio.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency, startAt + offset);
+      gain.gain.setValueAtTime(0.0001, startAt + offset);
+      gain.gain.exponentialRampToValueAtTime(0.12, startAt + offset + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startAt + offset + 0.12);
+      oscillator.connect(gain);
+      gain.connect(audio.destination);
+      oscillator.onended = () => {
+        try {
+          oscillator.disconnect();
+          gain.disconnect();
+        } catch {
+          /* already released */
+        }
+      };
+      scheduled.push(oscillator, gain);
+      oscillator.start(startAt + offset);
+      oscillator.stop(startAt + offset + 0.13);
+    }
+    const result: StaffNotificationSoundResult = {
+      contextState: safeState(audio),
+      resume,
+      playback: "scheduled",
+      restriction: "none",
+    };
+    diagnostic("playback_result", eventId, ownership, soundEnabled, eligible, {
+      audioContextBefore: before,
+      audioContextAfter: result.contextState,
+      resumeAttempted: before !== "running",
+      resume: result.resume,
+      playback: result.playback,
+      restriction: result.restriction,
+    });
+    return result;
+  } catch {
+    for (const node of scheduled) {
+      try {
+        node.disconnect();
+      } catch {
+        /* best-effort cleanup */
+      }
+    }
+    const result: StaffNotificationSoundResult = {
+      contextState: safeState(audio),
+      resume,
+      playback: "failed",
+      restriction: "schedule-failed",
+    };
+    diagnostic("playback_result", eventId, ownership, soundEnabled, eligible, {
+      audioContextBefore: before,
+      audioContextAfter: result.contextState,
+      resumeAttempted: before !== "running",
+      resume: result.resume,
+      playback: result.playback,
+      restriction: result.restriction,
+    });
+    return result;
+  }
+}
+
+/**
+ * Schedules an event cue only when this tab's AudioContext is already running.
+ * Call this inside the cross-tab claim so a tab blocked by autoplay does not
+ * consume the event for a different, audio-ready tab.
+ */
+export function scheduleStaffNotificationSoundIfReady(
+  context: Partial<StaffNotificationSoundDiagnostic> = {},
+): StaffNotificationSoundResult {
+  const eventId = context.eventId ?? "unknown-event";
+  const ownership = context.ownership ?? "winner";
+  const soundEnabled = context.soundEnabled ?? true;
+  const eligible = context.eligible ?? true;
+  const audio = getAudioContext();
+  const before = safeState(audio);
+
+  if (!audio || audio.state !== "running") {
+    const result: StaffNotificationSoundResult = {
+      contextState: before,
+      resume: "failed",
+      playback: "not-attempted",
+      restriction: audio ? "activation-required" : "unsupported",
+    };
+    diagnostic(
+      audio ? "activation_required" : "unavailable",
+      eventId,
+      ownership,
+      soundEnabled,
+      eligible,
+      {
+        audioContextBefore: before,
+        resumeAttempted: false,
+        playback: result.playback,
+        restriction: result.restriction,
+      },
+    );
+    return result;
+  }
+
+  return scheduleCue(
+    audio,
+    eventId,
+    ownership,
+    soundEnabled,
+    eligible,
+    before,
+    "not-needed",
+  );
+}
+
 /** Uses one shared context and cue for the settings test and eligible notifications. */
 export async function playStaffNotificationSound(
   context: Partial<StaffNotificationSoundDiagnostic> = {},
@@ -187,71 +319,13 @@ export async function playStaffNotificationSound(
     return result;
   }
 
-  const scheduled: AudioNode[] = [];
-  try {
-    const startAt = audio.currentTime;
-    for (const [offset, frequency] of [
-      [0, 880],
-      [0.14, 660],
-    ] as const) {
-      const oscillator = audio.createOscillator();
-      const gain = audio.createGain();
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(frequency, startAt + offset);
-      gain.gain.setValueAtTime(0.0001, startAt + offset);
-      gain.gain.exponentialRampToValueAtTime(0.12, startAt + offset + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, startAt + offset + 0.12);
-      oscillator.connect(gain);
-      gain.connect(audio.destination);
-      oscillator.onended = () => {
-        try {
-          oscillator.disconnect();
-          gain.disconnect();
-        } catch {
-          /* already released */
-        }
-      };
-      scheduled.push(oscillator, gain);
-      oscillator.start(startAt + offset);
-      oscillator.stop(startAt + offset + 0.13);
-    }
-    const result: StaffNotificationSoundResult = {
-      contextState: safeState(audio),
-      resume,
-      playback: "scheduled",
-      restriction: "none",
-    };
-    diagnostic("playback_result", eventId, ownership, soundEnabled, eligible, {
-      audioContextBefore: before,
-      audioContextAfter: result.contextState,
-      resumeAttempted: before !== "running",
-      resume: result.resume,
-      playback: result.playback,
-      restriction: result.restriction,
-    });
-    return result;
-  } catch {
-    for (const node of scheduled) {
-      try {
-        node.disconnect();
-      } catch {
-        /* best-effort cleanup */
-      }
-    }
-    const result: StaffNotificationSoundResult = {
-      contextState: safeState(audio),
-      resume,
-      playback: "failed",
-      restriction: "schedule-failed",
-    };
-    diagnostic("playback_result", eventId, ownership, soundEnabled, eligible, {
-      audioContextBefore: before,
-      audioContextAfter: result.contextState,
-      resumeAttempted: before !== "running",
-      resume: result.resume,
-      playback: result.playback,
-      restriction: result.restriction,
-    });
-    return result;
-  }
+  return scheduleCue(
+    audio,
+    eventId,
+    ownership,
+    soundEnabled,
+    eligible,
+    before,
+    resume,
+  );
 }

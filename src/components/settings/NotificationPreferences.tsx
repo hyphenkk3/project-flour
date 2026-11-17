@@ -156,7 +156,8 @@ export function NotificationPreferences({
           <p className="text-ink text-sm font-medium">Sound check</p>
           <p className="text-skyline mt-0.5 text-xs">
             Play one manual cue without changing preferences or sending a
-            notification.
+            notification. Use Test Sound in each open tab where you want alerts;
+            browsers can block audio until a user gesture.
           </p>
           {soundTestResult ? (
             <p className="text-skyline mt-1 text-xs" role="status">

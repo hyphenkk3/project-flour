@@ -4403,3 +4403,38 @@ After the Owner’s explicit GO, the exact execution phrase required by the prot
 - This clean candidate is eligible for one controlled DEV Preview integration/deployment using a normal fast-forward onto the existing branch, retaining the eight branch-scoped DEV variables, Preview SSO, generated `vercel.app` host, and existing aliases/domains unchanged. The prior Tranche 1 Preview `dpl_5i2fCAJhxQ8zc4zjrgQ6e4An6J6y` and the previous Tranche 2 Preview `dpl_F1G2toWCkBZqnHaHah6Xennt95CD` remain recovery references. The temporary-action Preview `dpl_CbQajdKqg5tRpUsfoSD45MPv6J2p` is retained as historical evidence and is not the clean rollback target.
 - No new deployment is recorded in this entry. After clean Preview deployment, verify exact commit/tree, DEV binding, SSO and domain stability, and absence of the temporary route without sending a request to any mutating endpoint. No notification test is authorized or needed for cleanup.
 - Remaining: exact old 404 URLs/origins unknown; tap navigation requires a separate source correction and qualification; automatic two-tab Sound remains unresolved; Home Screen session persistence remains unverified; device foreground/background behavior remains unqualified. Physical iPhone receipt for the one force-closed observation remains PASS. Production remains HOLD pending separate release authorization and the future tap-navigation correction.
+
+## 2026-11-17 — Exact DEV Sound source recovery and two-tab reliability candidate
+
+**Scope:** Recover the source behind DEV deployment `dpl_E1Juj59C6DbM2HmxctHo1iVP5gd5` and correct only Sound playback claiming. No Production source, database, deployment, migration, configuration, Push, Email, Fresh Pick schedule, or Dine In behavior was changed.
+
+### Source identity and preservation
+
+- Recovered the exact deployment source from the authorized GitHub repository branch `codex/staff-notifications-dev-20261109`: commit `d7e7a62ab2eb47dbbc38d22812dbe5760779636d`, tree `3957b1a66ba5473c5b0a372ade3762ca1e7866cb`; parent is `6ec43a823e8d96977c3d719c54abf4b81d0aacbb`. Vercel deployment metadata identifies the same commit and branch. This is exact source recovery, not reconstruction from the deployment bundle.
+- A separate persistent clone at `/Users/ycwee/Desktop/project-flour-recovery/recovered-dev-source-d7e7` passed `git fsck --full --no-reflogs --strict` and exact HEAD/tree checks before edits. The live deployment remains unchanged.
+- Working candidate branch: `codex/staff-sound-reliability-20261117`, based directly on the recovered commit above. Its final commit identity is recorded by this documentation commit and the branch ref after commit.
+
+### Sound correction
+
+- Existing Sound preference remains default OFF. Existing enable/disable persistence and Settings controls remain. The manual Test Sound control remains and its hint now explains that each tab may require a user gesture.
+- Root cause: the old listener tied Sound playback to the shared Web-toast claim and called an asynchronous audio resume after that claim had already been persisted. A tab whose AudioContext was suspended could therefore win the event claim, fail to produce a cue, and prevent an audio-ready second tab from handling it.
+- The candidate keeps Web-toast deduplication separate from Sound. Each eligible tab requests an event-specific `sound:<event UUID>` claim. While holding the existing cross-tab claim, it synchronously schedules only if that tab's AudioContext is already running. If not, the callback fails before persistence, leaving another ready tab able to claim. Once a cue is scheduled, the shared claim suppresses duplicate audio. No polling, subscription, schema, migration, event producer, Push, Email or scheduler change was added.
+- Recovery-delivered sound candidates also use the event-specific cross-tab claim. Browser autoplay restrictions remain respected: a tab that has not received a user gesture does not force resume in response to a background event and does not consume the claim.
+
+### Qualification evidence
+
+- `npm run test:staff-notification-sound` — **PASS**. Existing Sound checks plus new isolated two-tab simulations cover a single tab, two ready tabs with one scheduled cue, a suspended first tab followed by a ready second tab, both tabs suspended without consuming the claim, and later retry after a user gesture. These are automated simulations, not physical browser audibility.
+- `npm run build` — **PASS** on Next.js 16.2.12; TypeScript phase completed and static page generation reached 47/47. Existing middleware-to-proxy deprecation and workspace-root inference warnings remain; no configuration change was made for them.
+- Focused ESLint on the changed listener, Sound module, Settings UI, and test files — **PASS**.
+- Prettier check and `git diff --check` — **PASS**.
+- Standalone `npx tsc --noEmit` was started but did not finish within the bounded observation and was interrupted. The production build's own TypeScript phase completed successfully.
+- No physical two-tab browser event has yet been observed. No synthetic notification event was inserted for this qualification. Audio scheduling is not proof that a human heard the cue.
+
+### Status and next gate
+
+- Exact source: **EXACT RECOVERED**.
+- Sound implementation: **VERIFIED in source and automated simulations**; physical audibility remains unverified.
+- Two-tab playback: **automated simulated deduplication/fallback PASS; real-browser event playback UNTESTED**.
+- Existing DEV deployment `dpl_E1Juj59C6DbM2HmxctHo1iVP5gd5`: **UNCHANGED**. This candidate is not yet deployed.
+- Sound release: **READY FOR OWNER ACCEPTANCE only after a separate DEV Preview is created from this branch and hosted UI is read-only checked**. The smallest physical acceptance is for the Owner to open that Preview in two tabs, click Test Sound in each tab once to satisfy browser activation, then observe one real DEV operational notification event and report whether exactly one tab audibly played it. No Push is needed.
+- Push remains a separate HOLD: the 18 event-UUID callers and the failed event-scoped behavior check are unresolved. Pending notification migrations remain unapplied to Production. Email stays frozen; Fresh Pick scheduling and Push remain disabled. Production remains HOLD.
