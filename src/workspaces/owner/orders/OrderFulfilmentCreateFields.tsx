@@ -1,8 +1,10 @@
-import { FormField, FormInput } from "@/components/ui/form";
+import { FormField, FormInput, FormTextarea } from "@/components/ui/form";
+import { DineInVenuePartyFields } from "@/components/ui/DineInVenuePartyFields";
 import { OwnerPickupFields } from "@/components/ui/OwnerPickupFields";
 import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
+import { DINE_IN_VENUES } from "@/engines/business-calendar/dine-in-hours";
 import {
   OWNER_CREATE_FULFILMENT_OPTIONS,
   RECIPIENT_NOTIFY_OPTIONS,
@@ -11,6 +13,7 @@ import {
   type DeliveryCreateDraft,
   type OwnerCreateFulfilmentMethod,
 } from "@/engines/orders/fulfilment";
+import type { AssistedDineInDraft } from "@/engines/orders/assisted-fulfilment";
 import {
   LATE_ORDER_EDIT_SECTION_EXCLUDED,
   LATE_ORDER_EDIT_SECTION_PICKUP_INCLUDED,
@@ -18,8 +21,11 @@ import {
 import type { RecipientNotifyPreference } from "@/types/storefront";
 
 type OrderFulfilmentCreateFieldsProps = {
-  method: OwnerCreateFulfilmentMethod;
-  onMethodChange: (method: OwnerCreateFulfilmentMethod) => void;
+  method: OwnerCreateFulfilmentMethod | "dine_in";
+  onMethodChange: (method: OwnerCreateFulfilmentMethod | "dine_in") => void;
+  allowDineIn?: boolean;
+  dineIn?: AssistedDineInDraft;
+  onDineInChange?: (next: AssistedDineInDraft) => void;
   delivery: DeliveryCreateDraft;
   onDeliveryChange: (next: DeliveryCreateDraft) => void;
   customerName: string;
@@ -40,6 +46,9 @@ type OrderFulfilmentCreateFieldsProps = {
 export function OrderFulfilmentCreateFields({
   method,
   onMethodChange,
+  allowDineIn = false,
+  dineIn,
+  onDineInChange,
   delivery,
   onDeliveryChange,
   customerName,
@@ -54,9 +63,24 @@ export function OrderFulfilmentCreateFields({
   hoursSnapshot = OPERATING_HOURS_SEED,
 }: OrderFulfilmentCreateFieldsProps) {
   const isDelivery = method === "delivery";
+  const isDineIn = method === "dine_in";
   const showNotifyChoice = !delivery.sameAsCustomer;
-  const dateLabel = isDelivery ? "Delivery date" : "Pickup date";
-  const timeLabel = isDelivery ? "Delivery time" : "Pickup time";
+  const dateLabel = isDineIn
+    ? "Dine-in date"
+    : isDelivery
+      ? "Delivery date"
+      : "Pickup date";
+  const timeLabel = isDineIn
+    ? "Cake serving time"
+    : isDelivery
+      ? "Delivery time"
+      : "Pickup time";
+  const fulfilmentOptions = allowDineIn
+    ? [
+        ...OWNER_CREATE_FULFILMENT_OPTIONS,
+        { value: "dine_in" as const, label: "Dine-in" },
+      ]
+    : OWNER_CREATE_FULFILMENT_OPTIONS;
 
   function patchDelivery(patch: Partial<DeliveryCreateDraft>) {
     let next: DeliveryCreateDraft = { ...delivery, ...patch };
@@ -85,10 +109,10 @@ export function OrderFulfilmentCreateFields({
         ) : null}
         <div
           aria-label="Fulfilment method"
-          className="grid grid-cols-2 gap-2"
+          className={`grid gap-2 ${allowDineIn ? "grid-cols-3" : "grid-cols-2"}`}
           role="radiogroup"
         >
-          {OWNER_CREATE_FULFILMENT_OPTIONS.map((option) => {
+          {fulfilmentOptions.map((option) => {
             const selected = method === option.value;
             return (
               <button
@@ -99,7 +123,11 @@ export function OrderFulfilmentCreateFields({
                     : "border-fog text-ink hover:border-skyline hover:bg-mist inline-flex min-h-12 items-center justify-center rounded-lg border bg-white px-4 text-sm font-medium"
                 }
                 key={option.value}
-                onClick={() => onMethodChange(option.value)}
+                onClick={() =>
+                  onMethodChange(
+                    option.value as OwnerCreateFulfilmentMethod | "dine_in",
+                  )
+                }
                 role="radio"
                 type="button"
               >
@@ -116,7 +144,35 @@ export function OrderFulfilmentCreateFields({
         </p>
       ) : null}
 
-      {scheduleMode === "slots" ? (
+      {isDineIn ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField htmlFor="pickup_date" label={dateLabel}>
+            <FormInput
+              defaultValue={defaultDate}
+              id="pickup_date"
+              name="pickup_date"
+              onChange={(event) => onDateChange?.(event.target.value)}
+              required
+              type="date"
+            />
+          </FormField>
+          <FormField
+            help="Choose the cake serving time. It must be within 1 hour of the reservation and during venue hours."
+            htmlFor="pickup_time"
+            label={timeLabel}
+          >
+            <FormInput
+              defaultValue={defaultTime}
+              id="pickup_time"
+              name="pickup_time"
+              onChange={(event) => onTimeChange?.(event.target.value)}
+              required
+              step={15 * 60}
+              type="time"
+            />
+          </FormField>
+        </div>
+      ) : scheduleMode === "slots" ? (
         <PickupSlotFields
           dateLabel={dateLabel}
           defaultDate={defaultDate}
@@ -138,6 +194,73 @@ export function OrderFulfilmentCreateFields({
           timeLabel={timeLabel}
         />
       )}
+
+      {isDineIn && dineIn && onDineInChange ? (
+        <div className="border-fog space-y-4 rounded-lg border p-3">
+          <FormField
+            help="When the table reservation starts."
+            htmlFor="reservation_time"
+            label="Dine-in reservation time"
+          >
+            <FormInput
+              id="reservation_time"
+              name="reservation_time"
+              onChange={(event) =>
+                onDineInChange({
+                  ...dineIn,
+                  reservationTime: event.target.value,
+                })
+              }
+              required
+              step={15 * 60}
+              type="time"
+              value={dineIn.reservationTime}
+            />
+          </FormField>
+          <DineInVenuePartyFields
+            onChange={(party) =>
+              onDineInChange({
+                ...dineIn,
+                venue: party.venue,
+                adultCount: party.adultCount,
+                kidCount: party.kidCount,
+                toddlerCount: party.toddlerCount,
+                guestCount: String(
+                  Number(party.adultCount || 0) +
+                    Number(party.kidCount || 0) +
+                    Number(party.toddlerCount || 0),
+                ),
+              })
+            }
+            requireAcknowledgement={false}
+            value={{
+              venue: dineIn.venue,
+              adultCount: dineIn.adultCount,
+              kidCount: dineIn.kidCount,
+              toddlerCount: dineIn.toddlerCount,
+              whitebirdSplitSeatingAcknowledged: false,
+            }}
+            venues={[...DINE_IN_VENUES]}
+          />
+          <FormField
+            htmlFor="reservation_note"
+            label="Reservation note (optional)"
+          >
+            <FormTextarea
+              id="reservation_note"
+              name="reservation_note"
+              onChange={(event) =>
+                onDineInChange({
+                  ...dineIn,
+                  reservationNote: event.target.value,
+                })
+              }
+              rows={3}
+              value={dineIn.reservationNote}
+            />
+          </FormField>
+        </div>
+      ) : null}
 
       {isDelivery ? (
         <div className="border-fog space-y-4 rounded-lg border p-3">

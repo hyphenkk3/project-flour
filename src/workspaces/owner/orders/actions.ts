@@ -19,12 +19,14 @@ import {
   defaultDeliveryCreateDraft,
   deliveryDraftFromPersistedOrder,
   normalizeOwnerCreateFulfilmentMethod,
+  parseCustomerWebsiteFulfilmentMethod,
   validateOwnerCreateFulfilment,
 } from "@/engines/orders/fulfilment";
 import { createStaffGuestPreorderRecord } from "@/workspaces/owner/orders/create-staff-preorder";
 import { normalizeNewStaffOrderSourceInput } from "@/engines/orders/staff-order-source";
 import { formatNewOrderPersonName } from "@/engines/orders/customer-name";
 import {
+  parseDineInDraftFromForm,
   parseDeliveryDraftFromForm,
   parseStaffPreorderItemsFromForm,
 } from "@/workspaces/owner/orders/staff-preorder-form";
@@ -51,6 +53,7 @@ import {
   validatePaymentCorrection as validatePaymentRecordCorrection,
 } from "@/engines/orders/payment-record-correction";
 import {
+  buildPostPaymentDineInKey,
   classifyPaidOrderSave,
   decidePostPaymentCancel,
   decidePostPaymentSave,
@@ -397,9 +400,18 @@ export async function createStaffGuestOrderAction(
   const draftItems = parseItemsFromForm(formData);
   const draftComplimentary = parseComplimentaryFromForm(formData);
   const draftPaidAddons = parsePaidAddonsMutationFromForm(formData);
-  const fulfilmentMethod = normalizeOwnerCreateFulfilmentMethod(
-    String(formData.get("fulfilment_method") ?? ""),
-  );
+  const rawFulfilmentMethod = String(
+    formData.get("fulfilment_method") ?? "",
+  ).trim();
+  if (
+    rawFulfilmentMethod !== "pickup" &&
+    rawFulfilmentMethod !== "delivery" &&
+    rawFulfilmentMethod !== "dine_in"
+  ) {
+    return { error: "Please choose a valid fulfilment method." };
+  }
+  const fulfilmentMethod =
+    parseCustomerWebsiteFulfilmentMethod(rawFulfilmentMethod);
   const deliveryDraft = parseDeliveryDraftFromForm(formData);
 
   const created = await createStaffGuestPreorderRecord({
@@ -430,6 +442,7 @@ export async function createStaffGuestOrderAction(
     internalNotes: internalNotes || null,
     fulfilmentMethod,
     delivery: deliveryDraft,
+    dineIn: parseDineInDraftFromForm(formData),
   });
 
   if ("error" in created) {
@@ -485,10 +498,13 @@ export async function saveOrderWorkspaceAction(
       success: false,
     };
   }
+  const preserveDineIn =
+    before.fulfilmentMethod === "dine_in" &&
+    requestedFulfilmentMethod === "dine_in";
   if (pickupDate !== before.pickupDate) {
     const dateGuard = await assertStaffCollectionDateAllowed({
       pickupDate,
-      fulfilmentMethod,
+      fulfilmentMethod: preserveDineIn ? "dine_in" : fulfilmentMethod,
       items: draftItems,
       collectionId: before.collectionId,
       orderId,
@@ -497,10 +513,6 @@ export async function saveOrderWorkspaceAction(
       return { error: dateGuard.error, success: false };
     }
   }
-  const preserveDineIn =
-    before.fulfilmentMethod === "dine_in" &&
-    requestedFulfilmentMethod === "dine_in";
-
   // Customer Operations only: D−1/D−0 requires late_order_edit approval.
   // Manager and Owner may direct-save inside cutoff (Product-locked).
   if (
@@ -740,7 +752,23 @@ export async function saveOrderWorkspaceAction(
     pickupDate,
     pickupTime,
     customerNotes,
-    fulfilmentMethod,
+    fulfilmentMethod: preserveDineIn ? "dine_in" : fulfilmentMethod,
+    dineInKey:
+      preserveDineIn && dineInParty
+        ? buildPostPaymentDineInKey({
+            reservationDate: pickupDate,
+            reservationTime: dineInReservationTime,
+            venue: dineInParty.venue,
+            guestCount: dineInParty.totalGuestCount,
+            adultCount: dineInParty.adultCount,
+            kidCount: dineInParty.kidCount,
+            toddlerCount: dineInParty.toddlerCount,
+            whitebirdSplitSeatingAcknowledged:
+              dineInParty.whitebirdSplitSeatingAcknowledged,
+            reservationNote:
+              String(formData.get("reservation_note") ?? "").trim() || null,
+          })
+        : "",
     deliveryKey:
       fulfilmentMethod === "delivery"
         ? [

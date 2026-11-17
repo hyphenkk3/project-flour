@@ -563,14 +563,16 @@ const cakeItem = {
 }
 
 // ---------------------------------------------------------------------------
-// Z No Dine-In create/edit path introduced
+// Z Owner New Order includes Dine-In; the calendar still excludes Drive-through
 // ---------------------------------------------------------------------------
 {
   const createFields = readFileSync(
     resolve("src/workspaces/owner/orders/OrderFulfilmentCreateFields.tsx"),
     "utf8",
   );
-  assert.ok(!/dine.?in|dine_in|🍽️/i.test(createFields));
+  assert.match(createFields, /allowDineIn/);
+  assert.match(createFields, /DineInVenuePartyFields/);
+  assert.ok(!/drive_through|🍽️/i.test(createFields));
   const presentation = readFileSync(
     resolve(
       "src/workspaces/owner/calendar/calendar-fulfilment-presentation.ts",

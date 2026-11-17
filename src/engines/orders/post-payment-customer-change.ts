@@ -35,6 +35,18 @@ export type PostPaymentAddonLine = {
   messages?: Array<string | null>;
 };
 
+export type PostPaymentDineInReservation = {
+  reservationDate: string;
+  reservationTime: string;
+  venue: string;
+  guestCount: number;
+  adultCount: number;
+  kidCount: number;
+  toddlerCount: number;
+  whitebirdSplitSeatingAcknowledged: boolean;
+  reservationNote: string | null;
+};
+
 export type PostPaymentSaveProposed = {
   guestName: string;
   guestPhone: string;
@@ -44,6 +56,7 @@ export type PostPaymentSaveProposed = {
   customerNotes: string;
   fulfilmentMethod: string;
   deliveryKey?: string;
+  dineInKey?: string;
   items: PostPaymentCakeLine[];
   complimentary: PostPaymentComplimentaryLine[];
   paidAddons: PostPaymentAddonLine[];
@@ -135,6 +148,7 @@ export function classifyPaidOrderSave(
     pickupTime: string;
     notes: string | null;
     fulfilmentMethod: string;
+    dineInReservation?: PostPaymentDineInReservation | null;
     delivery: {
       recipientName: string;
       recipientPhone: string;
@@ -196,11 +210,16 @@ export function classifyPaidOrderSave(
       ].join("\u0000")
     : "";
 
+  const beforeDineInKey = before.dineInReservation
+    ? buildPostPaymentDineInKey(before.dineInReservation)
+    : "";
+
   const pickupOrFulfilmentChanged =
     before.pickupDate !== proposed.pickupDate.trim() ||
     normalizeClock(before.pickupTime) !== normalizeClock(proposed.pickupTime) ||
     before.fulfilmentMethod !== proposed.fulfilmentMethod ||
-    beforeDeliveryKey !== (proposed.deliveryKey ?? beforeDeliveryKey);
+    beforeDeliveryKey !== (proposed.deliveryKey ?? beforeDeliveryKey) ||
+    beforeDineInKey !== (proposed.dineInKey ?? beforeDineInKey);
 
   const customerFieldsChanged =
     before.customerName.trim() !== proposed.guestName.trim() ||
@@ -243,6 +262,22 @@ export function classifyPaidOrderSave(
     pickupOrFulfilmentChanged,
     customerFacingChange,
   };
+}
+
+export function buildPostPaymentDineInKey(
+  reservation: PostPaymentDineInReservation,
+): string {
+  return JSON.stringify([
+    reservation.reservationDate.trim(),
+    normalizeClock(reservation.reservationTime),
+    reservation.venue,
+    reservation.guestCount,
+    reservation.adultCount,
+    reservation.kidCount,
+    reservation.toddlerCount,
+    reservation.whitebirdSplitSeatingAcknowledged,
+    normalizeNotes(reservation.reservationNote),
+  ]);
 }
 
 export function decidePostPaymentSave(input: {

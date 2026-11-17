@@ -1541,6 +1541,7 @@ export function OrderWorkspaceForm({
                 id="reservation_time"
                 name="reservation_time"
                 required
+                step={15 * 60}
                 type="time"
               />
             </FormField>
@@ -1587,7 +1588,9 @@ export function OrderWorkspaceForm({
             }
             onDateChange={setEditPickupDate}
             onDeliveryChange={setEditDeliveryDraft}
-            onMethodChange={setEditFulfilmentMethod}
+            onMethodChange={(method) => {
+              if (method !== "dine_in") setEditFulfilmentMethod(method);
+            }}
             onTimeChange={setEditPickupTime}
             hoursSnapshot={hoursSnapshot}
             scheduleMode={sourceLocked ? "slots" : "owner"}

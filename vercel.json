@@ -1,5 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["sin1"],
-  "ignoreCommand": "[ \"$VERCEL_ENV:$VERCEL_GIT_COMMIT_REF:$VERCEL_GIT_COMMIT_MESSAGE:$VERCEL_GIT_PREVIOUS_SHA\" = \"preview:codex/staff-notifications-dev-20261109:One-time DEV Sound reliability Preview:d7e7a62ab2eb47dbbc38d22812dbe5760779636d\" ] && exit 1; exit 0"
+  "ignoreCommand": "[ \"$VERCEL_ENV:$VERCEL_GIT_COMMIT_REF:$VERCEL_GIT_COMMIT_MESSAGE:$VERCEL_GIT_PREVIOUS_SHA\" = \"preview:codex/staff-notifications-dev-20261109:One-time DEV Dine-In Preview:badf70e4f63697044f598eef6666463282123987\" ] && exit 1; exit 0"
 }

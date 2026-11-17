@@ -20,9 +20,13 @@ import {
 import {
   defaultDeliveryCreateDraft,
   defaultOwnerCreateFulfilmentMethod,
+  type CustomerWebsiteFulfilmentMethod,
   type DeliveryCreateDraft,
-  type OwnerCreateFulfilmentMethod,
 } from "@/engines/orders/fulfilment";
+import {
+  defaultAssistedDineInDraft,
+  type AssistedDineInDraft,
+} from "@/engines/orders/assisted-fulfilment";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type { PaidAddonType, StorefrontCake } from "@/types/storefront";
 import type { CollectionComplimentaryOption } from "@/workspaces/owner/orders/queries";
@@ -82,7 +86,12 @@ export function StaffGuestOrderForm({
   const [guestPhone, setGuestPhone] = useState("");
   const [pickupDate, setPickupDate] = useState("");
   const [fulfilmentMethod, setFulfilmentMethod] =
-    useState<OwnerCreateFulfilmentMethod>(defaultOwnerCreateFulfilmentMethod);
+    useState<CustomerWebsiteFulfilmentMethod>(
+      defaultOwnerCreateFulfilmentMethod,
+    );
+  const [dineInDraft, setDineInDraft] = useState<AssistedDineInDraft>(
+    defaultAssistedDineInDraft,
+  );
   const [deliveryDraft, setDeliveryDraft] = useState<DeliveryCreateDraft>(
     defaultDeliveryCreateDraft,
   );
@@ -252,13 +261,16 @@ export function StaffGuestOrderForm({
       </section>
 
       <OrderFulfilmentCreateFields
+        allowDineIn
         customerName={guestName}
         customerPhone={guestPhone}
         delivery={deliveryDraft}
+        dineIn={dineInDraft}
         hoursSnapshot={hoursSnapshot}
         method={fulfilmentMethod}
         onDateChange={setPickupDate}
         onDeliveryChange={setDeliveryDraft}
+        onDineInChange={setDineInDraft}
         onMethodChange={setFulfilmentMethod}
       />
 
