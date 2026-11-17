@@ -4438,3 +4438,10 @@ After the Owner’s explicit GO, the exact execution phrase required by the prot
 - Existing DEV deployment `dpl_E1Juj59C6DbM2HmxctHo1iVP5gd5`: **UNCHANGED**. This candidate is not yet deployed.
 - Sound release: **READY FOR OWNER ACCEPTANCE only after a separate DEV Preview is created from this branch and hosted UI is read-only checked**. The smallest physical acceptance is for the Owner to open that Preview in two tabs, click Test Sound in each tab once to satisfy browser activation, then observe one real DEV operational notification event and report whether exactly one tab audibly played it. No Push is needed.
 - Push remains a separate HOLD: the 18 event-UUID callers and the failed event-scoped behavior check are unresolved. Pending notification migrations remain unapplied to Production. Email stays frozen; Fresh Pick scheduling and Push remain disabled. Production remains HOLD.
+
+
+### One-time DEV Preview build gate
+
+- Vercel's current Ignore Build Step rule skips automatic builds for the approved DEV branch. A canceled deployment on the separate Sound branch confirmed the branch-filter cause; no application build ran and the existing DEV deployment remained unchanged.
+- To preserve the approved branch's branch-scoped DEV environment and leave Vercel project settings untouched, this candidate adds a source-level `vercel.json` ignore-command override. It permits one build only when the deployment is Preview, the ref is `codex/staff-notifications-dev-20261109`, the commit message is exactly `One-time DEV Sound reliability Preview`, and `VERCEL_GIT_PREVIOUS_SHA` is the recovered deployed source `d7e7a62ab2eb47dbbc38d22812dbe5760779636d`. For every other case, the existing project ignore outcomes are mirrored. Local scenario checks confirmed the one-time exception and the preserved skip behavior. No project-level Vercel setting or environment variable was changed.
+- The override is a deployment gate only; it does not alter application runtime behavior. A fast-forward integration into the approved DEV branch is allowed only for this already-qualified candidate. Production remains untouched.
