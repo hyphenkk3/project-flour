@@ -57,6 +57,9 @@ export function parseDineInDraftFromForm(
     toddlerCount: String(formData.get("toddler_count") ?? "").trim(),
     guestCount: String(formData.get("guest_count") ?? "").trim(),
     reservationNote: String(formData.get("reservation_note") ?? "").trim(),
+    whitebirdSplitSeatingAcknowledged:
+      String(formData.get("whitebird_split_seating_acknowledged") ?? "") ===
+      "1",
   };
   const raw = String(formData.get("dine_in_json") ?? "").trim();
   if (!raw) {
@@ -80,6 +83,9 @@ export function parseDineInDraftFromForm(
       guestCount: named.guestCount || String(parsed.guestCount ?? "").trim(),
       reservationNote:
         named.reservationNote || String(parsed.reservationNote ?? "").trim(),
+      whitebirdSplitSeatingAcknowledged:
+        named.whitebirdSplitSeatingAcknowledged ||
+        parsed.whitebirdSplitSeatingAcknowledged === true,
     };
   } catch {
     return named;

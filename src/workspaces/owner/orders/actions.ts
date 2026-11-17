@@ -60,6 +60,7 @@ import {
 } from "@/engines/orders/post-payment-customer-change";
 import { isValidDineInReservationPair } from "@/engines/business-calendar/dine-in-hours";
 import {
+  buildDineInReservationRpcPayload,
   validateDineInPartyFromForm,
   type ValidatedDineInParty,
 } from "@/engines/orders/dine-in-party";
@@ -483,9 +484,10 @@ export async function saveOrderWorkspaceAction(
   const requestedFulfilmentMethod = String(
     formData.get("fulfilment_method") ?? "",
   ).trim();
-  const fulfilmentMethod = normalizeOwnerCreateFulfilmentMethod(
-    requestedFulfilmentMethod,
-  );
+  const targetDineIn = requestedFulfilmentMethod === "dine_in";
+  const fulfilmentMethod = targetDineIn
+    ? "dine_in"
+    : normalizeOwnerCreateFulfilmentMethod(requestedFulfilmentMethod);
   const deliveryDraft = parseDeliveryDraftFromForm(formData);
 
   const before = await getGuestOrderById(orderId);
@@ -498,13 +500,10 @@ export async function saveOrderWorkspaceAction(
       success: false,
     };
   }
-  const preserveDineIn =
-    before.fulfilmentMethod === "dine_in" &&
-    requestedFulfilmentMethod === "dine_in";
   if (pickupDate !== before.pickupDate) {
     const dateGuard = await assertStaffCollectionDateAllowed({
       pickupDate,
-      fulfilmentMethod: preserveDineIn ? "dine_in" : fulfilmentMethod,
+      fulfilmentMethod,
       items: draftItems,
       collectionId: before.collectionId,
       orderId,
@@ -566,14 +565,16 @@ export async function saveOrderWorkspaceAction(
     };
   }
 
-  const fulfilmentError = validateOwnerCreateFulfilment({
-    method: fulfilmentMethod,
-    pickupDate,
-    pickupTime,
-    delivery: deliveryDraft,
-  });
-  if (fulfilmentError) {
-    return { error: fulfilmentError, success: false };
+  if (fulfilmentMethod !== "dine_in") {
+    const fulfilmentError = validateOwnerCreateFulfilment({
+      method: fulfilmentMethod,
+      pickupDate,
+      pickupTime,
+      delivery: deliveryDraft,
+    });
+    if (fulfilmentError) {
+      return { error: fulfilmentError, success: false };
+    }
   }
 
   // Normal amendment: pickup month stays put. Cross-month requires explicit Owner override.
@@ -600,7 +601,7 @@ export async function saveOrderWorkspaceAction(
   ).trim();
   const hoursSnapshot = await loadOperatingHoursSnapshot();
   let dineInParty: ValidatedDineInParty | null = null;
-  if (preserveDineIn) {
+  if (targetDineIn) {
     const partyResult = validateDineInPartyFromForm(formData, false);
     if (!partyResult.ok) {
       return { error: partyResult.error, success: false };
@@ -650,7 +651,7 @@ export async function saveOrderWorkspaceAction(
   let fulfilmentRpc: ReturnType<
     typeof buildCreateStaffFulfilmentRpcParams
   > | null = null;
-  if (!preserveDineIn) {
+  if (fulfilmentMethod !== "dine_in") {
     try {
       fulfilmentRpc = buildCreateStaffFulfilmentRpcParams({
         method: fulfilmentMethod,
@@ -752,9 +753,9 @@ export async function saveOrderWorkspaceAction(
     pickupDate,
     pickupTime,
     customerNotes,
-    fulfilmentMethod: preserveDineIn ? "dine_in" : fulfilmentMethod,
+    fulfilmentMethod,
     dineInKey:
-      preserveDineIn && dineInParty
+      targetDineIn && dineInParty
         ? buildPostPaymentDineInKey({
             reservationDate: pickupDate,
             reservationTime: dineInReservationTime,
@@ -831,12 +832,19 @@ export async function saveOrderWorkspaceAction(
   const complimentaryToSave = draftComplimentary.filter(
     (item) => item.quantity > 0,
   );
-  const { error: saveError } = await supabase.rpc(
-    "save_guest_order_workspace_atomic",
-    {
-      p_order_id: orderId,
-      p_actor_staff_id: staff.id,
-      p_plan: {
+  const dineInPayload =
+    targetDineIn && dineInParty
+      ? buildDineInReservationRpcPayload({
+          party: dineInParty,
+          reservationTime: dineInReservationTime,
+          reservationNote:
+            String(formData.get("reservation_note") ?? "").trim() || null,
+        })
+      : null;
+  const savePlan = {
+    p_order_id: orderId,
+    p_actor_staff_id: staff.id,
+    p_plan: {
         expected_pickup_date: before.pickupDate,
         post_payment_override: postPaymentOverride,
         pickup_month_override: pickupMonthOverride,
@@ -870,29 +878,18 @@ export async function saveOrderWorkspaceAction(
           sort_order: item.sortOrder,
         })),
         paid_addons: draftPaidAddons,
-        dine_in:
-          preserveDineIn && before.dineInReservation && dineInParty
-            ? {
-                reservation_time: dineInReservationTime,
-                venue: dineInParty.venue,
-                guest_count: dineInParty.totalGuestCount,
-                adult_count: dineInParty.adultCount,
-                kid_count: dineInParty.kidCount,
-                toddler_count: dineInParty.toddlerCount,
-                whitebird_split_seating_acknowledged:
-                  dineInParty.whitebirdSplitSeatingAcknowledged,
-                reservation_note:
-                  String(formData.get("reservation_note") ?? "").trim() || null,
-              }
-            : null,
+        dine_in: dineInPayload,
         fulfilment: fulfilmentRpc
           ? {
               method: fulfilmentRpc.p_fulfilment_method,
               delivery: fulfilmentRpc.p_delivery,
             }
           : null,
-      },
     },
+  };
+  const { error: saveError } = await supabase.rpc(
+    "save_guest_order_workspace_atomic",
+    savePlan,
   );
   if (saveError) return { error: saveError.message, success: false };
   scheduleStaffNotificationDispatch();

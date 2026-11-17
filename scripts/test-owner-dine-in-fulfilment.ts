@@ -37,8 +37,12 @@ assert.match(createAction, /rawFulfilmentMethod !== "dine_in"/);
 assert.match(createAction, /dineIn: parseDineInDraftFromForm\(formData\)/);
 assert.match(createHelper, /if \(websiteMethod === "dine_in"\)/);
 assert.match(createHelper, /rpcArgs\.p_dine_in = fulfilmentRpc\.p_dine_in/);
-assert.match(editForm, /order\.fulfilmentMethod === "dine_in"/);
-assert.match(editForm, /reservation_time/);
+assert.match(editForm, /allowDineIn/);
+assert.match(editForm, /onMethodChange=\{setEditFulfilmentMethod\}/);
+assert.match(editForm, /dineIn=\{editDineInDraft\}/);
+assert.match(createAction, /targetDineIn/);
+assert.match(createAction, /buildDineInReservationRpcPayload/);
+assert.match(createAction, /"save_guest_order_workspace_atomic"/);
 
 const dineInDraft = {
   ...defaultAssistedDineInDraft(),

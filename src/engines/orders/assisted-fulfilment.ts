@@ -50,6 +50,7 @@ export type AssistedDineInDraft = {
   toddlerCount: string;
   guestCount: string;
   reservationNote: string;
+  whitebirdSplitSeatingAcknowledged: boolean;
 };
 
 export type AssistedDineInRpcPayload = {
@@ -72,6 +73,7 @@ export function defaultAssistedDineInDraft(): AssistedDineInDraft {
     toddlerCount: "",
     guestCount: "",
     reservationNote: "",
+    whitebirdSplitSeatingAcknowledged: false,
   };
 }
 
@@ -85,6 +87,7 @@ export function buildAssistedDineInRpcPayload(
     kidCount: draft.kidCount,
     toddlerCount: draft.toddlerCount,
     guestCount: draft.guestCount,
+    acknowledged: draft.whitebirdSplitSeatingAcknowledged,
     requireAcknowledgement: false,
   });
   if (!party.ok || !reservationTime) return null;

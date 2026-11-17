@@ -225,6 +225,8 @@ export function OrderFulfilmentCreateFields({
                 adultCount: party.adultCount,
                 kidCount: party.kidCount,
                 toddlerCount: party.toddlerCount,
+                whitebirdSplitSeatingAcknowledged:
+                  party.whitebirdSplitSeatingAcknowledged,
                 guestCount: String(
                   Number(party.adultCount || 0) +
                     Number(party.kidCount || 0) +
@@ -238,9 +240,15 @@ export function OrderFulfilmentCreateFields({
               adultCount: dineIn.adultCount,
               kidCount: dineIn.kidCount,
               toddlerCount: dineIn.toddlerCount,
-              whitebirdSplitSeatingAcknowledged: false,
+              whitebirdSplitSeatingAcknowledged:
+                dineIn.whitebirdSplitSeatingAcknowledged,
             }}
             venues={[...DINE_IN_VENUES]}
+          />
+          <input
+            name="whitebird_split_seating_acknowledged"
+            type="hidden"
+            value={dineIn.whitebirdSplitSeatingAcknowledged ? "1" : ""}
           />
           <FormField
             htmlFor="reservation_note"
