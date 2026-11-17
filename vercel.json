@@ -1,5 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["sin1"],
-  "ignoreCommand": "if [ \"$VERCEL_ENV\" = \"preview\" ] && [ \"$VERCEL_GIT_COMMIT_REF\" = \"codex/staff-notifications-dev-20261109\" ] && [ \"$VERCEL_GIT_COMMIT_MESSAGE\" = \"One-time DEV Sound reliability Preview\" ] && [ \"$VERCEL_GIT_PREVIOUS_SHA\" = \"d7e7a62ab2eb47dbbc38d22812dbe5760779636d\" ]; then exit 1; fi; case \"$VERCEL_ENV:$VERCEL_GIT_COMMIT_REF\" in preview:codex/cake-size-availability-dev) exit 1;; preview:*) exit 0;; *:codex/freshpick-r3-dev-20261025|*:codex/staff-notifications-dev-20261109) exit 0;; *) exit 1;; esac"
+  "ignoreCommand": "[ \"$VERCEL_ENV:$VERCEL_GIT_COMMIT_REF:$VERCEL_GIT_COMMIT_MESSAGE:$VERCEL_GIT_PREVIOUS_SHA\" = \"preview:codex/staff-notifications-dev-20261109:One-time DEV Sound reliability Preview:d7e7a62ab2eb47dbbc38d22812dbe5760779636d\" ] && exit 1; exit 0"
 }
