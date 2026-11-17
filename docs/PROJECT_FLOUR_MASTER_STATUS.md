@@ -4412,7 +4412,7 @@ After the Owner’s explicit GO, the exact execution phrase required by the prot
 
 - Recovered the exact deployment source from the authorized GitHub repository branch `codex/staff-notifications-dev-20261109`: commit `d7e7a62ab2eb47dbbc38d22812dbe5760779636d`, tree `3957b1a66ba5473c5b0a372ade3762ca1e7866cb`; parent is `6ec43a823e8d96977c3d719c54abf4b81d0aacbb`. Vercel deployment metadata identifies the same commit and branch. This is exact source recovery, not reconstruction from the deployment bundle.
 - A separate persistent clone at `/Users/ycwee/Desktop/project-flour-recovery/recovered-dev-source-d7e7` passed `git fsck --full --no-reflogs --strict` and exact HEAD/tree checks before edits. The live deployment remains unchanged.
-- Working candidate branch: `codex/staff-sound-reliability-20261117`, based directly on the recovered commit above. Its final commit identity is recorded by this documentation commit and the branch ref after commit.
+- Working candidate branch: `codex/staff-sound-reliability-20261117`, based directly on the recovered commit above. Sound implementation and tests are committed as `2dc161ce8b0983f11dc50ebde6e96a790a6136ef` with application source tree `4ae60e8610bffdad1eea9d994763172200c4ffcf`. The branch HEAD includes the accompanying canonical evidence update; no application source changed after the tested commit.
 
 ### Sound correction
 
