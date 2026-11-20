@@ -15,6 +15,18 @@ export type FulfilmentMethod =
   | "drive_through"
   | "dine_in";
 
+export type OrderSource =
+  | "customer_website"
+  | "jotform"
+  | "whatsapp"
+  | "whitebird_instagram"
+  | "wee"
+  | "lex"
+  | "kin"
+  | "other"
+  | "walk_in"
+  | "last_minute";
+
 export type Order = {
   id: string;
   orderNumber: string;
@@ -33,6 +45,8 @@ export type Order = {
   updatedBy: string | null;
   createdAt: string;
   updatedAt: string;
+  orderSource?: OrderSource;
+  orderSourceOther?: string | null;
 };
 
 export type OrderCustomerSummary = {

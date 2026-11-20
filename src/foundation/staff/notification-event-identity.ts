@@ -1,5 +1,7 @@
 import {
   STAFF_NOTIFICATION_DEFAULT_ENABLED,
+  STAFF_NOTIFICATION_DEFAULT_PUSH_ENABLED,
+  STAFF_NOTIFICATION_DEFAULT_SOUND_ENABLED,
   STAFF_NOTIFICATION_DEFAULT_WEB_MODE,
   type StaffNotificationCode,
   type StaffNotificationPreference,
@@ -258,6 +260,8 @@ export function resolveStaffNotificationPreference(
     webEnabled?: boolean;
     webMode?: StaffNotificationWebMode;
     emailEnabled?: boolean;
+    soundEnabled?: boolean;
+    pushEnabled?: boolean;
   } | null,
 ): StaffNotificationPreference {
   return {
@@ -265,6 +269,9 @@ export function resolveStaffNotificationPreference(
     webEnabled: saved?.webEnabled ?? STAFF_NOTIFICATION_DEFAULT_ENABLED,
     webMode: saved?.webMode ?? STAFF_NOTIFICATION_DEFAULT_WEB_MODE,
     emailEnabled: saved?.emailEnabled ?? STAFF_NOTIFICATION_DEFAULT_ENABLED,
+    soundEnabled:
+      saved?.soundEnabled ?? STAFF_NOTIFICATION_DEFAULT_SOUND_ENABLED,
+    pushEnabled: saved?.pushEnabled ?? STAFF_NOTIFICATION_DEFAULT_PUSH_ENABLED,
   };
 }
 
@@ -283,7 +290,12 @@ export function selectStaffEmailRecipients(input: {
   }>;
   preferencesByStaffId: Map<
     string,
-    Partial<Record<StaffNotificationCode, Pick<StaffNotificationPreference, "emailEnabled">>>
+    Partial<
+      Record<
+        StaffNotificationCode,
+        Pick<StaffNotificationPreference, "emailEnabled">
+      >
+    >
   >;
 }): StaffEmailRecipient[] {
   const recipients: StaffEmailRecipient[] = [];

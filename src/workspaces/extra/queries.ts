@@ -1,3 +1,4 @@
+import { canRecoverExpiredStock, canAssignExpiredStockToPickupDate } from "@/engines/extra/expired-stock-recovery";
 import {
   isExtraAvailable,
   isExtraConfirmedOnOffer,
@@ -28,7 +29,10 @@ import { createClient } from "@/lib/supabase/server";
 import { isMissingCakePhotoSchema } from "@/workspaces/library/cakes/photo-storage";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
 import { loadFreshPicksPreparationConfig } from "@/workspaces/storefront/extra/config";
-import { mapAssignedOrderSummariesByStock } from "@/workspaces/extra/assigned-order-links";
+import {
+  mapAssignedOrderSummariesByStock,
+  missingAssignedDirectOrderIds,
+} from "@/workspaces/extra/assigned-order-links";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
 import type { AssignedOrderSummary } from "@/workspaces/extra/assigned-order-links";
 
@@ -394,13 +398,29 @@ export async function listExtraStockUnits(): Promise<ExtraStockUnit[]> {
     activeSoldRows = (soldQuery.data ?? []) as unknown as ExtraStockRow[];
   }
 
-  const stockRows = [...unsoldRows, ...activeSoldRows];
-  const units = stockRows.map((row) => mapExtraStockRow(row, now));
-  const assignedUnits = attachAssignedOrderDetails(
-    units,
-    stockRows,
+  const directOrderIdsToResolve = missingAssignedDirectOrderIds(
+    activeSoldRows.map(({ id, order_id }) => ({ id, order_id })),
     activeOrders,
   );
+  let directOrderDetails: AssignedOrderSummary[] = [];
+  if (directOrderIdsToResolve.length) {
+    const directOrderDetailsQuery = await supabase
+      .from("orders")
+      .select(ASSIGNED_ORDER_SELECT)
+      .in("id", directOrderIdsToResolve);
+    if (directOrderDetailsQuery.error) {
+      throw new Error(directOrderDetailsQuery.error.message);
+    }
+    directOrderDetails = (directOrderDetailsQuery.data ??
+      []) as unknown as AssignedOrderSummary[];
+  }
+
+  const stockRows = [...unsoldRows, ...activeSoldRows];
+  const units = stockRows.map((row) => mapExtraStockRow(row, now));
+  const assignedUnits = attachAssignedOrderDetails(units, stockRows, [
+    ...activeOrders,
+    ...directOrderDetails,
+  ]);
 
   const hasOrderabilityCandidates = assignedUnits.some(
     (unit) =>
@@ -724,15 +744,21 @@ export async function listAssignableOrdersForExtra(input: {
   if (stockError || !stock)
     throw new Error("This Fresh Pick is no longer available.");
   if (
-    !isExtraAvailable({
-      lifecycle: stock.lifecycle,
-      pickupThroughAt: stock.pickup_through_at,
-      soldAt: stock.sold_at,
-      cutIntoSlicesAt: stock.cut_into_slices_at,
-      walkInHeldUntil: stock.walk_in_held_until,
-    })
+    stock.lifecycle !== "confirmed" ||
+    stock.sold_at !== null ||
+    stock.cut_into_slices_at !== null ||
+    (stock.walk_in_held_until !== null &&
+      new Date(stock.walk_in_held_until).getTime() >= Date.now())
   ) {
     throw new Error("This Fresh Pick is no longer available for assignment.");
+  }
+
+  const recoveryToday = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+  if (!canRecoverExpiredStock(stock.pickup_through_at, recoveryToday) &&
+      Date.parse(stock.pickup_through_at ?? "") <= Date.now()) {
+    throw new Error("The two-day Bakery recovery window has ended.");
   }
 
   const page = Math.max(0, Math.min(1000, Math.trunc(input.page) || 0));
@@ -923,7 +949,8 @@ export async function listAssignableOrdersForExtra(input: {
         Boolean(assigned.cut_into_slices_at) ||
         (assigned.order_id !== null && assigned.order_id !== row.id),
     );
-    const canAssign = assessment.canAssign && !hasConflictingAllocation;
+    const withinRecoveryDate = canAssignExpiredStockToPickupDate(stock.pickup_through_at, row.pickup_date);
+    const canAssign = assessment.canAssign && !hasConflictingAllocation && withinRecoveryDate;
     return {
       id: row.id,
       orderNumber: row.order_number,

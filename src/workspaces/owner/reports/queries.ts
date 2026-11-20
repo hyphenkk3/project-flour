@@ -8,6 +8,7 @@ import {
   nextMonth,
   orderFinancials,
   previousMonth,
+  reportOrderSourceLabel,
   summarizeCash,
   type ReportOrder,
   type ReportMethod,
@@ -61,7 +62,7 @@ async function loadOrders(client: Client, month: string): Promise<Row[]> {
     client
       .from("orders")
       .select(
-        "id,pickup_date,created_at,fulfilment_method,status,order_source,extra_stock_id,picked_up_at,delivered_at",
+        "id,pickup_date,created_at,fulfilment_method,status,order_source,order_source_other,extra_stock_id,picked_up_at,delivered_at",
       )
       .gte("pickup_date", `${month}-01`)
       .lt("pickup_date", `${nextMonth(month)}-01`)
@@ -184,7 +185,10 @@ async function loadRelated(
       createdAt: text(row.created_at),
       method: (method === "drive_through" ? "pickup" : method) as ReportMethod,
       status: text(row.status),
-      source: text(row.order_source) || "other",
+      source: reportOrderSourceLabel(
+        text(row.order_source),
+        nullable(row.order_source_other),
+      ),
       extraStockId: nullable(row.extra_stock_id),
       deliveryConcession,
       pickedUpAt: nullable(row.picked_up_at),
@@ -248,7 +252,7 @@ export async function loadManagementReport(month: string) {
     client
       .from("orders")
       .select(
-        "id,order_source,status,pickup_date,created_at,fulfilment_method,extra_stock_id,picked_up_at,delivered_at",
+        "id,order_source,order_source_other,status,pickup_date,created_at,fulfilment_method,extra_stock_id,picked_up_at,delivered_at",
       )
       .gte("created_at", bounds.start)
       .lt("created_at", bounds.end)
@@ -416,12 +420,20 @@ export async function loadManagementReport(month: string) {
     bookings: {
       count: bookings.length,
       value: Math.round(bookingValue * 100) / 100,
-      sources: [...new Set(bookings.map((row) => text(row.order_source)))].map(
-        (source) => ({
-          source,
-          count: bookings.filter((row) => row.order_source === source).length,
-        }),
-      ),
+      sources: [...new Set(bookings.map((row) =>
+        reportOrderSourceLabel(
+          text(row.order_source),
+          nullable(row.order_source_other),
+        ),
+      ))].map((source) => ({
+        source,
+        count: bookings.filter((row) =>
+          reportOrderSourceLabel(
+            text(row.order_source),
+            nullable(row.order_source_other),
+          ) === source,
+        ).length,
+      })),
     },
     payments: cash,
     refundBreakdown,

@@ -47,6 +47,7 @@ const order = mapCollectionBoardOrder({
   fulfilment_method: "delivery",
   status: "paid",
   customer_notes: null,
+  internal_notes: null,
   production_started_at: null,
   ready_at: "2026-10-03T04:00:00Z",
   picked_up_at: null,
@@ -93,6 +94,7 @@ const pickup = mapCollectionBoardOrder({
   fulfilment_method: "pickup",
   status: "paid",
   customer_notes: null,
+  internal_notes: null,
   production_started_at: null,
   ready_at: "2026-10-03T04:00:00Z",
   picked_up_at: null,
@@ -123,7 +125,7 @@ const detailSource = readFileSync(
   "src/workspaces/collection/CollectionOrderDetail.tsx",
   "utf8",
 );
-assert.match(detailSource, /isDelivery\s*\?\s*\(/);
+assert.match(detailSource, /order\.fulfilmentMethod\s*===\s*"delivery"\s*\?/);
 assert.match(detailSource, /<CollectionDeliveryActions/);
 assert.match(detailSource, /<CollectionHandoffActions/);
 

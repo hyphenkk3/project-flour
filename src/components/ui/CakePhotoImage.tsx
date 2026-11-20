@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
 
 type CakePhotoImageProps = {
   src: string;
@@ -27,7 +28,11 @@ function canOptimizeRemote(src: string): boolean {
   }
 }
 
-export function CakePhotoImage({
+export function CakePhotoImage(props: CakePhotoImageProps) {
+  return <CakePhotoImageSource key={props.src} {...props} />;
+}
+
+function CakePhotoImageSource({
   src,
   alt,
   className,
@@ -36,6 +41,7 @@ export function CakePhotoImage({
   objectFit = "cover",
   zoomOnHover = false,
 }: CakePhotoImageProps) {
+  const [failed, setFailed] = useState(false);
   const imageClass = [
     "rounded-[10px]",
     objectFit === "contain" ? "object-contain" : "object-cover",
@@ -55,11 +61,20 @@ export function CakePhotoImage({
         .filter(Boolean)
         .join(" ")}
     >
-      {canOptimizeRemote(src) ? (
+      {failed ? (
+        <div
+          aria-label={`${alt} — photo unavailable`}
+          className="bg-fog text-skyline flex h-full w-full items-center justify-center px-4 text-center text-sm"
+          role="img"
+        >
+          Photo temporarily unavailable
+        </div>
+      ) : canOptimizeRemote(src) ? (
         <Image
           alt={alt}
           className={imageClass}
           fill
+          onError={() => setFailed(true)}
           priority={priority}
           sizes={sizes}
           src={src}
@@ -70,6 +85,7 @@ export function CakePhotoImage({
           alt={alt}
           className={`h-full w-full ${imageClass}`}
           loading={priority ? "eager" : "lazy"}
+          onError={() => setFailed(true)}
           src={src}
         />
       )}

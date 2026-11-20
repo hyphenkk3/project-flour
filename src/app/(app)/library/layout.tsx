@@ -28,7 +28,9 @@ export default async function LibraryLayout({
           special-date schedules. Pickup stays in the Pickup workspace.
         </p>
       </div>
-      <LibraryNav />
+      <LibraryNav
+        showOwnerAddons={staff.role.code === "owner" && staff.isActive && !staff.archivedAt}
+      />
       {children}
     </div>
   );

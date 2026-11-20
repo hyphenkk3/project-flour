@@ -10,6 +10,32 @@ export const CUSTOMER_NAME_HELP = "English / preferred name and surname.";
 
 export const CUSTOMER_NAME_SPACE_HINT = "Please leave a space between names.";
 
+const UNICODE_LETTER = /\p{L}/u;
+
+/**
+ * Formats a person name for a newly submitted order only.
+ * Whitespace and punctuation are preserved exactly; only Unicode letters are
+ * case-adjusted. Each whitespace-separated word starts with an uppercase
+ * letter, followed by lowercase letters.
+ */
+export function formatNewOrderPersonName(name: string): string {
+  let startOfWord = true;
+
+  return Array.from(name, (character) => {
+    if (/\s/u.test(character)) {
+      startOfWord = true;
+      return character;
+    }
+    if (!UNICODE_LETTER.test(character)) return character;
+
+    if (startOfWord) {
+      startOfWord = false;
+      return character.toUpperCase();
+    }
+    return character.toLowerCase();
+  }).join("");
+}
+
 const CUSTOMER_NAME_TITLES = new Set([
   "mr",
   "mrs",

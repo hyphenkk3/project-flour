@@ -17,9 +17,10 @@ import {
   type DeliveryCreateDraft,
   type OwnerCreateFulfilmentMethod,
 } from "@/engines/orders/fulfilment";
+import { formatNewOrderPersonName } from "@/engines/orders/customer-name";
+import { normalizeNewStaffOrderSourceInput } from "@/engines/orders/staff-order-source";
 import type { PaidAddonMutationPayload } from "@/engines/orders/paid-addons";
 import { createClient } from "@/lib/supabase/server";
-import { isStaffGuestOrderSource } from "@/workspaces/owner/orders/labels";
 import type { StaffPreorderFormItem } from "@/workspaces/owner/orders/staff-preorder-form";
 import { listOfferableLibraryCakes } from "@/workspaces/storefront/catalog/queries";
 
@@ -29,6 +30,7 @@ export type CreateStaffGuestPreorderInput = {
   guestPhone: string | null;
   guestEmail: string | null;
   orderSource: string;
+  orderSourceOther?: string | null;
   crewOrder?: boolean;
   pickupDate: string;
   pickupTime: string;
@@ -40,6 +42,8 @@ export type CreateStaffGuestPreorderInput = {
     sort_order: number;
   }>;
   paidAddons?: PaidAddonMutationPayload[];
+  /** Use the database-guarded all-catalogue exception for Owner New Order only. */
+  ownerManualCatalogueOverride?: boolean;
   includeReceipt?: boolean;
   needsBakeryAttention?: boolean;
   bakeryAttentionNote?: string | null;
@@ -63,12 +67,18 @@ export async function createStaffGuestPreorderRecord(
   input: CreateStaffGuestPreorderInput,
 ): Promise<{ orderId: string } | { error: string }> {
   const guestName = input.guestName.trim();
+  const delivery = {
+    ...input.delivery,
+    recipientName: formatNewOrderPersonName(input.delivery.recipientName),
+  };
   if (!guestName) {
     return { error: "Please enter the customer name." };
   }
-  if (!isStaffGuestOrderSource(input.orderSource)) {
-    return { error: "Please choose a valid order source." };
-  }
+  const sourceInput = normalizeNewStaffOrderSourceInput(
+    input.orderSource,
+    input.orderSourceOther ?? "",
+  );
+  if ("error" in sourceInput) return { error: sourceInput.error };
   if (
     input.guestEmail &&
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.guestEmail)
@@ -94,7 +104,7 @@ export async function createStaffGuestPreorderRecord(
       method: fulfilmentMethod,
       dateYmd: input.pickupDate,
       timeValue: input.pickupTime,
-      delivery: input.delivery,
+      delivery,
       dineIn,
       closedDates: input.closedDates,
       hoursSnapshot: input.hoursSnapshot ?? OPERATING_HOURS_SEED,
@@ -104,7 +114,7 @@ export async function createStaffGuestPreorderRecord(
     }
     fulfilmentRpc = buildAssistedFulfilmentRpcParams({
       method: fulfilmentMethod,
-      delivery: input.delivery,
+      delivery,
       dineIn,
     });
   } else {
@@ -116,7 +126,7 @@ export async function createStaffGuestPreorderRecord(
         method: "dine_in",
         dateYmd: input.pickupDate,
         timeValue: input.pickupTime,
-        delivery: input.delivery,
+        delivery,
         dineIn,
         hoursSnapshot: input.hoursSnapshot ?? OPERATING_HOURS_SEED,
       });
@@ -125,7 +135,7 @@ export async function createStaffGuestPreorderRecord(
       }
       fulfilmentRpc = buildAssistedFulfilmentRpcParams({
         method: "dine_in",
-        delivery: input.delivery,
+        delivery,
         dineIn,
       });
     } else {
@@ -136,7 +146,7 @@ export async function createStaffGuestPreorderRecord(
         method: fulfilmentMethod,
         pickupDate: input.pickupDate,
         pickupTime: input.pickupTime,
-        delivery: input.delivery,
+        delivery,
       });
       if (fulfilmentError) {
         return { error: fulfilmentError };
@@ -151,7 +161,7 @@ export async function createStaffGuestPreorderRecord(
       }
       fulfilmentRpc = buildCreateStaffFulfilmentRpcParams({
         method: fulfilmentMethod,
-        delivery: input.delivery,
+        delivery,
       });
     }
   }
@@ -178,10 +188,11 @@ export async function createStaffGuestPreorderRecord(
   const supabase = await createClient();
   const rpcArgs: Record<string, unknown> = {
     p_actor_staff_id: input.actorStaffId,
-    p_customer_name: guestName,
+    p_customer_name: formatNewOrderPersonName(guestName),
     p_phone: input.guestPhone,
     p_email: input.guestEmail,
-    p_order_source: input.orderSource,
+    p_order_source: sourceInput.orderSource,
+    p_order_source_other: sourceInput.orderSourceOther,
     p_crew_order: Boolean(input.crewOrder),
     p_pickup_date: input.pickupDate,
     p_pickup_time: input.pickupTime,
@@ -208,7 +219,9 @@ export async function createStaffGuestPreorderRecord(
   }
 
   const { data, error } = await supabase.rpc(
-    "create_staff_guest_preorder",
+    input.ownerManualCatalogueOverride
+      ? "create_owner_manual_guest_preorder_with_catalogue_override"
+      : "create_staff_guest_preorder_with_source_detail",
     rpcArgs,
   );
 

@@ -138,8 +138,8 @@ function OrderLines({
                             disabled={pending}
                             onChange={(event) => {
                               const next = sizeChoices.find(
-                              (choice) => choice.id === event.target.value,
-                            );
+                                (choice) => choice.id === event.target.value,
+                              );
                               if (!next) return;
                               void changeLine(
                                 item,
@@ -314,7 +314,6 @@ function OrderSummary({
   showDatePrompt: boolean;
   pricesPending: boolean;
 }) {
-  const selectedDate = formatCartCollectionDate(draft.pickupDate);
   const earliestDate = formatCartCollectionDate(
     draftEarliestCollectionYmd(draft.items),
   );
@@ -325,14 +324,6 @@ function OrderSummary({
   return (
     <div className="space-y-5">
       <dl className="space-y-3 text-sm">
-        <div>
-          <dt className="text-skyline text-[11px] font-medium tracking-[0.16em] uppercase">
-            Collection date
-          </dt>
-          <dd className="text-ink mt-1 font-medium">
-            {selectedDate ?? "Not selected yet"}
-          </dd>
-        </div>
         <div>
           <dt className="text-skyline text-[11px] font-medium tracking-[0.16em] uppercase">
             Earliest collection
@@ -416,6 +407,11 @@ function OrderSummary({
               View My Order
             </Link>
           )}
+          {!checkoutBlocked ? (
+            <p className="text-skyline -mt-2 text-center text-xs leading-relaxed">
+              You can select or change your collection date in the next step.
+            </p>
+          ) : null}
           <Link
             className="text-ink hover:text-skyline inline-flex min-h-11 w-full items-center justify-center text-sm font-medium"
             href={continueHref}
@@ -458,7 +454,10 @@ export function StorefrontCartShell({
   const pricesBySizeId = useMemo(
     () =>
       new Map(
-        (pricesPending || !hasSelectedPickupDate ? [] : datePricedEditCakes).flatMap((cake) =>
+        (pricesPending || !hasSelectedPickupDate
+          ? []
+          : datePricedEditCakes
+        ).flatMap((cake) =>
           cake.sizes.map((size) => [size.id, size.price] as const),
         ),
       ),
@@ -588,7 +587,6 @@ export function StorefrontCartShell({
     return null;
   }
 
-  const selectedDate = formatCartCollectionDate(draft.pickupDate);
   const earliestDate = formatCartCollectionDate(
     draftEarliestCollectionYmd(draft.items),
   );
@@ -636,20 +634,12 @@ export function StorefrontCartShell({
           <div className="px-6 sm:px-10">
             <div className="mx-auto w-full max-w-6xl">
               <button
-                aria-label={`Collection ${selectedDate ?? "not selected"}, earliest ${earliestDate ?? "unavailable"}. View order, ${count} ${count === 1 ? "item" : "items"}.`}
+                aria-label={`Earliest collection ${earliestDate ?? "unavailable"}. View order, ${count} ${count === 1 ? "item" : "items"}.`}
                 className="border-ink/15 text-ink pointer-events-auto flex min-h-16 w-full items-center justify-between gap-6 rounded-[10px] border bg-[#E2E1DC] px-6 shadow-[0_10px_28px_rgba(28,25,22,0.1)]"
                 onClick={() => setOpen(true)}
                 type="button"
               >
                 <span className="flex min-w-0 flex-1 items-center gap-8 text-left">
-                  <span>
-                    <span className="text-skyline block text-[11px] font-medium tracking-[0.16em] uppercase">
-                      Collection date
-                    </span>
-                    <span className="mt-0.5 block text-sm font-medium">
-                      {selectedDate ?? "Not selected yet"}
-                    </span>
-                  </span>
                   <span>
                     <span className="text-skyline block text-[11px] font-medium tracking-[0.16em] uppercase">
                       Earliest collection

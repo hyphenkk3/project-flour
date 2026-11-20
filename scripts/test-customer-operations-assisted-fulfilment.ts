@@ -364,7 +364,11 @@ assert.match(ownerForm, /OrderFulfilmentCreateFields/);
 assert.doesNotMatch(ownerForm, /slotPolicy/);
 assert.match(ownerCreateFields, /OwnerPickupFields/);
 assert.match(ownerCreateFields, /scheduleMode = "owner"/);
-assert.doesNotMatch(ownerCreateFields, /dine_in/);
+assert.match(ownerForm, /allowDineIn/);
+assert.match(ownerForm, /dineIn=\{dineInDraft\}/);
+assert.match(ownerCreateFields, /allowDineIn/);
+assert.match(ownerCreateFields, /DineInVenuePartyFields/);
+assert.match(ownerCreateFields, /reservation_time/);
 const ownerCreateAction = read("src/workspaces/owner/orders/actions.ts");
 const ownerCreateFn = ownerCreateAction.slice(
   ownerCreateAction.indexOf(
@@ -374,6 +378,8 @@ const ownerCreateFn = ownerCreateAction.slice(
 );
 assert.doesNotMatch(ownerCreateFn, /slotPolicy: "customer-slots"/);
 assert.match(ownerCreateFn, /createStaffGuestPreorderRecord/);
+assert.match(ownerCreateFn, /parseDineInDraftFromForm/);
+assert.match(ownerCreateFn, /rawFulfilmentMethod !== "dine_in"/);
 const ownerPickupFields = read("src/components/ui/OwnerPickupFields.tsx");
 assert.match(ownerPickupFields, /__custom__/);
 assert.match(ownerPickupFields, /Custom time for special arrangements/);

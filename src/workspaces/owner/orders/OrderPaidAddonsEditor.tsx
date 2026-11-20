@@ -18,12 +18,15 @@ type OrderPaidAddonsEditorProps = {
   onChange: (next: EditablePaidAddonDraft[]) => void;
   /** When true, show snapshot unit price for retained lines; else catalog price. */
   preferSnapshotPrice?: boolean;
+  /** Show catalog state labels in the Owner manual New Order workflow. */
+  showInactiveStatus?: boolean;
 };
 
 export function OrderPaidAddonsEditor({
   drafts,
   onChange,
   preferSnapshotPrice = false,
+  showInactiveStatus = false,
 }: OrderPaidAddonsEditorProps) {
   function updateDraft(
     code: string,
@@ -63,7 +66,11 @@ export function OrderPaidAddonsEditor({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <FormCheckbox
                 checked={draft.selected}
-                label={draft.name}
+                label={
+                  showInactiveStatus && !draft.isActive
+                    ? `${draft.name} (Inactive)`
+                    : draft.name
+                }
                 onChange={(event) => {
                   const selected = event.target.checked;
                   const nextQty = selected

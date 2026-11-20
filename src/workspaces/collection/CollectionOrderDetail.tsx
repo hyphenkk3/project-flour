@@ -26,6 +26,7 @@ import {
   isCollectionDineInMethod,
   isCollectionMarkCollectedEligible,
   isCollectionOrderSecured,
+  isCollectionPaymentEligibleForHandoff,
   isCollectionUndoCollectedEligible,
   isCollectionUndoDineInEligible,
   type CollectionBoardTab,
@@ -35,6 +36,8 @@ import { deriveCollectionPackingReminders } from "@/workspaces/collection/packin
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
 import { CustomerOrderNoteCallout } from "@/components/orders/CustomerOrderNoteCallout";
 import { CollectionReadyMessage } from "@/workspaces/collection/CollectionReadyMessage";
+import { orderFulfilmentDate } from "@/engines/orders/staff-presentation";
+import { OrderStaffIndicators } from "@/workspaces/owner/orders/OrderStaffIndicators";
 
 type CollectionOrderDetailProps = {
   order: CollectionBoardOrder;
@@ -53,6 +56,7 @@ export function CollectionOrderDetail({
 }: CollectionOrderDetailProps) {
   const presentation = collectionDeskPresentation({
     readyAt: order.readyAt,
+    readyForCollection: order.derivedReadyForCollection,
     pickedUpAt: order.pickedUpAt,
     deliveredAt: order.deliveredAt,
     outForDeliveryAt: order.outForDeliveryAt,
@@ -60,6 +64,7 @@ export function CollectionOrderDetail({
   });
   const desk = collectionDeskAttention({
     readyAt: order.readyAt,
+    readyForCollection: order.derivedReadyForCollection,
     pickedUpAt: order.pickedUpAt,
     deliveredAt: order.deliveredAt,
     outForDeliveryAt: order.outForDeliveryAt,
@@ -74,25 +79,38 @@ export function CollectionOrderDetail({
     status: order.status,
   });
   const packing = deriveCollectionPackingReminders(order);
+  const fulfilmentDate = orderFulfilmentDate({
+    fulfilmentMethod: order.fulfilmentMethod,
+    pickupDate: order.pickupDate,
+    dineInReservationDate: order.dineIn?.reservationDate,
+  });
   const dineIn = isCollectionDineInMethod(order.fulfilmentMethod);
   const isDelivery = order.fulfilmentMethod === "delivery";
-  const surface = collectionHandoffSurface({
-    presentation,
-    canMarkCollected: capabilities.canMarkCollected,
-    canUndoCollected: capabilities.canUndoCollected,
-    markCollectedEligible: dineIn
+  const markCollectedEligible =
+    isCollectionPaymentEligibleForHandoff({
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+    }) &&
+    (dineIn
       ? isCollectionCompleteDineInEligible({
           readyAt: order.readyAt,
+          readyForCollection: order.derivedReadyForCollection,
           pickedUpAt: order.pickedUpAt,
           fulfilmentMethod: order.fulfilmentMethod,
           status: order.status,
         })
       : isCollectionMarkCollectedEligible({
           readyAt: order.readyAt,
+          readyForCollection: order.derivedReadyForCollection,
           pickedUpAt: order.pickedUpAt,
           fulfilmentMethod: order.fulfilmentMethod,
           status: order.status,
-        }),
+        }));
+  const surface = collectionHandoffSurface({
+    presentation,
+    canMarkCollected: capabilities.canMarkCollected,
+    canUndoCollected: capabilities.canUndoCollected,
+    markCollectedEligible,
     undoCollectedEligible: dineIn
       ? isCollectionUndoDineInEligible({
           pickedUpAt: order.pickedUpAt,
@@ -114,6 +132,15 @@ export function CollectionOrderDetail({
       </Link>
 
       <header className="mt-3 space-y-2">
+        <OrderStaffIndicators
+          extraStockId={order.extraStockId}
+          fulfilmentDate={fulfilmentDate}
+          terminal={Boolean(
+            order.pickedUpAt ||
+              order.deliveredAt ||
+              order.status === "cancelled",
+          )}
+        />
         <div className="flex flex-wrap gap-2">
           <StatusBadge label={desk.label} tone={desk.tone} />
           <StatusBadge
@@ -122,6 +149,12 @@ export function CollectionOrderDetail({
             tone={guestOrderStatusBadgeTone(order.status)}
           />
           {!secured ? <StatusBadge label="Not secured" tone="warning" /> : null}
+          {order.paymentStatus !== "paid" ? (
+            <StatusBadge
+              label={order.paymentStatus === "refunded" ? "Payment refunded" : "Payment pending"}
+              tone="warning"
+            />
+          ) : null}
           {paymentAttention ? (
             <StatusBadge label="Payment Attention" tone="danger" />
           ) : null}
@@ -138,8 +171,17 @@ export function CollectionOrderDetail({
         </div>
       </header>
 
+      {order.internalNotes?.trim() ? (
+        <section className="border-[#EBCB77] bg-[#FFF8DF] mt-4 rounded-xl border p-4" aria-label="Internal Notes">
+          <h2 className="text-[#805513] text-sm font-semibold">Internal Notes</h2>
+          <p className="text-[#493A25] mt-2 whitespace-pre-wrap break-words text-sm font-bold leading-relaxed">
+            {order.internalNotes.trim()}
+          </p>
+        </section>
+      ) : null}
+
       {order.customerNotes?.trim() ? (
-        <div className="mt-4">
+        <div className="mt-4" aria-label="Customer Order Note">
           <CustomerOrderNoteCallout note={order.customerNotes} />
         </div>
       ) : null}
@@ -147,7 +189,8 @@ export function CollectionOrderDetail({
       {paymentAttention ? (
         <p className="border-status-danger/20 bg-status-danger-soft text-status-danger mt-4 rounded-2xl border px-4 py-2.5 text-sm leading-relaxed">
           Payment Attention — balance still needs Owner resolution. Collection
-          may complete handoff; do not take or correct payment here.
+          cannot complete handoff until payment is fully settled. Do not take or
+          correct payment here.
         </p>
       ) : null}
 

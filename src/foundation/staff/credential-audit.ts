@@ -68,7 +68,9 @@ export function sanitizeStaffCredentialMetadata(
   return output;
 }
 
-export function buildStaffCredentialEventRow(input: StaffCredentialEventInput): {
+export function buildStaffCredentialEventRow(
+  input: StaffCredentialEventInput,
+): {
   event_type: StaffCredentialEventType;
   actor_staff_id: string;
   subject_staff_id: string;
@@ -109,7 +111,9 @@ export async function recordStaffCredentialEvent(
 export function staffCredentialAuditWarning(
   recorded: { ok: true } | { ok: false; error: string },
 ): string | null {
-  return recorded.ok ? null : STAFF_CREDENTIAL_AUDIT_COPY.recordFailedAfterChange;
+  return recorded.ok
+    ? null
+    : STAFF_CREDENTIAL_AUDIT_COPY.recordFailedAfterChange;
 }
 
 export const STAFF_CREDENTIAL_EVENT_LABELS: Record<
@@ -134,6 +138,17 @@ export type StaffCredentialActivityItem = {
   detail: string | null;
 };
 
+export type StaffCredentialActivityCursor = {
+  createdAt: string;
+  id: string;
+};
+
+export type StaffCredentialActivityPage = {
+  events: StaffCredentialActivityItem[];
+  nextCursor: StaffCredentialActivityCursor | null;
+  hasMore: boolean;
+};
+
 export function formatStaffCredentialActivityDetail(
   eventType: StaffCredentialEventType,
   metadata: Record<string, unknown>,
@@ -155,10 +170,12 @@ export function formatStaffCredentialActivityDetail(
   return null;
 }
 
-function staffDisplayName(row: {
-  display_name?: string | null;
-  username?: string | null;
-} | null): string {
+function staffDisplayName(
+  row: {
+    display_name?: string | null;
+    username?: string | null;
+  } | null,
+): string {
   const display = row?.display_name?.trim();
   if (display) return display;
   const username = row?.username?.trim();
@@ -166,21 +183,17 @@ function staffDisplayName(row: {
   return "Unknown staff";
 }
 
-export async function listStaffCredentialEventsForAdmin(
-  limit = 40,
+function mapStaffCredentialRows(
+  rows: Array<{
+    id: string;
+    event_type: string;
+    metadata: unknown;
+    created_at: string;
+    actor_staff_id: string | null;
+    subject_staff_id: string;
+  }>,
 ): Promise<StaffCredentialActivityItem[]> {
   const admin = createServiceClient();
-  const { data, error } = await admin
-    .from("staff_credential_events")
-    .select("id, event_type, metadata, created_at, actor_staff_id, subject_staff_id")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    throw error;
-  }
-
-  const rows = data ?? [];
   const staffIds = Array.from(
     new Set(
       rows.flatMap((row) =>
@@ -191,43 +204,96 @@ export async function listStaffCredentialEventsForAdmin(
     ),
   );
 
-  const names = new Map<string, string>();
-  if (staffIds.length > 0) {
-    const { data: staffRows, error: staffError } = await admin
-      .from("staff_profiles")
-      .select("id, display_name, username")
-      .in("id", staffIds);
-    if (staffError) {
-      throw staffError;
+  return (async () => {
+    const names = new Map<string, string>();
+    if (staffIds.length > 0) {
+      const { data: staffRows, error: staffError } = await admin
+        .from("staff_profiles")
+        .select("id, display_name, username")
+        .in("id", staffIds);
+      if (staffError) throw staffError;
+      for (const staff of staffRows ?? []) {
+        names.set(String(staff.id), staffDisplayName(staff));
+      }
     }
-    for (const staff of staffRows ?? []) {
-      names.set(String(staff.id), staffDisplayName(staff));
-    }
-  }
 
-  return rows.flatMap((row) => {
-    const eventType = String(row.event_type ?? "");
-    if (!isStaffCredentialEventType(eventType)) return [];
-    const metadata =
-      row.metadata &&
-      typeof row.metadata === "object" &&
-      !Array.isArray(row.metadata)
-        ? (row.metadata as Record<string, unknown>)
-        : {};
-    const actorId =
-      typeof row.actor_staff_id === "string" ? row.actor_staff_id : "";
-    const subjectId =
-      typeof row.subject_staff_id === "string" ? row.subject_staff_id : "";
-    return [
-      {
-        id: String(row.id),
-        eventType,
-        label: STAFF_CREDENTIAL_EVENT_LABELS[eventType],
-        createdAt: String(row.created_at),
-        actorName: names.get(actorId) ?? "Unknown staff",
-        subjectName: names.get(subjectId) ?? "Unknown staff",
-        detail: formatStaffCredentialActivityDetail(eventType, metadata),
-      },
-    ];
-  });
+    return rows.flatMap((row) => {
+      const eventType = String(row.event_type ?? "");
+      if (!isStaffCredentialEventType(eventType)) return [];
+      const metadata =
+        row.metadata &&
+        typeof row.metadata === "object" &&
+        !Array.isArray(row.metadata)
+          ? (row.metadata as Record<string, unknown>)
+          : {};
+      const actorId =
+        typeof row.actor_staff_id === "string" ? row.actor_staff_id : "";
+      const subjectId =
+        typeof row.subject_staff_id === "string" ? row.subject_staff_id : "";
+      return [
+        {
+          id: String(row.id),
+          eventType,
+          label: STAFF_CREDENTIAL_EVENT_LABELS[eventType],
+          createdAt: String(row.created_at),
+          actorName: names.get(actorId) ?? "Unknown staff",
+          subjectName: names.get(subjectId) ?? "Unknown staff",
+          detail: formatStaffCredentialActivityDetail(eventType, metadata),
+        },
+      ];
+    });
+  })();
+}
+
+const CREDENTIAL_ACTIVITY_PAGE_SIZE = 5;
+const CREDENTIAL_ACTIVITY_TIMESTAMP =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/i;
+const CREDENTIAL_ACTIVITY_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isValidStaffCredentialActivityCursor(
+  cursor: unknown,
+): cursor is StaffCredentialActivityCursor {
+  if (!cursor || typeof cursor !== "object") return false;
+  const candidate = cursor as Record<string, unknown>;
+  return (
+    typeof candidate.createdAt === "string" &&
+    typeof candidate.id === "string" &&
+    CREDENTIAL_ACTIVITY_TIMESTAMP.test(candidate.createdAt) &&
+    CREDENTIAL_ACTIVITY_UUID.test(candidate.id)
+  );
+}
+
+export async function listStaffCredentialEventsPageForAdmin(
+  cursor: StaffCredentialActivityCursor | null = null,
+): Promise<StaffCredentialActivityPage> {
+  if (cursor && !isValidStaffCredentialActivityCursor(cursor)) {
+    throw new Error("Invalid credential activity cursor");
+  }
+  const admin = createServiceClient();
+  let query = admin
+    .from("staff_credential_events")
+    .select(
+      "id, event_type, metadata, created_at, actor_staff_id, subject_staff_id",
+    )
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(CREDENTIAL_ACTIVITY_PAGE_SIZE + 1);
+  if (cursor) {
+    query = query.or(
+      `created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`,
+    );
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  const rows = data ?? [];
+  const pageRows = rows.slice(0, CREDENTIAL_ACTIVITY_PAGE_SIZE);
+  const last = pageRows.at(-1);
+  return {
+    events: await mapStaffCredentialRows(pageRows),
+    nextCursor: last
+      ? { createdAt: String(last.created_at), id: String(last.id) }
+      : null,
+    hasMore: rows.length > CREDENTIAL_ACTIVITY_PAGE_SIZE,
+  };
 }

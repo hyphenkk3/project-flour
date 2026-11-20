@@ -5,9 +5,10 @@
  * - Apply supabase/migrations to your Supabase project
  * - Set env vars in .env.local
  *
- * Login uses username (not email):
- *   username: owner
- *   password: OwnerDev123!
+ * Login uses username (not email). The DEV seed password must be supplied
+ * at runtime in PROJECT_FLOUR_DEV_OWNER_PASSWORD from a trusted secret
+ * source. Do not store it in .env.local or place it in shell command text.
+ * It is never printed, and the seed fails closed when it is absent.
  *
  * Supabase Auth still requires an email on the auth user. That email is an
  * implementation detail for Auth storage only and is never used as the app
@@ -36,6 +37,9 @@ function loadEnvLocal() {
     }
     const key = trimmed.slice(0, eq).trim();
     const value = trimmed.slice(eq + 1).trim();
+    if (key === "PROJECT_FLOUR_DEV_OWNER_PASSWORD") {
+      continue;
+    }
     if (!process.env[key]) {
       process.env[key] = value;
     }
@@ -44,18 +48,32 @@ function loadEnvLocal() {
 
 loadEnvLocal();
 
+const DEV_SUPABASE_URL = "https://tzwtpxdcggesgjaqxkqr.supabase.co";
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const password = process.env.PROJECT_FLOUR_DEV_OWNER_PASSWORD;
 
-if (!url || !serviceRoleKey) {
-  console.error(
-    "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local",
-  );
+if (url !== DEV_SUPABASE_URL) {
+  console.error("Refusing to run: this seed script is restricted to the authorized DEV Supabase project.");
+  process.exit(1);
+}
+
+if (!serviceRoleKey) {
+  console.error("Missing SUPABASE_SERVICE_ROLE_KEY.");
+  process.exit(1);
+}
+
+if (!password) {
+  console.error("Missing PROJECT_FLOUR_DEV_OWNER_PASSWORD; no credentials were changed.");
+  process.exit(1);
+}
+
+if (password.length < 12) {
+  console.error("PROJECT_FLOUR_DEV_OWNER_PASSWORD must contain at least 12 characters.");
   process.exit(1);
 }
 
 const username = "owner";
-const password = "OwnerDev123!";
 const authEmail = "owner@whitebird.dev";
 const displayName = "Owner (Dev)";
 
@@ -85,7 +103,6 @@ async function main() {
   if (existingProfile) {
     console.log("Dev Owner already exists.");
     console.log(`  username: ${username}`);
-    console.log(`  password: ${password}`);
     return;
   }
 
@@ -120,13 +137,12 @@ async function main() {
 
   console.log("Dev Owner created.");
   console.log(`  username: ${username}`);
-  console.log(`  password: ${password}`);
   console.log(
     "  Note: Auth stores an email internally; app login uses username only.",
   );
 }
 
-main().catch((error) => {
-  console.error(error);
+main().catch(() => {
+  console.error("DEV Owner seed failed; no error details or credentials were logged.");
   process.exit(1);
 });

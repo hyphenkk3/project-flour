@@ -15,7 +15,7 @@ import { getNavigationForRole } from "@/foundation/navigation/workspaces";
 assert.equal(canAccessCollectionWorkspace("collection"), true);
 assert.equal(canAccessCollectionWorkspace("manager"), true);
 assert.equal(canAccessCollectionWorkspace("owner"), true);
-assert.equal(canAccessCollectionWorkspace("bakery"), false);
+assert.equal(canAccessCollectionWorkspace("bakery"), true);
 assert.equal(canAccessCollectionWorkspace("customer_operations"), true);
 
 for (const role of [
@@ -23,6 +23,7 @@ for (const role of [
   "manager",
   "owner",
   "customer_operations",
+  "bakery",
 ] as const) {
   const caps = buildCollectionWorkspaceCapabilities({
     role,
@@ -33,13 +34,13 @@ for (const role of [
   assert.equal(caps.canUndoCollected, true, `${role} Undo Collected`);
 }
 
-const bakeryDenied = buildCollectionWorkspaceCapabilities({
+const bakeryCapabilities = buildCollectionWorkspaceCapabilities({
   role: "bakery",
   staffId: "bakery-1",
 });
-assert.equal(bakeryDenied.canAccessCollectionWorkspace, false);
-assert.equal(bakeryDenied.canMarkCollected, false);
-assert.equal(bakeryDenied.canUndoCollected, false);
+assert.equal(bakeryCapabilities.canAccessCollectionWorkspace, true);
+assert.equal(bakeryCapabilities.canMarkCollected, true);
+assert.equal(bakeryCapabilities.canUndoCollected, true);
 
 // Owner Ops Collection controls: Owner + Manager + Customer Operations.
 assert.equal(
@@ -72,7 +73,7 @@ assert.equal(canAccessBakeryWorkspace("collection"), false);
 assert.equal(canAccessWorkspace("owner", "collection"), true);
 assert.equal(canAccessWorkspace("manager", "collection"), true);
 assert.equal(canAccessWorkspace("collection", "collection"), true);
-assert.equal(canAccessWorkspace("bakery", "collection"), false);
+assert.equal(canAccessWorkspace("bakery", "collection"), true);
 assert.equal(canAccessWorkspace("customer_operations", "collection"), true);
 
 const ownerNav = getNavigationForRole("owner");
@@ -93,7 +94,7 @@ assert.ok(
 assert.ok(!collectionNav.some((item) => item.id === "bakery"));
 
 const bakeryNav = getNavigationForRole("bakery");
-assert.ok(!bakeryNav.some((item) => item.id === "collection"));
+assert.ok(bakeryNav.some((item) => item.id === "collection"));
 
 const coNav = getNavigationForRole("customer_operations");
 assert.ok(

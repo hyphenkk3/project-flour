@@ -5,8 +5,12 @@
 
 import { getDeliverySlotsForDate } from "@/engines/business-calendar/delivery-hours";
 import {
+  availableDineInVenues,
+  cakeServingSlotsForReservation,
   getDineInSchedule,
   getDineInSlotsForDate,
+  venuesForReservationAndServing,
+  type DineInVenue,
 } from "@/engines/business-calendar/dine-in-hours";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
@@ -77,6 +81,101 @@ export type FreshPicksPhysicalItemContext = {
   window: ExtraPickupWindow;
   readyForCollection: boolean;
 };
+
+/** Venues available for at least one currently eligible Fresh Pick slot. */
+export function freshPicksDineInVenuesForSlots(
+  dateYmd: string,
+  slots: readonly PickupSlot[],
+  snapshot: OperatingHoursSnapshot,
+): DineInVenue[] {
+  const available = new Set<DineInVenue>();
+  for (const slot of slots) {
+    for (const venue of availableDineInVenues(dateYmd, slot.value, snapshot)) {
+      available.add(venue);
+    }
+  }
+  const venues: readonly DineInVenue[] = ["hyphen", "whitebird"];
+  return venues.filter((venue) => available.has(venue));
+}
+
+/** Restrict the existing shared dine-in slots to one selected venue. */
+export function freshPicksDineInSlotsForVenue(
+  dateYmd: string,
+  slots: readonly PickupSlot[],
+  venue: DineInVenue,
+  snapshot: OperatingHoursSnapshot,
+): PickupSlot[] {
+  return slots.filter((slot) =>
+    availableDineInVenues(dateYmd, slot.value, snapshot).includes(venue),
+  );
+}
+
+/** Reservation starts that have at least one stock-eligible cake-serving time. */
+export function freshPicksDineInReservationSlots(
+  dateYmd: string,
+  stockEligibleServingSlots: readonly PickupSlot[],
+  snapshot: OperatingHoursSnapshot,
+): PickupSlot[] {
+  return getDineInSlotsForDate(dateYmd, snapshot).filter((reservation) =>
+    freshPicksDineInServingSlotsForReservation(
+      dateYmd,
+      reservation.value,
+      stockEligibleServingSlots,
+      snapshot,
+    ).some((serving) =>
+      venuesForReservationAndServing(
+        dateYmd,
+        reservation.value,
+        serving.value,
+        snapshot,
+      ).length > 0,
+    ),
+  );
+}
+
+/** Shared regular-Preorder serving window intersected with this stock's slots. */
+export function freshPicksDineInServingSlotsForReservation(
+  dateYmd: string,
+  reservationTime: string,
+  stockEligibleServingSlots: readonly PickupSlot[],
+  snapshot: OperatingHoursSnapshot,
+): PickupSlot[] {
+  const eligibleTimes = new Set(
+    stockEligibleServingSlots.map((slot) => slot.value),
+  );
+  return cakeServingSlotsForReservation(dateYmd, reservationTime, snapshot).filter(
+    (slot) => eligibleTimes.has(slot.value),
+  );
+}
+
+/** Venues must serve both the table reservation and the cake serving time. */
+export function freshPicksDineInVenuesForPair(
+  dateYmd: string,
+  reservationTime: string,
+  servingTime: string,
+  snapshot: OperatingHoursSnapshot,
+): DineInVenue[] {
+  return venuesForReservationAndServing(
+    dateYmd,
+    reservationTime,
+    servingTime,
+    snapshot,
+  );
+}
+
+/** Keep a still-valid venue; clear an invalid customer choice instead of replacing it. */
+export function freshPicksDineInVenueSelection(
+  availableVenues: readonly DineInVenue[],
+  currentVenue: string,
+): DineInVenue | "" {
+  if (availableVenues.includes(currentVenue as DineInVenue)) {
+    return currentVenue as DineInVenue;
+  }
+  if (!currentVenue && availableVenues.length === 1) {
+    return availableVenues[0] ?? "";
+  }
+  return "";
+}
 
 function contextDefaults(input: FreshPicksFulfilmentContext): {
   window: ExtraPickupWindow;
@@ -403,6 +502,16 @@ export function extraCustomerSameDayUnavailableNotice(
   );
   if (cutoff?.message) return cutoff.message;
   return methods.find((method) => method.message)?.message ?? null;
+}
+
+/** Do not show today's cutoff warning when the customer selected another stock date. */
+export function extraCustomerSameDayUnavailableNoticeForDate(
+  dateYmd: string,
+  input: FreshPicksFulfilmentContext,
+): string | null {
+  const { now } = contextDefaults(input);
+  if (!isFreshPicksFulfilmentDateToday(dateYmd, now)) return null;
+  return extraCustomerSameDayUnavailableNotice({ ...input, now });
 }
 
 export function extraActionableFulfilmentDays(input: {

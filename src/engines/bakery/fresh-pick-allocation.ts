@@ -19,6 +19,7 @@ export type BakeryAssignedStockInput = {
   lifecycle: string;
   soldAt: string | null;
   cutIntoSlicesAt: string | null;
+  readyForCollection?: boolean;
   cakeId: string | null;
   cakeName: string;
   sizeId: string | null;

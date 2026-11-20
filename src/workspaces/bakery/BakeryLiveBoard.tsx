@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { createClient } from "@/lib/supabase/client";
 import { formatLongBusinessDate } from "@/lib/dates";
+import { startVisibilityAwarePolling } from "@/lib/visibility-aware-polling";
 import {
   getBakeryBoardOrderAction,
   listBakeryBoardOrdersAction,
@@ -11,7 +12,7 @@ import {
 import { BakeryDateNav } from "@/workspaces/bakery/BakeryDateNav";
 import { BakeryOrderCard } from "@/workspaces/bakery/BakeryOrderCard";
 import {
-  bakeryProductionPresentation,
+  bakeryOrderProductionPresentation,
   BAKERY_QUEUE_FILTERS,
   matchesBakeryQueueFilter,
   type BakeryQueueFilter,
@@ -68,6 +69,7 @@ export function BakeryLiveBoard({
 
   useEffect(() => {
     const supabase = createClient();
+    let noteRealtimeEvent = () => {};
     const channel = supabase
       .channel(`bakery-board-${boardDate}`)
       .on(
@@ -77,6 +79,7 @@ export function BakeryLiveBoard({
           const row = (payload.new ?? payload.old) as OrderRowPayload | null;
           if (!row?.id) return;
           if (row.customer_id != null) return;
+          noteRealtimeEvent();
           if (row.pickup_date && row.pickup_date !== boardDate) {
             setOrders((current) =>
               current.filter((order) => order.id !== row.id),
@@ -88,12 +91,15 @@ export function BakeryLiveBoard({
       )
       .subscribe();
 
-    const pollId = window.setInterval(() => {
-      void reconcileList();
-    }, POLL_INTERVAL_MS);
+    const polling = startVisibilityAwarePolling({
+      intervalMs: POLL_INTERVAL_MS,
+      poll: () => void reconcileList(),
+      onVisible: () => void reconcileList(),
+    });
+    noteRealtimeEvent = polling.noteRealtimeEvent;
 
     return () => {
-      window.clearInterval(pollId);
+      polling.dispose();
       void supabase.removeChannel(channel);
     };
   }, [boardDate, handleIncoming, reconcileList]);
@@ -104,24 +110,15 @@ export function BakeryLiveBoard({
 
   const notStarted = visibleOrders.filter(
     (order) =>
-      bakeryProductionPresentation({
-        productionStartedAt: order.productionStartedAt,
-        readyAt: order.readyAt,
-      }) === "not_started",
+      bakeryOrderProductionPresentation(order) === "not_started",
   );
   const inProduction = visibleOrders.filter(
     (order) =>
-      bakeryProductionPresentation({
-        productionStartedAt: order.productionStartedAt,
-        readyAt: order.readyAt,
-      }) === "in_production",
+      bakeryOrderProductionPresentation(order) === "in_production",
   );
   const ready = visibleOrders.filter(
     (order) =>
-      bakeryProductionPresentation({
-        productionStartedAt: order.productionStartedAt,
-        readyAt: order.readyAt,
-      }) === "ready",
+      bakeryOrderProductionPresentation(order) === "ready",
   );
 
   return (

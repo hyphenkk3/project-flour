@@ -107,10 +107,7 @@ export function CakeDetailPurchasePanel({
         : null;
   const scopedOfferVoucher = useMemo(() => {
     if (!offerVoucher || !offerToday) return null;
-    if (
-      !/^\d{4}-\d{2}-\d{2}$/.test(from) ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(to)
-    ) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
       return offerVoucher;
     }
     const period = cataloguePromotionPeriodFromWindow({
@@ -174,14 +171,20 @@ export function CakeDetailPurchasePanel({
         </section>
       ) : null}
 
-      <section className="border-fog border-t pt-5">
+      <section
+        className={
+          cake.sizes.length > 0 ? "border-fog border-t pt-5" : "hidden"
+        }
+      >
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-ink text-[11px] font-medium tracking-[0.16em] uppercase">
             Available sizes
           </h2>
           {selectedSize ? (
             <p className="text-ink text-lg font-semibold tabular-nums">
-              {pickupPricesReady ? formatRm(selectedSize.price) : "Checking price…"}
+              {pickupPricesReady
+                ? formatRm(selectedSize.price)
+                : "Checking price…"}
             </p>
           ) : null}
         </div>

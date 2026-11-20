@@ -5,6 +5,9 @@
  */
 
 import { moneyCompare } from "@/engines/orders/money";
+import type { OrderSource } from "@/types/order";
+
+export type { OrderSource } from "@/types/order";
 
 export const AUGUST_PROMO_CODE = "august_promo_2026" as const;
 export const AUGUST_PROMO_LABEL = "August Promo";
@@ -35,17 +38,6 @@ export function crewRm10VoucherShorthand(
   const number = physicalVoucherNumberFromMetadata(metadata);
   return number ? `Voucher No.${number}` : "Voucher No.";
 }
-
-export type OrderSource =
-  | "customer_website"
-  | "jotform"
-  | "whatsapp"
-  | "whitebird_instagram"
-  | "wee"
-  | "lex"
-  | "walk_in"
-  | "last_minute"
-  | "other";
 
 export type AugustPromoEligibilityInput = {
   orderSource: OrderSource;

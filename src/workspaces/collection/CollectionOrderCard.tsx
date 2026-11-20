@@ -25,6 +25,8 @@ import {
   type CollectionBoardTab,
 } from "@/workspaces/collection/eligibility";
 import type { CollectionBoardOrder } from "@/workspaces/collection/types";
+import { orderFulfilmentDate } from "@/engines/orders/staff-presentation";
+import { OrderStaffIndicators } from "@/workspaces/owner/orders/OrderStaffIndicators";
 
 type CollectionOrderCardProps = {
   order: CollectionBoardOrder;
@@ -41,6 +43,7 @@ export function CollectionOrderCard({
 }: CollectionOrderCardProps) {
   const desk = collectionDeskAttention({
     readyAt: order.readyAt,
+    readyForCollection: order.derivedReadyForCollection,
     pickedUpAt: order.pickedUpAt,
     deliveredAt: order.deliveredAt,
     outForDeliveryAt: order.outForDeliveryAt,
@@ -56,7 +59,7 @@ export function CollectionOrderCard({
     readyAt: order.readyAt,
     status: order.status,
   });
-  const notes = order.customerNotes?.trim() ?? "";
+  const internalNotes = order.internalNotes?.trim() ?? "";
   const completedAt = collectionHandoffCompletedAt(order);
   const completedLabel = completedAt ? formatTimelineTime(completedAt) : null;
   const dineIn = isCollectionDineInMethod(order.fulfilmentMethod);
@@ -70,6 +73,11 @@ export function CollectionOrderCard({
   const complimentaryItems = order.complimentaryItems ?? [];
   const paidAddons = order.paidAddons ?? [];
   const hasOptions = complimentaryItems.length > 0 || paidAddons.length > 0;
+  const fulfilmentDate = orderFulfilmentDate({
+    fulfilmentMethod: order.fulfilmentMethod,
+    pickupDate: order.pickupDate,
+    dineInReservationDate: order.dineIn?.reservationDate,
+  });
 
   return (
     <article
@@ -146,6 +154,15 @@ export function CollectionOrderCard({
               +{additionalCakeCount} more
             </p>
           ) : null}
+          <OrderStaffIndicators
+            extraStockId={order.extraStockId}
+            fulfilmentDate={fulfilmentDate}
+            terminal={Boolean(
+              order.pickedUpAt ||
+                order.deliveredAt ||
+                order.status === "cancelled",
+            )}
+          />
           {showCompletedMeta ? (
             <p className="text-skyline mt-0.5 text-xs leading-snug">
               {methodLabel}
@@ -154,10 +171,13 @@ export function CollectionOrderCard({
                 : null}
             </p>
           ) : null}
-          {notes ? (
-            <p className="text-ink mt-0.5 line-clamp-1 text-xs font-medium">
-              <span className="text-skyline">Order note:</span> {notes}
-            </p>
+          {internalNotes ? (
+            <div className="border-[#EBCB77] bg-[#FFF8DF] mt-2 rounded-lg border p-2.5">
+              <p className="text-[#805513] text-xs font-semibold">Internal Notes</p>
+              <p className="text-[#493A25] mt-1 whitespace-pre-wrap break-words text-sm font-bold leading-snug">
+                {internalNotes}
+              </p>
+            </div>
           ) : null}
 
           {hasOptions ? (
@@ -204,6 +224,12 @@ export function CollectionOrderCard({
             tone={guestOrderStatusBadgeTone(order.status)}
           />
           {!secured ? <StatusBadge label="Not secured" tone="warning" /> : null}
+          {order.paymentStatus !== "paid" ? (
+            <StatusBadge
+              label={order.paymentStatus === "refunded" ? "Payment refunded" : "Payment pending"}
+              tone="warning"
+            />
+          ) : null}
           {paymentAttention && tab === "ready" ? (
             <StatusBadge label="Payment Attention" tone="danger" />
           ) : null}

@@ -194,6 +194,7 @@ export function canMarkGuestOrderReady(input: {
 export function canCompleteGuestOrder(input: {
   snapshot: OrderLifecycleSnapshot;
   role: RoleCode;
+  collectionReady?: boolean;
   /** Collection desk is Ready-gated. Ops allows Owner/Manager override. */
   surface: "collection" | "ops";
 }): { ok: true } | { ok: false; error: string } {
@@ -204,7 +205,9 @@ export function canCompleteGuestOrder(input: {
   if (isGuestOrderComplete(snapshot)) {
     return { ok: false, error: LIFECYCLE_ERRORS.alreadyComplete };
   }
-  if (snapshot.readyAt) return { ok: true };
+  if (snapshot.readyAt || (surface === "collection" && input.collectionReady)) {
+    return { ok: true };
+  }
   if (
     surface === "ops" &&
     canOverrideCompleteBeforeReadyRole(role)

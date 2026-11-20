@@ -32,8 +32,13 @@ export type BakeryOrderRow = {
   ready_at: string | null;
   picked_up_at: string | null;
   out_for_delivery_at: string | null;
+  delivered_at: string | null;
   include_receipt: boolean | null;
   extra_stock_id?: string | null;
+  order_dine_in_reservations?:
+    | { reservation_date: string | null }
+    | { reservation_date: string | null }[]
+    | null;
   order_items?: Array<{
     id: string;
     cake_id: string | null;
@@ -126,6 +131,9 @@ export function mapBakeryBoardOrder(
   assignedStockRows: BakeryAssignedStockInput[] = [],
 ): BakeryBoardOrder {
   const cakeLines = mapCakeLines(row);
+  const reservation = Array.isArray(row.order_dine_in_reservations)
+    ? row.order_dine_in_reservations[0] ?? null
+    : row.order_dine_in_reservations ?? null;
   return {
     id: row.id,
     orderNumber: row.order_number,
@@ -133,6 +141,8 @@ export function mapBakeryBoardOrder(
     pickupDate: row.pickup_date,
     pickupTime: row.pickup_time,
     fulfilmentMethod: normalizeFulfilmentMethod(row.fulfilment_method),
+    extraStockId: row.extra_stock_id ?? null,
+    dineInReservationDate: reservation?.reservation_date?.slice(0, 10) ?? null,
     status: row.status,
     customerNotes: row.customer_notes,
     needsBakeryAttention: Boolean(row.needs_bakery_attention),
@@ -142,6 +152,7 @@ export function mapBakeryBoardOrder(
     readyAt: row.ready_at,
     pickedUpAt: row.picked_up_at,
     outForDeliveryAt: row.out_for_delivery_at,
+    deliveredAt: row.delivered_at,
     includeReceipt: Boolean(row.include_receipt),
     cakeLines,
     freshPickAllocation: summarizeBakeryFreshPickAllocations({
@@ -156,6 +167,16 @@ export function mapBakeryBoardOrder(
       })),
       stockRows: assignedStockRows,
     }),
+    assignedFreshPickStocks: assignedStockRows.map((stock) => ({
+      id: stock.id,
+      cakeName: stock.cakeName,
+      sizeLabel: stock.sizeLabel,
+      lifecycle: stock.lifecycle,
+      soldAt: stock.soldAt,
+      cutIntoSlicesAt: stock.cutIntoSlicesAt,
+      readyForCollection: stock.readyForCollection === true,
+      legacyLinkConflict: stock.legacyLinkConflict === true,
+    })),
     complimentaryItems: mapComplimentary(row),
     paidAddons: mapPaidAddons(row),
   };

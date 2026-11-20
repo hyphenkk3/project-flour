@@ -1,5 +1,10 @@
 import type { StatusTone } from "@/lib/design-tokens";
 import type { StorefrontOrder } from "@/types/storefront";
+import {
+  isJotformAvailableForNewStaffOrder,
+  isStaffOrderSource,
+  type StaffOrderSource,
+} from "@/engines/orders/staff-order-source";
 
 export function guestOrderStatusLabel(
   status: StorefrontOrder["status"],
@@ -209,6 +214,8 @@ export function guestOrderOperationalSuffix(input: {
       return "(wee)";
     case "lex":
       return "(lex)";
+    case "kin":
+      return "(kin)";
     case "customer_website":
     case "walk_in":
     case "last_minute":
@@ -233,16 +240,30 @@ export const STAFF_GUEST_ORDER_SOURCES = [
   { value: "whitebird_instagram", label: "Whitebird Instagram" },
   { value: "wee", label: "Wee" },
   { value: "lex", label: "Lex" },
+  { value: "kin", label: "Kin" },
   { value: "other", label: "Other" },
-] as const;
+] as const satisfies ReadonlyArray<{ value: StaffOrderSource; label: string }>;
 
-export type StaffGuestOrderSource =
-  (typeof STAFF_GUEST_ORDER_SOURCES)[number]["value"];
+export type StaffGuestOrderSource = StaffOrderSource;
+
+/** New-order menu only. Historical/edit menus keep the complete source list. */
+export function staffGuestNewOrderSources(now: Date | number = Date.now()) {
+  return STAFF_GUEST_ORDER_SOURCES.filter(
+    (source) =>
+      source.value !== "jotform" ||
+      isJotformAvailableForNewStaffOrder(now),
+  );
+}
+
+export function defaultStaffGuestNewOrderSource(): StaffGuestOrderSource {
+  // Preserve the existing default; Jotform remains an explicit choice until cutoff.
+  return "whatsapp";
+}
 
 export function isStaffGuestOrderSource(
   value: string,
 ): value is StaffGuestOrderSource {
-  return STAFF_GUEST_ORDER_SOURCES.some((entry) => entry.value === value);
+  return isStaffOrderSource(value);
 }
 
 export function orderSourceLabel(
@@ -261,6 +282,8 @@ export function orderSourceLabel(
       return "Wee";
     case "lex":
       return "Lex";
+    case "kin":
+      return "Kin";
     case "walk_in":
       return "Walk-in";
     case "last_minute":
@@ -268,6 +291,17 @@ export function orderSourceLabel(
     case "other":
       return "Other";
   }
+}
+
+export function orderSourceLabelWithDetail(
+  source: StorefrontOrder["orderSource"],
+  detail: string | null | undefined,
+): string {
+  const label = orderSourceLabel(source);
+  const normalizedDetail = detail?.trim();
+  return source === "other" && normalizedDetail
+    ? `${label} — ${normalizedDetail}`
+    : label;
 }
 
 /** Website storefront orders keep required WhatsApp phone on edit. */

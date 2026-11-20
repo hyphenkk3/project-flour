@@ -3,6 +3,7 @@
 import { useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { startVisibilityAwarePolling } from "@/lib/visibility-aware-polling";
 import {
   GUEST_ORDERS_LIVE_POLL_MS,
   isGuestOrderLiveEvent,
@@ -21,6 +22,27 @@ export function HomeLiveRefresh() {
 
   useEffect(() => {
     const supabase = createClient();
+    let refreshTimer: number | null = null;
+    function refreshSoon() {
+      if (refreshTimer !== null) return;
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
+        refresh();
+      }, 120);
+    }
+    function cancelQueuedRefresh() {
+      if (refreshTimer === null) return;
+      window.clearTimeout(refreshTimer);
+      refreshTimer = null;
+    }
+    const polling = startVisibilityAwarePolling({
+      intervalMs: GUEST_ORDERS_LIVE_POLL_MS,
+      poll: refreshSoon,
+      onVisible: refreshSoon,
+    });
+    function refreshRealtimeImmediately() {
+      polling.runRealtimeRefreshImmediately(refresh, cancelQueuedRefresh);
+    }
     const channel = supabase
       .channel("home-guest-orders")
       .on(
@@ -29,7 +51,7 @@ export function HomeLiveRefresh() {
         (payload) => {
           const row = payload.new as GuestOrderLiveRow;
           if (!isGuestOrderLiveEvent(row)) return;
-          refresh();
+          refreshRealtimeImmediately();
         },
       )
       .on(
@@ -38,14 +60,14 @@ export function HomeLiveRefresh() {
         (payload) => {
           const row = payload.new as GuestOrderLiveRow;
           if (!isGuestOrderLiveEvent(row)) return;
-          refresh();
+          refreshRealtimeImmediately();
         },
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "extra_stock" },
         () => {
-          refresh();
+          refreshRealtimeImmediately();
         },
       )
       .on(
@@ -58,23 +80,14 @@ export function HomeLiveRefresh() {
         (payload) => {
           const code = (payload.new as { code?: string | null }).code;
           if (code !== "waiting_list_new_request") return;
-          refresh();
+          refreshRealtimeImmediately();
         },
       )
       .subscribe();
 
-    const pollId = window.setInterval(() => {
-      refresh();
-    }, GUEST_ORDERS_LIVE_POLL_MS);
-
-    function onVisibility() {
-      if (document.visibilityState === "visible") refresh();
-    }
-    document.addEventListener("visibilitychange", onVisibility);
-
     return () => {
-      window.clearInterval(pollId);
-      document.removeEventListener("visibilitychange", onVisibility);
+      polling.dispose();
+      cancelQueuedRefresh();
       void supabase.removeChannel(channel);
     };
   }, [refresh]);

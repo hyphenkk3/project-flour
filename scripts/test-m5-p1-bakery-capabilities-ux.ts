@@ -40,7 +40,7 @@ assert.equal(denied.canMarkReady, false);
 assert.equal(denied.canUndoReady, false);
 
 // Owner Ops matrix unchanged for bakery role.
-assert.equal(canAccessGuestOrderWorkspace("bakery"), false);
+assert.equal(canAccessGuestOrderWorkspace("bakery"), true);
 assert.equal(canAccessGuestOrderWorkspace("owner"), true);
 
 assert.equal(canAccessWorkspace("owner", "bakery"), true);

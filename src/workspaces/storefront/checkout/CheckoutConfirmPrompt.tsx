@@ -8,6 +8,7 @@ import {
 import { parseDineInPartyCounts } from "@/engines/orders/dine-in-party";
 import {
   CUSTOMER_PAID_ADDON_QUANTITY,
+  customerComplimentaryDisplayQuantity,
   type CustomerComplimentaryOption,
   type CustomerPaidAddonOption,
 } from "@/engines/orders/customer-preorder-options";
@@ -166,6 +167,8 @@ export function buildExtraCheckoutConfirmSnapshot(input: {
   complimentaryCodes: readonly string[];
   total: number;
   catalogueVoucher?: CatalogueVoucherPreview | null;
+  /** Number of physical Fresh Picks receiving each selected complimentary item. */
+  eligibleWholeCakeQuantity?: number;
   items?: readonly {
     extraStockId: string;
     cakeName: string;
@@ -201,12 +204,15 @@ export function buildExtraCheckoutConfirmSnapshot(input: {
       linePrice: option.unitPrice * CUSTOMER_PAID_ADDON_QUANTITY,
     }));
   const selectedComplimentary = new Set(input.complimentaryCodes);
+  const complimentaryQuantity = customerComplimentaryDisplayQuantity(
+    input.eligibleWholeCakeQuantity ?? input.items?.length ?? 1,
+  );
   const complimentaryLines: CheckoutConfirmLine[] = input.complimentaryOptions
     .filter((option) => selectedComplimentary.has(option.code))
     .map((option) => ({
       key: `comp:${option.code}`,
       name: option.name,
-      quantity: 1,
+      quantity: complimentaryQuantity,
       linePrice: 0,
       complimentary: true,
     }));
@@ -235,6 +241,10 @@ export function buildExtraCheckoutConfirmSnapshot(input: {
 type CheckoutConfirmPromptProps = {
   open: boolean;
   pending?: boolean;
+  error?: string | null;
+  outcomeUncertain?: boolean;
+  onOutcomeVerifiedNoOrder?: () => void;
+  onRecoverUncertain?: () => void;
   snapshot: CheckoutConfirmSnapshot;
   onConfirm: () => void;
   onGoBack: () => void;
@@ -260,6 +270,10 @@ function ConfirmBlock({
 export function CheckoutConfirmPrompt({
   open,
   pending = false,
+  error = null,
+  outcomeUncertain = false,
+  onOutcomeVerifiedNoOrder,
+  onRecoverUncertain,
   snapshot,
   onConfirm,
   onGoBack,
@@ -439,14 +453,46 @@ export function CheckoutConfirmPrompt({
           Would you like to confirm this order?
         </p>
         <div className="mt-4 flex flex-col gap-3">
+          {error ? (
+            <p
+              className="border-status-danger/30 bg-status-danger/5 text-status-danger rounded-md border px-3 py-2 text-sm leading-relaxed"
+              role="alert"
+            >
+              {error}
+            </p>
+          ) : null}
+          {outcomeUncertain && onRecoverUncertain ? (
+            <button
+              className="text-ink min-h-11 px-2 text-sm underline underline-offset-4"
+              disabled={pending}
+              onClick={onRecoverUncertain}
+              type="button"
+            >
+              Check this submission safely
+            </button>
+          ) : outcomeUncertain && onOutcomeVerifiedNoOrder ? (
+            <button
+              className="text-ink min-h-11 px-2 text-sm underline underline-offset-4"
+              onClick={onOutcomeVerifiedNoOrder}
+              type="button"
+            >
+              I confirmed with Whitebird that no order was created
+            </button>
+          ) : null}
           <button
             className="bg-ink text-mist hover:bg-skyline inline-flex min-h-12 cursor-pointer items-center justify-center rounded-md px-6 text-sm font-medium transition duration-200 disabled:opacity-60"
-            disabled={pending}
-            onClick={onConfirm}
+            disabled={pending || (outcomeUncertain && !onRecoverUncertain)}
+            onClick={outcomeUncertain ? onRecoverUncertain : onConfirm}
             ref={confirmRef}
             type="button"
           >
-            {pending ? "Submitting…" : "Confirm Order"}
+            {pending
+              ? "Submitting…"
+              : outcomeUncertain
+                ? onRecoverUncertain
+                  ? "Check order status"
+                  : "Please contact Whitebird"
+                : "Confirm Order"}
           </button>
           <button
             className="text-ink hover:text-skyline inline-flex min-h-12 cursor-pointer items-center justify-center rounded-md px-6 text-sm font-medium transition-colors duration-200 disabled:opacity-60"

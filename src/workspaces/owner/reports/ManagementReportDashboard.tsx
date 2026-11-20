@@ -115,37 +115,33 @@ export function ManagementReportDashboard({ report }: { report: ManagementReport
   );
   return (
     <main className="mx-auto max-w-7xl space-y-8 px-1 pb-20 sm:px-4">
-      <header className="space-y-3">
-        <p className="text-xs font-semibold tracking-[.2em] text-teal-700 uppercase">
-          Owner Workspace · Management
+      <header className="space-y-4">
+        <h1 className="text-3xl font-semibold text-slate-900">Reports</h1>
+        <p className="text-sm leading-6 text-slate-600">
+          Fulfilled sales use scheduled fulfilment date. Bookings and cash
+          collection are separate.
         </p>
-        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-          <div>
-            <h1 className="text-3xl font-semibold text-slate-900">Reports</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Fulfilled sales use scheduled fulfilment date. Bookings and cash
-              collection are separate.
-            </p>
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-3">
+          <div className="w-full min-w-0 sm:w-auto sm:flex-none">
+            <select
+              id="report-month-select"
+              aria-label="Choose report month and year"
+              className="h-12 w-full min-w-0 cursor-pointer rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none sm:w-48"
+              onChange={(event) => selectMonth(event.currentTarget.value)}
+              value={current.month}
+            >
+              {availableMonths.map((month) => (
+                <option key={month} value={month}>
+                  {new Intl.DateTimeFormat("en-MY", {
+                    month: "long",
+                    year: "numeric",
+                    timeZone: "UTC",
+                  }).format(new Date(`${month}-01T00:00:00Z`))}
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex min-h-12 w-full max-w-sm min-w-0 items-center rounded-xl border border-slate-200 bg-white px-2 py-1 sm:w-auto">
-              <select
-                aria-label="Choose report month and year"
-                className="h-11 w-full min-w-0 cursor-pointer rounded-lg border-0 bg-transparent px-2 text-sm font-semibold text-slate-900 focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:outline-none sm:min-w-[12rem]"
-                onChange={(event) => selectMonth(event.currentTarget.value)}
-                value={current.month}
-              >
-                {availableMonths.map((month) => (
-                  <option key={month} value={month}>
-                    {new Intl.DateTimeFormat("en-MY", {
-                      month: "long",
-                      year: "numeric",
-                      timeZone: "UTC",
-                    }).format(new Date(`${month}-01T00:00:00Z`))}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="w-full min-w-0 sm:w-auto sm:flex-none">
             <ReportExportControls month={current.month} />
           </div>
         </div>

@@ -35,6 +35,10 @@ const receiptSource = readFileSync(
   "src/workspaces/storefront/checkout/receipt.ts",
   "utf8",
 );
+const waitingListConfirmation = readFileSync(
+  "src/workspaces/storefront/waiting-list/WaitingListConfirmationForm.tsx",
+  "utf8",
+);
 const noteCallout = readFileSync(
   "src/components/orders/CustomerOrderNoteCallout.tsx",
   "utf8",
@@ -87,7 +91,19 @@ assert.ok(
   "Edit Order shows the same read-only callout near the top",
 );
 assert.doesNotMatch(ownerDetail, /<ViewBlock title="Order Notes">/);
-assert.match(ownerDetail, /<ViewBlock title="Internal notes">/);
+assert.equal(
+  (ownerDetail.match(/<InternalOrderNoteCallout note=\{order\.internalNotes\} \/>/g) ?? []).length,
+  2,
+  "populated internal notes use the approved callout in both workspace modes",
+);
+assert.match(ownerDetail, /border-\[#EBCB77\] bg-\[#FFF8DF\]/);
+assert.match(ownerDetail, /text-\[#805513\]/);
+assert.match(ownerDetail, /text-\[#493A25\]/);
+assert.match(ownerDetail, /font-bold/);
+assert.match(ownerDetail, /whitespace-pre-wrap/);
+assert.match(ownerDetail, /break-words/);
+assert.doesNotMatch(ownerDetail, /No internal notes\./);
+assert.match(ownerDetail, /name="internal_notes"/);
 assert.match(ownerDetail, /order\.internalNotes/);
 
 assert.match(COLLECTION_ORDER_SELECT, /customer_notes/);
@@ -103,6 +119,7 @@ const mapped = mapCollectionBoardOrder({
   fulfilment_method: "pickup",
   status: "submitted",
   customer_notes: multilineNote,
+  internal_notes: "Crew instruction",
   production_started_at: null,
   ready_at: null,
   picked_up_at: null,
@@ -111,6 +128,7 @@ const mapped = mapCollectionBoardOrder({
   include_receipt: false,
 });
 assert.equal(mapped.customerNotes, multilineNote, "newlines and punctuation survive mapping");
+assert.equal(mapped.internalNotes, "Crew instruction", "staff-only notes map independently");
 assert.match(collectionDetail, /<CustomerOrderNoteCallout note=\{order\.customerNotes\} \/>/);
 const collectionNotePosition = collectionDetail.indexOf(
   "<CustomerOrderNoteCallout note={order.customerNotes} />",
@@ -122,7 +140,9 @@ assert.ok(
   "Customer Operations detail shows the note immediately below the order header",
 );
 assert.match(collectionDetail, /whitespace-pre-wrap/);
-assert.match(collectionCard, /Order note:/);
+assert.match(collectionCard, /Internal Notes/);
+assert.match(collectionCard, /whitespace-pre-wrap/);
+assert.doesNotMatch(collectionCard, /Order note:/);
 assert.equal(
   mapCollectionBoardOrder({
     id: "order-empty-notes",
@@ -135,6 +155,7 @@ assert.equal(
     fulfilment_method: "pickup",
     status: "submitted",
     customer_notes: null,
+    internal_notes: null,
     production_started_at: null,
     ready_at: null,
     picked_up_at: null,
@@ -150,7 +171,11 @@ assert.equal(
   OPTIONAL_NOTES_CUSTOMER_WARNING,
   "Please note: wording on cakes or cake boards and customised cake decoration are not available.",
 );
-assert.match(checkoutForm, /\{OPTIONAL_NOTES_CUSTOMER_WARNING\}/);
+assert.match(
+  waitingListConfirmation,
+  /\{OPTIONAL_NOTES_CUSTOMER_WARNING\}/,
+  "optional wording warning remains on the waiting-list confirmation flow",
+);
 assert.match(receiptSource, /customer_notes/);
 assert.doesNotMatch(receiptSource, /internal_notes/);
 

@@ -421,9 +421,10 @@ assert.match(extraCheckoutSrc, /router\.replace/);
 
 assert.match(extraActionsSrc, /getAll\("extra_stock_id"\)/);
 assert.match(extraActionsSrc, /p_extra_stock_ids: extraStockIds/);
-assert.match(extraActionsSrc, /getStorefrontExtraById/);
-assert.match(extraActionsSrc, /extraCartItemUnavailableMessage/);
-assert.match(extraActionsSrc, /isValidExtraCustomerFulfilment/);
+assert.doesNotMatch(extraActionsSrc, /getStorefrontExtraById|extraCartItemUnavailableMessage|isValidExtraCustomerFulfilment/);
+assert.match(extraActionsSrc, /submit_guest_extra_order_idempotent_v3/);
+assert.match(extraActionsSrc, /resolve_guest_checkout_attempt_v3/);
+assert.doesNotMatch(extraActionsSrc, /library_cake_photos/);
 assert.doesNotMatch(extraActionsSrc, /libraryCakeId/);
 assert.doesNotMatch(extraActionsSrc, /production_capacity/);
 
@@ -469,7 +470,11 @@ assert.doesNotMatch(
   cartShellSrc,
   /href=\{freshPickCheckoutHref\(\)\}[\s\S]{0,80}onClick=\{onContinue\}/,
 );
-assert.match(cartShellSrc, /\{itemLabel\} · \{formatRm\(total\)\}/);
+assert.match(
+  cartShellSrc,
+  /<span>\{itemLabel\}<\/span>\s*<span aria-hidden="true">·<\/span>\s*<span>\{formatRm\(total\)\}<\/span>/,
+);
+assert.match(cartShellSrc, /aria-label=\{`\$\{itemLabel\}, \$\{formatRm\(total\)\}\. View order\.`\}/);
 assert.match(cartShellSrc, /Remove/);
 assert.match(cartShellSrc, /pickupLabel/);
 assert.doesNotMatch(cartShellSrc, /production_capacity/);

@@ -23,7 +23,7 @@ assert.deepEqual([...DELIVERY_FEE_MORE_PRESETS], [20, 25, 30]);
 assert.equal(canAccessGuestOrderWorkspace("owner"), true);
 assert.equal(canAccessGuestOrderWorkspace("customer_operations"), true);
 assert.equal(canAccessGuestOrderWorkspace("manager"), true);
-assert.equal(canAccessGuestOrderWorkspace("bakery"), false);
+assert.equal(canAccessGuestOrderWorkspace("bakery"), true);
 assert.equal(canAccessGuestOrderWorkspace("collection"), false);
 
 const owner = buildGuestOrderWorkspaceCapabilities({

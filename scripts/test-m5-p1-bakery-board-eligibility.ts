@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import {
   bakeryCustomerNotesExcerpt,
   bakeryFulfilmentCue,
+  bakeryOrderProductionPresentation,
   bakeryPrimaryCakeSummary,
   bakeryProductionLabel,
   bakeryProductionPresentation,
@@ -17,6 +18,7 @@ import {
   isBakeryMarkReadyEligible,
   isBakeryOrderSecured,
   isBakeryStartEligibleStatus,
+  isBakeryFreshPickReadinessEligible,
 } from "@/workspaces/bakery/eligibility";
 import {
   bakeryPlusTwoYmd,
@@ -393,9 +395,41 @@ const mapped = mapBakeryBoardOrder({
     { id: "c1", name: "Candle", quantity: 2, sort_order: 1 },
   ],
   order_paid_addons: [],
-});
+}, [
+  {
+    id: "stock-chocolate",
+    orderId: "o1",
+    lifecycle: "confirmed",
+    soldAt: "2026-10-22T03:42:00Z",
+    cutIntoSlicesAt: null,
+    readyForCollection: true,
+    cakeId: "cake-chocolate",
+    cakeName: "Chocolate",
+    sizeId: "size-6",
+    sizeLabel: '6"',
+  },
+  {
+    id: "stock-matcha",
+    orderId: "o1",
+    lifecycle: "confirmed",
+    soldAt: "2026-10-22T03:43:00Z",
+    cutIntoSlicesAt: null,
+    readyForCollection: true,
+    cakeId: "cake-matcha",
+    cakeName: "Matcha",
+    sizeId: "size-8",
+    sizeLabel: '8"',
+  },
+]);
 
 assert.equal(mapped.cakeLines.length, 2);
+assert.equal(mapped.freshPickAllocation.fullyCovered, true);
+assert.equal(mapped.assignedFreshPickStocks.length, 2);
+assert.equal(
+  bakeryOrderProductionPresentation(mapped),
+  "ready",
+  "read model uses exact assigned stock readiness",
+);
 assert.equal(mapped.customerNotes, "Less sweet");
 assert.equal(mapped.needsBakeryAttention, true);
 assert.equal(
@@ -405,6 +439,136 @@ assert.equal(
 assert.equal(
   Object.prototype.hasOwnProperty.call(mapped, "phone"),
   false,
+);
+
+const verifiedAllocation = {
+  status: "verified" as const,
+  lines: [],
+  issues: [],
+  totalOrderedQuantity: 2,
+  totalAssignedQuantity: 2,
+  totalRemainingQuantity: 0,
+  fullyCovered: true,
+};
+const assignedStock = (id: string, readyForCollection: boolean) => ({
+  id,
+  cakeName: "Signature Yam",
+  sizeLabel: '6"',
+  lifecycle: "confirmed",
+  soldAt: "2026-10-22T03:42:00Z",
+  cutIntoSlicesAt: null,
+  readyForCollection,
+  legacyLinkConflict: false,
+});
+const freshPickOrder = {
+  productionStartedAt: null,
+  readyAt: null,
+  fulfilmentMethod: "pickup" as const,
+  freshPickAllocation: verifiedAllocation,
+  assignedFreshPickStocks: [
+    assignedStock("stock-1", true),
+    assignedStock("stock-2", true),
+  ],
+};
+assert.equal(
+  bakeryOrderProductionPresentation(freshPickOrder),
+  "ready",
+  "fully supplied, assigned, ready Fresh Pick order derives Ready without an order timestamp",
+);
+assert.equal(
+  bakeryOrderProductionPresentation({
+    ...freshPickOrder,
+    assignedFreshPickStocks: [
+      assignedStock("stock-1", true),
+      assignedStock("stock-2", false),
+    ],
+  }),
+  "not_started",
+  "one unready assigned unit prevents whole-order Ready",
+);
+assert.equal(
+  bakeryOrderProductionPresentation({
+    ...freshPickOrder,
+    productionStartedAt: "2026-10-22T04:00:00Z",
+    freshPickAllocation: {
+      ...verifiedAllocation,
+      totalOrderedQuantity: 3,
+      totalRemainingQuantity: 1,
+      fullyCovered: false,
+    },
+  }),
+  "in_production",
+  "mixed order waits for Bakery-produced remainder to be marked ready",
+);
+assert.equal(
+  bakeryOrderProductionPresentation({
+    ...freshPickOrder,
+    productionStartedAt: "2026-10-22T04:00:00Z",
+    readyAt: "2026-10-22T05:00:00Z",
+    fulfilmentMethod: "dine_in",
+    freshPickAllocation: {
+      ...verifiedAllocation,
+      totalOrderedQuantity: 3,
+      totalRemainingQuantity: 1,
+      fullyCovered: false,
+    },
+  }),
+  "ready",
+  "mixed dine-in order is Ready only when stock and Bakery remainder are ready",
+);
+assert.equal(
+  bakeryOrderProductionPresentation({
+    ...freshPickOrder,
+    readyAt: "2026-10-22T05:00:00Z",
+    assignedFreshPickStocks: [
+      assignedStock("stock-1", false),
+      assignedStock("stock-2", true),
+    ],
+  }),
+  "in_production",
+  "order-level Ready cannot override an unready Fresh Pick unit",
+);
+const readinessTarget = assignedStock("stock-1", false);
+for (const fulfilmentMethod of ["pickup", "dine_in"] as const) {
+  assert.equal(
+    isBakeryFreshPickReadinessEligible({
+      fulfilmentMethod,
+      pickedUpAt: null,
+      outForDeliveryAt: null,
+      stock: readinessTarget,
+    }),
+    true,
+    `${fulfilmentMethod} assigned physical stock is eligible for its stock action`,
+  );
+}
+assert.equal(
+  isBakeryFreshPickReadinessEligible({
+    fulfilmentMethod: "delivery",
+    pickedUpAt: null,
+    outForDeliveryAt: null,
+    stock: readinessTarget,
+  }),
+  false,
+  "delivery never exposes Fresh Pick readiness override controls",
+);
+assert.equal(
+  isBakeryFreshPickReadinessEligible({
+    fulfilmentMethod: "pickup",
+    pickedUpAt: "2026-10-23T06:00:00Z",
+    outForDeliveryAt: null,
+    stock: readinessTarget,
+  }),
+  false,
+  "stock readiness controls are hidden after Collection handoff",
+);
+assert.equal(
+  bakeryOrderProductionPresentation({
+    ...freshPickOrder,
+    fulfilmentMethod: "delivery",
+    readyAt: null,
+  }),
+  "not_started",
+  "delivery presentation is not derived from Fresh Pick readiness",
 );
 
 const today = bakeryTodayYmd(new Date("2026-08-12T04:00:00Z"));

@@ -35,7 +35,7 @@ function Harness() {
     window.lastReportUrl = url.pathname + url.search;
     setMonth(url.searchParams.get("month") || "2026-09");
   };
-  return <ManagementReportDashboard report={{current:makeMonth(month),previous:makeMonth(previousMonth(month)),bookings:{count:0,value:0,sources:[]},payments:{collected:0,refunds:0,methods:[]},asOf:"2026-10-13T00:00:00Z"}}/>;
+  return <ManagementReportDashboard report={{current:makeMonth(month),previous:makeMonth(previousMonth(month)),bookings:{count:0,value:0,sources:[]},payments:{collected:0,refunds:0,methods:[]},refundBreakdown:[],asOf:"2026-10-13T00:00:00Z"}}/>;
 }
 createRoot(document.getElementById("root")).render(<Harness/>);
 `;
@@ -137,6 +137,9 @@ try {
   assert.equal(await picker.evaluate((element) => element.tagName), "SELECT");
   assert.equal(await picker.locator('option[value="2020-01"]').count(), 1);
   assert.equal(await picker.locator('option[value="2026-10"]').count(), 1);
+  assert.equal(await picker.locator("option").first().getAttribute("value"), "2026-10");
+  assert.equal(await picker.locator("option").last().getAttribute("value"), "2020-01");
+  assert.equal(await page.getByRole("button", { name: /month/ }).count(), 0);
   assert.equal(
     await page.getByText("Choose month", { exact: true }).count(),
     0,
@@ -175,11 +178,46 @@ try {
     "/owner/management/reports?month=2026-08",
   );
 
+  await page.goto(`http://127.0.0.1:${address.port}/?month=2026-09`);
+  await picker.focus();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  assert.equal(
+    await page.evaluate(() => window.lastReportUrl),
+    "/owner/management/reports?month=2026-08",
+    "keyboard selection changes the month and URL",
+  );
+
+  await page.goto(`http://127.0.0.1:${address.port}/?month=2020-01`);
+  assert.equal(
+    await picker.locator("option").last().getAttribute("value"),
+    "2020-01",
+    "the earliest selectable month is the first available month",
+  );
+  await page.goto(`http://127.0.0.1:${address.port}/?month=2026-10`);
+  assert.equal(
+    await picker.locator("option").first().getAttribute("value"),
+    "2026-10",
+    "the latest selectable month is the current month",
+  );
+
   await page.goto(`http://127.0.0.1:${address.port}/?month=2026-01`);
   await picker.selectOption("2025-12");
+  assert.equal(
+    await page.evaluate(() => window.lastReportUrl),
+    "/owner/management/reports?month=2025-12",
+    "the dropdown can select the month before a year boundary",
+  );
   await picker.selectOption("2026-01");
+  assert.equal(
+    await page.evaluate(() => window.lastReportUrl),
+    "/owner/management/reports?month=2026-01",
+    "the dropdown can select the month after a year boundary",
+  );
 
-  for (const width of [320, 375, 390, 393, 430]) {
+  for (const width of [
+    320, 375, 390, 393, 430, 600, 768, 1024, 1280, 1440,
+  ]) {
     await page.setViewportSize({ width, height: 844 });
     assert.equal(await page.getByRole("button", { name: "Export PDF" }).isVisible(), true);
     assert.equal(await page.getByRole("button", { name: "Export Excel" }).isVisible(), true);
@@ -188,7 +226,51 @@ try {
         () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
       true,
-      `report month selector and export controls fit a ${width}px phone viewport`,
+      `report month selector and export controls fit a ${width}px viewport`,
+    );
+    const layout = await page.evaluate(() => {
+      const title = document.querySelector("header h1")?.getBoundingClientRect();
+      const description = document
+        .querySelector("header > p")
+        ?.getBoundingClientRect();
+      const month = document
+        .querySelector('select[aria-label="Choose report month and year"]')
+        ?.getBoundingClientRect();
+      const pdf = [...document.querySelectorAll("button")]
+        .find((button) => button.textContent?.includes("PDF"))
+        ?.getBoundingClientRect();
+      const excel = [...document.querySelectorAll("button")]
+        .find((button) => button.textContent?.includes("Excel"))
+        ?.getBoundingClientRect();
+      if (!title || !description || !month || !pdf || !excel) return null;
+      const controlsTop = Math.min(month.top, pdf.top, excel.top);
+      const controlsBottom = Math.max(month.bottom, pdf.bottom, excel.bottom);
+      const overlap = (a, b) =>
+        a.left < b.right &&
+        b.left < a.right &&
+        a.top < b.bottom &&
+        b.top < a.bottom;
+      return {
+        visible: month.width > 0 && month.height > 0,
+        titleDescriptionOverlap: overlap(title, description),
+        descriptionControlsOverlap:
+          description.top < controlsBottom && controlsTop < description.bottom,
+      };
+    });
+    assert.equal(
+      layout?.visible,
+      true,
+      `month dropdown is visible at ${width}px`,
+    );
+    assert.equal(
+      layout?.titleDescriptionOverlap,
+      false,
+      `report title and description do not overlap at ${width}px`,
+    );
+    assert.equal(
+      layout?.descriptionControlsOverlap,
+      false,
+      `report description and month/export controls do not overlap at ${width}px`,
     );
   }
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -217,5 +299,5 @@ try {
 }
 
 console.log(
-  "Report month selector browser checks passed for navigation, direct month selection, URL/data synchronization, year boundaries, future-month blocking, English display, keyboard label, and mobile width.",
+  "Report month selector browser checks passed for dropdown navigation, keyboard selection, month bounds, export behavior, spacing, and responsive overflow.",
 );

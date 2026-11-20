@@ -34,6 +34,7 @@ import {
 } from "@/lib/dates";
 import { createClient, createPublicClient } from "@/lib/supabase/server";
 import { cache } from "react";
+import { headers } from "next/headers";
 import { unstable_cache } from "next/cache";
 import {
   STOREFRONT_PUBLISHED_CAKES_CACHE_TAG,
@@ -64,6 +65,89 @@ export { formatRm, startingPrice };
 /** Short merchandising TTL. Not used for checkout offers, orderability, or Fresh Pick stock. */
 const STOREFRONT_MERCHANDISING_REVALIDATE_SECONDS = 30;
 const STOREFRONT_PRICE_LOOKUP_CONCURRENCY = 6;
+const CATALOG_DIAGNOSTICS_ENABLED = process.env.VERCEL_ENV === "preview" && process.env.FLOUR_CATALOG_DIAGNOSTICS === "1";
+let activeStorefrontDisplayCacheLoads = 0;
+
+function safeCatalogueRequestId(value: string | null): string | null {
+  return value && value.length <= 128 && /^[A-Za-z0-9._:-]+$/.test(value) ? value : null;
+}
+
+function catalogueFailure(error: unknown): { category: string; code: string | null } {
+  const candidate = error as { code?: unknown; message?: unknown } | null;
+  const rawCode = typeof candidate?.code === "string" ? candidate.code : "";
+  const code = /^[0-9A-Z_]{1,16}$/.test(rawCode) ? rawCode : null;
+  const message = typeof candidate?.message === "string" ? candidate.message : "";
+  if (code === "57014" || /statement timeout|query canceled|query cancelled/i.test(message)) return { category: "statement_timeout", code };
+  if (/timeout|timed out|ETIMEDOUT/i.test(message)) return { category: "timeout", code };
+  if (/^08/.test(rawCode) || ["53300", "57P01", "57P02", "57P03"].includes(rawCode)) return { category: "transient", code };
+  return { category: "error", code };
+}
+
+function logCatalogueDiagnostic(input: { operation: string; stage: string; requestId: string | null; durationMs: number; cakeCount: number; error?: unknown }): void {
+  if (!CATALOG_DIAGNOSTICS_ENABLED) return;
+  const failure = input.error === undefined ? null : catalogueFailure(input.error);
+  console.info("[CATALOG_READ_DIAGNOSTIC]", JSON.stringify({
+    operation: input.operation, stage: input.stage, requestId: input.requestId,
+    durationMs: Math.max(0, Math.round(input.durationMs)),
+    cakeCount: Math.max(0, Math.trunc(input.cakeCount)),
+    status: failure ? "error" : "ok", errorCategory: failure?.category ?? null,
+    errorCode: failure?.code ?? null,
+    timeout: failure ? failure.category === "timeout" || failure.category === "statement_timeout" : false,
+    activeCacheFills: activeStorefrontDisplayCacheLoads,
+  }));
+}
+
+async function catalogueRequestId(): Promise<string | null> {
+  if (!CATALOG_DIAGNOSTICS_ENABLED) return null;
+  return safeCatalogueRequestId((await headers()).get("x-vercel-id"));
+}
+
+async function measureCatalogueRequest<T>(
+  operation: string,
+  task: (context: { requestId: string | null; setCakeCount: (count: number) => void }) => Promise<T>,
+): Promise<T> {
+  if (!CATALOG_DIAGNOSTICS_ENABLED) {
+    return task({ requestId: null, setCakeCount: () => undefined });
+  }
+  const requestId = await catalogueRequestId();
+  let cakeCount = 0;
+  const started = Date.now();
+  let failure: unknown;
+  try {
+    return await task({
+      requestId,
+      setCakeCount: (count) => { cakeCount = Math.max(0, Math.trunc(count)); },
+    });
+  } catch (error) {
+    failure = error;
+    throw error;
+  } finally {
+    logCatalogueDiagnostic({
+      operation, stage: "request", requestId,
+      durationMs: Date.now() - started, cakeCount, error: failure,
+    });
+  }
+}
+
+async function measureCatalogueStage<T>(operation: string, stage: string, requestId: string | null, cakeCount: number, task: () => Promise<T>): Promise<T> {
+  if (!CATALOG_DIAGNOSTICS_ENABLED) return task();
+  const started = Date.now();
+  try {
+    const result = await task();
+    const queryError =
+      result && typeof result === "object" && "error" in result
+        ? (result as { error?: unknown }).error
+        : undefined;
+    logCatalogueDiagnostic({
+      operation, stage, requestId, durationMs: Date.now() - started, cakeCount,
+      error: queryError ?? undefined,
+    });
+    return result;
+  } catch (error) {
+    logCatalogueDiagnostic({ operation, stage, requestId, durationMs: Date.now() - started, cakeCount, error });
+    throw error;
+  }
+}
 
 type CategoryEmbed = {
   id: string;
@@ -808,19 +892,30 @@ async function loadStorefrontCakesByIds(
 ): Promise<CachedStorefrontCakeDisplay[]> {
   if (cakeIds.length === 0) return [];
   const supabase = createPublicClient();
-  const data = await withCakePhotoSelectFallback(
-    (photoSelect, includeAssignments, includeTags) =>
-      supabase
-        .from("library_cakes")
-        .select(
-          libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags),
-        )
-        .in("id", [...cakeIds]),
-  );
-
-  return ((data ?? []) as unknown as LibraryCakeEmbed[])
-    .filter((row) => row.library_cake_sizes?.length)
-    .map((row) => ({ cake: mapStorefrontCake(row), status: row.status }));
+  activeStorefrontDisplayCacheLoads += 1;
+  try {
+    const data = await measureCatalogueStage(
+      "storefront_collection_display",
+      "library_cakes_embed_cache_fill",
+      null,
+      cakeIds.length,
+      () =>
+        withCakePhotoSelectFallback(
+          (photoSelect, includeAssignments, includeTags) =>
+            supabase
+              .from("library_cakes")
+              .select(
+                libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags),
+              )
+              .in("id", [...cakeIds]),
+        ),
+    );
+    return ((data ?? []) as unknown as LibraryCakeEmbed[])
+      .filter((row) => row.library_cake_sizes?.length)
+      .map((row) => ({ cake: mapStorefrontCake(row), status: row.status }));
+  } finally {
+    activeStorefrontDisplayCacheLoads = Math.max(0, activeStorefrontDisplayCacheLoads - 1);
+  }
 }
 
 const readCachedStorefrontCakesByIds = cache((cakeIdsKey: string) =>
@@ -838,37 +933,56 @@ export async function listAvailableCakes(
   collectionId: string,
   options: { currentEffectivePrice?: boolean } = {},
 ): Promise<StorefrontCake[]> {
-  const supabase = createPublicClient();
-  const { data, error } = await supabase
-    .from("collection_cakes")
-    .select("library_cake_id, sort_order")
-    .eq("collection_id", collectionId)
-    .eq("available", true)
-    .order("sort_order", { ascending: true });
-  if (error) throw new Error(error.message);
+  return measureCatalogueRequest("list_available_cakes", async (context) => {
+    const supabase = createPublicClient();
+    const { data, error } = await measureCatalogueStage(
+      "list_available_cakes",
+      "collection_memberships_query",
+      context.requestId,
+      0,
+      async () => await supabase
+        .from("collection_cakes")
+        .select("library_cake_id, sort_order")
+        .eq("collection_id", collectionId)
+        .eq("available", true)
+        .order("sort_order", { ascending: true }),
+    );
+    if (error) throw new Error(error.message);
 
-  const memberships = (data ?? []) as Array<{
-    library_cake_id: string;
-    sort_order: number;
-  }>;
-  const cakeIds = [...new Set(memberships.map((row) => row.library_cake_id))];
-  const cachedCakes = await readCachedStorefrontCakesByIds(
-    [...cakeIds].sort().join(","),
-  );
-  const cakesById = new Map(
-    cachedCakes.map((display) => [display.cake.id, display]),
-  );
-  const cakes = memberships
-    .map((row) => cakesById.get(row.library_cake_id))
-    .filter(
-      (display): display is CachedStorefrontCakeDisplay =>
-        display !== undefined && isOfferableStatus(display.status),
-    )
-    .map((display) => display.cake);
+    const memberships = (data ?? []) as Array<{
+      library_cake_id: string;
+      sort_order: number;
+    }>;
+    const cakeIds = [...new Set(memberships.map((row) => row.library_cake_id))];
+    context.setCakeCount(cakeIds.length);
+    const cachedCakes = await measureCatalogueStage(
+      "list_available_cakes",
+      "cached_cake_display_lookup",
+      context.requestId,
+      cakeIds.length,
+      () => readCachedStorefrontCakesByIds([...cakeIds].sort().join(",")),
+    );
+    const cakesById = new Map(
+      cachedCakes.map((display) => [display.cake.id, display]),
+    );
+    const cakes = memberships
+      .map((row) => cakesById.get(row.library_cake_id))
+      .filter(
+        (display): display is CachedStorefrontCakeDisplay =>
+          display !== undefined && isOfferableStatus(display.status),
+      )
+      .map((display) => display.cake);
 
-  return options.currentEffectivePrice
-    ? withEffectiveStorefrontPrices(cakes, toBusinessDateKey())
-    : cakes;
+    return options.currentEffectivePrice
+      ? measureCatalogueStage(
+          "list_available_cakes",
+          "effective_price_resolution",
+          context.requestId,
+          cakeIds.length,
+          () => withEffectiveStorefrontPrices(cakes, toBusinessDateKey()),
+        )
+      : cakes;
+  });
 }
 
 /**
@@ -1021,8 +1135,23 @@ export async function listHomepageCollectionPreviewCakes(
   collectionId: string,
 ): Promise<StorefrontCake[]> {
   if (!collectionId) return [];
-  const cakes = await readCachedHomepageCollectionPreviewCakes(collectionId);
-  return withEffectiveStorefrontPrices(cakes, toBusinessDateKey());
+  return measureCatalogueRequest("list_homepage_collection_preview_cakes", async (context) => {
+    const cakes = await measureCatalogueStage(
+      "list_homepage_collection_preview_cakes",
+      "cached_collection_display_lookup",
+      context.requestId,
+      0,
+      () => readCachedHomepageCollectionPreviewCakes(collectionId),
+    );
+    context.setCakeCount(cakes.length);
+    return measureCatalogueStage(
+      "list_homepage_collection_preview_cakes",
+      "effective_price_resolution",
+      context.requestId,
+      cakes.length,
+      () => withEffectiveStorefrontPrices(cakes, toBusinessDateKey()),
+    );
+  });
 }
 
 /**
@@ -1078,42 +1207,94 @@ export async function listStorefrontCakesByIds(
   const ids = requestedStorefrontCakeIds(cakeIds);
   if (ids.length === 0) return [];
 
+  return measureCatalogueRequest("list_storefront_cakes_by_ids", async (context) => {
+    context.setCakeCount(ids.length);
+    const supabase = await createClient();
+    const data = await measureCatalogueStage(
+      "list_storefront_cakes_by_ids",
+      "library_cakes_embed_query",
+      context.requestId,
+      ids.length,
+      () => withCakePhotoSelectFallback(
+        (photoSelect, includeAssignments, includeTags) =>
+          supabase
+            .from("library_cakes")
+            .select(libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags))
+            .in("id", ids),
+      ),
+    );
+
+    const loaded = ((data ?? []) as unknown as LibraryCakeEmbed[])
+      .map(mapStorefrontCake)
+      .filter((cake) => cake.sizes.length > 0);
+
+    return selectStorefrontCakesByRequestedIds(ids, loaded);
+  });
+}
+
+/** Live, RLS-scoped fields needed by cart-size validation only. */
+export async function listStorefrontCakeSizesForValidation(
+  cakeIds: readonly string[],
+): Promise<Array<{
+  id: string;
+  name: string;
+  sizes: Array<{
+    id: string;
+    size: string;
+    availableFrom: string | null;
+    availableUntil: string | null;
+  }>;
+}>> {
+  const ids = requestedStorefrontCakeIds(cakeIds);
+  if (ids.length === 0) return [];
+
   const supabase = await createClient();
-  const data = await withCakePhotoSelectFallback(
-    (photoSelect, includeAssignments, includeTags) =>
-      supabase
-        .from("library_cakes")
-        .select(
-          libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags),
-        )
-        .in("id", ids),
-  );
+  const { data, error } = await supabase
+    .from("library_cakes")
+    .select("id,name,library_cake_sizes(id,label,available_from,available_until)")
+    .in("id", ids);
+  if (error) throw new Error(error.message);
 
-  const loaded = ((data ?? []) as unknown as LibraryCakeEmbed[])
-    .map(mapStorefrontCake)
-    .filter((cake) => cake.sizes.length > 0);
-
-  return selectStorefrontCakesByRequestedIds(ids, loaded);
+  return (data ?? []).map((cake) => ({
+    id: cake.id,
+    name: cake.name,
+    sizes: (cake.library_cake_sizes ?? []).map((size) => ({
+      id: size.id,
+      size: size.label,
+      availableFrom: size.available_from,
+      availableUntil: size.available_until,
+    })),
+  }));
 }
 
 /** Library cake by id when offerable (staff workspace). Not collection-gated. */
 export async function getAvailableCakeById(
   id: string,
 ): Promise<StorefrontCake | null> {
-  const supabase = await createClient();
-  const data = await withCakePhotoSelectFallback((photoSelect, includeAssignments, includeTags) =>
-    supabase
-      .from("library_cakes")
-      .select(libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags))
-      .eq("id", id)
-      .maybeSingle(),
-  );
-  if (!data) return null;
+  return measureCatalogueRequest("get_available_cake_by_id", async (context) => {
+    context.setCakeCount(id ? 1 : 0);
+    const supabase = await createClient();
+    const data = await measureCatalogueStage(
+      "get_available_cake_by_id",
+      "library_cakes_detail_query",
+      context.requestId,
+      id ? 1 : 0,
+      () => withCakePhotoSelectFallback(
+        (photoSelect, includeAssignments, includeTags) =>
+          supabase
+            .from("library_cakes")
+            .select(libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags))
+            .eq("id", id)
+            .maybeSingle(),
+      ),
+    );
+    if (!data) return null;
 
-  const cake = data as unknown as LibraryCakeEmbed;
-  if (!isOfferableStatus(cake.status)) return null;
+    const cake = data as unknown as LibraryCakeEmbed;
+    if (!isOfferableStatus(cake.status)) return null;
 
-  return mapStorefrontCake(cake);
+    return mapStorefrontCake(cake);
+  });
 }
 
 /**
@@ -1655,18 +1836,24 @@ async function loadLibraryCakeDisplayById(
   id: string,
 ): Promise<LibraryCakeEmbed | null> {
   const supabase = createPublicClient();
-  const data = await withCakePhotoSelectFallback(
-    (photoSelect, includeAssignments, includeTags) =>
-      supabase
-        .from("library_cakes")
-        .select(
-          `
+  const data = await measureCatalogueStage(
+    "browse_cake_display_cache_fill",
+    "library_cakes_detail_embed_query",
+    null,
+    id ? 1 : 0,
+    () => withCakePhotoSelectFallback(
+      (photoSelect, includeAssignments, includeTags) =>
+        supabase
+          .from("library_cakes")
+          .select(
+            `
       show_in_popular_cakes,
       ${libraryCakeEmbedSelect(photoSelect, includeAssignments, includeTags, false)}
     `,
-        )
-        .eq("id", id)
-        .maybeSingle(),
+          )
+          .eq("id", id)
+          .maybeSingle(),
+    ),
   );
   return data ? (data as unknown as LibraryCakeEmbed) : null;
 }
@@ -1713,7 +1900,16 @@ const readCachedLibraryCakeDisplay = cache(loadCachedLibraryCakeDisplay);
 export async function getBrowseCakeDisplayById(
   id: string,
 ): Promise<LibraryCakeEmbed | null> {
-  return readCachedLibraryCakeDisplay(id);
+  return measureCatalogueRequest("get_browse_cake_display_by_id", async (context) => {
+    context.setCakeCount(id ? 1 : 0);
+    return measureCatalogueStage(
+      "get_browse_cake_display_by_id",
+      "cached_library_cake_display_lookup",
+      context.requestId,
+      id ? 1 : 0,
+      () => readCachedLibraryCakeDisplay(id),
+    );
+  });
 }
 
 export function mergeBrowseCakeDisplay(
@@ -1759,12 +1955,25 @@ export function browseCakePreviewFromDisplay(
 async function loadBrowsePublishedCakeById(
   id: string,
   todayYmd: string,
+  requestId: string | null,
 ): Promise<BrowseStorefrontCake | null> {
   const supabase = createPublicClient();
-  void readCachedLibraryCakeDisplay(id);
+  void readCachedLibraryCakeDisplay(id).catch(() => undefined);
   const [commercial, catalogues] = await Promise.all([
-    loadLiveCakeCommercialState(supabase, id),
-    listCakePublicationCatalogues(supabase, id),
+    measureCatalogueStage(
+      "get_browse_published_cake_by_id",
+      "live_commercial_query",
+      requestId,
+      1,
+      () => loadLiveCakeCommercialState(supabase, id),
+    ),
+    measureCatalogueStage(
+      "get_browse_published_cake_by_id",
+      "publication_catalogue_query",
+      requestId,
+      1,
+      () => listCakePublicationCatalogues(supabase, id),
+    ),
   ]);
   if (!commercial) return null;
 
@@ -1787,7 +1996,13 @@ async function loadBrowsePublishedCakeById(
     todayYmd,
   });
   if (!published) return null;
-  const [priced] = await withEffectiveStorefrontPrices([published], todayYmd);
+  const [priced] = await measureCatalogueStage(
+    "get_browse_published_cake_by_id",
+    "date_sensitive_price_resolution",
+    requestId,
+    1,
+    () => withEffectiveStorefrontPrices([published], todayYmd),
+  );
   return priced
     ? {
         ...priced,
@@ -1798,7 +2013,8 @@ async function loadBrowsePublishedCakeById(
 }
 
 const readCachedBrowsePublishedCakeById = cache(
-  (id: string, todayYmd: string) => loadBrowsePublishedCakeById(id, todayYmd),
+  (id: string, todayYmd: string, requestId: string | null) =>
+    loadBrowsePublishedCakeById(id, todayYmd, requestId),
 );
 
 export async function getBrowsePublishedCakeById(
@@ -1806,7 +2022,16 @@ export async function getBrowsePublishedCakeById(
   todayYmd: string = toBusinessDateKey(),
 ): Promise<BrowseStorefrontCake | null> {
   if (!id) return null;
-  return readCachedBrowsePublishedCakeById(id, todayYmd);
+  return measureCatalogueRequest("get_browse_published_cake_by_id", async (context) => {
+    context.setCakeCount(1);
+    return measureCatalogueStage(
+      "get_browse_published_cake_by_id",
+      "published_cake_detail_resolution",
+      context.requestId,
+      1,
+      () => readCachedBrowsePublishedCakeById(id, todayYmd, context.requestId),
+    );
+  });
 }
 
 /**

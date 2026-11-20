@@ -14,6 +14,7 @@ import {
   STAFF_CREDENTIAL_EVENT_TYPES,
   buildStaffCredentialEventRow,
   formatStaffCredentialActivityDetail,
+  isValidStaffCredentialActivityCursor,
   sanitizeStaffCredentialMetadata,
   staffCredentialAuditWarning,
 } from "@/foundation/staff/credential-audit";
@@ -66,6 +67,9 @@ assert.deepEqual(STAFF_CREDENTIAL_EVENT_TYPES, [
   "passkey_added",
   "passkey_removed",
 ]);
+assert.equal(isValidStaffCredentialActivityCursor(null), false);
+assert.equal(isValidStaffCredentialActivityCursor({ createdAt: "bad", id: "bad" }), false);
+assert.equal(isValidStaffCredentialActivityCursor({ createdAt: "2026-10-28T10:25:00.000Z", id: "11111111-1111-4111-8111-111111111111" }), true);
 
 const sanitized = sanitizeStaffCredentialMetadata({
   old_username: `  ${SAFE_TEST_USERNAME}  `,
@@ -279,7 +283,10 @@ assert.match(auditHelper, /from\("staff_credential_events"\)\.insert\(row\)/);
 assert.match(auditHelper, /credential mutation is committed first/);
 assert.match(auditHelper, /retries once/);
 assert.match(auditHelper, /FORBIDDEN_METADATA_KEY/);
-assert.match(auditHelper, /listStaffCredentialEventsForAdmin/);
+assert.match(auditHelper, /listStaffCredentialEventsPageForAdmin/);
+assert.match(auditHelper, /CREDENTIAL_ACTIVITY_PAGE_SIZE \+ 1/);
+assert.match(auditHelper, /\.order\("created_at", \{ ascending: false \}\)/);
+assert.match(auditHelper, /\.order\("id", \{ ascending: false \}\)/);
 assert.doesNotMatch(auditHelper, /password_hash|current_password|new_password/);
 
 const migration = readSource(
@@ -304,12 +311,17 @@ assert.doesNotMatch(migration, /grant .* to anon/);
 const staffPage = readSource("src/app/(app)/settings/staff/page.tsx");
 assert.match(staffPage, /canManageStaff/);
 assert.match(staffPage, /StaffCredentialActivity/);
-assert.match(staffPage, /listStaffCredentialEventsForAdmin/);
+assert.match(staffPage, /listStaffCredentialEventsPageForAdmin/);
 assert.doesNotMatch(staffPage, /password reset|Passkey/);
 
 const activityUi = readSource(
   "src/components/settings/StaffCredentialActivity.tsx",
 );
+assert.match(activityUi, /<details className="group">/);
+assert.match(activityUi, /<summary/);
+assert.match(activityUi, /Load 5 older events/);
+assert.match(activityUi, /loadOlderStaffCredentialActivityAction/);
+assert.match(activityUi, /events\.filter\(\(event\) => !seen\.has\(event\.id\)\)/);
 assert.match(activityUi, /Credential activity/);
 assert.match(activityUi, /Performed by/);
 assert.match(activityUi, /canManageStaff|Owner|Manager|actorName/);
@@ -346,3 +358,4 @@ assert.doesNotMatch(loginForm, /recordStaffCredentialEvent|staff_credential_even
 assert.match(loginForm, /signInWithPasskey/);
 
 console.log("test-staff-credential-audit: PASS");
+

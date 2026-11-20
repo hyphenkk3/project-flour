@@ -23,6 +23,7 @@ import {
   storefrontKickerClass,
 } from "@/workspaces/storefront/StorefrontBrand";
 import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
+import { StorefrontRetryNotice } from "@/workspaces/storefront/StorefrontRetryNotice";
 import {
   listHomepageCollectionPreviewCakes,
   listHomepagePopularCakes,
@@ -30,6 +31,10 @@ import {
   listOrderableMonthlyCatalogues,
   type StorefrontSpecialCatalogue,
 } from "@/workspaces/storefront/catalog/queries";
+import {
+  settleStorefrontRead,
+  storefrontReadFailureMessage,
+} from "@/workspaces/storefront/catalog/storefront-read-resilience";
 import {
   CakeEntryScopeCapture,
   CakeEntryScopeClearOnUnscopedCakeClick,
@@ -59,7 +64,7 @@ import {
   sortCakesForCataloguePromotionPresentation,
 } from "@/engines/vouchers/catalogue-promotion-presentation";
 import { cataloguePromotionPeriodFromWindow } from "@/engines/vouchers/catalogue-voucher";
-import { listPublicCatalogueVouchers } from "@/workspaces/vouchers/catalogue-queries";
+import { listPublicCatalogueVouchersStrict } from "@/workspaces/vouchers/catalogue-queries";
 
 function monthDisplayName(monthYmd: string): string {
   return orderCollectionHeadline(monthYmd).replace(/ \d{4}/, "");
@@ -263,7 +268,33 @@ export async function StorefrontHomePage() {
 }
 
 async function HomeFreshPicksIsland() {
-  const listing = await listStorefrontAvailableExtra();
+  let listing: Awaited<ReturnType<typeof listStorefrontAvailableExtra>> | null =
+    null;
+  let failed = false;
+
+  try {
+    listing = await listStorefrontAvailableExtra();
+  } catch {
+    failed = true;
+  }
+
+  if (failed || !listing) {
+    return (
+      <section className="px-6 pt-4 pb-2 sm:px-10 md:pt-8">
+        <div className="mx-auto w-full max-w-6xl">
+          <p className={storefrontKickerClass}>Last-minute</p>
+          <h2 className="font-display text-ink mt-2 text-[1.45rem] tracking-tight">
+            Fresh Picks
+          </h2>
+          <StorefrontRetryNotice
+            title="Fresh Picks are temporarily unavailable"
+            message="We couldn’t check current Fresh Pick stock. This does not mean that no stock is available."
+          />
+        </div>
+      </section>
+    );
+  }
+
   const rawPicks = listing.picks;
   const picks = sortHomepageFreshPicks(rawPicks);
   return (
@@ -275,34 +306,77 @@ async function HomeFreshPicksIsland() {
 }
 
 async function HomeMerchandisingIsland() {
+  try {
+    return await HomeMerchandisingContent();
+  } catch {
+    return (
+      <section className="border-ink/[0.1] mt-8 border-t px-6 pt-8 sm:px-10">
+        <div className="mx-auto w-full max-w-6xl">
+          <StorefrontRetryNotice
+            title="Cake collections are temporarily unavailable"
+            message="We couldn’t load the latest cake selections. This does not mean cakes or collection dates are unavailable."
+          />
+          <div className="mt-5">
+            <HomeBrowseAllCakes />
+          </div>
+          <HomeVisitFooter lead={<HomeCatalogueBlock />} />
+        </div>
+      </section>
+    );
+  }
+}
+
+async function HomeMerchandisingContent() {
   const todayYmd = toBusinessDateKey();
   const todayYm = businessYearMonth(todayYmd) ?? todayYmd.slice(0, 7);
-  const popularPromise = listHomepagePopularCakes();
-  const [catalogues, specials] = await Promise.all([
-    listOrderableMonthlyCatalogues(todayYmd),
-    listCustomerSpecialCatalogues(todayYmd),
-  ]);
-  const selection = selectHomepageFeaturedCollections({
-    todayYearMonth: todayYm,
-    specials,
-    monthlies: catalogues,
-  });
+  const [catalogueResult, specialResult, popularResult, voucherResult] =
+    await Promise.all([
+      settleStorefrontRead(() => listOrderableMonthlyCatalogues(todayYmd)),
+      settleStorefrontRead(() => listCustomerSpecialCatalogues(todayYmd)),
+      settleStorefrontRead(() => listHomepagePopularCakes()),
+      settleStorefrontRead(() => listPublicCatalogueVouchersStrict()),
+    ]);
+  const catalogues = catalogueResult.ok ? catalogueResult.value : [];
+  const specials = specialResult.ok ? specialResult.value : [];
+  const popular = popularResult.ok ? popularResult.value : [];
+  const vouchers = voucherResult.ok ? voucherResult.value : [];
+  const collectionListError = (() => {
+    if (!catalogueResult.ok) return catalogueResult.error;
+    if (!specialResult.ok) return specialResult.error;
+    return null;
+  })();
+  const selection =
+    catalogueResult.ok && specialResult.ok
+      ? selectHomepageFeaturedCollections({
+          todayYearMonth: todayYm,
+          specials,
+          monthlies: catalogues,
+        })
+      : null;
 
-  const [popular, featured, vouchers] = await Promise.all([
-    popularPromise,
-    Promise.all(
-      selection.featured.map(async (candidate) => {
+  const featuredResults = await Promise.all(
+    (selection?.featured ?? []).map(async (candidate) => {
       const monthly =
         catalogues.find((catalogue) => catalogue.id === candidate.id) ?? null;
-      const special =
-        specials.find((row) => row.id === candidate.id) ?? null;
-      const cakes = await listHomepageCollectionPreviewCakes(candidate.id);
+      const special = specials.find((row) => row.id === candidate.id) ?? null;
       const copy = featuredCopy({
         kind: candidate.kind,
         month: monthly?.month ?? null,
         todayYm,
         special: special ?? undefined,
       });
+      const previewResult = await settleStorefrontRead(() =>
+        listHomepageCollectionPreviewCakes(candidate.id),
+      );
+      if (!previewResult.ok) {
+        return {
+          ok: false as const,
+          candidate,
+          copy,
+          error: previewResult.error,
+        };
+      }
+      const cakes = previewResult.value;
       const cakeEntries = collectionCakeEntries({
         kind: candidate.kind,
         month: monthly?.month ?? null,
@@ -311,21 +385,24 @@ async function HomeMerchandisingIsland() {
         cakes,
       });
       return {
-        id: candidate.id,
-        href: `/order/collection/${candidate.id}`,
-        cakes,
-        cakeHrefs: cakeEntries.hrefs,
-        cakeScopes: cakeEntries.scopes,
-        fulfilmentFrom: cakeEntries.fulfilmentFrom,
-        fulfilmentTo: cakeEntries.fulfilmentTo,
-        ...copy,
+        ok: true as const,
+        collection: {
+          id: candidate.id,
+          href: `/order/collection/${candidate.id}`,
+          cakes,
+          cakeHrefs: cakeEntries.hrefs,
+          cakeScopes: cakeEntries.scopes,
+          fulfilmentFrom: cakeEntries.fulfilmentFrom,
+          fulfilmentTo: cakeEntries.fulfilmentTo,
+          ...copy,
+        },
       };
-      }),
-    ),
-    listPublicCatalogueVouchers(),
-  ]);
+    }),
+  );
   const offerToday = singaporeDateFromIso(new Date().toISOString());
-  const featuredWithPromotions = featured.map((collection) => {
+  const featuredWithPromotions = featuredResults.flatMap((result) => {
+    if (!result.ok) return [];
+    const collection = result.collection;
     const period =
       collection.fulfilmentFrom && collection.fulfilmentTo
         ? cataloguePromotionPeriodFromWindow({
@@ -343,18 +420,20 @@ async function HomeMerchandisingIsland() {
         { collectionMerchandising: true },
       ),
     );
-    return {
-      ...collection,
-      promotions,
-      cakes: sortCakesForCataloguePromotionPresentation(collection.cakes, {
-        isNew: cakeHasNewMerchandisingTag,
-        isTargetedPromotion: (cake) => Boolean(promotions[cake.id]),
-        manualOrder: (_cake, index) => index + 1,
-      }),
-    };
+    return [
+      {
+        ...collection,
+        promotions,
+        cakes: sortCakesForCataloguePromotionPresentation(collection.cakes, {
+          isNew: cakeHasNewMerchandisingTag,
+          isTargetedPromotion: (cake) => Boolean(promotions[cake.id]),
+          manualOrder: (_cake, index) => index + 1,
+        }),
+      },
+    ];
   });
 
-  const more = selection.more.map((candidate) => {
+  const more = (selection?.more ?? []).map((candidate) => {
     const monthly =
       catalogues.find((catalogue) => catalogue.id === candidate.id) ?? null;
     const special = specials.find((row) => row.id === candidate.id) ?? null;
@@ -373,6 +452,59 @@ async function HomeMerchandisingIsland() {
 
   return (
     <>
+      {!catalogueResult.ok || !specialResult.ok ? (
+        <section className="border-ink/[0.1] mt-8 border-t px-6 pt-8 sm:px-10">
+          <div className="mx-auto w-full max-w-6xl">
+            <StorefrontRetryNotice
+              title="Cake collections are temporarily unavailable"
+              message={storefrontReadFailureMessage(
+                collectionListError,
+                "cake collection list",
+              )}
+            />
+          </div>
+        </section>
+      ) : null}
+      {!voucherResult.ok ? (
+        <StorefrontRetryNotice
+          title="Current offers are temporarily unavailable"
+          message={storefrontReadFailureMessage(
+            voucherResult.error,
+            "current offer details",
+          )}
+        />
+      ) : null}
+      {featuredResults.map((result) =>
+        result.ok ? null : (
+          <section
+            className="border-ink/[0.1] mt-8 border-t px-6 pt-8 sm:px-10"
+            key={result.candidate.id}
+          >
+            <div className="mx-auto w-full max-w-6xl">
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="font-display text-ink text-[1.45rem] leading-tight tracking-tight">
+                  {result.copy.heading}
+                </h2>
+                <Link
+                  className="text-skyline hover:text-ink shrink-0 text-[13px] font-medium"
+                  data-storefront-collection-intent
+                  href={`/order/collection/${result.candidate.id}`}
+                  prefetch={false}
+                >
+                  View all →
+                </Link>
+              </div>
+              <StorefrontRetryNotice
+                title={`${result.copy.heading} preview is temporarily unavailable`}
+                message={storefrontReadFailureMessage(
+                  result.error,
+                  `${result.copy.heading} cake preview`,
+                )}
+              />
+            </div>
+          </section>
+        ),
+      )}
       <StorefrontCakePrefetch
         excludeIds={popular.map((cake) => cake.id)}
         hrefs={featuredWithPromotions.flatMap((collection) =>
@@ -396,13 +528,30 @@ async function HomeMerchandisingIsland() {
           />
         </CakeEntryScopeCapture>
       ))}
-      <CakeEntryScopeCapture
-        scopes={Object.fromEntries(
-          popular.map((cake) => [cake.id, { origin: "home" as const }]),
-        )}
-      >
-        <HomePopularCakes cakes={popular} />
-      </CakeEntryScopeCapture>
+      {popularResult.ok ? (
+        <CakeEntryScopeCapture
+          scopes={Object.fromEntries(
+            popular.map((cake) => [cake.id, { origin: "home" as const }]),
+          )}
+        >
+          <HomePopularCakes cakes={popular} />
+        </CakeEntryScopeCapture>
+      ) : (
+        <section className="border-ink/[0.1] mt-8 min-w-0 border-t px-6 pt-8 sm:px-10">
+          <div className="mx-auto w-full max-w-6xl">
+            <h2 className="font-display text-ink text-xl tracking-tight sm:text-2xl">
+              Popular Cakes
+            </h2>
+            <StorefrontRetryNotice
+              title="Popular Cakes are temporarily unavailable"
+              message={storefrontReadFailureMessage(
+                popularResult.error,
+                "Popular Cakes",
+              )}
+            />
+          </div>
+        </section>
+      )}
       <StorefrontListingRestore origin="home" />
       <HomeMoreCollections items={more} />
       <HomeBrowseAllCakes />

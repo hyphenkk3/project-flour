@@ -16,7 +16,10 @@ assert.match(home, /sortCakesForCataloguePromotionPresentation/);
 assert.match(home, /buildTargetedPromotionBadgeByCakeId/);
 assert.match(home, /collectionMerchandising: true/);
 assert.match(home, /cataloguePromotionPeriodFromWindow/);
-assert.equal((home.match(/listPublicCatalogueVouchers\(\)/g) ?? []).length, 1);
+assert.equal(
+  (home.match(/listPublicCatalogueVouchersStrict\(\)/g) ?? []).length,
+  1,
+);
 
 const collectionPage = readSrc(
   "src/workspaces/storefront/home/StorefrontCollectionCakesPage.tsx",

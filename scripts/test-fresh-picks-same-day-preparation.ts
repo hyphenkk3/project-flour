@@ -5,7 +5,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { getDineInSlotsForDate } from "@/engines/business-calendar/dine-in-hours";
+import {
+  availableDineInVenues,
+  getDineInSlotsForDate,
+} from "@/engines/business-calendar/dine-in-hours";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import {
   extraCustomerPickupSlotsForDate,
@@ -13,8 +16,16 @@ import {
 import { extraPickupThroughIso } from "@/engines/extra/fresh-picks-time";
 import {
   extraCustomerSameDayUnavailableNotice,
+  extraCustomerSameDayUnavailableNoticeForDate,
   extraCustomerVisibleFulfilmentDates,
   freshPicksMethodAvailability,
+  freshPicksMethodAvailabilityForItems,
+  freshPicksDineInSlotsForVenue,
+  freshPicksDineInVenueSelection,
+  freshPicksDineInVenuesForSlots,
+  freshPicksDineInReservationSlots,
+  freshPicksDineInServingSlotsForReservation,
+  freshPicksDineInVenuesForPair,
   isValidExtraCustomerFulfilment,
 } from "@/engines/extra/fresh-picks-fulfilment";
 import {
@@ -24,6 +35,10 @@ import {
   sameDayFreshPicksCutoffCustomerMessage,
   slotPassesFreshPicksLead,
 } from "@/engines/extra/fresh-picks-preparation";
+import {
+  addFreshPickToCart,
+  parseFreshPickCart,
+} from "@/workspaces/storefront/extra/fresh-pick-cart";
 
 function readSrc(rel: string): string {
   return readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -91,6 +106,116 @@ assert.equal(parseFreshPicksPreparationConfig({}).leadMinutes, 60);
     extraCustomerSameDayUnavailableNotice({ ...ctx, now }),
     sameDayFreshPicksCutoffCustomerMessage(),
   );
+  assert.equal(
+    extraCustomerSameDayUnavailableNoticeForDate(FRI, { ...ctx, now }),
+    null,
+    "today's cutoff warning is not shown for a later selected date",
+  );
+}
+
+{
+  // On 25 Oct, a 26 Oct stock item must not show a warning about today's cutoff.
+  const sunday = "2026-10-25";
+  const monday = "2026-10-26";
+  const now = malaysiaNow(sunday, "16:00:00");
+  const itemWindow = {
+    pickupAvailableFromAt: extraPickupThroughIso(sunday, "12:00")!,
+    orderCutoffAt: extraPickupThroughIso(monday, "21:00")!,
+  };
+  const itemContext = {
+    window: itemWindow,
+    now,
+    snapshot: OPERATING_HOURS_SEED,
+  };
+  assert.deepEqual(extraCustomerVisibleFulfilmentDates(itemContext), [monday]);
+  assert.equal(
+    extraCustomerSameDayUnavailableNoticeForDate(monday, itemContext),
+    null,
+    "the selected 26 Oct date is not blocked by 25 Oct's cutoff notice",
+  );
+  assert.equal(
+    extraCustomerSameDayUnavailableNoticeForDate(sunday, itemContext),
+    sameDayFreshPicksCutoffCustomerMessage(),
+    "the notice still explains today's cutoff if today itself is selected",
+  );
+  const readyItemContext = { ...itemContext, readyForCollection: true };
+  assert.equal(
+    extraCustomerSameDayUnavailableNoticeForDate(sunday, readyItemContext),
+    null,
+    "a ready physical item with remaining same-day slots does not show a stale cutoff notice",
+  );
+}
+
+{
+  const afterCutoff = malaysiaNow(THU, "16:15:00");
+  const notReady = freshPicksMethodAvailability("pickup", THU, {
+    ...ctx,
+    now: afterCutoff,
+    readyForCollection: false,
+  });
+  const readyButUnpaid = freshPicksMethodAvailability("pickup", THU, {
+    ...ctx,
+    now: afterCutoff,
+    readyForCollection: true,
+  });
+  assert.equal(notReady.available, false, "not-ready stock keeps the cutoff");
+  assert.equal(notReady.reasonCode, "same_day_preparation_cutoff");
+  assert.equal(readyButUnpaid.available, true, "Ready stock bypasses preparation cutoff without payment state");
+  assert.equal(readyButUnpaid.slots[0]?.value, "16:30");
+  assert.equal(
+    isValidExtraCustomerFulfilment({
+      method: "pickup",
+      fulfilmentDate: THU,
+      fulfilmentTime: "16:30",
+      ...window,
+      readyForCollection: true,
+      now: afterCutoff,
+    }),
+    true,
+    "the specific ready item remains orderable after the preparation cutoff",
+  );
+  assert.equal(
+    isValidExtraCustomerFulfilment({
+      method: "pickup",
+      fulfilmentDate: THU,
+      fulfilmentTime: "16:30",
+      ...window,
+      readyForCollection: false,
+      now: afterCutoff,
+    }),
+    false,
+    "Undo Ready restores client-side rejection after cutoff",
+  );
+
+  const readyAndUnready = freshPicksMethodAvailabilityForItems(
+    "pickup",
+    THU,
+    [
+      { window, readyForCollection: true },
+      { window, readyForCollection: false },
+    ],
+    { now: afterCutoff, snapshot: OPERATING_HOURS_SEED },
+  );
+  assert.equal(readyAndUnready.available, false, "mixed stock must meet the unready item's cutoff too");
+
+  const beforeCutoff = malaysiaNow(THU, "15:00:00");
+  const mixedWithinCutoff = freshPicksMethodAvailabilityForItems(
+    "pickup",
+    THU,
+    [
+      { window, readyForCollection: true },
+      { window, readyForCollection: false },
+    ],
+    { now: beforeCutoff, snapshot: OPERATING_HOURS_SEED },
+  );
+  assert.equal(mixedWithinCutoff.available, true, "mixed items are available while the unready item's cutoff is met");
+
+  const undoReady = freshPicksMethodAvailability("pickup", THU, {
+    ...ctx,
+    now: afterCutoff,
+    readyForCollection: false,
+  });
+  assert.equal(undoReady.available, notReady.available, "Undo Ready restores the normal cutoff");
 }
 
 {
@@ -196,6 +321,92 @@ for (const example of dineInLeadCases) {
 }
 
 {
+  const slots = getDineInSlotsForDate(THU, OPERATING_HOURS_SEED);
+  const venues = freshPicksDineInVenuesForSlots(
+    THU,
+    slots,
+    OPERATING_HOURS_SEED,
+  );
+  assert.deepEqual(venues, ["hyphen", "whitebird"]);
+  assert.equal(
+    freshPicksDineInVenueSelection(["whitebird"], "hyphen"),
+    "",
+    "a date/time change clears an invalid previously selected venue",
+  );
+  assert.equal(
+    freshPicksDineInVenueSelection(["whitebird"], ""),
+    "whitebird",
+    "a sole venue may be selected when the customer has no prior choice",
+  );
+  assert.equal(
+    freshPicksDineInVenueSelection(["hyphen", "whitebird"], "whitebird"),
+    "whitebird",
+    "a still-available customer venue choice is preserved",
+  );
+  const whitebirdSlots = freshPicksDineInSlotsForVenue(
+    THU,
+    slots,
+    "whitebird",
+    OPERATING_HOURS_SEED,
+  );
+  assert.equal(whitebirdSlots.length > 0, true);
+  assert.equal(
+    whitebirdSlots.every((slot) =>
+      availableDineInVenues(THU, slot.value, OPERATING_HOURS_SEED).includes(
+        "whitebird",
+      ),
+    ),
+    true,
+    "venue-specific time options use the shared operating-hours resolver",
+  );
+  const restrictedVenueHours = {
+    ...OPERATING_HOURS_SEED,
+    overrides: [
+      {
+        capability: "whitebird" as const,
+        weekday: 4,
+        enabled: true,
+        opensAt: "10:00",
+        closesAt: "13:00",
+        latestBookable: "12:30",
+        usualStart: "10:00",
+        usualEnd: "13:00",
+        overrideDate: THU,
+        note: "synthetic venue-hours test",
+      },
+    ],
+  };
+  const restrictedSlots = getDineInSlotsForDate(THU, restrictedVenueHours);
+  const restrictedWhitebirdSlots = freshPicksDineInSlotsForVenue(
+    THU,
+    restrictedSlots,
+    "whitebird",
+    restrictedVenueHours,
+  );
+  assert.equal(
+    restrictedWhitebirdSlots.some((slot) => slot.value === "15:00"),
+    false,
+    "changing to a venue that closes earlier removes its now-invalid time",
+  );
+  assert.equal(
+    freshPicksDineInVenuesForSlots(
+      THU,
+      restrictedSlots,
+      restrictedVenueHours,
+    ).includes("whitebird"),
+    true,
+    "the venue remains selectable when it has other available times",
+  );
+  const extraCheckoutSrc = readSrc(
+    "src/workspaces/storefront/extra/GuestExtraCheckoutForm.tsx",
+  );
+  assert.match(extraCheckoutSrc, /freshPicksDineInVenuesForPair/);
+  assert.match(extraCheckoutSrc, /freshPicksDineInServingSlotsForReservation/);
+  assert.match(extraCheckoutSrc, /No dine-in venue is available/);
+  assert.doesNotMatch(extraCheckoutSrc, /setSelectedTime\(nextSlots\[0\]/);
+}
+
+{
   const now = malaysiaNow(THU, "15:30:00");
   const delivery = freshPicksMethodAvailability("delivery", THU, {
     ...ctx,
@@ -295,25 +506,126 @@ for (const example of dineInLeadCases) {
 const extraFormSrc = readSrc(
   "src/workspaces/storefront/extra/GuestExtraOrderForm.tsx",
 );
+const extraDetailPageSrc = readSrc(
+  "src/workspaces/storefront/extra/StorefrontExtraOrderPage.tsx",
+);
 assert.match(extraFormSrc, /FulfilmentMethodChooser/);
 assert.match(extraFormSrc, /Dine-in/);
 assert.match(extraFormSrc, /freshPicksChooserStates/);
 assert.match(extraFormSrc, /extraCustomerSameDayUnavailableNotice/);
 assert.match(extraFormSrc, /includeFieldName=\{false\}/);
+assert.match(extraDetailPageSrc, /<GuestExtraOrderForm/);
+assert.match(extraFormSrc, /timeLabel="Dine-in reservation time"/);
+assert.match(extraFormSrc, /timeLabel="Cake serving time"/);
+assert.match(extraFormSrc, /<DineInVenuePartyFields/);
+assert.match(extraFormSrc, /freshPicksDineInReservationSlots/);
+assert.match(extraFormSrc, /freshPicksDineInServingSlotsForReservation/);
+assert.match(extraFormSrc, /freshPicksDineInVenuesForPair/);
+assert.ok(
+  extraFormSrc.indexOf('timeLabel="Dine-in reservation time"') <
+    extraFormSrc.indexOf('timeLabel="Cake serving time"'),
+  "Fresh Pick follows regular Preorder reservation then cake serving order",
+);
+assert.ok(
+  extraFormSrc.indexOf('timeLabel="Cake serving time"') <
+    extraFormSrc.indexOf("<DineInVenuePartyFields\n") <
+    extraFormSrc.indexOf("<FormSubmitButton"),
+  "venue photo cards follow both times and precede Add to Cart",
+);
+
+{
+  const productDate = "2026-08-20";
+  const productNow = malaysiaNow(productDate, "15:00:00");
+  const productWindow = {
+    pickupAvailableFromAt: extraPickupThroughIso(productDate, "12:00")!,
+    orderCutoffAt: extraPickupThroughIso(productDate, "21:00")!,
+  };
+  const available = freshPicksMethodAvailability("dine_in", productDate, {
+    window: productWindow,
+    now: productNow,
+    snapshot: OPERATING_HOURS_SEED,
+  });
+  const reservation = freshPicksDineInReservationSlots(
+    productDate,
+    available.slots,
+    OPERATING_HOURS_SEED,
+  )[0];
+  assert.ok(reservation);
+  const serving = freshPicksDineInServingSlotsForReservation(
+    productDate,
+    reservation.value,
+    available.slots,
+    OPERATING_HOURS_SEED,
+  )[0];
+  assert.ok(serving);
+  const venue = freshPicksDineInVenuesForPair(
+    productDate,
+    reservation.value,
+    serving.value,
+    OPERATING_HOURS_SEED,
+  )[0];
+  assert.ok(venue);
+  const productInput = {
+    extraStockId: "synthetic-product-detail-extra",
+    cakeId: "synthetic-cake",
+    cakeSizeId: "synthetic-size",
+    cakeName: "Synthetic Cake",
+    sizeLabel: '6"',
+    unitPrice: 90,
+    imageUrl: null,
+    pickupDate: productDate,
+    pickupTime: serving.value,
+    reservationTime: reservation.value,
+    fulfilmentMethod: "dine_in" as const,
+    dineInVenue: venue,
+    pickupAvailableFromAt: productWindow.pickupAvailableFromAt,
+    orderCutoffAt: productWindow.orderCutoffAt,
+  };
+  const added = addFreshPickToCart(
+    null,
+    productInput,
+    productNow,
+    { snapshot: OPERATING_HOURS_SEED },
+  );
+  assert.equal(added.ok, true);
+  assert.equal(added.ok && added.cart.dineInVenue, venue);
+  assert.equal(added.ok && added.cart.reservationTime, reservation.value);
+  assert.equal(added.ok && added.cart.pickupTime, serving.value);
+  assert.equal(
+    addFreshPickToCart(
+      null,
+      { ...productInput, dineInVenue: "" },
+      productNow,
+      { snapshot: OPERATING_HOURS_SEED },
+    ).ok,
+    false,
+    "Dine-in add-to-cart requires a venue",
+  );
+  if (added.ok) {
+    const restored = parseFreshPickCart(added.cart);
+    assert.equal(restored?.dineInVenue, venue);
+    assert.equal(restored?.reservationTime, reservation.value);
+    assert.equal(restored?.pickupTime, serving.value);
+  }
+}
 
 const extraCheckoutSrc = readSrc(
   "src/workspaces/storefront/extra/GuestExtraCheckoutForm.tsx",
 );
 assert.match(extraCheckoutSrc, /name="fulfilment_method"/);
 assert.match(extraCheckoutSrc, /includeFieldName=\{false\}/);
-assert.match(extraCheckoutSrc, /resolveDineInVenueSelection/);
+assert.match(extraCheckoutSrc, /timeLabel="Dine-in reservation time"/);
+assert.match(extraCheckoutSrc, /timeLabel="Cake serving time"/);
 assert.match(extraCheckoutSrc, /extraCustomerSameDayUnavailableNotice/);
 assert.doesNotMatch(extraCheckoutSrc, /parseGuestCount/);
+assert.match(extraCheckoutSrc, /reservationTime:\s*resolvedMethod === "dine_in" \? reservationTime : ""/);
 
 const extraActionsSrc = readSrc("src/workspaces/storefront/extra/actions.ts");
 assert.match(extraActionsSrc, /loadOperatingHoursSnapshot/);
-assert.match(extraActionsSrc, /isValidExtraCustomerFulfilment/);
+assert.match(extraActionsSrc, /submit_guest_extra_order_idempotent_v3/);
+assert.match(extraActionsSrc, /if \(fulfilmentMethod === "dine_in"\)/);
 assert.match(extraActionsSrc, /p_fulfilment_method/);
+assert.match(extraActionsSrc, /p_dine_in/);
 assert.doesNotMatch(extraActionsSrc, /now:/);
 
 const checkoutSrc = readSrc(

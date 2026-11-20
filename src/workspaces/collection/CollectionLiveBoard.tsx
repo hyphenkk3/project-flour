@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { dineInVenueLabel } from "@/engines/business-calendar/dine-in-hours";
 import { createClient } from "@/lib/supabase/client";
 import { formatLongBusinessDate } from "@/lib/dates";
+import { startVisibilityAwarePolling } from "@/lib/visibility-aware-polling";
 import {
   listCollectionOrdersForTabAction,
 } from "@/workspaces/collection/actions";
@@ -173,10 +174,6 @@ export function CollectionLiveBoard({
       }, 120);
     }
 
-    function onVisibilityChange() {
-      if (document.visibilityState === "visible") refreshSoon();
-    }
-
     const channel = supabase
       .channel(`collection-board-${tab}-${boardDate}`)
       .on(
@@ -204,18 +201,20 @@ export function CollectionLiveBoard({
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") refreshSoon();
       });
 
-    const pollId = window.setInterval(() => {
-      refreshSoon();
-    }, POLL_INTERVAL_MS);
-    document.addEventListener("visibilitychange", onVisibilityChange);
+    const polling = startVisibilityAwarePolling({
+      intervalMs: POLL_INTERVAL_MS,
+      poll: refreshSoon,
+      onVisible: refreshSoon,
+      // refreshSoon already coalesces poll, Realtime, focus, and online events.
+      realtimeCoalesceMs: 0,
+    });
     window.addEventListener("focus", refreshSoon);
     window.addEventListener("online", refreshSoon);
 
     return () => {
       disposed = true;
-      window.clearInterval(pollId);
+      polling.dispose();
       if (refreshTimer !== null) window.clearTimeout(refreshTimer);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("focus", refreshSoon);
       window.removeEventListener("online", refreshSoon);
       void supabase.removeChannel(channel);

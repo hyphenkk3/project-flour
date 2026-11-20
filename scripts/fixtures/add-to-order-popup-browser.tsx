@@ -10,30 +10,59 @@ declare global {
     fixtureInitialSizeId: string;
     fixtureDraft: { items: Array<Record<string, unknown>> } | null;
     fixturePickupDate: string | null;
+    fixturePickupScope: {
+      from: string;
+      to: string;
+      pickup: string | null;
+    } | null;
+    fixtureValidationCalls: Array<{
+      items: unknown;
+      pickupDate: string | null;
+    }>;
     fixtureAdded: string | null;
-    setFixtureCake: (index: number, initialSizeId: string) => void;
+    setFixtureCake: (
+      index: number,
+      initialSizeId: string,
+      pickupScope?: { from: string; to: string; pickup: string | null } | null,
+    ) => void;
   }
 }
 
 function Harness() {
-  const [selection, setSelection] = useState({ index: 0, sizeId: "" });
+  const [selection, setSelection] = useState({
+    index: 0,
+    sizeId: "",
+    revision: 0,
+    pickupScope: null as Window["fixturePickupScope"],
+  });
   useEffect(() => {
-    window.setFixtureCake = (index, sizeId) => {
+    window.setFixtureCake = (index, sizeId, pickupScope = null) => {
       window.fixtureCakeIndex = index;
       window.fixtureInitialSizeId = sizeId;
+      window.fixturePickupScope = pickupScope;
       window.fixtureDraft = null;
       window.fixtureAdded = null;
-      setSelection({ index, sizeId });
+      setSelection((previous) => ({
+        index,
+        sizeId,
+        pickupScope,
+        revision: previous.revision + 1,
+      }));
     };
   }, []);
   const cake = window.fixtureCakes[selection.index]!;
   return (
     <>
-      <main className="p-4">
+      <main
+        className="p-4"
+        data-fixture-cake={cake.id}
+        data-fixture-size={selection.sizeId}
+        data-fixture-scope={selection.pickupScope?.from ?? "none"}
+      >
         Product page remains behind the compact order sheet.
       </main>
       <AddToOrderSheet
-        key={`${cake.id}:${selection.sizeId}`}
+        key={`${cake.id}:${selection.sizeId}:${selection.revision}`}
         cake={cake}
         initialSizeId={selection.sizeId}
         open
@@ -41,6 +70,7 @@ function Harness() {
         onAdded={(result) => {
           window.fixtureAdded = result;
         }}
+        pickupScope={selection.pickupScope}
       />
     </>
   );

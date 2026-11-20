@@ -1,0 +1,64 @@
+name: Issue 8 owner manual New Order exact-candidate verification
+on:
+  push:
+    branches:
+      - codex/issue-8-addons-implementation-20261101
+    paths:
+      - .github/workflows/issue8-owner-manual-new-order-verification.yml
+      - src/workspaces/owner/orders/StaffGuestOrderForm.tsx
+      - scripts/test-owner-manual-new-order-source.mjs
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: project_flour_regression
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: gha-regression-only
+        options: >-
+          --health-cmd "pg_isready -U postgres -d project_flour_regression"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Confirm exact event source commit and clean checkout
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain)"
+      - name: Install exact candidate dependencies
+        run: npm ci
+      - name: Focused Issue 8 source regressions
+        run: |
+          node scripts/test-owner-manual-new-order-source.mjs
+          node scripts/test-addon-collection-history.mjs
+      - name: Full release regression suite including isolated PostgreSQL assignment test
+        env:
+          RELEASE_TEST_POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: npm run test:release-regressions
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Scoped ESLint
+        run: >-
+          ./node_modules/.bin/eslint --no-cache
+          'src/app/(app)/owner/orders/new/page.tsx'
+          src/engines/orders/paid-addons.ts
+          src/workspaces/owner/orders/OrderPaidAddonsEditor.tsx
+          src/workspaces/owner/orders/StaffGuestOrderForm.tsx
+          src/workspaces/owner/orders/actions.ts
+          src/workspaces/owner/orders/create-staff-preorder.ts
+          src/workspaces/owner/orders/queries.ts
+          scripts/test-owner-manual-new-order-source.mjs
+      - name: Exact-candidate production build
+        run: npm run build

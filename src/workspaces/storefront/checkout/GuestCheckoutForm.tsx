@@ -33,7 +33,7 @@ import {
   focusElementById,
   focusFirstInvalidField,
 } from "@/components/ui/form";
-import { OPTIONAL_NOTES_CUSTOMER_WARNING } from "@/engines/orders/order-guide";
+import { CAKE_WORDING_REQUEST_ERROR, POSSIBLE_CAKE_WORDING_MESSAGE, hasCakeWordingRequest, hasPossibleCakeWording } from "@/engines/orders/cake-wording-note-guard";
 import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
 import { DineInVenuePartyFields } from "@/components/ui/DineInVenuePartyFields";
 import { derivedGuestCountDraft } from "@/engines/orders/dine-in-party";
@@ -167,6 +167,7 @@ import {
   type CheckoutPickupOffer,
   type CheckoutState,
 } from "@/workspaces/storefront/checkout/actions";
+import { createSecondaryOfferLoader } from "@/workspaces/storefront/checkout/secondary-offer-loader.mjs";
 import { clampCustomerPickupWindow } from "@/engines/menu/customer-browse";
 import {
   emptyPreorderFields,
@@ -184,10 +185,16 @@ import {
   CheckoutReceivedShellProbe,
   CheckoutSubmitUsableProbe,
   beginSuccessNavigationPerf,
+  CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE,
   markCheckoutActionReturned,
   submitGuestOrderAndNavigate,
   useCheckoutActionReturnPerf,
 } from "@/workspaces/storefront/checkout/CheckoutDevPerf";
+import {
+  clearUncertainSubmit,
+  hasUncertainSubmit,
+  setUncertainSubmit,
+} from "@/workspaces/storefront/checkout/uncertain-submit-lock.mjs";
 import { StorefrontSuccessLoading } from "@/workspaces/storefront/checkout/StorefrontSuccessLoading";
 import {
   checkoutActionResourceMark,
@@ -338,6 +345,9 @@ function persistDraft(
 const checkoutPickupOfferCache = new Map<string, CheckoutPickupOffer>();
 const checkoutCakeSizePriceCache = new Map<string, Promise<number | null>>();
 
+const CAPACITY_AVAILABILITY_UNCONFIRMED_MESSAGE =
+  "We can’t confirm capacity for every date right now. You may continue; availability will be checked securely when you submit your order.";
+
 export function GuestCheckoutForm({
   suggestedPickupDate = null,
   minPickupDate = null,
@@ -358,11 +368,20 @@ export function GuestCheckoutForm({
     null,
   );
   const [actionPending, setActionPending] = useState(false);
+  const [uncertainSubmit, setUncertainSubmitState] = useState(false);
   const [receivedShell, setReceivedShell] = useState(false);
   const navigatedRef = useRef(false);
   const viewState = actionState ?? state;
   const submitPending = pending || actionPending;
+  const submitOutcomeUncertain =
+    uncertainSubmit || viewState.outcomeUncertain === true;
+  const submitError = submitOutcomeUncertain
+    ? CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE
+    : viewState.error;
+  const [notesExpanded, setNotesExpanded] = useState(false);
+  const [notesNotWordingAcknowledged, setNotesNotWordingAcknowledged] = useState(false);
   const pendingSubmitRef = useRef<FormData | null>(null);
+  const confirmInFlightRef = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [resolvedPriceKey, setResolvedPriceKey] = useState<string | null>(null);
@@ -377,7 +396,6 @@ export function GuestCheckoutForm({
 
   useEffect(() => {
     if (viewState.error) {
-      setConfirmOpen(false);
       if (isCakePriceAckStaleError(viewState.error)) {
         checkoutCakeSizePriceCache.clear();
         setAcknowledgedSnapshot("");
@@ -385,6 +403,13 @@ export function GuestCheckoutForm({
       }
     }
   }, [viewState.error]);
+
+  useEffect(() => {
+    const sync = () => setUncertainSubmitState(hasUncertainSubmit("preorder"));
+    sync();
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
+  }, []);
 
   useLayoutEffect(() => {
     const orderId = viewState.orderId;
@@ -414,6 +439,15 @@ export function GuestCheckoutForm({
     CustomerPaidAddonOption[]
   >([]);
   const [optionsReady, setOptionsReady] = useState(false);
+  const [resolvedOptionsDate, setResolvedOptionsDate] = useState<string | null>(
+    null,
+  );
+  const [secondaryOfferState, setSecondaryOfferState] = useState<{
+    pickupDate: string;
+    requestKey: string;
+    status: "loading" | "error" | "ready";
+  } | null>(null);
+  const retrySecondaryOfferRef = useRef<(() => void) | null>(null);
   const [resolvedOfferDate, setResolvedOfferDate] = useState<string | null>(
     null,
   );
@@ -458,16 +492,24 @@ export function GuestCheckoutForm({
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [collectionId, setCollectionId] = useState<string | null>(null);
   const [cartCapacity, setCartCapacity] = useState<{
+    availabilityConfirmed: boolean;
+    showAdvisoryFailureNotice: boolean;
     fullyBookedDates: string[];
     waitingListDates: string[];
     blockingCakeNamesByDate: Record<string, string[]>;
     waitingListLineKeysByDate: Record<string, string[]>;
   }>({
+    availabilityConfirmed: true,
+    showAdvisoryFailureNotice: false,
     fullyBookedDates: [],
     waitingListDates: [],
     blockingCakeNamesByDate: {},
     waitingListLineKeysByDate: {},
   });
+  const [cartCapacityRequest, setCartCapacityRequest] = useState<{
+    key: string;
+    status: "ready" | "unconfirmed";
+  } | null>(null);
   const [closedWaitingList, setClosedWaitingList] =
     useState<CustomerWaitingListAvailabilityData | null>(null);
   const [waitingListAvailabilityOpen, setWaitingListAvailabilityOpen] =
@@ -523,6 +565,18 @@ export function GuestCheckoutForm({
   const rejectExcludedDates = items.length === 0;
 
   const cartCapacityKey = checkoutCartCapacityKey(items);
+  const cartCapacityRequestKey = JSON.stringify([
+    cartCapacityKey,
+    collectionId,
+    effectivePickupBounds.min,
+    effectivePickupBounds.max,
+  ]);
+  const cartCapacityStatus =
+    items.length === 0
+      ? "ready"
+      : cartCapacityRequest?.key === cartCapacityRequestKey
+        ? cartCapacityRequest.status
+        : "loading";
 
   useEffect(() => {
     startCheckoutLoadClock();
@@ -535,9 +589,7 @@ export function GuestCheckoutForm({
   }, [hydrated]);
 
   useEffect(() => {
-    if (!hydrated || !calendarReady || items.length === 0) {
-      return;
-    }
+    if (!hydrated || !calendarReady || items.length === 0) return;
     markCheckoutLoadOnce(
       "capacity_availability_start",
       checkoutLoadSeen.current,
@@ -555,14 +607,53 @@ export function GuestCheckoutForm({
         cakeName: item.cakeName,
         quantity: item.quantity,
       })),
-    }).then((snapshot) => {
-      if (!cancelled) setCartCapacity(snapshot);
-    });
+    })
+      .then((result) => {
+        if (cancelled) return;
+        if (result.ok) {
+          setCartCapacity(result.snapshot);
+          setCartCapacityRequest({
+            key: cartCapacityRequestKey,
+            status: result.snapshot.availabilityConfirmed
+              ? "ready"
+              : "unconfirmed",
+          });
+        } else {
+          setCartCapacity({
+            availabilityConfirmed: false,
+            showAdvisoryFailureNotice: true,
+            fullyBookedDates: [],
+            waitingListDates: [],
+            blockingCakeNamesByDate: {},
+            waitingListLineKeysByDate: {},
+          });
+          setCartCapacityRequest({
+            key: cartCapacityRequestKey,
+            status: "unconfirmed",
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCartCapacity({
+            availabilityConfirmed: false,
+            showAdvisoryFailureNotice: true,
+            fullyBookedDates: [],
+            waitingListDates: [],
+            blockingCakeNamesByDate: {},
+            waitingListLineKeysByDate: {},
+          });
+          setCartCapacityRequest({
+            key: cartCapacityRequestKey,
+            status: "unconfirmed",
+          });
+        }
+      });
     return () => {
       cancelled = true;
     };
-  // Price/name-only item updates must not refetch capacity.
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- cartCapacityKey encodes cake+size+qty
+    // Price/name-only item updates must not refetch capacity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- cartCapacityKey encodes cake+size+qty
   }, [
     calendarReady,
     cartCapacityKey,
@@ -570,6 +661,7 @@ export function GuestCheckoutForm({
     effectivePickupBounds.max,
     effectivePickupBounds.min,
     hydrated,
+    cartCapacityRequestKey,
   ]);
   useEffect(() => {
     const selectedYmd = fields.pickupDate.trim().slice(0, 10);
@@ -608,7 +700,10 @@ export function GuestCheckoutForm({
     blockingCakeNamesByDate: {} as Record<string, string[]>,
     waitingListLineKeysByDate: {} as Record<string, string[]>,
   };
-  const activeCartCapacity = items.length === 0 ? emptyCapacity : cartCapacity;
+  const activeCartCapacity =
+    items.length === 0 || cartCapacityStatus === "loading"
+      ? emptyCapacity
+      : cartCapacity;
   const waitingListPickerDates = activeCartCapacity.waitingListDates;
   const fullyBookedWithoutWaitingList =
     activeCartCapacity.fullyBookedDates.filter(
@@ -651,6 +746,7 @@ export function GuestCheckoutForm({
         setComplimentaryOptions(offer.complimentaryOptions);
         setPaidAddonOptions(offer.paidAddonOptions);
         setOptionsReady(true);
+        setResolvedOptionsDate(offerDate);
       }
       setOfferLabel(
         offer.collection
@@ -784,14 +880,23 @@ export function GuestCheckoutForm({
           resourceFromIndex,
           perf,
         });
-        void loadCheckoutPickupOffer(pickupDate).then(
-          (fullOffer) => {
-            if (cancelled) return;
-            checkoutPickupOfferCache.set(pickupDate, fullOffer);
-            applyOffer(fullOffer, pickupDate);
+        const secondaryOfferLoader = createSecondaryOfferLoader({
+          pickupDate,
+          requestKey: `${pickupDate}|${cakeIds.join(",")}`,
+          load: loadCheckoutPickupOffer,
+          isCurrent: (requestDate) =>
+            !cancelled &&
+            fields.pickupDate.trim().slice(0, 10) === requestDate,
+          onState: setSecondaryOfferState,
+          onSuccess: (fullOffer, requestDate) => {
+            checkoutPickupOfferCache.set(requestDate, fullOffer);
+            applyOffer(fullOffer, requestDate);
           },
-          () => undefined,
-        );
+        });
+        retrySecondaryOfferRef.current = () => {
+          void secondaryOfferLoader.run();
+        };
+        void secondaryOfferLoader.run();
         void loadCheckoutVenuePhotos().then(
           (photos) => {
             if (cancelled) return;
@@ -809,6 +914,7 @@ export function GuestCheckoutForm({
     );
     return () => {
       cancelled = true;
+      retrySecondaryOfferRef.current = null;
     };
   }, [
     cakeIdsKey,
@@ -1141,6 +1247,9 @@ export function GuestCheckoutForm({
     fields.pickupDate,
     resolvedOfferDate,
   );
+  const optionsReadyForSelectedDate =
+    optionsReady &&
+    resolvedOptionsDate === fields.pickupDate.trim().slice(0, 10);
   const sizePricesPending =
     items.length > 0 &&
     Boolean(fields.pickupDate) &&
@@ -1527,6 +1636,16 @@ export function GuestCheckoutForm({
   }
 
   function handleSubmit(formData: FormData) {
+    if (hasPossibleCakeWording(String(formData.get("notes") ?? "")) && formData.get("notes_not_cake_wording_ack") !== "yes") {
+      setItemError("Please confirm that your note is not a request for writing on the cake.");
+      focusElementById("notes");
+      return;
+    }
+    if (hasCakeWordingRequest(String(formData.get("notes") ?? ""))) {
+      setItemError(CAKE_WORDING_REQUEST_ERROR);
+      focusElementById("notes");
+      return;
+    }
     if (calendarPending || liveOfferPending || sizePricesPending) {
       return;
     }
@@ -1541,6 +1660,10 @@ export function GuestCheckoutForm({
     }
     if (items.length === 0) {
       setItemError("Please add at least one cake to your preorder.");
+      return;
+    }
+    if (cartCapacityStatus === "loading") {
+      setItemError(CAPACITY_AVAILABILITY_UNCONFIRMED_MESSAGE);
       return;
     }
     if (
@@ -1597,7 +1720,13 @@ export function GuestCheckoutForm({
   }
 
   async function confirmOrder() {
-    if (submitPending || viewState.orderId || navigatedRef.current) return;
+    if (
+      submitPending ||
+      submitOutcomeUncertain ||
+      confirmInFlightRef.current ||
+      viewState.orderId ||
+      navigatedRef.current
+    ) return;
     if (ackRequired && !pricesAcknowledged) {
       setConfirmOpen(false);
       setItemError(CAKE_PRICE_ACK_REQUIRED_MESSAGE);
@@ -1610,6 +1739,7 @@ export function GuestCheckoutForm({
     }
     const formData = pendingSubmitRef.current;
     if (!formData) return;
+    confirmInFlightRef.current = true;
     setActionPending(true);
     const result = await submitGuestOrderAndNavigate({
       formData,
@@ -1627,11 +1757,27 @@ export function GuestCheckoutForm({
     if (result.error) {
       setActionState(result);
       setActionPending(false);
+      if (result.outcomeUncertain) {
+        setUncertainSubmitState(true);
+        setUncertainSubmit("preorder");
+      } else {
+        confirmInFlightRef.current = false;
+      }
+    } else if (result.orderId) {
+      clearUncertainSubmit("preorder");
     }
   }
 
   function goBackFromConfirm() {
     if (submitPending || viewState.orderId) return;
+    setConfirmOpen(false);
+  }
+
+  function verifyNoOrderAndResume() {
+    clearUncertainSubmit("preorder");
+    confirmInFlightRef.current = false;
+    setUncertainSubmitState(false);
+    setActionState(null);
     setConfirmOpen(false);
   }
 
@@ -1714,6 +1860,7 @@ export function GuestCheckoutForm({
   );
   const submitBlocked =
     cartValidationPending ||
+    (items.length > 0 && cartCapacityStatus === "loading") ||
     Boolean(sizeAvailabilityError) ||
     calendarPending ||
     pickupMembershipsPending ||
@@ -1741,6 +1888,18 @@ export function GuestCheckoutForm({
         className="flex flex-col gap-10 lg:grid lg:grid-cols-[minmax(0,1fr)_20.5rem] lg:items-start lg:gap-x-16 lg:gap-y-0"
         noValidate
         onSubmit={(event) => {
+          if (hasPossibleCakeWording(fields.notes) && !notesNotWordingAcknowledged) {
+            event.preventDefault();
+            setItemError("Please confirm that your note is not a request for writing on the cake.");
+            focusElementById("notes");
+            return;
+          }
+          if (hasCakeWordingRequest(fields.notes)) {
+            event.preventDefault();
+            setItemError(CAKE_WORDING_REQUEST_ERROR);
+            focusElementById("notes");
+            return;
+          }
           const errors = collectInvalidFieldMessages(event.currentTarget);
           if (Object.keys(errors).length === 0) {
             setFieldErrors({});
@@ -1764,7 +1923,7 @@ export function GuestCheckoutForm({
         <input
           name="preorder_options_ready"
           type="hidden"
-          value={optionsReady ? "1" : "0"}
+          value={optionsReadyForSelectedDate ? "1" : "0"}
         />
         <input
           name="catalogue_voucher_id"
@@ -1843,6 +2002,24 @@ export function GuestCheckoutForm({
                 role="status"
               >
                 {calendarError}
+              </p>
+            ) : null}
+            {items.length > 0 && cartCapacityStatus === "loading" ? (
+              <p
+                className="text-skyline mt-4 text-sm leading-relaxed"
+                role="status"
+              >
+                Confirming availability for your selected dates…
+              </p>
+            ) : null}
+            {items.length > 0 &&
+            cartCapacityStatus === "unconfirmed" &&
+            cartCapacity.showAdvisoryFailureNotice ? (
+              <p
+                className="text-skyline mt-4 text-sm leading-relaxed"
+                role="status"
+              >
+                {CAPACITY_AVAILABILITY_UNCONFIRMED_MESSAGE}
               </p>
             ) : null}
             {unavailableMessage ? (
@@ -2301,7 +2478,32 @@ export function GuestCheckoutForm({
             )}
           </CheckoutSection>
 
-          {optionsReady &&
+          {secondaryOfferState?.requestKey ===
+          `${fields.pickupDate.trim().slice(0, 10)}|${cakeIdsKey}` ? (
+            <div className="border-fog border-t pt-4" aria-live="polite">
+              {secondaryOfferState.status === "error" ? (
+                <div className="flex flex-wrap items-center gap-3 text-ink-muted text-sm">
+                  <p>
+                    We couldn’t load the optional cake and add-on choices. Your
+                    selected cakes and prices are still in your order.
+                  </p>
+                  <button
+                    className="text-ink underline underline-offset-2"
+                    onClick={() => retrySecondaryOfferRef.current?.()}
+                    type="button"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              ) : secondaryOfferState.status === "loading" ? (
+                <p className="text-ink-muted text-sm">
+                  Loading optional cake and add-on choices…
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {optionsReadyForSelectedDate &&
           (complimentaryOptions.length > 0 || paidAddonOptions.length > 0) ? (
             <CheckoutSection
               className="border-fog border-t pt-10"
@@ -2469,24 +2671,62 @@ export function GuestCheckoutForm({
 
           <CheckoutSection
             className="border-fog border-t pt-10"
-            title="Order Notes"
+            title="Additional Information (Optional)"
           >
-            <p className="text-ink text-sm font-medium">Optional notes</p>
-            <p
-              className="text-status-danger text-sm leading-snug font-bold"
-              id="optional-notes-warning"
-            >
-              {OPTIONAL_NOTES_CUSTOMER_WARNING}
-            </p>
-            <FormTextarea
-              aria-describedby="optional-notes-warning"
-              aria-label="Optional notes"
-              id="notes"
-              name="notes"
-              onChange={(event) => patchFields({ notes: event.target.value })}
-              rows={3}
-              value={fields.notes}
-            />
+            <div className="space-y-1" id="optional-notes-warning">
+              <p className="text-ink text-sm leading-relaxed">
+                For collection or delivery instructions.
+              </p>
+              <p className="text-status-danger text-sm leading-relaxed font-bold">
+                We do not provide personalised writing or messages on cakes.
+              </p>
+            </div>
+            {notesExpanded || Boolean(fields.notes) ? (
+              <div className="space-y-2">
+                <FormTextarea
+                  aria-describedby="optional-notes-warning optional-notes-wording-error"
+                  aria-label="Additional information"
+                  id="notes"
+                  name="notes"
+                  onChange={(event) => {
+                    setNotesNotWordingAcknowledged(false);
+                    patchFields({ notes: event.target.value });
+                  }}
+                  placeholder="E.g. Please call upon arrival."
+                  rows={3}
+                  value={fields.notes}
+                />
+                {hasCakeWordingRequest(fields.notes) ? (
+                  <p className="text-status-danger text-sm font-medium" id="optional-notes-wording-error" role="alert">
+                    {CAKE_WORDING_REQUEST_ERROR}
+                  </p>
+                ) : hasPossibleCakeWording(fields.notes) ? (
+                  <div className="space-y-2" id="optional-notes-wording-error">
+                    <p className="text-status-danger text-sm font-medium" role="alert">
+                      {POSSIBLE_CAKE_WORDING_MESSAGE}
+                    </p>
+                    <label className="text-ink flex items-start gap-2 text-sm">
+                      <input
+                        checked={notesNotWordingAcknowledged}
+                        name="notes_not_cake_wording_ack"
+                        onChange={(event) => setNotesNotWordingAcknowledged(event.target.checked)}
+                        type="checkbox"
+                        value="yes"
+                      />
+                      <span>I confirm this note is not a request for cake writing.</span>
+                    </label>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <button
+                className="text-ink underline underline-offset-4 text-sm font-medium"
+                onClick={() => setNotesExpanded(true)}
+                type="button"
+              >
+                Add collection or delivery instructions
+              </button>
+            )}
           </CheckoutSection>
 
           {ackRequired ? (
@@ -2546,12 +2786,21 @@ export function GuestCheckoutForm({
               {itemError}
             </p>
           ) : null}
-          <FormError message={viewState.error} />
+          <FormError message={submitError} />
+          {submitOutcomeUncertain ? (
+            <button
+              className="text-ink min-h-11 text-left text-sm underline underline-offset-4"
+              onClick={verifyNoOrderAndResume}
+              type="button"
+            >
+              I confirmed with Whitebird that no order was created
+            </button>
+          ) : null}
 
           <FormActions className="border-fog border-t pt-8 sm:items-center">
             <FormSubmitButton
               className="w-full rounded-md sm:w-auto"
-              disabled={submitBlocked || confirmOpen}
+              disabled={submitBlocked || confirmOpen || submitOutcomeUncertain}
               pending={submitPending}
               pendingLabel="Submitting…"
             >
@@ -2616,6 +2865,9 @@ export function GuestCheckoutForm({
         onGoBack={goBackFromConfirm}
         open={confirmOpen}
         pending={submitPending || Boolean(viewState.orderId)}
+        error={submitError}
+        outcomeUncertain={submitOutcomeUncertain}
+        onOutcomeVerifiedNoOrder={verifyNoOrderAndResume}
         snapshot={confirmSnapshot}
       />
     </div>

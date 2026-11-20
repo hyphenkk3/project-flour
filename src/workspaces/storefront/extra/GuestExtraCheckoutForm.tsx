@@ -21,15 +21,14 @@ import {
   formStyles,
 } from "@/components/ui/form";
 import { DineInVenuePartyFields } from "@/components/ui/DineInVenuePartyFields";
+import { PickupSlotFields } from "@/components/ui/PickupSlotFields";
 import {
   EMPTY_DINE_IN_VENUE_PHOTOS,
   type DineInVenuePhotoMap,
 } from "@/engines/orders/dine-in-venue-photos";
 import {
-  availableDineInVenues,
   dineInVenueLabel,
   parseDineInVenue,
-  resolveDineInVenueSelection,
 } from "@/engines/business-calendar/dine-in-hours";
 import {
   derivedGuestCountDraft,
@@ -39,10 +38,13 @@ import {
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
-  extraCustomerSameDayUnavailableNotice,
+  extraCustomerSameDayUnavailableNoticeForDate,
   extraCustomerVisibleFulfilmentDates,
   firstAvailableFreshPicksFulfilmentForItems,
   freshPicksChooserStatesForItems,
+  freshPicksDineInReservationSlots,
+  freshPicksDineInServingSlotsForReservation,
+  freshPicksDineInVenuesForPair,
   freshPicksMethodAvailabilityForItems,
 } from "@/engines/extra/fresh-picks-fulfilment";
 import {
@@ -81,7 +83,8 @@ import {
   ITEMS_SUBTOTAL_LABEL,
   TOTAL_BEFORE_DELIVERY_FEE_LABEL,
 } from "@/engines/orders/delivery-processing-fee-ack";
-import { OPTIONAL_NOTES_CUSTOMER_WARNING } from "@/engines/orders/order-guide";
+import { customerNameValidationError } from "@/engines/orders/customer-name";
+import { CAKE_WORDING_REQUEST_ERROR, POSSIBLE_CAKE_WORDING_MESSAGE, hasCakeWordingRequest, hasPossibleCakeWording } from "@/engines/orders/cake-wording-note-guard";
 import { DineInReservationNotesNotice } from "@/workspaces/storefront/checkout/DineInReservationNotesNotice";
 import { FulfilmentMethodChooser } from "@/workspaces/storefront/checkout/FulfilmentMethodChooser";
 import {
@@ -105,6 +108,7 @@ import type { PhysicalReceiptChoice } from "@/workspaces/storefront/checkout/pre
 import {
   loadFreshPickPrices,
   loadExtraCustomerOptions,
+  resolveGuestExtraOrderAction,
   submitGuestExtraOrderAction,
   type ExtraOrderState,
   type FreshPickPrice,
@@ -122,12 +126,22 @@ import {
 import { useEligibleCatalogueVoucher } from "@/workspaces/storefront/offers/useEligibleCatalogueVoucher";
 import {
   beginSuccessNavigationPerf,
+  CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE,
   CheckoutReceivedShellProbe,
   markCheckoutActionReturned,
   submitGuestOrderAndNavigate,
   useCheckoutActionReturnPerf,
 } from "@/workspaces/storefront/checkout/CheckoutDevPerf";
+import {
+  clearUncertainSubmit,
+  hasUncertainSubmit,
+  setUncertainSubmit,
+} from "@/workspaces/storefront/checkout/uncertain-submit-lock.mjs";
 import { StorefrontSuccessLoading } from "@/workspaces/storefront/checkout/StorefrontSuccessLoading";
+import {
+  clearFreshPickCheckoutAttempt,
+  getOrCreateFreshPickCheckoutAttempt,
+} from "@/workspaces/storefront/extra/fresh-pick-checkout-attempt.mjs";
 
 const initialState: ExtraOrderState = { error: null };
 
@@ -153,15 +167,41 @@ export function GuestExtraCheckoutForm({
     null,
   );
   const [actionPending, setActionPending] = useState(false);
+  const [uncertainSubmit, setUncertainSubmitState] = useState(false);
   const [receivedShell, setReceivedShell] = useState(false);
+  const [clientError, setClientError] = useState<string | null>(null);
   const navigatedRef = useRef(false);
   const viewState = actionState ?? state;
   const submitPending = pending || actionPending;
+  const submitOutcomeUncertain =
+    uncertainSubmit || viewState.outcomeUncertain === true;
+  const submitError = submitOutcomeUncertain
+    ? CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE
+    : clientError ?? viewState.error;
+  const [notes, setNotes] = useState(cart?.notes ?? "");
+  const [notesExpanded, setNotesExpanded] = useState(Boolean(cart?.notes));
+  const [notesNotWordingAcknowledged, setNotesNotWordingAcknowledged] = useState(false);
+  const notesHydratedRef = useRef(false);
+  useEffect(() => {
+    if (!cart || notesHydratedRef.current) return;
+    notesHydratedRef.current = true;
+    setNotes(cart.notes ?? "");
+    setNotesExpanded(Boolean(cart.notes));
+  }, [cart]);
+
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmSnapshot, setConfirmSnapshot] =
     useState<CheckoutConfirmSnapshot | null>(null);
   const pendingSubmitRef = useRef<FormData | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  const confirmInFlightRef = useRef(false);
+
+  useEffect(() => {
+    const sync = () => setUncertainSubmitState(hasUncertainSubmit("fresh-pick"));
+    sync();
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
+  }, []);
   const [includeReceiptChoice, setIncludeReceiptChoice] =
     useState<PhysicalReceiptChoice>("");
   const [complimentaryOptions, setComplimentaryOptions] = useState<
@@ -212,6 +252,9 @@ export function GuestExtraCheckoutForm({
   );
   const [selectedDate, setSelectedDate] = useState(pickupDate);
   const [selectedTime, setSelectedTime] = useState(pickupTime);
+  const [reservationTime, setReservationTime] = useState(
+    cart?.reservationTime ?? "",
+  );
   const cartItemIds = (cart?.items ?? []).map((item) => item.extraStockId);
   const pricingKey = `${selectedDate}|${cartItemIds.join(",")}`;
   const [pricing, setPricing] = useState<{
@@ -235,7 +278,6 @@ export function GuestExtraCheckoutForm({
   });
   const [deliveryProcessingAckSnapshot, setDeliveryProcessingAckSnapshot] =
     useState("");
-  const [clientError, setClientError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -266,6 +308,7 @@ export function GuestExtraCheckoutForm({
     setRecipientNotifyPreference(cart.recipientNotifyPreference);
     setSelectedDate(cart.pickupDate);
     setSelectedTime(cart.pickupTime);
+    setReservationTime(cart.reservationTime);
   }, [cart]);
 
   useEffect(() => {
@@ -368,8 +411,8 @@ export function GuestExtraCheckoutForm({
           ),
       )
     : [];
-  const sameDayNotice = cart && physicalItemContexts.length > 0
-    ? extraCustomerSameDayUnavailableNotice({
+  const sameDayNotice = cart && physicalItemContexts.length > 0 && selectedDate
+    ? extraCustomerSameDayUnavailableNoticeForDate(selectedDate, {
         ...physicalItemContexts[0]!,
         ...fulfilmentContext,
       })
@@ -397,25 +440,42 @@ export function GuestExtraCheckoutForm({
         fulfilmentContext,
       )
     : null;
-  const usableSlots = methodAvailability?.slots ?? [];
+  const methodSlots = methodAvailability?.slots ?? [];
+  const reservationSlots =
+    resolvedMethod === "dine_in" && selectedDate
+      ? freshPicksDineInReservationSlots(
+          selectedDate,
+          methodSlots,
+          hoursSnapshot,
+        )
+      : [];
+  const usableSlots =
+    resolvedMethod === "dine_in" && selectedDate && reservationTime
+      ? freshPicksDineInServingSlotsForReservation(
+          selectedDate,
+          reservationTime,
+          methodSlots,
+          hoursSnapshot,
+        )
+      : resolvedMethod === "dine_in"
+        ? []
+        : methodSlots;
   const timeStillValid = usableSlots.some(
     (slot) => slot.value === selectedTime,
   );
-  const dineInVenues = selectedDate
-    ? availableDineInVenues(
-        selectedDate,
-        timeStillValid ? selectedTime : "",
-        hoursSnapshot,
-      )
-    : [];
-  const resolvedVenue =
-    resolvedMethod === "dine_in" && selectedDate
-      ? resolveDineInVenueSelection(
+  const dineInVenues =
+    resolvedMethod === "dine_in" && selectedDate && reservationTime && timeStillValid
+      ? freshPicksDineInVenuesForPair(
           selectedDate,
-          timeStillValid ? selectedTime : "",
-          dineInVenue,
+          reservationTime,
+          selectedTime,
           hoursSnapshot,
         )
+      : [];
+  const parsedDineInVenue = parseDineInVenue(dineInVenue);
+  const resolvedVenue =
+    parsedDineInVenue && dineInVenues.includes(parsedDineInVenue)
+      ? parsedDineInVenue
       : "";
   const deliveryAckRequired = deliveryProcessingFeeAckRequired(resolvedMethod);
   const deliveryProcessingFeeAcknowledged = deliveryProcessingFeeAckSatisfied({
@@ -437,13 +497,180 @@ export function GuestExtraCheckoutForm({
       setClientError(null);
     }
     setFulfilmentMethod(next);
+    const nextSlots = freshPicksMethodAvailabilityForItems(
+      next,
+      selectedDate,
+      physicalItemContexts,
+      fulfilmentContext,
+    ).slots;
+    if (next !== "dine_in") {
+      setReservationTime("");
+      setDineInVenue("");
+      setSelectedTime((current) =>
+        nextSlots.some((slot) => slot.value === current) ? current : "",
+      );
+      return;
+    }
+    const nextReservations = freshPicksDineInReservationSlots(
+      selectedDate,
+      nextSlots,
+      hoursSnapshot,
+    );
+    const nextReservation = nextReservations.some(
+      (slot) => slot.value === reservationTime,
+    )
+      ? reservationTime
+      : "";
+    const nextServingSlots = nextReservation
+      ? freshPicksDineInServingSlotsForReservation(
+          selectedDate,
+          nextReservation,
+          nextSlots,
+          hoursSnapshot,
+        )
+      : [];
+    const nextServing = nextServingSlots.some(
+      (slot) => slot.value === selectedTime,
+    )
+      ? selectedTime
+      : "";
+    const nextVenues = nextServing
+      ? freshPicksDineInVenuesForPair(
+          selectedDate,
+          nextReservation,
+          nextServing,
+          hoursSnapshot,
+        )
+      : [];
+    setReservationTime(nextReservation);
+    setSelectedTime(nextServing);
+    setDineInVenue(
+      nextVenues.includes(dineInVenue as "hyphen" | "whitebird")
+        ? dineInVenue
+        : "",
+    );
+  }
+
+  function changeSelectedDate(nextDate: string) {
+    setSelectedDate(nextDate);
+    const nextMethod = firstAvailableFreshPicksFulfilmentForItems(
+      nextDate,
+      fulfilmentMethod,
+      physicalItemContexts,
+      fulfilmentContext,
+    );
+    setFulfilmentMethod(nextMethod);
+    const nextSlots = freshPicksMethodAvailabilityForItems(
+      nextMethod,
+      nextDate,
+      physicalItemContexts,
+      fulfilmentContext,
+    ).slots;
+    if (nextMethod !== "dine_in") {
+      setReservationTime("");
+      setDineInVenue("");
+      setSelectedTime((current) =>
+        nextSlots.some((slot) => slot.value === current) ? current : "",
+      );
+      return;
+    }
+    const nextReservations = freshPicksDineInReservationSlots(
+      nextDate,
+      nextSlots,
+      hoursSnapshot,
+    );
+    const nextReservation = nextReservations.some(
+      (slot) => slot.value === reservationTime,
+    )
+      ? reservationTime
+      : "";
+    const nextServingSlots = nextReservation
+      ? freshPicksDineInServingSlotsForReservation(
+          nextDate,
+          nextReservation,
+          nextSlots,
+          hoursSnapshot,
+        )
+      : [];
+    const nextServing = nextServingSlots.some(
+      (slot) => slot.value === selectedTime,
+    )
+      ? selectedTime
+      : "";
+    const nextVenues = nextServing
+      ? freshPicksDineInVenuesForPair(
+          nextDate,
+          nextReservation,
+          nextServing,
+          hoursSnapshot,
+        )
+      : [];
+    setReservationTime(nextReservation);
+    setSelectedTime(nextServing);
+    setDineInVenue(
+      nextVenues.includes(dineInVenue as "hyphen" | "whitebird")
+        ? dineInVenue
+        : "",
+    );
+  }
+
+  function changeReservationTime(nextReservation: string) {
+    setReservationTime(nextReservation);
+    const servingSlots = freshPicksDineInServingSlotsForReservation(
+      selectedDate,
+      nextReservation,
+      methodSlots,
+      hoursSnapshot,
+    );
+    const nextServing = servingSlots.some(
+      (slot) => slot.value === selectedTime,
+    )
+      ? selectedTime
+      : "";
+    const nextVenues = nextServing
+      ? freshPicksDineInVenuesForPair(
+          selectedDate,
+          nextReservation,
+          nextServing,
+          hoursSnapshot,
+        )
+      : [];
+    setSelectedTime(nextServing);
+    setDineInVenue(
+      nextVenues.includes(dineInVenue as "hyphen" | "whitebird")
+        ? dineInVenue
+        : "",
+    );
+  }
+
+  function changeCakeServingTime(nextServing: string) {
+    setSelectedTime(nextServing);
+    const nextVenues = reservationTime
+      ? freshPicksDineInVenuesForPair(
+          selectedDate,
+          reservationTime,
+          nextServing,
+          hoursSnapshot,
+        )
+      : [];
+    setDineInVenue(
+      nextVenues.includes(dineInVenue as "hyphen" | "whitebird")
+        ? dineInVenue
+        : "",
+    );
   }
 
   function extraConfirmDetails(): string[] {
     if (resolvedMethod === "dine_in") {
       const details: string[] = [];
-      const venue = parseDineInVenue(resolvedVenue || dineInVenue);
+      const venue = parseDineInVenue(resolvedVenue);
       if (venue) details.push(dineInVenueLabel(venue));
+      if (reservationTime) {
+        details.push(`Reservation ${formatPickupTime(reservationTime)}`);
+      }
+      if (timeStillValid && selectedTime) {
+        details.push(`Cake served ${formatPickupTime(selectedTime)}`);
+      }
       const parsed = parseDineInPartyCounts({
         adultCount,
         kidCount,
@@ -495,8 +722,10 @@ export function GuestExtraCheckoutForm({
         wishingCardMessage,
         pickupDate: selectedDate,
         pickupTime: timeStillValid ? selectedTime : "",
+        reservationTime:
+          resolvedMethod === "dine_in" ? reservationTime : "",
         fulfilmentMethod: resolvedMethod,
-        dineInVenue: resolvedVenue || dineInVenue,
+        dineInVenue: resolvedMethod === "dine_in" ? resolvedVenue : "",
         adultCount,
         kidCount,
         toddlerCount,
@@ -529,14 +758,30 @@ export function GuestExtraCheckoutForm({
       return;
     }
     const errors = collectInvalidFieldMessages(form);
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
+    const customerNameError = customerNameValidationError(
+      String(new FormData(form).get("customer_name") ?? ""),
+    );
+    const validationErrors = customerNameError
+      ? { ...errors, customer_name: customerNameError }
+      : errors;
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
       setClientError(CUSTOMER_FORM_HIGHLIGHT_SUMMARY);
       focusFirstInvalidField(form);
       return;
     }
     persistCheckoutFields(form);
     const data = new FormData(form);
+    if (hasCakeWordingRequest(String(data.get("notes") ?? ""))) {
+      setClientError(CAKE_WORDING_REQUEST_ERROR);
+      document.getElementById("notes")?.focus();
+      return;
+    }
+    if (hasPossibleCakeWording(String(data.get("notes") ?? "")) && data.get("notes_not_cake_wording_ack") !== "yes") {
+      setClientError("Please confirm that your note is not a request for writing on the cake.");
+      document.getElementById("notes")?.focus();
+      return;
+    }
     if (deliveryAckRequired && !deliveryProcessingFeeAcknowledged) {
       setFieldErrors((current) => ({
         ...current,
@@ -548,6 +793,13 @@ export function GuestExtraCheckoutForm({
     }
     setFieldErrors({});
     setClientError(null);
+    const checkoutAttempt = getOrCreateFreshPickCheckoutAttempt();
+    if (!checkoutAttempt) {
+      setClientError("We couldn’t start a secure checkout attempt. Please refresh checkout before submitting.");
+      return;
+    }
+    data.set("checkout_request_id", checkoutAttempt.requestId);
+    data.set("checkout_recovery_digest", checkoutAttempt.recoveryDigest);
     pendingSubmitRef.current = data;
     setConfirmSnapshot(
       buildExtraCheckoutConfirmSnapshot({
@@ -566,6 +818,7 @@ export function GuestExtraCheckoutForm({
         paidAddonCodes,
         complimentaryOptions,
         complimentaryCodes,
+        eligibleWholeCakeQuantity: cart?.items.length ?? 0,
         total: displayedTotal,
         catalogueVoucher,
       }),
@@ -573,8 +826,14 @@ export function GuestExtraCheckoutForm({
     setConfirmOpen(true);
   }
 
-  async function confirmOrder() {
-    if (submitPending || viewState.orderId || navigatedRef.current) return;
+  async function runFreshPickSubmission() {
+    if (
+      submitPending ||
+      submitOutcomeUncertain ||
+      confirmInFlightRef.current ||
+      viewState.orderId ||
+      navigatedRef.current
+    ) return;
     if (!pricingReady || pricedItems.some((item) => item.unitPrice == null)) {
       setConfirmOpen(false);
       setClientError(pricingError || "Fresh Pick pricing is still loading.");
@@ -586,7 +845,11 @@ export function GuestExtraCheckoutForm({
       return;
     }
     const formData = pendingSubmitRef.current;
-    if (!formData) return;
+    if (!formData) {
+      setClientError(CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE);
+      return;
+    }
+    confirmInFlightRef.current = true;
     setActionPending(true);
     const result = await submitGuestOrderAndNavigate({
       formData,
@@ -600,12 +863,78 @@ export function GuestExtraCheckoutForm({
       },
       onCommitted: () => {
         setReceivedShell(true);
+        clearFreshPickCheckoutAttempt();
       },
     });
     if (result.error) {
       setActionState(result);
       setActionPending(false);
+      if (result.outcomeUncertain) {
+        setUncertainSubmitState(true);
+        setUncertainSubmit("fresh-pick");
+      } else {
+        confirmInFlightRef.current = false;
+      }
+    } else if (result.orderId) {
+      clearUncertainSubmit("fresh-pick");
     }
+  }
+
+  function confirmOrder() {
+    return runFreshPickSubmission();
+  }
+
+  async function recoverUncertainOrder() {
+    if (submitPending || confirmInFlightRef.current || !submitOutcomeUncertain) return;
+    let formData = pendingSubmitRef.current;
+    if (!formData) {
+      const form = formRef.current;
+      if (!form) return;
+      persistCheckoutFields(form);
+      formData = new FormData(form);
+      const attempt = getOrCreateFreshPickCheckoutAttempt();
+      if (!attempt) {
+        setActionState({ error: CHECKOUT_OUTCOME_UNCERTAIN_MESSAGE, outcomeUncertain: true });
+        return;
+      }
+      formData.set("checkout_request_id", attempt.requestId);
+      formData.set("checkout_recovery_digest", attempt.recoveryDigest);
+      pendingSubmitRef.current = formData;
+    }
+    confirmInFlightRef.current = true;
+    setActionPending(true);
+    const result = await submitGuestOrderAndNavigate({
+      formData,
+      flow: "extra",
+      action: resolveGuestExtraOrderAction,
+      hrefForOrderId: (orderId) =>
+        `/order/success?order=${orderId}&flow=${FRESH_PICKS_SUCCESS_FLOW}`,
+      replace: (href) => router.replace(href),
+      markNavigated: () => {
+        navigatedRef.current = true;
+      },
+      onCommitted: () => {
+        setReceivedShell(true);
+        clearFreshPickCheckoutAttempt();
+      },
+    });
+    if (result.error) {
+      setActionState(result);
+      setActionPending(false);
+      confirmInFlightRef.current = false;
+    } else if (result.orderId) {
+      clearUncertainSubmit("fresh-pick");
+      clearFreshPickCheckoutAttempt();
+    }
+  }
+
+  function verifyNoOrderAndResume() {
+    clearUncertainSubmit("fresh-pick");
+    clearFreshPickCheckoutAttempt();
+    confirmInFlightRef.current = false;
+    setUncertainSubmitState(false);
+    setActionState(null);
+    setConfirmOpen(false);
   }
 
   function goBackFromConfirm() {
@@ -675,6 +1004,11 @@ export function GuestExtraCheckoutForm({
           type="hidden"
           value={timeStillValid ? selectedTime : ""}
         />
+        <input
+          name="reservation_time"
+          type="hidden"
+          value={resolvedMethod === "dine_in" ? reservationTime : ""}
+        />
         <input name="fulfilment_method" type="hidden" value={resolvedMethod} />
         <input
           name="delivery_processing_fee_ack_json"
@@ -722,7 +1056,9 @@ export function GuestExtraCheckoutForm({
           <p className="text-skyline text-sm">
             {workspaceFulfilmentSectionTitle(resolvedMethod)} ·{" "}
             {formatShortBusinessDate(selectedDate) || selectedDate} ·{" "}
-            {formatPickupTime(timeStillValid ? selectedTime : "")}
+              {resolvedMethod === "dine_in"
+                ? `Reservation ${formatPickupTime(reservationTime)} · cake served ${formatPickupTime(timeStillValid ? selectedTime : "")}`
+                : formatPickupTime(timeStillValid ? selectedTime : "")}
           </p>
           {deliveryCharges ? (
             <div className="space-y-1.5">
@@ -789,24 +1125,7 @@ export function GuestExtraCheckoutForm({
                   : ""
               }
               id="checkout_pickup_date"
-              onChange={(event) => {
-                const next = event.target.value;
-                setSelectedDate(next);
-                const nextMethod = firstAvailableFreshPicksFulfilmentForItems(
-                  next,
-                  fulfilmentMethod,
-                  physicalItemContexts,
-                  fulfilmentContext,
-                );
-                applyFulfilment(nextMethod);
-                const nextSlots = freshPicksMethodAvailabilityForItems(
-                  nextMethod,
-                  next,
-                  physicalItemContexts,
-                  fulfilmentContext,
-                ).slots;
-                setSelectedTime(nextSlots[0]?.value ?? "");
-              }}
+              onChange={(event) => changeSelectedDate(event.target.value)}
               required
               value={selectedDate}
             >
@@ -834,99 +1153,130 @@ export function GuestExtraCheckoutForm({
               hoursSnapshot={hoursSnapshot}
               includeFieldName={false}
               methodStates={methodStates}
-              onChange={(value) => {
-                const next = parseCustomerWebsiteFulfilmentMethod(value);
-                applyFulfilment(next);
-                const nextSlots = freshPicksMethodAvailabilityForItems(
-                  next,
-                  selectedDate,
-                  physicalItemContexts,
-                  fulfilmentContext,
-                ).slots;
-                setSelectedTime(nextSlots[0]?.value ?? "");
-              }}
+              onChange={(value) =>
+                applyFulfilment(parseCustomerWebsiteFulfilmentMethod(value))
+              }
               value={resolvedMethod}
             />
           ) : null}
-          <div className="flex flex-col gap-1.5">
-            <label
-              className="text-ink text-sm font-medium"
-              htmlFor="checkout_pickup_time"
-            >
-              <span data-field-label="">
-                {resolvedMethod === "dine_in"
-                  ? "Dine-in reservation time"
-                  : workspaceScheduleTimeLabel(resolvedMethod)}
-                <RequiredAsterisk />
-              </span>
-            </label>
-            <FormSelect
-              aria-invalid={fieldErrors.checkout_pickup_time ? true : undefined}
-              className={
-                fieldErrors.checkout_pickup_time
-                  ? formStyles.invalidControlClass
-                  : ""
-              }
-              id="checkout_pickup_time"
-              onChange={(event) => setSelectedTime(event.target.value)}
-              required
-              value={timeStillValid ? selectedTime : ""}
-            >
-              <option value="">Choose a time</option>
-              {usableSlots.map((slot) => (
-                <option key={slot.value} value={slot.value}>
-                  {slot.label}
-                </option>
-              ))}
-            </FormSelect>
-            {fieldErrors.checkout_pickup_time ? (
-              <p className={formStyles.fieldErrorClass} role="alert">
-                {fieldErrors.checkout_pickup_time}
-              </p>
-            ) : null}
-          </div>
           {resolvedMethod === "dine_in" ? (
-            <div className="space-y-3">
-              {dineInVenues.length > 0 ? (
-                <DineInVenuePartyFields
-                  fieldErrors={fieldErrors}
-                  markRequired
-                  onChange={(next) => {
-                    setDineInVenue(next.venue);
-                    setAdultCount(next.adultCount);
-                    setKidCount(next.kidCount);
-                    setToddlerCount(next.toddlerCount);
-                    setWhitebirdSplitSeatingAcknowledged(
-                      next.whitebirdSplitSeatingAcknowledged,
-                    );
-                  }}
-                  photos={venuePhotos}
-                  value={{
-                    venue: resolvedVenue || dineInVenue,
-                    adultCount,
-                    kidCount,
-                    toddlerCount,
-                    whitebirdSplitSeatingAcknowledged,
-                  }}
-                  venues={dineInVenues}
-                />
+            <>
+              <PickupSlotFields
+                defaultDate={selectedDate}
+                defaultTime={reservationTime}
+                hoursSnapshot={hoursSnapshot}
+                key={`fresh-pick-checkout-reservation-${selectedDate}`}
+                markRequired
+                onTimeChange={changeReservationTime}
+                includeFieldNames={false}
+                showDate={false}
+                slotsForDate={() => reservationSlots}
+                timeError={fieldErrors.reservation_time}
+                timeHelp="Choose when you would like your table reservation to start."
+                timeId="checkout_reservation_time"
+                timeLabel="Dine-in reservation time"
+                timeName="reservation_time"
+              />
+              <PickupSlotFields
+                defaultDate={selectedDate}
+                defaultTime={timeStillValid ? selectedTime : ""}
+                hoursSnapshot={hoursSnapshot}
+                key={`fresh-pick-checkout-serving-${selectedDate}-${reservationTime}`}
+                markRequired
+                onTimeChange={changeCakeServingTime}
+                includeFieldNames={false}
+                showDate={false}
+                slotsForDate={() => usableSlots}
+                timeError={fieldErrors.pickup_time}
+                timeHelp="Choose when you would like your cake served. It must be within 1 hour of your reservation time."
+                timeId="checkout_pickup_time"
+                timeLabel="Cake serving time"
+                timeName="pickup_time"
+              />
+              {reservationTime && timeStillValid ? (
+                <div className="space-y-3">
+                  {dineInVenues.length > 0 ? (
+                    <DineInVenuePartyFields
+                      fieldErrors={fieldErrors}
+                      markRequired
+                      onChange={(next) => {
+                        setDineInVenue(next.venue);
+                        setAdultCount(next.adultCount);
+                        setKidCount(next.kidCount);
+                        setToddlerCount(next.toddlerCount);
+                        setWhitebirdSplitSeatingAcknowledged(
+                          next.whitebirdSplitSeatingAcknowledged,
+                        );
+                      }}
+                      photos={venuePhotos}
+                      value={{
+                        venue: resolvedVenue,
+                        adultCount,
+                        kidCount,
+                        toddlerCount,
+                        whitebirdSplitSeatingAcknowledged,
+                      }}
+                      venues={dineInVenues}
+                    />
+                  ) : (
+                    <p className="text-ink text-sm" role="status">
+                      No dine-in venue is available for this date and the items in your order.
+                    </p>
+                  )}
+                  <DineInReservationNotesNotice />
+                  <FormField
+                    help="Optional."
+                    htmlFor="reservation_note"
+                    label="Reservation note"
+                  >
+                    <FormTextarea
+                      id="reservation_note"
+                      name="reservation_note"
+                      onChange={(event) => setReservationNote(event.target.value)}
+                      rows={3}
+                      value={reservationNote}
+                    />
+                  </FormField>
+                </div>
               ) : null}
-              <DineInReservationNotesNotice />
-              <FormField
-                help="Optional."
-                htmlFor="reservation_note"
-                label="Reservation note"
+            </>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              <label
+                className="text-ink text-sm font-medium"
+                htmlFor="checkout_pickup_time"
               >
-                <FormTextarea
-                  id="reservation_note"
-                  name="reservation_note"
-                  onChange={(event) => setReservationNote(event.target.value)}
-                  rows={3}
-                  value={reservationNote}
-                />
-              </FormField>
+                <span data-field-label="">
+                  {workspaceScheduleTimeLabel(resolvedMethod)}
+                  <RequiredAsterisk />
+                </span>
+              </label>
+              <FormSelect
+                aria-invalid={fieldErrors.checkout_pickup_time ? true : undefined}
+                className={
+                  fieldErrors.checkout_pickup_time
+                    ? formStyles.invalidControlClass
+                    : ""
+                }
+                id="checkout_pickup_time"
+                onChange={(event) => setSelectedTime(event.target.value)}
+                required
+                value={timeStillValid ? selectedTime : ""}
+              >
+                <option value="">Choose a time</option>
+                {usableSlots.map((slot) => (
+                  <option key={slot.value} value={slot.value}>
+                    {slot.label}
+                  </option>
+                ))}
+              </FormSelect>
+              {fieldErrors.checkout_pickup_time ? (
+                <p className={formStyles.fieldErrorClass} role="alert">
+                  {fieldErrors.checkout_pickup_time}
+                </p>
+              ) : null}
             </div>
-          ) : null}
+          )}
           {resolvedMethod === "delivery" ? (
             <div className="space-y-3">
               <FormCheckbox
@@ -1225,31 +1575,78 @@ export function GuestExtraCheckoutForm({
 
         <section className="space-y-3">
           <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-            Notes
+            Additional Information (Optional)
           </h2>
-          <p className="text-ink text-sm font-medium">Optional notes</p>
-          <p
-            className="text-status-danger text-sm leading-snug font-bold"
-            id="optional-notes-warning"
-          >
-            {OPTIONAL_NOTES_CUSTOMER_WARNING}
+          <p className="text-ink text-sm leading-relaxed">
+            For collection or delivery instructions.
           </p>
-          <FormTextarea
-            aria-describedby="optional-notes-warning"
-            aria-label="Optional notes"
-            defaultValue={cart.notes}
-            id="notes"
-            name="notes"
-            rows={3}
-          />
+          <p className="text-status-danger text-sm leading-relaxed font-bold" id="optional-notes-warning">
+            We do not provide personalised writing or messages on cakes.
+          </p>
+          {notesExpanded || Boolean(notes) ? (
+            <div className="space-y-2">
+              <FormTextarea
+                aria-describedby="optional-notes-warning optional-notes-wording-error"
+                aria-label="Additional information"
+                id="notes"
+                name="notes"
+                placeholder="E.g. Please call upon arrival."
+                rows={3}
+                value={notes}
+                onChange={(event) => {
+                  setNotes(event.target.value);
+                  setNotesNotWordingAcknowledged(false);
+                }}
+              />
+              {hasCakeWordingRequest(notes) ? (
+                <p className="text-status-danger text-sm font-medium" id="optional-notes-wording-error" role="alert">
+                  {CAKE_WORDING_REQUEST_ERROR}
+                </p>
+              ) : hasPossibleCakeWording(notes) ? (
+                <div className="space-y-2" id="optional-notes-wording-error">
+                  <p className="text-status-danger text-sm font-medium" role="alert">
+                    {POSSIBLE_CAKE_WORDING_MESSAGE}
+                  </p>
+                  <label className="text-ink flex items-start gap-2 text-sm">
+                    <input
+                      checked={notesNotWordingAcknowledged}
+                      name="notes_not_cake_wording_ack"
+                      onChange={(event) => setNotesNotWordingAcknowledged(event.target.checked)}
+                      type="checkbox"
+                      value="yes"
+                    />
+                    <span>I confirm this note is not a request for cake writing.</span>
+                  </label>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <button
+              className="text-ink text-sm font-medium underline underline-offset-4"
+              onClick={() => setNotesExpanded(true)}
+              type="button"
+            >
+              Add collection or delivery instructions
+            </button>
+          )}
         </section>
 
-        <FormError message={clientError ?? viewState.error} />
-
+        <FormError message={submitError} />
+        {submitOutcomeUncertain ? (
+          <button
+            className="text-ink min-h-11 text-left text-sm underline underline-offset-4"
+            disabled={submitPending}
+            onClick={recoverUncertainOrder}
+            type="button"
+          >
+            Check this submission safely
+          </button>
+        ) : null}
         <FormActions>
           <FormSubmitButton
             disabled={
               confirmOpen ||
+              submitOutcomeUncertain ||
               (deliveryAckRequired && !deliveryProcessingFeeAcknowledged)
             }
             pending={submitPending || Boolean(viewState.orderId)}
@@ -1270,6 +1667,10 @@ export function GuestExtraCheckoutForm({
           onGoBack={goBackFromConfirm}
           open={confirmOpen}
           pending={submitPending || Boolean(viewState.orderId)}
+          error={submitError}
+          outcomeUncertain={submitOutcomeUncertain}
+          onRecoverUncertain={recoverUncertainOrder}
+          onOutcomeVerifiedNoOrder={verifyNoOrderAndResume}
           snapshot={confirmSnapshot}
         />
       ) : null}

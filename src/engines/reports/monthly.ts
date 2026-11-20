@@ -46,6 +46,18 @@ export type ReportOrder = {
   refunds: ReportRefund[];
 };
 
+/** Preserve Other as the category while carrying its saved detail into reports. */
+export function reportOrderSourceLabel(
+  source: string | null | undefined,
+  sourceOther: string | null | undefined,
+): string {
+  const category = source?.trim() || "other";
+  if (category === "other" && sourceOther?.trim()) {
+    return `Other — ${sourceOther.trim()}`;
+  }
+  return category === "kin" ? "Kin" : category;
+}
+
 const cents = (value: number) => Math.round(value * 100);
 const money = (value: number) => Math.round(value) / 100;
 const roundedCurrency = (value: number) => cents(value) / 100;

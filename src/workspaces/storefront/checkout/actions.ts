@@ -13,6 +13,7 @@ import {
   type DineInReservationRpcPayload,
 } from "@/engines/orders/dine-in-party";
 import { earliestPickupDateYmd } from "@/engines/business-calendar/pickup-slots";
+import { CAKE_WORDING_REQUEST_ERROR, hasCakeWordingRequest, hasPossibleCakeWording } from "@/engines/orders/cake-wording-note-guard";
 import { loadCustomerCartDateCapacity } from "@/workspaces/storefront/checkout/capacity-availability";
 import { customerSelectedDateInvalidatedMessage } from "@/engines/preorder/validate";
 import {
@@ -28,7 +29,6 @@ import {
   customerComplimentaryMutationPayload,
   customerPaidAddonMutationPayload,
   emptyCustomerPreorderSelections,
-  isCustomerPaidAddonCode,
   selectCustomerComplimentaryOptions,
   selectCustomerPaidAddonOptions,
   type CustomerComplimentaryOption,
@@ -83,7 +83,10 @@ import {
   parseDeliveryProcessingFeeAckPayload,
 } from "@/engines/orders/delivery-processing-fee-ack";
 import { setGuestPreorderReceiptCookie } from "@/workspaces/storefront/checkout/receipt";
-import { customerNameValidationError } from "@/engines/orders/customer-name";
+import {
+  customerNameValidationError,
+  formatNewOrderPersonName,
+} from "@/engines/orders/customer-name";
 import {
   acceptPerfCorrelationId,
   logPerf,
@@ -92,10 +95,12 @@ import {
   withDevCheckoutPerf,
   type CheckoutServerPerf,
 } from "@/lib/perf/dev-only-server";
+import { isDefinitivePostgresFailure } from "@/workspaces/storefront/checkout/submit-action-outcome.mjs";
 
 export type CheckoutState = {
   error: string | null;
   orderId?: string;
+  outcomeUncertain?: boolean;
   perf?: CheckoutServerPerf;
 };
 
@@ -214,6 +219,7 @@ function parsePaidAddonOptions(rows: unknown): CustomerPaidAddonOption[] {
         name: String(item.name ?? ""),
         unitPrice: Number(item.unitPrice ?? 0),
         financialShorthand: String(item.financialShorthand ?? ""),
+        maxQuantity: Number(item.maxQuantity ?? 1),
         sortOrder: Number(item.sortOrder ?? 0),
       };
     }),
@@ -222,6 +228,7 @@ function parsePaidAddonOptions(rows: unknown): CustomerPaidAddonOption[] {
 
 function complimentaryPayloadFromForm(
   selections: CustomerPreorderSelections,
+  eligibleWholeCakeQuantity: number,
 ) {
   const options = selections.complimentaryCodes
     .map((code, index) => ({
@@ -234,12 +241,14 @@ function complimentaryPayloadFromForm(
   return customerComplimentaryMutationPayload({
     options,
     selectedCodes: selections.complimentaryCodes,
+    eligibleWholeCakeQuantity,
   });
 }
 
 function paidAddonPayloadFromForm(selections: CustomerPreorderSelections) {
   const options = selections.paidAddonCodes
-    .filter((code) => isCustomerPaidAddonCode(code))
+    .map((code) => String(code).trim())
+    .filter(Boolean)
     .map((code, index) => ({
       code,
       name: code,
@@ -314,6 +323,12 @@ async function submitGuestPreorderActionBody(
     String(formData.get("fulfilment_method") ?? ""),
   );
   const notes = String(formData.get("notes") ?? "").trim();
+  if (hasCakeWordingRequest(notes)) {
+    return { error: CAKE_WORDING_REQUEST_ERROR };
+  }
+  if (hasPossibleCakeWording(notes) && formData.get("notes_not_cake_wording_ack") !== "yes") {
+    return { error: "Please confirm that your note is not a request for writing on the cake." };
+  }
   const items = consolidateItems(parseItems(formData));
   const persistOptions =
     String(formData.get("preorder_options_ready") ?? "") === "1";
@@ -327,6 +342,7 @@ async function submitGuestPreorderActionBody(
   if (nameError) {
     return { error: nameError };
   }
+  const formattedCustomerName = formatNewOrderPersonName(customerName);
   if (includeReceipt === null) {
     return {
       error: "Please choose whether you would like a copy of the receipt.",
@@ -391,8 +407,10 @@ async function submitGuestPreorderActionBody(
       String(formData.get("same_as_customer") ?? "") === "true";
     deliveryDraft = {
       recipientName: sameAsCustomer
-        ? customerName
-        : String(formData.get("recipient_name") ?? ""),
+        ? formattedCustomerName
+        : formatNewOrderPersonName(
+            String(formData.get("recipient_name") ?? ""),
+          ),
       recipientPhone: sameAsCustomer
         ? phone
         : String(formData.get("recipient_phone") ?? ""),
@@ -429,7 +447,7 @@ async function submitGuestPreorderActionBody(
   if (availability.error) return { error: availability.error };
 
   const rpcArgs: Record<string, unknown> = {
-    p_customer_name: customerName,
+    p_customer_name: formattedCustomerName,
     p_phone: phone,
     p_email: null,
     p_pickup_date: pickupDate,
@@ -449,7 +467,10 @@ async function submitGuestPreorderActionBody(
     p_dine_in: fulfilmentMethod === "dine_in" ? dineInPayload : null,
   };
   if (persistOptions) {
-    rpcArgs.p_complimentary = complimentaryPayloadFromForm(selections);
+    rpcArgs.p_complimentary = complimentaryPayloadFromForm(
+      selections,
+      items.reduce((total, item) => total + item.quantity, 0),
+    );
     rpcArgs.p_paid_addons = paidAddonPayloadFromForm(selections);
   }
 
@@ -475,12 +496,20 @@ async function submitGuestPreorderActionBody(
     formData.get("catalogue_voucher_id") ?? "",
   ).trim();
   const clientStarted = performance.now();
-  const supabase = await createClient();
+  let supabase: Awaited<ReturnType<typeof createClient>>;
+  try {
+    supabase = await createClient();
+  } catch {
+    return {
+      error:
+        "We couldn’t verify the order details just now, so your order was not submitted. Please try again shortly.",
+    };
+  }
   logPerf("CHECKOUT_SUBMIT", "createClient", performance.now() - clientStarted);
   let usedCombinedSubmit = false;
   const rpcStarted = performance.now();
   let data: unknown;
-  let error: { message: string } | null = null;
+  let error: { message: string; code?: string } | null = null;
   if (catalogueVoucherId) {
     const combined = await supabase.rpc(
       "submit_guest_preorder_with_catalogue_voucher",
@@ -530,6 +559,13 @@ async function submitGuestPreorderActionBody(
   }
 
   if (error) {
+    if (!isDefinitivePostgresFailure(error.code)) {
+      return {
+        error:
+          "We couldn’t confirm whether your order was placed. Please don’t submit again yet. Contact Whitebird so the team can check for your order.",
+        outcomeUncertain: true,
+      };
+    }
     if (/fully booked/i.test(error.message)) {
       return {
         error: customerSelectedDateInvalidatedMessage(
@@ -552,7 +588,10 @@ async function submitGuestPreorderActionBody(
       : "";
 
   if (!orderId) {
-    return { error: "Order was created but could not be confirmed." };
+    return {
+      error: "We couldn’t confirm whether your order was placed. Please don’t submit again yet. Contact Whitebird so the team can check for your order.",
+      outcomeUncertain: true,
+    };
   }
 
   const cookieStarted = performance.now();
@@ -581,7 +620,7 @@ async function submitGuestPreorderActionBody(
       { voucherApply: "executed" },
     );
     if (applied.error) {
-      return { error: applied.error };
+      return { error: applied.error, orderId };
     }
   } else if (catalogueVoucherId) {
     logPerfSkipped("CHECKOUT_SUBMIT", "applyGuestCatalogueVoucherAction", {
@@ -611,6 +650,7 @@ type StorefrontClient = Awaited<ReturnType<typeof createClient>>;
 async function loadCustomerPreorderOptions(
   supabase: StorefrontClient,
   collectionId: string,
+  fulfilmentDate: string,
 ): Promise<{
   complimentary: CustomerComplimentaryOption[];
   paidAddons: CustomerPaidAddonOption[];
@@ -624,38 +664,21 @@ async function loadCustomerPreorderOptions(
   try {
     const { data, error } = await supabase.rpc(
       "storefront_customer_preorder_options",
-      { p_collection_id: collectionId },
+      { p_collection_id: collectionId, p_fulfilment_date: fulfilmentDate },
     );
 
-    console.error("[CHECKOUT OPTION DEBUG] RPC result", {
-      collectionId,
-      error: error
-        ? {
-            message: error.message,
-            code: error.code,
-            details: error.details,
-            hint: error.hint,
-          }
-        : null,
-      data,
-      dataType: typeof data,
-      isArray: Array.isArray(data),
-    });
-
-    if (error || data == null) return empty;
+    if (error) {
+      console.error("[CHECKOUT OPTIONS] RPC failed", {
+        code: error.code ?? null,
+        message: error.message.slice(0, 240),
+      });
+      return empty;
+    }
+    if (data == null) return empty;
 
     const payload = data as Record<string, unknown>;
     const complimentary = parseComplimentaryOptions(payload.complimentary);
     const paidAddons = parsePaidAddonOptions(payload.paidAddons);
-
-    console.error("[CHECKOUT OPTION DEBUG] Parsed result", {
-      collectionId,
-      complimentaryCount: complimentary.length,
-      complimentary,
-      paidAddonCount: paidAddons.length,
-      paidAddons,
-      ready: true,
-    });
 
     return {
       complimentary,
@@ -721,7 +744,7 @@ export async function loadCheckoutPickupOffer(
         );
   const optionResult = includeOptions && supabase
     ? await timeCheckoutDateStage("options", () =>
-        loadCustomerPreorderOptions(supabase, collection.id),
+        loadCustomerPreorderOptions(supabase, collection.id, key),
       )
     : {
         complimentary: [] as CustomerComplimentaryOption[],
@@ -854,19 +877,32 @@ export async function loadCartDateCapacityAvailability(input: {
     quantity: number;
   }>;
 }): Promise<{
-  fullyBookedDates: string[];
-  waitingListDates: string[];
-  blockingCakeNamesByDate: Record<string, string[]>;
-  waitingListLineKeysByDate: Record<string, string[]>;
-}> {
+  ok: true;
+  snapshot: {
+    availabilityConfirmed: boolean;
+    showAdvisoryFailureNotice: boolean;
+    fullyBookedDates: string[];
+    waitingListDates: string[];
+    blockingCakeNamesByDate: Record<string, string[]>;
+    waitingListLineKeysByDate: Record<string, string[]>;
+  };
+} | { ok: false }> {
   try {
-    return await loadCustomerCartDateCapacity(input);
+    return { ok: true, snapshot: await loadCustomerCartDateCapacity(input) };
   } catch {
+    // This read is advisory. The protected checkout RPC remains authoritative;
+    // failure is represented as unconfirmed and does not masquerade as full or
+    // available or prevent a legitimate checkout attempt.
     return {
-      fullyBookedDates: [],
-      waitingListDates: [],
-      blockingCakeNamesByDate: {},
-      waitingListLineKeysByDate: {},
+      ok: true,
+      snapshot: {
+        availabilityConfirmed: false,
+        showAdvisoryFailureNotice: true,
+        fullyBookedDates: [],
+        waitingListDates: [],
+        blockingCakeNamesByDate: {},
+        waitingListLineKeysByDate: {},
+      },
     };
   }
 }

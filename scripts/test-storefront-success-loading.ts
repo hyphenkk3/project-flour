@@ -81,7 +81,11 @@ assert.match(extraFormSrc, /onCommitted: \(\) => \{\s*setReceivedShell\(true\);/
 assert.match(extraFormSrc, /<StorefrontSuccessLoading \/>/);
 assert.match(
   navigateSrc,
-  /if \(result\.error \|\| !result\.orderId\) \{\s*return result;\s*\}\s*input\.markNavigated\(\);\s*input\.onCommitted\?\.\(\);/,
+  /if \(result\.orderId\) \{[\s\S]*?input\.markNavigated\(\);\s*input\.onCommitted\?\.\(\);/,
+);
+assert.match(
+  navigateSrc,
+  /if \(result\.error \|\| result\.outcomeUncertain\) \{\s*return result;\s*\}/,
 );
 assert.match(
   navigateSrc,

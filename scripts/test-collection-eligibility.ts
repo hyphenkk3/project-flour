@@ -14,6 +14,7 @@ import {
   isActiveOnCollectionDineInReadyBoard,
   isActiveOnCollectionReadyQueue,
   isCollectionMarkCollectedEligible,
+  isCollectionPaymentEligibleForHandoff,
   isCollectionUndoCollectedEligible,
   isVisibleOnCollectionDetail,
 } from "@/workspaces/collection/eligibility";
@@ -29,6 +30,26 @@ const base = {
 };
 
 assert.equal(isActiveOnCollectionBoard(base), true);
+assert.equal(
+  isActiveOnCollectionBoard({
+    ...base,
+    status: "submitted",
+    readyAt: null,
+    readyForCollection: true,
+  }),
+  true,
+  "physically ready submitted order appears in Collection independent of payment",
+);
+assert.equal(
+  isActiveOnCollectionBoard({
+    ...base,
+    status: "awaiting_payment",
+    readyAt: null,
+    readyForCollection: true,
+  }),
+  true,
+  "physically ready awaiting-payment order appears in Collection",
+);
 assert.equal(
   isActiveOnCollectionBoard({ ...base, fulfilmentMethod: "delivery" }),
   false,
@@ -54,6 +75,26 @@ assert.equal(
 assert.equal(
   isActiveOnCollectionBoard({ ...base, status: "cancelled" as never }),
   false,
+);
+assert.equal(
+  isActiveOnCollectionBoard({
+    ...base,
+    status: "cancelled" as never,
+    readyAt: null,
+    readyForCollection: true,
+  }),
+  false,
+  "physical readiness does not restore a cancelled order to the queue",
+);
+assert.equal(
+  isActiveOnCollectionBoard({
+    ...base,
+    readyAt: null,
+    readyForCollection: true,
+    pickedUpAt: "2026-10-23T02:00:00Z",
+  }),
+  false,
+  "physical readiness does not return an already-collected order to the queue",
 );
 
 const deliveryReady = {
@@ -166,6 +207,44 @@ assert.equal(
   }),
   true,
   "AP Ready may Collect (payment independent)",
+);
+assert.equal(
+  isCollectionPaymentEligibleForHandoff({
+    status: "submitted",
+    paymentStatus: "unpaid",
+  }),
+  false,
+  "display readiness does not enable handoff for an unpaid order",
+);
+assert.equal(
+  isCollectionPaymentEligibleForHandoff({
+    status: "paid",
+    paymentStatus: "paid",
+  }),
+  true,
+  "paid order retains existing handoff UI eligibility",
+);
+assert.equal(
+  collectionHandoffSurface({
+    presentation: "ready",
+    canMarkCollected: true,
+    canUndoCollected: true,
+    markCollectedEligible:
+      isCollectionPaymentEligibleForHandoff({
+        status: "submitted",
+        paymentStatus: "unpaid",
+      }) &&
+      isCollectionMarkCollectedEligible({
+        readyAt: null,
+        readyForCollection: true,
+        pickedUpAt: null,
+        fulfilmentMethod: "pickup",
+        status: "submitted",
+      }),
+    undoCollectedEligible: false,
+  }).canMarkCollected,
+  false,
+  "Collection can display unpaid physical readiness without showing handoff action",
 );
 assert.equal(
   isCollectionMarkCollectedEligible({

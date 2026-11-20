@@ -16,6 +16,7 @@ import {
   ORDER_DETAILS_NOTICE_BODY,
   ORDER_DETAILS_NOTICE_MARK,
   ORDER_DETAILS_NOTICE_TITLE,
+  ORDER_DETAILS_IMAGE_LOAD_TIMEOUT_MS,
   ORDER_DETAILS_PNG_HEIGHT,
   ORDER_DETAILS_PNG_WIDTH,
   buildOrderDetailsCardModel,
@@ -30,7 +31,9 @@ import {
   orderDetailsNoticeBody,
   orderDetailsNoticeMark,
   preloadOrderDetailsImages,
+  resolveOrderDetailsReceiptForSave,
   resolveOrderDetailsSavePath,
+  runOrderDetailsSaveAttempt,
   shareOrDownloadOrderDetailsImage,
   wrapCanvasText,
 } from "@/workspaces/storefront/checkout/order-details-card";
@@ -378,13 +381,26 @@ assert.equal(
   ).join("|"),
   "11 September 2026 · 2:00 PM|Pickup",
 );
+const unbroken = "RecipientWithoutSpaces".repeat(8);
+const unbrokenLines = wrapCanvasText((text) => text.length * 8, unbroken, 96);
+assert.ok(unbrokenLines.length > 1);
+assert.equal(unbrokenLines.join(""), unbroken);
+assert.ok(unbrokenLines.every((line) => line.length * 8 <= 96));
 
-type DrawnText = { text: string; x: number; y: number };
+type DrawnText = {
+  text: string;
+  x: number;
+  y: number;
+  left: number;
+  right: number;
+};
 
 function createMockCtx(): {
   ctx: CanvasRenderingContext2D;
   texts: DrawnText[];
   drawImages: Array<{ x: number; y: number; width: number; height: number }>;
+  roundRects: Array<{ x: number; y: number; width: number; height: number }>;
+  canvas: { width: number; height: number };
 } {
   const texts: DrawnText[] = [];
   const drawImages: Array<{
@@ -393,8 +409,17 @@ function createMockCtx(): {
     width: number;
     height: number;
   }> = [];
+  const roundRects: Array<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }> = [];
+  const canvas = { width: ORDER_DETAILS_PNG_WIDTH, height: ORDER_DETAILS_PNG_HEIGHT };
   let textAlign = "left";
+  let letterSpacing = "0px";
   const ctx = {
+    canvas,
     save() {},
     restore() {},
     fillRect() {},
@@ -406,7 +431,9 @@ function createMockCtx(): {
     lineTo() {},
     quadraticCurveTo() {},
     rect() {},
-    roundRect() {},
+    roundRect(x: number, y: number, width: number, height: number) {
+      roundRects.push({ x, y, width, height });
+    },
     stroke() {},
     drawImage(
       _image: unknown,
@@ -429,16 +456,26 @@ function createMockCtx(): {
       });
     },
     fillText(text: string, x: number, y: number) {
-      texts.push({ text, x, y });
+      const spacing = Number.parseFloat(letterSpacing) || 0;
+      const width =
+        text.length * 8 + Math.max(0, text.length - 1) * spacing;
+      const left = textAlign === "right" ? x - width : x;
+      texts.push({ text, x, y, left, right: left + width });
     },
     measureText(text: string) {
-      return { width: text.length * 8 };
+      const spacing = Number.parseFloat(letterSpacing) || 0;
+      return { width: text.length * 8 + Math.max(0, text.length - 1) * spacing };
     },
     font: "",
     fillStyle: "",
     strokeStyle: "",
     lineWidth: 1,
-    letterSpacing: "0px",
+    get letterSpacing() {
+      return letterSpacing;
+    },
+    set letterSpacing(value: string) {
+      letterSpacing = value;
+    },
     get textAlign() {
       return textAlign;
     },
@@ -447,7 +484,13 @@ function createMockCtx(): {
     },
     textBaseline: "alphabetic",
   };
-  return { ctx: ctx as unknown as CanvasRenderingContext2D, texts, drawImages };
+  return {
+    ctx: ctx as unknown as CanvasRenderingContext2D,
+    texts,
+    drawImages,
+    roundRects,
+    canvas,
+  };
 }
 
 function reconstructedLines(texts: DrawnText[]): Array<{ y: number; text: string }> {
@@ -481,14 +524,16 @@ function assertReceiptLayout(
     notes?: string | null;
   },
 ) {
-  const { ctx, texts } = createMockCtx();
+  const { ctx, texts, canvas } = createMockCtx();
   const cardModel = buildOrderDetailsCardModel(receipt);
   const size = drawOrderDetailsCard(ctx, cardModel);
   assert.equal(size.width, 1080);
   assert.equal(size.height, 1800);
+  assert.equal(canvas.height, size.height);
   for (const entry of texts) {
-    assert.ok(entry.y > 0 && entry.y < 1800, `clipped y=${entry.y} "${entry.text}"`);
-    assert.ok(entry.x >= 0 && entry.x <= 1080, `overflow x=${entry.x} "${entry.text}"`);
+    assert.ok(entry.y > 0 && entry.y < size.height, `clipped y=${entry.y} "${entry.text}"`);
+    assert.ok(entry.left >= 0, `left overflow x=${entry.left} "${entry.text}"`);
+    assert.ok(entry.right <= size.width, `right overflow x=${entry.right} "${entry.text}"`);
   }
   const lines = reconstructedLines(texts);
   const received = lines.filter((line) => line.text === "ORDER RECEIVED");
@@ -565,6 +610,69 @@ assertReceiptLayout(sampleReceipt(), {
   complimentary: ["Candle"],
   notes: "Write Happy Birthday on the card.",
 });
+{
+  const longCustomer = "SyntheticRecipientWithoutSpaces".repeat(12);
+  const longPhone = "0123456789".repeat(18);
+  const longCakeName = "ChocolateStrawberryRecipientSpecial".repeat(10);
+  const longNoteToken = "UnbrokenCustomerNoteWithoutSpaces".repeat(18);
+  const longNote = Array.from(
+    { length: 7 },
+    (_, index) => `Delivery note ${index + 1}: ${"Please leave the package safely ".repeat(16)}${longNoteToken}`,
+  ).join("\n");
+  const longReceipt = sampleReceipt({
+    guestName: longCustomer,
+    guestPhone: longPhone,
+    notes: longNote,
+    items: [
+      {
+        key: "long-cake",
+        cakeId: "synthetic-long-cake",
+        cakeSizeId: "synthetic-size",
+        cakeName: longCakeName,
+        sizeLabel: '6"',
+        quantity: 1,
+        unitPrice: 135,
+        imageUrl: null,
+        imageAlt: null,
+      },
+    ],
+  });
+  const { ctx, texts, roundRects, canvas } = createMockCtx();
+  const model = {
+    ...buildOrderDetailsCardModel(longReceipt),
+    noticeTitle: "ImportantNoticeWithoutSpaces".repeat(12),
+    noticeBody: `Important customer notice ${longNoteToken} ${"please read carefully ".repeat(35)}`,
+  };
+  const size = drawOrderDetailsCard(ctx, model);
+  assert.ok(size.height > ORDER_DETAILS_PNG_HEIGHT);
+  assert.equal(canvas.height, size.height);
+  assert.equal(size.width, ORDER_DETAILS_PNG_WIDTH);
+  assert.ok(size.height < 32_767);
+  for (const entry of texts) {
+    assert.ok(entry.left >= 0, `long text left-clipped: ${entry.text}`);
+    assert.ok(
+      entry.right <= size.width,
+      `long text right-clipped: ${entry.text} at ${entry.right}/${size.width}`,
+    );
+    assert.ok(entry.y < size.height, `long text vertically clipped: ${entry.text}`);
+  }
+  const noticeBox = roundRects[0];
+  assert.ok(noticeBox, "notice border is recorded in the export layout");
+  const noticeText = texts.filter(
+    (entry) => entry.y >= noticeBox.y && entry.y <= noticeBox.y + noticeBox.height,
+  );
+  assert.ok(noticeText.length > 4, "long notice title/body wrap into the notice box");
+  assert.ok(noticeText.every((entry) => entry.left >= noticeBox.x + 28));
+  assert.ok(noticeText.every((entry) => entry.right <= noticeBox.x + noticeBox.width - 28));
+  const rendered = reconstructedLines(texts)
+    .map((line) => line.text)
+    .join("\n");
+  assert.ok(rendered.replace(/\n/g, "").includes(longCustomer));
+  assert.ok(rendered.replace(/\n/g, "").includes(longPhone));
+  assert.ok(rendered.replace(/\n/g, "").includes(longCakeName));
+  assert.ok(rendered.replace(/\n/g, "").includes(longNoteToken));
+  assert.match(rendered, /Delivery note 7/);
+}
 assertReceiptLayout(octoberVoucherReceipt, {
   cakes: ["Earl Grey Pistachio"],
   sizes: ['6"'],
@@ -1035,6 +1143,7 @@ function pngBlob(): Blob {
 }
 
 async function runShareTests() {
+  assert.ok(ORDER_DETAILS_IMAGE_LOAD_TIMEOUT_MS <= 8_000);
   assert.equal(
     resolveOrderDetailsSavePath({
       isSecureContext: false,
@@ -1329,6 +1438,65 @@ async function runShareTests() {
   assert.equal(loaded.has("https://photos.example/ok.jpg"), true);
   assert.equal(loaded.has("https://photos.example/fail.jpg"), false);
   assert.equal(loaded.size, 1);
+
+  let timedOutSignal: AbortSignal | undefined;
+  const stalledImages = await preloadOrderDetailsImages(
+    ["https://photos.example/stalled.jpg"],
+    (_url, signal) => {
+      timedOutSignal = signal;
+      return new Promise<CanvasImageSource>(() => undefined);
+    },
+    5,
+  );
+  assert.equal(stalledImages.size, 0, "a stalled remote image is omitted");
+  assert.equal(timedOutSignal?.aborted, true, "timed-out image loads are aborted");
+
+  const originalReceipt = sampleReceipt();
+  const photoEnrichedReceipt = { ...originalReceipt, notes: "photo-enriched" };
+  assert.equal(
+    await resolveOrderDetailsReceiptForSave({
+      current: originalReceipt,
+      resolve: async () => photoEnrichedReceipt,
+      timeoutMs: 5,
+    }),
+    photoEnrichedReceipt,
+  );
+  assert.equal(
+    await resolveOrderDetailsReceiptForSave({
+      current: originalReceipt,
+      resolve: () => new Promise<GuestPreorderReceipt>(() => undefined),
+      timeoutMs: 5,
+    }),
+    originalReceipt,
+    "an unresolved optional photo lookup falls back to the authorized receipt",
+  );
+  assert.equal(
+    await resolveOrderDetailsReceiptForSave({
+      current: originalReceipt,
+      resolve: async () => {
+        throw new Error("photo lookup failed");
+      },
+      timeoutMs: 5,
+    }),
+    originalReceipt,
+  );
+
+  let busy = false;
+  const busyTransitions: boolean[] = [];
+  await assert.rejects(
+    runOrderDetailsSaveAttempt(
+      async () => {
+        throw new Error("synthetic canvas export failure");
+      },
+      (nextBusy) => {
+        busy = nextBusy;
+        busyTransitions.push(nextBusy);
+      },
+    ),
+    /synthetic canvas export failure/,
+  );
+  assert.deepEqual(busyTransitions, [true, false]);
+  assert.equal(busy, false, "failed export returns Save to its retryable state");
 
   assert.equal(
     isIosTouchDevice({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)" }),

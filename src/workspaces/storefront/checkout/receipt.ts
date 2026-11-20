@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/admin";
 import { getEffectiveAdjustments } from "@/engines/orders/promotions";
 import { calculateOrderSettlement } from "@/engines/orders/settlement";
 import { calculateCommercialSubtotal } from "@/engines/orders/totals";
+import { effectiveReceiptProcessingFeeAmount } from "@/engines/orders/receipt-amount-presentation";
 import { isMissingCakePhotoSchema } from "@/workspaces/library/cakes/photo-storage";
 import {
   mapStorefrontCakePhoto,
@@ -60,6 +61,11 @@ export type GuestPreorderReceipt = {
   guestCount: number | null;
   dineInVenue: "hyphen" | "whitebird" | null;
   reservationTime: string | null;
+  /** Persisted Delivery quote state; null for non-Delivery or missing legacy detail. */
+  deliveryFeeStatus?: "not_set" | "quoted" | "quoted_waived" | null;
+  deliveryFeeQuotedAmount?: number | null;
+  /** Effective processing-fee adjustment included in this receipt's settlement. */
+  processingFeeAmount?: number | null;
   /** Commercial cakes + paid add-ons before effective adjustments. */
   subtotal: number;
   adjustments: GuestPreorderReceiptAdjustment[];
@@ -152,6 +158,16 @@ type ReceiptOrderRow = {
   fulfilment_method?: string | null;
   extra_stock_id?: string | null;
   created_at?: string | null;
+  order_delivery_details?:
+    | {
+        delivery_fee_status?: string | null;
+        delivery_fee_quoted_amount?: number | string | null;
+      }
+    | {
+        delivery_fee_status?: string | null;
+        delivery_fee_quoted_amount?: number | string | null;
+      }[]
+    | null;
   order_dine_in_reservations?:
     | {
         guest_count?: number | null;
@@ -207,6 +223,7 @@ function orderReceiptSelect(): string {
         extra_stock_id,
         created_at,
         customer_id,
+        order_delivery_details ( delivery_fee_status, delivery_fee_quoted_amount ),
         order_dine_in_reservations ( guest_count, venue, reservation_time ),
         order_items (
           id,
@@ -431,6 +448,23 @@ export async function loadGuestPreorderReceipt(
     const dineInVenue =
       venueRaw === "hyphen" || venueRaw === "whitebird" ? venueRaw : null;
     const notesRaw = String(order.customer_notes ?? "").trim();
+    const deliveryRel = order.order_delivery_details;
+    const deliveryDetails = Array.isArray(deliveryRel)
+      ? deliveryRel[0]
+      : deliveryRel;
+    const rawDeliveryFeeStatus = String(
+      deliveryDetails?.delivery_fee_status ?? "",
+    );
+    const deliveryFeeStatus =
+      rawDeliveryFeeStatus === "not_set" ||
+      rawDeliveryFeeStatus === "quoted" ||
+      rawDeliveryFeeStatus === "quoted_waived"
+        ? rawDeliveryFeeStatus
+        : null;
+    const deliveryFeeQuotedAmount =
+      deliveryDetails?.delivery_fee_quoted_amount == null
+        ? null
+        : Number(deliveryDetails.delivery_fee_quoted_amount);
     const adjustmentRows = adjustmentsResult.data;
     const adjustments = getEffectiveAdjustments(
       (Array.isArray(adjustmentRows) ? adjustmentRows : []).map((row) => ({
@@ -487,6 +521,14 @@ export async function loadGuestPreorderReceipt(
       reservationTime:
         fulfilmentMethod === "dine_in"
           ? String(reservation?.reservation_time ?? "").slice(0, 5) || null
+          : null,
+      deliveryFeeStatus:
+        fulfilmentMethod === "delivery" ? deliveryFeeStatus : null,
+      deliveryFeeQuotedAmount:
+        fulfilmentMethod === "delivery" ? deliveryFeeQuotedAmount : null,
+      processingFeeAmount:
+        fulfilmentMethod === "delivery"
+          ? effectiveReceiptProcessingFeeAmount(adjustments)
           : null,
       subtotal: calculateCommercialSubtotal({
         items: items.map((item) => ({

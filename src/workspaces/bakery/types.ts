@@ -44,6 +44,17 @@ export type BakeryPaidAddonLine = {
   messages: BakeryPaidAddonMessage[];
 };
 
+export type BakeryAssignedFreshPickStock = {
+  id: string;
+  cakeName: string;
+  sizeLabel: string;
+  lifecycle: string;
+  soldAt: string | null;
+  cutIntoSlicesAt: string | null;
+  readyForCollection: boolean;
+  legacyLinkConflict: boolean;
+};
+
 /** Board card + shared identity for list rows. */
 export type BakeryBoardOrder = {
   id: string;
@@ -52,6 +63,8 @@ export type BakeryBoardOrder = {
   pickupDate: string;
   pickupTime: string;
   fulfilmentMethod: StorefrontOrderFulfilmentMethod;
+  extraStockId: string | null;
+  dineInReservationDate: string | null;
   status: GuestOrderStatus;
   customerNotes: string | null;
   needsBakeryAttention: boolean;
@@ -61,9 +74,11 @@ export type BakeryBoardOrder = {
   readyAt: string | null;
   pickedUpAt: string | null;
   outForDeliveryAt: string | null;
+  deliveredAt: string | null;
   includeReceipt: boolean;
   cakeLines: BakeryCakeLine[];
   freshPickAllocation: BakeryAllocationSummary;
+  assignedFreshPickStocks: BakeryAssignedFreshPickStock[];
   complimentaryItems: BakeryComplimentaryLine[];
   paidAddons: BakeryPaidAddonLine[];
 };

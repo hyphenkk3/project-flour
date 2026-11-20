@@ -14,15 +14,18 @@ const ITEMS = [
   { href: "/library/customer-qa", label: "Customer Q&A" },
 ] as const;
 
-export function LibraryNav() {
+export function LibraryNav({ showOwnerAddons = false }: { showOwnerAddons?: boolean }) {
   const pathname = usePathname();
+  const items = showOwnerAddons
+    ? [...ITEMS, { href: "/library/addons", label: "Complimentary & paid add-ons" }]
+    : ITEMS;
 
   return (
     <nav
       aria-label="Master Library sections"
       className="border-fog mb-6 flex flex-wrap gap-1 border-b"
     >
-      {ITEMS.map((item) => {
+      {items.map((item) => {
         const active =
           pathname === item.href || pathname.startsWith(`${item.href}/`);
 

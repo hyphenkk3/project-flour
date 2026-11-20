@@ -7,6 +7,9 @@
 import { createServiceClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
+import { listBakeryBoardOrdersForPickupRange } from "@/workspaces/bakery/queries";
+import { isBakeryOrderReadyForCollection } from "@/workspaces/bakery/eligibility";
+import type { BakeryBoardOrder } from "@/workspaces/bakery/types";
 import {
   COLLECTION_ACTIVE_PREORDER_STATUSES,
   COLLECTION_HISTORY_LOOKBACK_DAYS,
@@ -46,6 +49,7 @@ function rowPassesPickupBoard(
     status: row.status,
     fulfilmentMethod: row.fulfilment_method,
     readyAt: row.ready_at,
+    readyForCollection: row.derived_ready_for_collection,
     pickedUpAt: row.picked_up_at,
   });
 }
@@ -81,6 +85,7 @@ function rowPassesReadyQueue(
     status: row.status,
     fulfilmentMethod: row.fulfilment_method,
     readyAt: row.ready_at,
+    readyForCollection: row.derived_ready_for_collection,
     pickedUpAt: row.picked_up_at,
     deliveredAt: row.delivered_at,
   });
@@ -148,8 +153,35 @@ function rowPassesDetail(
     status: row.status,
     fulfilmentMethod: row.fulfilment_method,
     readyAt: row.ready_at,
+    readyForCollection: row.derived_ready_for_collection,
     pickedUpAt: row.picked_up_at,
     deliveredAt: row.delivered_at,
+  });
+}
+
+async function applyPhysicalReadiness(
+  rows: CollectionOrderRow[],
+  selectedPickupDate: string,
+): Promise<CollectionOrderRow[]> {
+  const bakeryOrders = await listBakeryBoardOrdersForPickupRange(
+    selectedPickupDate,
+    selectedPickupDate,
+    { includePickedUp: rows.some((row) => Boolean(row.picked_up_at)) },
+  );
+  const byId = new Map<string, BakeryBoardOrder>(
+    bakeryOrders.map((order) => [order.id, order]),
+  );
+  return rows.map((row) => {
+    const order = byId.get(row.id);
+    return {
+      ...row,
+      derived_ready_for_collection: isBakeryOrderReadyForCollection({
+        order: order ?? null,
+        readyAt: row.ready_at,
+        status: row.status,
+        paymentStatus: row.payment_status,
+      }),
+    };
   });
 }
 
@@ -170,7 +202,6 @@ export async function listCollectionPickupReadyOrders(
     .is("customer_id", null)
     .eq("pickup_date", selectedPickupDate)
     .in("status", [...COLLECTION_ACTIVE_PREORDER_STATUSES])
-    .not("ready_at", "is", null)
     .is("picked_up_at", null)
     .order("pickup_time", { ascending: true });
 
@@ -178,7 +209,11 @@ export async function listCollectionPickupReadyOrders(
     throw new Error(error.message);
   }
 
-  const mapped = ((data ?? []) as CollectionOrderRow[])
+  const rows = await applyPhysicalReadiness(
+    (data ?? []) as CollectionOrderRow[],
+    selectedPickupDate,
+  );
+  const mapped = rows
     .filter((row) => rowPassesPickupBoard(row, selectedPickupDate))
     .map(mapCollectionBoardOrder);
 
@@ -222,14 +257,17 @@ export async function listCollectionReadyQueueOrders(
     .is("customer_id", null)
     .eq("pickup_date", selectedPickupDate)
     .in("status", [...COLLECTION_ACTIVE_PREORDER_STATUSES])
-    .not("ready_at", "is", null)
     .order("pickup_time", { ascending: true });
 
   if (error) {
     throw new Error(error.message);
   }
 
-  const mapped = ((data ?? []) as CollectionOrderRow[])
+  const rows = await applyPhysicalReadiness(
+    (data ?? []) as CollectionOrderRow[],
+    selectedPickupDate,
+  );
+  const mapped = rows
     .filter((row) => rowPassesReadyQueue(row, selectedPickupDate))
     .map(mapCollectionBoardOrder);
 
@@ -310,7 +348,11 @@ export async function listCollectionDineInOrders(
     throw new Error(error.message);
   }
 
-  const mapped = ((data ?? []) as CollectionOrderRow[])
+  const rows = await applyPhysicalReadiness(
+    (data ?? []) as CollectionOrderRow[],
+    selectedPickupDate,
+  );
+  const mapped = rows
     .filter((row) => rowPassesDineIn(row, selectedPickupDate))
     .map(mapCollectionBoardOrder);
 
@@ -358,6 +400,10 @@ export async function getCollectionBoardOrderById(
   if (!data) return null;
 
   const row = data as CollectionOrderRow;
+  if (tab === "ready" || tab === "pickup" || tab === "dine_in") {
+    const [eligibleRow] = await applyPhysicalReadiness([row], selectedPickupDate);
+    Object.assign(row, eligibleRow);
+  }
   if (tab === "ready") {
     if (!rowPassesReadyQueue(row, selectedPickupDate)) return null;
   } else if (tab === "pickup") {
@@ -396,6 +442,8 @@ export async function getCollectionOrderDetail(
   if (!data) return null;
 
   const row = data as CollectionOrderRow;
+  const [eligibleRow] = await applyPhysicalReadiness([row], selectedPickupDate);
+  Object.assign(row, eligibleRow);
   if (!rowPassesDetail(row, selectedPickupDate)) {
     return null;
   }
@@ -437,7 +485,7 @@ export async function getCollectionOrderDetail(
 
   if (
     order.fulfilmentMethod === "pickup" &&
-    (order.readyAt || order.readyMessageSent)
+    (order.readyAt || order.derivedReadyForCollection || order.readyMessageSent)
   ) {
     try {
       const hours = await loadOperatingHoursSnapshot();

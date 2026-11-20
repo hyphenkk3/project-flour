@@ -125,16 +125,14 @@ assert.doesNotMatch(extraDialogSrc, /cutExtraStockIntoSlicesAction/);
 const assignDialogSrc = readSrc(
   "src/workspaces/extra/AssignExtraToOrderDialog.tsx",
 );
-assert.match(assignDialogSrc, /findAssignableOrderForExtraAction/);
+assert.match(assignDialogSrc, /listAssignableOrdersForExtraAction/);
 assert.match(assignDialogSrc, /assignExtraStockToOrderAction/);
-assert.match(assignDialogSrc, /extraStockId: extra\.id/);
-assert.match(assignDialogSrc, /orderId: foundOrder\.id/);
-assert.match(assignDialogSrc, /name="extra_stock_id"/);
-assert.match(assignDialogSrc, /value=\{extra\.id\}/);
-assert.match(assignDialogSrc, /searchAssignOrder\(order\.id\)/);
+assert.match(assignDialogSrc, /extraStockId: stockId/);
+assert.match(assignDialogSrc, /orderId: selected\.id/);
+assert.match(assignDialogSrc, /matchingOnly/);
+assert.match(assignDialogSrc, /Select the intended order before assigning this Fresh Pick/);
 assert.match(assignDialogSrc, /Assign Fresh Pick/);
-assert.match(assignDialogSrc, /Select an existing order/);
-assert.match(assignDialogSrc, /Find order/);
+assert.match(assignDialogSrc, /Search orders/);
 
 const moveDialogSrc = readSrc(
   "src/workspaces/extra/MoveExtraWindowDialog.tsx",

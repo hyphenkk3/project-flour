@@ -11,7 +11,7 @@ type AppShellProps = {
   staff: StaffProfile;
   navigation: WorkspaceNavItem[];
   currentPath: string;
-  title?: string;
+  title: string;
   children: ReactNode;
 };
 
@@ -19,7 +19,7 @@ export function AppShell({
   staff,
   navigation,
   currentPath,
-  title = "Home",
+  title,
   children,
 }: AppShellProps) {
   return (
@@ -45,7 +45,9 @@ export function AppShell({
         <div className="flex min-w-0 flex-1 flex-col">
           <TopHeader staff={staff} title={title} />
           <main className="flex-1">
-            <PageContainer>{children}</PageContainer>
+            <PageContainer compactHome={currentPath === "/home"}>
+              {children}
+            </PageContainer>
           </main>
         </div>
       </div>
@@ -54,3 +56,4 @@ export function AppShell({
     </div>
   );
 }
+

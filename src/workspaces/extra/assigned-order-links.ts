@@ -20,6 +20,24 @@ export type AssignedStockOrder = AssignedOrderSummary & {
   readinessLinkVerified: boolean;
 };
 
+/** Return direct stock order IDs that are not present in the supplied candidates. */
+export function missingAssignedDirectOrderIds(
+  stockRows: Array<{ id: string; order_id: string | null }>,
+  orders: AssignedOrderSummary[],
+): string[] {
+  const knownOrderIds = new Set(orders.map((order) => order.id));
+  return [
+    ...new Set(
+      stockRows
+        .map((stock) => stock.order_id)
+        .filter(
+          (id): id is string =>
+            id !== null && id.length > 0 && !knownOrderIds.has(id),
+        ),
+    ),
+  ];
+}
+
 export function mapAssignedOrderSummariesByStock(
   stockRows: Array<{ id: string; order_id: string | null }>,
   orders: AssignedOrderSummary[],

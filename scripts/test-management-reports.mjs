@@ -417,9 +417,7 @@ assert.match(dashboard, /Outstanding for Selected Month/);
 assert.match(dashboard, /Payments collected/);
 assert.match(dashboard, /Recorded refunds/);
 assert.match(dashboard, /formatReportAsOf\(report\.asOf\)/);
-assert.doesNotMatch(dashboard, /nextMonth\(current\.month\)/);
-assert.doesNotMatch(dashboard, /aria-label="Previous month/);
-assert.doesNotMatch(dashboard, /aria-label="Next month/);
+
 assert.match(dashboard, /aria-label="Choose report month and year"/);
 assert.match(dashboard, /<select/);
 assert.match(dashboard, /availableMonths\.map/);

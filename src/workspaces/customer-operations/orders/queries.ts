@@ -4,6 +4,7 @@ import type {
   Order,
   OrderDetail,
   OrderListItem,
+  OrderSource,
   OrderStatus,
   PaymentStatus,
 } from "@/types/order";
@@ -34,6 +35,8 @@ type OrderRow = {
   guest_name: string | null;
   guest_phone: string | null;
   guest_email: string | null;
+  order_source: OrderSource | null;
+  order_source_other: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -69,6 +72,8 @@ function mapOrder(row: OrderRow): Order {
     updatedBy: row.updated_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    orderSource: row.order_source ?? "other",
+    orderSourceOther: row.order_source_other ?? null,
   };
 }
 
@@ -124,6 +129,8 @@ const listSelect = `
   guest_name,
   guest_phone,
   guest_email,
+  order_source,
+  order_source_other,
   created_by,
   updated_by,
   created_at,

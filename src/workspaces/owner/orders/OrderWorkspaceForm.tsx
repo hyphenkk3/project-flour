@@ -8,7 +8,6 @@ import {
   useTransition,
   type ReactNode,
 } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   FormActions,
@@ -20,7 +19,6 @@ import {
   FormSubmitButton,
   FormTextarea,
 } from "@/components/ui/form";
-import { DineInVenuePartyFields } from "@/components/ui/DineInVenuePartyFields";
 import { OrderGuideCallout } from "@/components/ui/OrderGuideCallout";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import {
@@ -50,7 +48,6 @@ import {
 } from "@/engines/operations/approval-ux";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
-import { DINE_IN_VENUES } from "@/engines/business-calendar/dine-in-hours";
 import {
   dineInSplitSeatingStaffLabel,
   formatDineInPartyComposition,
@@ -78,6 +75,10 @@ import {
   type DeliveryCreateDraft,
   type OwnerCreateFulfilmentMethod,
 } from "@/engines/orders/fulfilment";
+import {
+  defaultAssistedDineInDraft,
+  type AssistedDineInDraft,
+} from "@/engines/orders/assisted-fulfilment";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import { paymentMethodLabel } from "@/engines/orders/payment-details";
 import type {
@@ -143,6 +144,7 @@ import {
   guestOrderStatusLabel,
   isGuestOrderEditable,
   orderSourceLabel,
+  orderSourceLabelWithDetail,
   STAFF_GUEST_ORDER_SOURCES,
 } from "@/workspaces/owner/orders/labels";
 import { withOwnerReturnTo } from "@/workspaces/owner/navigation/return-to";
@@ -154,6 +156,8 @@ import {
 } from "@/workspaces/owner/orders/pickup-date-cake-size-prices";
 import { usePickupDateCakeSizePrices } from "@/workspaces/owner/orders/use-pickup-date-cake-size-prices";
 import { preserveOrderEditorStateOnReset } from "@/workspaces/owner/orders/preserve-action-form-state.mjs";
+import { orderFulfilmentDate } from "@/engines/orders/staff-presentation";
+import { OrderStaffIndicators } from "@/workspaces/owner/orders/OrderStaffIndicators";
 
 const initialSaveState: OrderWorkspaceSaveState = {
   error: null,
@@ -194,6 +198,25 @@ type OrderWorkspaceFormProps = {
   preorderBusinessDate: string;
 };
 
+type OrderWorkspaceFulfilmentMethod = OwnerCreateFulfilmentMethod | "dine_in";
+
+function dineInDraftFromReservation(
+  reservation: StorefrontOrder["dineInReservation"],
+): AssistedDineInDraft {
+  return {
+    ...defaultAssistedDineInDraft(),
+    reservationTime: reservation?.reservationTime.slice(0, 5) ?? "",
+    venue: reservation?.venue ?? "",
+    adultCount: String(reservation?.adultCount ?? ""),
+    kidCount: String(reservation?.kidCount ?? "0"),
+    toddlerCount: String(reservation?.toddlerCount ?? "0"),
+    guestCount: String(reservation?.guestCount ?? ""),
+    reservationNote: reservation?.reservationNote ?? "",
+    whitebirdSplitSeatingAcknowledged:
+      reservation?.whitebirdSplitSeatingAcknowledged === true,
+  };
+}
+
 function ViewBlock({
   title,
   children,
@@ -207,6 +230,23 @@ function ViewBlock({
         {title}
       </h2>
       {children}
+    </section>
+  );
+}
+
+function InternalOrderNoteCallout({ note }: { note: string | null }) {
+  const content = note?.trim();
+  if (!content) return null;
+
+  return (
+    <section
+      aria-label="Internal Notes"
+      className="rounded-xl border border-[#EBCB77] bg-[#FFF8DF] p-4"
+    >
+      <h2 className="text-sm font-semibold text-[#805513]">Internal Notes</h2>
+      <p className="mt-2 text-sm leading-relaxed font-bold break-words whitespace-pre-wrap text-[#493A25]">
+        {content}
+      </p>
     </section>
   );
 }
@@ -246,8 +286,10 @@ export function OrderWorkspaceForm({
   const [editGuestName, setEditGuestName] = useState(order.customerName);
   const [editGuestPhone, setEditGuestPhone] = useState(order.phone);
   const [editFulfilmentMethod, setEditFulfilmentMethod] =
-    useState<OwnerCreateFulfilmentMethod>(() =>
-      normalizeOwnerCreateFulfilmentMethod(order.fulfilmentMethod),
+    useState<OrderWorkspaceFulfilmentMethod>(() =>
+      order.fulfilmentMethod === "dine_in"
+        ? "dine_in"
+        : normalizeOwnerCreateFulfilmentMethod(order.fulfilmentMethod),
     );
   const [editDeliveryDraft, setEditDeliveryDraft] =
     useState<DeliveryCreateDraft>(() =>
@@ -271,14 +313,9 @@ export function OrderWorkspaceForm({
   const [editPickupTime, setEditPickupTime] = useState(() =>
     normalizePickupTimeValue(order.pickupTime),
   );
-  const [editDineInParty, setEditDineInParty] = useState({
-    venue: order.dineInReservation?.venue ?? "",
-    adultCount: String(order.dineInReservation?.adultCount ?? ""),
-    kidCount: String(order.dineInReservation?.kidCount ?? "0"),
-    toddlerCount: String(order.dineInReservation?.toddlerCount ?? "0"),
-    whitebirdSplitSeatingAcknowledged:
-      order.dineInReservation?.whitebirdSplitSeatingAcknowledged === true,
-  });
+  const [editDineInDraft, setEditDineInDraft] = useState(() =>
+    dineInDraftFromReservation(order.dineInReservation),
+  );
   const [pickupMonthOverride, setPickupMonthOverride] = useState(false);
   const [postPaymentChangeOverride, setPostPaymentChangeOverride] =
     useState(false);
@@ -651,8 +688,11 @@ export function OrderWorkspaceForm({
     setEditGuestName(order.customerName);
     setEditGuestPhone(order.phone);
     setEditFulfilmentMethod(
-      normalizeOwnerCreateFulfilmentMethod(order.fulfilmentMethod),
+      order.fulfilmentMethod === "dine_in"
+        ? "dine_in"
+        : normalizeOwnerCreateFulfilmentMethod(order.fulfilmentMethod),
     );
+    setEditDineInDraft(dineInDraftFromReservation(order.dineInReservation));
     setEditDeliveryDraft(
       deliveryDraftFromPersistedOrder({
         customerName: order.customerName,
@@ -668,6 +708,7 @@ export function OrderWorkspaceForm({
     order.customerName,
     order.phone,
     order.fulfilmentMethod,
+    order.dineInReservation,
     order.delivery,
     formKey,
   ]);
@@ -734,8 +775,11 @@ export function OrderWorkspaceForm({
     setEditGuestName(order.customerName);
     setEditGuestPhone(order.phone);
     setEditFulfilmentMethod(
-      normalizeOwnerCreateFulfilmentMethod(order.fulfilmentMethod),
+      order.fulfilmentMethod === "dine_in"
+        ? "dine_in"
+        : normalizeOwnerCreateFulfilmentMethod(order.fulfilmentMethod),
     );
+    setEditDineInDraft(dineInDraftFromReservation(order.dineInReservation));
     setEditDeliveryDraft(
       deliveryDraftFromPersistedOrder({
         customerName: order.customerName,
@@ -812,6 +856,21 @@ export function OrderWorkspaceForm({
     (item) => item.quantity > 0,
   );
   const orderPaidAddons = order.paidAddons ?? [];
+  const orderFulfilmentDay = orderFulfilmentDate({
+    fulfilmentMethod: order.fulfilmentMethod,
+    pickupDate: order.pickupDate,
+    dineInReservationDate: order.dineInReservation?.reservationDate,
+  });
+  const orderActionRequired =
+    order.status === "submitted" ||
+    order.status === "awaiting_payment" ||
+    (order.status === "pending_confirmation" &&
+      order.confirmationNeedsResend) ||
+    order.needsBakeryAttention;
+  const orderIsTerminal =
+    order.status === "cancelled" ||
+    order.readyAt !== null ||
+    Boolean(order.pickedUpAt || order.deliveredAt || order.outForDeliveryAt);
 
   if (mode === "view") {
     return (
@@ -842,7 +901,14 @@ export function OrderWorkspaceForm({
           />
           <p className="text-skyline text-sm">{order.orderNumber}</p>
         </div>
+        <OrderStaffIndicators
+          actionRequired={orderActionRequired}
+          extraStockId={order.extraStockId}
+          fulfilmentDate={orderFulfilmentDay}
+          terminal={orderIsTerminal}
+        />
         <CustomerOrderNoteCallout note={order.notes} />
+        <InternalOrderNoteCallout note={order.internalNotes} />
         {order.status === "paid" &&
         (order.postPaymentCustomerChangeCount ?? 0) >= 1 ? (
           <p className="border-fog text-ink rounded-lg border bg-white px-4 py-3 text-sm">
@@ -888,7 +954,11 @@ export function OrderWorkspaceForm({
               {order.email.trim() ? order.email : "No email"}
             </p>
             <p className="text-skyline text-sm">
-              Source · {orderSourceLabel(order.orderSource)}
+              Source ·{" "}
+              {orderSourceLabelWithDetail(
+                order.orderSource,
+                order.orderSourceOther,
+              )}
               {order.crewOrder ? " · Crew order" : ""}
             </p>
           </div>
@@ -1164,14 +1234,6 @@ export function OrderWorkspaceForm({
           </ViewBlock>
         ) : null}
 
-        <ViewBlock title="Internal notes">
-          <p className="text-skyline text-sm leading-relaxed whitespace-pre-wrap">
-            {order.internalNotes?.trim()
-              ? order.internalNotes
-              : "No internal notes."}
-          </p>
-        </ViewBlock>
-
         <ViewBlock title="Bakery attention">
           {order.needsBakeryAttention ? (
             <div className="space-y-1">
@@ -1348,11 +1410,7 @@ export function OrderWorkspaceForm({
       <input
         name="fulfilment_method"
         type="hidden"
-        value={
-          order.fulfilmentMethod === "dine_in"
-            ? "dine_in"
-            : editFulfilmentMethod
-        }
+        value={editFulfilmentMethod}
       />
       <input name="delivery_json" type="hidden" value={deliveryJson} />
 
@@ -1382,8 +1440,15 @@ export function OrderWorkspaceForm({
         />
         <p className="text-skyline text-sm">{order.orderNumber}</p>
       </div>
+      <OrderStaffIndicators
+        actionRequired={orderActionRequired}
+        extraStockId={order.extraStockId}
+        fulfilmentDate={orderFulfilmentDay}
+        terminal={orderIsTerminal}
+      />
 
       <CustomerOrderNoteCallout note={order.notes} />
+      <InternalOrderNoteCallout note={order.internalNotes} />
 
       {renderApprovalPanels()}
 
@@ -1471,83 +1536,27 @@ export function OrderWorkspaceForm({
       </section>
 
       <div className="space-y-4">
-        {order.fulfilmentMethod === "dine_in" && order.dineInReservation ? (
-          <section className="border-fog space-y-4 rounded-xl border bg-white p-5">
-            <h2 className="text-ink text-xs font-semibold tracking-[0.14em] uppercase">
-              Dine-in
-            </h2>
-            <FormField htmlFor="pickup_date" label="Dine-in date">
-              <FormInput
-                defaultValue={order.pickupDate}
-                id="pickup_date"
-                name="pickup_date"
-                onChange={(event) => setEditPickupDate(event.target.value)}
-                required
-                type="date"
-              />
-            </FormField>
-            <FormField
-              help="When the table reservation starts."
-              htmlFor="reservation_time"
-              label="Dine-in reservation time"
-            >
-              <FormInput
-                defaultValue={order.dineInReservation.reservationTime}
-                id="reservation_time"
-                name="reservation_time"
-                required
-                type="time"
-              />
-            </FormField>
-            <FormField
-              help="When the cake should be served. Must be within 1 hour of the reservation time."
-              htmlFor="pickup_time"
-              label="Cake serving time"
-            >
-              <FormInput
-                defaultValue={order.pickupTime}
-                id="pickup_time"
-                name="pickup_time"
-                onChange={(event) => setEditPickupTime(event.target.value)}
-                required
-                type="time"
-              />
-            </FormField>
-            <DineInVenuePartyFields
-              onChange={setEditDineInParty}
-              requireAcknowledgement={false}
-              value={editDineInParty}
-              venues={[...DINE_IN_VENUES]}
-            />
-            <FormField htmlFor="reservation_note" label="Reservation note">
-              <FormTextarea
-                defaultValue={order.dineInReservation.reservationNote ?? ""}
-                id="reservation_note"
-                name="reservation_note"
-                rows={3}
-              />
-            </FormField>
-          </section>
-        ) : (
-          <OrderFulfilmentCreateFields
-            customerName={editGuestName}
-            customerPhone={editGuestPhone}
-            defaultDate={order.pickupDate}
-            defaultTime={order.pickupTime}
-            delivery={editDeliveryDraft}
-            lateEditCutoffHints={blockDirectSave}
-            method={editFulfilmentMethod}
-            minDate={
-              editPickupDate === order.pickupDate ? order.pickupDate : undefined
-            }
-            onDateChange={setEditPickupDate}
-            onDeliveryChange={setEditDeliveryDraft}
-            onMethodChange={setEditFulfilmentMethod}
-            onTimeChange={setEditPickupTime}
-            hoursSnapshot={hoursSnapshot}
-            scheduleMode={sourceLocked ? "slots" : "owner"}
-          />
-        )}
+        <OrderFulfilmentCreateFields
+          allowDineIn
+          customerName={editGuestName}
+          customerPhone={editGuestPhone}
+          defaultDate={order.pickupDate}
+          defaultTime={order.pickupTime}
+          delivery={editDeliveryDraft}
+          dineIn={editDineInDraft}
+          lateEditCutoffHints={blockDirectSave}
+          method={editFulfilmentMethod}
+          minDate={
+            editPickupDate === order.pickupDate ? order.pickupDate : undefined
+          }
+          onDateChange={setEditPickupDate}
+          onDeliveryChange={setEditDeliveryDraft}
+          onDineInChange={setEditDineInDraft}
+          onMethodChange={setEditFulfilmentMethod}
+          onTimeChange={setEditPickupTime}
+          hoursSnapshot={hoursSnapshot}
+          scheduleMode={sourceLocked ? "slots" : "owner"}
+        />
         {pickupMonthChanging ? (
           <div className="border-status-warning/30 bg-status-warning-soft space-y-3 rounded-lg border px-4 py-3">
             <p className="text-status-warning text-sm">

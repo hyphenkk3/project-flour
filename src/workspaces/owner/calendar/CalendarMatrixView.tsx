@@ -20,7 +20,10 @@ import type {
 } from "@/workspaces/owner/calendar/types";
 import { calendarFulfilmentBackgroundClass } from "@/workspaces/owner/calendar/calendar-fulfilment-presentation";
 import { guestOrderStatusTextClass } from "@/workspaces/owner/orders/labels";
-import { withOperationalMarker } from "@/engines/orders/operational-state";
+import {
+  operationalMarkerFromTimestamps,
+  withOperationalMarker,
+} from "@/engines/orders/operational-state";
 
 type CalendarMatrixViewProps = {
   columns: CalendarDayCell[];
@@ -414,15 +417,19 @@ export function CalendarMatrixView({
                           ) : (
                             <ul className="space-y-0.5">
                               {(cell?.customers ?? []).map((customer) => {
+                                const markerInput = {
+                                  readyAt: customer.readyAt,
+                                  derivedReadyForCollection:
+                                    customer.derivedReadyForCollection,
+                                  pickedUpAt: customer.pickedUpAt,
+                                  outForDeliveryAt: customer.outForDeliveryAt,
+                                  deliveredAt: customer.deliveredAt,
+                                  fulfilmentMethod: customer.fulfilmentMethod,
+                                };
+                                const marker = operationalMarkerFromTimestamps(markerInput);
                                 const nameWithMarker = withOperationalMarker(
                                   customer.displayName,
-                                  {
-                                    readyAt: customer.readyAt,
-                                    pickedUpAt: customer.pickedUpAt,
-                                    outForDeliveryAt: customer.outForDeliveryAt,
-                                    deliveredAt: customer.deliveredAt,
-                                    fulfilmentMethod: customer.fulfilmentMethod,
-                                  },
+                                  markerInput,
                                 );
                                 const label =
                                   customer.quantity > 1
@@ -432,13 +439,6 @@ export function CalendarMatrixView({
                                   <li key={customer.orderId}>
                                     <button
                                       className={[
-                                        guestOrderStatusTextClass(customer.status),
-                                        customer.needsBakeryAttention
-                                          ? "font-bold"
-                                          : "",
-                                        customer.hasEffectiveRm10
-                                          ? "line-through"
-                                          : "",
                                         calendarFulfilmentBackgroundClass(
                                           customer.fulfilmentMethod,
                                         ),
@@ -450,7 +450,15 @@ export function CalendarMatrixView({
                                       title={label}
                                       type="button"
                                     >
-                                      {label}
+                                      {marker ? <span aria-hidden="true">{marker} </span> : null}
+                                      <span className={[
+                                        guestOrderStatusTextClass(customer.status),
+                                        customer.needsBakeryAttention ? "font-bold" : "",
+                                        customer.hasEffectiveRm10 ? "line-through" : "",
+                                      ].join(" ")}>
+                                        {customer.displayName}
+                                      </span>
+                                      {customer.quantity > 1 ? ` ×${customer.quantity}` : null}
                                     </button>
                                   </li>
                                 );

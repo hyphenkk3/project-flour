@@ -1,7 +1,17 @@
 \set ON_ERROR_STOP on
-create role anon nologin;
-create role authenticated nologin;
-create role service_role nologin;
+DO $fixture_roles$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    CREATE ROLE anon NOLOGIN;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE ROLE authenticated NOLOGIN;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+    CREATE ROLE service_role NOLOGIN;
+  END IF;
+END;
+$fixture_roles$;
 create schema auth;
 
 create function auth.uid() returns uuid language sql stable as $$
@@ -42,6 +52,8 @@ $$;
 
 create table public.orders (
   id uuid primary key, order_number text not null unique, status text not null,
+  payment_status text not null default 'paid', ready_at timestamptz,
+  production_started_at timestamptz,
   pickup_date date not null default current_date + 1,
   picked_up_at timestamptz, out_for_delivery_at timestamptz, delivered_at timestamptz,
   extra_stock_id uuid unique, updated_at timestamptz not null default now()
@@ -53,7 +65,8 @@ create table public.order_items (
 create table public.extra_stock (
   id uuid primary key, library_cake_id uuid, library_cake_size_id uuid,
   cake_name text not null, size_label text not null, lifecycle text not null,
-  sold_at timestamptz, cut_into_slices_at timestamptz, order_id uuid,
+  sold_at timestamptz, cut_into_slices_at timestamptz, cut_into_slices_by uuid, order_id uuid,
+  ready_for_collection boolean not null default false,
   pickup_through_at timestamptz, walk_in_held_until timestamptz, updated_at timestamptz not null default now()
 );
 create index extra_stock_order_id_idx on public.extra_stock(order_id);

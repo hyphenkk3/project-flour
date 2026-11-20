@@ -5,19 +5,16 @@ import { isDevPerfEnabled } from "@/lib/perf/dev-only-shared";
 import { CakeDetailBackNav } from "@/workspaces/storefront/catalog/CakeDetailBackNav";
 import { CakeDetailPickupScope } from "@/workspaces/storefront/catalog/CakeDetailPickupScope";
 import { StorefrontCakeDetailPerfProbe } from "@/workspaces/storefront/catalog/StorefrontCakeDetailPerfProbe";
-import { StorefrontCakeDetailView } from "@/workspaces/storefront/catalog/StorefrontCakeDetailView";
+import { StorefrontRetryNotice } from "@/workspaces/storefront/StorefrontRetryNotice";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
-import {
-  loadCakeOfferVoucher,
-  type CakeOfferVoucher,
-} from "@/workspaces/storefront/offers/CakeOfferHint";
+import { loadCakeOfferVoucher } from "@/workspaces/storefront/offers/CakeOfferHint";
+import { resolveLiveReadWithDisplayFallback } from "@/workspaces/storefront/catalog/storefront-read-resilience";
 import {
   browseCakePreviewFromDisplay,
   getBrowseCakeDisplayById,
   getBrowsePublishedCakeById,
   mergeBrowseCakeDisplay,
 } from "@/workspaces/storefront/catalog/queries";
-import type { StorefrontCake } from "@/types/storefront";
 
 type CakeDetailSearchParams = Promise<
   Record<string, string | string[] | undefined>
@@ -28,38 +25,10 @@ type CakeDetailProps = {
   searchParams: CakeDetailSearchParams;
 };
 
-function ymdQueryValue(
-  value: string | string[] | undefined,
-): string | null {
+function ymdQueryValue(value: string | string[] | undefined): string | null {
   const raw = Array.isArray(value) ? value[0] : value;
   const key = raw?.trim().slice(0, 10) ?? "";
   return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : null;
-}
-
-function CakeDetailFallback({
-  availabilityNote,
-  cake,
-  offer,
-}: {
-  availabilityNote?: string | null;
-  cake: StorefrontCake;
-  offer: CakeOfferVoucher | null;
-}) {
-  return (
-    <>
-      {isDevPerfEnabled() ? (
-        <StorefrontCakeDetailPerfProbe cakeId={cake.id} phase="preview" />
-      ) : null}
-      <StorefrontCakeDetailView
-        availabilityNote={availabilityNote}
-        cake={cake}
-        hideAddToOrder
-        offerToday={offer?.today ?? null}
-        offerVoucher={offer?.voucher ?? null}
-        pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
-      />
-    </>
-  );
 }
 
 function CakeDetailBodyFallback() {
@@ -81,29 +50,36 @@ function CakeDetailBodyFallback() {
   );
 }
 
+type CakeDisplayRead = {
+  display: Awaited<ReturnType<typeof getBrowseCakeDisplayById>>;
+  failed: boolean;
+};
+
 async function CakeDetailLive({
+  cake,
   displayPromise,
-  livePromise,
   offerPromise,
   searchParams,
 }: {
-  displayPromise: ReturnType<typeof getBrowseCakeDisplayById>;
-  livePromise: ReturnType<typeof getBrowsePublishedCakeById>;
+  cake: NonNullable<Awaited<ReturnType<typeof getBrowsePublishedCakeById>>>;
+  displayPromise: Promise<CakeDisplayRead>;
   offerPromise: ReturnType<typeof loadCakeOfferVoucher>;
   searchParams: CakeDetailSearchParams;
 }) {
-  const [display, cake, query] = await Promise.all([
+  const [{ display, failed }, query] = await Promise.all([
     displayPromise,
-    livePromise,
     searchParams,
   ]);
-  if (!cake) {
-    notFound();
-  }
   const merged = mergeBrowseCakeDisplay(cake, display);
 
   return (
     <>
+      {failed ? (
+        <StorefrontRetryNotice
+          title="Some cake details are temporarily unavailable"
+          message="The live cake and ordering details are shown where available. Photo, category, or tag information could not be refreshed."
+        />
+      ) : null}
       {isDevPerfEnabled() ? (
         <StorefrontCakeDetailPerfProbe cakeId={merged.id} phase="live" />
       ) : null}
@@ -128,29 +104,72 @@ async function CakeDetailWithDisplay({
   cakeId: string;
   searchParams: CakeDetailSearchParams;
 }) {
-  const displayPromise = getBrowseCakeDisplayById(cakeId);
-  const livePromise = getBrowsePublishedCakeById(cakeId);
-  const query = await searchParams;
+  const displayPromise: Promise<CakeDisplayRead> = getBrowseCakeDisplayById(
+    cakeId,
+  )
+    .then((display) => ({ display, failed: false }))
+    .catch(() => ({ display: null, failed: true }));
+  const [query, liveRead] = await Promise.all([
+    searchParams,
+    resolveLiveReadWithDisplayFallback(
+      getBrowsePublishedCakeById(cakeId),
+      displayPromise.then(({ display }) => display),
+      (display) => browseCakePreviewFromDisplay(cakeId, display),
+    ),
+  ]);
+  if (liveRead.source === "display_fallback") {
+    return (
+      <>
+        <StorefrontRetryNotice
+          title="Current ordering details are temporarily unavailable"
+          message="Saved cake details and photos are shown for reference, but we couldn’t confirm current availability or price. Please try again before ordering."
+        />
+        <CakeDetailPickupScope
+          cake={liveRead.value!}
+          hideAddToOrder
+          pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
+          urlFrom={ymdQueryValue(query.from)}
+          urlPickup={ymdQueryValue(query.pickup)}
+          urlTo={ymdQueryValue(query.to)}
+        />
+      </>
+    );
+  }
+  if (liveRead.source === "unavailable") {
+    return (
+      <StorefrontRetryNotice
+        title="Cake details are temporarily unavailable"
+        message="We couldn’t confirm the current cake details. Please try again shortly."
+      />
+    );
+  }
+  const cake = liveRead.value;
+  if (!cake) {
+    notFound();
+  }
   const offerPromise = loadCakeOfferVoucher(cakeId, {
     fulfilmentFrom: ymdQueryValue(query.from) ?? ymdQueryValue(query.pickup),
     fulfilmentTo: ymdQueryValue(query.to) ?? ymdQueryValue(query.pickup),
   });
-  const display = await displayPromise;
-  const preview = browseCakePreviewFromDisplay(cakeId, display);
 
   return (
     <Suspense
       fallback={
-        preview ? (
-          <CakeDetailFallback cake={preview} offer={null} />
-        ) : (
-          <CakeDetailBodyFallback />
-        )
+        <CakeDetailPickupScope
+          availabilityNote={cake.availabilityNote}
+          cake={cake}
+          hideAddToOrder={cake.currentlyOffered === false}
+          offerPromise={offerPromise}
+          pickupDateNotice={CUSTOMER_PICKUP_DATE_CAKE_NOTICE}
+          urlFrom={ymdQueryValue(query.from)}
+          urlPickup={ymdQueryValue(query.pickup)}
+          urlTo={ymdQueryValue(query.to)}
+        />
       }
     >
       <CakeDetailLive
+        cake={cake}
         displayPromise={displayPromise}
-        livePromise={livePromise}
         offerPromise={offerPromise}
         searchParams={searchParams}
       />
@@ -158,10 +177,7 @@ async function CakeDetailWithDisplay({
   );
 }
 
-async function CakeDetailResolved({
-  params,
-  searchParams,
-}: CakeDetailProps) {
+async function CakeDetailResolved({ params, searchParams }: CakeDetailProps) {
   const { id } = await params;
   return (
     <>

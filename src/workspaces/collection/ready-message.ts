@@ -20,6 +20,32 @@ import type {
 export const COLLECTION_READY_MESSAGE_SENT_EVENT =
   "customer_ready_message_sent";
 
+export function collectionCustomerMessageAvailability(input: {
+  readyAt: string | null;
+  derivedReadyForCollection?: boolean;
+  pickedUpAt: string | null;
+  deliveredAt: string | null;
+  readyMessageSent: boolean;
+}): {
+  activeReady: boolean;
+  showCustomer: boolean;
+  canOpenWhatsApp: boolean;
+  whatsappMessageKind: "ready" | "thank_you";
+  canMarkReadyMessageSent: boolean;
+} {
+  const ready = Boolean(input.readyAt || input.derivedReadyForCollection);
+  const completed = Boolean(input.pickedUpAt || input.deliveredAt);
+  const activeReady = ready && !completed;
+  return {
+    activeReady,
+    showCustomer: ready,
+    canOpenWhatsApp: ready && (activeReady || completed),
+    whatsappMessageKind:
+      input.readyMessageSent || completed ? "thank_you" : "ready",
+    canMarkReadyMessageSent: activeReady && !input.readyMessageSent,
+  };
+}
+
 export function collectionReadyMessageSentFromEvent(
   event: { createdAt: string; actorStaffId: string | null } | null,
   actorName: string | null,

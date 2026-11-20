@@ -75,6 +75,9 @@ const draftSrc = readSrc(
 );
 const extraBoardSrc = readSrc("src/workspaces/extra/ExtraBoard.tsx");
 const ownerCardSrc = readSrc("src/workspaces/owner/orders/OwnerOrderCard.tsx");
+const staffIndicatorsSrc = readSrc(
+  "src/workspaces/owner/orders/OrderStaffIndicators.tsx",
+);
 const extraRpcSrc = readSrc(
   "supabase/migrations/20260818150000_guest_extra_include_receipt_complimentary.sql",
 );
@@ -197,7 +200,7 @@ assert.match(extraRpcSrc, /for update/);
 assert.match(extraRpcSrc, /and e\.sold_at is null/);
 assert.match(extraRpcSrc, /This Extra cake has already been sold/);
 assert.match(extraActionsSrc, /extraSubmitCustomerError/);
-assert.match(extraActionsSrc, /getStorefrontExtraById/);
+assert.doesNotMatch(extraActionsSrc, /getStorefrontExtraById/);
 
 // Pickup-window errors stay pickup-window errors
 assert.equal(
@@ -298,17 +301,22 @@ assert.doesNotMatch(extraCheckoutSrc, /name="email"/);
 assert.doesNotMatch(extraCheckoutSrc, /Email \(optional\)/);
 assert.doesNotMatch(extraCheckoutSrc, /Email me a copy of my order/);
 assert.doesNotMatch(extraCheckoutSrc, /name="surname"/);
-assert.match(extraCheckoutSrc, /OPTIONAL_NOTES_CUSTOMER_WARNING/);
+assert.match(extraCheckoutSrc, /We do not provide personalised writing or messages on cakes/);
+assert.match(extraCheckoutSrc, /hasCakeWordingRequest/);
+assert.match(extraCheckoutSrc, /hasPossibleCakeWording/);
+assert.match(extraCheckoutSrc, /notes_not_cake_wording_ack/);
 assert.match(
   extraActionsSrc,
   /Please fill in your name and WhatsApp phone number/,
 );
 
-// 17. Server submission revalidates availability
-assert.match(extraActionsSrc, /isValidExtraCustomerFulfilment/);
-assert.match(extraActionsSrc, /getStorefrontExtraById/);
+// 17. Authoritative database submission validates and allocates Fresh Pick stock.
+assert.match(extraActionsSrc, /submit_guest_extra_order_idempotent_v3/);
+assert.match(extraActionsSrc, /resolve_guest_checkout_attempt_v3/);
+assert.doesNotMatch(extraActionsSrc, /getStorefrontExtraById|library_cake_photos/);
 assert.match(extraCartRpcSrc, /stock_row\.lifecycle <> 'confirmed'/);
 assert.match(extraCartRpcSrc, /stock_row\.sold_at is not null/);
+assert.match(extraCartRpcSrc, /for update/);
 assert.match(extraCartRpcSrc, /p_extra_stock_ids/);
 
 // 18. Success / payment-pending state
@@ -356,8 +364,12 @@ assert.match(receiptSrc, /extra_stock_id/);
 
 // 19. Existing Fresh Picks staff handling remains
 assert.match(extraBoardSrc, /EXTRA stock/);
-assert.match(extraBoardSrc, /Sold Extra cakes leave Fresh Picks immediately/);
-assert.match(ownerCardSrc, /extraStockId \? " · Fresh Picks"/);
+assert.match(extraBoardSrc, /classifySoldExtra\(soldOrderSnapshot\(unit\)\) !== "history"/);
+assert.match(extraBoardSrc, /Sold physical stock remains here while its linked order still needs/);
+assert.match(extraBoardSrc, /Completed sales and collections are kept in Sold/);
+assert.match(ownerCardSrc, /<OrderStaffIndicators/);
+assert.match(ownerCardSrc, /extraStockId=\{order\.extraStockId\}/);
+assert.match(staffIndicatorsSrc, /label=\{freshPick \? "Fresh Pick" : "Normal Preorder"\}/);
 assert.doesNotMatch(extraBoardSrc, /production_capacity/);
 assert.doesNotMatch(extraBoardSrc, /AvailabilityOverview/);
 

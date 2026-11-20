@@ -28,7 +28,9 @@ assert.match(formSrc, /Confirming opening hours/);
 assert.match(summarySrc, /Checking availability for that date/);
 assert.match(formSrc, /date_confirmation_start/);
 assert.match(formSrc, /date_confirmed/);
-assert.match(formSrc, /void loadCheckoutPickupOffer\(pickupDate\)/);
+assert.match(formSrc, /load: loadCheckoutPickupOffer/);
+assert.match(formSrc, /createSecondaryOfferLoader/);
+assert.match(formSrc, /Try Again/);
 assert.match(formSrc, /void loadCheckoutVenuePhotos\(\)/);
 
 const confirmFn = actionsSrc.slice(

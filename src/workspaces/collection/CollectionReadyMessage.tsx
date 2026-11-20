@@ -11,6 +11,7 @@ import type { CollectionBoardOrder } from "@/workspaces/collection/types";
 import { markCollectionReadyMessageSentAction } from "@/workspaces/collection/actions";
 import {
   generateCollectionReadyMessage,
+  collectionCustomerMessageAvailability,
   selectCollectionWhatsAppMessage,
 } from "@/workspaces/collection/ready-message";
 import type { CollectionReadyMessageSent } from "@/workspaces/collection/types";
@@ -44,10 +45,21 @@ export function CollectionReadyMessage({
     [order, senderName, templates],
   );
   const thankYouMessage = useMemo(() => generateCustomerThankYouMessage(templates), [templates]);
+  const messageAvailability = collectionCustomerMessageAvailability({
+    readyAt: order.readyAt,
+    derivedReadyForCollection: order.derivedReadyForCollection,
+    pickedUpAt: order.pickedUpAt,
+    deliveredAt: order.deliveredAt,
+    readyMessageSent: Boolean(sent),
+  });
   const selectedWhatsAppMessage = useMemo(
     () =>
-      selectCollectionWhatsAppMessage(message, thankYouMessage, Boolean(sent)),
-    [message, thankYouMessage, sent],
+      selectCollectionWhatsAppMessage(
+        message,
+        thankYouMessage,
+        messageAvailability.whatsappMessageKind === "thank_you",
+      ),
+    [message, thankYouMessage, messageAvailability.whatsappMessageKind],
   );
   const whatsappUrl = useMemo(
     () =>
@@ -57,10 +69,7 @@ export function CollectionReadyMessage({
       ),
     [order.guestPhone, selectedWhatsAppMessage.text],
   );
-  const activeReady = Boolean(
-    order.readyAt && !order.pickedUpAt && !order.deliveredAt,
-  );
-  const showCustomer = Boolean(order.readyAt && (activeReady || sent));
+  const showCustomer = messageAvailability.showCustomer;
   const showRecipient =
     order.fulfilmentMethod === "delivery" &&
     order.delivery?.recipientNotifyPreference === "inform_recipient";
@@ -122,7 +131,7 @@ export function CollectionReadyMessage({
           >
             Customer Thank You Message
           </button>
-          {activeReady ? (
+          {messageAvailability.canOpenWhatsApp ? (
             <div className="flex flex-col gap-2">
               <button
                 className="border-fog text-ink hover:bg-mist inline-flex min-h-11 w-full items-center justify-center rounded-lg border px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
@@ -135,7 +144,7 @@ export function CollectionReadyMessage({
                   ? "Ready Message"
                   : "Thank You Message"}
               </button>
-              {!sent ? (
+              {messageAvailability.canMarkReadyMessageSent ? (
                 <button
                   className="bg-ink text-mist hover:bg-skyline inline-flex min-h-11 w-full items-center justify-center rounded-lg px-4 text-sm font-medium disabled:opacity-60"
                   disabled={pending}

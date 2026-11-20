@@ -34,9 +34,6 @@ const successSrc = readSrc(
 );
 const successRouteSrc = readSrc("src/app/order/success/page.tsx");
 const actionsSrc = readSrc("src/workspaces/storefront/checkout/actions.ts");
-const extraFormSrc = readSrc(
-  "src/workspaces/storefront/extra/GuestExtraOrderForm.tsx",
-);
 const extraCheckoutSrc = readSrc(
   "src/workspaces/storefront/extra/GuestExtraCheckoutForm.tsx",
 );
@@ -118,8 +115,10 @@ assert.match(confirmOrderSrc, /onCommitted: \(\) => \{\s*setReceivedShell\(true\
 assert.match(confirmOrderSrc, /action: submitGuestPreorderAction/);
 assert.match(
   confirmOrderSrc,
-  /if \(submitPending \|\| viewState\.orderId \|\| navigatedRef\.current\) return/,
+  /if\s*\([\s\S]*?submitPending[\s\S]*?submitOutcomeUncertain[\s\S]*?confirmInFlightRef\.current[\s\S]*?viewState\.orderId[\s\S]*?navigatedRef\.current[\s\S]*?\)\s*return;/,
+  "confirmation blocks pending, uncertain, in-flight, completed and navigated submissions",
 );
+assert.match(confirmOrderSrc, /confirmInFlightRef\.current = true/);
 assert.doesNotMatch(handleSubmitSrc, /formAction\(/);
 assert.equal(
   (confirmOrderSrc.match(/submitGuestOrderAndNavigate/g) ?? []).length,
@@ -185,7 +184,11 @@ assert.match(extraCheckoutSrc, /buildExtraCheckoutConfirmSnapshot/);
 assert.match(extraCheckoutSrc, /event\.preventDefault\(\)/);
 assert.match(extraCheckoutSrc, /onSubmit=\{\(event\) => \{/);
 assert.doesNotMatch(extraCheckoutSrc, /onClick=\{openConfirm\}/);
-assert.doesNotMatch(extraCheckoutSrc, /type="button"/);
+assert.match(
+  extraCheckoutSrc,
+  /onClick=\{recoverUncertainOrder\}[\s\S]*?type="button"/,
+  "uncertain-outcome recovery is a non-submit action, not a second checkout submission",
+);
 assert.match(extraCheckoutSrc, /collectInvalidFieldMessages/);
 assert.match(extraCheckoutSrc, /focusFirstInvalidField/);
 assert.match(extraCheckoutSrc, /noValidate/);
@@ -201,8 +204,8 @@ const extraOpenConfirmSrc = extraCheckoutSrc.slice(
   extraCheckoutSrc.indexOf("function confirmOrder"),
 );
 const extraConfirmOrderSrc = extraCheckoutSrc.slice(
+  extraCheckoutSrc.indexOf("async function runFreshPickSubmission"),
   extraCheckoutSrc.indexOf("function confirmOrder"),
-  extraCheckoutSrc.indexOf("function goBackFromConfirm"),
 );
 const extraGoBackSrc = extraCheckoutSrc.slice(
   extraCheckoutSrc.indexOf("function goBackFromConfirm"),
@@ -211,12 +214,14 @@ const extraGoBackSrc = extraCheckoutSrc.slice(
 assert.match(extraOpenConfirmSrc, /setConfirmOpen\(true\)/);
 assert.match(extraOpenConfirmSrc, /new FormData\(form\)/);
 assert.doesNotMatch(extraOpenConfirmSrc, /formAction\(/);
+assert.match(extraCheckoutSrc, /function confirmOrder\(\)\s*\{\s*return runFreshPickSubmission\(\);/);
 assert.match(extraConfirmOrderSrc, /submitGuestOrderAndNavigate/);
 assert.match(extraConfirmOrderSrc, /onCommitted: \(\) => \{\s*setReceivedShell\(true\);/);
 assert.match(extraConfirmOrderSrc, /action: submitGuestExtraOrderAction/);
 assert.match(
   extraConfirmOrderSrc,
-  /if \(submitPending \|\| viewState\.orderId \|\| navigatedRef\.current\) return/,
+  /if\s*\([\s\S]*?submitPending[\s\S]*?submitOutcomeUncertain[\s\S]*?confirmInFlightRef\.current[\s\S]*?viewState\.orderId[\s\S]*?navigatedRef\.current[\s\S]*?\)\s*return;/,
+  "Fresh Pick submission blocks pending, uncertain, in-flight, completed and navigated requests",
 );
 assert.doesNotMatch(extraGoBackSrc, /formAction\(/);
 assert.match(extraGoBackSrc, /setConfirmOpen\(false\)/);

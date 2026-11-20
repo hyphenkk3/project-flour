@@ -21,7 +21,7 @@ import type { StorefrontOrder } from "@/types/storefront";
 assert.equal(canAccessGuestOrderWorkspace("owner"), true);
 assert.equal(canAccessGuestOrderWorkspace("manager"), true);
 assert.equal(canAccessGuestOrderWorkspace("customer_operations"), true);
-assert.equal(canAccessGuestOrderWorkspace("bakery"), false);
+assert.equal(canAccessGuestOrderWorkspace("bakery"), true);
 
 const owner = buildGuestOrderWorkspaceCapabilities({
   role: "owner",

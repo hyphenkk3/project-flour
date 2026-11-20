@@ -112,11 +112,23 @@ assert.match(sheetSrc, /mergeDraftItem/);
 assert.match(sheetSrc, /setDraftLineQuantity/);
 assert.match(sheetSrc, /draftLineQuantity/);
 assert.match(sheetSrc, /addingRef\.current/);
-assert.match(sheetSrc, /disabled=\{\!selected \|\| !pickupPricesReady \|\| adding\}/);
+assert.match(
+  sheetSrc,
+  /!selectedAvailability\?\.available[\s\S]*!pickupPricesReady[\s\S]*adding/,
+);
 assert.match(sheetSrc, /Added ✓/);
 assert.match(sheetSrc, /Update Order/);
 assert.match(sheetSrc, /setSizeId/);
 assert.match(sheetSrc, /setQuantity/);
+assert.match(sheetSrc, /cakeSizeEligibleDateInPickupRange/);
+assert.match(sheetSrc, /lineEarliestCollectionDate/);
+assert.match(sheetSrc, /preorderBusinessDate/);
+assert.match(sheetSrc, /&& !hasValidPickupScope/);
+assert.match(sheetSrc, /scopedEligibilityDate\(selected\)/);
+assert.match(
+  sheetSrc,
+  /This size is not available within this collection's pickup dates and preorder window/,
+);
 assert.match(sheetSrc, /\{cake\.name\}/);
 assert.match(sheetSrc, /name=\{`\$\{titleId\}-size`\}/);
 assert.match(sheetSrc, /type="radio"/);

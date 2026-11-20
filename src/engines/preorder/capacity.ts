@@ -5,17 +5,25 @@
  * No capacity row = unrestricted.
  * Matching row + (used + cart quantity) > capacity = Fully Booked.
  *
- * Used statuses are submit-time occupancy, not the staff confirmed-order floor.
- * Waiting-list holds are not counted. Phase 7 owns waiting lists.
+ * Used statuses are advisory submit-time occupancy, not the staff
+ * confirmed-order floor. Customer reads cannot inspect private active holds;
+ * the protected database checker includes those holds at submission time.
  */
 
 import type { Ymd } from "@/engines/preorder/types";
 
 export const CUSTOMER_DATE_CAPACITY_SEARCH_DAYS = 14;
 
+/**
+ * Orders reserve preorder capacity from guest submission through payment.
+ * `confirmed` must remain in this set: staff confirmation is a lifecycle
+ * transition, not a release of the slot. Cancelled/completed orders release
+ * it. Fresh Pick orders are excluded separately by their stock linkage.
+ */
 export const GUEST_PREORDER_CAPACITY_ORDER_STATUSES = [
   "submitted",
   "pending_confirmation",
+  "confirmed",
   "awaiting_payment",
   "paid",
 ] as const;

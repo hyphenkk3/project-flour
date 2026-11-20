@@ -20,9 +20,13 @@ import {
 import {
   defaultDeliveryCreateDraft,
   defaultOwnerCreateFulfilmentMethod,
+  type CustomerWebsiteFulfilmentMethod,
   type DeliveryCreateDraft,
-  type OwnerCreateFulfilmentMethod,
 } from "@/engines/orders/fulfilment";
+import {
+  defaultAssistedDineInDraft,
+  type AssistedDineInDraft,
+} from "@/engines/orders/assisted-fulfilment";
 import { formatRm } from "@/workspaces/storefront/catalog/pricing";
 import type { PaidAddonType, StorefrontCake } from "@/types/storefront";
 import type { CollectionComplimentaryOption } from "@/workspaces/owner/orders/queries";
@@ -30,7 +34,7 @@ import {
   createStaffGuestOrderAction,
   type CreateStaffGuestOrderState,
 } from "@/workspaces/owner/orders/actions";
-import { STAFF_GUEST_ORDER_SOURCES } from "@/workspaces/owner/orders/labels";
+import { StaffGuestOrderSourceFields } from "@/workspaces/owner/orders/StaffGuestOrderSourceFields";
 import { OrderPaidAddonsEditor } from "@/workspaces/owner/orders/OrderPaidAddonsEditor";
 import { OPERATING_HOURS_SEED } from "@/engines/business-calendar/operating-hours-seed";
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
@@ -82,7 +86,12 @@ export function StaffGuestOrderForm({
   const [guestPhone, setGuestPhone] = useState("");
   const [pickupDate, setPickupDate] = useState("");
   const [fulfilmentMethod, setFulfilmentMethod] =
-    useState<OwnerCreateFulfilmentMethod>(defaultOwnerCreateFulfilmentMethod);
+    useState<CustomerWebsiteFulfilmentMethod>(
+      defaultOwnerCreateFulfilmentMethod,
+    );
+  const [dineInDraft, setDineInDraft] = useState<AssistedDineInDraft>(
+    defaultAssistedDineInDraft,
+  );
   const [deliveryDraft, setDeliveryDraft] = useState<DeliveryCreateDraft>(
     defaultDeliveryCreateDraft,
   );
@@ -103,15 +112,21 @@ export function StaffGuestOrderForm({
     () =>
       complimentaryOptions.map((option) => ({
         typeId: option.typeId,
-        name: option.name,
-        quantity: option.isDefault ? option.defaultQuantity : 0,
+        name: option.isActive ? option.name : `${option.name} (Inactive)`,
+        quantity:
+          option.isActive && option.isDefault ? option.defaultQuantity : 0,
         sortOrder: option.sortOrder,
       })),
   );
 
   const [paidAddonDrafts, setPaidAddonDrafts] = useState<
     EditablePaidAddonDraft[]
-  >(() => buildEditablePaidAddonDrafts({ catalog: paidAddonCatalog }));
+  >(() =>
+    buildEditablePaidAddonDrafts({
+      catalog: paidAddonCatalog,
+      includeInactiveCatalog: true,
+    }),
+  );
 
   const [needsAttention, setNeedsAttention] = useState(false);
 
@@ -237,20 +252,7 @@ export function StaffGuestOrderForm({
             value={guestPhone}
           />
         </FormField>
-        <FormField htmlFor="order_source" label="Order source">
-          <FormSelect
-            defaultValue="jotform"
-            id="order_source"
-            name="order_source"
-            required
-          >
-            {STAFF_GUEST_ORDER_SOURCES.map((source) => (
-              <option key={source.value} value={source.value}>
-                {source.label}
-              </option>
-            ))}
-          </FormSelect>
-        </FormField>
+        <StaffGuestOrderSourceFields />
         <FormCheckbox
           help="Shows as (crew) later. Does not change payment or discounts."
           label="Crew order"
@@ -260,13 +262,16 @@ export function StaffGuestOrderForm({
       </section>
 
       <OrderFulfilmentCreateFields
+        allowDineIn
         customerName={guestName}
         customerPhone={guestPhone}
         delivery={deliveryDraft}
+        dineIn={dineInDraft}
         hoursSnapshot={hoursSnapshot}
         method={fulfilmentMethod}
         onDateChange={setPickupDate}
         onDeliveryChange={setDeliveryDraft}
+        onDineInChange={setDineInDraft}
         onMethodChange={setFulfilmentMethod}
       />
 
@@ -327,9 +332,11 @@ export function StaffGuestOrderForm({
                           {size.size} —{" "}
                           {Number.isFinite(pickupDatePrices.prices[size.id])
                             ? formatRm(pickupDatePrices.prices[size.id])
-                            : pickupDatePrices.status === "error"
-                              ? "Price unavailable"
-                              : "Checking price…"}
+                            : pickupDatePrices.status === "idle"
+                              ? "Select pickup date"
+                              : pickupDatePrices.status === "loading"
+                                ? "Checking price…"
+                                : "Price unavailable"}
                         </option>
                       ))}
                     </FormSelect>
@@ -373,6 +380,7 @@ export function StaffGuestOrderForm({
         <OrderPaidAddonsEditor
           drafts={paidAddonDrafts}
           onChange={setPaidAddonDrafts}
+          showInactiveStatus
         />
       </section>
 
@@ -454,7 +462,15 @@ export function StaffGuestOrderForm({
 
       {requiredPriceSizeIds.length > 0 && !cakePriceVerified ? (
         <div className="text-sm" role="status">
-          {pickupDatePrices.status === "error" ? (
+          {pickupDatePrices.status === "idle" ? (
+            <p className="text-skyline">
+              Select a pickup date to verify cake prices before saving.
+            </p>
+          ) : pickupDatePrices.status === "loading" ? (
+            <p className="text-skyline">
+              Checking price… Saving is available when prices are verified.
+            </p>
+          ) : (
             <>
               <p className="text-status-danger">
                 Cake prices could not be verified. Retry before saving.
@@ -467,10 +483,6 @@ export function StaffGuestOrderForm({
                 Retry prices
               </button>
             </>
-          ) : (
-            <p className="text-skyline">
-              Checking price… Saving is available when prices are verified.
-            </p>
           )}
         </div>
       ) : null}

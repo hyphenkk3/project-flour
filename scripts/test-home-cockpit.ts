@@ -179,6 +179,7 @@ const bakeryOrders: BakeryBoardOrder[] = [
       totalRemainingQuantity: 0,
       fullyCovered: false,
     },
+    assignedFreshPickStocks: [],
     complimentaryItems: [],
     paidAddons: [],
   },

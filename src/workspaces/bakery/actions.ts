@@ -220,6 +220,41 @@ export async function markBakeryOrderReadyAction(
   return { error: null };
 }
 
+/**
+ * Explicit Delivery readiness for an order fully covered by ready Fresh Pick.
+ * The database RPC repeats all eligibility checks atomically with the state
+ * transition; this action intentionally performs no read-then-write gate.
+ */
+export async function markFreshPickDeliveryOrderReadyAction(
+  orderId: string,
+): Promise<{ error: string | null }> {
+  const staff = await requireBakeryStaff();
+  const caps = buildBakeryWorkspaceCapabilities({
+    role: staff.role.code,
+    staffId: staff.id,
+  });
+  if (!caps.canMarkReady) {
+    return { error: "Not authorized to mark ready." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "mark_fresh_pick_delivery_order_ready",
+    {
+      p_order_id: orderId,
+      p_actor_staff_id: staff.id,
+    },
+  );
+
+  if (error) {
+    return { error: error.message };
+  }
+  revalidatePath("/bakery");
+  revalidatePath(`/bakery/orders/${orderId}`);
+  revalidatePath("/collection");
+  return { error: null };
+}
+
 export async function undoBakeryOrderReadyAction(
   orderId: string,
 ): Promise<{ error: string | null }> {

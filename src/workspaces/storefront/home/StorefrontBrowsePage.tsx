@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { BrowseCakeCatalogue } from "@/workspaces/storefront/catalog/BrowseCakeCatalogue";
 import { StorefrontTheme } from "@/workspaces/storefront/StorefrontTheme";
+import { StorefrontRetryNotice } from "@/workspaces/storefront/StorefrontRetryNotice";
 import { StorefrontBrowsePerfProbe } from "@/workspaces/storefront/catalog/StorefrontBrowsePerfProbe";
 import { CakePhotoDisclaimer } from "@/workspaces/storefront/catalog/CakePhotoDisclaimer";
 import {
@@ -47,13 +48,19 @@ function BrowseCatalogueFallback() {
 }
 
 async function BrowseCatalogueIsland() {
-  const [cakes, vouchers] = await Promise.all([
+  const [cakes, voucherResult] = await Promise.all([
     listBrowsePublishedCakes(),
-    listPublicCatalogueVouchers(),
+    listPublicCatalogueVouchers()
+      .then((vouchers) => ({ vouchers, failed: false }))
+      .catch(() => ({ vouchers: [], failed: true })),
   ]);
   const today = singaporeDateFromIso(new Date().toISOString());
   const promotions = Object.fromEntries(
-    buildTargetedPromotionBadgeByCakeId(vouchers, today, "preorder"),
+    buildTargetedPromotionBadgeByCakeId(
+      voucherResult.vouchers,
+      today,
+      "preorder",
+    ),
   );
   const cakeScopes = Object.fromEntries(
     cakes.map((cake) => [cake.id, { origin: "browse" as const }]),
@@ -63,6 +70,12 @@ async function BrowseCatalogueIsland() {
       <h2 className="sr-only" id="browse-cakes-heading">
         All cakes
       </h2>
+      {voucherResult.failed ? (
+        <StorefrontRetryNotice
+          title="Current offers are temporarily unavailable"
+          message="The cake menu is available, but offer details could not be checked. Please retry before relying on any promotion."
+        />
+      ) : null}
       <CakeEntryScopeCapture scopes={cakeScopes}>
         <StorefrontBrowsePerfProbe cakeCount={cakes.length} />
         <BrowseCakeCatalogue cakes={cakes} promotions={promotions} />

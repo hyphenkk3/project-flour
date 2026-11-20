@@ -13,8 +13,7 @@ import {
   type OwnerAttentionReasonKey,
 } from "@/engines/operations/owner-attention";
 import { operationsTodayYmd } from "@/engines/operations/order-board";
-import { deriveOperationalState } from "@/engines/orders/operational-state";
-import { bakeryProductionPresentation } from "@/workspaces/bakery/eligibility";
+import { bakeryOrderProductionPresentation } from "@/workspaces/bakery/eligibility";
 import type { BakeryBoardOrder } from "@/workspaces/bakery/types";
 import {
   isCollectionActiveStatus,
@@ -218,6 +217,21 @@ export function buildHomeCockpitModel(input: {
   const dineInsToday = todayOrders.filter((order) =>
     isCollectionDineInMethod(order.fulfilmentMethod),
   ).length;
+  const bakeryById = new Map(
+    input.bakeryOrders.map((order) => [order.id, order]),
+  );
+  const isReady = (order: StorefrontOrderListItem) => {
+    const bakeryOrder = bakeryById.get(order.id);
+    if (!bakeryOrder) return Boolean(order.readyAt);
+    if (bakeryOrderProductionPresentation(bakeryOrder) !== "ready") {
+      return false;
+    }
+    return (
+      Boolean(order.readyAt) ||
+      (order.status === "paid" &&
+        bakeryOrder.assignedFreshPickStocks.length > 0)
+    );
+  };
 
   const completedOrderIds = new Set([
     ...buckets.completed
@@ -231,13 +245,10 @@ export function buildHomeCockpitModel(input: {
   const ready = todayOrders.filter(
     (order) =>
       !isCollectionDineInMethod(order.fulfilmentMethod) &&
-      deriveOperationalState({
-        readyAt: order.readyAt,
-        pickedUpAt: order.pickedUpAt,
-        outForDeliveryAt: order.outForDeliveryAt,
-        deliveredAt: order.deliveredAt,
-        fulfilmentMethod: order.fulfilmentMethod,
-      }) === "ready",
+      isReady(order) &&
+      (isCollectionDeliveryMethod(order.fulfilmentMethod)
+        ? !order.outForDeliveryAt && !order.deliveredAt
+        : !order.pickedUpAt),
   ).length;
 
   const visibleNeedsAttention = buckets.needsAttention.filter(
@@ -356,10 +367,7 @@ export function buildHomeCockpitModel(input: {
   let inProduction = 0;
   let bakeryReady = 0;
   for (const order of input.bakeryOrders) {
-    const presentation = bakeryProductionPresentation({
-      productionStartedAt: order.productionStartedAt,
-      readyAt: order.readyAt,
-    });
+    const presentation = bakeryOrderProductionPresentation(order);
     if (presentation === "ready") bakeryReady += 1;
     else if (presentation === "in_production") inProduction += 1;
     else notStarted += 1;
@@ -371,10 +379,7 @@ export function buildHomeCockpitModel(input: {
     inProduction,
     ready: bakeryReady,
     preview: input.bakeryOrders.slice(0, 3).map((order) => {
-      const presentation = bakeryProductionPresentation({
-        productionStartedAt: order.productionStartedAt,
-        readyAt: order.readyAt,
-      });
+      const presentation = bakeryOrderProductionPresentation(order);
       return {
         id: order.id,
         orderNumber: order.orderNumber,

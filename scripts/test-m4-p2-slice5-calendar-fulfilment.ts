@@ -563,14 +563,16 @@ const cakeItem = {
 }
 
 // ---------------------------------------------------------------------------
-// Z No Dine-In create/edit path introduced
+// Z Owner New Order includes Dine-In; the calendar still excludes Drive-through
 // ---------------------------------------------------------------------------
 {
   const createFields = readFileSync(
     resolve("src/workspaces/owner/orders/OrderFulfilmentCreateFields.tsx"),
     "utf8",
   );
-  assert.ok(!/dine.?in|dine_in|🍽️/i.test(createFields));
+  assert.match(createFields, /allowDineIn/);
+  assert.match(createFields, /DineInVenuePartyFields/);
+  assert.ok(!/drive_through|🍽️/i.test(createFields));
   const presentation = readFileSync(
     resolve(
       "src/workspaces/owner/calendar/calendar-fulfilment-presentation.ts",
@@ -675,6 +677,24 @@ const cakeItem = {
       assert.equal(bg, "");
     }
   }
+}
+
+// Fresh Pick readiness reconciliation updates the order row; the Calendar
+// must refresh its separate physical-stock markers from the existing realtime
+// order channel instead of waiting for the 30-second poll.
+{
+  const calendarRealtime = readFileSync(
+    resolve("src/workspaces/owner/calendar/WholeCakeCalendar.tsx"),
+    "utf8",
+  );
+  assert.match(calendarRealtime, /const scheduleExtrasRefresh = \(\) => \{/);
+  assert.equal(
+    calendarRealtime.match(/scheduleExtrasRefresh\(\);/g)?.length,
+    2,
+    "Order insert and update realtime events both refresh Fresh Pick markers",
+  );
+  assert.match(calendarRealtime, /void refreshExtrasOnly\(\);/);
+  assert.match(calendarRealtime, /window\.clearTimeout\(extrasRefreshTimeout\)/);
 }
 
 console.log("M4-P2 Slice 5 calendar-fulfilment tests: PASSED");

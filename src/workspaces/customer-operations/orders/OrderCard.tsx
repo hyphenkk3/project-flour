@@ -2,6 +2,7 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDateTime } from "@/lib/dates";
 import type { OrderListItem } from "@/types/order";
+import { orderSourceLabelWithDetail } from "@/workspaces/owner/orders/labels";
 import { ownerOrderWorkspaceHref } from "@/workspaces/owner/navigation/return-to";
 import {
   formatOrderDate,
@@ -53,6 +54,17 @@ export function OrderCard({ order }: OrderCardProps) {
       </div>
 
       <dl className="text-skyline mt-3 grid gap-1 text-sm sm:grid-cols-2">
+        {order.orderSource ? (
+          <div>
+            <dt className="sr-only">Order source</dt>
+            <dd>
+              {orderSourceLabelWithDetail(
+                order.orderSource,
+                order.orderSourceOther,
+              )}
+            </dd>
+          </div>
+        ) : null}
         <div>
           <dt className="sr-only">{dateLabel}</dt>
           <dd>

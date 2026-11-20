@@ -73,12 +73,17 @@ export type CollectionBoardOrder = {
   pickupDate: string;
   pickupTime: string;
   fulfilmentMethod: StorefrontOrderFulfilmentMethod;
+  extraStockId: string | null;
   status: GuestOrderStatus;
+  paymentStatus?: string | null;
   customerNotes: string | null;
+  internalNotes: string | null;
   readyMessageSent?: CollectionReadyMessageSent | null;
   readyMessageOperatingHours?: CollectionReadyMessageOperatingHours;
   productionStartedAt: string | null;
   readyAt: string | null;
+  /** Effective readiness derived from order lifecycle and Bakery allocation; never persisted. */
+  derivedReadyForCollection?: boolean;
   pickedUpAt: string | null;
   outForDeliveryAt: string | null;
   deliveredAt: string | null;

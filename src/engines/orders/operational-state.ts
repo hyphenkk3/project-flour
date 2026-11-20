@@ -18,6 +18,8 @@ export type OperationalState =
 
 export type OperationalTimestamps = {
   readyAt: string | null;
+  /** Derived only after Bakery verifies complete assigned-stock readiness. */
+  derivedReadyForCollection?: boolean;
   pickedUpAt: string | null;
   outForDeliveryAt?: string | null;
   deliveredAt?: string | null;
@@ -46,7 +48,7 @@ export function deriveOperationalState(
     return "not_ready";
   }
   if (input.pickedUpAt) return "picked_up";
-  if (input.readyAt) return "ready";
+  if (input.readyAt || input.derivedReadyForCollection) return "ready";
   return "not_ready";
 }
 

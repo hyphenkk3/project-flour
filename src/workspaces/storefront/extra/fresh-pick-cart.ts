@@ -1,5 +1,10 @@
 import type { OperatingHoursSnapshot } from "@/engines/business-calendar/operating-hours";
 import {
+  availableDineInVenues,
+  isValidDineInReservationPair,
+  parseDineInVenue,
+} from "@/engines/business-calendar/dine-in-hours";
+import {
   FRESH_PICKS_ALREADY_IN_CART,
   FRESH_PICKS_CART_PICKUP_MISMATCH,
   FRESH_PICKS_CART_UNAVAILABLE_FOR_PICKUP,
@@ -37,7 +42,10 @@ export type FreshPickCartItem = {
 
 export type FreshPickCart = {
   pickupDate: string;
+  /** Cake serving time, persisted as orders.pickup_time. */
   pickupTime: string;
+  /** Table reservation start, persisted separately in the dine-in reservation. */
+  reservationTime: string;
   fulfilmentMethod: CustomerWebsiteFulfilmentMethod;
   pickupAvailableFromAt: string;
   orderCutoffAt: string;
@@ -77,8 +85,11 @@ export type FreshPickCartAddInput = {
   unitPrice: number | null;
   imageUrl: string | null;
   pickupDate: string;
+  /** Cake serving time; retained as pickupTime for the existing order contract. */
   pickupTime: string;
   fulfilmentMethod?: CustomerWebsiteFulfilmentMethod;
+  reservationTime?: string;
+  dineInVenue?: string;
   pickupAvailableFromAt: string;
   orderCutoffAt: string;
   readyForCollection?: boolean;
@@ -98,6 +109,7 @@ export function emptyFreshPickCart(): FreshPickCart {
   return {
     pickupDate: "",
     pickupTime: "",
+    reservationTime: "",
     fulfilmentMethod: "pickup",
     pickupAvailableFromAt: "",
     orderCutoffAt: "",
@@ -206,14 +218,25 @@ export function parseFreshPickCart(value: unknown): FreshPickCart | null {
     .trim()
     .slice(0, 5);
   const receipt = String(row.includeReceiptChoice ?? "");
+  const fulfilmentMethod = parseCustomerWebsiteFulfilmentMethod(
+    String(row.fulfilmentMethod ?? "pickup"),
+  );
+  const parsedReservationTime = String(row.reservationTime ?? "")
+    .trim()
+    .slice(0, 5);
   const empty = emptyFreshPickCart();
   return {
     ...empty,
     pickupDate: isYmd(pickupDate) ? pickupDate : (items[0]?.pickupDate ?? ""),
     pickupTime: isHm(pickupTime) ? pickupTime : (items[0]?.pickupTime ?? ""),
-    fulfilmentMethod: parseCustomerWebsiteFulfilmentMethod(
-      String(row.fulfilmentMethod ?? "pickup"),
-    ),
+    fulfilmentMethod,
+    // Older Dine-in carts stored the same time in pickupTime and the reservation.
+    // Preserve those sessions while new carts keep the two values independent.
+    reservationTime: isHm(parsedReservationTime)
+      ? parsedReservationTime
+      : fulfilmentMethod === "dine_in" && isHm(pickupTime)
+        ? pickupTime
+        : "",
     pickupAvailableFromAt: String(row.pickupAvailableFromAt ?? ""),
     orderCutoffAt: String(row.orderCutoffAt ?? ""),
     dineInVenue: String(row.dineInVenue ?? ""),
@@ -383,6 +406,33 @@ export function addFreshPickToCart(
     };
   }
 
+  const dineInVenue = parseDineInVenue(input.dineInVenue);
+  const reservationTime = String(input.reservationTime ?? "")
+    .trim()
+    .slice(0, 5);
+  if (
+    fulfilmentMethod === "dine_in" &&
+    (!isHm(reservationTime) ||
+      !dineInVenue ||
+      !isValidDineInReservationPair({
+        dateYmd: input.pickupDate,
+        reservationTime,
+        servingTime: input.pickupTime,
+        venue: dineInVenue,
+        snapshot: context.snapshot,
+      }) ||
+      !availableDineInVenues(
+        input.pickupDate,
+        input.pickupTime,
+        context.snapshot,
+      ).includes(dineInVenue))
+  ) {
+    return {
+      ok: false,
+      error: "Please choose a valid dine-in venue and time.",
+    };
+  }
+
   const current = cart ?? emptyFreshPickCart();
   if (current.items.some((item) => item.extraStockId === extraStockId)) {
     return { ok: false, error: FRESH_PICKS_ALREADY_IN_CART };
@@ -392,9 +442,20 @@ export function addFreshPickToCart(
     if (
       current.pickupDate !== input.pickupDate ||
       current.pickupTime !== input.pickupTime ||
+      current.reservationTime !==
+        (fulfilmentMethod === "dine_in" ? reservationTime : "") ||
       current.fulfilmentMethod !== fulfilmentMethod
     ) {
       return { ok: false, error: FRESH_PICKS_CART_PICKUP_MISMATCH };
+    }
+    if (
+      fulfilmentMethod === "dine_in" &&
+      current.dineInVenue !== dineInVenue
+    ) {
+      return {
+        ok: false,
+        error: "Choose the same dine-in venue for Fresh Picks in your cart.",
+      };
     }
     if (
       current.items.some(
@@ -438,8 +499,20 @@ export function addFreshPickToCart(
       current.items.length > 0 ? current.pickupDate : input.pickupDate,
     pickupTime:
       current.items.length > 0 ? current.pickupTime : input.pickupTime,
+    reservationTime:
+      current.items.length > 0
+        ? current.reservationTime
+        : fulfilmentMethod === "dine_in"
+          ? reservationTime
+          : "",
     fulfilmentMethod:
       current.items.length > 0 ? current.fulfilmentMethod : fulfilmentMethod,
+    dineInVenue:
+      current.items.length > 0
+        ? current.dineInVenue
+        : fulfilmentMethod === "dine_in"
+          ? dineInVenue ?? ""
+          : "",
     pickupAvailableFromAt:
       current.items.length > 0
         ? current.pickupAvailableFromAt
