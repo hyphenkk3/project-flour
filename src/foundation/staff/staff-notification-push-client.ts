@@ -6,6 +6,18 @@ export type BrowserStaffPushSubscription = {
   keys: { p256dh: string; auth: string };
 };
 
+export type StaffPushEnableFailureCode =
+  | "push_unsupported"
+  | "permission_denied"
+  | "permission_not_granted"
+  | "service_worker_registration_failed"
+  | "subscription_lookup_failed"
+  | "subscription_key_unavailable"
+  | "vapid_key_mismatch"
+  | "subscription_create_failed"
+  | "subscription_incomplete"
+  | "push_configuration_invalid";
+
 function applicationServerKeyBytes(value: string): ArrayBuffer {
   const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
@@ -17,31 +29,92 @@ function applicationServerKeyBytes(value: string): ArrayBuffer {
   return bytes.buffer as ArrayBuffer;
 }
 
+export function matchesApplicationServerKey(
+  existingValue: BufferSource | null,
+  expectedValue: BufferSource,
+): boolean {
+  if (!existingValue) return false;
+  const toBytes = (value: BufferSource) =>
+    value instanceof ArrayBuffer
+      ? new Uint8Array(value)
+      : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  const existing = toBytes(existingValue);
+  const expected = toBytes(expectedValue);
+  if (existing.byteLength !== expected.byteLength) return false;
+  return existing.every((value, index) => value === expected[index]);
+}
+
+type SubscribeResult =
+  | {
+      subscription: BrowserStaffPushSubscription;
+      error: null;
+      errorCode: null;
+      created: boolean;
+    }
+  | {
+      subscription: null;
+      error: string;
+      errorCode: StaffPushEnableFailureCode;
+      staleEndpoint?: string;
+      created: false;
+    };
+
+function failed(
+  errorCode: StaffPushEnableFailureCode,
+  error: string,
+  staleEndpoint?: string,
+): SubscribeResult {
+  return {
+    subscription: null,
+    error,
+    errorCode,
+    staleEndpoint,
+    created: false,
+  };
+}
+
 export async function subscribeCurrentStaffDevice(input: {
   applicationServerKey: string;
-}): Promise<
-  | { subscription: BrowserStaffPushSubscription; error: null }
-  | { subscription: null; error: string }
-> {
+}): Promise<SubscribeResult> {
   if (
     typeof window === "undefined" ||
     !("serviceWorker" in navigator) ||
     !("PushManager" in window) ||
     !("Notification" in window)
   ) {
-    return {
-      subscription: null,
-      error: "Push is not supported by this browser.",
-    };
+    return failed(
+      "push_unsupported",
+      "Push is not supported in this browser. Open the installed Home Screen app on a supported iPhone or browser.",
+    );
   }
-  if (!input.applicationServerKey.trim()) {
-    return {
-      subscription: null,
-      error: "Push is not configured for this site yet.",
-    };
-  }
-
+  let stage:
+    | "permission"
+    | "service_worker"
+    | "subscription_lookup"
+    | "subscription_create" = "permission";
   try {
+    if (!input.applicationServerKey.trim()) {
+      return failed(
+        "push_configuration_invalid",
+        "Push is not configured for this Preview. Contact the project owner.",
+      );
+    }
+    let expectedKey: ArrayBuffer;
+    try {
+      expectedKey = applicationServerKeyBytes(input.applicationServerKey);
+    } catch {
+      return failed(
+        "push_configuration_invalid",
+        "The Push key configured for this Preview is invalid. Contact the project owner.",
+      );
+    }
+    if (expectedKey.byteLength !== 65 || new Uint8Array(expectedKey)[0] !== 4) {
+      return failed(
+        "push_configuration_invalid",
+        "The Push key configured for this Preview is invalid. Contact the project owner.",
+      );
+    }
+
     // Request permission directly in response to the staff member's click.
     const permissionPromise =
       Notification.permission === "granted"
@@ -49,15 +122,18 @@ export async function subscribeCurrentStaffDevice(input: {
         : Notification.requestPermission();
     const permission = await permissionPromise;
     if (permission !== "granted") {
-      return {
-        subscription: null,
-        error:
-          permission === "denied"
-            ? "Notifications are blocked in this browser's site settings."
-            : "Allow notifications to enable staff push.",
-      };
+      return permission === "denied"
+        ? failed(
+            "permission_denied",
+            "Notifications are blocked for this Preview. Allow them in iPhone Settings, then try again.",
+          )
+        : failed(
+            "permission_not_granted",
+            "Allow notifications for this Preview, then try again.",
+          );
     }
 
+    stage = "service_worker";
     const registration =
       (await navigator.serviceWorker.getRegistration("/")) ??
       (await navigator.serviceWorker.register("/sw.js", {
@@ -66,25 +142,45 @@ export async function subscribeCurrentStaffDevice(input: {
       }));
     await navigator.serviceWorker.ready;
 
+    stage = "subscription_lookup";
     const existing = await registration.pushManager.getSubscription();
-    const subscription =
-      existing ??
-      (await registration.pushManager.subscribe({
+    if (existing) {
+      const existingKey = existing.options.applicationServerKey;
+      if (!existingKey) {
+        return failed(
+          "subscription_key_unavailable",
+          "This device has an older Push registration that cannot be verified. Turn Push off for this device, then enable it again.",
+        );
+      }
+      if (!matchesApplicationServerKey(existingKey, expectedKey)) {
+        return failed(
+          "vapid_key_mismatch",
+          "This device's Push registration uses an older key and must be replaced. The old device registration will be retired before creating a new one.",
+          existing.endpoint,
+        );
+      }
+    }
+
+    let created = false;
+    let subscription = existing;
+    if (!subscription) {
+      stage = "subscription_create";
+      subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: applicationServerKeyBytes(
-          input.applicationServerKey,
-        ) as BufferSource,
-      }));
+        applicationServerKey: expectedKey as BufferSource,
+      });
+      created = true;
+    }
     const serialized = subscription.toJSON();
     if (
       !serialized.endpoint ||
       !serialized.keys?.p256dh ||
       !serialized.keys.auth
     ) {
-      return {
-        subscription: null,
-        error: "The browser returned an incomplete push subscription.",
-      };
+      return failed(
+        "subscription_incomplete",
+        "The browser returned incomplete Push details. Refresh the Home Screen app and try again.",
+      );
     }
 
     return {
@@ -97,12 +193,32 @@ export async function subscribeCurrentStaffDevice(input: {
         },
       },
       error: null,
+      errorCode: null,
+      created,
     };
   } catch {
-    return {
-      subscription: null,
-      error: "This device could not subscribe to staff push notifications.",
-    };
+    if (stage === "permission") {
+      return failed(
+        "permission_not_granted",
+        "iPhone could not request notification permission. Check Safari notification settings and try again.",
+      );
+    }
+    if (stage === "service_worker") {
+      return failed(
+        "service_worker_registration_failed",
+        "The Preview could not start its notification worker. Close and reopen the Home Screen app, then try again.",
+      );
+    }
+    if (stage === "subscription_lookup") {
+      return failed(
+        "subscription_lookup_failed",
+        "The Preview could not check this device's Push registration. Refresh the Home Screen app and try again.",
+      );
+    }
+    return failed(
+      "subscription_create_failed",
+      "The browser could not create a Push registration. Check notification permission and try again.",
+    );
   }
 }
 

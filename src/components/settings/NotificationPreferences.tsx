@@ -27,6 +27,13 @@ type NotificationPreferencesProps = {
   pushApplicationServerKey: string;
 };
 
+class PreferenceOperationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PreferenceOperationError";
+  }
+}
+
 export function NotificationPreferences({
   definitions,
   initialPreferences,
@@ -66,70 +73,141 @@ export function NotificationPreferences({
     }
 
     let registeredPushEndpoint: string | null = null;
-    const previouslyPushEnabled = previous.some(
-      (preference) => preference.pushEnabled,
-    );
-    if (patch.pushEnabled === true) {
-      const subscribed = await subscribeCurrentStaffDevice({
-        applicationServerKey: pushApplicationServerKey,
-      });
-      if (!subscribed.subscription) {
-        setPreferences(previous);
-        setError(subscribed.error);
-        setSaving(null);
-        return;
+    let createdBrowserSubscription = false;
+    let registrationAttempted = false;
+    let preferenceSaved = false;
+    try {
+      if (patch.pushEnabled === true) {
+        let subscribed = await subscribeCurrentStaffDevice({
+          applicationServerKey: pushApplicationServerKey,
+        });
+
+        if (subscribed.errorCode === "vapid_key_mismatch") {
+          const staleEndpoint = subscribed.staleEndpoint;
+          if (!staleEndpoint) {
+            throw new PreferenceOperationError(
+              "This device's old Push registration could not be safely identified. Turn Push off for this device, then enable it again.",
+            );
+          }
+
+          let revoked: { error: string | null };
+          try {
+            revoked = await revokeStaffPushSubscriptionAction(staleEndpoint);
+          } catch {
+            throw new PreferenceOperationError(
+              "The Preview could not retire this device's old Push registration. No replacement was created; refresh and try again.",
+            );
+          }
+          if (revoked.error) {
+            throw new PreferenceOperationError(revoked.error);
+          }
+
+          const removed = await unsubscribeCurrentStaffDevice();
+          if (!removed.success) {
+            throw new PreferenceOperationError(
+              "The old device registration was retired, but iPhone could not remove it locally. Close and reopen the Home Screen app, then try again.",
+            );
+          }
+
+          subscribed = await subscribeCurrentStaffDevice({
+            applicationServerKey: pushApplicationServerKey,
+          });
+        }
+
+        if (!subscribed.subscription) {
+          throw new PreferenceOperationError(subscribed.error);
+        }
+
+        createdBrowserSubscription = subscribed.created;
+        registrationAttempted = true;
+        let registered: { error: string | null };
+        try {
+          registered = await registerStaffPushSubscriptionAction(
+            subscribed.subscription,
+          );
+        } catch {
+          throw new PreferenceOperationError(
+            "The Preview could not complete the device registration request. Confirm you are signed in, refresh, and try again.",
+          );
+        }
+        if (registered.error) {
+          throw new PreferenceOperationError(registered.error);
+        }
+        registeredPushEndpoint = subscribed.subscription.endpoint;
       }
 
-      const registered = await registerStaffPushSubscriptionAction(
-        subscribed.subscription,
+      const formData = new FormData();
+      formData.set("notification_code", definition.code);
+      formData.set("web_enabled", String(next.webEnabled));
+      formData.set("web_mode", next.webMode);
+      formData.set("sound_enabled", String(next.soundEnabled));
+      formData.set("push_enabled", String(next.pushEnabled));
+      if (!emailNotificationsPaused) {
+        formData.set("email_enabled", String(next.emailEnabled));
+      }
+
+      let result: { error: string | null };
+      try {
+        result = await saveStaffNotificationPreferenceAction(formData);
+      } catch {
+        throw new PreferenceOperationError(
+          "The preference save result could not be confirmed. Refresh the Home Screen app to check the saved setting before retrying.",
+        );
+      }
+      if (result.error) {
+        throw new PreferenceOperationError(result.error);
+      }
+      preferenceSaved = true;
+
+      if (
+        patch.pushEnabled === false &&
+        !nextPreferences.some((preference) => preference.pushEnabled)
+      ) {
+        const endpoint = await currentStaffDeviceEndpoint();
+        if (endpoint) {
+          const revoked = await revokeStaffPushSubscriptionAction(endpoint);
+          if (revoked.error) {
+            throw new PreferenceOperationError(revoked.error);
+          }
+          const removed = await unsubscribeCurrentStaffDevice();
+          if (!removed.success) {
+            throw new PreferenceOperationError(
+              "Push was turned off, but iPhone could not remove its local registration. Reopen the Home Screen app and check the setting.",
+            );
+          }
+        }
+      }
+    } catch (error) {
+      if (!preferenceSaved) setPreferences(previous);
+      const safeMessage =
+        error instanceof PreferenceOperationError
+          ? error.message
+          : "Push settings could not be saved because the request did not complete. Refresh the Home Screen app, confirm you are signed in, and try again.";
+
+      let cleanupFailed = false;
+      try {
+        if (createdBrowserSubscription) {
+          const endpoint =
+            registeredPushEndpoint ?? (await currentStaffDeviceEndpoint());
+          if (endpoint && registrationAttempted) {
+            const revoked = await revokeStaffPushSubscriptionAction(endpoint);
+            if (revoked.error) cleanupFailed = true;
+          }
+          const removed = await unsubscribeCurrentStaffDevice();
+          if (!removed.success) cleanupFailed = true;
+        }
+      } catch {
+        cleanupFailed = true;
+      }
+
+      setError(
+        cleanupFailed
+          ? `${safeMessage} The device registration could not be fully cleaned up; refresh before trying again.`
+          : safeMessage,
       );
-      if (registered.error) {
-        setPreferences(previous);
-        setError(registered.error);
-        if (!previouslyPushEnabled) {
-          await unsubscribeCurrentStaffDevice();
-        }
-        setSaving(null);
-        return;
-      }
-      registeredPushEndpoint = subscribed.subscription.endpoint;
+    } finally {
+      setSaving(null);
     }
-
-    const formData = new FormData();
-    formData.set("notification_code", definition.code);
-    formData.set("web_enabled", String(next.webEnabled));
-    formData.set("web_mode", next.webMode);
-    formData.set("sound_enabled", String(next.soundEnabled));
-    formData.set("push_enabled", String(next.pushEnabled));
-    if (!emailNotificationsPaused) {
-      formData.set("email_enabled", String(next.emailEnabled));
-    }
-
-    const result = await saveStaffNotificationPreferenceAction(formData);
-
-    if (result.error) {
-      setPreferences(previous);
-      setError(result.error);
-      if (registeredPushEndpoint && !previouslyPushEnabled) {
-        await revokeStaffPushSubscriptionAction(registeredPushEndpoint);
-        await unsubscribeCurrentStaffDevice();
-      }
-    } else if (
-      patch.pushEnabled === false &&
-      !nextPreferences.some((preference) => preference.pushEnabled)
-    ) {
-      const endpoint = await currentStaffDeviceEndpoint();
-      if (endpoint) {
-        const revoked = await revokeStaffPushSubscriptionAction(endpoint);
-        if (revoked.error) {
-          setError(revoked.error);
-        } else {
-          await unsubscribeCurrentStaffDevice();
-        }
-      }
-    }
-
-    setSaving(null);
   }
 
   function updateWebMode(

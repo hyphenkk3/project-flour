@@ -84,7 +84,13 @@ export async function saveStaffNotificationPreferenceAction(
     );
 
   if (error) {
-    return { error: error.message };
+    console.error("[staff-notifications] Preference save failed:", {
+      code: error.code ?? "unknown",
+    });
+    return {
+      error:
+        "The notification preference was not saved. Refresh the Home Screen app, confirm you are signed in, and try again.",
+    };
   }
 
   return { error: null };
