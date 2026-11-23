@@ -7,7 +7,10 @@ import {
   registerStaffPushSubscriptionAction,
   revokeStaffPushSubscriptionAction,
 } from "@/foundation/staff/staff-notification-push-actions";
-import { playStaffNotificationSound } from "@/foundation/staff/staff-notification-sound";
+import {
+  playStaffNotificationSound,
+  primeStaffNotificationSound,
+} from "@/foundation/staff/staff-notification-sound";
 import {
   currentStaffDeviceEndpoint,
   subscribeCurrentStaffDevice,
@@ -50,6 +53,10 @@ export function NotificationPreferences({
     definition: StaffNotificationDefinition,
     patch: Partial<StaffNotificationPreference>,
   ) {
+    if (patch.soundEnabled === true) {
+      // Unlock iOS Web Audio in the same direct tap that enables Sound.
+      primeStaffNotificationSound();
+    }
     const previous = preferences;
 
     setError(null);
@@ -222,8 +229,8 @@ export function NotificationPreferences({
     const result = await playStaffNotificationSound({ eventId: "manual-test" });
     setSoundTestResult(
       result.playback === "scheduled"
-        ? "Cue scheduled. Confirm that you can hear it."
-        : `Sound unavailable (${result.restriction}).`,
+        ? `Audio check: context ${result.contextStateBefore} → ${result.contextState}; resume ${result.resume}; cue ${result.playback}. Confirm that you can hear it.`
+        : `Audio check: context ${result.contextStateBefore} → ${result.contextState}; resume ${result.resume}; cue ${result.playback}; restriction ${result.restriction}.`,
     );
   }
 

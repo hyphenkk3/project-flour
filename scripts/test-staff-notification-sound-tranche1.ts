@@ -30,9 +30,12 @@ const createdNodes: FakeNode[] = [];
 let contextInstances = 0;
 let resumeMode: "success" | "reject" = "success";
 let failScheduling = false;
+let requireTapForStart = false;
+let tapIsActive = false;
+let startsOutsideTap = 0;
 const contexts: FakeAudioContext[] = [];
 class FakeAudioContext {
-  state: "running" | "suspended" | "closed" = "running";
+  state: "running" | "suspended" | "interrupted" | "closed" = "running";
   currentTime = 7;
   destination = { id: "destination" };
   constructor() {
@@ -62,6 +65,10 @@ class FakeAudioContext {
         this.disconnected = true;
       },
       start(at) {
+        if (requireTapForStart && !tapIsActive) {
+          startsOutsideTap += 1;
+          throw new Error("audio start missed the direct tap");
+        }
         if (failScheduling) throw new Error("mock scheduling failure");
         this.startAt = at;
       },
@@ -156,6 +163,15 @@ const privilegeMigration = readFileSync(
 assert.match(preferenceQuery, /sound_enabled/);
 assert.match(preferenceAction, /sound_enabled/);
 assert.match(preferenceAction, /soundEnabledValue\s*\?/);
+assert.match(preferenceAction, /soundEnabled/);
+assert.match(
+  readFileSync(resolve("src/components/settings/NotificationPreferences.tsx"), "utf8"),
+  /if \(patch\.soundEnabled === true\)[\s\S]*?primeStaffNotificationSound\(\)/,
+);
+assert.match(
+  readFileSync(resolve("src/components/settings/NotificationPreferences.tsx"), "utf8"),
+  /onClick=\{\(\) => void testSound\(\)\}/,
+);
 assert.match(listener, /preference\.soundEnabled === true/);
 assert.match(listener, /claimStaffNotificationForStaff/);
 assert.match(listener, /ownership: "duplicate_suppressed"/);
@@ -198,14 +214,33 @@ assert.equal("payload" in (diagnostics.at(-1) ?? {}), false);
 const contextsBeforeReuse = contextInstances;
 contexts[0].state = "suspended";
 resumeMode = "success";
-const resumed = await playStaffNotificationSound({
+requireTapForStart = true;
+tapIsActive = true;
+const resumedPromise = playStaffNotificationSound({
   eventId: "10000000-0000-4000-8000-000000000002",
   ownership: "winner",
   soundEnabled: true,
   eligible: true,
 });
+tapIsActive = false;
+const resumed = await resumedPromise;
 assert.equal(resumed.resume, "succeeded");
 assert.equal(resumed.playback, "scheduled");
+assert.equal(resumed.contextStateBefore, "suspended");
+assert.equal(startsOutsideTap, 0, "oscillators start in the direct tap stack");
+requireTapForStart = false;
+
+contexts[0].state = "interrupted";
+resumeMode = "success";
+tapIsActive = true;
+const interruptedPromise = playStaffNotificationSound({
+  eventId: "10000000-0000-4000-8000-000000000005",
+});
+tapIsActive = false;
+const interrupted = await interruptedPromise;
+assert.equal(interrupted.contextStateBefore, "interrupted");
+assert.equal(interrupted.resume, "succeeded");
+assert.equal(interrupted.playback, "scheduled");
 assert.equal(
   contextInstances,
   contextsBeforeReuse,
@@ -223,7 +258,12 @@ const rejectedResume = await playStaffNotificationSound({
 });
 assert.equal(rejectedResume.resume, "failed");
 assert.equal(rejectedResume.playback, "not-attempted");
-assert.equal(createdNodes.length, scheduledBeforeRejectedResume);
+assert.equal(createdNodes.length, scheduledBeforeRejectedResume + 4);
+assert.equal(
+  createdNodes.slice(scheduledBeforeRejectedResume).every((node) => node.disconnected),
+  true,
+  "tap-scheduled nodes are cancelled and released if resume fails",
+);
 
 contexts[0].state = "running";
 failScheduling = true;
@@ -256,7 +296,8 @@ const resumeTestPath = readFileSync(
 );
 assert.match(resumeTestPath, /audio\.resume\(\)/);
 assert.match(resumeTestPath, /Promise\.race/);
-assert.match(resumeTestPath, /context\.state === "closed"/);
+assert.match(resumeTestPath, /Call resume and schedule the short cue before awaiting/);
+assert.match(resumeTestPath, /audioContext\.state === "closed"/);
 assert.doesNotMatch(resumeTestPath, /setInterval|while\s*\(/);
 console.info = originalInfo;
 console.log(

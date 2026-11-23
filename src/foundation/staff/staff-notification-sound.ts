@@ -28,7 +28,18 @@ export function recordStaffNotificationSoundOwnership(
 }
 
 export type StaffNotificationSoundResult = {
-  contextState: "running" | "suspended" | "closed" | "unavailable";
+  contextState:
+    | "running"
+    | "suspended"
+    | "interrupted"
+    | "closed"
+    | "unavailable";
+  contextStateBefore:
+    | "running"
+    | "suspended"
+    | "interrupted"
+    | "closed"
+    | "unavailable";
   resume: "not-needed" | "succeeded" | "failed" | "timeout";
   playback: "scheduled" | "failed" | "not-attempted";
   restriction: "none" | "unsupported" | "resume-failed" | "schedule-failed";
@@ -63,10 +74,12 @@ function safeState(
   context: AudioContext | null,
 ): StaffNotificationSoundResult["contextState"] {
   if (!context) return "unavailable";
-  return context.state === "running" ||
-    context.state === "suspended" ||
-    context.state === "closed"
-    ? context.state
+  const state = (context as AudioContext & { state: string }).state;
+  return state === "running" ||
+    state === "suspended" ||
+    state === "interrupted" ||
+    state === "closed"
+    ? state
     : "unavailable";
 }
 
@@ -113,6 +126,59 @@ function getAudioContext(): AudioContext | null {
   }
 }
 
+/** Unlocks the shared context synchronously from a staff input gesture. */
+export function primeStaffNotificationSound(): void {
+  const audio = getAudioContext();
+  if (!audio) {
+    diagnostic("prime_unavailable", "manual-prime", "winner", true, true, {
+      audioContextBefore: "unavailable",
+      resumeAttempted: false,
+    });
+    return;
+  }
+  if (audio.state === "running") return;
+
+  try {
+    const resumePromise = audio.resume();
+    void resumePromise.then(
+      () => {
+        diagnostic("prime_result", "manual-prime", "winner", true, true, {
+          audioContextAfter: safeState(audio),
+          resume: audio.state === "running" ? "succeeded" : "failed",
+        });
+      },
+      () => {
+        diagnostic("prime_result", "manual-prime", "winner", true, true, {
+          audioContextAfter: safeState(audio),
+          resume: "failed",
+        });
+      },
+    );
+  } catch {
+    diagnostic("prime_result", "manual-prime", "winner", true, true, {
+      audioContextAfter: safeState(audio),
+      resume: "failed",
+    });
+  }
+}
+
+function stopAndRelease(nodes: AudioNode[], oscillators: OscillatorNode[]) {
+  for (const oscillator of oscillators) {
+    try {
+      oscillator.stop();
+    } catch {
+      // It may already have stopped.
+    }
+  }
+  for (const node of nodes) {
+    try {
+      node.disconnect();
+    } catch {
+      // Best-effort cleanup.
+    }
+  }
+}
+
 /** Uses one shared context and cue for the settings test and eligible notifications. */
 export async function playStaffNotificationSound(
   context: Partial<StaffNotificationSoundDiagnostic> = {},
@@ -127,6 +193,7 @@ export async function playStaffNotificationSound(
   if (!audio) {
     const result: StaffNotificationSoundResult = {
       contextState: "unavailable",
+      contextStateBefore: before,
       resume: "failed",
       playback: "not-attempted",
       restriction: "unsupported",
@@ -141,38 +208,26 @@ export async function playStaffNotificationSound(
   }
 
   let resume: StaffNotificationSoundResult["resume"] = "not-needed";
+  let resumePromise: Promise<void> | null = null;
   if (audio.state !== "running") {
     diagnostic("resume_started", eventId, ownership, soundEnabled, eligible, {
       audioContextBefore: before,
       resumeAttempted: true,
     });
     try {
-      let timeoutId: number | undefined;
-      const outcome = await Promise.race([
-        audio.resume().then(
-          () => "settled" as const,
-          () => "rejected" as const,
-        ),
-        new Promise<"timeout">((resolve) => {
-          timeoutId = window.setTimeout(() => resolve("timeout"), 1500);
-        }),
-      ]);
-      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-      resume =
-        outcome === "timeout"
-          ? "timeout"
-          : outcome === "rejected" || safeState(audio) !== "running"
-            ? "failed"
-            : "succeeded";
+      // Call resume and schedule the short cue before awaiting either one.
+      // iOS Safari may require both operations to remain in the tap's gesture.
+      resumePromise = audio.resume();
     } catch {
       resume = "failed";
     }
   }
 
-  if (audio.state !== "running") {
+  if (audio.state !== "running" && !resumePromise) {
     const result: StaffNotificationSoundResult = {
       contextState: safeState(audio),
-      resume: resume === "not-needed" ? "failed" : resume,
+      contextStateBefore: before,
+      resume: "failed",
       playback: "not-attempted",
       restriction: "resume-failed",
     };
@@ -188,6 +243,7 @@ export async function playStaffNotificationSound(
   }
 
   const scheduled: AudioNode[] = [];
+  const oscillators: OscillatorNode[] = [];
   try {
     const startAt = audio.currentTime;
     for (const [offset, frequency] of [
@@ -196,6 +252,7 @@ export async function playStaffNotificationSound(
     ] as const) {
       const oscillator = audio.createOscillator();
       const gain = audio.createGain();
+      oscillators.push(oscillator);
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(frequency, startAt + offset);
       gain.gain.setValueAtTime(0.0001, startAt + offset);
@@ -215,9 +272,49 @@ export async function playStaffNotificationSound(
       oscillator.start(startAt + offset);
       oscillator.stop(startAt + offset + 0.13);
     }
+    if (resumePromise) {
+      let timeoutId: number | undefined;
+      const outcome = await Promise.race([
+        resumePromise.then(
+          () => "settled" as const,
+          () => "rejected" as const,
+        ),
+        new Promise<"timeout">((resolve) => {
+          timeoutId = window.setTimeout(() => resolve("timeout"), 1500);
+        }),
+      ]);
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      resume =
+        outcome === "timeout"
+          ? "timeout"
+          : outcome === "rejected" || safeState(audio) !== "running"
+            ? "failed"
+            : "succeeded";
+      if (resume !== "succeeded") {
+        stopAndRelease(scheduled, oscillators);
+        const failed: StaffNotificationSoundResult = {
+          contextState: safeState(audio),
+          contextStateBefore: before,
+          resume,
+          playback: "not-attempted",
+          restriction: "resume-failed",
+        };
+        diagnostic("resume_failed", eventId, ownership, soundEnabled, eligible, {
+          audioContextBefore: before,
+          audioContextAfter: failed.contextState,
+          resumeAttempted: true,
+          resume: failed.resume,
+          playback: failed.playback,
+          restriction: failed.restriction,
+        });
+        return failed;
+      }
+    }
+
     const result: StaffNotificationSoundResult = {
       contextState: safeState(audio),
-      resume,
+      contextStateBefore: before,
+      resume: resumePromise ? resume : "not-needed",
       playback: "scheduled",
       restriction: "none",
     };
@@ -231,15 +328,10 @@ export async function playStaffNotificationSound(
     });
     return result;
   } catch {
-    for (const node of scheduled) {
-      try {
-        node.disconnect();
-      } catch {
-        /* best-effort cleanup */
-      }
-    }
+    stopAndRelease(scheduled, oscillators);
     const result: StaffNotificationSoundResult = {
       contextState: safeState(audio),
+      contextStateBefore: before,
       resume,
       playback: "failed",
       restriction: "schedule-failed",
