@@ -1,5 +1,6 @@
 import { STAFF_NOTIFICATION_DEFINITIONS } from "./notification-preferences";
 import type { StaffNotificationEvent } from "./staff-notification-engine";
+import { resolveStaffNotificationTestScope } from "./staff-notification-test-scope";
 
 export const MALFORMED_LIVE_RECOVERY_COOLDOWN_MS = 30_000;
 
@@ -72,15 +73,27 @@ export function normalizeLiveNotificationEvent(
   const title = typeof value.title === "string" ? value.title.trim() : "";
   const description =
     typeof value.description === "string" ? value.description.trim() : "";
+  const payload = isRecord(value.payload) ? value.payload : null;
+  const testScope = resolveStaffNotificationTestScope(title, payload);
+  if (testScope.kind === "invalid") return null;
+  const displayTitle =
+    testScope.kind === "owner_only"
+      ? "SYSTEM TEST — NO REAL ORDER"
+      : authoritativeNotificationTitle(code);
+  const displayDescription =
+    testScope.kind === "owner_only"
+      ? "No order, payment, customer, reservation, or collection record was created."
+      : description;
   const href = typeof value.href === "string" ? value.href : undefined;
 
   return {
     id,
     code,
     orderId,
-    title: title || "Staff notification",
-    description,
+    title: displayTitle,
+    description: displayDescription,
     href,
+    payload,
     actionLabel:
       code === "waiting_list_new_request"
         ? "View"
@@ -89,6 +102,31 @@ export function normalizeLiveNotificationEvent(
           : "View order",
     tone: toneFromCode(code),
   };
+}
+
+function authoritativeNotificationTitle(
+  code: StaffNotificationEvent["code"],
+): string {
+  switch (code) {
+    case "new_order":
+      return "New Order";
+    case "last_minute":
+      return "Last Minute Order";
+    case "order_paid":
+      return "Order Paid";
+    case "order_confirmed":
+      return "Order Confirmed";
+    case "order_cancelled":
+      return "Order Cancelled";
+    case "order_edited":
+      return "Order Edited";
+    case "approval_required":
+      return "Approval Required";
+    case "fresh_pick_walk_in_hold_reminder":
+      return "Fresh Pick hold reminder";
+    case "waiting_list_new_request":
+      return "New waiting list request";
+  }
 }
 
 function toneFromCode(

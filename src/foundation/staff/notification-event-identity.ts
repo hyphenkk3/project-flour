@@ -20,7 +20,8 @@ export const STAFF_NOTIFICATION_AUTHORITATIVE_SOURCES = {
   new_order: "orders.insert",
   order_paid: "orders.update.paid",
   order_cancelled: "orders.update.cancelled",
-  last_minute: "orders.order_source.last_minute",
+  last_minute:
+    "orders.insert.customer_website_extra_stock_or_order_source.last_minute",
   order_confirmed: "order_timeline_events.insert.customer_confirmed",
   order_edited: "order_timeline_events.insert.order_updated",
   approval_required: "operations_approval_requests.insert.pending",
@@ -71,10 +72,14 @@ export function staffNotificationEventKey(
 }
 
 export function isNewOrderNotificationSource(
-  order: Pick<OrderNotificationSnapshot, "status" | "extraStockId">,
+  order: Pick<
+    OrderNotificationSnapshot,
+    "status" | "extraStockId" | "orderSource"
+  >,
 ): boolean {
   if (order.status !== "submitted") return false;
   if (order.extraStockId != null) return false;
+  if (order.orderSource === LAST_MINUTE_ORDER_SOURCE) return false;
   return true;
 }
 
@@ -121,7 +126,9 @@ export function classifyOrderInsert(
     });
   }
 
-  if (isLastMinuteNotificationTransition(null, order)) {
+  const isFreshPickCheckout =
+    order.orderSource === "customer_website" && order.extraStockId != null;
+  if (isFreshPickCheckout || isLastMinuteNotificationTransition(null, order)) {
     events.push({
       eventKey: staffNotificationEventKey("last_minute", order.id),
       code: "last_minute",

@@ -143,13 +143,13 @@ const listener = readFileSync(
 );
 const soundMigration = readFileSync(
   resolve(
-    "supabase/migrations/20261109110501_staff_notification_sound_preference.sql",
+    "recovery/candidates/notification-migrations/20261109110501_staff_notification_sound_preference.sql",
   ),
   "utf8",
 );
 const privilegeMigration = readFileSync(
   resolve(
-    "supabase/migrations/20261109213004_staff_notification_preferences_revoke_client_truncate.sql",
+    "recovery/candidates/notification-migrations/20261109213004_staff_notification_preferences_revoke_client_truncate.sql",
   ),
   "utf8",
 );

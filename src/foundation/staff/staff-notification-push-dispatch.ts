@@ -12,10 +12,10 @@ import {
   type StaffPushSender,
 } from "@/foundation/staff/staff-notification-push-delivery-core";
 import {
-  isStaffPushOrderNotificationCode,
   isStaffNotificationEventId,
   parseStaffPushSubscription,
 } from "@/foundation/staff/staff-notification-push-protocol";
+import { resolveStaffNotificationTestScope } from "@/foundation/staff/staff-notification-test-scope";
 
 // Keep each post-response/cron pass short and bound provider concurrency.
 const PUSH_DELIVERY_LIMIT = 10;
@@ -33,6 +33,15 @@ type PushClaimRow = {
   endpoint: string;
   p256dh: string;
   auth_secret: string;
+};
+
+type PushEventContent = {
+  id: string;
+  code: string;
+  order_id: string | null;
+  title: string;
+  description: string;
+  payload: Record<string, unknown> | null;
 };
 
 function environmentConfiguration() {
@@ -175,6 +184,46 @@ export async function deliverPendingStaffPushNotifications(input: {
 
   try {
     const admin = createServiceClient();
+    const { data: event, error: eventError } = await admin
+      .from("staff_notification_events")
+      .select("id, code, order_id, title, description, payload")
+      .eq("id", eventId)
+      .maybeSingle();
+    if (eventError || !event || !isNotificationCode(event.code)) {
+      console.error("[staff-push] Event preflight failed", {
+        code: eventError?.code ?? (event ? "unsupported_event" : "not_found"),
+      });
+      return {
+        queued: 0,
+        attempted: 0,
+        sent: 0,
+        failed: 0,
+        revoked: 0,
+        suppressed: 0,
+        completionUnrecorded: 0,
+        skipped: null,
+      };
+    }
+    const eventContent = event as PushEventContent;
+    const testScope = resolveStaffNotificationTestScope(
+      eventContent.title,
+      eventContent.payload,
+    );
+    if (testScope.kind === "invalid") {
+      console.warn("[staff-push] Invalid synthetic test scope suppressed", {
+        eventId,
+      });
+      return {
+        queued: 0,
+        attempted: 0,
+        sent: 0,
+        failed: 0,
+        revoked: 0,
+        suppressed: 0,
+        completionUnrecorded: 0,
+        skipped: null,
+      };
+    }
     const { data: queued, error: queueError } = await admin.rpc(
       "queue_staff_notification_push_deliveries",
       {
@@ -244,53 +293,31 @@ export async function deliverPendingStaffPushNotifications(input: {
         subscriptionId: row.subscription_id,
         claimedUntil: row.claimed_until,
         code,
-        orderId: null,
+        orderId:
+          typeof eventContent.order_id === "string" &&
+          isStaffNotificationEventId(eventContent.order_id)
+            ? eventContent.order_id
+            : null,
+        eventTitle: eventContent.title,
+        eventDescription: eventContent.description,
+        syntheticTest: testScope.kind === "owner_only",
         subscription,
       });
-    }
-
-    const orderEventIds = [
-      ...new Set(
-        claimed
-          .filter((delivery) => isStaffPushOrderNotificationCode(delivery.code))
-          .map((delivery) => delivery.eventId)
-          .filter(isStaffNotificationEventId),
-      ),
-    ];
-    if (orderEventIds.length > 0) {
-      const { data: events, error: eventError } = await admin
-        .from("staff_notification_events")
-        .select("id, order_id")
-        .in("id", orderEventIds);
-      if (eventError) {
-        console.error("[staff-push] Order destination lookup failed:", {
-          code: eventError.code ?? "unknown",
-        });
-      } else {
-        const orderIdByEventId = new Map<string, string | null>();
-        for (const event of events ?? []) {
-          orderIdByEventId.set(
-            event.id,
-            typeof event.order_id === "string" &&
-              isStaffNotificationEventId(event.order_id)
-              ? event.order_id
-              : null,
-          );
-        }
-        for (const delivery of claimed) {
-          if (isStaffPushOrderNotificationCode(delivery.code)) {
-            delivery.orderId = orderIdByEventId.get(delivery.eventId) ?? null;
-          }
-        }
-      }
     }
 
     const result = await deliverClaimedStaffPushNotifications({
       claimed,
       sender: createWebPushSender(configuration),
       complete: completeDelivery,
-      beforeSend: (delivery) =>
-        validateFreshPickReminderBeforeSend(admin, delivery),
+      beforeSend: async (delivery) => {
+        if (
+          testScope.kind === "owner_only" &&
+          delivery.staffId !== testScope.recipientStaffId
+        ) {
+          return "suppress_recipient";
+        }
+        return validateFreshPickReminderBeforeSend(admin, delivery);
+      },
     });
     return {
       queued: Number(queued ?? 0),

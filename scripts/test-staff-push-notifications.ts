@@ -66,7 +66,7 @@ assert.equal(
 );
 
 const message = buildStaffPushMessage({ eventId, code: "new_order" });
-assert.equal(message.title, "New order received");
+assert.equal(message.title, "New Order");
 assert.equal(message.data.href, "/owner");
 assert.equal(
   resolveStaffPushHref({ code: "new_order", orderId }),
@@ -353,10 +353,13 @@ async function main() {
     completionUnrecorded: 0,
   });
   assert.deepEqual(JSON.parse(sent[0].payload), {
-    version: 1,
+    version: 2,
     eventId,
     code: "new_order",
     orderId,
+    title: "New Order",
+    body: "A new preorder needs attention.",
+    systemTest: false,
   });
   assert.equal(sent[0].urgency, "normal");
   assert.doesNotMatch(sent[0].payload, /endpoint|p256dh|auth|customer|cake/i);
@@ -484,7 +487,7 @@ async function main() {
   });
 
   const migration = read(
-    "supabase/migrations/20261109193000_staff_notification_push.sql",
+    "recovery/candidates/notification-migrations/20261109193000_staff_notification_push.sql",
   );
   assert.equal(
     createHash("sha256").update(migration).digest("hex"),
@@ -504,7 +507,7 @@ async function main() {
   assert.match(migration, /interval '1 hour'/i);
 
   const scopedMigration = read(
-    "supabase/migrations/20261114120000_staff_notification_push_dispatch_scope.sql",
+    "recovery/candidates/notification-migrations/20261114120000_staff_notification_push_dispatch_scope.sql",
   );
   assert.match(
     scopedMigration,
@@ -544,12 +547,13 @@ async function main() {
   assert.doesNotMatch(dispatcher, /input\?\.eventId \?\? null/);
   assert.match(dispatcher, /PUSH_DELIVERY_LIMIT = 10/);
   assert.match(dispatcher, /PUSH_BATCH_EVENT_LIMIT = 10/);
-  assert.match(dispatcher, /\.select\("id, order_id"\)/);
-  assert.match(dispatcher, /\.in\("id", orderEventIds\)/);
   assert.match(
     dispatcher,
-    /isStaffPushOrderNotificationCode\(delivery\.code\)[\s\S]*?delivery\.orderId = orderIdByEventId\.get\(delivery\.eventId\) \?\? null/,
+    /\.select\("id, code, order_id, title, description, payload"\)/,
   );
+  assert.match(dispatcher, /resolveStaffNotificationTestScope/);
+  assert.match(dispatcher, /delivery\.staffId !== testScope\.recipientStaffId/);
+  assert.match(dispatcher, /suppress_recipient/);
   assert.match(dispatcher, /list_staff_notification_push_batch_event_ids/);
   assert.match(dispatcher, /validateFreshPickReminderBeforeSend/);
   assert.match(
@@ -558,7 +562,7 @@ async function main() {
   );
 
   const handoffFixture = read(
-    "scripts/fixtures/20261111110823_staff_notification_fresh_pick_push_handoff.sql",
+    "recovery/candidates/notification-migrations/20261111110823_staff_notification_fresh_pick_push_handoff.sql",
   );
   assert.equal(
     createHash("sha256").update(handoffFixture).digest("hex"),

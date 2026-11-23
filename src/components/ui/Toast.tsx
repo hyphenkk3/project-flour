@@ -77,9 +77,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const tone = input.tone ?? "info";
       const durationMs =
-        input.durationMs === undefined
-          ? DEFAULT_DURATION_MS
-          : input.durationMs;
+        input.durationMs === undefined ? DEFAULT_DURATION_MS : input.durationMs;
 
       setItems((current) => {
         const next = [
@@ -115,7 +113,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div
         aria-live="polite"
-        className="pointer-events-none fixed inset-x-0 top-0 z-50 flex flex-col items-center gap-2 px-4 pt-4 pb-[env(safe-area-inset-top)] md:items-end md:pt-6 md:pr-6"
+        className="pointer-events-none fixed inset-x-0 top-0 z-50 flex max-h-[calc(100dvh-6rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col items-center gap-2 overflow-y-auto px-4 pt-4 pb-[env(safe-area-inset-top)] md:inset-y-0 md:left-auto md:max-h-full md:items-end md:pt-6 md:pr-6"
       >
         {items.map((item) => (
           <div

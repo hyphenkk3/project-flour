@@ -1,37 +1,37 @@
 const STAFF_PUSH_COPY = {
   new_order: {
-    title: "New order received",
+    title: "New Order",
     body: "A new preorder needs attention.",
     href: "/owner",
   },
   order_paid: {
-    title: "Order paid",
+    title: "Order Paid",
     body: "An order payment was recorded.",
     href: "/owner",
   },
   order_confirmed: {
-    title: "Order confirmed",
+    title: "Order Confirmed",
     body: "An order was confirmed.",
     href: "/owner",
   },
   order_cancelled: {
-    title: "Order cancelled",
+    title: "Order Cancelled",
     body: "An order was cancelled.",
     href: "/owner",
   },
   order_edited: {
-    title: "Order updated",
+    title: "Order Edited",
     body: "An order was updated.",
     href: "/owner",
   },
   approval_required: {
-    title: "Approval required",
+    title: "Approval Required",
     body: "A staff action needs review.",
     href: "/owner/approvals",
   },
   last_minute: {
-    title: "Last-minute order",
-    body: "Urgent order activity needs attention.",
+    title: "Last Minute Order",
+    body: "A new Fresh Pick order needs attention.",
     href: "/owner",
   },
   fresh_pick_walk_in_hold_reminder: {
@@ -72,7 +72,7 @@ self.addEventListener("push", (event) => {
     return;
   }
   if (
-    message?.version !== 1 ||
+    ![1, 2].includes(message?.version) ||
     typeof message.eventId !== "string" ||
     !Object.hasOwn(STAFF_PUSH_COPY, message.code)
   ) {
@@ -80,15 +80,39 @@ self.addEventListener("push", (event) => {
   }
 
   const copy = STAFF_PUSH_COPY[message.code];
+  const testTitle = "SYSTEM TEST — NO REAL ORDER";
+  const testBody =
+    "No order, payment, customer, reservation, or collection record was created.";
+  const isSafeSyntheticCopy =
+    message.version === 2 &&
+    message.systemTest === true &&
+    message.title === testTitle &&
+    message.body === testBody;
+  const isSafeEventCopy =
+    message.version === 2 &&
+    message.systemTest !== true &&
+    message.title === copy.title &&
+    message.body === copy.body;
   event.waitUntil(
-    self.registration.showNotification(copy.title, {
-      body: copy.body,
-      icon: "/icons/whitebird-w-bird-icon-192.png",
-      badge: "/icons/whitebird-w-bird-icon-192.png",
-      tag: `whitebird-staff-${message.eventId}`,
-      renotify: false,
-      data: { href: staffNotificationHref(message.code, message.orderId) },
-    }),
+    self.registration.showNotification(
+      isSafeSyntheticCopy
+        ? testTitle
+        : isSafeEventCopy
+          ? message.title
+          : copy.title,
+      {
+        body: isSafeSyntheticCopy
+          ? testBody
+          : isSafeEventCopy
+            ? message.body
+            : copy.body,
+        icon: "/icons/whitebird-w-bird-icon-192.png",
+        badge: "/icons/whitebird-w-bird-icon-192.png",
+        tag: `whitebird-staff-${message.eventId}`,
+        renotify: false,
+        data: { href: staffNotificationHref(message.code, message.orderId) },
+      },
+    ),
   );
 });
 

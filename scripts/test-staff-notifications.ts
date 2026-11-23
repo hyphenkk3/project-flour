@@ -117,7 +117,7 @@ assert.equal(
 );
 assert.equal(
   STAFF_NOTIFICATION_AUTHORITATIVE_SOURCES.last_minute,
-  "orders.order_source.last_minute",
+  "orders.insert.customer_website_extra_stock_or_order_source.last_minute",
 );
 assert.equal(
   STAFF_NOTIFICATION_AUTHORITATIVE_SOURCES.fresh_pick_walk_in_hold_reminder,
@@ -198,7 +198,8 @@ const freshPicks = classifyOrderInsert({
   ...order,
   extraStockId: "extra-1",
 });
-assert.equal(freshPicks.length, 0);
+assert.equal(freshPicks.length, 1);
+assert.equal(freshPicks[0]?.code, "last_minute");
 assert.equal(
   isNewOrderNotificationSource({
     status: "submitted",
@@ -399,11 +400,11 @@ const lastMinuteInsert = classifyOrderInsert({
   ...order,
   orderSource: "last_minute",
 });
-assert.equal(lastMinuteInsert.length, 2);
-assert.deepEqual(lastMinuteInsert.map((item) => item.code).sort(), [
-  "last_minute",
-  "new_order",
-]);
+assert.equal(lastMinuteInsert.length, 1);
+assert.deepEqual(
+  lastMinuteInsert.map((item) => item.code),
+  ["last_minute"],
+);
 
 const lastMinuteUpdate = classifyOrderUpdate(
   { ...order, orderSource: "walk_in" },
@@ -924,7 +925,13 @@ async function testEmailDelivery() {
   );
 
   const engineSrc = read("src/foundation/staff/staff-notification-engine.ts");
-  assert.doesNotMatch(engineSrc, /localStorage/);
+  assert.match(engineSrc, /claimStaffNotificationForStaff/);
+  assert.match(engineSrc, /localStorage/);
+  const toastBuilderSource =
+    engineSrc
+      .split("export function buildStaffNotificationToast")[1]
+      ?.split("export type NotificationOrderSummary")[0] ?? "";
+  assert.doesNotMatch(toastBuilderSource, /localStorage|BroadcastChannel/);
   assert.match(engineSrc, /BroadcastChannel/);
 
   const operationsSrc = read("src/workspaces/owner/OperationsLiveBoard.tsx");

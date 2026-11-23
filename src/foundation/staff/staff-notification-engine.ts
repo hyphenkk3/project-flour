@@ -14,6 +14,7 @@ export type StaffNotificationEvent = {
   title: string;
   description: string;
   href?: string | null;
+  payload?: Record<string, unknown> | null;
   actionLabel?: string | null;
   tone?: ToastInput["tone"];
 };
@@ -430,28 +431,28 @@ export function buildOrderEventNotification(
     case "order_paid":
       return {
         ...base,
-        title: "Order paid",
+        title: "Order Paid",
         tone: "success",
       };
 
     case "order_confirmed":
       return {
         ...base,
-        title: "Order confirmed",
+        title: "Order Confirmed",
         tone: "success",
       };
 
     case "order_cancelled":
       return {
         ...base,
-        title: "Order cancelled",
+        title: "Order Cancelled",
         tone: "warning",
       };
 
     case "order_edited":
       return {
         ...base,
-        title: "Order edited",
+        title: "Order Edited",
         tone: "info",
       };
   }
@@ -465,7 +466,7 @@ export function buildNewOrderNotification(
     id: eventId,
     code: "new_order",
     orderId: order.id,
-    title: "New order received",
+    title: "New Order",
     description: orderDescription(order),
     href: orderHref(order.id),
     actionLabel: "View order",
@@ -481,7 +482,7 @@ export function buildLastMinuteNotification(
     id: eventId,
     code: "last_minute",
     orderId: order.id,
-    title: "Last-minute order",
+    title: "Last Minute Order",
     description: orderDescription(order),
     href: orderHref(order.id),
     actionLabel: "View order",
@@ -518,7 +519,7 @@ export function buildApprovalRequiredNotification(approval: {
     id: approval.eventId ?? `approval_required:${approval.id}`,
     code: "approval_required",
     orderId,
-    title: "Approval required",
+    title: "Approval Required",
     description: approval.requestType
       ? `Approval requested · ${approval.requestType}`
       : "A new approval request requires your attention.",

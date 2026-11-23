@@ -1,5 +1,8 @@
 import type { StaffNotificationCode } from "@/foundation/staff/notification-preferences";
-import type { StaffPushSubscriptionInput } from "@/foundation/staff/staff-notification-push-protocol";
+import {
+  buildStaffPushMessage,
+  type StaffPushSubscriptionInput,
+} from "@/foundation/staff/staff-notification-push-protocol";
 
 export type ClaimedStaffPushDelivery = {
   deliveryId: string;
@@ -9,6 +12,9 @@ export type ClaimedStaffPushDelivery = {
   claimedUntil: string;
   code: StaffNotificationCode;
   orderId: string | null;
+  eventTitle?: string | null;
+  eventDescription?: string | null;
+  syntheticTest?: boolean;
   subscription: StaffPushSubscriptionInput;
 };
 
@@ -20,7 +26,8 @@ export type StaffPushSender = {
   }): Promise<void>;
 };
 
-export type StaffPushPreSendResult = "send" | "retry" | "suppress";
+export type StaffPushPreSendResult =
+  "send" | "retry" | "suppress" | "suppress_recipient";
 
 export type StaffPushDeliveryCompleter = (input: {
   deliveryId: string;
@@ -60,19 +67,31 @@ export async function deliverClaimedStaffPushNotifications(input: {
 
       try {
         const preSend = await input.beforeSend?.(delivery);
-        if (preSend === "suppress") {
+        if (preSend === "suppress" || preSend === "suppress_recipient") {
           status = "suppressed";
-          errorCode = "stale_hold";
+          errorCode =
+            preSend === "suppress_recipient" ? "recipient_scope" : "stale_hold";
         } else if (preSend === "retry") {
           errorCode = "hold_preflight_failed";
         } else {
+          const message = buildStaffPushMessage({
+            eventId: delivery.eventId,
+            code: delivery.code,
+            orderId: delivery.orderId,
+            eventTitle: delivery.eventTitle,
+            eventDescription: delivery.eventDescription,
+            syntheticTest: delivery.syntheticTest,
+          });
           await input.sender.send({
             subscription: delivery.subscription,
             payload: JSON.stringify({
-              version: 1,
+              version: 2,
               eventId: delivery.eventId,
               code: delivery.code,
               orderId: delivery.orderId,
+              title: message.title,
+              body: message.body,
+              systemTest: message.systemTest,
             }),
             urgency: delivery.code === "last_minute" ? "high" : "normal",
           });

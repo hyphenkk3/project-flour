@@ -32,38 +32,38 @@ export const STAFF_NOTIFICATION_DEFINITIONS: readonly StaffNotificationDefinitio
   [
     {
       code: "new_order",
-      label: "New order",
-      description: "When a new order is placed.",
+      label: "New Order",
+      description: "When a regular preorder is received.",
     },
     {
       code: "order_paid",
-      label: "Order paid",
+      label: "Order Paid",
       description: "When an order payment is recorded.",
     },
     {
       code: "order_confirmed",
-      label: "Order confirmed",
-      description: "When an order is confirmed.",
+      label: "Order Confirmed",
+      description: "When a crew member marks an order Customer Confirmed.",
     },
     {
       code: "order_cancelled",
-      label: "Order cancelled",
+      label: "Order Cancelled",
       description: "When an order is cancelled.",
     },
     {
       code: "order_edited",
-      label: "Order edited",
+      label: "Order Edited",
       description: "When an existing order is changed.",
     },
     {
       code: "approval_required",
-      label: "Approval required",
+      label: "Approval Required",
       description: "When an action requires your approval.",
     },
     {
       code: "last_minute",
-      label: "Last Minute",
-      description: "Urgent last-minute order activity requiring quick action.",
+      label: "Last Minute Order",
+      description: "When a new Fresh Pick order is received.",
     },
     {
       code: "fresh_pick_walk_in_hold_reminder",

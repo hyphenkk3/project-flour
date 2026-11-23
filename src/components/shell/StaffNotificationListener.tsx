@@ -20,6 +20,7 @@ import {
   type RecoverableStaffNotificationEvent,
 } from "@/foundation/staff/staff-notification-recovery";
 import { normalizeLiveNotificationEvent } from "@/foundation/staff/staff-notification-live-fallback";
+import { isStaffNotificationVisibleToRecipient } from "@/foundation/staff/staff-notification-test-scope";
 import {
   playStaffNotificationSound,
   recordStaffNotificationSoundOwnership,
@@ -55,7 +56,6 @@ export function StaffNotificationListener({
   const [retryVisible, setRetryVisible] = useState(() =>
     hasStaffNotificationRecoveryPending(staffId),
   );
-  const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
   const [recoveryRunning, setRecoveryRunning] = useState(false);
   const runRecoveryRef = useRef<
     | ((source: "page_load" | "reconnect" | "manual_retry") => Promise<void>)
@@ -83,6 +83,18 @@ export function StaffNotificationListener({
       source: "live" | "reconnect",
       recovered = false,
     ) => {
+      if (
+        !isStaffNotificationVisibleToRecipient({
+          title: event.title,
+          payload: event.payload,
+          staffId,
+        })
+      ) {
+        console.info("[staff-notifications] owner-only test excluded", {
+          eventId: event.id,
+        });
+        return;
+      }
       const preference = preferenceFor(event.code);
       if (!preference) return;
       const webEligible = preference.webEnabled;
@@ -182,7 +194,7 @@ export function StaffNotificationListener({
             let query = supabase
               .from("staff_notification_events")
               .select(
-                "id, created_at, code, order_id, title, description, href",
+                "id, created_at, code, order_id, title, description, href, payload",
               )
               .gte("created_at", since)
               .lte("created_at", until)
@@ -207,26 +219,24 @@ export function StaffNotificationListener({
         if (result.status === "complete") {
           clearStaffNotificationRecoveryPending(staffId);
           setRetryVisible(false);
-          setRecoveryMessage(
-            result.olderEventsSkipped
-              ? "Notifications older than the 15-minute recovery window were skipped."
-              : null,
-          );
+          console.info("[staff-notifications] recovery completed", {
+            recovered: result.recovered,
+            olderEventsSkipped: result.olderEventsSkipped,
+          });
         } else {
           markStaffNotificationRecoveryPending(staffId);
           setRetryVisible(true);
-          setRecoveryMessage(
-            result.status === "incomplete"
-              ? "More recent staff notifications are available. Continue recovery."
-              : "Some staff notifications may not have loaded. Try recovery again.",
-          );
+          console.warn("[staff-notifications] recovery incomplete", {
+            status: result.status,
+            olderEventsSkipped: result.olderEventsSkipped,
+          });
         }
-      } catch {
+      } catch (error) {
         markStaffNotificationRecoveryPending(staffId);
         setRetryVisible(true);
-        setRecoveryMessage(
-          "Some staff notifications may not have loaded. Try recovery again.",
-        );
+        console.warn("[staff-notifications] recovery failed", {
+          errorType: error instanceof Error ? error.name : "unknown",
+        });
       } finally {
         recoveryInFlightRef.current = false;
         setRecoveryRunning(false);
@@ -284,9 +294,9 @@ export function StaffNotificationListener({
             void present(event, "live").catch(() => {
               markStaffNotificationRecoveryPending(staffId);
               setRetryVisible(true);
-              setRecoveryMessage(
-                "Some staff notifications may not have loaded. Try recovery again.",
-              );
+              console.warn("[staff-notifications] live presentation failed", {
+                eventId: event.id,
+              });
             });
             return;
           }
@@ -318,9 +328,9 @@ export function StaffNotificationListener({
     };
   }, [notificationPreferences, present, staffId]);
 
-  return retryVisible || recoveryMessage ? (
-    <div className="fixed bottom-4 left-4 z-[60] flex max-w-sm items-center gap-3 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm shadow">
-      {recoveryMessage ? <p role="status">{recoveryMessage}</p> : null}
+  return retryVisible ? (
+    <div className="fixed inset-x-3 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-[60] mx-auto flex max-w-sm items-center justify-between gap-3 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm shadow md:inset-x-auto md:right-4 md:bottom-4">
+      <p role="status">Some staff notifications may not have loaded.</p>
       {retryVisible ? (
         <button
           className="shrink-0 underline"

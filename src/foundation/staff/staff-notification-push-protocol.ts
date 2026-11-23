@@ -82,43 +82,43 @@ export function isTrustedStaffPushEndpoint(value: string): boolean {
   }
 }
 
-const PUSH_COPY: Record<
+export const STAFF_PUSH_CATEGORY_COPY: Record<
   StaffNotificationCode,
   { title: string; body: string; href: string }
 > = {
   new_order: {
-    title: "New order received",
+    title: "New Order",
     body: "A new preorder needs attention.",
     href: "/owner",
   },
   order_paid: {
-    title: "Order paid",
+    title: "Order Paid",
     body: "An order payment was recorded.",
     href: "/owner",
   },
   order_confirmed: {
-    title: "Order confirmed",
+    title: "Order Confirmed",
     body: "An order was confirmed.",
     href: "/owner",
   },
   order_cancelled: {
-    title: "Order cancelled",
+    title: "Order Cancelled",
     body: "An order was cancelled.",
     href: "/owner",
   },
   order_edited: {
-    title: "Order updated",
+    title: "Order Edited",
     body: "An order was updated.",
     href: "/owner",
   },
   approval_required: {
-    title: "Approval required",
+    title: "Approval Required",
     body: "A staff action needs review.",
     href: "/owner/approvals",
   },
   last_minute: {
-    title: "Last-minute order",
-    body: "Urgent order activity needs attention.",
+    title: "Last Minute Order",
+    body: "A new Fresh Pick order needs attention.",
     href: "/owner",
   },
   fresh_pick_walk_in_hold_reminder: {
@@ -157,18 +157,71 @@ export function resolveStaffPushHref(input: {
       ? `/owner/orders/${input.orderId}`
       : "/owner";
   }
-  return PUSH_COPY[input.code].href;
+  return STAFF_PUSH_CATEGORY_COPY[input.code].href;
+}
+
+const LEGACY_PUSH_TITLES: Partial<
+  Record<StaffNotificationCode, readonly string[]>
+> = {
+  new_order: ["new order received"],
+  order_paid: ["order paid"],
+  order_confirmed: ["order confirmed"],
+  order_cancelled: ["order cancelled"],
+  order_edited: ["order edited", "order updated"],
+  approval_required: ["approval required"],
+  last_minute: ["last-minute order", "last minute order"],
+};
+
+export function resolveSafeStaffPushTitle(
+  code: StaffNotificationCode,
+  eventTitle: string | null | undefined,
+): string {
+  const title = eventTitle?.trim().toLocaleLowerCase("en-US");
+  const accepted = [
+    STAFF_PUSH_CATEGORY_COPY[code].title.toLocaleLowerCase("en-US"),
+    ...(LEGACY_PUSH_TITLES[code] ?? []),
+  ];
+  if (!title || !accepted.includes(title)) {
+    return STAFF_PUSH_CATEGORY_COPY[code].title;
+  }
+  if (eventTitle?.trim() === STAFF_PUSH_CATEGORY_COPY[code].title) {
+    return eventTitle.trim();
+  }
+  return STAFF_PUSH_CATEGORY_COPY[code].title;
+}
+
+export function resolveSafeStaffPushDescription(
+  code: StaffNotificationCode,
+  eventDescription: string | null | undefined,
+): string {
+  const categoryDescription = STAFF_PUSH_CATEGORY_COPY[code].body;
+  // Order descriptions contain names, order numbers, and fulfilment details.
+  // Forward a stored description only when it is already the approved generic
+  // category copy; otherwise use the safe category-specific fallback.
+  return eventDescription?.trim() === categoryDescription
+    ? eventDescription.trim()
+    : categoryDescription;
 }
 
 export function buildStaffPushMessage(input: {
   eventId: string;
   code: StaffNotificationCode;
   orderId?: string | null;
+  eventTitle?: string | null;
+  eventDescription?: string | null;
+  syntheticTest?: boolean;
 }) {
-  const copy = PUSH_COPY[input.code];
+  const isSyntheticTest = input.syntheticTest === true;
   return {
-    title: copy.title,
-    body: copy.body,
+    title: isSyntheticTest
+      ? "SYSTEM TEST — NO REAL ORDER"
+      : resolveSafeStaffPushTitle(input.code, input.eventTitle),
+    // Event descriptions for order events include customer and order details.
+    // Keep lock-screen copy category-specific and privacy-safe.
+    body: isSyntheticTest
+      ? "No order, payment, customer, reservation, or collection record was created."
+      : resolveSafeStaffPushDescription(input.code, input.eventDescription),
+    systemTest: isSyntheticTest,
     tag: `whitebird-staff-${input.eventId}`,
     renotify: false as const,
     data: { href: resolveStaffPushHref(input) },
