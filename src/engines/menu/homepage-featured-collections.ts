@@ -1,11 +1,10 @@
 /**
- * Homepage featured collections: at most two full previews, data-driven.
- * Priority: active Special Period, current monthly, then upcoming monthly
- * already open for customer ordering. Remaining relevant catalogues get a
- * quiet direct link instead of a generic "more collections" control.
+ * Select homepage collections from the already customer-orderable lists.
+ * Their order is the Owner's Library display order across all collection
+ * purposes; no calendar or collection-name priority is applied here.
  */
 
-export const HOMEPAGE_FEATURED_COLLECTION_MAX = 2;
+export const HOMEPAGE_FEATURED_COLLECTION_MAX = 4;
 
 export type HomepageFeaturedKind =
   | "special"
@@ -19,18 +18,17 @@ export type HomepageFeaturedCandidate = {
 
 export type HomepageFeaturedSelection = {
   featured: HomepageFeaturedCandidate[];
-  more: HomepageFeaturedCandidate[];
 };
 
 export type HomepageSpecialCandidate = {
   id: string;
   displayOrder?: number | null;
-  startDate?: string | null;
 };
 
 export type HomepageMonthlyCandidate = {
   id: string;
   month: string | null;
+  displayOrder?: number | null;
 };
 
 function yearMonthKey(value: string | null | undefined): string | null {
@@ -38,23 +36,25 @@ function yearMonthKey(value: string | null | undefined): string | null {
   return /^\d{4}-\d{2}$/.test(key) ? key : null;
 }
 
-function compareSpecialOrder(
-  left: HomepageSpecialCandidate,
-  right: HomepageSpecialCandidate,
+function compareLibraryOrder(
+  left: { id: string; displayOrder?: number | null },
+  right: { id: string; displayOrder?: number | null },
 ): number {
   const leftOrder = left.displayOrder;
   const rightOrder = right.displayOrder;
-  if (leftOrder != null && rightOrder != null && leftOrder !== rightOrder) {
-    return leftOrder - rightOrder;
+  if (leftOrder == null && rightOrder == null) {
+    return left.id.localeCompare(right.id);
   }
-  if (leftOrder != null && rightOrder == null) return -1;
-  if (leftOrder == null && rightOrder != null) return 1;
-  return (left.startDate ?? "").localeCompare(right.startDate ?? "");
+  if (leftOrder == null) return 1;
+  if (rightOrder == null) return -1;
+  if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+  return left.id.localeCompare(right.id);
 }
 
 /**
- * Build the homepage featured/more lists from catalogues already qualified
- * as customer-orderable. Does not re-check publication rules.
+ * Build the homepage's full-section list from catalogues already qualified
+ * as published and customer-orderable. Publication, photo and availability
+ * rules remain with the query/component layers.
  */
 export function selectHomepageFeaturedCollections(input: {
   todayYearMonth: string;
@@ -62,46 +62,45 @@ export function selectHomepageFeaturedCollections(input: {
   monthlies: readonly HomepageMonthlyCandidate[];
 }): HomepageFeaturedSelection {
   const today = yearMonthKey(input.todayYearMonth);
-  const candidates: HomepageFeaturedCandidate[] = [];
+  const candidates: Array<
+    HomepageFeaturedCandidate & { displayOrder?: number | null }
+  > = [];
   const seen = new Set<string>();
 
-  function push(candidate: HomepageFeaturedCandidate) {
-    if (seen.has(candidate.id)) return;
-    seen.add(candidate.id);
-    candidates.push(candidate);
+  for (const special of input.specials) {
+    if (!special.id || seen.has(special.id)) continue;
+    seen.add(special.id);
+    candidates.push({
+      id: special.id,
+      kind: "special",
+      displayOrder: special.displayOrder,
+    });
   }
 
-  const specials = [...input.specials].sort(compareSpecialOrder);
-  for (const special of specials) {
-    if (!special.id) continue;
-    push({ id: special.id, kind: "special" });
+  for (const monthly of input.monthlies) {
+    if (!monthly.id || seen.has(monthly.id)) continue;
+    seen.add(monthly.id);
+    candidates.push({
+      id: monthly.id,
+      kind:
+        today && yearMonthKey(monthly.month) === today
+          ? "current_monthly"
+          : "upcoming_monthly",
+      displayOrder: monthly.displayOrder,
+    });
   }
 
-  if (today) {
-    const current = input.monthlies.find(
-      (row) => yearMonthKey(row.month) === today,
-    );
-    if (current) {
-      push({ id: current.id, kind: "current_monthly" });
-    }
-
-    const upcoming = input.monthlies
-      .filter((row) => {
-        const month = yearMonthKey(row.month);
-        return Boolean(month && month > today);
-      })
-      .sort((left, right) =>
-        (yearMonthKey(left.month) ?? "").localeCompare(
-          yearMonthKey(right.month) ?? "",
-        ),
-      );
-    for (const row of upcoming) {
-      push({ id: row.id, kind: "upcoming_monthly" });
-    }
+  if (
+    candidates.length > 0 &&
+    candidates.every((candidate) => candidate.displayOrder == null)
+  ) {
+    throw new Error("Homepage collection display order is unavailable");
   }
 
+  const ordered = candidates.sort(compareLibraryOrder);
   return {
-    featured: candidates.slice(0, HOMEPAGE_FEATURED_COLLECTION_MAX),
-    more: candidates.slice(HOMEPAGE_FEATURED_COLLECTION_MAX),
+    featured: ordered
+      .slice(0, HOMEPAGE_FEATURED_COLLECTION_MAX)
+      .map(({ id, kind }) => ({ id, kind })),
   };
 }

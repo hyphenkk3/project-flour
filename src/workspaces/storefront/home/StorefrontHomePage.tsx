@@ -51,7 +51,6 @@ import { HomeFeaturedCollection } from "@/workspaces/storefront/home/HomeFeature
 import { HomeFreshPicksSection } from "@/workspaces/storefront/home/HomeFreshPicksSection";
 import { HomeHero } from "@/workspaces/storefront/home/HomeHero";
 import { HomeMobileNav } from "@/workspaces/storefront/home/HomeMobileNav";
-import { HomeMoreCollections } from "@/workspaces/storefront/home/HomeMoreCollections";
 import { HomeOrderSummary } from "@/workspaces/storefront/home/HomeOrderSummary";
 import { HomePopularCakes } from "@/workspaces/storefront/home/HomePopularCakes";
 import { HomeVisitFooter } from "@/workspaces/storefront/home/HomeVisitFooter";
@@ -131,7 +130,6 @@ function featuredCopy(input: {
   heading: string;
   description: string;
   viewAllLabel: string;
-  moreSupporting: string;
 } {
   if (input.kind === "special") {
     const heading = input.special?.name?.trim() || SPECIAL_MENU_HEADING;
@@ -146,7 +144,6 @@ function featuredCopy(input: {
       heading,
       description: period ?? SPECIAL_MENU_DESCRIPTION,
       viewAllLabel: `View all ${heading} →`,
-      moreSupporting: period ?? "Now accepting orders",
     };
   }
 
@@ -157,9 +154,6 @@ function featuredCopy(input: {
       heading,
       description: "Our current selection of cakes for your celebrations.",
       viewAllLabel: `View all ${heading} →`,
-      moreSupporting: input.month
-        ? orderCollectionPickupCopy(input.month, input.todayYm)
-        : "Now accepting orders",
     };
   }
 
@@ -170,7 +164,6 @@ function featuredCopy(input: {
       ? orderCollectionPickupCopy(input.month, input.todayYm)
       : "Preorders are now open.",
     viewAllLabel: `View all ${heading} →`,
-    moreSupporting: "Now accepting orders",
   };
 }
 
@@ -317,6 +310,9 @@ async function HomeMerchandisingIsland() {
             message="We couldn’t load the latest cake selections. This does not mean cakes or collection dates are unavailable."
           />
           <div className="mt-5">
+            <HomePopularCakes cakes={[]} />
+          </div>
+          <div className="mt-5">
             <HomeBrowseAllCakes />
           </div>
           <HomeVisitFooter lead={<HomeCatalogueBlock />} />
@@ -433,23 +429,6 @@ async function HomeMerchandisingContent() {
     ];
   });
 
-  const more = (selection?.more ?? []).map((candidate) => {
-    const monthly =
-      catalogues.find((catalogue) => catalogue.id === candidate.id) ?? null;
-    const special = specials.find((row) => row.id === candidate.id) ?? null;
-    const copy = featuredCopy({
-      kind: candidate.kind,
-      month: monthly?.month ?? null,
-      todayYm,
-      special: special ?? undefined,
-    });
-    return {
-      href: `/order/collection/${candidate.id}`,
-      heading: copy.heading,
-      supporting: copy.moreSupporting,
-    };
-  });
-
   return (
     <>
       {!catalogueResult.ok || !specialResult.ok ? (
@@ -553,7 +532,6 @@ async function HomeMerchandisingContent() {
         </section>
       )}
       <StorefrontListingRestore origin="home" />
-      <HomeMoreCollections items={more} />
       <HomeBrowseAllCakes />
 
       <HomeVisitFooter lead={<HomeCatalogueBlock />} />

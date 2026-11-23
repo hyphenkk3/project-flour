@@ -334,7 +334,7 @@ assert.match(homeSrc, /selectHomepageFeaturedCollections/);
 assert.match(homeSrc, /listHomepageCollectionPreviewCakes/);
 assert.match(homeSrc, /sortHomepageFreshPicks/);
 assert.match(homeSrc, /HomeFeaturedCollection/);
-assert.match(homeSrc, /HomeMoreCollections/);
+assert.doesNotMatch(homeSrc, /HomeMoreCollections/);
 assert.match(homeSrc, /HomeBrowseAllCakes/);
 assert.match(homeSrc, /HomeFreshPicksSection/);
 assert.doesNotMatch(homeSrc, /HomeCurrentCollection/);

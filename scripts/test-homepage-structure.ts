@@ -67,21 +67,19 @@ assert.doesNotMatch(freshSectionSrc, /HomeDestinationCard/);
 
 const homeSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
 assert.match(homeSrc, /sortHomepageFreshPicks/);
-assert.match(homeSrc, /HomeFreshPicksSection picks=\{picks\}/);
+assert.match(homeSrc, /HomeFreshPicksSection[\s\S]*picks=\{picks\}/);
 
 // B. Empty Fresh Picks still render the section on the homepage.
 const heroIndex = homeSrc.indexOf("<HomeHero");
 const freshIndex = homeSrc.indexOf("<HomeFreshPicksSection");
 const featuredIndex = homeSrc.indexOf("<HomeFeaturedCollection");
-const popularIndex = homeSrc.indexOf("<HomePopularCakes");
-const moreIndex = homeSrc.indexOf("<HomeMoreCollections");
-const browseIndex = homeSrc.indexOf("<HomeBrowseAllCakes");
-const visitIndex = homeSrc.indexOf("<HomeVisitFooter");
+const popularIndex = homeSrc.lastIndexOf("<HomePopularCakes");
+const browseIndex = homeSrc.lastIndexOf("<HomeBrowseAllCakes");
+const visitIndex = homeSrc.lastIndexOf("<HomeVisitFooter");
 assert.ok(heroIndex >= 0 && freshIndex > heroIndex);
 assert.ok(featuredIndex > freshIndex);
 assert.ok(popularIndex > featuredIndex);
-assert.ok(moreIndex > popularIndex);
-assert.ok(browseIndex > moreIndex);
+assert.ok(browseIndex > popularIndex);
 assert.ok(visitIndex > browseIndex);
 assert.match(homeSrc, /<HomePopularCakes cakes=\{popular\} \/>/);
 assert.match(homeSrc, /HomeVisitFooter lead=\{<HomeCatalogueBlock \/>\}/);
@@ -99,12 +97,14 @@ assert.match(homeSrc, /selectHomepageFeaturedCollections/);
 assert.match(homeSrc, /listHomepageCollectionPreviewCakes/);
 assert.match(homeSrc, /listCustomerSpecialCatalogues/);
 assert.match(homeSrc, /listOrderableMonthlyCatalogues/);
+assert.doesNotMatch(homeSrc, /HomeMoreCollections/);
+assert.match(homeSrc, /<HomePopularCakes cakes=\{\[\]\} \/>/);
 assert.doesNotMatch(homeSrc, /listAvailableCakes/);
 
 // C. Collection selection cases.
-const special = { id: "special", displayOrder: 0, startDate: "2026-09-16" };
-const september = { id: "sep", month: "2026-09-01" };
-const october = { id: "oct", month: "2026-10-01" };
+const special = { id: "special", displayOrder: 0 };
+const september = { id: "sep", month: "2026-09-01", displayOrder: 2 };
+const october = { id: "oct", month: "2026-10-01", displayOrder: 1 };
 const todayYm = "2026-09";
 
 assert.deepEqual(
@@ -118,7 +118,6 @@ assert.deepEqual(
       { id: "special", kind: "special" },
       { id: "sep", kind: "current_monthly" },
     ],
-    more: [],
   },
   "Special + current → Special + current",
 );
@@ -131,12 +130,11 @@ assert.deepEqual(
   }),
   {
     featured: [
-      { id: "sep", kind: "current_monthly" },
       { id: "oct", kind: "upcoming_monthly" },
+      { id: "sep", kind: "current_monthly" },
     ],
-    more: [],
   },
-  "current + upcoming → current + upcoming",
+  "Library order overrides current/upcoming calendar priority",
 );
 
 assert.deepEqual(
@@ -148,11 +146,11 @@ assert.deepEqual(
   {
     featured: [
       { id: "special", kind: "special" },
+      { id: "oct", kind: "upcoming_monthly" },
       { id: "sep", kind: "current_monthly" },
     ],
-    more: [{ id: "oct", kind: "upcoming_monthly" }],
   },
-  "Special + current + upcoming → Special + current, October remains a quiet link",
+  "Special and monthly candidates share one Library order",
 );
 
 assert.deepEqual(
@@ -166,7 +164,6 @@ assert.deepEqual(
       { id: "special", kind: "special" },
       { id: "oct", kind: "upcoming_monthly" },
     ],
-    more: [],
   },
   "Special + October with no current monthly",
 );
@@ -179,7 +176,6 @@ assert.deepEqual(
   }),
   {
     featured: [{ id: "sep", kind: "current_monthly" }],
-    more: [],
   },
   "only current monthly collection",
 );
@@ -192,29 +188,43 @@ assert.deepEqual(
   }),
   {
     featured: [{ id: "oct", kind: "upcoming_monthly" }],
-    more: [],
   },
   "only upcoming monthly collection",
 );
 
 const overflow = selectHomepageFeaturedCollections({
   todayYearMonth: todayYm,
-  specials: [special],
-  monthlies: [september, october, { id: "nov", month: "2026-11-01" }],
+  specials: [
+    { id: "special", displayOrder: 1 },
+    { id: "special-four", displayOrder: 4 },
+  ],
+  monthlies: [
+    { id: "sep", month: "2026-09-01", displayOrder: 0 },
+    { id: "oct", month: "2026-10-01", displayOrder: 2 },
+    { id: "nov", month: "2026-11-01", displayOrder: 3 },
+    { id: "dec", month: "2026-12-01", displayOrder: 5 },
+  ],
 });
-assert.equal(overflow.featured.length, 2);
-assert.ok(overflow.more.some((row) => row.id === "oct"));
-assert.ok(overflow.more.some((row) => row.id === "nov"));
+assert.equal(overflow.featured.length, 4);
+assert.deepEqual(overflow.featured.map((row) => row.id), [
+  "sep",
+  "special",
+  "oct",
+  "nov",
+]);
 
-const moreSrc = readSrc(
-  "src/workspaces/storefront/home/HomeMoreCollections.tsx",
+assert.deepEqual(
+  selectHomepageFeaturedCollections({
+    todayYearMonth: todayYm,
+    specials: [{ id: "duplicate", displayOrder: 2 }],
+    monthlies: [
+      { id: "duplicate", month: "2026-09-01", displayOrder: 0 },
+      { id: "first", month: "2026-10-01", displayOrder: 2 },
+    ],
+  }).featured.map((row) => row.id),
+  ["duplicate", "first"],
+  "an identity appears at most once and equal orders use the Library id tie-break",
 );
-assert.match(moreSrc, /item\.heading/);
-assert.match(moreSrc, /item\.supporting/);
-assert.match(moreSrc, /px-6 pt-5 pb-1 sm:px-10/);
-assert.match(moreSrc, /mx-auto w-full max-w-6xl/);
-assert.doesNotMatch(moreSrc, /More collections/);
-assert.doesNotMatch(moreSrc, /HomeDestinationCard/);
 assert.match(homeSrc, /Now accepting orders/);
 
 const featuredSrc = readSrc(
@@ -305,7 +315,7 @@ assert.deepEqual(
   selectHomepageFeaturedCollections({
     todayYearMonth: todayYm,
     specials: [],
-    monthlies: [{ id: "sep", month: "2026-09-01" }],
+    monthlies: [{ id: "sep", month: "2026-09-01", displayOrder: 2 }],
   }).featured.map((row) => row.id),
   ["sep"],
   "future collection not passed as orderable is not featured",
