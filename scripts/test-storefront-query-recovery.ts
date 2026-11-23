@@ -15,7 +15,16 @@ assert.match(queries, /STOREFRONT_PRICE_LOOKUP_CONCURRENCY = 6/);
 assert.match(queries, /data == null \|\| !Number\.isFinite\(Number\(data\)\)/);
 assert.match(queries, /The current cake price could not be verified/);
 assert.match(queries, /\.select\("library_cake_id, sort_order"\)/);
-assert.match(queries, /\.select\("library_cake_id, homepage_sort_order"\)/);
+assert.match(
+  queries,
+  /async function loadHomepageCollectionPreviewCakes[\s\S]*?\.select\("library_cake_id, sort_order"\)[\s\S]*?\.order\("sort_order", \{ ascending: true \}\)/,
+);
+assert.doesNotMatch(
+  queries.slice(
+    queries.indexOf("async function loadHomepageCollectionPreviewCakes"),
+  ),
+  /homepage_sort_order/,
+);
 assert.match(queries, /readCachedStorefrontCakesByIds/);
 assert.match(queries, /withEffectiveStorefrontPrices\(cakes, todayYmd\)/);
 assert.doesNotMatch(

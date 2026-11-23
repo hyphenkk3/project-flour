@@ -6,10 +6,7 @@ import {
   isCatalogueExpired,
   isEffectivelyArchived,
 } from "@/engines/menu/customer-browse";
-import {
-  parseHomepageCollectionPreviewOrder,
-  planHomepageCollectionPreviewChange,
-} from "@/engines/menu/homepage-collection-preview";
+import { planHomepageCollectionPreviewSelection } from "@/engines/menu/homepage-collection-preview";
 import { requireStaff } from "@/foundation/auth/session";
 import { canManageLibrary } from "@/foundation/navigation/access";
 import { toBusinessDateKey } from "@/lib/dates";
@@ -92,7 +89,10 @@ export async function createCatalogueAction(
         return { error: duplicateMonthlyMonthMessage(createInput.month) };
       }
     } catch (error) {
-      return mutationError(error, "Could not check existing monthly catalogues.");
+      return mutationError(
+        error,
+        "Could not check existing monthly catalogues.",
+      );
     }
   }
 
@@ -140,7 +140,11 @@ export async function createCatalogueAction(
     }
   }
 
-  if (createInput.websiteOverride && createInput.startDate && createInput.endDate) {
+  if (
+    createInput.websiteOverride &&
+    createInput.startDate &&
+    createInput.endDate
+  ) {
     try {
       const conflict = await findPublishedOverrideConflict(supabase, {
         startDate: createInput.startDate,
@@ -189,7 +193,8 @@ export async function createCatalogueAction(
       await supabase.from("collections").delete().eq("id", data.id);
       if (copyErrorInsert.code === "23505") {
         return {
-          error: "Could not copy that catalogue because a cake would be duplicated.",
+          error:
+            "Could not copy that catalogue because a cake would be duplicated.",
         };
       }
       return { error: copyErrorInsert.message };
@@ -546,9 +551,7 @@ export async function updateCatalogueDetailsAction(
   }
 
   revalidateCollectionPaths(collectionId);
-  redirect(
-    `/library/collections/${collectionId}?${CATALOGUE_UPDATED_QUERY}=1`,
-  );
+  redirect(`/library/collections/${collectionId}?${CATALOGUE_UPDATED_QUERY}=1`);
 }
 
 export async function setCatalogueShowInPastMenuAction(
@@ -668,7 +671,9 @@ export async function restoreCatalogueAction(
       purpose: String(existing.purpose ?? "monthly"),
       status,
       month: existing.month ? String(existing.month).slice(0, 10) : null,
-      endDate: existing.end_date ? String(existing.end_date).slice(0, 10) : null,
+      endDate: existing.end_date
+        ? String(existing.end_date).slice(0, 10)
+        : null,
     },
     toBusinessDateKey(),
   );
@@ -818,17 +823,12 @@ export async function toggleCollectionCakeAvailableAction(
           : {
               available: false,
               show_on_homepage: false,
-              homepage_sort_order: null,
             },
       )
       .eq("id", membershipId)
       .eq("collection_id", collectionId);
     if (error) {
-      if (
-        !available &&
-        (error.message.includes("show_on_homepage") ||
-          error.message.includes("homepage_sort_order"))
-      ) {
+      if (!available && error.message.includes("show_on_homepage")) {
         const fallback = await supabase
           .from("collection_cakes")
           .update({ available: false })
@@ -861,14 +861,6 @@ export async function updateCollectionCakeHomepageAction(
 
   const showOnHomepage =
     String(formData.get("show_on_homepage") ?? "").trim() === "on";
-  const parsedOrder = showOnHomepage
-    ? parseHomepageCollectionPreviewOrder(
-        String(formData.get("homepage_sort_order") ?? ""),
-      )
-    : null;
-  if (typeof parsedOrder === "string") {
-    return { error: parsedOrder };
-  }
 
   try {
     const locked = await requireMutableCatalogue(collectionId);
@@ -877,25 +869,23 @@ export async function updateCollectionCakeHomepageAction(
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("collection_cakes")
-      .select("id, available, show_on_homepage, homepage_sort_order")
+      .select("id, available, show_on_homepage")
       .eq("collection_id", collectionId);
     if (error) {
       throw new Error(error.message);
     }
 
-    const members = ((data ?? []) as Array<{
-      id: string;
-      available: boolean;
-      show_on_homepage: boolean | null;
-      homepage_sort_order: number | null;
-    }>).map((row) => {
-      const order =
-        row.homepage_sort_order == null ? null : Number(row.homepage_sort_order);
+    const members = (
+      (data ?? []) as Array<{
+        id: string;
+        available: boolean;
+        show_on_homepage: boolean | null;
+      }>
+    ).map((row) => {
       return {
         id: row.id,
         available: row.available === true,
         showOnHomepage: row.show_on_homepage === true,
-        homepageSortOrder: Number.isInteger(order) ? order : null,
       };
     });
     const current = members.find((member) => member.id === membershipId);
@@ -904,30 +894,27 @@ export async function updateCollectionCakeHomepageAction(
     }
     if (showOnHomepage && !current.available) {
       return {
-        error: "Offer this cake in the catalogue before featuring it on the homepage.",
+        error:
+          "Offer this cake in the catalogue before featuring it on the homepage.",
       };
     }
 
-    const plan = planHomepageCollectionPreviewChange(members, membershipId, {
+    const plan = planHomepageCollectionPreviewSelection(
+      members,
+      membershipId,
       showOnHomepage,
-      homepageSortOrder: parsedOrder,
-    });
+    );
     if (!plan.ok) {
       return { error: plan.error };
     }
 
-    for (const update of plan.updates) {
-      const { error: updateError } = await supabase
-        .from("collection_cakes")
-        .update({
-          show_on_homepage: update.showOnHomepage,
-          homepage_sort_order: update.homepageSortOrder,
-        })
-        .eq("id", update.id)
-        .eq("collection_id", collectionId);
-      if (updateError) {
-        throw new Error(updateError.message);
-      }
+    const { error: updateError } = await supabase
+      .from("collection_cakes")
+      .update({ show_on_homepage: plan.showOnHomepage })
+      .eq("id", membershipId)
+      .eq("collection_id", collectionId);
+    if (updateError) {
+      throw new Error(updateError.message);
     }
 
     revalidateCollectionPaths(collectionId);

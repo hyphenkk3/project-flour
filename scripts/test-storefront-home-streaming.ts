@@ -80,7 +80,9 @@ const previewFn = queriesSrc.slice(
     previewStart,
   ),
 );
-assert.match(previewFn, /\.select\("library_cake_id, homepage_sort_order"\)/);
+assert.match(previewFn, /\.select\("library_cake_id, sort_order"\)/);
+assert.match(previewFn, /\.order\("sort_order", \{ ascending: true \}\)/);
+assert.doesNotMatch(previewFn, /homepage_sort_order/);
 assert.match(previewFn, /readCachedStorefrontCakesByIds/);
 assert.doesNotMatch(previewFn, /withEffectiveStorefrontPrices/);
 assert.doesNotMatch(previewFn, /catch/);

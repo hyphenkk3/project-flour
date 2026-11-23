@@ -2,9 +2,6 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { FormError } from "@/components/ui/form";
-import {
-  HOMEPAGE_COLLECTION_PREVIEW_MAX,
-} from "@/engines/menu/homepage-collection-preview";
 import { libraryActionInitialState } from "@/workspaces/library/action-state";
 import { updateCollectionCakeHomepageAction } from "@/workspaces/library/collections/actions";
 
@@ -13,7 +10,6 @@ type CollectionHomepagePreviewControlProps = {
   membershipId: string;
   available: boolean;
   showOnHomepage: boolean;
-  position: number | null;
   canManage: boolean;
   disabled?: boolean;
 };
@@ -23,7 +19,6 @@ export function CollectionHomepagePreviewControl({
   membershipId,
   available,
   showOnHomepage,
-  position,
   canManage,
   disabled = false,
 }: CollectionHomepagePreviewControlProps) {
@@ -32,24 +27,19 @@ export function CollectionHomepagePreviewControl({
     libraryActionInitialState,
   );
   const [checked, setChecked] = useState(showOnHomepage);
-  const [orderValue, setOrderValue] = useState(
-    position != null ? String(position) : "",
-  );
 
   useEffect(() => {
     setChecked(showOnHomepage);
-    setOrderValue(position != null ? String(position) : "");
-  }, [position, showOnHomepage]);
+  }, [showOnHomepage]);
 
   useEffect(() => {
     if (state.error) {
       setChecked(showOnHomepage);
-      setOrderValue(position != null ? String(position) : "");
     }
-  }, [position, showOnHomepage, state.error]);
+  }, [showOnHomepage, state.error]);
 
   const statusLabel = showOnHomepage
-    ? `✓ Homepage · #${position ?? "—"}`
+    ? "✓ Homepage · follows Library order"
     : "Not shown on homepage";
 
   if (!available) {
@@ -84,31 +74,7 @@ export function CollectionHomepagePreviewControl({
         />
         Show on homepage
       </label>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <p className="text-skyline text-xs">{statusLabel}</p>
-        {showOnHomepage ? (
-          <label className="text-skyline flex items-center gap-1.5 text-xs">
-            Order
-            <input
-              className="border-fog text-ink h-9 w-14 rounded-md border bg-white px-2 text-sm tabular-nums outline-none focus:border-signal disabled:opacity-60"
-              disabled={pending || disabled}
-              inputMode="numeric"
-              max={HOMEPAGE_COLLECTION_PREVIEW_MAX}
-              min={1}
-              name="homepage_sort_order"
-              onChange={(event) => {
-                setOrderValue(event.target.value);
-                if (event.target.value.trim()) {
-                  event.currentTarget.form?.requestSubmit();
-                }
-              }}
-              step={1}
-              type="number"
-              value={orderValue}
-            />
-          </label>
-        ) : null}
-      </div>
+      <p className="text-skyline text-xs">{statusLabel}</p>
       {pending ? (
         <p className="text-skyline text-xs">Saving…</p>
       ) : (

@@ -35,7 +35,6 @@ export type CollectionCakeRow = {
   available: boolean;
   sortOrder: number;
   showOnHomepage: boolean;
-  homepageSortOrder: number | null;
   cake: LibraryCake;
 };
 
@@ -60,7 +59,6 @@ type MembershipRow = {
   available: boolean;
   sort_order: number;
   show_on_homepage?: boolean | null;
-  homepage_sort_order?: number | null;
   library_cakes:
     Parameters<typeof mapCake>[0] | Parameters<typeof mapCake>[0][] | null;
 };
@@ -85,8 +83,7 @@ function mapCollection(row: CollectionRow): LibraryCollection {
     status: row.status,
     purpose: row.purpose === "special" ? "special" : "monthly",
     websiteOverride: row.website_override === true,
-    displayOrder:
-      row.display_order == null ? null : Number(row.display_order),
+    displayOrder: row.display_order == null ? null : Number(row.display_order),
     showInPastMenu: row.show_in_past_menu === true,
     createdAt: row.created_at,
   };
@@ -314,9 +311,10 @@ export async function getLibraryCollectionById(
   );
 }
 
-function mapMembershipRow(row: MembershipRow, cake: LibraryCake): CollectionCakeRow {
-  const rawOrder = row.homepage_sort_order;
-  const homepageSortOrder = rawOrder == null ? null : Number(rawOrder);
+function mapMembershipRow(
+  row: MembershipRow,
+  cake: LibraryCake,
+): CollectionCakeRow {
   return {
     id: row.id,
     collectionId: row.collection_id,
@@ -324,9 +322,6 @@ function mapMembershipRow(row: MembershipRow, cake: LibraryCake): CollectionCake
     available: row.available,
     sortOrder: row.sort_order,
     showOnHomepage: row.show_on_homepage === true,
-    homepageSortOrder: Number.isInteger(homepageSortOrder)
-      ? homepageSortOrder
-      : null,
     cake,
   };
 }
@@ -342,7 +337,6 @@ export async function listCollectionCakeRows(
       available,
       sort_order,
       show_on_homepage,
-      homepage_sort_order,
       library_cakes (
         id,
         name,
@@ -394,13 +388,13 @@ export async function listCollectionCakeRows(
     .select(membershipSelect)
     .eq("collection_id", collectionId)
     .order("sort_order", { ascending: true });
-  let { data, error } =
-    (withHomepage.error?.message ?? "").includes("show_on_homepage") ||
-    (withHomepage.error?.message ?? "").includes("homepage_sort_order")
-      ? await supabase
-          .from("collection_cakes")
-          .select(
-            `
+  let { data, error } = (withHomepage.error?.message ?? "").includes(
+    "show_on_homepage",
+  )
+    ? await supabase
+        .from("collection_cakes")
+        .select(
+          `
       id,
       collection_id,
       library_cake_id,
@@ -452,10 +446,10 @@ export async function listCollectionCakeRows(
         )
       )
     `,
-          )
-          .eq("collection_id", collectionId)
-          .order("sort_order", { ascending: true })
-      : withHomepage;
+        )
+        .eq("collection_id", collectionId)
+        .order("sort_order", { ascending: true })
+    : withHomepage;
   if (error && isMissingCakeTagAssignmentSchema(error.message)) {
     const retry = await supabase
       .from("collection_cakes")

@@ -16,7 +16,7 @@ import {
   HOMEPAGE_COLLECTION_PREVIEW_DISPLAY_MAX_LG,
   HOMEPAGE_COLLECTION_PREVIEW_MAX,
   isCustomerFacingHistoricalCatalogue,
-  planHomepageCollectionPreviewChange,
+  planHomepageCollectionPreviewSelection,
   takeHomepageCollectionPreviewCakes,
 } from "@/engines/menu/homepage-collection-preview";
 import { selectHomepageFeaturedCollections } from "@/engines/menu/homepage-featured-collections";
@@ -47,7 +47,10 @@ const freshSectionSrc = readSrc(
   "src/workspaces/storefront/home/HomeFreshPicksSection.tsx",
 );
 assert.match(freshSectionSrc, /Nothing extra is available right now/);
-assert.match(freshSectionSrc, /Check back here for last-minute cake availability/);
+assert.match(
+  freshSectionSrc,
+  /Check back here for last-minute cake availability/,
+);
 assert.match(freshSectionSrc, /empty \?/);
 assert.doesNotMatch(freshSectionSrc, /return null/);
 assert.doesNotMatch(freshSectionSrc, /if \(picks\.length === 0\) return null/);
@@ -65,7 +68,9 @@ assert.doesNotMatch(freshSectionSrc, /lg:grid lg:grid-cols-2/);
 assert.doesNotMatch(freshSectionSrc, /md:grid-cols-2/);
 assert.doesNotMatch(freshSectionSrc, /HomeDestinationCard/);
 
-const homeSrc = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
+const homeSrc = readSrc(
+  "src/workspaces/storefront/home/StorefrontHomePage.tsx",
+);
 assert.match(homeSrc, /sortHomepageFreshPicks/);
 assert.match(homeSrc, /HomeFreshPicksSection[\s\S]*picks=\{picks\}/);
 
@@ -206,12 +211,10 @@ const overflow = selectHomepageFeaturedCollections({
   ],
 });
 assert.equal(overflow.featured.length, 4);
-assert.deepEqual(overflow.featured.map((row) => row.id), [
-  "sep",
-  "special",
-  "oct",
-  "nov",
-]);
+assert.deepEqual(
+  overflow.featured.map((row) => row.id),
+  ["sep", "special", "oct", "nov"],
+);
 
 assert.deepEqual(
   selectHomepageFeaturedCollections({
@@ -396,7 +399,10 @@ assert.match(cakeCardSrc, /text-status-danger/);
 const catalogueSrc = readSrc(
   "src/workspaces/storefront/catalog/BrowseCakeCatalogue.tsx",
 );
-assert.match(catalogueSrc, /hideAddToOrder=\{cake\.currentlyOffered === false\}/);
+assert.match(
+  catalogueSrc,
+  /hideAddToOrder=\{cake\.currentlyOffered === false\}/,
+);
 
 const detailSrc = readSrc(
   "src/workspaces/storefront/catalog/StorefrontCakeDetail.tsx",
@@ -423,48 +429,49 @@ const size = (id: string, price: number) => ({
   sortOrder: 1,
   preorderDays: 2,
 });
-assert.equal(
-  formatHomepagePrice({ sizes: [size("6\"", 78)] }),
-  "RM78",
-);
-assert.equal(
-  isStartingFromPrice({ sizes: [size("6\"", 78)] }),
-  false,
-);
+assert.equal(formatHomepagePrice({ sizes: [size('6"', 78)] }), "RM78");
+assert.equal(isStartingFromPrice({ sizes: [size('6"', 78)] }), false);
 assert.equal(
   formatHomepagePrice({
-    sizes: [size("4\"", 75), size("6\"", 95)],
+    sizes: [size('4"', 75), size('6"', 95)],
   }),
   "RM75~",
 );
 assert.equal(
   formatHomepagePrice({
-    sizes: [size("6\"", 78), size("8\"", 78)],
+    sizes: [size('6"', 78), size('8"', 78)],
   }),
   "RM78",
 );
 
-const previewPlan = planHomepageCollectionPreviewChange(
+const previewSelection = planHomepageCollectionPreviewSelection(
   [
-    { id: "a", showOnHomepage: true, homepageSortOrder: 1 },
-    { id: "b", showOnHomepage: false, homepageSortOrder: null },
+    { id: "a", showOnHomepage: true },
+    { id: "b", showOnHomepage: false },
   ],
   "b",
-  { showOnHomepage: true, homepageSortOrder: 1 },
+  true,
 );
-assert.equal(previewPlan.ok, true);
-if (previewPlan.ok) {
-  assert.deepEqual(
-    previewPlan.updates
-      .filter((row) => row.showOnHomepage)
-      .sort(
-        (left, right) =>
-          (left.homepageSortOrder ?? 0) - (right.homepageSortOrder ?? 0),
-      )
-      .map((row) => row.id),
-    ["b", "a"],
-  );
-}
+assert.deepEqual(previewSelection, {
+  ok: true,
+  id: "b",
+  showOnHomepage: true,
+});
+assert.deepEqual(
+  planHomepageCollectionPreviewSelection(
+    Array.from({ length: HOMEPAGE_COLLECTION_PREVIEW_MAX }, (_, index) => ({
+      id: `selected-${index}`,
+      showOnHomepage: true,
+    })).concat({ id: "unselected", showOnHomepage: false }),
+    "unselected",
+    true,
+  ),
+  {
+    ok: false,
+    error:
+      "You can feature up to 6 cakes on the homepage for this collection. Remove one before adding another.",
+  },
+);
 
 const builderSrc = readSrc(
   "src/workspaces/library/collections/CollectionBuilder.tsx",

@@ -12,7 +12,8 @@ function readSrc(rel: string): string {
 
 const home = readSrc("src/workspaces/storefront/home/StorefrontHomePage.tsx");
 assert.match(home, /listPublicCatalogueVouchers/);
-assert.match(home, /sortCakesForCataloguePromotionPresentation/);
+assert.doesNotMatch(home, /sortCakesForCataloguePromotionPresentation/);
+assert.match(home, /cakes=\{collection\.cakes\}/);
 assert.match(home, /buildTargetedPromotionBadgeByCakeId/);
 assert.match(home, /collectionMerchandising: true/);
 assert.match(home, /cataloguePromotionPeriodFromWindow/);
@@ -26,14 +27,25 @@ const collectionPage = readSrc(
 );
 assert.match(collectionPage, /listPublicCatalogueVouchers/);
 assert.match(collectionPage, /collectionMerchandising: true/);
-assert.match(collectionPage, /sortCakesForCataloguePromotionPresentation/);
+assert.doesNotMatch(
+  collectionPage,
+  /sortCakesForCataloguePromotionPresentation/,
+);
+assert.match(collectionPage, /const orderedCakes = cakes;/);
 
-const browse = readSrc("src/workspaces/storefront/home/StorefrontBrowsePage.tsx");
+const browse = readSrc(
+  "src/workspaces/storefront/home/StorefrontBrowsePage.tsx",
+);
 assert.match(browse, /listPublicCatalogueVouchers/);
 assert.match(browse, /buildTargetedPromotionBadgeByCakeId/);
-assert.equal((browse.match(/listPublicCatalogueVouchers\(\)/g) ?? []).length, 1);
+assert.equal(
+  (browse.match(/listPublicCatalogueVouchers\(\)/g) ?? []).length,
+  1,
+);
 
-const card = readSrc("src/workspaces/storefront/catalog/StorefrontCakeCard.tsx");
+const card = readSrc(
+  "src/workspaces/storefront/catalog/StorefrontCakeCard.tsx",
+);
 assert.match(card, /StorefrontPromotionBadge/);
 assert.doesNotMatch(card, /listPublicCatalogueVouchers/);
 

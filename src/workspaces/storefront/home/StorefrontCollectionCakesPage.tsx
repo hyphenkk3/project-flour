@@ -31,11 +31,7 @@ import { StorefrontHomeLink } from "@/workspaces/storefront/StorefrontBrand";
 import { StorefrontRetryNotice } from "@/workspaces/storefront/StorefrontRetryNotice";
 import { PreorderInProgressBar } from "@/workspaces/storefront/checkout/PreorderInProgressBar";
 import { singaporeDateFromIso } from "@/engines/orders/promotions";
-import {
-  buildTargetedPromotionBadgeByCakeId,
-  cakeHasNewMerchandisingTag,
-  sortCakesForCataloguePromotionPresentation,
-} from "@/engines/vouchers/catalogue-promotion-presentation";
+import { buildTargetedPromotionBadgeByCakeId } from "@/engines/vouchers/catalogue-promotion-presentation";
 import { cataloguePromotionPeriodFromWindow } from "@/engines/vouchers/catalogue-voucher";
 import { listPublicCatalogueVouchersStrict } from "@/workspaces/vouchers/catalogue-queries";
 import {
@@ -62,9 +58,10 @@ function scopedCheckoutHref(
   if (!window) return "/order";
   return collectionScopedCheckoutHref({
     from,
-    pickupDate: pickupDate && pickupDate >= window.min && pickupDate <= window.max
-      ? pickupDate
-      : window.min,
+    pickupDate:
+      pickupDate && pickupDate >= window.min && pickupDate <= window.max
+        ? pickupDate
+        : window.min,
     to,
   });
 }
@@ -106,9 +103,7 @@ function CollectionCakesFallback() {
   );
 }
 
-async function CollectionCakesBody({
-  collectionId,
-}: CollectionCakesBodyProps) {
+async function CollectionCakesBody({ collectionId }: CollectionCakesBodyProps) {
   const monthlyResult = await settleStorefrontRead(() =>
     getOrderableMonthlyCatalogueById(collectionId),
   );
@@ -179,8 +174,11 @@ async function CollectionCakesBody({
   let description: string;
   let note: string | null = null;
   let checkoutHref: string;
-  let collectionScope: { from: string; to: string; pickup: string | null } | null =
-    null;
+  let collectionScope: {
+    from: string;
+    to: string;
+    pickup: string | null;
+  } | null = null;
 
   if (monthly?.month) {
     const bounds = catalogueMonthPickupBounds(monthly.month);
@@ -212,10 +210,8 @@ async function CollectionCakesBody({
   } else {
     headline = SPECIAL_MENU_HEADING;
     description =
-      customerSpecialMenuPeriodLabel(
-        special!.startDate,
-        special!.endDate,
-      ) ?? SPECIAL_MENU_DESCRIPTION;
+      customerSpecialMenuPeriodLabel(special!.startDate, special!.endDate) ??
+      SPECIAL_MENU_DESCRIPTION;
     checkoutHref = scopedCheckoutHref(
       earliest,
       special!.startDate,
@@ -247,11 +243,9 @@ async function CollectionCakesBody({
       { collectionMerchandising: true },
     ),
   );
-  const orderedCakes = sortCakesForCataloguePromotionPresentation(cakes, {
-    isNew: cakeHasNewMerchandisingTag,
-    isTargetedPromotion: (cake) => Boolean(promotions[cake.id]),
-    manualOrder: (_cake, index) => index + 1,
-  });
+  // `listAvailableCakes` already applies the collection membership's saved
+  // sort_order. Promotion badges describe cakes; they must not reorder them.
+  const orderedCakes = cakes;
   const detailHrefs =
     scope == null
       ? undefined
@@ -314,7 +308,10 @@ async function CollectionCakesBody({
       ) : null}
       <CakePhotoDisclaimer className="mt-3 max-w-xl" />
 
-      <section aria-labelledby="collection-cakes-heading" className="mt-6 sm:mt-8">
+      <section
+        aria-labelledby="collection-cakes-heading"
+        className="mt-6 sm:mt-8"
+      >
         <h2 className="sr-only" id="collection-cakes-heading">
           Cakes in this collection
         </h2>

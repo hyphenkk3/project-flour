@@ -46,7 +46,11 @@ import type {
   LibraryCollection,
 } from "@/workspaces/library/collections/queries";
 import { CollectionHomepagePreviewControl } from "@/workspaces/library/collections/CollectionHomepagePreviewControl";
-import { cakeCategoryOptionLabel, formatCakeCategoryNames, sortCakeCategories } from "@/engines/menu/cake-categories";
+import {
+  cakeCategoryOptionLabel,
+  formatCakeCategoryNames,
+  sortCakeCategories,
+} from "@/engines/menu/cake-categories";
 import { formatCakeTagNames } from "@/engines/menu/cake-tags";
 import {
   LIBRARY_CAKE_STATUSES,
@@ -297,111 +301,116 @@ export function CollectionBuilder({
       </section>
 
       {locked ? null : (
-      <section className="space-y-3">
-        <div>
-          <h3 className="text-ink text-sm font-semibold">Add from Library</h3>
-          <p className="text-skyline mt-1 text-sm">
-            Search the Master Cake Library. Adding a cake is an explicit
-            merchandising choice and does not change its Library status.
-          </p>
-        </div>
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-ink text-sm font-semibold">Add from Library</h3>
+            <p className="text-skyline mt-1 text-sm">
+              Search the Master Cake Library. Adding a cake is an explicit
+              merchandising choice and does not change its Library status.
+            </p>
+          </div>
 
-        <div className="space-y-3">
-          <FormInput
-            aria-label="Search Library cakes"
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search by name or category"
-            value={query}
-          />
-          <FormField htmlFor="collection-add-status" label="Library status">
-            <FormSelect
-              id="collection-add-status"
-              onChange={(event) =>
-                setStatus(event.target.value as LibraryCakeStatusFilter)
-              }
-              value={status}
-            >
-              <option value="all">All statuses</option>
-              {LIBRARY_CAKE_STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {cakeStatusLabel(value)}
-                </option>
-              ))}
-            </FormSelect>
-          </FormField>
-          <FormField htmlFor="collection-add-category" label="Category">
-            <FormSelect
-              id="collection-add-category"
-              onChange={(event) =>
-                setCategory(event.target.value as LibraryCakeCategoryFilter)
-              }
-              value={category}
-            >
-              <option value="all">All categories</option>
-              {sortCakeCategories(categories).map((value) => (
-                <option key={value.id} value={value.id}>
-                  {cakeCategoryOptionLabel(value)}
-                </option>
-              ))}
-            </FormSelect>
-          </FormField>
-        </div>
-
-        {addable.length === 0 ? (
-          <EmptyState
-            compact
-            description={
-              libraryCakes.length === members.length
-                ? "Every Library cake is already in this catalogue."
-                : "Try a different search or filter."
-            }
-            title="No matching Library cakes"
-          />
-        ) : (
-          <ul className="divide-fog border-fog divide-y rounded-xl border bg-white">
-            {addable.map((cake) => (
-              <li
-                className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-                key={cake.id}
+          <div className="space-y-3">
+            <FormInput
+              aria-label="Search Library cakes"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search by name or category"
+              value={query}
+            />
+            <FormField htmlFor="collection-add-status" label="Library status">
+              <FormSelect
+                id="collection-add-status"
+                onChange={(event) =>
+                  setStatus(event.target.value as LibraryCakeStatusFilter)
+                }
+                value={status}
               >
-                <div className="min-w-0">
-                  <p className="text-ink font-medium">{cake.name}</p>
-                  <p className="text-skyline mt-1 text-sm">
-                    {formatCakeCategoryNames(cake.categories) || cakeCategoryLabel(cake.categoryName)} ·{" "}
-                    {formatCakeSizePrices(cake.sizes)}
-                  </p>
-                  {formatCakeTagNames(cake.tags ?? [], { includeInactive: true }) ? (
+                <option value="all">All statuses</option>
+                {LIBRARY_CAKE_STATUSES.map((value) => (
+                  <option key={value} value={value}>
+                    {cakeStatusLabel(value)}
+                  </option>
+                ))}
+              </FormSelect>
+            </FormField>
+            <FormField htmlFor="collection-add-category" label="Category">
+              <FormSelect
+                id="collection-add-category"
+                onChange={(event) =>
+                  setCategory(event.target.value as LibraryCakeCategoryFilter)
+                }
+                value={category}
+              >
+                <option value="all">All categories</option>
+                {sortCakeCategories(categories).map((value) => (
+                  <option key={value.id} value={value.id}>
+                    {cakeCategoryOptionLabel(value)}
+                  </option>
+                ))}
+              </FormSelect>
+            </FormField>
+          </div>
+
+          {addable.length === 0 ? (
+            <EmptyState
+              compact
+              description={
+                libraryCakes.length === members.length
+                  ? "Every Library cake is already in this catalogue."
+                  : "Try a different search or filter."
+              }
+              title="No matching Library cakes"
+            />
+          ) : (
+            <ul className="divide-fog border-fog divide-y rounded-xl border bg-white">
+              {addable.map((cake) => (
+                <li
+                  className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                  key={cake.id}
+                >
+                  <div className="min-w-0">
+                    <p className="text-ink font-medium">{cake.name}</p>
                     <p className="text-skyline mt-1 text-sm">
-                      {formatCakeTagNames(cake.tags ?? [], { includeInactive: true })}
+                      {formatCakeCategoryNames(cake.categories) ||
+                        cakeCategoryLabel(cake.categoryName)}{" "}
+                      · {formatCakeSizePrices(cake.sizes)}
                     </p>
-                  ) : null}
-                  <p className="text-skyline mt-1 text-sm">
-                    {libraryAddHint(cake.status, cake.sizes.length)}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <StatusBadge
-                    label={cakeStatusLabel(cake.status)}
-                    tone={libraryStatusTone(cake.status)}
-                  />
-                  <button
-                    className={inkButtonClass}
-                    disabled={pending}
-                    onClick={() =>
-                      run(() =>
-                        addCakeToCollectionAction(collection.id, cake.id),
-                      )
-                    }
-                    type="button"
-                  >
-                    Add
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                    {formatCakeTagNames(cake.tags ?? [], {
+                      includeInactive: true,
+                    }) ? (
+                      <p className="text-skyline mt-1 text-sm">
+                        {formatCakeTagNames(cake.tags ?? [], {
+                          includeInactive: true,
+                        })}
+                      </p>
+                    ) : null}
+                    <p className="text-skyline mt-1 text-sm">
+                      {libraryAddHint(cake.status, cake.sizes.length)}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <StatusBadge
+                      label={cakeStatusLabel(cake.status)}
+                      tone={libraryStatusTone(cake.status)}
+                    />
+                    <button
+                      className={inkButtonClass}
+                      disabled={pending}
+                      onClick={() =>
+                        run(() =>
+                          addCakeToCollectionAction(collection.id, cake.id),
+                        )
+                      }
+                      type="button"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
 
       <ConfirmDialog
@@ -522,10 +531,13 @@ function CollectionMemberCard({
             <div className="min-w-0">
               <p className="text-ink font-medium">{member.cake.name}</p>
               <p className="text-skyline mt-1 text-sm">
-                {formatCakeCategoryNames(member.cake.categories) || cakeCategoryLabel(member.cake.categoryName)} ·{" "}
-                {formatCakeSizePrices(member.cake.sizes)}
+                {formatCakeCategoryNames(member.cake.categories) ||
+                  cakeCategoryLabel(member.cake.categoryName)}{" "}
+                · {formatCakeSizePrices(member.cake.sizes)}
               </p>
-              {formatCakeTagNames(member.cake.tags ?? [], { includeInactive: true }) ? (
+              {formatCakeTagNames(member.cake.tags ?? [], {
+                includeInactive: true,
+              }) ? (
                 <p className="text-skyline mt-1 text-sm">
                   {formatCakeTagNames(member.cake.tags ?? [], {
                     includeInactive: true,
@@ -562,7 +574,6 @@ function CollectionMemberCard({
                 collectionId={member.collectionId}
                 disabled={disabled}
                 membershipId={member.id}
-                position={member.homepageSortOrder}
                 showOnHomepage={member.showOnHomepage}
               />
             </div>

@@ -57,11 +57,7 @@ import { HomeVisitFooter } from "@/workspaces/storefront/home/HomeVisitFooter";
 import { StorefrontCakePrefetch } from "@/workspaces/storefront/home/StorefrontCakePrefetch";
 import type { StorefrontCake } from "@/types/storefront";
 import { singaporeDateFromIso } from "@/engines/orders/promotions";
-import {
-  buildTargetedPromotionBadgeByCakeId,
-  cakeHasNewMerchandisingTag,
-  sortCakesForCataloguePromotionPresentation,
-} from "@/engines/vouchers/catalogue-promotion-presentation";
+import { buildTargetedPromotionBadgeByCakeId } from "@/engines/vouchers/catalogue-promotion-presentation";
 import { cataloguePromotionPeriodFromWindow } from "@/engines/vouchers/catalogue-voucher";
 import { listPublicCatalogueVouchersStrict } from "@/workspaces/vouchers/catalogue-queries";
 
@@ -93,7 +89,12 @@ function collectionCakeEntries(input: {
   } else if (input.month) {
     const bounds = catalogueMonthPickupBounds(input.month);
     if (!bounds) {
-      return { hrefs: {}, scopes: {}, fulfilmentFrom: null, fulfilmentTo: null };
+      return {
+        hrefs: {},
+        scopes: {},
+        fulfilmentFrom: null,
+        fulfilmentTo: null,
+      };
     }
     from = bounds.from;
     to = bounds.to;
@@ -112,9 +113,7 @@ function collectionCakeEntries(input: {
     hrefs: Object.fromEntries(
       input.cakes.map((cake) => [cake.id, storefrontCakeDetailHref(cake.id)]),
     ),
-    scopes: Object.fromEntries(
-      input.cakes.map((cake) => [cake.id, scope]),
-    ),
+    scopes: Object.fromEntries(input.cakes.map((cake) => [cake.id, scope])),
     fulfilmentFrom: from,
     fulfilmentTo: to,
   };
@@ -177,31 +176,31 @@ function HomeHeroHeader() {
         </div>
         <nav className="text-skyline hidden flex-wrap items-center justify-center gap-x-5 gap-y-1 text-sm md:flex">
           <Link
-            className="hover:text-ink active:opacity-70 transition-colors duration-200"
+            className="hover:text-ink transition-colors duration-200 active:opacity-70"
             href="/order"
           >
             Order
           </Link>
           <Link
-            className="hover:text-ink active:opacity-70 transition-colors duration-200"
+            className="hover:text-ink transition-colors duration-200 active:opacity-70"
             href="/browse"
           >
             Browse Cakes
           </Link>
           <Link
-            className="hover:text-ink active:opacity-70 transition-colors duration-200"
+            className="hover:text-ink transition-colors duration-200 active:opacity-70"
             href="/offers"
           >
             Current Offers
           </Link>
           <Link
-            className="hover:text-ink active:opacity-70 transition-colors duration-200"
+            className="hover:text-ink transition-colors duration-200 active:opacity-70"
             href="/extra"
           >
             Fresh Picks
           </Link>
           <Link
-            className="hover:text-ink active:opacity-70 transition-colors duration-200"
+            className="hover:text-ink transition-colors duration-200 active:opacity-70"
             href="/faq"
           >
             FAQ
@@ -229,7 +228,10 @@ function HomeFreshPicksFallback() {
 
 function HomeMerchandisingFallback() {
   return (
-    <section aria-busy="true" className="border-ink/[0.1] mt-8 border-t px-6 pt-8 sm:px-10">
+    <section
+      aria-busy="true"
+      className="border-ink/[0.1] mt-8 border-t px-6 pt-8 sm:px-10"
+    >
       <div className="mx-auto flex w-full max-w-6xl gap-3">
         <div className="bg-fog h-24 w-24 shrink-0 rounded-[10px] lg:h-[10.5rem] lg:w-[10.5rem]" />
         <div className="bg-fog h-24 w-24 shrink-0 rounded-[10px] lg:h-[10.5rem] lg:w-[10.5rem]" />
@@ -420,11 +422,6 @@ async function HomeMerchandisingContent() {
       {
         ...collection,
         promotions,
-        cakes: sortCakesForCataloguePromotionPresentation(collection.cakes, {
-          isNew: cakeHasNewMerchandisingTag,
-          isTargetedPromotion: (cake) => Boolean(promotions[cake.id]),
-          manualOrder: (_cake, index) => index + 1,
-        }),
       },
     ];
   });
