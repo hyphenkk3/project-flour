@@ -17,6 +17,8 @@ import {
 type CreateClientOptions = {
   /** Abort in-flight Supabase fetches after this many ms. */
   timeoutMs?: number;
+  /** Sanitized observer for auth cookie writes; receives no cookie names or values. */
+  onAuthCookieMutation?: (kind: "written" | "cleared") => void;
 };
 
 function fetchForCheckoutDateTiming(timeoutMs: number): typeof fetch {
@@ -57,6 +59,20 @@ export async function createClient(options?: CreateClientOptions) {
           cookiesToSet.forEach(({ name, value, options: cookieOptions }) => {
             cookieStore.set(name, value, cookieOptions);
           });
+          if (
+            cookiesToSet.some(
+              ({ options: cookieOptions }) => cookieOptions?.maxAge === 0,
+            )
+          ) {
+            options?.onAuthCookieMutation?.("cleared");
+          }
+          if (
+            cookiesToSet.some(
+              ({ options: cookieOptions }) => cookieOptions?.maxAge !== 0,
+            )
+          ) {
+            options?.onAuthCookieMutation?.("written");
+          }
         } catch {
           // Called from a Server Component where cookies are read-only.
         }

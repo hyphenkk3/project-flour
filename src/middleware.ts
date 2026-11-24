@@ -14,6 +14,7 @@ const PUBLIC_PATHS = new Set([
   "/order/success",
   "/auth/callback",
   "/auth/session-check",
+  "/auth/session-resume",
 ]);
 
 function isPublicPath(pathname: string) {
@@ -30,6 +31,28 @@ function isPublicPath(pathname: string) {
 function isMachineDispatchPath(pathname: string) {
   // Skip staff-session middleware only. Bearer auth is enforced by the route.
   return pathname === "/api/staff/notifications/dispatch";
+}
+
+function hasSupabaseAuthCookie(request: NextRequest): boolean {
+  return request.cookies
+    .getAll()
+    .some(({ name }) => /^sb-[a-z0-9]+-auth-token(?:\.\d+)?$/i.test(name));
+}
+
+function devAuthDiagnostic(
+  event: string,
+  details: Record<string, string | boolean>,
+) {
+  if (
+    process.env.VERCEL_ENV === "preview" ||
+    (process.env.VERCEL_ENV !== "production" &&
+      process.env.NODE_ENV === "development")
+  ) {
+    console.info(
+      "[pwa-auth-diagnostic]",
+      JSON.stringify({ event, ...details }),
+    );
+  }
 }
 
 function staffLoginRedirect(request: NextRequest): NextResponse {
@@ -77,6 +100,45 @@ function sessionVerificationUnavailable(request: NextRequest): NextResponse {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (
+    pathname === "/" &&
+    request.nextUrl.searchParams.get("pwaLaunch") === "1"
+  ) {
+    devAuthDiagnostic("launch-marker", {
+      launch_context: "manifest_start_url",
+      auth_cookie_present: hasSupabaseAuthCookie(request),
+      decision: "route_to_session_resume",
+    });
+    return NextResponse.rewrite(
+      new URL("/auth/session-resume?from=pwa", request.url),
+    );
+  }
+
+  if (
+    pathname === "/login" &&
+    request.nextUrl.searchParams.get("resumeChecked") !== "1"
+  ) {
+    const authCookiePresent = hasSupabaseAuthCookie(request);
+    if (authCookiePresent) {
+      devAuthDiagnostic("login-entry", {
+        launch_context: "normal_login_route",
+        auth_cookie_present: true,
+        decision: "route_to_session_resume",
+      });
+      const resumeUrl = new URL("/auth/session-resume", request.url);
+      resumeUrl.searchParams.set("from", "login");
+      const next = request.nextUrl.searchParams.get("next");
+      if (next) resumeUrl.searchParams.set("next", next);
+      return NextResponse.rewrite(resumeUrl);
+    }
+    devAuthDiagnostic("login-entry", {
+      launch_context: "normal_login_route",
+      auth_cookie_present: false,
+      decision: "show_login",
+    });
+    return NextResponse.next();
+  }
 
   // Public routes must never wait on Supabase.
   if (isPublicPath(pathname) || isMachineDispatchPath(pathname)) {
