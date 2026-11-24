@@ -3,6 +3,8 @@ export type WalkInHolderNameFields = {
   walkInHeldByName: string | null;
 };
 
+const SAFE_HOLDER_FALLBACK = "Staff member";
+
 export function uniqueWalkInHolderIds(
   units: readonly Pick<WalkInHolderNameFields, "walkInHeldBy">[],
 ): string[] {
@@ -32,13 +34,21 @@ export async function hydrateWalkInHolderNames<
   try {
     names = await lookup(holderIds);
   } catch {
-    return units.map((unit) => unit);
+    return units.map((unit) =>
+      unit.walkInHeldBy
+        ? { ...unit, walkInHeldByName: SAFE_HOLDER_FALLBACK }
+        : { ...unit },
+    );
   }
 
   return units.map((unit) => {
     const name = unit.walkInHeldBy
       ? names.get(unit.walkInHeldBy)?.trim()
       : undefined;
-    return name ? { ...unit, walkInHeldByName: name } : unit;
+    if (!unit.walkInHeldBy) return { ...unit };
+    return {
+      ...unit,
+      walkInHeldByName: name || SAFE_HOLDER_FALLBACK,
+    };
   });
 }

@@ -36,6 +36,69 @@ assert.deepEqual(
 );
 assert.equal(rows[0].walkInHeldByName, null, "input rows remain unchanged");
 
+const fallbackRows = [
+  {
+    id: "inactive",
+    walkInHeldBy: "inactive-staff",
+    walkInHeldByName: "Stale name",
+  },
+  {
+    id: "archived",
+    walkInHeldBy: "archived-staff",
+    walkInHeldByName: "Former name",
+  },
+  {
+    id: "missing",
+    walkInHeldBy: "deleted-staff",
+    walkInHeldByName: "Cached name",
+  },
+  {
+    id: "inaccessible",
+    walkInHeldBy: "inaccessible-staff",
+    walkInHeldByName: "Embedded name",
+  },
+  { id: "unheld", walkInHeldBy: null, walkInHeldByName: null },
+];
+const safeFallbacks = await hydrateWalkInHolderNames(
+  fallbackRows,
+  async (ids) => {
+    assert.deepEqual(ids, [
+      "inactive-staff",
+      "archived-staff",
+      "deleted-staff",
+      "inaccessible-staff",
+    ]);
+    // The production query returns no rows for inactive/archived/deleted or
+    // inaccessible profiles. A result for an unrelated profile is ignored.
+    return new Map([["unrelated-staff", "Must not be exposed"]]);
+  },
+);
+assert.deepEqual(
+  safeFallbacks.map(({ id, walkInHeldByName }) => [id, walkInHeldByName]),
+  [
+    ["inactive", "Staff member"],
+    ["archived", "Staff member"],
+    ["missing", "Staff member"],
+    ["inaccessible", "Staff member"],
+    ["unheld", null],
+  ],
+);
+
+const activeHolder = await hydrateWalkInHolderNames(
+  [
+    {
+      id: "active",
+      walkInHeldBy: "active-staff",
+      walkInHeldByName: "Stale name",
+    },
+  ],
+  async (ids) => {
+    assert.deepEqual(ids, ["active-staff"]);
+    return new Map([["active-staff", "Current active name"]]);
+  },
+);
+assert.equal(activeHolder[0].walkInHeldByName, "Current active name");
+
 let emptyLookupCalled = false;
 const withoutHolders = await hydrateWalkInHolderNames(
   [{ id: "stock-empty", walkInHeldBy: null, walkInHeldByName: null }],
@@ -50,7 +113,16 @@ assert.equal(withoutHolders[0].walkInHeldByName, null);
 const failedLookup = await hydrateWalkInHolderNames(rows, async () => {
   throw new Error("simulated lookup failure");
 });
-assert.deepEqual(failedLookup, rows, "lookup failure preserves safe fallback");
+assert.deepEqual(
+  failedLookup.map(({ id, walkInHeldByName }) => [id, walkInHeldByName]),
+  [
+    ["stock-a", "Staff member"],
+    ["stock-b", "Staff member"],
+    ["stock-c", "Staff member"],
+    ["stock-d", null],
+  ],
+  "lookup failure must not preserve potentially stale embedded names",
+);
 
 const querySource = readFileSync(
   resolve("src/workspaces/extra/queries.ts"),
@@ -63,7 +135,7 @@ const storefrontSource = readFileSync(
 assert.match(querySource, /createServiceClient\(\)/);
 assert.match(
   querySource,
-  /\.from\("staff_profiles"\)[\s\S]*?\.select\("id, display_name"\)[\s\S]*?\.in\("id", batch\)/,
+  /\.from\("staff_profiles"\)[\s\S]*?\.select\("id, display_name"\)[\s\S]*?\.in\("id", batch\)[\s\S]*?\.eq\("is_active", true\)[\s\S]*?\.is\("archived_at", null\)/,
 );
 assert.match(querySource, /return withWalkInHolderNames\(assignedUnits\)/);
 assert.match(

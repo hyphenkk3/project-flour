@@ -188,7 +188,9 @@ async function withWalkInHolderNames(
       const { data, error } = await admin
         .from("staff_profiles")
         .select("id, display_name")
-        .in("id", batch);
+        .in("id", batch)
+        .eq("is_active", true)
+        .is("archived_at", null);
       if (error) throw error;
 
       for (const row of data ?? []) {
