@@ -3,6 +3,10 @@ import { redirect } from "next/navigation";
 import { getStaffByAuthUserId } from "@/foundation/staff/queries";
 import { createClient } from "@/lib/supabase/server";
 import { AUTH_FETCH_TIMEOUT_MS } from "@/lib/supabase/fetch-timeout";
+import {
+  isTransientSessionVerificationError,
+  StaffSessionVerificationUnavailable,
+} from "@/foundation/auth/session-errors";
 import type { StaffProfile } from "@/types/staff";
 
 /**
@@ -14,7 +18,12 @@ export const getSessionStaff = cache(async (): Promise<StaffProfile | null> => {
     const supabase = await createClient({ timeoutMs: AUTH_FETCH_TIMEOUT_MS });
     const {
       data: { user },
+      error,
     } = await supabase.auth.getUser();
+
+    if (error && isTransientSessionVerificationError(error)) {
+      throw new StaffSessionVerificationUnavailable();
+    }
 
     if (!user) {
       return null;
@@ -28,14 +37,27 @@ export const getSessionStaff = cache(async (): Promise<StaffProfile | null> => {
     }
 
     return staff;
-  } catch {
-    // Auth/network timeout or failure — treat as signed out.
+  } catch (error) {
+    if (
+      error instanceof StaffSessionVerificationUnavailable ||
+      isTransientSessionVerificationError(error)
+    ) {
+      throw new StaffSessionVerificationUnavailable();
+    }
     return null;
   }
 });
 
 export async function requireStaff(): Promise<StaffProfile> {
-  const staff = await getSessionStaff();
+  let staff: StaffProfile | null;
+  try {
+    staff = await getSessionStaff();
+  } catch (error) {
+    if (error instanceof StaffSessionVerificationUnavailable) {
+      redirect("/auth/session-check");
+    }
+    throw error;
+  }
 
   if (!staff) {
     redirect("/login");

@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 import { AUTH_FETCH_TIMEOUT_MS } from "@/lib/supabase/fetch-timeout";
+import { classifySessionVerification } from "@/foundation/auth/session-errors";
 
 const PUBLIC_PATHS = new Set([
   "/",
@@ -12,6 +13,7 @@ const PUBLIC_PATHS = new Set([
   "/order",
   "/order/success",
   "/auth/callback",
+  "/auth/session-check",
 ]);
 
 function isPublicPath(pathname: string) {
@@ -47,6 +49,32 @@ function staffLoginRedirect(request: NextRequest): NextResponse {
   return NextResponse.redirect(loginUrl);
 }
 
+function sessionVerificationUnavailable(request: NextRequest): NextResponse {
+  const retryPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+  const escapedRetryPath = retryPath.replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+    return entities[character];
+  });
+
+  return new NextResponse(
+    `<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Staff session check</title><body><main><h1>We couldn’t verify your session</h1><p>Your sign-in has not been cleared. Please retry when the connection is ready.</p><form method="get" action="${escapedRetryPath}"><button type="submit">Try again</button></form></main></body></html>`,
+    {
+      status: 503,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "private, no-store, max-age=0",
+        "Retry-After": "3",
+      },
+    },
+  );
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -56,19 +84,25 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    const { user, supabaseResponse } = await updateSession(
+    const { user, error, supabaseResponse } = await updateSession(
       request,
       AUTH_FETCH_TIMEOUT_MS,
     );
 
-    if (!user) {
+    const verification = classifySessionVerification(Boolean(user), error);
+    if (verification === "temporarily_unavailable") {
+      return sessionVerificationUnavailable(request);
+    }
+
+    if (verification === "signed_out") {
       return staffLoginRedirect(request);
     }
 
     return supabaseResponse;
   } catch {
-    // Timeout / network failure: fail closed to login, never hang.
-    return staffLoginRedirect(request);
+    // A failed verification is not proof that the stored session is invalid.
+    // Fail closed without clearing the cookie or misrouting to Login.
+    return sessionVerificationUnavailable(request);
   }
 }
 

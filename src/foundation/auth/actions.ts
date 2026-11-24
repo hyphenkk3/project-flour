@@ -7,21 +7,21 @@ import {
   sanitizePostLoginPath,
 } from "@/foundation/auth/post-login-destination";
 import { getSessionStaff } from "@/foundation/auth/session";
+import { StaffSessionVerificationUnavailable } from "@/foundation/auth/session-errors";
 import { STAFF_FORCED_PASSWORD_CHANGE_PATH } from "@/foundation/staff/forced-password-change";
 import {
   findStaffByUsername,
   getAuthEmailForUserId,
 } from "@/foundation/staff/queries";
 import { createClient } from "@/lib/supabase/server";
-import type { RoleCode } from "@/types/staff";
+import type { RoleCode, StaffProfile } from "@/types/staff";
 
 export type LoginState = {
   error: string | null;
 };
 
 export type PasskeyLoginCompletion =
-  | { ok: true; destination: string }
-  | { ok: false; error: string };
+  { ok: true; destination: string } | { ok: false; error: string };
 
 const genericLoginError = "Invalid username or password.";
 
@@ -96,7 +96,18 @@ export async function logoutAction() {
 export async function completePasskeyLoginAction(
   requestedNext?: string | null,
 ): Promise<PasskeyLoginCompletion> {
-  const staff = await getSessionStaff();
+  let staff: StaffProfile | null;
+  try {
+    staff = await getSessionStaff();
+  } catch (error) {
+    if (error instanceof StaffSessionVerificationUnavailable) {
+      return {
+        ok: false,
+        error: "We couldn’t verify your sign-in yet. Please try again.",
+      };
+    }
+    throw error;
+  }
 
   if (!staff) {
     return { ok: false, error: PASSKEY_COPY.failedSignIn };
