@@ -242,14 +242,17 @@ export function buildHomeCockpitModel(input: {
       .map((order) => order.id),
   ]);
 
-  const ready = todayOrders.filter(
-    (order) =>
-      !isCollectionDineInMethod(order.fulfilmentMethod) &&
-      isReady(order) &&
-      (isCollectionDeliveryMethod(order.fulfilmentMethod)
-        ? !order.outForDeliveryAt && !order.deliveredAt
-        : !order.pickedUpAt),
-  ).length;
+  const readyOrderIds = new Set(
+    todayOrders
+      .filter(
+        (order) =>
+          isReady(order) &&
+          !order.pickedUpAt &&
+          !order.outForDeliveryAt &&
+          !order.deliveredAt,
+      )
+      .map((order) => order.id),
+  );
 
   const visibleNeedsAttention = buckets.needsAttention.filter(
     (order) =>
@@ -262,7 +265,7 @@ export function buildHomeCockpitModel(input: {
     pickupsToday,
     deliveriesToday,
     dineInsToday,
-    ready,
+    ready: readyOrderIds.size,
     completed: completedOrderIds.size,
     needAttention: visibleNeedsAttention.length,
     pendingApprovals: input.pendingApprovals.length,

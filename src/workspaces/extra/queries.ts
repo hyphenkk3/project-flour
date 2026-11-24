@@ -25,6 +25,7 @@ import {
 } from "@/engines/extra/assignment-eligibility";
 import { resolveCakePhoto, type ResolvableCakePhoto } from "@/engines/menu/cake-photos";
 import { sortCakeSizesByNumericLabel } from "@/engines/menu/cake-size-order";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isMissingCakePhotoSchema } from "@/workspaces/library/cakes/photo-storage";
 import { loadOperatingHoursSnapshot } from "@/workspaces/library/operating-hours/queries";
@@ -33,6 +34,7 @@ import {
   mapAssignedOrderSummariesByStock,
   missingAssignedDirectOrderIds,
 } from "@/workspaces/extra/assigned-order-links";
+import { hydrateWalkInHolderNames } from "@/workspaces/extra/walk-in-holder-names";
 import type { ExtraCakeOption, ExtraStockUnit } from "@/workspaces/extra/types";
 import type { AssignedOrderSummary } from "@/workspaces/extra/assigned-order-links";
 
@@ -172,6 +174,31 @@ export function mapExtraStockRow(
       now,
     }),
   };
+}
+
+async function withWalkInHolderNames(
+  units: ExtraStockUnit[],
+): Promise<ExtraStockUnit[]> {
+  return hydrateWalkInHolderNames(units, async (holderIds) => {
+    const admin = createServiceClient();
+    const names = new Map<string, string>();
+
+    for (let offset = 0; offset < holderIds.length; offset += 100) {
+      const batch = holderIds.slice(offset, offset + 100);
+      const { data, error } = await admin
+        .from("staff_profiles")
+        .select("id, display_name")
+        .in("id", batch);
+      if (error) throw error;
+
+      for (const row of data ?? []) {
+        const name = String(row.display_name ?? "").trim();
+        if (name) names.set(String(row.id), name);
+      }
+    }
+
+    return names;
+  });
 }
 
 function attachTodayOrderability(
@@ -429,13 +456,17 @@ export async function listExtraStockUnits(): Promise<ExtraStockUnit[]> {
       !unit.cutIntoSlicesAt &&
       Boolean(unit.pickupAvailableFromAt && unit.pickupThroughAt),
   );
-  if (!hasOrderabilityCandidates) return assignedUnits;
+  if (!hasOrderabilityCandidates) {
+    return withWalkInHolderNames(assignedUnits);
+  }
 
   const [snapshot, config] = await Promise.all([
     loadOperatingHoursSnapshot(),
     loadFreshPicksPreparationConfig(),
   ]);
-  return attachTodayOrderability(assignedUnits, { now, snapshot, config });
+  return withWalkInHolderNames(
+    attachTodayOrderability(assignedUnits, { now, snapshot, config }),
+  );
 }
 
 const ASSIGNED_ORDER_SELECT =
@@ -700,7 +731,9 @@ export async function listHomeFreshPickUnits(): Promise<ExtraStockUnit[]> {
     snapshot,
     config,
   });
-  return attachTodayOrderability(presented, { now, snapshot, config });
+  return withWalkInHolderNames(
+    attachTodayOrderability(presented, { now, snapshot, config }),
+  );
 }
 
 export type ExtraAssignableOrder = {

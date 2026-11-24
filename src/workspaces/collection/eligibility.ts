@@ -413,7 +413,7 @@ export function collectionDeskLabel(
     case "dine_in_complete":
       return "Completed";
     case "dine_in_ready":
-      return "Ready for Collection";
+      return "Ready for Dine-In";
     case "dine_in_pending":
       return "Not ready";
     case "ready":

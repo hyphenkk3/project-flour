@@ -412,8 +412,8 @@ assert.equal(dineInModel.summary.pickupsToday, 3);
 assert.equal(dineInModel.summary.deliveriesToday, 1);
 assert.equal(
   dineInModel.summary.ready,
-  1,
-  "dine-in ready must not increment Ready",
+  2,
+  "Ready includes the active Pickup and Dine-In orders",
 );
 assert.equal(dineInModel.handoffs.ready, 1, "pickup Ready queue unchanged");
 assert.equal(

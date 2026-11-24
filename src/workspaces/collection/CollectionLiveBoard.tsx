@@ -48,7 +48,7 @@ function boardTitle(tab: CollectionBoardTab): string {
     case "delivery":
       return "Delivery";
     default:
-      return "Ready for Collection";
+      return "Ready Orders";
   }
 }
 

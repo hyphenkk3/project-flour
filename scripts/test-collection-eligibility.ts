@@ -304,6 +304,13 @@ assert.notEqual(
   collectionDeskLabel(deliveryReadyPresentation),
   "Ready for Collection",
 );
+const dineInReadyPresentation = collectionDeskPresentation({
+  readyAt: base.readyAt,
+  pickedUpAt: null,
+  fulfilmentMethod: "dine_in",
+});
+assert.equal(dineInReadyPresentation, "dine_in_ready");
+assert.equal(collectionDeskLabel(dineInReadyPresentation), "Ready for Dine-In");
 assert.equal(
   collectionDeskPresentation({
     readyAt: base.readyAt,
