@@ -107,6 +107,7 @@ assert.match(manifest, /id:\s*["']\/["']/);
 assert.match(manifest, /start_url:\s*["']\/?\?pwaLaunch=1["']/);
 assert.match(manifest, /scope:\s*["']\/["']/);
 assert.match(middleware, /searchParams\.get\("pwaLaunch"\) === "1"/);
+assert.match(middleware, /"\/manifest\.webmanifest"/);
 assert.match(
   middleware,
   /const resumeUrl = new URL\("\/auth\/session-resume", request\.url\)/,
@@ -128,6 +129,7 @@ assert.match(resumeRoute, /staff_profile: profile/);
 assert.match(resumeRoute, /tzwtpxdcggesgjaqxkqr\.supabase\.co/);
 assert.match(resumeRoute, /VERCEL_ENV === "preview"/);
 assert.match(resumeRoute, /VERCEL_ENV !== "production"/);
+assert.match(middleware, /tzwtpxdcggesgjaqxkqr\.supabase\.co/);
 assert.doesNotMatch(
   resumeRoute,
   /console\.(?:log|info)\([^\n]*(?:cookie|token|secret|password)\s*:/i,

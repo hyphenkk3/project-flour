@@ -5,6 +5,7 @@ import { classifySessionVerification } from "@/foundation/auth/session-errors";
 
 const PUBLIC_PATHS = new Set([
   "/",
+  "/manifest.webmanifest",
   "/login",
   "/browse",
   "/offers",
@@ -43,11 +44,22 @@ function devAuthDiagnostic(
   event: string,
   details: Record<string, string | boolean>,
 ) {
-  if (
-    process.env.VERCEL_ENV === "preview" ||
-    (process.env.VERCEL_ENV !== "production" &&
-      process.env.NODE_ENV === "development")
-  ) {
+  let supabaseProjectIsDev = false;
+  try {
+    supabaseProjectIsDev =
+      new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname ===
+      "tzwtpxdcggesgjaqxkqr.supabase.co";
+  } catch {
+    supabaseProjectIsDev = false;
+  }
+
+  const isDevRuntime =
+    (process.env.VERCEL_ENV === "preview" ||
+      (process.env.VERCEL_ENV !== "production" &&
+        process.env.NODE_ENV === "development")) &&
+    supabaseProjectIsDev;
+
+  if (isDevRuntime) {
     console.info(
       "[pwa-auth-diagnostic]",
       JSON.stringify({ event, ...details }),
