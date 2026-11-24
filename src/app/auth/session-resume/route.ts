@@ -46,7 +46,15 @@ function privateRedirect(request: NextRequest, path: string): NextResponse {
 
 export async function GET(request: NextRequest) {
   const from = request.nextUrl.searchParams.get("from");
-  const source: SessionResumeSource = from === "login" ? "login" : "pwa";
+  const source: SessionResumeSource =
+    from === "login" ? "login" : from === "legacy-pwa" ? "legacy_pwa" : "pwa";
+  const requestedStandaloneSignal =
+    request.nextUrl.searchParams.get("standaloneSignal") ?? "";
+  const standaloneSignal = ["ios", "display-mode", "both"].includes(
+    requestedStandaloneSignal,
+  )
+    ? requestedStandaloneSignal
+    : "unknown";
   const next = sanitizePostLoginPath(request.nextUrl.searchParams.get("next"));
   const cookieStore = await cookies();
   const authCookiePresent = hasAuthCookie(
@@ -100,7 +108,14 @@ export async function GET(request: NextRequest) {
             "[pwa-auth-diagnostic]",
             JSON.stringify({
               launch_context:
-                source === "pwa" ? "manifest_start_url_marker" : "login_route",
+                source === "legacy_pwa"
+                  ? "legacy_standalone_root"
+                  : source === "pwa"
+                    ? "manifest_start_url_marker"
+                    : "login_route",
+              ...(source === "legacy_pwa"
+                ? { standalone_signal: standaloneSignal }
+                : {}),
               auth_cookie_present: authCookiePresent,
               auth_verification: auth,
               session_refresh: refreshOutcome,
@@ -140,7 +155,14 @@ export async function GET(request: NextRequest) {
       "[pwa-auth-diagnostic]",
       JSON.stringify({
         launch_context:
-          source === "pwa" ? "manifest_start_url_marker" : "login_route",
+          source === "legacy_pwa"
+            ? "legacy_standalone_root"
+            : source === "pwa"
+              ? "manifest_start_url_marker"
+              : "login_route",
+        ...(source === "legacy_pwa"
+          ? { standalone_signal: standaloneSignal }
+          : {}),
         auth_cookie_present: authCookiePresent,
         auth_verification: auth,
         session_refresh: refreshOutcome,
@@ -154,8 +176,10 @@ export async function GET(request: NextRequest) {
   if (decision === "retry") {
     return privateRedirect(
       request,
-      source === "pwa"
-        ? "/auth/session-check?retry=pwa-launch"
+      source === "pwa" || source === "legacy_pwa"
+        ? source === "legacy_pwa"
+          ? `/auth/session-check?retry=pwa-legacy&standaloneSignal=${encodeURIComponent(standaloneSignal)}`
+          : "/auth/session-check?retry=pwa-launch"
         : "/auth/session-check?retry=login",
     );
   }
@@ -167,5 +191,8 @@ export async function GET(request: NextRequest) {
     return privateRedirect(request, `${loginUrl.pathname}${loginUrl.search}`);
   }
 
-  return privateRedirect(request, "/");
+  return privateRedirect(
+    request,
+    source === "legacy_pwa" ? "/?pwaResumeChecked=1" : "/",
+  );
 }

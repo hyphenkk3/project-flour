@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Outfit, Newsreader } from "next/font/google";
 import "@/app/globals.css";
 
@@ -30,6 +31,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <Script src="/pwa-legacy-launch.js" strategy="beforeInteractive" />
       <body className={`${sans.variable} ${display.variable} antialiased`}>
         {children}
       </body>

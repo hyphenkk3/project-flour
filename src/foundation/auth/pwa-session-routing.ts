@@ -1,4 +1,4 @@
-export type SessionResumeSource = "pwa" | "login";
+export type SessionResumeSource = "pwa" | "legacy_pwa" | "login";
 export type SessionAuthOutcome =
   | "verified"
   | "signed_out"
@@ -29,7 +29,7 @@ export function decideSessionResume(input: {
   }
 
   if (
-    input.source === "pwa" &&
+    (input.source === "pwa" || input.source === "legacy_pwa") &&
     !input.authCookiePresent &&
     input.auth === "signed_out"
   ) {

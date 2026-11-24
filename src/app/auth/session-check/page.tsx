@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 type SessionCheckPageProps = {
-  searchParams: Promise<{ retry?: string }>;
+  searchParams: Promise<{ retry?: string; standaloneSignal?: string }>;
 };
 
 export default async function SessionCheckPage({
@@ -9,11 +9,13 @@ export default async function SessionCheckPage({
 }: SessionCheckPageProps) {
   const params = await searchParams;
   const retryHref =
-    params.retry === "pwa-launch"
-      ? "/?pwaLaunch=1"
-      : params.retry === "login"
-        ? "/login"
-        : "/home";
+    params.retry === "pwa-legacy"
+      ? `/auth/session-resume?from=legacy-pwa&standaloneSignal=${encodeURIComponent(params.standaloneSignal ?? "unknown")}`
+      : params.retry === "pwa-launch"
+        ? "/?pwaLaunch=1"
+        : params.retry === "login"
+          ? "/login"
+          : "/home";
   return (
     <main className="mx-auto flex min-h-[70vh] max-w-lg flex-col items-center justify-center gap-4 px-6 text-center">
       <h1 className="text-2xl font-semibold">
